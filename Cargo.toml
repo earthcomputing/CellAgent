@@ -1,0 +1,6 @@
+[package]
+name = "multicell"
+version = "0.1.0"
+authors = ["alanhkarp <alanhkarp@gmail.com>"]
+
+[dependencies]
