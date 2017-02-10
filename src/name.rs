@@ -33,8 +33,7 @@ impl Name {
 		}
 		l
 	}
-	fn add_component(&self, s: &str) -> Result<Self,NameError> {
-		
+	fn add_component(&self, s: &str) -> Result<Self,NameError> {	
 		let mut n = self.name;
 		let mut s_plus = s.to_string();
 		s_plus.insert(0,SEPARATOR);
@@ -58,7 +57,7 @@ impl Name {
 			}
 		}
 	}
-	fn to_string(&self) -> String {
+	pub fn to_string(&self) -> String {
 		let mut s = String::new();
 		for c in self.name.iter() {
 			if *c == ' ' { break; }
@@ -93,9 +92,12 @@ impl Clone for Name { fn clone(&self) -> Name { *self } }
 impl fmt::Debug for Name {
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result { write!(f, "{}", self.to_string()) }
 }
-#[derive(Copy, Clone, PartialEq, Eq)]
+impl fmt::Display for Name {
+	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result { write!(f, "{}", self.to_string()) }
+}
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub struct CellID { name: Name, }
-impl CellID {
+impl<'a> CellID {
 	pub fn new(n: &str) -> Result<CellID,NameError> { 
 		match Name::new(n) {
 			Ok(name) => Ok(CellID { name: name}),
@@ -108,11 +110,11 @@ impl CellID {
 			Err(e) => Err(e)
 		}
 	}
-	pub fn get_name(&self) -> NAME { self.name.name }
+	pub fn get_name(&self) -> Name { self.name }
 	pub fn to_string(&self) -> String { format!("CellID: {}", self.name.to_string()) }
 }
-impl fmt::Debug for CellID { fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result { self.name.fmt(f) } }
-#[derive(Copy, Clone, PartialEq, Eq, Hash)]
+impl fmt::Display for CellID { fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result { self.name.fmt(f) } }
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
 pub struct TenantID { name: Name, }
 impl TenantID {
 	pub fn new(n: &str) -> Result<TenantID,NameError> { 
@@ -127,11 +129,11 @@ impl TenantID {
 			Err(e) => Err(e)
 		}		
 	}
-	pub fn get_name(&self) -> NAME { self.name.name }
+	pub fn get_name(&self) -> Name { self.name }
 	pub fn to_string(&self) -> String { format!("TenantID: {}", self.name.to_string()) }
 }
-impl fmt::Debug for TenantID { fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result { self.name.fmt(f) } }
-#[derive(Copy, Clone, PartialEq, Eq, Hash)]
+impl fmt::Display for TenantID { fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result { self.name.fmt(f) } }
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
 pub struct PortID { name: Name, }
 impl PortID {
 	pub fn new(n: &str) -> Result<PortID,NameError> { 
@@ -146,10 +148,29 @@ impl PortID {
 			Err(e) => Err(e)
 		}		
 	}
-	pub fn get_name(&self) -> NAME { self.name.name }
+	pub fn get_name(&self) -> Name { self.name }
 	pub fn to_string(&self) -> String { format!("PortID: {}", self.name.to_string()) }
 }
-impl fmt::Debug for PortID { fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result { self.name.fmt(f) } }
+impl fmt::Display for PortID { fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result { self.name.fmt(f) } }
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
+pub struct LinkID { name: Name, }
+impl LinkID {
+	pub fn new(n: &str) -> Result<LinkID,NameError> { 
+		match Name::new(n) {
+			Ok(name) => Ok(LinkID { name: name}),
+			Err(e) => Err(e)
+		}
+	}
+	pub fn add_component(&self, s: &str) -> Result<LinkID,NameError> { 
+		match self.name.add_component(s) {
+			Ok(n) => Ok(LinkID { name: n}),
+			Err(e) => Err(e)
+		}		
+	}
+	pub fn get_name(&self) -> Name { self.name }
+	pub fn to_string(&self) -> String { format!("LinkID: {}", self.name.to_string()) }
+}
+impl fmt::Display for LinkID { fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result { self.name.fmt(f) } }
 
 // Errors
 use std::error::Error;
