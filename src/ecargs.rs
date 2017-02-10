@@ -1,36 +1,59 @@
 use std::fmt;
 use config::MAX_PORTS;
 
+#[derive(Debug)]
 pub struct ECArgs {
-	pub nports: u8,
-	pub ncells: usize,
+	nports: u8,
+	ncells: usize,
+	nlinks: usize,
 }
 impl ECArgs {
-	pub fn get_args(args: Vec<String>)-> Result<ECArgs,ECArgsError> {
+	pub fn new(ncells: usize, nports: u8, nlinks: usize) -> Result<ECArgs,ECArgsError> {
+		if nports < (MAX_PORTS - 1) as u8{
+			Ok(ECArgs { nports: nports as u8, ncells: ncells, nlinks: nlinks })
+		} else {
+			Err(ECArgsError::NumberPorts(NumberPortsError::new(nports as usize)))
+		}	
+	}
+	pub fn get_nports(&self) -> u8 { return self.nports }
+	pub fn get_ncells(&self) -> usize { return self.ncells }
+	pub fn get_nlinks(&self) -> usize { return self.nlinks }
+	pub fn get_args(&self) -> (usize,u8) { (self.ncells, self.nports) } 
+	pub fn args(args: Vec<String>)-> Result<ECArgs,ECArgsError> {
 		if args.len() != 3 { Err(ECArgsError::NumberArgs(NumberArgsError::new(args.len()-1,2))) }
 		else {
 			let nports = match args[1].parse::<i32>() {
 				Ok(n) => Some(n),
-				Err(err) => None
+				Err(_) => None
 			};
 			let ncells = match args[2].parse::<i32>() {
 				Ok(n) => Some(n),
 				Err(_) => None
 			};
-			if nports.is_some() & ncells.is_some() { 
-				let n = nports.unwrap() as usize;
-				if n < MAX_PORTS - 1 {
-					Ok(ECArgs { nports: nports.unwrap() as u8, ncells: ncells.unwrap() as usize })
-				} else {
-					Err(ECArgsError::NumberPorts(NumberPortsError::new(n as usize)))
-				}
-			} else if nports.is_none() {
+			let nlinks = match args[3].parse::<i32>() {
+				Ok(n) => Some(n),
+				Err(_) => None
+			};
+			if nports.is_none() {
 				Err(ECArgsError::ArgType(ArgTypeError::new(&args[1], 1, "i32")))
-			} else {
+			} else if ncells.is_none() {
 				Err(ECArgsError::ArgType(ArgTypeError::new(&args[2], 2, "i32")))
+			} else if nlinks.is_none() {
+				Err(ECArgsError::ArgType(ArgTypeError::new(&args[3], 3, "i32")))
+			} else {
+				Ok(ECArgs { nports: nports.unwrap() as u8, 
+						    ncells: ncells.unwrap() as usize, nlinks: nlinks.unwrap() as usize })
 			}
 		}
 	}
+	pub fn to_string(&self) -> String {
+		let mut s = format!("{} cells, {} ports per cell, {} links", 
+			self.ncells, self.nports, self.nlinks);
+		s
+	}
+}
+impl fmt::Display for ECArgs { 
+	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result { write!(f, "{}", self.to_string()) }
 }
 // Errors
 use std::error::Error;
@@ -88,7 +111,7 @@ impl From<NumberArgsError> for ECArgsError {
 pub struct ArgTypeError { msg: String }
 impl ArgTypeError { 
 	pub fn new(v: &str, n: usize, needed: &str) -> ArgTypeError {
-		ArgTypeError { msg: format!("You entered {} for arg {}, but a {} is required", v, n, needed) }
+		ArgTypeError { msg: format!("You entered {} for arg {}, but {} is required", v, n, needed) }
 	}
 }
 impl Error for ArgTypeError {

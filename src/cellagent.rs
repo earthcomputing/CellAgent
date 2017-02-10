@@ -1,4 +1,4 @@
-
+#[derive(Debug, Clone)]
 pub struct CellAgent {
 	//routing_table: RoutingTable,
 	//traphs: Vec<Traph>,
