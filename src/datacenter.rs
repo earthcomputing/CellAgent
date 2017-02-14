@@ -4,47 +4,31 @@ use link::{Link,LinkError};
 use noc::NOC;
 
 #[derive(Debug,Clone)]
-pub struct Datacenter<'a> {
+pub struct Datacenter<'b> {
 	cells: Vec<NalCell>,
-	links: Vec<Link<'a>>,
+	links: Vec<Link<'b>>,
 	noc: Option<NOC>
 }
-impl<'a> Datacenter<'a> {
-	pub fn new() -> Datacenter<'a> {
-		Datacenter { cells: Vec::new(), links: Vec::new(), noc: None, }
-	}
-	pub fn build(&'a mut self, ncells: usize, nports: u8, edge_list: Vec<(usize,usize)>) -> Result<(),DatacenterError> {
-		try!(self.build_cells(ncells, nports));
-		try!(self.connect_edges(edge_list));
-		Ok(()) 
-	}
-	fn build_cells(&mut self, ncells: usize, nports: u8) -> Result<&Vec<NalCell>,DatacenterError>{
+impl<'b> Datacenter<'b> {
+	pub fn new(cells: &'b mut Vec<NalCell>, ncells: usize, nports: u8, edge_list: Vec<(usize,usize)>) -> Result<Datacenter<'b>,DatacenterError> {
+		//let mut cells = Vec::new();
 		for i in 0..ncells {
 			let mut is_border = false;
 			if i % 3 == 1 { is_border = true; }
-			let id = format!("C:{}",i);
-			let cell = try!(NalCell::new(&id, i, nports, is_border));
-			self.cells.push(cell);
+			cells.push(try!(NalCell::new(i, nports, is_border))); 
 		}	
-		Ok((&self.cells))	
-	}
-	fn connect_edges(&'a mut self, edge_list: Vec<(usize,usize)>) -> Result<&Vec<Link>,DatacenterError> {
+		let mut links: Vec<Link> = Vec::new();
 		for edge in edge_list {
 			if edge.0 == edge.1 { return Err(DatacenterError::Wire(WireError::new(edge))); }
-			let p1 = match self.cells[edge.0].get_free_port() {
-				Ok(p) => p,
-				Err(err) => return Err(DatacenterError::Cell(err))
-			};
-			let p2 = try!(self.cells[edge.1].get_free_port());
-			let id = try!(p1.get_id().add_component(&p2.get_id().get_name().to_string()));
-			let link = try!(Link::new(&id.get_name().to_string(),&p1,&p2));
-			self.links.push(link);
+			let p1 = try!(cells[edge.0].get_free_port()); 
+			let p2 = try!(cells[edge.1].get_free_port());
+			links.push(try!(Link::new(p1,p2)));
 		} 
-		Ok(&self.links)		
+		Ok(Datacenter { cells: cells.clone(), links: links, noc: None })
 	}
-	pub fn add_noc(&mut self, control: NalCell, backup: NalCell) {
-		self.noc = Some(NOC::new(control, backup));
-	}
+	//pub fn add_noc(&mut self, control: &'b NalCell, backup: &'b NalCell) {
+	//	self.noc = Some(NOC::new(control, backup));
+	//}
 	pub fn to_string(&self) -> String {
 		let mut s = format!("Cells");
 		for i in 0..self.cells.len() {
@@ -57,7 +41,7 @@ impl<'a> Datacenter<'a> {
 		s
 	}
 }
-impl<'a> fmt::Display for Datacenter<'a> { 
+impl<'b> fmt::Display for Datacenter<'b> { 
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result { write!(f, "{}", self.to_string()) }
 }
 // Errors

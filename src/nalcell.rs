@@ -1,8 +1,10 @@
 use std::fmt;
+use std::marker::PhantomData;
 use config::MAX_PORTS;
 use name::{CellID};
 use port::{Port};
 use vm::VirtualMachine;
+use packet::PacketEngine;
 
 use cellagent::{CellAgent};
 
@@ -13,21 +15,24 @@ pub struct NalCell {
 	is_border: bool,
 	ports: Vec<Port>,
 	cell_agent: CellAgent,
+	packet_engine: PacketEngine,
 	vms: Vec<VirtualMachine>,
+//	_marker: PhantomData<&'a T>
 }
 impl NalCell {
-	pub fn new(id: &str, cell_no: usize, nports: u8, is_border: bool) -> Result<NalCell,NalCellError> {
+	pub fn new(cell_no: usize, nports: u8, is_border: bool) -> Result<NalCell,NalCellError> {
+		let id = &format!("C:{}", cell_no);
 		let cell_id = try!(CellID::new(id));
 		let mut ports = Vec::new();
 		let mut is_border_port;
 		for i in 0..nports + 1 {
 			if is_border & (i == 2) { is_border_port = true; }
 			else                    { is_border_port = false; }
-			ports.push(try!(Port::new(cell_id, i as u8, is_border_port)));
+			ports.push(try!(Port::new(&cell_id, i as u8, is_border_port)));
 		}
 		ports[0].set_connected();
 		Ok(NalCell { id: cell_id, cell_no: cell_no, ports: ports, is_border: is_border,
-				cell_agent: CellAgent::new(), vms: Vec::new() })
+				cell_agent: CellAgent::new(), vms: Vec::new(), packet_engine: PacketEngine{}, })
 	}
 	pub fn get_id(&self) -> CellID { self.id }
 	pub fn get_cell_no(&self) -> usize { self.cell_no }
