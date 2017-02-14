@@ -9,8 +9,9 @@ pub struct Link<'a> {
 	ports: (&'a Port,&'a Port),
 }
 impl<'a> Link<'a> {
-	pub fn new(id: &str, left: &'a Port, right: &'a Port) -> Result<Link<'a>,LinkError> {
-		let id = try!(LinkID::new(id));
+	pub fn new(left: &'a Port, right: &'a Port) -> Result<Link<'a>,LinkError> {
+		let id = try!(left.get_id().add_component(&right.get_id().get_name().to_string()));
+		let id = try!(LinkID::new(&id.get_name().to_string()));
 		left.set_connected();
 		right.set_connected();
 		Ok(Link { id: id, ports: (left,right), is_connected: true })

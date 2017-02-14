@@ -6,6 +6,7 @@ mod link;
 mod nalcell;
 mod name;
 mod noc;
+mod packet;
 mod port;
 mod tenant;
 mod utility;
@@ -52,13 +53,14 @@ fn main() {
 			} 
 		}
 	}
-	test_mut(); // Trying to figure out an issue with mutability
+	//test_mut(); // Trying to figure out an issue with mutability
 }
-fn build_datacenter<'a>(nports: u8, ncells: usize) -> Result<(),Box<Error>>{
+fn build_datacenter(nports: u8, ncells: usize) -> Result<(),Box<Error>>{
 	let edges = vec![(0,1),(1,2),(2,3),(3,4),(5,6),(6,7),(7,8),(8,9),(0,5),(1,6),(2,7),(3,8),(4,9)];
-	let mut dc = Datacenter::new();
-	try!(dc.build(ncells, nports, edges));
-	//println!("{}",dc);
+	let mut cells = Vec::new();
+	let mut dc = try!(Datacenter::new(&mut cells, ncells, nports, edges));
+	//try!(dc.build(ncells, nports, edges));
+	println!("{}",dc);
 	Ok(())
 }
 // Test mutability
