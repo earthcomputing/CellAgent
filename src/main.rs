@@ -60,8 +60,7 @@ fn main() {
 }
 fn build_datacenter(nports: u8, ncells: usize) -> Result<(),Box<Error>>{
 	let edges = vec![(0,1),(1,2),(2,3),(3,4),(5,6),(6,7),(7,8),(8,9),(0,5),(1,6),(2,7),(3,8),(4,9)];
-	let mut cells = Vec::new();
-	let mut dc = try!(Datacenter::new(&mut cells, ncells, nports, edges));
+	let mut dc = try!(Datacenter::new(ncells, nports, edges));
 	//try!(dc.build(ncells, nports, edges));
 	println!("{}",dc);
 	Ok(())
