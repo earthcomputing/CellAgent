@@ -3,14 +3,15 @@
 use std::fmt;
 use std::hash::{Hash,Hasher};
 use config::MAX_NAME_SIZE;
+use utility::chars_to_string;
 
 const SEPARATOR: char = '+';
 type NAME = [char; MAX_NAME_SIZE];
 // Names may not contain blanks
 #[derive(Copy)]
-struct Name { name: NAME }
+pub struct Name { name: NAME }
 impl Name {
-	fn new(n: &str) -> Result<Name,NameError> {
+	pub fn new(n: &str) -> Result<Name,NameError> {
 		let mut name = [' '; MAX_NAME_SIZE];
 		match n.find(' ') {
 			Some(_) => { Err(NameError::Format(FormatError::new(n)) ) },
@@ -57,14 +58,7 @@ impl Name {
 			}
 		}
 	}
-	pub fn to_string(&self) -> String {
-		let mut s = String::new();
-		for c in self.name.iter() {
-			if *c == ' ' { break; }
-			s.push(*c);
-		}
-		s
-	}
+	pub fn to_string(&self) -> String { chars_to_string(&self.name) }
 }
 impl PartialEq for Name {
 	fn eq(&self, other: &Name) -> bool { 
@@ -114,6 +108,25 @@ impl<'a> CellID {
 	pub fn to_string(&self) -> String { format!("CellID: {}", self.name.to_string()) }
 }
 impl fmt::Display for CellID { fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result { self.name.fmt(f) } }
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
+pub struct TreeID { name: Name, }
+impl<'a> TreeID {
+	pub fn new(n: &str) -> Result<TreeID,NameError> { 
+		match Name::new(n) {
+			Ok(name) => Ok(TreeID { name: name}),
+			Err(e) => Err(e)
+		}
+	}
+	pub fn add_component(&self, s: &str) -> Result<TreeID,NameError> { 
+		match self.name.add_component(s) {
+			Ok(n) => Ok(TreeID { name: n}),
+			Err(e) => Err(e)
+		}
+	}
+	pub fn get_name(&self) -> Name { self.name }
+	pub fn to_string(&self) -> String { format!("TreeID: {}", self.name.to_string()) }
+}
+impl fmt::Display for TreeID { fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result { self.name.fmt(f) } }
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
 pub struct TenantID { name: Name, }
 impl TenantID {
@@ -201,6 +214,9 @@ impl fmt::Display for NameError {
 		}
 	}
 }
+impl From<SizeError> for NameError {
+	fn from(err: SizeError) -> NameError { NameError::Size(err) }
+}
 #[derive(Debug)]
 pub struct FormatError { msg: String }
 impl FormatError {
@@ -235,7 +251,4 @@ impl fmt::Display for SizeError {
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result { 
 		write!(f, "'{}", self.msg) 
 	}
-}
-impl From<SizeError> for NameError {
-	fn from(err: SizeError) -> NameError { NameError::Size(err) }
 }

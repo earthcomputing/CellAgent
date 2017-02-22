@@ -1,32 +1,39 @@
 use std::fmt;
-use std::cell::Cell;
+use std::sync::mpsc;
+use link::{Sender, Receiver};
 use name::{NameError,PortID,CellID};
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct Port {
 	id: PortID,
 	port_no: u8,
 	is_border: bool,
-	is_connected: Cell<bool>,
+	is_connected: bool,
 	is_broken: bool,
+	send: Option<Sender>,
+	recv: Option<Receiver>,
 }
 impl Port {
 	pub fn new(cell_id: &CellID, port_no: u8, is_border: bool) -> Result<Port,NameError>{
 		let port_label = format!("P:{}", port_no);
 		let temp_id = try!(cell_id.add_component(&port_label));
 		let port_id = try!(PortID::new(&temp_id.get_name().to_string()));
-		let is_connected = Cell::new(false);
-		Ok(Port{ id: port_id, port_no: port_no, 
+		let is_connected = false;
+		Ok(Port{ id: port_id, port_no: port_no, send: None, recv: None,
 				 is_border: is_border, is_connected: is_connected, is_broken: false })
 	}
 	pub fn get_id(&self) -> PortID { self.id }
 	pub fn get_port_no(&self) -> u8 { self.port_no }
-	pub fn is_connected(&self) -> bool { self.is_connected.get() }
+	pub fn is_connected(&self) -> bool { self.is_connected }
 	pub fn is_broken(&self) -> bool { self.is_broken }
 	pub fn is_border(&self) -> bool { self.is_border }
-	pub fn set_connected(&self) { self.is_connected.set(true) }
+	pub fn set_connected(&mut self, send: Option<Sender>, recv: Option<Receiver>) { 
+		self.is_connected = true; 
+		self.send = send;
+		self.recv = recv;
+	}
 	pub fn to_string(&self) -> String {
-		let is_connected = self.is_connected.get();
+		let is_connected = self.is_connected;
 		let mut s = format!("Port {} {}", self.port_no, self.id);
 		if self.is_border { s = s + " is TCP  port,"; }
 		else              { s = s + " is ECLP port,"; }
