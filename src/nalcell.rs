@@ -80,9 +80,9 @@ impl Error for NalCellError {
 impl fmt::Display for NalCellError {
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
 		match *self {
-			NalCellError::NoFreePort(ref err) => write!(f, "NalCell NoFreePort Error: {}", err),
-			NalCellError::Name(_) => write!(f, "NalCell Name Error caused by"),
-			NalCellError::CellAgent(_) => write!(f, "NalCell Cell Agent Error caused by"),
+			NalCellError::NoFreePort(ref err) => write!(f, "NalCell NoFreePort Error caused by {}", err),
+			NalCellError::Name(ref err) => write!(f, "NalCell Name Error caused by {}", err),
+			NalCellError::CellAgent(ref err) => write!(f, "NalCell Cell Agent Error caused by {}", err),
 		}
 	}
 }

@@ -11,12 +11,14 @@ pub struct Datacenter<'b> {
 	noc: Option<NOC<'b>>
 }
 impl<'b> Datacenter<'b> {
-	pub fn new(cells: &'b mut Vec<NalCell>, ncells: usize, nports: u8, edge_list: Vec<(usize,usize)>) -> Result<Datacenter<'b>,DatacenterError> {
+	pub fn new(ncells: usize, nports: u8, edge_list: Vec<(usize,usize)>) -> Result<Datacenter<'b>,DatacenterError> {
 		if ncells < 2  {
-			return Err(DatacenterError::Size(SizeError::new(format!("{} is not enough cells.",ncells))));
+			println!("ncells {}", ncells);
+			//return Err(DatacenterError::Size(SizeError::new(format!("{} is not enough cells.",ncells))));
 		}
 		if edge_list.len() < ncells {
-			return Err(DatacenterError::Size(SizeError::new(format!("{} is not enough links.",edge_list.len()))));			
+			println!("nlinks {}", edge_list.len());
+			//return Err(DatacenterError::Size(SizeError::new(format!("{} is not enough links.",edge_list.len()))));			
 		}
 		let mut cells = Vec::new();
 		for i in 0..ncells {
@@ -28,9 +30,9 @@ impl<'b> Datacenter<'b> {
 		for edge in edge_list {
 			if edge.0 == edge.1 { return Err(DatacenterError::Wire(WireError::new(edge))); }
 			let split;
-			if edge.0 == cells.len() - 1 { 
+			if (edge.0 == 0) | (edge.0 == cells.len() - 1) { 
 				split = cells.split_at_mut(edge.1)
-			} else {
+			} else  {
 				split = cells.split_at_mut(edge.0)
 			};
 			let mut cell = match split.0.last_mut() {
