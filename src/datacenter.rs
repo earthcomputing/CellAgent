@@ -6,24 +6,43 @@ use noc::NOC;
 
 #[derive(Debug)]
 pub struct Datacenter<'b> {
-	cells: Vec<RefCell<NalCell>>,
+	cells: Vec<NalCell>,
 	links: Vec<Link>,
 	noc: Option<NOC<'b>>
 }
 impl<'b> Datacenter<'b> {
 	pub fn new(cells: &'b mut Vec<NalCell>, ncells: usize, nports: u8, edge_list: Vec<(usize,usize)>) -> Result<Datacenter<'b>,DatacenterError> {
+		if ncells < 2  {
+			return Err(DatacenterError::Size(SizeError::new(format!("{} is not enough cells.",ncells))));
+		}
+		if edge_list.len() < ncells {
+			return Err(DatacenterError::Size(SizeError::new(format!("{} is not enough links.",edge_list.len()))));			
+		}
 		let mut cells = Vec::new();
 		for i in 0..ncells {
 			let mut is_border = false;
 			if i % 3 == 1 { is_border = true; }
-			cells.push(RefCell::new(try!(NalCell::new(i, nports, is_border)))); 
+			cells.push(try!(NalCell::new(i, nports, is_border))); 
 		}	
 		let mut links: Vec<Link> = Vec::new();
 		for edge in edge_list {
 			if edge.0 == edge.1 { return Err(DatacenterError::Wire(WireError::new(edge))); }
-			let mut cell = try!(cells[edge.0].try_borrow_mut());
+			let split;
+			if edge.0 == cells.len() - 1 { 
+				split = cells.split_at_mut(edge.1)
+			} else {
+				split = cells.split_at_mut(edge.0)
+			};
+			let mut cell = match split.0.last_mut() {
+				Some(c) => c,
+				None => return Err(DatacenterError::Size(SizeError::new("Problem splitting cells array".to_string())))
+
+			};
 			let p1 = try!(cell.get_free_port_mut());
-			let mut cell = try!(cells[edge.1].try_borrow_mut());
+			let mut cell = match split.1.first_mut() {
+				Some(c) => c,
+				None => return Err(DatacenterError::Size(SizeError::new("Problem splitting cells array".to_string())))
+			};
 			let p2 = try!(cell.get_free_port_mut());
 			links.push(try!(Link::new(p1,p2)));
 		} 
@@ -34,14 +53,8 @@ impl<'b> Datacenter<'b> {
 	}
 	pub fn to_string(&self) -> String {
 		let mut s = format!("Cells");
-		for i in 0..self.cells.len() {
-			// let cell = try!(self.cells[i].try_borrow()); Doesn't compile
-			let cell = match self.cells[i].try_borrow() {
-				Ok(cell) => cell,
-				Err(err) => panic!("error")
-			};
-			
-			if i < 3 { s = s + &format!("\n {}", *cell); }
+		for i in 0..self.cells.len() {			
+			if i < 3 { s = s + &format!("\n {}", self.cells[i]); }
 		}
 		s = s + "\nLinks";
 		for l in &self.links {
@@ -62,8 +75,7 @@ pub enum DatacenterError {
 	Link(LinkError),
 	Cell(NalCellError),
 	Wire(WireError),
-	Borrow(BorrowError),
-	BorrowMut(BorrowMutError)
+	Size(SizeError),
 }
 impl Error for DatacenterError {
 	fn description(&self) -> &str {
@@ -72,8 +84,7 @@ impl Error for DatacenterError {
 			DatacenterError::Link(ref err) => err.description(),
 			DatacenterError::Cell(ref err) => err.description(),
 			DatacenterError::Wire(ref err) => err.description(),
-			DatacenterError::Borrow(ref err) => err.description(),
-			DatacenterError::BorrowMut(ref err) => err.description(),
+			DatacenterError::Size(ref err) => err.description(),
 		}
 	}
 	fn cause(&self) -> Option<&Error> {
@@ -82,8 +93,7 @@ impl Error for DatacenterError {
 			DatacenterError::Link(ref err) => Some(err),
 			DatacenterError::Cell(ref err) => Some(err),
 			DatacenterError::Wire(ref err) => Some(err),
-			DatacenterError::Borrow(ref err) => Some(err),
-			DatacenterError::BorrowMut(ref err) => Some(err),
+			DatacenterError::Size(ref err) => Some(err),
 		}
 	}
 }
@@ -94,8 +104,7 @@ impl fmt::Display for DatacenterError {
 			DatacenterError::Link(_) => write!(f, "Link Error caused by"),
 			DatacenterError::Cell(_) => write!(f, "Cell Error caused by"),
 			DatacenterError::Wire(_) => write!(f, "Wire Error caused by"),
-			DatacenterError::Borrow(_) => write!(f, "RefCell Error caused by"),
-			DatacenterError::BorrowMut(_) => write!(f, "RefCell Error caused by"),
+			DatacenterError::Size(_) => write!(f, "Size Error caused by"),
 		}
 	}
 }
@@ -115,6 +124,28 @@ impl fmt::Display for WireError {
 		write!(f, "{}", self.msg)
 	}
 }
+impl From<WireError> for DatacenterError {
+	fn from(err: WireError) -> DatacenterError { DatacenterError::Wire(err) }
+}
+#[derive(Debug)]
+pub struct SizeError { msg: String }
+impl SizeError { 
+	pub fn new(msg: String) -> SizeError {
+		SizeError { msg: msg }
+	}
+}
+impl Error for SizeError {
+	fn description(&self) -> &str { &self.msg }
+	fn cause(&self) -> Option<&Error> { None }
+}
+impl fmt::Display for SizeError {
+	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+		write!(f, "{}", self.msg)
+	}
+}
+impl From<SizeError> for DatacenterError {
+	fn from(err: SizeError) -> DatacenterError { DatacenterError::Size(err) }
+}
 impl From<NameError> for DatacenterError {
 	fn from(err: NameError) -> DatacenterError { DatacenterError::Name(err) }
 }
@@ -123,13 +154,4 @@ impl From<LinkError> for DatacenterError {
 }
 impl From<NalCellError> for DatacenterError {
 	fn from(err: NalCellError) -> DatacenterError { DatacenterError::Cell(err) }
-}
-impl From<WireError> for DatacenterError {
-	fn from(err: WireError) -> DatacenterError { DatacenterError::Wire(err) }
-}
-impl From<BorrowError> for DatacenterError {
-	fn from(err: BorrowError) -> DatacenterError { DatacenterError::Borrow(err) }
-}
-impl From<BorrowMutError> for DatacenterError {
-	fn from(err: BorrowMutError) -> DatacenterError { DatacenterError::BorrowMut(err) }
 }
