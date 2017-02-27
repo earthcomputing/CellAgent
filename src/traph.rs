@@ -21,7 +21,7 @@ enum TraphStatus {
 	Pruned
 }
 
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Clone)]
 struct TraphElement {
 	port_id: PortID,
 	is_connected: bool,

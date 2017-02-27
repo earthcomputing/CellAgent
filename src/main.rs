@@ -81,12 +81,6 @@ fn f2(dc: &mut Test) { println!("f2: {:?}", dc); }
 // Other tests
 fn tests() -> Result<(),Box<Error>> {
 	let cell_id = try!(CellID::new(42));
-	let cell_id2 = try!(CellID::new(17)); 
-	let cell_id_clone = cell_id.clone();
-	let x = cell_id;
-	println!("Main: cell_id {:?} {:?} {:?} {:?}", cell_id, cell_id == cell_id_clone, 
-		x == cell_id, cell_id == cell_id2);
-	let y = cell_id.get_name().to_string() + "bar";
 	let mut base_tenant = try!(Tenant::new("Base", 100, None));
 	println!("Main: {:?}", base_tenant);
 	let mut sub_tenant = try!(base_tenant.create_subtenant("A", 75));

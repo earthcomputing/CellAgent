@@ -6,7 +6,7 @@ use name::{Name, TenantID};
 
 #[derive(Clone)]
 pub struct Tenant { 
-	name: TenantID, 
+	id: TenantID, 
 	ncells: usize, 
 	children: HashMap<TenantID,Box<Tenant>>,
 }
@@ -18,11 +18,11 @@ impl Tenant {
 			None => TenantID::new(id)
 		}; 
 		match name {
-			Ok(name) => Ok(Tenant { name: name, ncells: n, children: HashMap::new(), }),
+			Ok(name) => Ok(Tenant { id: name, ncells: n, children: HashMap::new(), }),
 			Err(err) => Err(TenantError::from(err))
 		}
 	}
-	pub fn get_name(&self) -> TenantID { self.name }
+	pub fn get_id(&self) -> TenantID { self.id.clone() }
 	pub fn get_ncells(&self) -> usize { self.ncells }
 	//pub fn get_size(&self) -> usize { self.ncells }
 	pub fn get_children(&self) -> &HashMap<TenantID,Box<Tenant>> { &self.children }
@@ -36,11 +36,11 @@ impl Tenant {
 		if self.ncells < n {
 			Err(TenantError::Quota(QuotaError::new(n, self.ncells) ))
 		} else {
-			let tenant = Tenant::new(id, n, Some(self.get_name()));
+			let tenant = Tenant::new(id, n, Some(self.get_id()));
 			match tenant {	
 				Ok(t) => {
-					if !self.children.contains_key(&t.get_name()) {
-						self.children.insert(t.get_name(),Box::new(t.clone()));
+					if !self.children.contains_key(&t.get_id()) {
+						self.children.insert(t.get_id(),Box::new(t.clone()));
 						Ok(t)	
 					} else { 
 						Err(TenantError::DuplicateName(DuplicateNameError::new(id) )) 
@@ -52,7 +52,7 @@ impl Tenant {
 	}
 	pub fn to_string(&self) -> String {
 		let mut s = "Tenant: ".to_string();
-		s = s + &format!("{:?} {} cells", self.name, self.ncells);
+		s = s + &format!("{:?} {} cells", self.id, self.ncells);
 		s
 	}
 }

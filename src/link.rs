@@ -19,8 +19,8 @@ pub struct Link {
 }
 impl Link {
 	pub fn new(left: &mut Port, rite: &mut Port) -> Result<Link,LinkError> {
-		let temp_id = try!(left.get_id().add_component(rite.get_id().get_name()));
-		let id = try!(LinkID::new(temp_id.get_name()));
+		let temp_id = try!(left.get_id().add_component(&rite.get_id().get_name()));
+		let id = try!(LinkID::new(&temp_id.get_name()));
 		let (left_send, left_port_recv) = channel();
 		let (rite_send, rite_port_recv) = channel();
 		let (left_port_send, left_recv)  = channel();
