@@ -1,9 +1,10 @@
 use std::fmt;
+use std::hash::{Hash,Hasher};
 use std::collections::HashMap;
 use std::error::Error;
-use name::{TenantID};
+use name::{Name, TenantID};
 
-#[derive(Clone, PartialEq)]
+#[derive(Clone)]
 pub struct Tenant { 
 	name: TenantID, 
 	ncells: usize, 
@@ -11,9 +12,9 @@ pub struct Tenant {
 }
 
 impl Tenant {
-	pub fn new(id: &str, n: usize, parent_id: Option<TenantID>) -> Result<Tenant,TenantError> {
+	pub fn new(id: &'static str, n: usize, parent_id: Option<TenantID>) -> Result<Tenant,TenantError> {
 		let name = match parent_id {
-			Some(p) => p.add_component(id),
+			Some(p) => Ok(try!(p.add_component(id))),
 			None => TenantID::new(id)
 		}; 
 		match name {
@@ -31,7 +32,7 @@ impl Tenant {
 	pub fn get_mut_subtenant(&mut self, id: TenantID) -> Option<&mut Box<Tenant>> {
 		self.children.get_mut(&id)
 	}
-	pub fn create_subtenant(&mut self, id: &str, n:usize) -> Result<Tenant,TenantError> {
+	pub fn create_subtenant(&mut self, id: &'static str, n:usize) -> Result<Tenant,TenantError> {
 		if self.ncells < n {
 			Err(TenantError::Quota(QuotaError::new(n, self.ncells) ))
 		} else {

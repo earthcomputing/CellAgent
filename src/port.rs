@@ -1,7 +1,7 @@
 use std::fmt;
 use std::sync::mpsc;
 use link::{Sender, Receiver};
-use name::{NameError,PortID,CellID};
+use name::{Name, NameError,PortID,CellID};
 
 #[derive(Debug)]
 pub struct Port {
@@ -15,9 +15,8 @@ pub struct Port {
 }
 impl Port {
 	pub fn new(cell_id: &CellID, port_no: u8, is_border: bool) -> Result<Port,NameError>{
-		let port_label = format!("P:{}", port_no);
-		let temp_id = try!(cell_id.add_component(&port_label));
-		let port_id = try!(PortID::new(&temp_id.get_name().to_string()));
+		let port_id = try!(PortID::new(port_no));
+		let temp_id = try!(port_id.add_component(cell_id.get_name()));
 		let is_connected = false;
 		Ok(Port{ id: port_id, port_no: port_no, send: None, recv: None,
 				 is_border: is_border, is_connected: is_connected, is_broken: false })
