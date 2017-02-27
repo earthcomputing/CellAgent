@@ -1,135 +1,96 @@
 use std::fmt;
+use std::marker::Sized;
 use config::SEPARATOR;
 // Using String means names are not Copy
 type NAME = String;
-// Names may not contain blanks
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub struct Name { name: NAME }
-impl Name {
-	pub fn new(n: &str) -> Result<Name,NameError> {
-		match n.find(' ') {
-			Some(_) => { Err(NameError::Format(FormatError::new(n)) ) },
-			None => Ok(Name { name: n.to_string(), })
-		}		
+pub trait Name: Sized {
+	fn get_name(&self) -> &str;
+	fn create_from_string(&self, n: String) -> Self;
+	// Default implementations
+	fn to_string(&self) -> String { self.get_name().to_string() }
+	fn from_str(&self, s: &str) -> Result<Self,NameError> {
+		// Names may not contain blanks
+		match s.find(' ') {
+			Some(_) => Err(NameError::Format(FormatError::new(s))),
+			None => Ok(self.create_from_string(s.to_string()) )
+		}
 	}
-	fn get_name(&self) -> String { self.name.clone() }
 	fn add_component(&self, s: &str) -> Result<Self,NameError> {	
 		match s.find(' ') {
 			Some(_) => Err(NameError::Format( FormatError::new(s) )),
-			None => Ok(Name { name: [self.name.clone(),s.to_string()].join(SEPARATOR) })
+			None => self.from_str(&([self.get_name(),s].join(SEPARATOR)))
 		}
-	}	
-	pub fn to_string(&self) -> String { self.name.clone() }
-}
-// From http://stackoverflow.com/questions/23975391/how-to-convert-string-into-static-str
-use std::mem;
-impl Name {
-	fn string_to_static_str(s: String) -> &'static str {
-	    unsafe {
-	        let ret = mem::transmute(&s as &str);
-	        mem::forget(s);
-	        ret
-	    }
-	}
-}
-impl fmt::Display for Name {
-	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result { write!(f, "{}", self.to_string()) }
+	}		
 }
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub struct CellID { name: Name, }
+pub struct CellID { name: NAME, }
 impl<'a> CellID {
 	pub fn new(n: usize) -> Result<CellID,NameError> { 
-		let n = Name::string_to_static_str(format!("C:{}",n));
-		match Name::new(n) {
-			Ok(name) => Ok(CellID { name: name}),
-			Err(e) => Err(e)
-		}
+		let n = format!("C:{}",n);
+		Ok(CellID { name: n})
 	}
-	pub fn add_component(&self, s: &str) -> Result<CellID,NameError> { 
-		match self.name.add_component(s) {
-			Ok(n) => Ok(CellID { name: n}),
-			Err(e) => Err(e)
-		}
-	}
-	pub fn get_name(&self) -> String { self.name.name.clone() }
-	pub fn to_string(&self) -> String { format!("CellID: {}", self.name.to_string()) }
+}
+impl Name for CellID {
+	fn get_name(&self) -> &str { &self.name }
+	fn create_from_string(&self, n: String) -> CellID { CellID { name: n } }	
 }
 impl fmt::Display for CellID { fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result { self.name.fmt(f) } }
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub struct TreeID { name: Name, }
-impl<'a> TreeID {
-	pub fn new(n: &str) -> Result<TreeID,NameError> { 
-		match Name::new(n) {
-			Ok(name) => Ok(TreeID { name: name}),
-			Err(e) => Err(e)
-		}
-	}
-	pub fn add_component(&self, s: &str) -> Result<TreeID,NameError> { 
-		match self.name.add_component(s) {
-			Ok(n) => Ok(TreeID { name: n}),
-			Err(e) => Err(e)
-		}
-	}
-	pub fn get_name(&self) -> String { self.name.name.clone() }
-	pub fn to_string(&self) -> String { format!("TreeID: {}", self.name.to_string()) }
-}
-impl fmt::Display for TreeID { fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result { self.name.fmt(f) } }
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub struct TenantID { name: Name, }
-impl TenantID {
-	pub fn new(n: &str) -> Result<TenantID,NameError> { 
-		match Name::new(n) {
-			Ok(name) => Ok(TenantID { name: name}),
-			Err(e) => Err(e)
-		}
-	}
-	pub fn add_component(&self, s: &str) -> Result<TenantID,NameError> { 
-		match self.name.add_component(s) {
-			Ok(n) => Ok(TenantID { name: n}),
-			Err(e) => Err(e)
-		}		
-	}
-	pub fn get_name(&self) -> String { self.name.name.clone() }
-	pub fn to_string(&self) -> String { format!("TenantID: {}", self.name.to_string()) }
-}
-impl fmt::Display for TenantID { fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result { self.name.fmt(f) } }
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub struct PortID { name: Name, }
+pub struct PortID { name: NAME, }
 impl PortID {
 	pub fn new(n: u8) -> Result<PortID,NameError> { 
-		let n = Name::string_to_static_str(format!("P:{}",n));
-		match Name::new(n) {
-			Ok(name) => Ok(PortID { name: name}),
-			Err(e) => Err(e)
-		}
+		let n = format!("P:{}",n);
+		Ok(PortID { name: n })
 	}
-	pub fn add_component(&self, s: &str) -> Result<PortID,NameError> { 
-		match self.name.add_component(s) {
-			Ok(n) => Ok(PortID { name: n}),
-			Err(e) => Err(e)
-		}		
-	}
-	pub fn get_name(&self) -> String { self.name.name.clone() }
-	pub fn to_string(&self) -> String { format!("PortID: {}", self.name.to_string()) }
+}
+impl Name for PortID {
+	fn get_name(&self) -> &str { &self.name }
+	fn create_from_string(&self, n: String) -> PortID { PortID { name: n } }
 }
 impl fmt::Display for PortID { fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result { self.name.fmt(f) } }
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub struct LinkID { name: Name, }
-impl LinkID {
-	pub fn new(n: &str) -> Result<LinkID,NameError> { 
-		match Name::new(n) {
-			Ok(name) => Ok(LinkID { name: name}),
-			Err(e) => Err(e)
+pub struct TreeID { name: NAME, }
+impl<'a> TreeID {
+	pub fn new(n: &str) -> Result<TreeID,NameError> { 
+		match n.find(' ') {
+			None => Ok(TreeID { name: n.to_string()}),
+			Some(_) => Err(NameError::Format(FormatError::new(n)))
 		}
 	}
-	pub fn add_component(&self, s: &str) -> Result<LinkID,NameError> { 
-		match self.name.add_component(s) {
-			Ok(n) => Ok(LinkID { name: n}),
-			Err(e) => Err(e)
-		}		
+}
+impl Name for TreeID {
+	fn get_name(&self) -> &str { &self.name }
+	fn create_from_string(&self, n: String) -> TreeID { TreeID { name: n } }
+}
+impl fmt::Display for TreeID { fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result { self.name.fmt(f) } }
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct TenantID { name: NAME, }
+impl TenantID {
+	pub fn new(n: &str) -> Result<TenantID,NameError> { 
+		match n.find(' ') {
+			None => Ok(TenantID { name: n.to_string()}),
+			Some(i) => Err(NameError::Format(FormatError::new(n)) )
+		}
 	}
-	pub fn get_name(&self) -> String { self.name.name.clone() }
-	pub fn to_string(&self) -> String { format!("LinkID: {}", self.name.to_string()) }
+}
+impl Name for TenantID {
+	fn get_name(&self) -> &str { &self.name }
+	fn create_from_string(&self, n: String) -> TenantID { TenantID { name: n } }
+}
+impl fmt::Display for TenantID { fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result { self.name.fmt(f) } }
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct LinkID { name: NAME, }
+impl LinkID {
+	pub fn new(n: &str) -> Result<LinkID,NameError> { 
+		match n.find(' ') {
+			None => Ok(LinkID { name: n.to_string(), }),
+			Some(_) => Err(NameError::Format(FormatError::new(n)) )
+		}
+	}
+}
+impl Name for LinkID {
+	fn get_name(&self) -> &str { &self.name }
+	fn create_from_string(&self, n: String) -> LinkID { LinkID { name: n } }
 }
 impl fmt::Display for LinkID { fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result { self.name.fmt(f) } }
 

@@ -2,7 +2,7 @@ use std::fmt;
 use std::hash::{Hash,Hasher};
 use std::collections::HashMap;
 use std::error::Error;
-use name::{Name, TenantID};
+use name::{Name,TenantID};
 
 #[derive(Clone)]
 pub struct Tenant { 
