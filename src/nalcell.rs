@@ -25,18 +25,18 @@ impl NalCell {
 			ports.push(try!(Port::new(&cell_id, i as u8, is_border_port)));
 		}
 		ports[0].set_connected(None, None);
-		let cell_agent = try!(CellAgent::new(cell_id));
+		let cell_agent = try!(CellAgent::new(cell_id.clone()));
 		Ok(NalCell { id: cell_id, cell_no: cell_no, ports: ports, is_border: is_border,
 				cell_agent: cell_agent, vms: Vec::new(), })
 	}
-	pub fn get_id(&self) -> CellID { self.id }
+	pub fn get_id(&self) -> CellID { self.id.clone() }
 	pub fn get_cell_no(&self) -> usize { self.cell_no }
 	pub fn get_port(&mut self, index: u8) -> &mut Port { &mut self.ports[index as usize] }
 	pub fn get_free_port_mut (&mut self) -> Result<&mut Port,NalCellError> {
 		for p in &mut self.ports {
 			if !p.is_connected() & !p.is_border() { return Ok(p); }
 		}
-		Err(NalCellError::NoFreePort(NoFreePortError::new(self.id)))
+		Err(NalCellError::NoFreePort(NoFreePortError::new(self.id.clone())))
 	}
 	pub fn to_string(&self) -> String {
 		let mut s = String::new();

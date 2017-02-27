@@ -16,12 +16,12 @@ pub struct Port {
 impl Port {
 	pub fn new(cell_id: &CellID, port_no: u8, is_border: bool) -> Result<Port,NameError>{
 		let port_id = try!(PortID::new(port_no));
-		let temp_id = try!(port_id.add_component(cell_id.get_name()));
+		let temp_id = try!(port_id.add_component(&cell_id.get_name()));
 		let is_connected = false;
-		Ok(Port{ id: port_id, port_no: port_no, send: None, recv: None,
+		Ok(Port{ id: temp_id, port_no: port_no, send: None, recv: None,
 				 is_border: is_border, is_connected: is_connected, is_broken: false })
 	}
-	pub fn get_id(&self) -> PortID { self.id }
+	pub fn get_id(&self) -> PortID { self.id.clone() }
 	pub fn get_port_no(&self) -> u8 { self.port_no }
 	pub fn is_connected(&self) -> bool { self.is_connected }
 	pub fn is_broken(&self) -> bool { self.is_broken }
