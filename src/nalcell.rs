@@ -16,8 +16,7 @@ pub struct NalCell {
 }
 impl NalCell {
 	pub fn new(cell_no: usize, nports: u8, is_border: bool) -> Result<NalCell,NalCellError> {
-		let id = &format!("C:{}", cell_no);
-		let cell_id = try!(CellID::new(id));
+		let cell_id = try!(CellID::new(cell_no));
 		let mut ports = Vec::new();
 		let mut is_border_port;
 		for i in 0..nports + 1 {
