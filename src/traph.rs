@@ -26,6 +26,7 @@ enum TraphStatus {
 #[derive(Debug, Clone)]
 struct TraphElement {
 	port_index: u8,
+	other_index: usize,
 	is_connected: bool,
 	is_broken: bool,
 	status: TraphStatus,

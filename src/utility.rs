@@ -18,4 +18,11 @@ pub fn chars_to_string(chars: &[char]) -> String {
 	}
 	s
 }
-
+pub fn int_to_mask(i: u8) -> Option<u16> {
+    if i > 15 {
+        None
+    } else {
+        let mask: u16 = (1 as u16).rotate_left(i as u32);
+        Some(mask)
+    }
+}
