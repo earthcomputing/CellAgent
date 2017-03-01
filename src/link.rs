@@ -1,12 +1,9 @@
 use std::fmt;
-use std::sync::mpsc;
 use std::sync::mpsc::channel;
-use name::{Name, LinkID, PortID};
-use packet::Packet;
+use message::{Sender,Receiver};
+use name::{Name, LinkID};
 use port::Port;
 
-pub type Sender = mpsc::Sender<Packet>;
-pub type Receiver = mpsc::Receiver<Packet>;
 #[derive(Debug)]
 pub struct Link {
 	id: LinkID,

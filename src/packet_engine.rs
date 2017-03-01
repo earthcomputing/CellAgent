@@ -1,13 +1,18 @@
-use std::collections::VecDeque;
-use packet::Packet;
+use std::thread;
+use message::{Sender, Receiver};
+use name::CellID;
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct PacketEngine {
-	send_buffer: VecDeque<Packet>,
-	recv_buffer: VecDeque<Packet>
+	cell_id: CellID
 }
 impl PacketEngine {
-	pub fn new() -> PacketEngine {
-		PacketEngine { send_buffer: VecDeque::new(), recv_buffer: VecDeque::new() }
+	pub fn new(cell_id: CellID, send_to_ca: Sender, recv_from_ca: Receiver, pe_ports: Vec<(Sender,Receiver)>) -> PacketEngine {
+		let pe = PacketEngine { cell_id: cell_id.clone()};
+		thread::spawn( || { PacketEngine::ca_channel(cell_id, send_to_ca, recv_from_ca) });
+		pe
+	}
+	fn ca_channel(cell_id: CellID, send_to_ca: Sender, recv_from_ca: Receiver) {
+		println!("Packet Engine for cell {} here", cell_id);
 	}
 }

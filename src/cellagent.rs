@@ -1,19 +1,23 @@
 use std::fmt;
+use std::thread;
+use message::{Sender,Receiver};
 use name::{CellID};
 use routingtable::{RoutingTable, RoutingTableError};
-use packet_engine::PacketEngine;
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct CellAgent {
 	cell_id: CellID,
 	routing_table: RoutingTable,
-	packet_engine: PacketEngine,
 }
 impl CellAgent {
-	pub fn new(cell_id: CellID) -> Result<CellAgent, CellAgentError> {
+	pub fn new(cell_id: CellID, send_to_pe: Sender, recv_from_pe: Receiver) -> Result<CellAgent, CellAgentError> {
 		let routing_table = try!(RoutingTable::new()); 
-		Ok(CellAgent { cell_id: cell_id, routing_table: routing_table,
-			packet_engine: PacketEngine::new() })
+		let ca = CellAgent { cell_id: cell_id.clone(), routing_table: routing_table };
+		thread::spawn( move || { CellAgent::work(cell_id.clone(), send_to_pe, recv_from_pe); } );
+		Ok(ca)
+	}
+	pub fn work(cell_id: CellID, send_to_pe: Sender, recv_from_pe: Receiver) {
+		println!("Cell Agent on cell {} is working", cell_id);
 	}
 }
 // Errors
