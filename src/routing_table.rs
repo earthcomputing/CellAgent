@@ -1,9 +1,10 @@
 use std::fmt;
 use std::fmt::Display;
 use std::collections::HashMap;
-use std::sync::{Arc};
+use std::cell::{Cell};
 use config::{MAX_ENTRIES, MAX_PORTS};
 use name::{PortID,TreeID};
+use routing_table_entry::{RoutingTableEntry, RoutingTableEntryError};
 use traph::Traph;
 
 const CONTROLPORT: &'static str = "Control";
@@ -15,7 +16,7 @@ pub struct RoutingTable {
 	control_tree_id: TreeID,
 	connected_ports_tree_id: TreeID,
 	free_indices: Vec<usize>,
-	entries: Vec<Arc<RoutingTableEntry>>,
+	entries: Vec<Cell<RoutingTableEntry>>,
 	tree_ids: HashMap<TreeID,Traph>,
 	connected_ports: Vec<u8>
 }
@@ -28,8 +29,8 @@ impl RoutingTable {
 		let mut entries = Vec::new();
 		for i in 1..MAX_ENTRIES {
 			let mut entry = default_entry.clone(); 
-			entry.index = i;
-			entries.push(Arc::new(entry.clone()));
+			entry.set_index(i);
+			entries.push(Cell::new(entry.clone()));
 		}
 		let control_tree_id = try!(TreeID::new(CONTROLPORT)).clone();
 		let connected_ports_tree_id = try!(TreeID::new(CONNECTEDPORTS));
@@ -49,7 +50,7 @@ impl RoutingTable {
 	pub fn add_entry(&mut self, tree_id: &TreeID, port_index: u8, hops: usize, path: Option<&TreeID>) -> Result<(),RoutingTableError>{
 		let index = try!(self.use_index());
 		let traph = Traph::new(tree_id.clone(), index, port_index, hops, path);
-		self.entries[index] = Arc::new(RoutingTableEntry::new(index, true));
+		self.entries[index] = Cell::new(RoutingTableEntry::new(index, true));
 		self.tree_ids.insert(tree_id.clone(), traph);
 		Ok(())
 	}
@@ -58,11 +59,12 @@ impl RoutingTable {
 			Some(t) => t,
 			None => return Err(RoutingTableError::Traph(TraphError::new(tree_id)))
 		};
-		let mut entry = match self.entries.get_mut(traph.get_table_index()) {
-			Some(e) => e,
+		let index = traph.get_table_index();
+		let mut entry = match self.entries.get_mut(index) {
+			Some(e) => e.get(),
 			None => return Err(RoutingTableError::Traph(TraphError::new(tree_id)))
 		};
-		Arc::get_mut(&mut entry).unwrap().add_parent(parent_port_no, other_index);
+		self.entries[index] = Cell::new(try!(entry.update_parent(parent_port_no, other_index)));
 		Ok(())
 	}
 	pub fn add_child(&mut self, tree_id: &TreeID, child_port_no: u8, other_index: usize) -> Result<(),RoutingTableError> {
@@ -70,12 +72,12 @@ impl RoutingTable {
 			Some(t) => t,
 			None => return Err(RoutingTableError::Traph(TraphError::new(tree_id)))
 		};
-		let mut entry = match self.entries.get_mut(traph.get_table_index()) {
-			Some(e) => e,
+		let index = traph.get_table_index();
+		let entry = match self.entries.get_mut(index) {
+			Some(e) => e.get(),
 			None => return Err(RoutingTableError::Traph(TraphError::new(tree_id)))
 		};
-		
-		Arc::get_mut(&mut entry).unwrap().add_child(child_port_no, other_index);
+		self.entries[index] = Cell::new(try!(entry.update_children(child_port_no, other_index)));
 		Ok(())
 	}
 }
@@ -86,7 +88,8 @@ use name::NameError;
 pub enum RoutingTableError {
 	Name(NameError),
 	Size(SizeError),
-	Traph(TraphError)
+	Traph(TraphError),
+	RoutingTableEntry(RoutingTableEntryError)
 }
 impl Error for RoutingTableError {
 	fn description(&self) -> &str {
@@ -94,6 +97,7 @@ impl Error for RoutingTableError {
 			RoutingTableError::Name(ref err) => err.description(),
 			RoutingTableError::Size(ref err) => err.description(),
 			RoutingTableError::Traph(ref err) => err.description(),
+			RoutingTableError::RoutingTableEntry(ref err) => err.description(),
 		}
 	}
 	fn cause(&self) -> Option<&Error> {
@@ -101,6 +105,7 @@ impl Error for RoutingTableError {
 			RoutingTableError::Name(ref err) => Some(err),
 			RoutingTableError::Size(ref err) => Some(err),
 			RoutingTableError::Traph(ref err) => Some(err),
+			RoutingTableError::RoutingTableEntry(ref err) => Some(err),
 		}
 	}
 }
@@ -110,11 +115,15 @@ impl fmt::Display for RoutingTableError {
 			RoutingTableError::Name(ref err) => write!(f, "Routing Table Name Error caused by {}", err),
 			RoutingTableError::Size(ref err) => write!(f, "Routing Table Size Error caused by {}", err),
 			RoutingTableError::Traph(ref err) => write!(f, "Routing Table Traph Error caused by {}", err),
+			RoutingTableError::RoutingTableEntry(ref err) => write!(f, "Routing Table Entry Error caused by {}", err),
 		}
 	}
 }
 impl From<NameError> for RoutingTableError {
 	fn from(err: NameError) -> RoutingTableError { RoutingTableError::Name(err) }
+}
+impl From<RoutingTableEntryError> for RoutingTableError {
+	fn from(err: RoutingTableEntryError) -> RoutingTableError { RoutingTableError::RoutingTableEntry(err) }
 }
 #[derive(Debug)]
 pub struct SizeError { msg: String }
@@ -155,41 +164,3 @@ impl From<TraphError> for RoutingTableError {
 	fn from(err: TraphError) -> RoutingTableError { RoutingTableError::Traph(err) }
 }
 
-#[derive(Clone)]
-struct RoutingTableEntry {
-	index: usize,
-	inuse: bool,
-	parent: u8,
-	mask: u16,
-	indices: Vec<usize>
-}
-impl RoutingTableEntry {
-	fn new(table_index: usize, inuse: bool) -> RoutingTableEntry {
-		let mut indices = Vec::new();
-		for i in 0..MAX_ENTRIES { indices.push(0); }
-		RoutingTableEntry { index: table_index, parent: 0,
-			inuse: inuse, mask: 0, indices: indices }
-	}
-	fn add_parent(&mut self, parent: u8, other_index: usize) {
-		self.indices[parent as usize] = other_index;
-		self.parent = parent;
-	}
-	fn add_child(&mut self, child: u8, other_index: usize) {
-		self.indices[child as usize] = other_index;
-		self.mask = self.mask | (child as u16);
-	}
-	fn to_string(&self) -> String {
-		let mut s = format!("{:4}", self.index);
-		if self.inuse { s = s + &format!(" Yes  ") }
-		else          { s = s + &format!(" No   ") }
-		s = s + &format!(" {:016.b}", self.mask);
-		s = s + &format!(" {:?}", self.indices.to_vec());
-		s
-	}
-}
-impl fmt::Display for RoutingTableEntry {
-	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result { write!(f, "{}", self.to_string()) }
-}
-impl fmt::Debug for RoutingTableEntry {
-	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result { write!(f, "{}", self.to_string()) }
-}
