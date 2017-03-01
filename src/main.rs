@@ -3,6 +3,7 @@ mod config;
 mod datacenter;
 mod ecargs;
 mod link;
+mod message;
 mod nalcell;
 mod name;
 mod noc;
@@ -16,12 +17,10 @@ mod utility;
 mod vm;
 use std::error::Error;
 use config::{NCELLS,NPORTS,NLINKS};
-use datacenter::{Datacenter,DatacenterError};
+use datacenter::{Datacenter};
 use ecargs::{ECArgs};
-use nalcell::{NalCell};
 use name::{CellID};
 use tenant::{Tenant};
-use vm::VirtualMachine;
 
 fn main() {
 	println!("Multicell Routing");

@@ -2,6 +2,7 @@ use std::fmt;
 #[derive(Copy)]
 pub struct Packet {
 	index: u32,
+	is_rootcast: bool,
 	packet: [char; 32],
 }
 impl Packet {
@@ -14,7 +15,7 @@ impl Packet {
 	}
 }
 impl Clone for Packet {
-	fn clone(&self) -> Packet { Packet { index: self.index, packet: self.packet } }
+	fn clone(&self) -> Packet { Packet { index: self.index, packet: self.packet, is_rootcast: false } }
 }
 impl fmt::Debug for Packet { 
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result { write!(f, "{}", self.to_string()) }
