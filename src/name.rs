@@ -7,7 +7,7 @@ pub trait Name: Sized {
 	fn get_name(&self) -> &str;
 	fn create_from_string(&self, n: String) -> Self;
 	// Default implementations
-	fn to_string(&self) -> String { self.get_name().to_string() }
+	fn stringify(&self) -> String { self.get_name().to_string() }
 	fn from_str(&self, s: &str) -> Result<Self,NameError> {
 		// Names may not contain blanks
 		match s.find(' ') {

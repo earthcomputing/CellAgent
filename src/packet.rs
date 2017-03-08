@@ -6,7 +6,7 @@ pub struct Packet {
 	packet: [char; 32],
 }
 impl Packet {
-	fn to_string(&self) -> String {
+	fn stringify(&self) -> String {
 		let mut s = format!("Table Index {}: {:?}", self.index, self.packet);
 		for c in self.packet.iter() {
 			s = s + &c.to_string();
@@ -18,5 +18,5 @@ impl Clone for Packet {
 	fn clone(&self) -> Packet { Packet { index: self.index, packet: self.packet, is_rootcast: false } }
 }
 impl fmt::Debug for Packet { 
-	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result { write!(f, "{}", self.to_string()) }
+	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result { write!(f, "{}", self.stringify()) }
 }

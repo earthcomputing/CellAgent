@@ -1,3 +1,4 @@
+extern crate crossbeam;
 mod cellagent;
 mod config;
 mod datacenter;
@@ -39,29 +40,30 @@ fn main() {
 	};
 	let (ncells,nports) = ecargs.get_args();
 	println!("Main: {} ports for each of {} cells", nports, ncells);
-	if nports > 0 {
-		match build_datacenter(nports, ncells) {
-			Ok(_) => println!("Normal Exit"),
-			Err(e) => match e.cause() {
-				Some(c) => println!("Abnormal Exit: {} {}", e, c),
-				None => println!("Abnormal Exit: {}", e)
+	let full_scope = crossbeam::scope( |scope| { 
+		if nports > 0 {
+			match build_datacenter(scope, nports, ncells) {
+				Ok(_) => println!("Normal Exit"),
+				Err(e) => match e.cause() {
+					Some(c) => println!("Abnormal Exit: {} {}", e, c),
+					None => println!("Abnormal Exit: {}", e)
+				}
+			}
+		} else { 
+			match tests() {
+				Ok(_) => println!("Normal Exit"),
+				Err(e) => match e.cause() {
+					Some(c) => println!("Abnormal Exit: {} {}",e, c),
+					None => println!("Abnormal Exit: {}",e)
+				}
 			}
 		}
-	} else { 
-		match tests() {
-			Ok(_) => println!("Normal Exit"),
-			Err(e) => match e.cause() {
-				Some(c) => println!("Abnormal Exit: {} {}",e, c),
-				None => println!("Abnormal Exit: {}",e)
-			} 
-		}
-	}
 	//test_mut(); // Trying to figure out an issue with mutability
+	});
 }
-fn build_datacenter(nports: u8, ncells: usize) -> Result<(),Box<Error>>{
+fn build_datacenter(scope: &crossbeam::Scope, nports: u8, ncells: usize) -> Result<(),Box<Error>>{
 	let edges = vec![(0,1),(1,2),(2,3),(3,4),(5,6),(6,7),(7,8),(8,9),(0,5),(1,6),(2,7),(3,8),(4,9)];
-	let mut dc = try!(Datacenter::new(ncells, nports, edges));
-	//try!(dc.build(ncells, nports, edges));
+	let mut dc = try!(Datacenter::new(scope, ncells, nports, edges));
 	println!("{}",dc);
 	Ok(())
 }
