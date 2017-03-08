@@ -52,10 +52,11 @@ impl NalCell {
 		let cell_agent = try!(CellAgent::new(cell_id.clone(), ca_to_pe, ca_from_pe,
 								ca_entry_to_pe, ca_from_port));
 		let packet_engine = try!(PacketEngine::new(scope, cell_id.clone(), pe_to_ca, pe_from_ca, pe_from_port,
-								pe_to_ports));
+								pe_to_ports, pe_entry_from_ca));
 		println!("NalCell: cell {} nports {}", cell_id, boxed.len());
-		Ok(NalCell { id: cell_id, cell_no: cell_no, ports: boxed, is_border: is_border,
-				cell_agent: cell_agent, packet_engine: packet_engine, vms: Vec::new()})
+		let nalcell = NalCell { id: cell_id, cell_no: cell_no, ports: boxed, is_border: is_border,
+				cell_agent: cell_agent, packet_engine: packet_engine, vms: Vec::new()};
+		Ok(nalcell)
 	}
 	pub fn get_id(&self) -> CellID { self.id.clone() }
 	pub fn get_cell_no(&self) -> usize { self.cell_no }

@@ -16,27 +16,26 @@ pub struct PacketEngine {
 }
 impl PacketEngine {
 	pub fn new(scope: &Scope, cell_id: CellID, send_to_ca: Sender, recv_from_ca: Receiver, recv_from_port: Receiver, 
-				send_to_ports: Vec<Sender>) -> Result<PacketEngine, PacketEngineError> {
-		let routing_table = try!(RoutingTable::new()); 
-		let mut pe = PacketEngine { cell_id: cell_id.clone(), routing_table: Arc::new(Mutex::new(routing_table)) };
-		let cell_id1 = cell_id.clone();
-		Ok(pe)
+				send_to_ports: Vec<Sender>, recv_entry_from_ca: EntryReceiver) -> Result<PacketEngine, PacketEngineError> {
+		let routing_table = Arc::new(Mutex::new(try!(RoutingTable::new()))); 
+		PacketEngine::entry_channel(scope, &cell_id, &routing_table, recv_entry_from_ca);
+		Ok(PacketEngine { cell_id: cell_id.clone(), routing_table: routing_table })
 	}
-	fn ca_channel(scope: Scope, cell_id: CellID, send_to_ca: Sender, recv_from_ca: Receiver) {
+	fn ca_channel(scope: Scope, cell_id: &CellID, send_to_ca: Sender, recv_from_ca: Receiver) {
 		println!("Packet Engine for cell {} here", cell_id);
 	}
-	pub fn entry_channel<'a>(&'a self, scope: &Scope<'a>, receive_entry_from_ca: EntryReceiver) -> Result<(),PacketEngineError> {
-		println!("Packet Engine entry receiver for cell {}", self.cell_id);
+	pub fn entry_channel(scope: &Scope, cell_id: &CellID, routing_table: &Arc<Mutex<RoutingTable>>, recv_entry_from_ca: EntryReceiver) -> Result<(),PacketEngineError> {
+		println!("Packet Engine entry receiver for cell {}", cell_id);
 		scope.spawn( move || -> Result<(), PacketEngineError> {
 			loop { 
-				let entry = match receive_entry_from_ca.recv() {
-					Ok(e) => { println!("received entry"); e },
+				let entry = match recv_entry_from_ca.recv() {
+					Ok(e) => { println!("received entry {}", e); e },
 					Err(err) => {
 						println!("Receive error {} in entry_channel", err);
 						return Err(PacketEngineError::Receive(err))
 					}
 				};
-				self.routing_table.lock().unwrap().set_entry(entry);
+				//self.routing_table.lock().unwrap().set_entry(entry);
 			}
 			Ok(())
 		});
