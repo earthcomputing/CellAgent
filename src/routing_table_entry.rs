@@ -1,7 +1,9 @@
 use std::fmt;
-use config::MAX_PORTS;
+use config;
 use utility::int_to_mask;
-#[derive(Copy, Clone)]
+
+const MAX_PORTS: usize = config::MAX_PORTS as usize;
+#[derive(Debug, Copy, Clone)]
 pub struct RoutingTableEntry {
 	index: usize,
 	inuse: bool,
@@ -10,15 +12,32 @@ pub struct RoutingTableEntry {
 	other_indices: [usize; MAX_PORTS as usize]
 }
 impl RoutingTableEntry {
-	pub fn new(table_index: usize, inuse: bool) -> RoutingTableEntry {
+	pub fn new(table_index: usize, inuse: bool, parent: u8, mask: u16, other_indices: [usize; MAX_PORTS]) -> RoutingTableEntry {
 		let mut indices = [0; MAX_PORTS as usize];
 		RoutingTableEntry { index: table_index, parent: 0,
-			inuse: inuse, mask: 0, other_indices: indices }
+			inuse: inuse, mask: mask, other_indices: indices }
 	}
 	pub fn get_index(&self) -> usize { self.index }
 	pub fn set_index(&mut self, index: usize) { self.index = index; }
+	pub fn get_inuse(&self) -> bool { self.inuse }
+	pub fn set_inuse(&mut self, inuse: bool) { self.inuse = inuse; }
+	pub fn get_parent(&self) -> u8 { self.parent }
+	pub fn set_parent(&mut self, parent: u8) { self.parent = parent; }
+	pub fn get_mask(&self) -> u16 { self.mask }
+	pub fn set_mask(&mut self, mask: u16) { self.mask = mask; }
+	pub fn get_other_indices(&self) -> [usize; MAX_PORTS as usize] { self.other_indices }
+	pub fn set_other_index(&mut self, port_index: u8, other_index: usize) -> Result<(),RoutingTableEntryError> {
+		{
+			match self.other_indices.get(port_index as usize) {
+				Some(other) => (),
+				None => return Err(RoutingTableEntryError::Port(PortError::new(port_index)))
+			};
+		}
+		self.other_indices[port_index as usize] = other_index;
+		Ok(())
+	}
 	pub fn update_parent(&self, parent: u8, other_index: usize) -> Result<RoutingTableEntry,RoutingTableEntryError> {
-		if parent > MAX_PORTS { return Err(RoutingTableEntryError::Port(PortError::new(parent))); }
+		if parent > MAX_PORTS as u8 { return Err(RoutingTableEntryError::Port(PortError::new(parent))); }
 		let mut indices = self.other_indices.clone();
 		indices[parent as usize] = other_index;
 		Ok(RoutingTableEntry { index: self.index, parent: parent, inuse: self.inuse, mask: self.mask,
@@ -26,16 +45,16 @@ impl RoutingTableEntry {
 	}
 	pub fn update_children(&self, child: u8, other_index: usize) -> Result<RoutingTableEntry,RoutingTableEntryError> {
 		let mut indices = self.other_indices.clone();
-		let child_mask = match int_to_mask(child) {
-			Some(m) => m,
-			None => return Err(RoutingTableEntryError::Port(PortError::new(child)))
-		};
-		let mask = self.mask | child_mask;
+//		let child_mask = match int_to_mask(child) {
+//			Some(m) => m,
+//			None => return Err(RoutingTableEntryError::Port(PortError::new(child)))
+//		};
+//		let mask = self.mask | child_mask;
 		indices[child as usize] = other_index;
-		Ok(RoutingTableEntry { index: self.index, parent: self.parent, inuse: self.inuse, mask: mask,
+		Ok(RoutingTableEntry { index: self.index, parent: self.parent, inuse: self.inuse, mask: 0,
 							other_indices: indices })
 	}
-	pub fn to_string(&self) -> String {
+	pub fn stringify(&self) -> String {
 		let mut s = format!("{:4}", self.index);
 		if self.inuse { s = s + &format!(" Yes  ") }
 		else          { s = s + &format!(" No   ") }
@@ -45,10 +64,7 @@ impl RoutingTableEntry {
 	}
 }
 impl fmt::Display for RoutingTableEntry {
-	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result { write!(f, "{}", self.to_string()) }
-}
-impl fmt::Debug for RoutingTableEntry {
-	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result { write!(f, "{}", self.to_string()) }
+	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result { write!(f, "{}", self.stringify()) }
 }
 // Errors
 use std::error::Error;

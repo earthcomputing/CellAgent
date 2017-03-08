@@ -1,68 +1,85 @@
 use std::fmt;
+use std::sync::mpsc;
 use std::sync::mpsc::channel;
+use crossbeam::Scope;
+use cellagent::{CellAgent, CellAgentError};
 use config::MAX_PORTS;
 use message::{Sender, Receiver};
 use name::{CellID};
 use packet_engine::PacketEngine;
-use port::{Port};
+use port::{Port, PortStatus};
+use routing_table_entry::RoutingTableEntry;
 use vm::VirtualMachine;
-use cellagent::{CellAgent, CellAgentError};
+
+pub type EntrySender = mpsc::Sender<RoutingTableEntry>;
+pub type EntryReceiver = mpsc::Receiver<RoutingTableEntry>;
+pub type PortStatusSender = mpsc::Sender<PortStatus>;
+pub type PortStatusReceiver = mpsc::Receiver<PortStatus>;
 
 #[derive(Debug)]
 pub struct NalCell {
 	id: CellID,
 	cell_no: usize,
 	is_border: bool,
-	ports: Vec<Port>,
+	ports: Box<[Port]>,
 	cell_agent: CellAgent,
 	packet_engine: PacketEngine,
 	vms: Vec<VirtualMachine>,
 }
 impl NalCell {
-	pub fn new(cell_no: usize, nports: u8, is_border: bool) -> Result<NalCell,NalCellError> {
+	pub fn new(scope: &Scope, cell_no: usize, nports: u8, is_border: bool) -> Result<NalCell,NalCellError> {
 		if nports > MAX_PORTS { return Err(NalCellError::NumberPorts(NumberPortsError::new(nports))) }
 		let cell_id = try!(CellID::new(cell_no));
-		let (send_to_pe, recv_from_ca): (Sender,Receiver) = channel();
-		let (send_to_ca, recv_from_pe): (Sender,Receiver) = channel();
+		let (ca_entry_to_pe, pe_entry_from_ca): (EntrySender, EntryReceiver) = channel();
+		let (ca_to_pe, pe_from_ca): (Sender, Receiver) = channel();
+		let (pe_to_ca, ca_from_pe): (Sender, Receiver) = channel();
+		let (port_to_pe, pe_from_port): (Sender, Receiver) = channel();
+		let (port_to_ca, ca_from_port): (PortStatusSender, PortStatusReceiver) = channel();
 		let mut ports = Vec::new();
+		let mut pe_to_ports = Vec::new();
 		let mut is_border_port;
-		let mut pe_ports: Vec<(Sender,Receiver)> = Vec::new();
 		for i in 0..nports + 1 {
 			if is_border & (i == 2) { is_border_port = true; }
 			else                    { is_border_port = false; }
-			let (pe_to_port, pe_from_port): (Sender,Receiver) = channel();
-			let (port_to_pe, port_from_pe): (Sender,Receiver) = channel();
-			pe_ports.push((pe_to_port, pe_from_port));
-			ports.push(try!(Port::new(&cell_id, i as u8, is_border_port,
-						port_to_pe.clone(), port_from_pe)));
+			let (pe_to_port, port_from_pe): (Sender, Receiver) = channel();
+			pe_to_ports.push(pe_to_port);
+			let port = try!(Port::new(&cell_id, i as u8, is_border_port,
+						port_to_pe.clone(), port_from_pe, port_to_ca.clone()));
+			ports.push(port);
 		}
 		ports[0].set_connected(None, None);
-		let cell_agent = try!(CellAgent::new(cell_id.clone(), send_to_pe.clone(), recv_from_pe));
-		let packet_engine = try!(PacketEngine::new(cell_id.clone(),send_to_ca, recv_from_ca, pe_ports));
-		Ok(NalCell { id: cell_id, cell_no: cell_no, ports: ports, is_border: is_border,
+		let boxed: Box<[Port]> = ports.into_boxed_slice(); 
+		let cell_agent = try!(CellAgent::new(cell_id.clone(), ca_to_pe, ca_from_pe,
+								ca_entry_to_pe, ca_from_port));
+		let packet_engine = try!(PacketEngine::new(scope, cell_id.clone(), pe_to_ca, pe_from_ca, pe_from_port,
+								pe_to_ports));
+		println!("NalCell: cell {} nports {}", cell_id, boxed.len());
+		Ok(NalCell { id: cell_id, cell_no: cell_no, ports: boxed, is_border: is_border,
 				cell_agent: cell_agent, packet_engine: packet_engine, vms: Vec::new()})
 	}
 	pub fn get_id(&self) -> CellID { self.id.clone() }
 	pub fn get_cell_no(&self) -> usize { self.cell_no }
 	pub fn get_port(&mut self, index: u8) -> &mut Port { &mut self.ports[index as usize] }
 	pub fn get_free_port_mut (&mut self) -> Result<&mut Port,NalCellError> {
-		for p in &mut self.ports {
+		for p in &mut self.ports.iter_mut() {
 			if !p.is_connected() & !p.is_border() { return Ok(p); }
 		}
 		Err(NalCellError::NoFreePort(NoFreePortError::new(self.id.clone())))
 	}
-	pub fn to_string(&self) -> String {
+	pub fn stringify(&self) -> String {
 		let mut s = String::new();
 		if self.is_border { s = s + &format!("Border Cell {}", self.id); }
 		else              { s = s + &format!("Cell {}", self.id); }
-		for p in &self.ports {
+		for p in &mut self.ports.iter() {
 			if p.get_port_no() < 4 { s = s + "\n" + &format!("{}", p); }
 		}
 		s
 	}
 }
 impl fmt::Display for NalCell { 
-	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result { write!(f, "{}", self.to_string()) }
+	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result { 
+		let s = self.stringify();
+		write!(f, "{}", s) }
 }
 // Errors
 use std::error::Error;
