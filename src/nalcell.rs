@@ -1,6 +1,7 @@
 use std::fmt;
 use std::sync::mpsc;
 use std::sync::mpsc::channel;
+use std::{thread, time};
 use crossbeam::Scope;
 use cellagent::{CellAgent, CellAgentError};
 use config::MAX_PORTS;
@@ -49,9 +50,9 @@ impl NalCell {
 		}
 		ports[0].set_connected(None, None);
 		let boxed: Box<[Port]> = ports.into_boxed_slice(); 
-		let cell_agent = try!(CellAgent::new(cell_id.clone(), ca_to_pe, ca_from_pe,
+		let cell_agent = try!(CellAgent::new(&cell_id, ca_to_pe, ca_from_pe,
 								ca_entry_to_pe, ca_from_port));
-		let packet_engine = try!(PacketEngine::new(scope, cell_id.clone(), pe_to_ca, pe_from_ca, pe_from_port,
+		let packet_engine = try!(PacketEngine::new(scope, &cell_id, pe_to_ca, pe_from_ca, pe_from_port,
 								pe_to_ports, pe_entry_from_ca));
 		println!("NalCell: cell {} nports {}", cell_id, boxed.len());
 		let nalcell = NalCell { id: cell_id, cell_no: cell_no, ports: boxed, is_border: is_border,

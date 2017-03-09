@@ -40,7 +40,7 @@ fn main() {
 	};
 	let (ncells,nports) = ecargs.get_args();
 	println!("Main: {} ports for each of {} cells", nports, ncells);
-	let full_scope = crossbeam::scope( |scope| { 
+	crossbeam::scope( |scope| { 
 		if nports > 0 {
 			match build_datacenter(scope, nports, ncells) {
 				Ok(_) => println!("Normal Exit"),
@@ -60,10 +60,11 @@ fn main() {
 		}
 	//test_mut(); // Trying to figure out an issue with mutability
 	});
+	println!("Main exit");
 }
 fn build_datacenter(scope: &crossbeam::Scope, nports: u8, ncells: usize) -> Result<(),Box<Error>>{
 	let edges = vec![(0,1),(1,2),(2,3),(3,4),(5,6),(6,7),(7,8),(8,9),(0,5),(1,6),(2,7),(3,8),(4,9)];
-	let mut dc = try!(Datacenter::new(scope, ncells, nports, edges));
+	let dc = try!(Datacenter::new(scope, ncells, nports, edges));
 	println!("{}",dc);
 	Ok(())
 }

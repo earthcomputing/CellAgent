@@ -20,7 +20,8 @@ impl RoutingTableEntry {
 	pub fn get_index(&self) -> usize { self.index }
 	pub fn set_index(&mut self, index: usize) { self.index = index; }
 	pub fn get_inuse(&self) -> bool { self.inuse }
-	pub fn set_inuse(&mut self, inuse: bool) { self.inuse = inuse; }
+	pub fn set_inuse(&mut self) { self.inuse = true; }
+	pub fn set_not_inuse(&mut self) { self.inuse = false; }
 	pub fn get_parent(&self) -> u8 { self.parent }
 	pub fn set_parent(&mut self, parent: u8) { self.parent = parent; }
 	pub fn get_mask(&self) -> u16 { self.mask }

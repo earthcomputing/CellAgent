@@ -15,33 +15,38 @@ pub struct PacketEngine {
 	routing_table: Arc<Mutex<RoutingTable>>,
 }
 impl PacketEngine {
-	pub fn new(scope: &Scope, cell_id: CellID, send_to_ca: Sender, recv_from_ca: Receiver, recv_from_port: Receiver, 
+	pub fn new(scope: &Scope, cell_id: &CellID, send_to_ca: Sender, recv_from_ca: Receiver, recv_from_port: Receiver, 
 				send_to_ports: Vec<Sender>, recv_entry_from_ca: EntryReceiver) -> Result<PacketEngine, PacketEngineError> {
 		let routing_table = Arc::new(Mutex::new(try!(RoutingTable::new()))); 
-		PacketEngine::entry_channel(scope, &cell_id, &routing_table, recv_entry_from_ca);
-		Ok(PacketEngine { cell_id: cell_id.clone(), routing_table: routing_table })
+		let pe = PacketEngine { cell_id: cell_id.clone(), routing_table: routing_table };
+		try!(pe.entry_channel(scope, recv_entry_from_ca));
+		Ok(pe)
 	}
-	fn ca_channel(scope: Scope, cell_id: &CellID, send_to_ca: Sender, recv_from_ca: Receiver) {
-		println!("Packet Engine for cell {} here", cell_id);
+	fn ca_channel(&self, scope: &Scope, send_to_ca: Sender, recv_from_ca: Receiver) {
+		println!("Packet Engine for cell {} here", self.cell_id);
 	}
-	pub fn entry_channel(scope: &Scope, cell_id: &CellID, routing_table: &Arc<Mutex<RoutingTable>>, recv_entry_from_ca: EntryReceiver) -> Result<(),PacketEngineError> {
-		println!("Packet Engine entry receiver for cell {}", cell_id);
-		scope.spawn( move || -> Result<(), PacketEngineError> {
+	pub fn entry_channel(&self, scope: &Scope, recv_entry_from_ca: EntryReceiver) -> Result<(),PacketEngineError> {
+		println!("Packet Engine entry receiver for cell {}", self.cell_id);
+		let table = self.routing_table.clone();
+		let entry_handle = scope.spawn( move || -> Result<(), PacketEngineError> {
 			loop { 
-				let entry = match recv_entry_from_ca.recv() {
-					Ok(e) => { println!("received entry {}", e); e },
+				let mut entry = match recv_entry_from_ca.recv() {
+					Ok(e) => e, 
 					Err(err) => {
 						println!("Receive error {} in entry_channel", err);
 						return Err(PacketEngineError::Receive(err))
 					}
 				};
-				//self.routing_table.lock().unwrap().set_entry(entry);
+				entry.set_inuse();
+				println!("received entry {}", entry);
+				table.lock().unwrap().set_entry(entry);
 			}
 			Ok(())
 		});
 		println!("Return from entry_channel");
 		Ok(())
 	}
+	pub fn get_table(&self) -> &Arc<Mutex<RoutingTable>> { &self.routing_table }
 }
 // Errors
 use std::error::Error;
