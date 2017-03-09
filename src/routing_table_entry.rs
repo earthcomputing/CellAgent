@@ -46,11 +46,11 @@ impl RoutingTableEntry {
 	}
 	pub fn update_children(&self, child: u8, other_index: usize) -> Result<RoutingTableEntry,RoutingTableEntryError> {
 		let mut indices = self.other_indices.clone();
-//		let child_mask = match int_to_mask(child) {
-//			Some(m) => m,
-//			None => return Err(RoutingTableEntryError::Port(PortError::new(child)))
-//		};
-//		let mask = self.mask | child_mask;
+		let child_mask = match int_to_mask(child) {
+			Ok(m) => m,
+			Err(_) => return Err(RoutingTableEntryError::Port(PortError::new(child)))
+		};
+		let mask = self.mask | child_mask;
 		indices[child as usize] = other_index;
 		Ok(RoutingTableEntry { index: self.index, parent: self.parent, inuse: self.inuse, mask: 0,
 							other_indices: indices })

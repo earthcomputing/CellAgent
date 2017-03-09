@@ -28,8 +28,8 @@ impl Link {
 		let (rite_send, rite_port_recv) = channel();
 		let (left_port_send, left_recv)  = channel();
 		let (rite_port_send, rite_recv) = channel();
-		left.set_connected(Some(left_port_send), Some(left_port_recv));
-		rite.set_connected(Some(rite_port_send), Some(rite_port_recv));
+		left.set_connected(left_port_send, left_port_recv);
+		rite.set_connected(rite_port_send, rite_port_recv);
 		Ok(Link { id: id, is_broken: false, is_connected: true,
 				left_send: left_send, rite_send: rite_send,
 				left_recv: left_recv, rite_recv: rite_recv })

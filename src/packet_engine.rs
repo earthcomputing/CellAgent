@@ -1,5 +1,4 @@
 use std::fmt;
-use std::thread;
 use std::sync::{Arc, Mutex};
 use std::sync::mpsc::RecvError;
 use crossbeam::Scope;
@@ -26,24 +25,16 @@ impl PacketEngine {
 		println!("Packet Engine for cell {} here", self.cell_id);
 	}
 	pub fn entry_channel(&self, scope: &Scope, recv_entry_from_ca: EntryReceiver) -> Result<(),PacketEngineError> {
-		println!("Packet Engine entry receiver for cell {}", self.cell_id);
 		let table = self.routing_table.clone();
-		let entry_handle = scope.spawn( move || -> Result<(), PacketEngineError> {
+		let cell_id = self.cell_id.clone(); // Debug only
+		scope.spawn( move || -> Result<(), PacketEngineError> {
 			loop { 
-				let mut entry = match recv_entry_from_ca.recv() {
-					Ok(e) => e, 
-					Err(err) => {
-						println!("Receive error {} in entry_channel", err);
-						return Err(PacketEngineError::Receive(err))
-					}
-				};
-				entry.set_inuse();
-				println!("received entry {}", entry);
+				let entry = try!(recv_entry_from_ca.recv());
 				table.lock().unwrap().set_entry(entry);
+				println!("CellID {} entry {}", cell_id, entry);
 			}
 			Ok(())
 		});
-		println!("Return from entry_channel");
 		Ok(())
 	}
 	pub fn get_table(&self) -> &Arc<Mutex<RoutingTable>> { &self.routing_table }
