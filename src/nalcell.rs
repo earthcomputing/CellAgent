@@ -61,7 +61,7 @@ impl NalCell {
 		Ok(nalcell)
 	}
 	pub fn get_id(&self) -> CellID { self.id.clone() }
-	pub fn get_cell_no(&self) -> usize { self.cell_no }
+	pub fn get_no(&self) -> usize { self.cell_no }
 	pub fn get_port(&mut self, index: u8) -> &mut Port { &mut self.ports[index as usize] }
 	pub fn get_free_port_mut (&mut self) -> Result<&mut Port,NalCellError> {
 		for p in &mut self.ports.iter_mut() {
@@ -74,7 +74,7 @@ impl NalCell {
 		if self.is_border { s = s + &format!("Border Cell {}", self.id); }
 		else              { s = s + &format!("Cell {}", self.id); }
 		for p in &mut self.ports.iter() {
-			if p.get_port_no() < 4 { s = s + "\n" + &format!("{}", p); }
+			if p.get_no() < 4 { s = s + "\n" + &format!("{}", p); }
 		}
 		s
 	}

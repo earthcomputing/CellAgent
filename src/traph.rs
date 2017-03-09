@@ -20,7 +20,7 @@ impl Traph {
 	}
 	pub fn get_table_index(&self) -> usize { self.table_index } 
 	pub fn add_element(&mut self, port: Port, other_index: usize) -> Result<(), TraphError> {
-		let port_no = port.get_port_no();
+		let port_no = port.get_no();
 		if port_no > MAX_PORTS { return Err(TraphError::Port(PortError::new(port_no))) };
 		let port_id = port.get_id();
 		let element = TraphElement::new(port_no, port_id, other_index);

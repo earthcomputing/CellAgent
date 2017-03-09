@@ -35,7 +35,7 @@ impl Port {
 		//println!("Port {} worker", port_id);
 	}
 	pub fn get_id(&self) -> PortID { self.id.clone() }
-	pub fn get_port_no(&self) -> u8 { self.port_no }
+	pub fn get_no(&self) -> u8 { self.port_no }
 	pub fn is_connected(&self) -> bool { self.is_connected }
 	pub fn is_broken(&self) -> bool { self.is_broken }
 	pub fn is_border(&self) -> bool { self.is_border }
