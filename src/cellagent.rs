@@ -26,7 +26,7 @@ pub struct CellAgent {
 	send_entry_to_pe: EntrySender
 }
 impl CellAgent {
-	pub fn new(cell_id: CellID, send_to_pe: Sender, recv_from_pe: Receiver, send_entry_to_pe: EntrySender,
+	pub fn new(cell_id: &CellID, send_to_pe: Sender, recv_from_pe: Receiver, send_entry_to_pe: EntrySender,
 			recv_from_port: PortStatusReceiver) -> Result<CellAgent, CellAgentError> {
 		let mut free_indices = Vec::new();
 		for i in 2..MAX_ENTRIES { free_indices.push(i); } // O reserved for control tree, 1 for connected tree
