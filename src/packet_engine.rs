@@ -31,7 +31,6 @@ impl PacketEngine {
 			loop { 
 				let entry = try!(recv_entry_from_ca.recv());
 				table.lock().unwrap().set_entry(entry);
-				println!("CellID {} entry {}", cell_id, entry);
 			}
 			Ok(())
 		});

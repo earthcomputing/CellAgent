@@ -1,4 +1,5 @@
 use std::fmt;
+use std::cmp::max;
 use crossbeam::Scope;
 
 use nalcell::{NalCell,NalCellError};
@@ -32,13 +33,8 @@ impl<'b> Datacenter<'b> {
 		for edge in edge_list {
 			if edge.0 == edge.1 { return Err(DatacenterError::Wire(WireError::new(edge))); }
 			if (edge.0 > ncells) | (edge.1 >= ncells) { return Err(DatacenterError::Wire(WireError::new(edge))); }
-			let split;
-			if edge.0 == 0 { 
-				split = cells.split_at_mut(edge.1)
-			} else  {
-				split = cells.split_at_mut(edge.0)
-			};
-			let mut cell = match split.0.last_mut() {
+			let split = cells.split_at_mut(max(edge.0,edge.1));
+			let mut cell = match split.0.get_mut(edge.0) {
 				Some(c) => c,
 				None => return Err(DatacenterError::Wire(WireError::new(edge)))
 
