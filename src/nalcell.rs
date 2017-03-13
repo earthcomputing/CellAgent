@@ -76,6 +76,8 @@ impl NalCell {
 		for p in &mut self.ports.iter() {
 			if p.get_no() < 4 { s = s + "\n" + &format!("{}", p); }
 		}
+		s = s + &format!("{}",self.cell_agent.stringify());
+		s = s + &self.packet_engine.stringify();
 		s
 	}
 }

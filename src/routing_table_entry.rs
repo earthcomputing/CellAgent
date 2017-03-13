@@ -56,9 +56,10 @@ impl RoutingTableEntry {
 							other_indices: indices })
 	}
 	pub fn stringify(&self) -> String {
-		let mut s = format!("{:4}", self.index);
-		if self.inuse { s = s + &format!(" Yes  ") }
-		else          { s = s + &format!(" No   ") }
+		let mut s = format!("\n{:6}", self.index);
+		if self.inuse { s = s + &format!("  Yes  ") }
+		else          { s = s + &format!("  No   ") }
+		s = s + &format!("{:7}", self.parent);
 		s = s + &format!(" {:016.b}", self.mask);
 		s = s + &format!(" {:?}", self.other_indices.to_vec());
 		s

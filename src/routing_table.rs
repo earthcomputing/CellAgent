@@ -9,7 +9,6 @@ use traph::Traph;
 #[derive(Debug)]
 pub struct RoutingTable {
 	entries: Vec<RoutingTableEntry>,
-	tree_ids: HashMap<TreeID,Traph>,
 	connected_ports: Vec<u8>
 }
 impl RoutingTable {
@@ -21,9 +20,17 @@ impl RoutingTable {
 			entry.set_index(i);
 			entries.push(entry);
 		}
-		Ok(RoutingTable { entries: entries, tree_ids: HashMap::new(), connected_ports: Vec::new() })
+		Ok(RoutingTable { entries: entries, connected_ports: Vec::new() })
 	}
 	pub fn set_entry(&mut self, entry: RoutingTableEntry) { self.entries[entry.get_index()] = entry; }
+	pub fn stringify(&self) -> String {
+		let mut s = format!("\nRouting Table with {} Entries", MAX_ENTRIES);
+		s = s + &format!("\n Index In Use Parent Mask             Indices");
+		for entry in self.entries.iter() {
+			if entry.get_index() < 8 { s = s + &entry.stringify(); }
+		}
+		s
+	}
 }
 // Errors
 use std::error::Error;
