@@ -18,6 +18,7 @@ mod traph;
 mod utility;
 mod vm;
 use std::error::Error;
+use std::{thread, time};
 use config::{NCELLS,NPORTS,NLINKS};
 use datacenter::{Datacenter};
 use ecargs::{ECArgs};
@@ -65,7 +66,9 @@ fn main() {
 fn build_datacenter(scope: &crossbeam::Scope, nports: u8, ncells: usize) -> Result<(),Box<Error>>{
 	let edges = vec![(0,1),(1,2),(2,3),(3,4),(5,6),(6,7),(7,8),(8,9),(0,5),(1,6),(2,7),(3,8),(4,9)];
 	let dc = try!(Datacenter::new(scope, ncells, nports, edges));
-	println!("{}",dc);
+	let nap = time::Duration::from_millis(100);
+	thread::sleep(nap);
+	println!("Datacenter: {}",dc);
 	Ok(())
 }
 // Test mutability

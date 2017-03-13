@@ -37,6 +37,11 @@ impl PacketEngine {
 		Ok(())
 	}
 	pub fn get_table(&self) -> &Arc<Mutex<RoutingTable>> { &self.routing_table }
+	pub fn stringify(&self) -> String {
+		let mut s = format!("\nPacket Engine");
+		let mut s = s + &self.routing_table.lock().unwrap().stringify();
+		s
+	}
 }
 // Errors
 use std::error::Error;

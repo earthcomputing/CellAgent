@@ -25,7 +25,7 @@ pub struct CellAgent {
 	cell_id: CellID,
 	connected_ports_tree_id: TreeID,
 	free_indices: Vec<usize>,
-	traphs: HashMap<TreeID,Arc<Mutex<Traph>>>,
+	traphs: Arc<Mutex<HashMap<TreeID,Traph>>>,
 }
 impl CellAgent {
 	pub fn new(scope: &Scope, cell_id: &CellID, send_to_pe: Sender, recv_from_pe: Receiver, 
@@ -35,21 +35,29 @@ impl CellAgent {
 		let mut free_indices = Vec::new();
 		for i in 2..MAX_ENTRIES { free_indices.push(i); } // O reserved for control tree, 1 for connected tree
 		free_indices.reverse();
+		let traphs = Arc::new(Mutex::new(HashMap::new()));
 		let mut ca = CellAgent { cell_id: cell_id.clone(), connected_ports_tree_id: connected_tree_id.clone(),
-			free_indices: free_indices, traphs: HashMap::new()};
+			free_indices: free_indices, traphs: traphs };
 		let entry = try!(ca.new_tree(0, control_tree_id, 0, vec![0], 0, None));
 		try!(send_entry_to_pe.send(entry));
 		let entry = try!(ca.new_tree(1, connected_tree_id, 0, vec![], 0, None));
 		try!(send_entry_to_pe.send(entry));
-		ca.port_status(scope, entry, recv_from_port, send_entry_to_pe);
+		try!(ca.port_status(scope, entry, recv_from_port, send_entry_to_pe));
 		//thread::spawn( move || { CellAgent::work(cell_id.clone(), send_to_pe, recv_from_pe); } );
 		Ok(ca)
 	}
+	pub fn stringify(&self) -> String {
+		let mut s = format!("\nCell Agent {}", self.cell_id);
+		for (tree_id, traph) in self.traphs.lock().unwrap().iter() {
+			s = s + &traph.stringify();
+		}
+		s
+	}	
 	pub fn new_tree(&mut self, index: usize, tree_id: TreeID, parent_no: u8, children: Vec<u8>, 
 					hops: usize, path: Option<&TreeID>) -> Result<RoutingTableEntry, CellAgentError> {
 		let mask = try!(mask_from_port_nos(children));
-		let traph = try!(Traph::new(tree_id.clone(), 0));
-		self.traphs.insert(tree_id.clone(), Arc::new(Mutex::new(traph)));
+		let traph = try!(Traph::new(tree_id.clone(), index));
+		self.traphs.lock().unwrap().insert(tree_id.clone(), traph);
 		Ok(RoutingTableEntry::new(index, true, 0 as u8, mask, OTHER_INDICES))
 	}
 	fn port_status(&self, scope: &Scope, entry: RoutingTableEntry, 
@@ -63,12 +71,12 @@ impl CellAgent {
 					PortStatus::Connected => { 
 						let mask = port_no_mask | entry.get_mask();
 						entry.set_mask(mask);
-						send_entry_to_pe.send(entry);
+						try!(send_entry_to_pe.send(entry));
 					},
 					PortStatus::Disconnected => {
 						let mask = (!port_no_mask) & entry.get_mask();
 						entry.set_mask(mask);
-						send_entry_to_pe.send(entry);
+						try!(send_entry_to_pe.send(entry));
 					}
 				}
  			}
