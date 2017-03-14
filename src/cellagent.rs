@@ -2,22 +2,28 @@ use std::fmt;
 use std::sync::{Arc, Mutex};
 use std::sync::mpsc::{SendError, RecvError};
 use std::collections::HashMap;
+use std::sync::mpsc;
 use crossbeam::Scope;
 use config::{MAX_ENTRIES, MAX_PORTS};
-use message::{Sender,Receiver};
 use nalcell::{EntrySender, PortStatusReceiver};
-use name::{CellID, TreeID};
-use traph::{Traph, TraphError};
+use message::DiscoverMsg;
+use name::{Name, CellID, TreeID};
+use packet::Packet64;
 use routing_table::RoutingTableError;
 use routing_table_entry::RoutingTableEntry;
 use port::PortStatus;
+use traph::{Traph, TraphError};
 use utility::{int_to_mask, mask_from_port_nos};
+
+pub type SendPacket64 = mpsc::Sender<Packet64>;
+pub type ReceivePacket64 = mpsc::Receiver<Packet64>;
+pub type SendPacketError = SendError<Packet64>;
 
 type IndexArray = [usize; MAX_PORTS as usize];
 type PortArray = [u8; MAX_PORTS as usize];
 
-const CONTROL_TREE: &'static str = "Control";
-const CONNECTED_PORTS_TREE: &'static str = "Connected";
+const CONTROL_TREE_NAME: &'static str = "Control";
+const CONNECTED_PORTS_TREE_NAME: &'static str = "Connected";
 const OTHER_INDICES: IndexArray = [0; MAX_PORTS as usize];
 
 #[derive(Debug)]
@@ -28,31 +34,42 @@ pub struct CellAgent {
 	traphs: Arc<Mutex<HashMap<TreeID,Traph>>>,
 }
 impl CellAgent {
-	pub fn new(scope: &Scope, cell_id: &CellID, send_to_pe: Sender, recv_from_pe: Receiver, 
+	pub fn new(scope: &Scope, cell_id: &CellID, send_to_pe: SendPacket64, recv_from_pe: ReceivePacket64, 
 		send_entry_to_pe: EntrySender, recv_from_port: PortStatusReceiver) -> Result<CellAgent, CellAgentError> {
-		let control_tree_id = try!(TreeID::new(CONTROL_TREE));
-		let connected_tree_id = try!(TreeID::new(CONNECTED_PORTS_TREE));
+		let control_tree_id = try!(TreeID::new(CONTROL_TREE_NAME));
+		let connected_tree_id = try!(TreeID::new(CONNECTED_PORTS_TREE_NAME));
 		let mut free_indices = Vec::new();
 		for i in 2..MAX_ENTRIES { free_indices.push(i); } // O reserved for control tree, 1 for connected tree
 		free_indices.reverse();
 		let traphs = Arc::new(Mutex::new(HashMap::new()));
 		let mut ca = CellAgent { cell_id: cell_id.clone(), connected_ports_tree_id: connected_tree_id.clone(),
 			free_indices: free_indices, traphs: traphs };
+		// Set up predefined trees
 		let entry = try!(ca.new_tree(0, control_tree_id, 0, vec![0], 0, None));
 		try!(send_entry_to_pe.send(entry));
-		let entry = try!(ca.new_tree(1, connected_tree_id, 0, vec![], 0, None));
+		let connected_entry = try!(ca.new_tree(1, connected_tree_id.clone(), 0, vec![], 0, None));
 		try!(send_entry_to_pe.send(entry));
-		try!(ca.port_status(scope, entry, recv_from_port, send_entry_to_pe));
+		try!(ca.initiate_discover(connected_tree_id, &send_entry_to_pe));
+		try!(ca.port_status(scope, connected_entry, recv_from_port, send_entry_to_pe));
 		//thread::spawn( move || { CellAgent::work(cell_id.clone(), send_to_pe, recv_from_pe); } );
 		Ok(ca)
 	}
 	pub fn stringify(&self) -> String {
 		let mut s = format!("\nCell Agent {}", self.cell_id);
-		for (tree_id, traph) in self.traphs.lock().unwrap().iter() {
+		for (_, traph) in self.traphs.lock().unwrap().iter() {
 			s = s + &traph.stringify();
 		}
 		s
 	}	
+	pub fn initiate_discover(&mut self, connected_tree_id: TreeID, send_entry_to_pe: &EntrySender) -> Result<(), CellAgentError>{
+		// Create my tree
+		let index = try!(self.use_index());
+		let tree_id = try!(TreeID::new(self.cell_id.get_name()));
+		let entry = try!(self.new_tree(index, tree_id.clone(), 0, vec![], 0, None)); 
+		try!(send_entry_to_pe.send(entry));
+		let msg = DiscoverMsg::new(connected_tree_id, tree_id, self.cell_id.clone(), 0, 0);
+		Ok(())
+	}
 	pub fn new_tree(&mut self, index: usize, tree_id: TreeID, parent_no: u8, children: Vec<u8>, 
 					hops: usize, path: Option<&TreeID>) -> Result<RoutingTableEntry, CellAgentError> {
 		let mask = try!(mask_from_port_nos(children));
@@ -89,7 +106,7 @@ impl CellAgent {
 			None => Err(CellAgentError::Size(SizeError::new()))
 		}
 	}
-	pub fn work(cell_id: CellID, send_to_pe: Sender, recv_from_pe: Receiver) {
+	pub fn work(cell_id: CellID, send_to_pe: SendPacket64, recv_from_pe: ReceivePacket64) {
 		println!("Cell Agent on cell {} is working", cell_id);
 	}
 }

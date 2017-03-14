@@ -2,7 +2,7 @@ use std::fmt;
 use std::sync::{Arc, Mutex};
 use std::sync::mpsc::RecvError;
 use crossbeam::Scope;
-use message::{Sender, Receiver};
+use cellagent::{SendPacket64, ReceivePacket64};
 use nalcell::{EntryReceiver};
 use name::CellID;
 use routing_table::{RoutingTable, RoutingTableError};
@@ -14,14 +14,15 @@ pub struct PacketEngine {
 	routing_table: Arc<Mutex<RoutingTable>>,
 }
 impl PacketEngine {
-	pub fn new(scope: &Scope, cell_id: &CellID, send_to_ca: Sender, recv_from_ca: Receiver, recv_from_port: Receiver, 
-				send_to_ports: Vec<Sender>, recv_entry_from_ca: EntryReceiver) -> Result<PacketEngine, PacketEngineError> {
+	pub fn new(scope: &Scope, cell_id: &CellID, send_to_ca: SendPacket64, recv_from_ca: ReceivePacket64, 
+		recv_from_port: ReceivePacket64, send_to_ports: Vec<SendPacket64>, 
+		recv_entry_from_ca: EntryReceiver) -> Result<PacketEngine, PacketEngineError> {
 		let routing_table = Arc::new(Mutex::new(try!(RoutingTable::new()))); 
 		let pe = PacketEngine { cell_id: cell_id.clone(), routing_table: routing_table };
 		try!(pe.entry_channel(scope, recv_entry_from_ca));
 		Ok(pe)
 	}
-	fn ca_channel(&self, scope: &Scope, send_to_ca: Sender, recv_from_ca: Receiver) {
+	fn ca_channel(&self, scope: &Scope, send_to_ca: SendPacket64, recv_from_ca: ReceivePacket64) {
 		println!("Packet Engine for cell {} here", self.cell_id);
 	}
 	pub fn entry_channel(&self, scope: &Scope, recv_entry_from_ca: EntryReceiver) -> Result<(),PacketEngineError> {
