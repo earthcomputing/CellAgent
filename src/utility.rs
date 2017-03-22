@@ -1,4 +1,5 @@
 use config::{MAX_PORTS, SEPARATOR};
+use nalcell::PortNumber;
 
 pub fn get_first_arg(a: Vec<String>) -> Option<i32> {
 	if a.len() != 2 {
@@ -26,10 +27,10 @@ pub fn int_to_mask(i: u8) -> Result<u16, UtilityError> {
         Ok(mask)
     }
 }
-pub fn mask_from_port_nos(port_nos: Vec<u8>) -> Result<u16, UtilityError> {
+pub fn mask_from_port_nos(port_nos: Vec<PortNumber>) -> Result<u16, UtilityError> {
 	let mut mask: u16 = 0;
 	for port_no in port_nos.iter() {
-		mask = mask | try!(int_to_mask(*port_no));
+		mask = mask | try!(int_to_mask(port_no.get_port_no()));
 	}
 	Ok(mask)
 }

@@ -1,6 +1,6 @@
 use std::fmt;
 use std::thread;
-use nalcell::{PortStatusSender, PortStatusSenderError};
+use nalcell::{PortNumber, PortStatusSender, PortStatusSenderError};
 use cellagent::{SendPacketSmall, ReceivePacketSmall, SendPacketError};
 use name::{Name, NameError,PortID,CellID};
 
@@ -13,16 +13,16 @@ pub enum PortStatus {
 #[derive(Debug)]
 pub struct Port {
 	id: PortID,
-	port_no: u8,
+	port_no: PortNumber,
 	is_border: bool,
 	is_connected: bool,
 	is_broken: bool,
 	send_to_ca: PortStatusSender,
 }
 impl Port {
-	pub fn new(cell_id: &CellID, port_no: u8, is_border: bool, is_connected: bool,
+	pub fn new(cell_id: &CellID, port_no: PortNumber, is_border: bool, is_connected: bool,
 			   send_to_pe: SendPacketSmall, recv_from_pe: ReceivePacketSmall, send_to_ca: PortStatusSender) -> Result<Port,NameError>{
-		let port_id = try!(PortID::new(port_no));
+		let port_id = try!(PortID::new(port_no.get_port_no()));
 		let temp_id = try!(port_id.add_component(&cell_id.get_name()));
 		let port = Port{ id: temp_id, port_no: port_no, is_border: is_border, is_connected: is_connected, 
 			is_broken: false, send_to_ca: send_to_ca };
@@ -33,7 +33,7 @@ impl Port {
 		//println!("Port {} worker", port_id);
 	}
 	pub fn get_id(&self) -> PortID { self.id.clone() }
-	pub fn get_no(&self) -> u8 { self.port_no }
+	pub fn get_no(&self) -> u8 { self.port_no.get_port_no() }
 	pub fn is_connected(&self) -> bool { self.is_connected }
 	pub fn is_broken(&self) -> bool { self.is_broken }
 	pub fn is_border(&self) -> bool { self.is_border }
@@ -41,7 +41,7 @@ impl Port {
 		self.is_connected = true; 
 		let send_to_link = send;
 		let recv_from_link = recv;
-		try!(self.send_to_ca.send((self.port_no, PortStatus::Connected)));
+		try!(self.send_to_ca.send((self.port_no.get_port_no(), PortStatus::Connected)));
 		Ok(())
 	}
 	pub fn stringify(&self) -> String {

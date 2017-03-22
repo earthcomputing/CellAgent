@@ -46,7 +46,7 @@ impl NalCell {
 			else                    { is_border_port = false; }
 			let (pe_to_port, port_from_pe): (SendPacketSmall, ReceivePacketSmall) = channel();
 			pe_to_ports.push(pe_to_port);
-			let port = try!(Port::new(&cell_id, i as u8, is_border_port, is_connected,
+			let port = try!(Port::new(&cell_id, PortNumber { port_no: i as u8 }, is_border_port, is_connected,
 						port_to_pe.clone(), port_from_pe, port_to_ca.clone()));
 			ports.push(port);
 			is_connected = false;
@@ -62,6 +62,7 @@ impl NalCell {
 	}
 	pub fn get_id(&self) -> CellID { self.id.clone() }
 	pub fn get_no(&self) -> usize { self.cell_no }
+	pub fn get_no_ports(&self) -> usize { self.ports.len() }
 	pub fn get_port(&mut self, index: u8) -> &mut Port { &mut self.ports[index as usize] }
 	pub fn get_free_port_mut (&mut self) -> Result<&mut Port,NalCellError> {
 		for p in &mut self.ports.iter_mut() {
@@ -182,4 +183,27 @@ impl From<NumberPortsError> for NalCellError {
 }
 impl From<PortError> for NalCellError {
 	fn from(err: PortError) -> NalCellError { NalCellError::Port(err) }
+}
+#[derive(Debug, Copy, Clone)]
+pub struct PortNumber { pub port_no: u8 }
+impl PortNumber {
+	pub fn new(no: usize, cell: &NalCell) -> Result<PortNumber, PortNumberError> {
+		if no > cell.get_no_ports() {
+			Err(PortNumberError::new(no, cell))
+		} else {
+			Ok(PortNumber { port_no: (no as u8) })
+		}
+	}
+	pub fn get_port_no(&self) -> u8 { self.port_no }
+}
+impl fmt::Display for PortNumber {
+	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result { write!(f, "{}", self.port_no) }
+}
+pub struct PortNumberError { msg: String }
+impl PortNumberError {
+	fn new(port_no: usize, cell: &NalCell) -> PortNumberError {
+		let msg = format!("You asked for port number {}, but cell {} only has {} ports",
+			port_no, cell.get_id(), cell.get_no_ports());
+		PortNumberError { msg: msg }
+	}
 }

@@ -12,7 +12,8 @@ pub struct RoutingTableEntry {
 	other_indices: [usize; MAX_PORTS as usize]
 }
 impl RoutingTableEntry {
-	pub fn new(table_index: usize, inuse: bool, parent: u8, mask: u16, other_indices: [usize; MAX_PORTS]) -> RoutingTableEntry {
+	pub fn new(table_index: usize, inuse: bool, parent: u8, mask: u16, 
+			other_indices: [usize; MAX_PORTS]) -> RoutingTableEntry {
 		let mut indices = [0; MAX_PORTS as usize];
 		RoutingTableEntry { index: table_index, parent: 0,
 			inuse: inuse, mask: mask, other_indices: indices }

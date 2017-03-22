@@ -7,7 +7,7 @@ use std::sync::mpsc;
 use serde;
 use crossbeam::Scope;
 use config::{MAX_ENTRIES, MAX_PORTS, CHUNK_ID_SIZE};
-use nalcell::{EntrySender, PortStatusReceiver};
+use nalcell::{PortNumber, EntrySender, PortStatusReceiver};
 use message::{Message, MsgPayload, DiscoverMsg};
 use name::{Name, CellID, TreeID};
 use packet::{Packetizer, PacketSmall, PacketMedium, PacketLarge};
@@ -36,8 +36,9 @@ pub struct CellAgent {
 	traphs: Arc<Mutex<HashMap<TreeID,Traph>>>,
 }
 impl CellAgent {
-	pub fn new(scope: &Scope, cell_id: &CellID, send_to_pe: SendPacketSmall, recv_from_pe: ReceivePacketSmall, 
-		send_entry_to_pe: EntrySender, recv_from_port: PortStatusReceiver) -> Result<CellAgent, CellAgentError> {
+	pub fn new(scope: &Scope, cell_id: &CellID,  
+			send_to_pe: SendPacketSmall, recv_from_pe: ReceivePacketSmall, send_entry_to_pe: EntrySender, 
+			recv_from_port: PortStatusReceiver) -> Result<CellAgent, CellAgentError> {
 		let control_tree_id = try!(TreeID::new(CONTROL_TREE_NAME));
 		let connected_tree_id = try!(TreeID::new(CONNECTED_PORTS_TREE_NAME));
 		let mut free_indices = Vec::new();
@@ -47,7 +48,7 @@ impl CellAgent {
 		let mut ca = CellAgent { cell_id: cell_id.clone(), connected_ports_tree_id: connected_tree_id.clone(),
 			free_indices: free_indices, traphs: traphs };
 		// Set up predefined trees
-		let entry = try!(ca.new_tree(0, control_tree_id, 0, vec![0], 0, None));
+		let entry = try!(ca.new_tree(0, control_tree_id, 0, vec![PortNumber { port_no: 0 }], 0, None));
 		try!(send_entry_to_pe.send(entry));
 		let connected_entry = try!(ca.new_tree(1, connected_tree_id.clone(), 0, vec![], 0, None));
 		try!(send_entry_to_pe.send(entry));
@@ -80,7 +81,7 @@ impl CellAgent {
 		//let deserialized: DiscoverMsg = try!(serde_json::from_str(&serialized));
 		Ok(())
 	}
-	pub fn new_tree(&mut self, index: usize, tree_id: TreeID, parent_no: u8, children: Vec<u8>, 
+	pub fn new_tree(&mut self, index: usize, tree_id: TreeID, parent_no: u8, children: Vec<PortNumber>, 
 					hops: usize, path: Option<&TreeID>) -> Result<RoutingTableEntry, CellAgentError> {
 		let mask = try!(mask_from_port_nos(children));
 		let traph = try!(Traph::new(tree_id.clone(), index));
