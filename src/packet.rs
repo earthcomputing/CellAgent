@@ -22,14 +22,20 @@ pub trait Packet {
 	fn get_payload(&self) -> Vec<PacketElement>;
 	fn set_payload(&mut self, payload: &[u8]) -> Result<(), PacketizerError>;
 	fn get_packet_payload_size(&self) -> usize;
+	fn get_size(&self) -> usize;
 	fn stringify(&self) -> String {
 		format!("Payload: {:?}", self.get_payload())
 	}
 }
 pub struct Packetizer {}
 impl Packetizer {
-	pub fn packetize<T>(msg: &T, other_index: u32) -> Result<Vec<&Packet>, PacketizerError>
+	pub fn packetize<T>(msg: &T, other_index: u32) -> 
+		Result<Vec<(PacketSmall,PacketMedium,PacketLarge)>, PacketizerError>
 			where T: Message + Hash + serde::Serialize {
+		let serialized = try!(serde_json::to_string(&msg));
+		let bytes = serialized.into_bytes();
+		msg.get_header().set_msg_size(bytes.len());
+		// Redo after putting msg_size into message header
 		let serialized = try!(serde_json::to_string(&msg));
 		let bytes = serialized.into_bytes();
 		let packet = try!(Packetizer::packet_type(bytes.len()));
@@ -41,15 +47,32 @@ impl Packetizer {
 		packet_header.set_uniquifier(unique_id);
 		packet_header.set_index(other_index);
 		packet_header.set_direction(direction);
-		let packets = Vec::new();
-		let payload_size = packet.get_packet_payload_size();
+		let mut packets = Vec::new();
 		for i in 0..num_packets {
-			packet_header.set_count((num_packets as u32) - (i as u32));
+			packet_header.set_count(num_packets - i);
 			let mut packet_bytes = vec![PAYLOAD_DEFAULT_ELEMENT; payload_size];
 			for j in 0..payload_size {
 				if i*payload_size + j == bytes.len() { break; }
 				packet_bytes[j] = bytes[i*payload_size + j];
 			}
+			let (mut small, mut medium, mut large) = (PacketSmall::new(), PacketMedium::new(), 
+					PacketLarge::new());
+			match payload_size {
+				PAYLOAD_SMALL => {
+					small.set_header(packet_header);
+					small.set_payload(&bytes);
+				},
+				PAYLOAD_MEDIUM => {
+					medium.set_header(packet_header);
+					medium.set_payload(&bytes);
+				},
+				PAYLOAD_LARGE => {
+					large.set_header(packet_header);
+					large.set_payload(&bytes);
+				}
+				_ => return Err(PacketizerError::Size(SizeError::new(payload_size)))
+			}
+			packets.push((small, medium, large));
 		}
 		Ok(packets)
 	}
@@ -83,8 +106,8 @@ impl PacketHeader {
 	}
 	pub fn get_uniquifier(&self) -> u64 { self.uniquifier }
 	fn set_uniquifier(&mut self, uniquifier: u64) { self.uniquifier = uniquifier; }
-	fn get_count(&self) -> u32 { self.count }
-	fn set_count(&mut self, count: u32) { self.count = count; }
+	pub fn get_count(&self) -> u32 { self.count }
+	fn set_count(&mut self, count: usize) { self.count = count as u32; }
 	pub fn is_root_cast(&self) -> bool { self.is_rootcast }
 	pub fn is_leaf_cast(&self) -> bool { self.is_rootcast }
 	fn set_direction(&mut self, direction: bool) { self.is_rootcast = direction; }
@@ -120,6 +143,7 @@ impl Packet for PacketSmall {
 		for i in payload.iter() { self.payload[*i as usize] = payload[*i as usize]; } 
 		Ok(())
 	}
+	fn get_size(&self) -> usize { PACKET_SMALL }
 	fn get_packet_payload_size(&self) -> usize { PAYLOAD_SMALL }
 }
 impl Clone for PacketSmall {
@@ -156,6 +180,7 @@ impl Packet for PacketMedium {
 		for i in payload.iter() { self.payload[*i as usize] = payload[*i as usize]; } 
 		Ok(())
 	}
+	fn get_size(&self) -> usize { PACKET_MEDIUM }
 	fn get_packet_payload_size(&self) -> usize { PAYLOAD_MEDIUM }
 }
 impl Clone for PacketMedium {
@@ -191,6 +216,7 @@ impl Packet for PacketLarge {
 		self.payload = [PAYLOAD_DEFAULT_ELEMENT; PAYLOAD_LARGE];
 		Ok(())
 	}
+	fn get_size(&self) -> usize { PACKET_LARGE }	
 	fn get_packet_payload_size(&self) -> usize { PAYLOAD_LARGE }
 }
 impl Clone for PacketLarge {

@@ -36,18 +36,18 @@ impl fmt::Display for MsgDirection {
 pub struct MsgHeader {
 	tree_id: TreeID,
 	direction: MsgDirection,
-	sending_port: u8,
+	msg_size: usize,		// Size of serialized message in bytes, includes header
 }
 impl MsgHeader {
 	pub fn new(tree_id: TreeID, direction: MsgDirection) -> MsgHeader {
-		MsgHeader { tree_id: tree_id, direction: direction, sending_port: 0 }
+		MsgHeader { tree_id: tree_id, direction: direction, msg_size: 0 }
 	}
 	pub fn get_tree_id(&self) -> TreeID { self.tree_id.clone() }
 	pub fn get_direction(&self) -> MsgDirection { self.direction }
-	pub fn get_sending_port(&self) -> u8 { self.sending_port }
+	pub fn get_msg_size(&self) -> usize { self.msg_size }
 	pub fn set_tree_id(&mut self, tree_id: TreeID) { self.tree_id = tree_id; }
 	pub fn set_direction(&mut self, direction: MsgDirection) { self.direction = direction; }
-	pub fn set_sending_port(&mut self, sending_port: u8) { self.sending_port = sending_port; }
+	pub fn set_msg_size(&mut self, msg_size: usize) { self.msg_size = msg_size; }
 	pub fn stringify(&self) -> String {
 		format!("Message {} on Tree '{}'", self.direction, self.tree_id)
 	}

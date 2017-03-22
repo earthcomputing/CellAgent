@@ -10,7 +10,7 @@ use config::{MAX_ENTRIES, MAX_PORTS, CHUNK_ID_SIZE};
 use nalcell::{PortNumber, EntrySender, PortStatusReceiver};
 use message::{Message, MsgPayload, DiscoverMsg};
 use name::{Name, CellID, TreeID};
-use packet::{Packetizer, PacketSmall, PacketMedium, PacketLarge};
+use packet::{Packet, Packetizer, PacketSmall, PacketMedium, PacketLarge, PacketizerError};
 use port::Port;
 use routing_table::RoutingTableError;
 use routing_table_entry::RoutingTableEntry;
@@ -80,7 +80,18 @@ impl CellAgent {
 	}
 	fn send_msg<T>(&self, msg: T, other_index: u32) -> Result<(), CellAgentError> 
 			where T: Message + Hash + serde::Serialize {
-		let packets = Packetizer::packetize(&msg, other_index);
+		let packets = try!(Packetizer::packetize(&msg, other_index));
+		for packet in packets.iter() {
+			if packet.0.get_header().get_count() > 0 {
+				println!("small");
+			} else if packet.1.get_header().get_count() > 0 {
+				println!("medium");
+			} else if packet.2.get_header().get_count() > 0 {
+				println!("large");
+			} else {
+				return Err(CellAgentError::BadPacket(BadPacketError::new()));
+			}
+		}		
 		//let deserialized: DiscoverMsg = try!(serde_json::from_str(&serialized));
 		Ok(())
 	}
@@ -140,6 +151,8 @@ pub enum CellAgentError {
 	Size(SizeError),
 	Tree(TreeError),
 	Traph(TraphError),
+	Packetizer(PacketizerError),
+	BadPacket(BadPacketError),
 	Utility(UtilityError),
 	NoFreePort(NoFreePortError),
 	Routing(RoutingTableError),
@@ -149,6 +162,8 @@ pub enum CellAgentError {
 impl Error for CellAgentError {
 	fn description(&self) -> &str {
 		match *self {
+			CellAgentError::Packetizer(ref err) => err.description(),
+			CellAgentError::BadPacket(ref err) => err.description(),
 			CellAgentError::NoFreePort(ref err) => err.description(),
 			CellAgentError::Name(ref err) => err.description(),
 			CellAgentError::Size(ref err) => err.description(),
@@ -162,6 +177,8 @@ impl Error for CellAgentError {
 	}
 	fn cause(&self) -> Option<&Error> {
 		match *self {
+			CellAgentError::Packetizer(ref err) => Some(err),
+			CellAgentError::BadPacket(ref err) => Some(err),
 			CellAgentError::NoFreePort(ref err) => Some(err),
 			CellAgentError::Name(ref err) => Some(err),
 			CellAgentError::Size(ref err) => Some(err),
@@ -177,6 +194,8 @@ impl Error for CellAgentError {
 impl fmt::Display for CellAgentError {
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
 		match *self {
+			CellAgentError::Packetizer(ref err) => write!(f, "Cell Agent Packetizer Error caused by {}", err),
+			CellAgentError::BadPacket(ref err) => write!(f, "Cell Agent Bad Packet Error caused by {}", err),
 			CellAgentError::NoFreePort(ref err) => write!(f, "Cell Agent No Free Port Error caused by {}", err),
 			CellAgentError::Name(ref err) => write!(f, "Cell Agent Name Error caused by {}", err),
 			CellAgentError::Size(ref err) => write!(f, "Cell Agent Size Error caused by {}", err),
@@ -227,6 +246,25 @@ impl From<SizeError> for CellAgentError {
 	fn from(err: SizeError) -> CellAgentError { CellAgentError::Size(err) }
 }
 #[derive(Debug)]
+pub struct BadPacketError { msg: String }
+impl BadPacketError { 
+	pub fn new() -> BadPacketError {
+		BadPacketError { msg: format!("No packet created by packetizer") }
+	}
+}
+impl Error for BadPacketError {
+	fn description(&self) -> &str { &self.msg }
+	fn cause(&self) -> Option<&Error> { None }
+}
+impl fmt::Display for BadPacketError {
+	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+		write!(f, "{}", self.msg)
+	}
+}
+impl From<BadPacketError> for CellAgentError {
+	fn from(err: BadPacketError) -> CellAgentError { CellAgentError::BadPacket(err) }
+}
+#[derive(Debug)]
 pub struct TreeError { msg: String }
 impl TreeError { 
 	pub fn new(tree_id: &TreeID) -> TreeError {
@@ -263,4 +301,7 @@ impl fmt::Display for NoFreePortError {
 }
 impl From<NoFreePortError> for CellAgentError {
 	fn from(err: NoFreePortError) -> CellAgentError { CellAgentError::NoFreePort(err) }
+}
+impl From<PacketizerError> for CellAgentError {
+	fn from(err: PacketizerError) -> CellAgentError { CellAgentError::Packetizer(err) }
 }
