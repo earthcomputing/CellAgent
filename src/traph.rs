@@ -1,5 +1,6 @@
 use std::fmt;
 use config::MAX_PORTS;
+use nalcell::PortNumber;
 use name::{TreeID, PortID, NameError};
 use port::Port;
 
@@ -31,24 +32,22 @@ impl Traph {
 	}
 	pub fn add_element(&mut self, port: Port, other_index: usize) -> Result<(), TraphError> {
 		let port_no = port.get_no();
-		if port_no > MAX_PORTS { return Err(TraphError::Port(PortError::new(port_no))) };
 		let port_id = port.get_id();
 		let element = TraphElement::new(port_no, port_id, other_index);
 		self.elements[port_no as usize] = element;
 		Ok(())
 	}
-	pub fn set_connected(&mut self, port_no: u8) -> Result<(), TraphError> { 
+	pub fn set_connected(&mut self, port_no: PortNumber) -> Result<(), TraphError> { 
 		self.set_connected_state(port_no, true); 
 		Ok(())
 	}
-	pub fn set_disconnected(&mut self, port_no: u8) -> Result<(), TraphError> { 
+	pub fn set_disconnected(&mut self, port_no: PortNumber) -> Result<(), TraphError> { 
 		self.set_connected_state(port_no, false); 
 		Ok(())
 	}
-	fn set_connected_state(&mut self, port_no: u8, state: bool) -> Result<(),TraphError> {
-		if port_no > MAX_PORTS { return Err(TraphError::Port(PortError::new(port_no))); }
-		if state { self.elements[port_no as usize].set_connected(); }
-		else     { self.elements[port_no as usize].set_disconnected(); }
+	fn set_connected_state(&mut self, port_no: PortNumber, state: bool) -> Result<(),TraphError> {
+		if state { self.elements[port_no.get_port_no() as usize].set_connected(); }
+		else     { self.elements[port_no.get_port_no() as usize].set_disconnected(); }
 		Ok(())
 	}
 }
@@ -72,21 +71,18 @@ use std::error::Error;
 #[derive(Debug)]
 pub enum TraphError {
 	Name(NameError),
-	Port(PortError),
 	Lookup(LookupError),
 }
 impl Error for TraphError {
 	fn description(&self) -> &str {
 		match *self {
 			TraphError::Name(ref err) => err.description(),
-			TraphError::Port(ref err) => err.description(),
 			TraphError::Lookup(ref err) => err.description(),
 		}
 	}
 	fn cause(&self) -> Option<&Error> {
 		match *self {
 			TraphError::Name(ref err) => Some(err),
-			TraphError::Port(ref err) => Some(err),
 			TraphError::Lookup(ref err) => Some(err),
 		}
 	}
@@ -95,29 +91,9 @@ impl fmt::Display for TraphError {
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
 		match *self {
 			TraphError::Name(ref err) => write!(f, "Traph Name Error caused by {}", err),
-			TraphError::Port(ref err) => write!(f, "Traph Port Error caused by {}", err),
 			TraphError::Lookup(ref err) => write!(f, "Traph Lookup Error caused by {}", err),
 		}
 	}
-}
-#[derive(Debug)]
-pub struct PortError { msg: String }
-impl PortError { 
-	pub fn new(port_no: u8) -> PortError {
-		PortError { msg: format!("Port number {} is greater than the maximum of {}", port_no, MAX_PORTS) }
-	}
-}
-impl Error for PortError {
-	fn description(&self) -> &str { &self.msg }
-	fn cause(&self) -> Option<&Error> { None }
-}
-impl fmt::Display for PortError {
-	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-		write!(f, "{}", self.msg)
-	}
-}
-impl From<PortError> for TraphError {
-	fn from(err: PortError) -> TraphError { TraphError::Port(err) }
 }
 #[derive(Debug)]
 pub struct LookupError { msg: String }
