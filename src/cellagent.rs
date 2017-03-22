@@ -11,6 +11,7 @@ use nalcell::{PortNumber, EntrySender, PortStatusReceiver};
 use message::{Message, MsgPayload, DiscoverMsg};
 use name::{Name, CellID, TreeID};
 use packet::{Packetizer, PacketSmall, PacketMedium, PacketLarge};
+use port::Port;
 use routing_table::RoutingTableError;
 use routing_table_entry::RoutingTableEntry;
 use port::PortStatus;
@@ -31,12 +32,13 @@ const OTHER_INDICES: IndexArray = [0; MAX_PORTS as usize];
 #[derive(Debug)]
 pub struct CellAgent {
 	cell_id: CellID,
+	ports: Box<[Port]>,
 	connected_ports_tree_id: TreeID,
 	free_indices: Vec<usize>,
 	traphs: Arc<Mutex<HashMap<TreeID,Traph>>>,
 }
 impl CellAgent {
-	pub fn new(scope: &Scope, cell_id: &CellID,  
+	pub fn new(scope: &Scope, cell_id: &CellID, ports: Box<[Port]>,
 			send_to_pe: SendPacketSmall, recv_from_pe: ReceivePacketSmall, send_entry_to_pe: EntrySender, 
 			recv_from_port: PortStatusReceiver) -> Result<CellAgent, CellAgentError> {
 		let control_tree_id = try!(TreeID::new(CONTROL_TREE_NAME));
@@ -45,8 +47,8 @@ impl CellAgent {
 		for i in 2..MAX_ENTRIES { free_indices.push(i); } // O reserved for control tree, 1 for connected tree
 		free_indices.reverse();
 		let traphs = Arc::new(Mutex::new(HashMap::new()));
-		let mut ca = CellAgent { cell_id: cell_id.clone(), connected_ports_tree_id: connected_tree_id.clone(),
-			free_indices: free_indices, traphs: traphs };
+		let mut ca = CellAgent { cell_id: cell_id.clone(), ports: ports,
+			connected_ports_tree_id: connected_tree_id.clone(), free_indices: free_indices, traphs: traphs };
 		// Set up predefined trees
 		let entry = try!(ca.new_tree(0, control_tree_id, 0, vec![PortNumber { port_no: 0 }], 0, None));
 		try!(send_entry_to_pe.send(entry));
@@ -63,7 +65,8 @@ impl CellAgent {
 			s = s + &traph.stringify();
 		}
 		s
-	}	
+	}
+	pub fn get_no_ports(&self) -> usize { self.ports.len() }	
 	pub fn initiate_discover(&mut self, connected_tree_id: TreeID, send_entry_to_pe: &EntrySender) -> Result<(), CellAgentError>{
 		// Create my tree
 		let index = try!(self.use_index());
@@ -117,6 +120,12 @@ impl CellAgent {
 			None => Err(CellAgentError::Size(SizeError::new()))
 		}
 	}
+	pub fn get_free_port_mut (&mut self) -> Result<&mut Port,CellAgentError> {
+		for p in &mut self.ports.iter_mut() {
+			if !p.is_connected() & !p.is_border() { return Ok(p); }
+		}
+		Err(CellAgentError::NoFreePort(NoFreePortError::new(self.cell_id.clone())))
+	}
 	pub fn work(cell_id: CellID, send_to_pe: SendPacketSmall, recv_from_pe: ReceivePacketSmall) {
 		println!("Cell Agent on cell {} is working", cell_id);
 	}
@@ -132,6 +141,7 @@ pub enum CellAgentError {
 	Tree(TreeError),
 	Traph(TraphError),
 	Utility(UtilityError),
+	NoFreePort(NoFreePortError),
 	Routing(RoutingTableError),
 	Send(SendError<RoutingTableEntry>),
 	Recv(RecvError),
@@ -139,6 +149,7 @@ pub enum CellAgentError {
 impl Error for CellAgentError {
 	fn description(&self) -> &str {
 		match *self {
+			CellAgentError::NoFreePort(ref err) => err.description(),
 			CellAgentError::Name(ref err) => err.description(),
 			CellAgentError::Size(ref err) => err.description(),
 			CellAgentError::Tree(ref err) => err.description(),
@@ -151,6 +162,7 @@ impl Error for CellAgentError {
 	}
 	fn cause(&self) -> Option<&Error> {
 		match *self {
+			CellAgentError::NoFreePort(ref err) => Some(err),
 			CellAgentError::Name(ref err) => Some(err),
 			CellAgentError::Size(ref err) => Some(err),
 			CellAgentError::Tree(ref err) => Some(err),
@@ -165,6 +177,7 @@ impl Error for CellAgentError {
 impl fmt::Display for CellAgentError {
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
 		match *self {
+			CellAgentError::NoFreePort(ref err) => write!(f, "Cell Agent No Free Port Error caused by {}", err),
 			CellAgentError::Name(ref err) => write!(f, "Cell Agent Name Error caused by {}", err),
 			CellAgentError::Size(ref err) => write!(f, "Cell Agent Size Error caused by {}", err),
 			CellAgentError::Tree(ref err) => write!(f, "Cell Agent Tree Error caused by {}", err),
@@ -231,4 +244,23 @@ impl fmt::Display for TreeError {
 }
 impl From<TreeError> for CellAgentError {
 	fn from(err: TreeError) -> CellAgentError { CellAgentError::Tree(err) }
+}
+#[derive(Debug)]
+pub struct NoFreePortError { msg: String }
+impl NoFreePortError { 
+	pub fn new(cell_id: CellID) -> NoFreePortError {
+		NoFreePortError { msg: format!("All ports have been assigned for cell {}", cell_id) }
+	}
+}
+impl Error for NoFreePortError {
+	fn description(&self) -> &str { &self.msg }
+	fn cause(&self) -> Option<&Error> { None }
+}
+impl fmt::Display for NoFreePortError {
+	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+		write!(f, "{}", self.msg)
+	}
+}
+impl From<NoFreePortError> for CellAgentError {
+	fn from(err: NoFreePortError) -> CellAgentError { CellAgentError::NoFreePort(err) }
 }
