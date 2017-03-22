@@ -1,7 +1,7 @@
 use std::fmt;
 use std::thread;
 use nalcell::{PortStatusSender, PortStatusSenderError};
-use cellagent::{SendPacket64, ReceivePacket64, SendPacketError};
+use cellagent::{SendPacketSmall, ReceivePacketSmall, SendPacketError};
 use name::{Name, NameError,PortID,CellID};
 
 #[derive(Debug, Copy, Clone)]
@@ -17,17 +17,15 @@ pub struct Port {
 	is_border: bool,
 	is_connected: bool,
 	is_broken: bool,
-	send_to_pe: SendPacket64,
-	recv_from_pe: ReceivePacket64,
 	send_to_ca: PortStatusSender,
 }
 impl Port {
 	pub fn new(cell_id: &CellID, port_no: u8, is_border: bool, is_connected: bool,
-			   send_to_pe: SendPacket64, recv_from_pe: ReceivePacket64, send_to_ca: PortStatusSender) -> Result<Port,NameError>{
+			   send_to_pe: SendPacketSmall, recv_from_pe: ReceivePacketSmall, send_to_ca: PortStatusSender) -> Result<Port,NameError>{
 		let port_id = try!(PortID::new(port_no));
 		let temp_id = try!(port_id.add_component(&cell_id.get_name()));
 		let port = Port{ id: temp_id, port_no: port_no, is_border: is_border, is_connected: is_connected, 
-			is_broken: false, send_to_pe: send_to_pe, recv_from_pe: recv_from_pe, send_to_ca: send_to_ca };
+			is_broken: false, send_to_ca: send_to_ca };
 		port.work(&port_id);
 		Ok(port)
 	}
@@ -39,7 +37,7 @@ impl Port {
 	pub fn is_connected(&self) -> bool { self.is_connected }
 	pub fn is_broken(&self) -> bool { self.is_broken }
 	pub fn is_border(&self) -> bool { self.is_border }
-	pub fn set_connected(&mut self, send: SendPacket64, recv: ReceivePacket64) -> Result<(),PortStatusSenderError> { 
+	pub fn set_connected(&mut self, send: SendPacketSmall, recv: ReceivePacketSmall) -> Result<(),PortStatusSenderError> { 
 		self.is_connected = true; 
 		let send_to_link = send;
 		let recv_from_link = recv;
