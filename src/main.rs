@@ -1,4 +1,8 @@
 extern crate crossbeam;
+extern crate serde;
+#[macro_use]
+extern crate serde_derive;
+extern crate serde_json;
 mod cellagent;
 mod config;
 mod datacenter;
@@ -24,6 +28,11 @@ use datacenter::{Datacenter};
 use ecargs::{ECArgs};
 use name::{CellID};
 use tenant::{Tenant};
+#[derive(Serialize, Deserialize, Debug)]
+struct Point {
+    x: i32,
+    y: i32,
+}
 
 fn main() {
 	println!("Multicell Routing");

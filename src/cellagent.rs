@@ -1,23 +1,25 @@
 use std::fmt;
 use std::sync::{Arc, Mutex};
 use std::sync::mpsc::{SendError, RecvError};
+use std::hash::Hash;
 use std::collections::HashMap;
 use std::sync::mpsc;
+use serde;
 use crossbeam::Scope;
-use config::{MAX_ENTRIES, MAX_PORTS};
+use config::{MAX_ENTRIES, MAX_PORTS, CHUNK_ID_SIZE};
 use nalcell::{EntrySender, PortStatusReceiver};
-use message::DiscoverMsg;
+use message::{Message, MsgPayload, DiscoverMsg};
 use name::{Name, CellID, TreeID};
-use packet::Packet64;
+use packet::{Packetizer, PacketSmall, PacketMedium, PacketLarge};
 use routing_table::RoutingTableError;
 use routing_table_entry::RoutingTableEntry;
 use port::PortStatus;
 use traph::{Traph, TraphError};
 use utility::{int_to_mask, mask_from_port_nos};
 
-pub type SendPacket64 = mpsc::Sender<Packet64>;
-pub type ReceivePacket64 = mpsc::Receiver<Packet64>;
-pub type SendPacketError = SendError<Packet64>;
+pub type SendPacketSmall = mpsc::Sender<PacketSmall>;
+pub type ReceivePacketSmall = mpsc::Receiver<PacketSmall>;
+pub type SendPacketError = SendError<PacketSmall>;
 
 type IndexArray = [usize; MAX_PORTS as usize];
 type PortArray = [u8; MAX_PORTS as usize];
@@ -34,7 +36,7 @@ pub struct CellAgent {
 	traphs: Arc<Mutex<HashMap<TreeID,Traph>>>,
 }
 impl CellAgent {
-	pub fn new(scope: &Scope, cell_id: &CellID, send_to_pe: SendPacket64, recv_from_pe: ReceivePacket64, 
+	pub fn new(scope: &Scope, cell_id: &CellID, send_to_pe: SendPacketSmall, recv_from_pe: ReceivePacketSmall, 
 		send_entry_to_pe: EntrySender, recv_from_port: PortStatusReceiver) -> Result<CellAgent, CellAgentError> {
 		let control_tree_id = try!(TreeID::new(CONTROL_TREE_NAME));
 		let connected_tree_id = try!(TreeID::new(CONNECTED_PORTS_TREE_NAME));
@@ -68,6 +70,14 @@ impl CellAgent {
 		let entry = try!(self.new_tree(index, tree_id.clone(), 0, vec![], 0, None)); 
 		try!(send_entry_to_pe.send(entry));
 		let msg = DiscoverMsg::new(connected_tree_id, tree_id, self.cell_id.clone(), 0, 0);
+		println!("Msg: {}", msg);
+		try!(self.send_msg(msg, 0));
+		Ok(())
+	}
+	fn send_msg<T>(&self, msg: T, other_index: u32) -> Result<(), CellAgentError> 
+			where T: Message + Hash + serde::Serialize {
+		let packets = Packetizer::packetize(&msg, other_index);
+		//let deserialized: DiscoverMsg = try!(serde_json::from_str(&serialized));
 		Ok(())
 	}
 	pub fn new_tree(&mut self, index: usize, tree_id: TreeID, parent_no: u8, children: Vec<u8>, 
@@ -106,7 +116,7 @@ impl CellAgent {
 			None => Err(CellAgentError::Size(SizeError::new()))
 		}
 	}
-	pub fn work(cell_id: CellID, send_to_pe: SendPacket64, recv_from_pe: ReceivePacket64) {
+	pub fn work(cell_id: CellID, send_to_pe: SendPacketSmall, recv_from_pe: ReceivePacketSmall) {
 		println!("Cell Agent on cell {} is working", cell_id);
 	}
 }

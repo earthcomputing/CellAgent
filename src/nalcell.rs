@@ -5,7 +5,7 @@ use std::{thread, time};
 use crossbeam::Scope;
 use cellagent::{CellAgent, CellAgentError};
 use config::MAX_PORTS;
-use cellagent::{SendPacket64, ReceivePacket64};
+use cellagent::{SendPacketSmall, ReceivePacketSmall};
 use name::{CellID, PortID};
 use packet_engine::PacketEngine;
 use port::{Port, PortStatus, PortError};
@@ -33,9 +33,9 @@ impl NalCell {
 		if nports > MAX_PORTS { return Err(NalCellError::NumberPorts(NumberPortsError::new(nports))) }
 		let cell_id = try!(CellID::new(cell_no));
 		let (ca_entry_to_pe, pe_entry_from_ca): (EntrySender, EntryReceiver) = channel();
-		let (ca_to_pe, pe_from_ca): (SendPacket64, ReceivePacket64) = channel();
-		let (pe_to_ca, ca_from_pe): (SendPacket64, ReceivePacket64) = channel();
-		let (port_to_pe, pe_from_port): (SendPacket64, ReceivePacket64) = channel();
+		let (ca_to_pe, pe_from_ca): (SendPacketSmall, ReceivePacketSmall) = channel();
+		let (pe_to_ca, ca_from_pe): (SendPacketSmall, ReceivePacketSmall) = channel();
+		let (port_to_pe, pe_from_port): (SendPacketSmall, ReceivePacketSmall) = channel();
 		let (port_to_ca, ca_from_port): (PortStatusSender, PortStatusReceiver) = channel();
 		let mut ports = Vec::new();
 		let mut pe_to_ports = Vec::new();
@@ -44,7 +44,7 @@ impl NalCell {
 			let mut is_border_port;
 			if is_border & (i == 2) { is_border_port = true; }
 			else                    { is_border_port = false; }
-			let (pe_to_port, port_from_pe): (SendPacket64, ReceivePacket64) = channel();
+			let (pe_to_port, port_from_pe): (SendPacketSmall, ReceivePacketSmall) = channel();
 			pe_to_ports.push(pe_to_port);
 			let port = try!(Port::new(&cell_id, i as u8, is_border_port, is_connected,
 						port_to_pe.clone(), port_from_pe, port_to_ca.clone()));

@@ -1,5 +1,6 @@
 use std::fmt;
 use std::marker::Sized;
+use serde_derive;
 use config::SEPARATOR;
 // Using String means names are not Copy
 type NAME = String;
@@ -22,7 +23,7 @@ pub trait Name: Sized {
 		}
 	}		
 }
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct CellID { name: NAME, }
 impl<'a> CellID {
 	pub fn new(n: usize) -> Result<CellID,NameError> { 
@@ -48,7 +49,7 @@ impl Name for PortID {
 	fn create_from_string(&self, n: String) -> PortID { PortID { name: n } }
 }
 impl fmt::Display for PortID { fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result { self.name.fmt(f) } }
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct TreeID { name: NAME, }
 impl<'a> TreeID {
 	pub fn new(n: &str) -> Result<TreeID,NameError> { 
