@@ -1,8 +1,15 @@
 use std::fmt;
 use cellagent::CellAgent;
 use name::{CellID, TreeID};
+use nalcell::PortNumber;
 
+#[derive(Debug, Clone, Hash, Serialize, Deserialize)]
+pub enum MsgType {
+	Discover,
+	DiscoverD,
+}
 pub trait Message {
+	fn get_msg_type(&self) -> MsgType;
 	fn get_header(&self) -> MsgHeader;
 	fn get_payload(&self) -> Box<MsgPayload>;
 	fn is_rootward(&self) -> bool {
@@ -54,19 +61,20 @@ impl fmt::Display for MsgHeader {
 }
 #[derive(Debug, Clone, Hash, Serialize, Deserialize)]
 pub struct DiscoverMsg {
+	msg_type: MsgType,
 	header: MsgHeader,
 	payload: DiscoverPayload
 }
 impl DiscoverMsg {
-	pub fn new(connected_ports_id: TreeID, tree_id: TreeID, sending_node_id: CellID, hops: usize, path: u8) -> DiscoverMsg {
+	pub fn new(connected_ports_id: TreeID, tree_id: TreeID, 
+			sending_node_id: CellID, hops: usize, path: PortNumber) -> DiscoverMsg {
 		let payload = DiscoverPayload::new(tree_id, sending_node_id, hops, path);
 		let header = MsgHeader::new(connected_ports_id, MsgDirection::Leafward);
-		DiscoverMsg { header: header, payload: payload }
+		DiscoverMsg { msg_type: MsgType::Discover, header: header, payload: payload }
 	}
-	pub fn get_header(&self) -> MsgHeader { self.header.clone() }
-	pub fn get_payload(&self) -> DiscoverPayload { self.payload.clone() }
 }
 impl Message for DiscoverMsg {
+	fn get_msg_type(&self) -> MsgType { self.msg_type.clone() }
 	fn get_header(&self) -> MsgHeader { self.header.clone() }
 	fn get_payload(&self) -> Box<MsgPayload> { Box::new(self.payload.clone()) }
 	fn process(&self, port_no: u8, cell_agent: &CellAgent) { println!("message::process	not implemented"); }
@@ -82,10 +90,10 @@ struct DiscoverPayload {
 	tree_id: TreeID,
 	sending_node_id: CellID,
 	hops: usize,
-	path: u8,
+	path: PortNumber,
 }
 impl DiscoverPayload {
-	fn new(tree_id: TreeID, sending_node_id: CellID, hops: usize, path: u8) -> DiscoverPayload {
+	fn new(tree_id: TreeID, sending_node_id: CellID, hops: usize, path: PortNumber) -> DiscoverPayload {
 		DiscoverPayload { tree_id: tree_id, sending_node_id: sending_node_id, hops: hops, path: path }
 	}
 }
@@ -99,3 +107,10 @@ impl MsgPayload for DiscoverPayload {
 				self.hops, self.path)
 	}
 }
+#[derive(Debug, Clone, Hash, Serialize, Deserialize)]
+pub struct DiscoverDMsg {
+	header: MsgHeader,
+	payload: DiscoverDPayload
+}
+#[derive(Debug, Clone, Hash, Serialize, Deserialize)]
+pub struct DiscoverDPayload {}
