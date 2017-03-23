@@ -1,4 +1,5 @@
 use std::fmt;
+use std::str;
 use std::sync::{Arc, Mutex};
 use std::sync::mpsc::{SendError, RecvError};
 use std::hash::Hash;
@@ -10,7 +11,7 @@ use config::{MAX_ENTRIES, MAX_PORTS, CHUNK_ID_SIZE};
 use nalcell::{PortNumber, EntrySender, PortStatusReceiver};
 use message::{Message, MsgPayload, DiscoverMsg};
 use name::{Name, CellID, TreeID};
-use packet::{Packet, Packetizer, PacketSmall, PacketMedium, PacketLarge, PacketizerError};
+use packet::{Packet, Packetizer, PacketizerError};
 use port::Port;
 use routing_table::RoutingTableError;
 use routing_table_entry::RoutingTableEntry;
@@ -18,9 +19,9 @@ use port::PortStatus;
 use traph::{Traph, TraphError};
 use utility::{int_to_mask, mask_from_port_nos};
 
-pub type SendPacketSmall = mpsc::Sender<PacketSmall>;
-pub type ReceivePacketSmall = mpsc::Receiver<PacketSmall>;
-pub type SendPacketError = SendError<PacketSmall>;
+pub type SendPacketSmall = mpsc::Sender<Packet>;
+pub type ReceivePacketSmall = mpsc::Receiver<Packet>;
+pub type SendPacketError = SendError<Packet>;
 
 type IndexArray = [usize; MAX_PORTS as usize];
 type PortArray = [u8; MAX_PORTS as usize];
@@ -81,7 +82,6 @@ impl CellAgent {
 	fn send_msg<T>(&self, msg: T, other_index: u32) -> Result<(), CellAgentError> 
 			where T: Message + Hash + serde::Serialize {
 		let packets = try!(Packetizer::packetize(&msg, other_index));
-		println!("packet size {}", packets[0].get_size());
 		//let deserialized: DiscoverMsg = try!(serde_json::from_str(&serialized));
 		Ok(())
 	}
