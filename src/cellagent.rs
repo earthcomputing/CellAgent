@@ -9,7 +9,7 @@ use serde;
 use crossbeam::Scope;
 use config::{MAX_ENTRIES, MAX_PORTS, CHUNK_ID_SIZE};
 use nalcell::{PortNumber, EntrySender, PortStatusReceiver};
-use message::{Message, MsgPayload, DiscoverMsg};
+use message::{Message, MsgType, MsgPayload, DiscoverMsg};
 use name::{Name, CellID, TreeID};
 use packet::{Packet, Packetizer, PacketizerError};
 use port::Port;
@@ -19,16 +19,18 @@ use port::PortStatus;
 use traph::{Traph, TraphError};
 use utility::{int_to_mask, mask_from_port_nos};
 
-pub type SendPacketSmall = mpsc::Sender<Packet>;
-pub type ReceivePacketSmall = mpsc::Receiver<Packet>;
+pub type SendPacketSmall = mpsc::Sender<(u16, u16, Packet)>;
+pub type ReceivePacketSmall = mpsc::Receiver<(u16, u16, Packet)>;
 pub type SendPacketError = SendError<Packet>;
 
 type IndexArray = [usize; MAX_PORTS as usize];
-type PortArray = [u8; MAX_PORTS as usize];
 
 const CONTROL_TREE_NAME: &'static str = "Control";
 const CONNECTED_PORTS_TREE_NAME: &'static str = "Connected";
 const OTHER_INDICES: IndexArray = [0; MAX_PORTS as usize];
+const BASE_TENANT_MASK: u16 = 255;
+const DEFAULT_USER_MASK: u16 = 255;
+const CONTROL_TREE_OTHER_INDEX: u32 = 0;
 
 #[derive(Debug)]
 pub struct CellAgent {
@@ -74,16 +76,31 @@ impl CellAgent {
 		let tree_id = try!(TreeID::new(self.cell_id.get_name()));
 		let entry = try!(self.new_tree(index, tree_id.clone(), 0, vec![], 0, None)); 
 		try!(send_entry_to_pe.send(entry));
-		let msg = DiscoverMsg::new(connected_tree_id, tree_id, self.cell_id.clone(), 0, 0);
-		println!("Msg: {}", msg);
-		try!(self.send_msg(msg, 0));
+		for port in self.ports.iter() {
+			if port.is_connected() {
+				let port_number = port.get_port_number(); 
+				let msg = DiscoverMsg::new(connected_tree_id.clone(), tree_id.clone(), 
+					self.cell_id.clone(), 0, port_number);
+				let port_no = port_number.get_port_no();
+				let user_mask = try!(int_to_mask(port_no));
+				try!(self.send_msg(msg, CONTROL_TREE_OTHER_INDEX, BASE_TENANT_MASK, user_mask));
+			}
+		}
 		Ok(())
 	}
-	fn send_msg<T>(&self, msg: T, other_index: u32) -> Result<(), CellAgentError> 
-			where T: Message + Hash + serde::Serialize {
+	fn send_msg<T>(&self, msg: T, other_index: u32, tenant_mask: u16, user_mask: u16) -> Result<(), CellAgentError> 
+			where T: Message + Hash + serde::Serialize + fmt::Display {
 		let packets = try!(Packetizer::packetize(&msg, other_index));
-		let msg: DiscoverMsg = try!(Packetizer::unpacketize(packets));
-		println!("DiscoverMsg {}", msg);
+		// send packet on channel
+		Ok(())
+	}
+	fn recv_msg<T>(&self, packets: Vec<Box<Packet>>) -> Result<(), CellAgentError>
+			where T: Message + Hash + serde::Deserialize + fmt::Display {
+		let msg: T = try!(Packetizer::unpacketize(packets));
+		match msg.get_msg_type() {
+			MsgType::Discover  => println!("DiscoverMsg {}", msg),
+			MsgType::DiscoverD => println!("DiscoverD not implemented"),
+		};
 		Ok(())
 	}
 	pub fn new_tree(&mut self, index: usize, tree_id: TreeID, parent_no: u8, children: Vec<PortNumber>, 

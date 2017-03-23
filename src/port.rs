@@ -34,6 +34,7 @@ impl Port {
 	}
 	pub fn get_id(&self) -> PortID { self.id.clone() }
 	pub fn get_no(&self) -> u8 { self.port_no.get_port_no() }
+	pub fn get_port_number(&self) -> PortNumber { self.port_no }
 	pub fn is_connected(&self) -> bool { self.is_connected }
 	pub fn is_broken(&self) -> bool { self.is_broken }
 	pub fn is_border(&self) -> bool { self.is_border }

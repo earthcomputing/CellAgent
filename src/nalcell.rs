@@ -153,7 +153,7 @@ impl From<NumberPortsError> for NalCellError {
 impl From<PortError> for NalCellError {
 	fn from(err: PortError) -> NalCellError { NalCellError::Port(err) }
 }
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, Hash, Serialize, Deserialize)]
 pub struct PortNumber { pub port_no: u8 }
 impl PortNumber {
 	pub fn new(no: usize, cell: &NalCell) -> Result<PortNumber, PortNumberError> {

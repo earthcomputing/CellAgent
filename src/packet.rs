@@ -111,7 +111,8 @@ impl Packetizer {
 		}
 		Ok(packets)
 	}
-	pub fn unpacketize(packets: Vec<Box<Packet>>) -> Result<DiscoverMsg, PacketizerError> {
+	pub fn unpacketize<T>(packets: Vec<Box<Packet>>) -> Result<T, PacketizerError> 
+			where T: Message + serde::Deserialize {
 		let first = match packets.first() { 
 			Some(f) => f,
 			None => return Err(PacketizerError::Unpacketize(UnpacketizeError::new(0, 0)))
@@ -125,8 +126,7 @@ impl Packetizer {
 		}
 		all_bytes.truncate(msg_size as usize);
 		let serialized = try!(str::from_utf8(&all_bytes));
-		println!("unpacketizer {}", serialized);
-		let deserialized: DiscoverMsg = try!(serde_json::from_str(&serialized));
+		let deserialized: T = try!(serde_json::from_str(&serialized));
 		Ok(deserialized)
 	}
 	fn packet_payload_size(len: usize) -> Result<usize, PacketizerError> {
