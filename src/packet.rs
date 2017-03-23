@@ -29,9 +29,8 @@ pub trait Packet {
 }
 pub struct Packetizer {}
 impl Packetizer {
-	pub fn packetize<T>(msg: &T, other_index: u32) -> 
-		Result<Vec<(PacketSmall,PacketMedium,PacketLarge)>, PacketizerError>
-			where T: Message + Hash + serde::Serialize {
+	pub fn packetize<M>(msg: &M, other_index: u32) -> Result<Vec<Box<Packet>>, PacketizerError>
+			where M: Message + Hash + serde::Serialize {
 		let serialized = try!(serde_json::to_string(&msg));
 		let bytes = serialized.into_bytes();
 		msg.get_header().set_msg_size(bytes.len());
@@ -60,19 +59,21 @@ impl Packetizer {
 			match payload_size {
 				PAYLOAD_SMALL => {
 					small.set_header(packet_header);
-					small.set_payload(&bytes);
+					try!(small.set_payload(&bytes));
+					packets.push(Box::new(small) as Box<Packet>);
 				},
 				PAYLOAD_MEDIUM => {
 					medium.set_header(packet_header);
-					medium.set_payload(&bytes);
+					try!(medium.set_payload(&bytes));
+					packets.push(Box::new(medium) as Box<Packet>);
 				},
 				PAYLOAD_LARGE => {
 					large.set_header(packet_header);
-					large.set_payload(&bytes);
+					try!(large.set_payload(&bytes));
+					packets.push(Box::new(large) as Box<Packet>);
 				}
 				_ => return Err(PacketizerError::Size(SizeError::new(payload_size)))
 			}
-			packets.push((small, medium, large));
 		}
 		Ok(packets)
 	}

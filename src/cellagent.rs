@@ -81,17 +81,7 @@ impl CellAgent {
 	fn send_msg<T>(&self, msg: T, other_index: u32) -> Result<(), CellAgentError> 
 			where T: Message + Hash + serde::Serialize {
 		let packets = try!(Packetizer::packetize(&msg, other_index));
-		for packet in packets.iter() {
-			if packet.0.get_header().get_count() > 0 {
-				println!("small");
-			} else if packet.1.get_header().get_count() > 0 {
-				println!("medium");
-			} else if packet.2.get_header().get_count() > 0 {
-				println!("large");
-			} else {
-				return Err(CellAgentError::BadPacket(BadPacketError::new()));
-			}
-		}		
+		println!("packet size {}", packets[0].get_size());
 		//let deserialized: DiscoverMsg = try!(serde_json::from_str(&serialized));
 		Ok(())
 	}
