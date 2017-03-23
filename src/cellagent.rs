@@ -82,7 +82,8 @@ impl CellAgent {
 	fn send_msg<T>(&self, msg: T, other_index: u32) -> Result<(), CellAgentError> 
 			where T: Message + Hash + serde::Serialize {
 		let packets = try!(Packetizer::packetize(&msg, other_index));
-		//let deserialized: DiscoverMsg = try!(serde_json::from_str(&serialized));
+		let msg: DiscoverMsg = try!(Packetizer::unpacketize(packets));
+		println!("DiscoverMsg {}", msg);
 		Ok(())
 	}
 	pub fn new_tree(&mut self, index: usize, tree_id: TreeID, parent_no: u8, children: Vec<PortNumber>, 
