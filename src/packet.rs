@@ -8,7 +8,7 @@ use std::collections::hash_map::DefaultHasher;
 use serde;
 use serde_json;
 use config::{PACKET_SMALL, PACKET_MEDIUM, PACKET_LARGE};
-use message::Message;
+use message::{Message, DiscoverMsg};
 
 const PAYLOAD_DEFAULT_ELEMENT: u8 = 0;
 const PAYLOAD_SMALL:  usize = PACKET_SMALL  - PACKET_HEADER_SIZE;
@@ -111,6 +111,24 @@ impl Packetizer {
 		}
 		Ok(packets)
 	}
+	pub fn unpacketize(packets: Vec<Box<Packet>>) -> Result<DiscoverMsg, PacketizerError> {
+		let first = match packets.first() { 
+			Some(f) => f,
+			None => return Err(PacketizerError::Unpacketize(UnpacketizeError::new(0, 0)))
+		};
+		let header = first.get_header();
+		let msg_size = header.get_msg_size();
+		let mut all_bytes = Vec::new();
+		for packet in &packets {
+			let payload = &packet.get_payload();
+			all_bytes.extend_from_slice(payload);
+		}
+		all_bytes.truncate(msg_size as usize);
+		let serialized = try!(str::from_utf8(&all_bytes));
+		println!("unpacketizer {}", serialized);
+		let deserialized: DiscoverMsg = try!(serde_json::from_str(&serialized));
+		Ok(deserialized)
+	}
 	fn packet_payload_size(len: usize) -> Result<usize, PacketizerError> {
 		match len-1 { 
 			0...PAYLOAD_SMALL              => Ok(PAYLOAD_SMALL),
@@ -173,6 +191,7 @@ use std::error::Error;
 pub enum PacketizerError {
 	Size(SizeError),
 	Utf8(str::Utf8Error),
+	Unpacketize(UnpacketizeError),
 	Serde(serde_json::Error)
 }
 impl Error for PacketizerError {
@@ -180,6 +199,7 @@ impl Error for PacketizerError {
 		match *self {
 			PacketizerError::Size(ref err) => err.description(),
 			PacketizerError::Utf8(ref err) => err.description(),
+			PacketizerError::Unpacketize(ref err) => err.description(),
 			PacketizerError::Serde(ref err) => err.description(),
 		}
 	}
@@ -187,6 +207,7 @@ impl Error for PacketizerError {
 		match *self {
 			PacketizerError::Size(ref err) => Some(err),
 			PacketizerError::Utf8(ref err) => Some(err),
+			PacketizerError::Unpacketize(ref err) => Some(err),
 			PacketizerError::Serde(ref err) => Some(err),
 		}
 	}
@@ -196,6 +217,7 @@ impl fmt::Display for PacketizerError {
 		match *self {
 			PacketizerError::Size(ref err) => write!(f, "Packetizer Size Error caused by {}", err),
 			PacketizerError::Utf8(ref err) => write!(f, "Packetizer Utf8 Error caused by {}", err),
+			PacketizerError::Unpacketize(ref err) => write!(f, "Packetizer Unpacketize Error caused by {}", err),
 			PacketizerError::Serde(ref err) => write!(f, "Packetizer Serialization Error caused by {}", err),
 		}
 	}
@@ -218,6 +240,29 @@ impl fmt::Display for SizeError {
 }
 impl From<SizeError> for PacketizerError {
 	fn from(err: SizeError) -> PacketizerError { PacketizerError::Size(err) }
+}
+#[derive(Debug)]
+pub struct UnpacketizeError { msg: String }
+impl UnpacketizeError { 
+	pub fn new(supplied: usize, required: usize) -> UnpacketizeError {
+		if supplied == 0 {
+			UnpacketizeError { msg: format!("Zero bytes supplied") }
+		} else {
+			UnpacketizeError { msg: format!("Only {} bytes of {} required", supplied, required) }
+		}
+	}
+}
+impl Error for UnpacketizeError {
+	fn description(&self) -> &str { &self.msg }
+	fn cause(&self) -> Option<&Error> { None }
+}
+impl fmt::Display for UnpacketizeError {
+	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+		write!(f, "{}", self.msg)
+	}
+}
+impl From<UnpacketizeError> for PacketizerError {
+	fn from(err: UnpacketizeError) -> PacketizerError { PacketizerError::Unpacketize(err) }
 }
 impl From<serde_json::Error> for PacketizerError{
 	fn from(err: serde_json::Error) -> PacketizerError { PacketizerError::Serde(err) }
