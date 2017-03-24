@@ -1,6 +1,6 @@
 use std::fmt;
 use std::sync::mpsc::channel;
-use cellagent::{SendPacketSmall,ReceivePacketSmall};
+use cellagent::{SendPacket,ReceivePacket};
 use name::{Name, LinkID};
 use port::Port;
 
@@ -8,11 +8,11 @@ use port::Port;
 pub struct Link {
 	id: LinkID,
 	is_broken: bool,
-	is_connected: bool,		       //     Left Port        Link        Right Port
-	left_send: SendPacketSmall,	   //        R1              S1
-	rite_send: SendPacketSmall,       //                        S2            R2
-	left_recv: ReceivePacketSmall,    //        S3              R3
-	rite_recv: ReceivePacketSmall     //                        R4            S4
+	is_connected: bool,		      //     Left Port        Link        Right Port
+	left_send: SendPacket,	     //        R1              S1
+	rite_send: SendPacket,       //                        S2            R2
+	left_recv: ReceivePacket,    //        S3              R3
+	rite_recv: ReceivePacket     //                        R4            S4
 }
 impl Link {
 	pub fn new(left: &mut Port, rite: &mut Port) -> Result<Link,LinkError> {
