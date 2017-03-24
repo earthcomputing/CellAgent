@@ -1,6 +1,7 @@
 use std;
 use std::fmt;
 use std::mem;
+use rand;
 use std::str;
 use std::str::Utf8Error;
 use std::hash::{Hash, Hasher};
@@ -61,15 +62,16 @@ impl Packet {
 }
 pub struct Packetizer {}
 impl Packetizer {
-	pub fn packetize<M>(msg: &M, other_index: u32) -> Result<Vec<Box<Packet>>, PacketizerError>
+	pub fn packetize<M>(msg: &M, other_index: u32, flags: [bool;4]) -> Result<Vec<Box<Packet>>, PacketizerError>
 			where M: Message + Hash + serde::Serialize {
 		let serialized = try!(serde_json::to_string(&msg));
 		let bytes = serialized.clone().into_bytes();
 		let payload_size = try!(Packetizer::packet_payload_size(bytes.len()));
 		let num_packets = (bytes.len() + payload_size - 1)/ payload_size; // Poor man's ceiling
-		let unique_id = Packetizer::hash(&msg);
+		//Packetizer::hash(&msg); // Can't use hash in case two cells send the same message
+		let unique_id = rand::random(); 
 		let direction = msg.is_rootward();
-		let mut packet_header = PacketHeader::new(unique_id, other_index, bytes.len(), direction);
+		let mut packet_header = PacketHeader::new(unique_id, bytes.len(), other_index, direction, flags);
 		let mut packets = Vec::new();
 		packet_header.set_msg_size(bytes.len());
 		for i in 0..num_packets {
@@ -111,7 +113,7 @@ impl Packetizer {
 		}
 		Ok(packets)
 	}
-	pub fn unpacketize<T>(packets: Vec<Box<Packet>>) -> Result<T, PacketizerError> 
+	pub fn unpacketize<T>(packets: &Vec<Box<Packet>>) -> Result<T, PacketizerError> 
 			where T: Message + serde::Deserialize {
 		let first = match packets.first() { 
 			Some(f) => f,
@@ -120,7 +122,7 @@ impl Packetizer {
 		let header = first.get_header();
 		let msg_size = header.get_msg_size();
 		let mut all_bytes = Vec::new();
-		for packet in &packets {
+		for packet in packets {
 			let payload = &packet.get_payload();
 			all_bytes.extend_from_slice(payload);
 		}
@@ -152,19 +154,24 @@ impl fmt::Debug for Packet {
 impl fmt::Display for Packet { 
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result { write!(f, "{}", self.stringify()) }
 }
-const PACKET_HEADER_SIZE: usize = 8 + 4 + 4 + 1 + 7; // Last value is padding
+const PACKET_HEADER_SIZE: usize = 8 + 4 + 4 + 1 + 3 + 4; // Last value is padding
 #[derive(Debug, Copy, Clone)]
 pub struct PacketHeader {
 	uniquifier: u64,	// Unique identifier of this message
-	msg_size: u32,		// Size of message in bytes
+	msg_size: u32,		// Size of message in bytes, 0 => stream
 	index: u32,			// Routing table index on receiving cell
 	is_rootcast: bool,	// true for Rootcast, false for Leafcast
+	version: [bool; 3], // Version encoded as 3 bits
+	flags: [bool;4],    // 0000 => EC Protocol to CellAgent
+						// 0001 => EC Protocol to VirtualMachine
+						// 0010 => Legacy Protocol to VirtualMachine
 }
 impl PacketHeader {
-	pub fn new(uniquifier: u64, msg_size: u32, index: usize, is_rootcast: bool) -> PacketHeader {
+	pub fn new(uniquifier: u64, msg_size: usize, index: u32, is_rootcast: bool, flags: [bool;4]) -> PacketHeader {
 		// Assertion fails if I forgot to change PACKET_HEADER_SIZE when I changed PacketHeader struct
 		assert_eq!(PACKET_HEADER_SIZE, mem::size_of::<PacketHeader>());
-		PacketHeader { uniquifier: uniquifier, msg_size: msg_size, index: index as u32, is_rootcast: is_rootcast }
+		PacketHeader { uniquifier: uniquifier, msg_size: msg_size as u32, index: index, 
+				flags: flags, is_rootcast: is_rootcast, version: [false, false, true] }
 	}
 	pub fn get_uniquifier(&self) -> u64 { self.uniquifier }
 	fn set_uniquifier(&mut self, uniquifier: u64) { self.uniquifier = uniquifier; }

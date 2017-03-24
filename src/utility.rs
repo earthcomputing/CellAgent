@@ -40,16 +40,19 @@ use std::error::Error;
 #[derive(Debug)]
 pub enum UtilityError {
 	Port(PortError),
+	Unimplemented(UnimplementedError),
 }
 impl Error for UtilityError {
 	fn description(&self) -> &str {
 		match *self {
 			UtilityError::Port(ref err) => err.description(),
+			UtilityError::Unimplemented(ref err) => err.description(),
 		}
 	}
 	fn cause(&self) -> Option<&Error> {
 		match *self {
 			UtilityError::Port(ref err) => Some(err),
+			UtilityError::Unimplemented(ref err) => Some(err),
 		}
 	}
 }
@@ -57,6 +60,7 @@ impl fmt::Display for UtilityError {
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
 		match *self {
 			UtilityError::Port(_) => write!(f, "Cell Agent Name Error caused by"),
+			UtilityError::Unimplemented(_) => write!(f, "Cell Agent Unimplemented Feature Error caused by"),
 		}
 	}
 }
@@ -78,4 +82,20 @@ impl fmt::Display for PortError {
 }
 impl From<PortError> for UtilityError {
 	fn from(err: PortError) -> UtilityError { UtilityError::Port(err) }
+}
+#[derive(Debug)]
+pub struct UnimplementedError { msg: String }
+impl UnimplementedError { 
+	pub fn new(feature: &str) -> UnimplementedError {
+		UnimplementedError { msg: format!("{} is not implemented", feature) }
+	}
+}
+impl Error for UnimplementedError {
+	fn description(&self) -> &str { &self.msg }
+	fn cause(&self) -> Option<&Error> { None }
+}
+impl fmt::Display for UnimplementedError {
+	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+		write!(f, "{}", self.msg)
+	}
 }
