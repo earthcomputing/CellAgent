@@ -34,6 +34,14 @@ pub fn mask_from_port_nos(port_nos: Vec<PortNumber>) -> Result<u16, UtilityError
 	}
 	Ok(mask)
 }
+pub fn ints_from_mask(mask: u16) -> Result<Vec<u8>, UtilityError> {
+	let mut port_nos = Vec::new();
+	for i in 0..16 {
+		let test = try!(int_to_mask(i as u8));
+		if test & mask != 0 { port_nos.push(i as u8) }
+	}
+	Ok(port_nos)
+}
 // Errors
 use std::fmt;
 use std::error::Error;
