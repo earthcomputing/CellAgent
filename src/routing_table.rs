@@ -22,6 +22,7 @@ impl RoutingTable {
 		}
 		Ok(RoutingTable { entries: entries, connected_ports: Vec::new() })
 	}
+	pub fn get_entry(&self, index: u32) -> RoutingTableEntry { self.entries[index as usize] }
 	pub fn set_entry(&mut self, entry: RoutingTableEntry) { self.entries[entry.get_index()] = entry; }
 	pub fn stringify(&self) -> String {
 		let mut s = format!("\nRouting Table with {} Entries", MAX_ENTRIES);
@@ -39,6 +40,7 @@ use name::NameError;
 pub enum RoutingTableError {
 	Name(NameError),
 	Size(SizeError),
+	Index(IndexError),
 	RoutingTableEntry(RoutingTableEntryError)
 }
 impl Error for RoutingTableError {
@@ -46,6 +48,7 @@ impl Error for RoutingTableError {
 		match *self {
 			RoutingTableError::Name(ref err) => err.description(),
 			RoutingTableError::Size(ref err) => err.description(),
+			RoutingTableError::Index(ref err) => err.description(),
 			RoutingTableError::RoutingTableEntry(ref err) => err.description(),
 		}
 	}
@@ -53,6 +56,7 @@ impl Error for RoutingTableError {
 		match *self {
 			RoutingTableError::Name(ref err) => Some(err),
 			RoutingTableError::Size(ref err) => Some(err),
+			RoutingTableError::Index(ref err) => Some(err),
 			RoutingTableError::RoutingTableEntry(ref err) => Some(err),
 		}
 	}
@@ -62,6 +66,7 @@ impl fmt::Display for RoutingTableError {
 		match *self {
 			RoutingTableError::Name(ref err) => write!(f, "Routing Table Name Error caused by {}", err),
 			RoutingTableError::Size(ref err) => write!(f, "Routing Table Size Error caused by {}", err),
+			RoutingTableError::Index(ref err) => write!(f, "Routing Table Index Error caused by {}", err),
 			RoutingTableError::RoutingTableEntry(ref err) => write!(f, "Routing Table Entry Error caused by {}", err),
 		}
 	}
@@ -90,4 +95,23 @@ impl fmt::Display for SizeError {
 }
 impl From<SizeError> for RoutingTableError {
 	fn from(err: SizeError) -> RoutingTableError { RoutingTableError::Size(err) }
+}
+#[derive(Debug)]
+pub struct IndexError { msg: String }
+impl IndexError { 
+	pub fn new(index: u32) -> IndexError {
+		IndexError { msg: format!("{} is not a valid routing table index", index) }
+	}
+}
+impl Error for IndexError {
+	fn description(&self) -> &str { &self.msg }
+	fn cause(&self) -> Option<&Error> { None }
+}
+impl fmt::Display for IndexError {
+	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+		write!(f, "{}", self.msg)
+	}
+}
+impl From<IndexError> for RoutingTableError {
+	fn from(err: IndexError) -> RoutingTableError { RoutingTableError::Index(err) }
 }

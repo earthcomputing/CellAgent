@@ -147,18 +147,15 @@ impl fmt::Display for NumberPortsError {
 		write!(f, "{}", self.msg)
 	}
 }
-impl From<NumberPortsError> for NalCellError {
-	fn from(err: NumberPortsError) -> NalCellError { NalCellError::NumberPorts(err) }
-}
 impl From<PortError> for NalCellError {
 	fn from(err: PortError) -> NalCellError { NalCellError::Port(err) }
 }
 #[derive(Debug, Copy, Clone, Hash, Serialize, Deserialize)]
 pub struct PortNumber { pub port_no: u8 }
 impl PortNumber {
-	pub fn new(no: usize, cell: &NalCell) -> Result<PortNumber, PortNumberError> {
-		if no > cell.cell_agent.get_no_ports() {
-			Err(PortNumberError::new(no, cell))
+	pub fn new(no: u8, no_ports: u8) -> Result<PortNumber, PortNumberError> {
+		if no > no_ports {
+			Err(PortNumberError::new(no, no_ports))
 		} else {
 			Ok(PortNumber { port_no: (no as u8) })
 		}
@@ -168,11 +165,22 @@ impl PortNumber {
 impl fmt::Display for PortNumber {
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result { write!(f, "{}", self.port_no) }
 }
+#[derive(Debug)]
 pub struct PortNumberError { msg: String }
 impl PortNumberError {
-	fn new(port_no: usize, cell: &NalCell) -> PortNumberError {
-		let msg = format!("You asked for port number {}, but cell {} only has {} ports",
-			port_no, cell.get_id(), cell.cell_agent.get_no_ports());
+	pub fn new(port_no: u8, no_ports: u8) -> PortNumberError {
+		let msg = format!("You asked for port number {}, but this cell only has {} ports",
+			port_no, no_ports);
 		PortNumberError { msg: msg }
 	}
+}
+impl Error for PortNumberError {
+	fn description(&self) -> &str { &self.msg }
+	fn cause(&self) -> Option<&Error> { None }
+}
+impl fmt::Display for PortNumberError {
+	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result { write!(f, "{}", self.msg) }
+}
+impl From<NumberPortsError> for NalCellError {
+	fn from(err: NumberPortsError) -> NalCellError { NalCellError::NumberPorts(err) }
 }

@@ -5,7 +5,7 @@ use crossbeam::Scope;
 use cellagent::{SendPacket, ReceivePacket};
 use nalcell::{EntryReceiver};
 use name::CellID;
-use routing_table::{RoutingTable, RoutingTableError};
+use routing_table::{RoutingTable, RoutingTableError, IndexError};
 use routing_table_entry::RoutingTableEntry;
 
 #[derive(Debug, Clone)]
@@ -24,10 +24,15 @@ impl PacketEngine {
 		Ok(pe)
 	}
 	fn ca_channel(&self, scope: &Scope, send_to_ca: SendPacket, recv_from_ca: ReceivePacket) {
+		let table = self.routing_table.clone();
 		scope.spawn( move || -> Result<(), PacketEngineError> {
 				loop {
-					let packet = try!(recv_from_ca.recv());
-					println!("received packet {:?}", packet);
+					let (index, mask, packet) = try!(recv_from_ca.recv());
+					let header = packet.get_header();
+					let unlocked = table.lock().unwrap();
+					let entry = (*unlocked).get_entry(index);
+					let mask = entry.get_mask();
+					println!("received mask {:08b} packet {}", mask, packet);
 				}
 				Ok(())
 			}

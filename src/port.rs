@@ -10,7 +10,7 @@ pub enum PortStatus {
 	Disconnected,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Port {
 	id: PortID,
 	port_no: PortNumber,
