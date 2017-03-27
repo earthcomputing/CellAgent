@@ -62,7 +62,7 @@ impl Packet {
 }
 pub struct Packetizer {}
 impl Packetizer {
-	pub fn packetize<M>(msg: &M, this_index: u32, other_index: u32, 
+	pub fn packetize<M>(msg: &M, other_index: u32, 
 				flags: [bool;4]) -> Result<Vec<Box<Packet>>, PacketizerError>
 			where M: Message + Hash + serde::Serialize {
 		let serialized = try!(serde_json::to_string(&msg));
@@ -72,7 +72,7 @@ impl Packetizer {
 		//Packetizer::hash(&msg); // Can't use hash in case two cells send the same message
 		let unique_id = rand::random(); 
 		let direction = msg.is_rootward();
-		let mut packet_header = PacketHeader::new(unique_id, bytes.len(), this_index, other_index, direction, flags);
+		let mut packet_header = PacketHeader::new(unique_id, bytes.len(), other_index, direction, flags);
 		let mut packets = Vec::new();
 		packet_header.set_msg_size(bytes.len());
 		for i in 0..num_packets {
@@ -155,12 +155,11 @@ impl fmt::Debug for Packet {
 impl fmt::Display for Packet { 
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result { write!(f, "{}", self.stringify()) }
 }
-const PACKET_HEADER_SIZE: usize = 8 + 4 + 4 + 4 + 1 + 3 + 4 + 4; // Last value is padding
+const PACKET_HEADER_SIZE: usize = 8 + 4 + 4 + 1 + 3 + 4; // Last value is padding
 #[derive(Debug, Copy, Clone)]
 pub struct PacketHeader {
 	uniquifier: u64,	// Unique identifier of this message
 	msg_size: u32,		// Size of message in bytes, 0 => stream
-	this_index: u32,	// Routing table index on this cell
 	other_index: u32,	// Routing table index on receiving cell
 	is_rootcast: bool,	// true for Rootcast, false for Leafcast
 	version: [bool; 3], // Version encoded as 3 bits
@@ -169,11 +168,11 @@ pub struct PacketHeader {
 						// 0010 => Legacy Protocol to VirtualMachine
 }
 impl PacketHeader {
-	pub fn new(uniquifier: u64, msg_size: usize, this_index: u32, other_index: u32, 
+	pub fn new(uniquifier: u64, msg_size: usize, other_index: u32, 
 			is_rootcast: bool, flags: [bool;4]) -> PacketHeader {
 		// Assertion fails if I forgot to change PACKET_HEADER_SIZE when I changed PacketHeader struct
 		assert_eq!(PACKET_HEADER_SIZE, mem::size_of::<PacketHeader>());
-		PacketHeader { uniquifier: uniquifier, msg_size: msg_size as u32, this_index: this_index,
+		PacketHeader { uniquifier: uniquifier, msg_size: msg_size as u32, 
 			other_index: other_index, flags: flags, is_rootcast: is_rootcast, version: [false, false, true] }
 	}
 	pub fn get_uniquifier(&self) -> u64 { self.uniquifier }
@@ -183,11 +182,10 @@ impl PacketHeader {
 	pub fn is_root_cast(&self) -> bool { self.is_rootcast }
 	pub fn is_leaf_cast(&self) -> bool { self.is_rootcast }
 	fn set_direction(&mut self, direction: bool) { self.is_rootcast = direction; }
-	pub fn get_this_index(&self) -> u32 { self.this_index }
 	pub fn get_other_index(&self) -> u32 { self.other_index }
 	pub fn set_other_index(&mut self, other_index: u32) { self.other_index = other_index; }
 	pub fn stringify(&self) -> String {
-		let mut s = format!("Table Index {}, Message Size {}: ", self.this_index, self.msg_size);
+		let mut s = format!("Table Index {}, Message Size {}: ", self.other_index, self.msg_size);
 		if self.is_rootcast { s = s + "Rootward"; }
 		else                { s = s + "Leafward"; }
 		s

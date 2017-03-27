@@ -1,7 +1,8 @@
 use std::fmt;
-use std::thread;
+use std::sync::mpsc;
+use crossbeam::Scope;
 use nalcell::{PortNumber, PortStatusSender, PortStatusSenderError};
-use cellagent::{SendPacket, ReceivePacket, SendPacketError};
+use packet_engine::{SendPacket, ReceivePacket};
 use name::{Name, NameError,PortID,CellID};
 
 #[derive(Debug, Copy, Clone)]
@@ -20,17 +21,25 @@ pub struct Port {
 	send_to_ca: PortStatusSender,
 }
 impl Port {
-	pub fn new(cell_id: &CellID, port_no: PortNumber, is_border: bool, is_connected: bool,
+	pub fn new(scope: &Scope, cell_id: &CellID, port_no: PortNumber, is_border: bool, is_connected: bool,
 			   send_to_pe: SendPacket, recv_from_pe: ReceivePacket, send_to_ca: PortStatusSender) -> Result<Port,NameError>{
 		let port_id = try!(PortID::new(port_no.get_port_no()));
 		let temp_id = try!(port_id.add_component(&cell_id.get_name()));
 		let port = Port{ id: temp_id, port_no: port_no, is_border: is_border, is_connected: is_connected, 
 			is_broken: false, send_to_ca: send_to_ca };
-		port.work(&port_id);
+		port.listen_for_outgoing(scope, send_to_pe, recv_from_pe);
 		Ok(port)
 	}
-	fn work(&self, port_id: &PortID) {
-		//println!("Port {} worker", port_id);
+	fn listen_for_outgoing(&self, scope: &Scope, send_to_pe: SendPacket, recv_from_pe: ReceivePacket) {
+		let port_id = self.id.clone();
+		scope.spawn( move || -> Result<(), PortError> {
+				loop {
+					let packet = try!(recv_from_pe.recv());
+					println!("Port {} received packet {}", port_id, packet);
+				}
+				Ok(())
+			}
+		);
 	}
 	pub fn get_id(&self) -> PortID { self.id.clone() }
 	pub fn get_no(&self) -> u8 { self.port_no.get_port_no() }
@@ -38,7 +47,8 @@ impl Port {
 	pub fn is_connected(&self) -> bool { self.is_connected }
 	pub fn is_broken(&self) -> bool { self.is_broken }
 	pub fn is_border(&self) -> bool { self.is_border }
-	pub fn set_connected(&mut self, send: SendPacket, recv: ReceivePacket) -> Result<(),PortStatusSenderError> { 
+	pub fn set_connected(&mut self, send: SendPacket, recv: ReceivePacket) -> Result<(),PortStatusSenderError> {
+		println!("Port {} connected", self.id); 
 		self.is_connected = true; 
 		let send_to_link = send;
 		let recv_from_link = recv;
@@ -65,16 +75,19 @@ use std::error::Error;
 #[derive(Debug)]
 pub enum PortError {
 	Send(PortStatusSenderError),
+	Recv(mpsc::RecvError)
 }
 impl Error for PortError {
 	fn description(&self) -> &str {
 		match *self {
 			PortError::Send(ref err) => err.description(),
+			PortError::Recv(ref err) => err.description(),
 		}
 	}
 	fn cause(&self) -> Option<&Error> {
 		match *self {
 			PortError::Send(ref err) => Some(err),
+			PortError::Recv(ref err) => Some(err),
 		}
 	}
 }
@@ -82,9 +95,13 @@ impl fmt::Display for PortError {
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
 		match *self {
 			PortError::Send(ref err) => write!(f, "Port Send Error caused by {}", err),
+			PortError::Recv(ref err) => write!(f, "Port Receive Error caused by {}", err),
 		}
 	}
 }
 impl From<PortStatusSenderError> for PortError {
 	fn from(err: PortStatusSenderError) -> PortError { PortError::Send(err) }
+}
+impl From<mpsc::RecvError> for PortError {
+	fn from(err: mpsc::RecvError) -> PortError { PortError::Recv(err) }
 }

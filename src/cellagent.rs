@@ -19,9 +19,8 @@ use port::PortStatus;
 use traph::{Traph, TraphError};
 use utility::{int_to_mask, mask_from_port_nos, ints_from_mask, UnimplementedError};
 
-pub type SendPacket = mpsc::Sender<(u32, u16, Packet)>;
-pub type ReceivePacket = mpsc::Receiver<(u32, u16, Packet)>;
-pub type SendPacketError = SendError<Packet>;
+pub type SendPacketCaToPe = mpsc::Sender<(u32, u16, Packet)>;
+pub type ReceivePacketPeFromCa = mpsc::Receiver<(u32, u16, Packet)>;
 
 type IndexArray = [usize; MAX_PORTS as usize];
 
@@ -41,12 +40,12 @@ pub struct CellAgent {
 	free_indices: Vec<usize>,
 	traphs: Arc<Mutex<HashMap<TreeID,Traph>>>,
 	tenant_masks: Vec<u16>,
-	send_to_pe: SendPacket,
-	recv_from_pe: ReceivePacket,
+	send_to_pe: SendPacketCaToPe,
+	recv_from_pe: ReceivePacketPeFromCa,
 }
 impl CellAgent {
 	pub fn new(scope: &Scope, cell_id: &CellID, ports: Box<[Port]>,
-			send_to_pe: SendPacket, recv_from_pe: ReceivePacket, send_entry_to_pe: EntrySender, 
+			send_to_pe: SendPacketCaToPe, recv_from_pe: ReceivePacketPeFromCa, send_entry_to_pe: EntrySender, 
 			recv_from_port: PortStatusReceiver) -> Result<CellAgent, CellAgentError> {
 		let tenant_masks = vec![BASE_TENANT_MASK];
 		let control_tree_id = try!(TreeID::new(CONTROL_TREE_NAME));
@@ -94,7 +93,6 @@ impl CellAgent {
 		// I'm getting a lifetime error when I have PortNumber::new inside the spawn
 		let no_ports = self.get_no_ports();
 		let cell_id = self.cell_id.clone();
-		let ports = (*self.ports).to_vec();
 		let send_to_pe = self.send_to_pe.clone();
 		scope.spawn( move || -> Result<(), CellAgentError> {
 			loop {
@@ -122,12 +120,10 @@ impl CellAgent {
 		Ok(())
 	}				
 	fn send_msg<T>(msg: T, this_index: u32, other_index: u32, mask: u16,
-				send_to_pe: SendPacket) -> Result<(), CellAgentError> 
+				send_to_pe: SendPacketCaToPe) -> Result<(), CellAgentError> 
 			where T: Message + Hash + serde::Serialize + fmt::Display {
-		let packets = try!(Packetizer::packetize(&msg, this_index, other_index, [false;4]));
-		let port_nos = try!(ints_from_mask(mask));
+		let packets = try!(Packetizer::packetize(&msg, other_index, [false;4]));
 		for packet in packets.iter() {
-			println!("sending packet {}", packet);
 			try!(send_to_pe.send((this_index, mask, **packet)));
 		}
 		// send packet on channel
@@ -164,7 +160,7 @@ impl CellAgent {
 		}
 		Err(CellAgentError::NoFreePort(NoFreePortError::new(self.cell_id.clone())))
 	}
-	pub fn work(cell_id: CellID, send_to_pe: SendPacket, recv_from_pe: ReceivePacket) {
+	pub fn work(cell_id: CellID, send_to_pe: SendPacketCaToPe, recv_from_pe: ReceivePacketPeFromCa) {
 		println!("Cell Agent on cell {} is working", cell_id);
 	}
 }
