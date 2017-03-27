@@ -1,6 +1,6 @@
 use std::fmt;
 use std::sync::mpsc::channel;
-use cellagent::{SendPacket,ReceivePacket};
+use packet_engine::{SendPacket,ReceivePacket};
 use name::{Name, LinkID};
 use port::Port;
 
