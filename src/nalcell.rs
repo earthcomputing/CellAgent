@@ -50,8 +50,8 @@ impl NalCell {
 			ports.push(port);
 			is_connected = false;
 		}
-		let boxed: Box<[Port]> = ports.into_boxed_slice(); 
-		let cell_agent = try!(CellAgent::new(scope, &cell_id, boxed, 
+		let boxed_ports: Box<[Port]> = ports.into_boxed_slice(); 
+		let cell_agent = try!(CellAgent::new(scope, &cell_id, boxed_ports, 
 				ca_to_pe, ca_from_pe, ca_entry_to_pe, ca_from_port));
 		let packet_engine = try!(PacketEngine::new(scope, &cell_id, pe_to_ca, pe_from_ca, pe_from_port,
 								pe_to_ports, pe_entry_from_ca));
