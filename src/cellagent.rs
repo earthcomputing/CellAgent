@@ -106,6 +106,7 @@ impl CellAgent {
 						try!(send_entry_to_pe.send(entry));
 						let msg = DiscoverMsg::new(connected_tree_id.clone(), tree_id.clone(), 
 									cell_id.clone(), 0, port_number);
+						println!("CellAgent {} sending packet", cell_id);
 						try!(CellAgent::send_msg(msg, CONNECTED_TREE_INDEX, CONTROL_TREE_OTHER_INDEX, 
 								tenant_mask & DEFAULT_USER_MASK, send_to_pe.clone()));
 					},
@@ -126,8 +127,6 @@ impl CellAgent {
 		for packet in packets.iter() {
 			try!(send_to_pe.send((this_index, mask, **packet)));
 		}
-		// send packet on channel
-		//try!(self.recv_msg(packets));
 		Ok(())
 	}
 	fn recv_msg<T>(&self, packets: Vec<Box<Packet>>) -> Result<(), CellAgentError>
