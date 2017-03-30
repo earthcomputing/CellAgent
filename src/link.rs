@@ -2,9 +2,9 @@ use std::fmt;
 use std::sync::mpsc;
 use std::sync::mpsc::channel;
 use crossbeam::Scope;
-use packet::Packet;
-use packet_engine::{SendPacket,ReceivePacket};
+use nalcell::{SendPacket,RecvPacket};
 use name::{Name, LinkID};
+use packet::Packet;
 use port::Port;
 
 #[derive(Debug)]
@@ -33,8 +33,8 @@ impl Link {
 		link.listen(scope, left_recv, rite_send, rite_recv, left_send);
 		Ok(link)
 	}
-	fn listen(&self, scope: &Scope, left_recv: ReceivePacket, rite_send: SendPacket,
-					 rite_recv: ReceivePacket, left_send: SendPacket) -> Result<(), LinkError> {
+	fn listen(&self, scope: &Scope, left_recv: RecvPacket, rite_send: SendPacket,
+					 rite_recv: RecvPacket, left_send: SendPacket) -> Result<(), LinkError> {
 		let link_id = self.id.clone();
 		scope.spawn( move || -> Result<(), LinkError> {
 				loop {

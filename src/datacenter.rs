@@ -7,13 +7,14 @@ use link::{Link,LinkError};
 use noc::NOC;
 
 #[derive(Debug)]
-pub struct Datacenter<'b> {
+pub struct Datacenter<'a> {
 	cells: Vec<NalCell>,
 	links: Vec<Link>,
-	noc: Option<NOC<'b>>
+	noc: Option<NOC<'a>>
 }
-impl<'b> Datacenter<'b> {
-	pub fn new(scope: &Scope, ncells: usize, nports: u8, edge_list: Vec<(usize,usize)>) -> Result<Datacenter<'b>,DatacenterError> {
+impl<'a> Datacenter<'a> {
+	pub fn new(scope: &Scope, ncells: usize, nports: u8, edge_list: Vec<(usize,usize)>) -> 
+				Result<Datacenter<'a>,DatacenterError> {
 		if ncells < 2  {
 			println!("ncells {}", ncells);
 			return Err(DatacenterError::Size(SizeError::new(ncells)));
@@ -49,7 +50,7 @@ impl<'b> Datacenter<'b> {
 		} 
 		Ok(Datacenter { cells: cells, links: links, noc: None })
 	}
-	pub fn add_noc(&mut self, control: &'b NalCell, backup: &'b NalCell) {
+	pub fn add_noc(&mut self, control: &'a NalCell, backup: &'a NalCell) {
 		self.noc = Some(NOC::new(control, backup));
 	}
 	pub fn stringify(&self) -> String {
