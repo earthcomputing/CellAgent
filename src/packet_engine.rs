@@ -2,16 +2,11 @@ use std::fmt;
 use std::sync::{Arc, Mutex};
 use std::sync::mpsc;
 use crossbeam::Scope;
-use cellagent::{SendPacketCaToPe, ReceivePacketPeFromCa};
-use nalcell::{EntryReceiver};
+use nalcell::{EntryPeFromCa, SendPacket, RecvPacket, SendPacketError, PacketCaToPe, PacketPeFromCa, PacketPeToCa};
 use name::CellID;
 use packet::Packet;
 use routing_table::{RoutingTable, RoutingTableError};
 use utility::{ints_from_mask, UtilityError};
-
-pub type SendPacket = mpsc::Sender<Packet>;
-pub type ReceivePacket = mpsc::Receiver<Packet>;
-pub type SendPacketError = mpsc::SendError<Packet>;
 
 #[derive(Debug, Clone)]
 pub struct PacketEngine {
@@ -19,27 +14,27 @@ pub struct PacketEngine {
 	routing_table: Arc<Mutex<RoutingTable>>,
 }
 impl PacketEngine {
-	pub fn new(scope: &Scope, cell_id: &CellID, send_to_ca: SendPacketCaToPe, recv_from_ca: ReceivePacketPeFromCa, 
-		recv_from_port: ReceivePacket, send_to_ports: Vec<SendPacket>, 
-		recv_entry_from_ca: EntryReceiver) -> Result<PacketEngine, PacketEngineError> {
+	pub fn new(scope: &Scope, cell_id: &CellID, packet_pe_to_ca: PacketPeToCa, packet_pe_from_ca: PacketPeFromCa, 
+		recv_from_port: RecvPacket, send_to_ports: Vec<SendPacket>, 
+		recv_entry_from_ca: EntryPeFromCa) -> Result<PacketEngine, PacketEngineError> {
 		let routing_table = Arc::new(Mutex::new(try!(RoutingTable::new()))); 
 		let pe = PacketEngine { cell_id: cell_id.clone(), routing_table: routing_table };
 		try!(pe.entry_channel(scope, recv_entry_from_ca));
-		pe.ca_channel(scope, send_to_ca, recv_from_ca, send_to_ports);
+		pe.ca_channel(scope, packet_pe_to_ca, packet_pe_from_ca, send_to_ports);
 		Ok(pe)
 	}
-	fn ca_channel(&self, scope: &Scope, send_to_ca: SendPacketCaToPe, recv_from_ca: ReceivePacketPeFromCa,
-			send_to_ports: Vec<SendPacket>) {
+	fn ca_channel(&self, scope: &Scope, packet_pe_to_ca: PacketPeToCa, packet_pe_from_ca: PacketPeFromCa,
+			packet_pe_to_ports: Vec<SendPacket>) {
 		let table = self.routing_table.clone();
 		scope.spawn( move || -> Result<(), PacketEngineError> {
 				loop {
-					let (index, mask, packet) = try!(recv_from_ca.recv());
+					let (index, mask, packet) = try!(packet_pe_from_ca.recv());
 					let unlocked = table.lock().unwrap();
 					let entry = (*unlocked).get_entry(index);
 					let entry_mask = entry.get_mask();
 					let port_nos = try!(ints_from_mask(entry_mask & mask));
 					for port_no in port_nos.iter() {
-						let sender = send_to_ports.get(*port_no as usize);
+						let sender = packet_pe_to_ports.get(*port_no as usize);
 						match sender {
 							Some(s) => try!(s.send(packet)),
 							None => return Err(PacketEngineError::Port(PortError::new(*port_no)))
@@ -50,12 +45,12 @@ impl PacketEngine {
 			}
 		);
 	}
-	pub fn entry_channel(&self, scope: &Scope, recv_entry_from_ca: EntryReceiver) -> Result<(),PacketEngineError> {
+	pub fn entry_channel(&self, scope: &Scope, entry_pe_from_ca: EntryPeFromCa) -> Result<(),PacketEngineError> {
 		let table = self.routing_table.clone();
 		let cell_id = self.cell_id.clone(); // Debug only
 		scope.spawn( move || -> Result<(), PacketEngineError> {
 			loop { 
-				let entry = try!(recv_entry_from_ca.recv());
+				let entry = try!(entry_pe_from_ca.recv());
 				table.lock().unwrap().set_entry(entry);
 			}
 			Ok(())

@@ -8,7 +8,8 @@ use std::sync::mpsc;
 use serde;
 use crossbeam::Scope;
 use config::{MAX_ENTRIES, MAX_PORTS, CHUNK_ID_SIZE};
-use nalcell::{PortNumber, PortNumberError, EntrySender, PortStatusReceiver};
+use nalcell::{PortNumber, PortNumberError, EntryCaToPe, StatusCaFromPort, 
+		SendPacket, RecvPacket, PacketCaToPe, PacketPeFromCa, PacketCaFromPe};
 use message::{Message, MsgType, MsgPayload, DiscoverMsg};
 use name::{Name, CellID, TreeID};
 use packet::{Packet, Packetizer, PacketizerError, UnpacketizeError};
@@ -18,9 +19,6 @@ use routing_table_entry::RoutingTableEntry;
 use port::PortStatus;
 use traph::{Traph, TraphError};
 use utility::{int_to_mask, mask_from_port_nos, ints_from_mask, UnimplementedError};
-
-pub type SendPacketCaToPe = mpsc::Sender<(u32, u16, Packet)>;
-pub type ReceivePacketPeFromCa = mpsc::Receiver<(u32, u16, Packet)>;
 
 type IndexArray = [usize; MAX_PORTS as usize];
 
@@ -40,13 +38,14 @@ pub struct CellAgent {
 	free_indices: Vec<usize>,
 	traphs: Arc<Mutex<HashMap<TreeID,Traph>>>,
 	tenant_masks: Vec<u16>,
-	send_to_pe: SendPacketCaToPe,
-	recv_from_pe: ReceivePacketPeFromCa,
+	port_to_pe: SendPacket,
+	packet_ca_to_pe: PacketCaToPe,
+	packet_ca_from_pe: PacketCaFromPe,
 }
 impl CellAgent {
-	pub fn new(scope: &Scope, cell_id: &CellID, ports: Box<[Port]>,
-			send_to_pe: SendPacketCaToPe, recv_from_pe: ReceivePacketPeFromCa, send_entry_to_pe: EntrySender, 
-			recv_from_port: PortStatusReceiver) -> Result<CellAgent, CellAgentError> {
+	pub fn new(scope: &Scope, cell_id: &CellID, ports: Box<[Port]>, port_to_pe: SendPacket,
+			packet_ca_to_pe: PacketCaToPe, packet_ca_from_pe: PacketCaFromPe, entry_ca_to_pe: EntryCaToPe, 
+			recv_status_from_port: StatusCaFromPort) -> Result<CellAgent, CellAgentError> {
 		let tenant_masks = vec![BASE_TENANT_MASK];
 		let control_tree_id = try!(TreeID::new(CONTROL_TREE_NAME));
 		let connected_tree_id = try!(TreeID::new(CONNECTED_PORTS_TREE_NAME));
@@ -56,13 +55,14 @@ impl CellAgent {
 		let traphs = Arc::new(Mutex::new(HashMap::new()));
 		let mut ca = CellAgent { cell_id: cell_id.clone(), ports: ports, traphs: traphs,
 			connected_ports_tree_id: connected_tree_id.clone(), free_indices: free_indices,
-			tenant_masks: tenant_masks, send_to_pe: send_to_pe.clone(), recv_from_pe: recv_from_pe };
+			tenant_masks: tenant_masks, packet_ca_to_pe: packet_ca_to_pe.clone(), 
+			port_to_pe: port_to_pe, packet_ca_from_pe: packet_ca_from_pe };
 		// Set up predefined trees
 		let entry = try!(ca.new_tree(0, control_tree_id, 0, vec![PortNumber { port_no: 0 }], 0, None));
-		try!(send_entry_to_pe.send(entry));
+		try!(entry_ca_to_pe.send(entry));
 		let connected_entry = try!(ca.new_tree(1, connected_tree_id.clone(), 0, vec![], 0, None));
-		try!(send_entry_to_pe.send(entry));
-		try!(ca.port_status(scope, connected_tree_id, connected_entry, recv_from_port, send_entry_to_pe));
+		try!(entry_ca_to_pe.send(entry));
+		try!(ca.port_status(scope, connected_tree_id, connected_entry, recv_status_from_port, entry_ca_to_pe));
 		//thread::spawn( move || { CellAgent::work(cell_id.clone(), send_to_pe, recv_from_pe); } );
 		Ok(ca)
 	}
@@ -82,38 +82,44 @@ impl CellAgent {
 		Ok(RoutingTableEntry::new(index, true, 0 as u8, mask, OTHER_INDICES))
 	}
 	fn port_status(&mut self, scope: &Scope, connected_tree_id: TreeID, control_tree_entry: RoutingTableEntry,
-			recv_from_port: PortStatusReceiver, send_entry_to_pe: EntrySender) -> Result<(), CellAgentError>{
+			status_ca_from_port: StatusCaFromPort, entry_ca_to_pe: EntryCaToPe) -> Result<(), CellAgentError>{
 		// Create my tree
 		let index = try!(self.use_index());
 		let tree_id = try!(TreeID::new(self.cell_id.get_name()));
 		let entry = try!(self.new_tree(index, tree_id.clone(), 0, vec![], 0, None)); 
-		try!(send_entry_to_pe.send(entry));
+		try!(entry_ca_to_pe.send(entry));
 		let tenant_mask = self.tenant_masks[0];//.last().expect("CellAgent: initiate_discover: No tenant mask");
 		let mut entry = control_tree_entry.clone();	
 		// I'm getting a lifetime error when I have PortNumber::new inside the spawn
 		let no_ports = self.get_no_ports();
 		let cell_id = self.cell_id.clone();
-		let send_to_pe = self.send_to_pe.clone();
+		let send_plus_to_pe = self.packet_ca_to_pe.clone();
+		let ports = self.ports.clone();
 		scope.spawn( move || -> Result<(), CellAgentError> {
 			loop {
-				let (port_no, status) = try!(recv_from_port.recv());
+				let (port_no, status) = try!(status_ca_from_port.recv());
 				let port_no_mask = try!(int_to_mask(port_no));
 				let port_number = try!(PortNumber::new(port_no, no_ports));
+				let port = match ports.get(port_no as usize) {
+					Some(p) => p,
+					None => return Err(CellAgentError::PortNumber(PortNumberError::new(port_no, no_ports)))
+				};
 				match  status {
 					PortStatus::Connected => { 
 						let mask = port_no_mask | entry.get_mask();
 						entry.set_mask(mask);
-						try!(send_entry_to_pe.send(entry));
+						try!(entry_ca_to_pe.send(entry));
 						let msg = DiscoverMsg::new(connected_tree_id.clone(), tree_id.clone(), 
 									cell_id.clone(), 0, port_number);
 						println!("CellAgent {} sending packet", cell_id);
-						try!(CellAgent::send_msg(msg, CONNECTED_TREE_INDEX, CONTROL_TREE_OTHER_INDEX, 
-								tenant_mask & DEFAULT_USER_MASK, send_to_pe.clone()));
+						//port.listen_for_outgoing(scope, self.port_to_pe, recv_from_link);
+						//try!(CellAgent::send_msg(msg, CONNECTED_TREE_INDEX, CONTROL_TREE_OTHER_INDEX, 
+						//		tenant_mask & DEFAULT_USER_MASK, self.packet_ca_to_pe.clone()));
 					},
 					PortStatus::Disconnected => {
 						let mask = (!port_no_mask) & entry.get_mask();
 						entry.set_mask(mask);
-						try!(send_entry_to_pe.send(entry));
+						try!(entry_ca_to_pe.send(entry));
 					}
 				}
  			}
@@ -121,11 +127,11 @@ impl CellAgent {
 		Ok(())
 	}				
 	fn send_msg<T>(msg: T, this_index: u32, other_index: u32, mask: u16,
-				send_to_pe: SendPacketCaToPe) -> Result<(), CellAgentError> 
+				packet_ca_to_pe: PacketCaToPe) -> Result<(), CellAgentError> 
 			where T: Message + Hash + serde::Serialize + fmt::Display {
 		let packets = try!(Packetizer::packetize(&msg, other_index, [false;4]));
 		for packet in packets.iter() {
-			try!(send_to_pe.send((this_index, mask, **packet)));
+			try!(packet_ca_to_pe.send((this_index, mask, **packet)));
 		}
 		Ok(())
 	}
@@ -159,7 +165,7 @@ impl CellAgent {
 		}
 		Err(CellAgentError::NoFreePort(NoFreePortError::new(self.cell_id.clone())))
 	}
-	pub fn work(cell_id: CellID, send_to_pe: SendPacketCaToPe, recv_from_pe: ReceivePacketPeFromCa) {
+	pub fn work(cell_id: CellID, packet_ca_to_pe: PacketCaToPe, recv_from_pe: RecvPacket) {
 		println!("Cell Agent on cell {} is working", cell_id);
 	}
 }

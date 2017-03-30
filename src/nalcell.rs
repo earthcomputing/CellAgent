@@ -5,18 +5,33 @@ use std::{thread, time};
 use crossbeam::Scope;
 use cellagent::{CellAgent, CellAgentError};
 use config::MAX_PORTS;
-use cellagent::{SendPacketCaToPe, ReceivePacketPeFromCa};
 use name::{CellID, PortID};
-use packet_engine::{PacketEngine, SendPacket, ReceivePacket};
+use packet::Packet;
+use packet_engine::{PacketEngine};
 use port::{Port, PortStatus, PortError};
 use routing_table_entry::RoutingTableEntry;
 use vm::VirtualMachine;
 
-pub type EntrySender = mpsc::Sender<RoutingTableEntry>;
-pub type EntryReceiver = mpsc::Receiver<RoutingTableEntry>;
-pub type PortStatusSender = mpsc::Sender<(u8,PortStatus)>;
-pub type PortStatusReceiver = mpsc::Receiver<(u8,PortStatus)>;
-pub type PortStatusSenderError = mpsc::SendError<(u8,PortStatus)>;
+// Packet from CellAgent to PacketEngine, (table index, mask, packet)
+pub type PacketCaToPe = mpsc::Sender<(u32, u16, Packet)>;
+pub type PacketPeFromCa = mpsc::Receiver<(u32, u16, Packet)>;
+pub type PacketCaPeSendError = mpsc::SendError<(u32, u16, Packet)>;
+// Packet from PacketEngine to CellAgent, (port_no, packet)
+pub type PacketPeToCa = mpsc::Sender<(u8, Packet)>;
+pub type PacketCaFromPe = mpsc::Receiver<(u8, Packet)>;
+pub type PacketPeCaSendError = mpsc::SendError<(u8, Packet)>;
+// Table entry from CellAgent to PacketEngine, table entry
+pub type EntryCaToPe = mpsc::Sender<RoutingTableEntry>;
+pub type EntryPeFromCa = mpsc::Receiver<RoutingTableEntry>;
+pub type EntrySendError = mpsc::SendError<RoutingTableEntry>;
+// Port status from Port to CellAgent, (port_no, status)
+pub type StatusPortToCa = mpsc::Sender<(u8, PortStatus)>;
+pub type StatusCaFromPort = mpsc::Receiver<(u8, PortStatus)>;
+pub type PortStatusSendError = mpsc::SendError<(u8, PortStatus)>;
+// Packet from PacketEngine to Port, Port to Link, Link to Port, Port to PacketEngine, packet
+pub type SendPacket = mpsc::Sender<Packet>;
+pub type RecvPacket = mpsc::Receiver<Packet>;
+pub type SendPacketError = mpsc::SendError<Packet>;
 
 #[derive(Debug)]
 pub struct NalCell {
@@ -31,11 +46,11 @@ impl NalCell {
 	pub fn new(scope: &Scope, cell_no: usize, nports: u8, is_border: bool) -> Result<NalCell,NalCellError> {
 		if nports > MAX_PORTS { return Err(NalCellError::NumberPorts(NumberPortsError::new(nports))) }
 		let cell_id = try!(CellID::new(cell_no));
-		let (ca_entry_to_pe, pe_entry_from_ca): (EntrySender, EntryReceiver) = channel();
-		let (ca_to_pe, pe_from_ca): (SendPacketCaToPe, ReceivePacketPeFromCa) = channel();
-		let (pe_to_ca, ca_from_pe): (SendPacketCaToPe, ReceivePacketPeFromCa) = channel();
-		let (port_to_pe, pe_from_port): (SendPacket, ReceivePacket) = channel();
-		let (port_to_ca, ca_from_port): (PortStatusSender, PortStatusReceiver) = channel();
+		let (entry_ca_to_pe, entry_pe_from_ca): (EntryCaToPe, EntryPeFromCa) = channel();
+		let (packet_ca_to_pe, packet_pe_from_ca): (PacketCaToPe, PacketPeFromCa) = channel();
+		let (packet_pe_to_ca, packet_ca_from_pe): (PacketPeToCa, PacketCaFromPe) = channel();
+		let (port_to_pe, pe_from_port): (SendPacket, RecvPacket) = channel();
+		let (status_port_to_ca, status_ca_from_port): (StatusPortToCa, StatusCaFromPort) = channel();
 		let mut ports = Vec::new();
 		let mut pe_to_ports = Vec::new();
 		let mut is_connected = true;
@@ -43,18 +58,18 @@ impl NalCell {
 			let is_border_port;
 			if is_border & (i == 2) { is_border_port = true; }
 			else                    { is_border_port = false; }
-			let (pe_to_port, port_from_pe): (SendPacket, ReceivePacket) = channel();
+			let (pe_to_port, pe_from_port): (SendPacket, RecvPacket) = channel();
 			pe_to_ports.push(pe_to_port);
 			let port = try!(Port::new(&scope, &cell_id, PortNumber { port_no: i as u8 }, is_border_port, 
-					is_connected, port_to_pe.clone(), port_from_pe, port_to_ca.clone()));
+					is_connected, port_to_pe.clone(), status_port_to_ca.clone()));
 			ports.push(port);
 			is_connected = false;
 		}
-		let boxed_ports: Box<[Port]> = ports.into_boxed_slice(); 
-		let cell_agent = try!(CellAgent::new(scope, &cell_id, boxed_ports, 
-				ca_to_pe, ca_from_pe, ca_entry_to_pe, ca_from_port));
-		let packet_engine = try!(PacketEngine::new(scope, &cell_id, pe_to_ca, pe_from_ca, pe_from_port,
-								pe_to_ports, pe_entry_from_ca));
+		let boxed_ports: Box<[Port]> = ports.into_boxed_slice();
+		let cell_agent = try!(CellAgent::new(scope, &cell_id, boxed_ports, port_to_pe, 
+				packet_ca_to_pe, packet_ca_from_pe, entry_ca_to_pe, status_ca_from_port));
+		let packet_engine = try!(PacketEngine::new(scope, &cell_id, packet_pe_to_ca, packet_pe_from_ca, pe_from_port,
+								pe_to_ports, entry_pe_from_ca));
 		let nalcell = NalCell { id: cell_id, cell_no: cell_no, is_border: is_border,
 				cell_agent: cell_agent, packet_engine: packet_engine, vms: Vec::new()};
 		Ok(nalcell)
