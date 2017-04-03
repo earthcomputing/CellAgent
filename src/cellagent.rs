@@ -9,7 +9,7 @@ use serde;
 use crossbeam::Scope;
 use config::{MAX_ENTRIES, MAX_PORTS, CHUNK_ID_SIZE};
 use nalcell::{PortNumber, PortNumberError, EntryCaToPe, StatusCaFromPort, RecvrCaToPort, RecvrSendError,
-		PacketSend, PacketRecv, PacketSendError, PacketCaToPe, PacketPeFromCa, PacketCaFromPe};
+		PacketSend, PacketRecv, PacketSendError, PacketCaToPe, PacketPeFromCa, PacketCaFromPe, PacketPortToPe};
 use message::{Message, MsgType, MsgPayload, DiscoverMsg};
 use name::{Name, CellID, TreeID};
 use packet::{Packet, Packetizer, PacketizerError, UnpacketizeError};
@@ -39,14 +39,13 @@ pub struct CellAgent {
 	free_indices: Vec<usize>,
 	traphs: Arc<Mutex<HashMap<TreeID,Traph>>>,
 	tenant_masks: Vec<u16>,
-	packet_port_to_pe: PacketSend,
+	packet_port_to_pe: PacketPortToPe,
 	packet_ca_to_pe: PacketCaToPe,
-	packet_ca_from_pe: PacketCaFromPe,
 	recv_ca_to_ports: Vec<RecvrCaToPort>,
 	packet_engine: PacketEngine,
 }
 impl CellAgent {
-	pub fn new(scope: &Scope, cell_id: &CellID, ports: Box<[Port]>, packet_port_to_pe: PacketSend, 
+	pub fn new(scope: &Scope, cell_id: &CellID, ports: Box<[Port]>, packet_port_to_pe: PacketPortToPe, 
 			packet_engine: PacketEngine, packet_ca_to_pe: PacketCaToPe, packet_ca_from_pe: PacketCaFromPe, 
 			entry_ca_to_pe: EntryCaToPe, recv_status_from_port: StatusCaFromPort,
 			recv_ca_to_ports: Vec<RecvrCaToPort>, packet_ports_from_pe: HashMap<u8,PacketRecv>) -> Result<CellAgent, CellAgentError> {
@@ -60,7 +59,7 @@ impl CellAgent {
 		let mut ca = CellAgent { cell_id: cell_id.clone(), ports: ports, traphs: traphs,
 			connected_ports_tree_id: connected_tree_id.clone(), free_indices: free_indices,
 			tenant_masks: tenant_masks, packet_ca_to_pe: packet_ca_to_pe.clone(), 
-			packet_port_to_pe: packet_port_to_pe, packet_ca_from_pe: packet_ca_from_pe, packet_engine: packet_engine,
+			packet_port_to_pe: packet_port_to_pe, packet_engine: packet_engine,
 			recv_ca_to_ports: recv_ca_to_ports};
 		// Set up predefined trees
 		let entry = try!(ca.new_tree(0, control_tree_id, 0, vec![PortNumber { port_no: 0 }], 0, None));
@@ -69,7 +68,7 @@ impl CellAgent {
 		try!(entry_ca_to_pe.send(entry));
 		try!(ca.port_status(scope, connected_tree_id, connected_entry, recv_status_from_port, 
 				entry_ca_to_pe, packet_ports_from_pe));
-		//thread::spawn( move || { CellAgent::work(cell_id.clone(), send_to_pe, recv_from_pe); } );
+		try!(ca.recv_packets(scope, cell_id.clone(), packet_ca_from_pe));
 		Ok(ca)
 	}
 	pub fn stringify(&self) -> String {
@@ -132,6 +131,42 @@ impl CellAgent {
 		});
 		Ok(())
 	}				
+	fn recv_packets(&self, scope: &Scope, cell_id: CellID, packet_ca_from_pe: PacketCaFromPe) -> 
+			Result<(), CellAgentError> {
+		let mut packet_assembler: HashMap<u64, Vec<u8>> = HashMap::new();
+		scope.spawn( move || -> Result<(), CellAgentError> {
+			loop {
+				let (port_no, index, packet) = try!(packet_ca_from_pe.recv());
+				println!("CellAgent {} received packet on port number {}", cell_id, port_no);
+				let header = packet.get_header();
+				let payload = packet.get_payload();
+				let payload_size = packet.get_payload_size();
+				let msg_len = header.get_msg_size();
+				let uniquifier = header.get_uniquifier();
+				if packet_assembler.contains_key(&uniquifier) {
+					let mut bytes = match packet_assembler.remove(&uniquifier) {
+						Some(p) => p,
+						None => return Err(CellAgentError::MsgAssembly(MsgAssemblyError::new()))
+					};
+					let payload_bytes = packet.get_payload_bytes();
+					bytes.append(&mut payload_bytes.clone());
+					if bytes.len() >= msg_len as usize {
+						// upacketize
+						packet_assembler.remove(&uniquifier);
+					} else {
+						packet_assembler.insert(uniquifier, bytes);
+					}
+				} else {
+					packet_assembler.insert(uniquifier, payload);
+					if payload_size >= msg_len as usize {
+						// unpacketize
+						packet_assembler.remove(&uniquifier);
+					}
+				}
+			}	
+		});
+		Ok(())
+	}
 	fn send_msg<T>(msg: T, this_index: u32, other_index: u32, mask: u16,
 				packet_ca_to_pe: PacketCaToPe) -> Result<(), CellAgentError> 
 			where T: Message + Hash + serde::Serialize + fmt::Display {
@@ -141,7 +176,7 @@ impl CellAgent {
 		}
 		Ok(())
 	}
-	fn recv_msg<T>(&self, packets: Vec<Box<Packet>>) -> Result<(), CellAgentError>
+	fn msg_from_packets<T>(&self, packets: Vec<Box<Packet>>) -> Result<(), CellAgentError>
 			where T: Message + Hash + serde::Deserialize + fmt::Display {
 		let msg: T = match Packetizer::unpacketize(&packets) {
 			Ok(m) => {
@@ -188,6 +223,7 @@ pub enum CellAgentError {
 	Packetizer(PacketizerError),
 	PortNumber(PortNumberError),
 	PortTaken(PortTakenError),
+	MsgAssembly(MsgAssemblyError),
 	BadPacket(BadPacketError),
 	Utility(UtilityError),
 	NoFreePort(NoFreePortError),
@@ -205,6 +241,7 @@ impl Error for CellAgentError {
 			CellAgentError::PortNumber(ref err) => err.description(),
 			CellAgentError::PortTaken(ref err) => err.description(),
 			CellAgentError::BadPacket(ref err) => err.description(),
+			CellAgentError::MsgAssembly(ref err) => err.description(),
 			CellAgentError::NoFreePort(ref err) => err.description(),
 			CellAgentError::Name(ref err) => err.description(),
 			CellAgentError::Size(ref err) => err.description(),
@@ -225,6 +262,7 @@ impl Error for CellAgentError {
 			CellAgentError::PortNumber(ref err) => Some(err),
 			CellAgentError::PortTaken(ref err) => Some(err),
 			CellAgentError::BadPacket(ref err) => Some(err),
+			CellAgentError::MsgAssembly(ref err) => Some(err),
 			CellAgentError::NoFreePort(ref err) => Some(err),
 			CellAgentError::Name(ref err) => Some(err),
 			CellAgentError::Size(ref err) => Some(err),
@@ -247,6 +285,7 @@ impl fmt::Display for CellAgentError {
 			CellAgentError::PortNumber(ref err) => write!(f, "Cell Agent PortNumber Error caused by {}", err),
 			CellAgentError::PortTaken(ref err) => write!(f, "Cell Agent PortNumber Error caused by {}", err),
 			CellAgentError::BadPacket(ref err) => write!(f, "Cell Agent Bad Packet Error caused by {}", err),
+			CellAgentError::MsgAssembly(ref err) => write!(f, "Cell Agent Message Assembly Error caused by {}", err),
 			CellAgentError::NoFreePort(ref err) => write!(f, "Cell Agent No Free Port Error caused by {}", err),
 			CellAgentError::Name(ref err) => write!(f, "Cell Agent Name Error caused by {}", err),
 			CellAgentError::Size(ref err) => write!(f, "Cell Agent Size Error caused by {}", err),
@@ -307,6 +346,25 @@ impl fmt::Display for SizeError {
 }
 impl From<SizeError> for CellAgentError {
 	fn from(err: SizeError) -> CellAgentError { CellAgentError::Size(err) }
+}
+#[derive(Debug)]
+pub struct MsgAssemblyError { msg: String }
+impl MsgAssemblyError { 
+	pub fn new() -> MsgAssemblyError {
+		MsgAssemblyError { msg: format!("Problem with packet assembler") }
+	}
+}
+impl Error for MsgAssemblyError {
+	fn description(&self) -> &str { &self.msg }
+	fn cause(&self) -> Option<&Error> { None }
+}
+impl fmt::Display for MsgAssemblyError {
+	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+		write!(f, "{}", self.msg)
+	}
+}
+impl From<MsgAssemblyError> for CellAgentError {
+	fn from(err: MsgAssemblyError) -> CellAgentError { CellAgentError::MsgAssembly(err) }
 }
 #[derive(Debug)]
 pub struct BadPacketError { msg: String }

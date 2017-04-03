@@ -13,14 +13,22 @@ use port::{Port, PortStatus, PortError};
 use routing_table_entry::RoutingTableEntry;
 use vm::VirtualMachine;
 
+// Packet from PacketEngine to Port, Port to Link, Link to Port
+pub type PacketSend = mpsc::Sender<Packet>;
+pub type PacketRecv = mpsc::Receiver<Packet>;
+pub type PacketSendError = mpsc::SendError<Packet>;
+// Packet from Port to PacketEngine
+pub type PacketPortToPe = mpsc::Sender<(u8, Packet)>;
+pub type PacketPeFromPort = mpsc::Receiver<(u8, Packet)>;
+pub type PacketPortPeSendError = mpsc::SendError<(u8, Packet)>;
+// Packet from PacketEngine to CellAgent, (port_no, table index, packet)
+pub type PacketPeToCa = mpsc::Sender<(u8, u32, Packet)>;
+pub type PacketCaFromPe = mpsc::Receiver<(u8, u32, Packet)>;
+pub type PacketPeCaSendError = mpsc::SendError<(u8, u32, Packet)>;
 // Packet from CellAgent to PacketEngine, (table index, mask, packet)
 pub type PacketCaToPe = mpsc::Sender<(u32, u16, Packet)>;
 pub type PacketPeFromCa = mpsc::Receiver<(u32, u16, Packet)>;
 pub type PacketCaPeSendError = mpsc::SendError<(u32, u16, Packet)>;
-// Packet from PacketEngine to CellAgent, (port_no, packet)
-pub type PacketPeToCa = mpsc::Sender<(u8, Packet)>;
-pub type PacketCaFromPe = mpsc::Receiver<(u8, Packet)>;
-pub type PacketPeCaSendError = mpsc::SendError<(u8, Packet)>;
 // Table entry from CellAgent to PacketEngine, table entry
 pub type EntryCaToPe = mpsc::Sender<RoutingTableEntry>;
 pub type EntryPeFromCa = mpsc::Receiver<RoutingTableEntry>;
@@ -29,10 +37,6 @@ pub type EntrySendError = mpsc::SendError<RoutingTableEntry>;
 pub type StatusPortToCa = mpsc::Sender<(u8, PortStatus)>;
 pub type StatusCaFromPort = mpsc::Receiver<(u8, PortStatus)>;
 pub type PortStatusSendError = mpsc::SendError<(u8, PortStatus)>;
-// Packet from PacketEngine to Port, Port to Link, Link to Port, Port to PacketEngine, packet
-pub type PacketSend = mpsc::Sender<Packet>;
-pub type PacketRecv = mpsc::Receiver<Packet>;
-pub type PacketSendError = mpsc::SendError<Packet>;
 // Receiver from CellAgent to Port
 pub type RecvrCaToPort = mpsc::Sender<PacketRecv>;
 pub type RecvrPortFromCa = mpsc::Receiver<PacketRecv>;
@@ -53,7 +57,7 @@ impl NalCell {
 		let (entry_ca_to_pe, entry_pe_from_ca): (EntryCaToPe, EntryPeFromCa) = channel();
 		let (packet_ca_to_pe, packet_pe_from_ca): (PacketCaToPe, PacketPeFromCa) = channel();
 		let (packet_pe_to_ca, packet_ca_from_pe): (PacketPeToCa, PacketCaFromPe) = channel();
-		let (packet_port_to_pe, packet_pe_from_port): (PacketSend, PacketRecv) = channel();
+		let (packet_port_to_pe, packet_pe_from_port): (PacketPortToPe, PacketPeFromPort) = channel();
 		let (status_port_to_ca, status_ca_from_port): (StatusPortToCa, StatusCaFromPort) = channel();
 		let mut ports = Vec::new();
 		let mut ca_to_ports = Vec::new();

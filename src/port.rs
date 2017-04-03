@@ -1,7 +1,8 @@
 use std::fmt;
 use std::sync::mpsc;
 use crossbeam::Scope;
-use nalcell::{PortNumber, StatusPortToCa, PortStatusSendError, PacketSend, PacketRecv, RecvrPortFromCa};
+use nalcell::{PortNumber, StatusPortToCa, PortStatusSendError, PacketSend, PacketRecv, 
+	RecvrPortFromCa, PacketPortToPe};
 use packet::Packet;
 use name::{Name, PortID, CellID};
 
@@ -19,12 +20,12 @@ pub struct Port {
 	is_connected: bool,
 	is_broken: bool,
 	status_port_to_ca: StatusPortToCa,
-	packet_port_to_pe: PacketSend,
+	packet_port_to_pe: PacketPortToPe,
 	recv_port_from_ca: RecvrPortFromCa,
 }
 impl Port {
 	pub fn new(cell_id: &CellID, port_no: PortNumber, is_border: bool, is_connected: bool,
-			   packet_port_to_pe: PacketSend, status_port_to_ca: StatusPortToCa,
+			   packet_port_to_pe: PacketPortToPe, status_port_to_ca: StatusPortToCa,
 			   recv_port_from_ca: RecvrPortFromCa) -> Result<Port,PortError>{
 		let port_id = try!(PortID::new(port_no.get_port_no()));
 		let temp_id = try!(port_id.add_component(&cell_id.get_name()));
@@ -46,6 +47,7 @@ impl Port {
 		try!(self.status_port_to_ca.send((port_no, PortStatus::Connected)));
 		let packet_port_from_pe = try!(self.recv_port_from_ca.recv());
 		let port_id = self.id.clone();
+		let port_no = self.get_no();
 		let packet_port_to_pe = self.packet_port_to_pe.clone();
 		scope.spawn( move || -> Result<(), PortError> {
 			loop {
@@ -56,7 +58,7 @@ impl Port {
 		scope.spawn( move || -> Result<(), PortError> {
 				loop {
 					let packet = try!(packet_port_from_link.recv());
-					try!(packet_port_to_pe.send(packet));
+					try!(packet_port_to_pe.send((port_no, packet)));
 				}
 			});
 		Ok(())
@@ -84,6 +86,7 @@ pub enum PortError {
 	Name(NameError),
 	Channel(ChannelError),
 	SendStatus(PortStatusSendError),
+	SendToPe(mpsc::SendError<(u8,Packet)>),
 	Send(mpsc::SendError<Packet>),
 	Recv(mpsc::RecvError)
 }
@@ -93,6 +96,7 @@ impl Error for PortError {
 			PortError::Name(ref err) => err.description(),
 			PortError::Channel(ref err) => err.description(),
 			PortError::SendStatus(ref err) => err.description(),
+			PortError::SendToPe(ref err) => err.description(),
 			PortError::Send(ref err) => err.description(),
 			PortError::Recv(ref err) => err.description(),
 		}
@@ -102,6 +106,7 @@ impl Error for PortError {
 			PortError::Name(ref err) => Some(err),
 			PortError::Channel(ref err) => Some(err),
 			PortError::SendStatus(ref err) => Some(err),
+			PortError::SendToPe(ref err) => Some(err),
 			PortError::Send(ref err) => Some(err),
 			PortError::Recv(ref err) => Some(err),
 		}
@@ -113,6 +118,7 @@ impl fmt::Display for PortError {
 			PortError::Name(ref err) => write!(f, "Port Name Error caused by {}", err),
 			PortError::Channel(ref err) => write!(f, "Port Channel Error caused by {}", err),
 			PortError::SendStatus(ref err) => write!(f, "Port Send Status Error caused by {}", err),
+			PortError::SendToPe(ref err) => write!(f, "Port Send Packet Error caused by {}", err),
 			PortError::Send(ref err) => write!(f, "Port Send Error caused by {}", err),
 			PortError::Recv(ref err) => write!(f, "Port Receive Error caused by {}", err),
 		}
@@ -145,6 +151,9 @@ impl From<PortStatusSendError> for PortError {
 }
 impl From<mpsc::SendError<Packet>> for PortError {
 	fn from(err: mpsc::SendError<Packet>) -> PortError { PortError::Send(err) }
+}
+impl From<mpsc::SendError<(u8,Packet)>> for PortError {
+	fn from(err: mpsc::SendError<(u8,Packet)>) -> PortError { PortError::SendToPe(err) }
 }
 impl From<mpsc::RecvError> for PortError {
 	fn from(err: mpsc::RecvError) -> PortError { PortError::Recv(err) }

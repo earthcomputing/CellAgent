@@ -25,20 +25,21 @@ pub enum Packet {
 	Large  { header: PacketHeader, payload: [u8; PAYLOAD_LARGE]  }
 }
 impl Packet {
-	pub fn get_header(&self) -> PacketHeader { 
+	pub fn get_header(&self) -> PacketHeader {
 		match *self {
 			Packet::Small  { header, payload } => header,
 			Packet::Medium { header, payload } => header,
 			Packet::Large  { header, payload } => header,
 		}
 	}
-	pub fn get_payload(&self) -> Vec<PacketElement> { 
+	pub fn get_payload(&self) -> Vec<PacketElement> {
 		match *self {
 			Packet::Small  { header, payload } => payload.iter().cloned().collect(),
 			Packet::Medium { header, payload } => payload.iter().cloned().collect(),
 			Packet::Large  { header, payload } => payload.iter().cloned().collect(),
 		}
 	}
+	pub fn get_payload_bytes(&self) -> Vec<u8> { self.get_payload().iter().cloned().collect() }
 	pub fn get_size(&self) -> usize { 
 		match *self {
 			Packet::Small  {header, payload} => PACKET_SMALL, 
@@ -46,7 +47,7 @@ impl Packet {
 			Packet::Large  {header, payload} => PACKET_LARGE
 		}
 	}
-	pub fn get_packet_payload_size(&self) -> usize { 
+	pub fn get_payload_size(&self) -> usize { 
 		match *self {
 			Packet::Small  {header, payload} => PAYLOAD_SMALL, 
 			Packet::Medium {header, payload} => PAYLOAD_MEDIUM,
