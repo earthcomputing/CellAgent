@@ -40,7 +40,6 @@ impl Link {
 		scope.spawn( move || -> Result<(), LinkError> {
 				loop {
 					let packet = try!(packet_link_from_left.recv());
-					println!("Link {} received packet from left", link_id);
 					try!(packet_link_to_rite.send(packet));
 				}
 			}
@@ -49,7 +48,6 @@ impl Link {
 		scope.spawn( move || -> Result<(), LinkError> {
 				loop {
 					let packet = try!(packet_link_from_rite.recv());
-					println!("Link {} received packet from rite", link_id);
 					try!(packet_link_to_left.send(packet));
 				}
 			}
