@@ -1,49 +1,65 @@
 use std::fmt;
 use std::sync::{Arc, Mutex};
 use std::sync::mpsc;
+use std::sync::mpsc::channel;
 use crossbeam::Scope;
-use nalcell::{EntryPeFromCa, SendPacket, RecvPacket, SendPacketError, PacketCaToPe, PacketPeFromCa, PacketPeToCa};
+use nalcell::{EntryPeFromCa, PacketSend, PacketRecv, PacketSendError, PacketCaToPe, PacketPeFromCa, PacketPeToCa};
 use name::CellID;
 use packet::Packet;
 use routing_table::{RoutingTable, RoutingTableError};
 use utility::{ints_from_mask, UtilityError};
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct PacketEngine {
 	cell_id: CellID,
 	routing_table: Arc<Mutex<RoutingTable>>,
+	packet_pe_to_ports: Vec<PacketSend>,
 }
 impl PacketEngine {
-	pub fn new(scope: &Scope, cell_id: &CellID, packet_pe_to_ca: PacketPeToCa, packet_pe_from_ca: PacketPeFromCa, 
-		recv_from_port: RecvPacket, send_to_ports: Vec<SendPacket>, 
-		recv_entry_from_ca: EntryPeFromCa) -> Result<PacketEngine, PacketEngineError> {
+	pub fn new(scope: &Scope, cell_id: &CellID, packet_pe_to_ca: PacketPeToCa, 
+		packet_pe_from_ca: PacketPeFromCa, recv_entry_from_ca: EntryPeFromCa, 
+		packet_pe_from_ports: PacketRecv, packet_pe_to_ports: Vec<PacketSend>) -> Result<PacketEngine, PacketEngineError> {
 		let routing_table = Arc::new(Mutex::new(try!(RoutingTable::new()))); 
-		let pe = PacketEngine { cell_id: cell_id.clone(), routing_table: routing_table };
+		let pe = PacketEngine { cell_id: cell_id.clone(), routing_table: routing_table, 
+			packet_pe_to_ports: packet_pe_to_ports };
 		try!(pe.entry_channel(scope, recv_entry_from_ca));
-		pe.ca_channel(scope, packet_pe_to_ca, packet_pe_from_ca, send_to_ports);
+		pe.ca_channel(scope, packet_pe_from_ca);
+		pe.port_channel(scope, packet_pe_from_ports, packet_pe_to_ca);
 		Ok(pe)
 	}
-	fn ca_channel(&self, scope: &Scope, packet_pe_to_ca: PacketPeToCa, packet_pe_from_ca: PacketPeFromCa,
-			packet_pe_to_ports: Vec<SendPacket>) {
+	fn ca_channel(&self, scope: &Scope,  packet_pe_from_ca: PacketPeFromCa) {
 		let table = self.routing_table.clone();
+		let packet_pe_to_ports = self.packet_pe_to_ports.clone();
 		scope.spawn( move || -> Result<(), PacketEngineError> {
-				loop {
-					let (index, mask, packet) = try!(packet_pe_from_ca.recv());
-					let unlocked = table.lock().unwrap();
-					let entry = (*unlocked).get_entry(index);
-					let entry_mask = entry.get_mask();
-					let port_nos = try!(ints_from_mask(entry_mask & mask));
-					for port_no in port_nos.iter() {
-						let sender = packet_pe_to_ports.get(*port_no as usize);
-						match sender {
-							Some(s) => try!(s.send(packet)),
-							None => return Err(PacketEngineError::Port(PortError::new(*port_no)))
-						};
-					}
+			loop {
+				let (index, mask, packet) = try!(packet_pe_from_ca.recv());
+				let unlocked = table.lock().unwrap();
+				let entry = (*unlocked).get_entry(index);
+				let entry_mask = entry.get_mask();
+				let port_nos = try!(ints_from_mask(entry_mask & mask));
+				for port_no in port_nos.iter() {
+					let sender = packet_pe_to_ports.get(*port_no as usize);
+					match sender {
+						Some(s) => try!(s.send(packet)),
+						None => return Err(PacketEngineError::Port(PortError::new(*port_no)))
+					};
 				}
-				Ok(())
 			}
-		);
+			Ok(())
+		});
+	}
+	fn port_channel(&self, scope: &Scope, packet_pe_from_ports: PacketRecv, 
+			packet_pe_to_ca: PacketPeToCa) -> Result<(),PacketEngineError> {
+		let cell_id = self.cell_id.clone();
+		scope.spawn( move || -> Result<(), PacketEngineError> {
+		loop {
+			println!("PacketEngine for cell {} received packet", cell_id);
+			let packet = try!(packet_pe_from_ports.recv());
+			//try!(packet_pe_to_ca.send(packet));
+		}
+		Ok(())	
+		});
+		Ok(())
 	}
 	pub fn entry_channel(&self, scope: &Scope, entry_pe_from_ca: EntryPeFromCa) -> Result<(),PacketEngineError> {
 		let table = self.routing_table.clone();
@@ -71,7 +87,7 @@ pub enum PacketEngineError {
 	RoutingTable(RoutingTableError),
 	Utility(UtilityError),
 	Port(PortError),
-	Send(SendPacketError),
+	Send(PacketSendError),
 	Recv(mpsc::RecvError),
 }
 impl Error for PacketEngineError {

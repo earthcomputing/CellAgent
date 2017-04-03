@@ -1,9 +1,9 @@
 use std::fmt;
 use std::sync::mpsc;
 use crossbeam::Scope;
-use nalcell::{PortNumber, StatusPortToCa, PortStatusSendError, SendPacket, RecvPacket};
+use nalcell::{PortNumber, StatusPortToCa, PortStatusSendError, PacketSend, PacketRecv, RecvrPortFromCa};
 use packet::Packet;
-use name::{Name, NameError,PortID,CellID};
+use name::{Name, PortID, CellID};
 
 #[derive(Debug, Copy, Clone)]
 pub enum PortStatus {
@@ -11,7 +11,7 @@ pub enum PortStatus {
 	Disconnected,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct Port {
 	id: PortID,
 	port_no: PortNumber,
@@ -19,15 +19,18 @@ pub struct Port {
 	is_connected: bool,
 	is_broken: bool,
 	status_port_to_ca: StatusPortToCa,
-	packet_port_to_pe: SendPacket
+	packet_port_to_pe: PacketSend,
+	recv_port_from_ca: RecvrPortFromCa,
 }
 impl Port {
-	pub fn new(scope: &Scope, cell_id: &CellID, port_no: PortNumber, is_border: bool, is_connected: bool,
-			   packet_port_to_pe: SendPacket, status_port_to_ca: StatusPortToCa) -> Result<Port,PortError>{
+	pub fn new(cell_id: &CellID, port_no: PortNumber, is_border: bool, is_connected: bool,
+			   packet_port_to_pe: PacketSend, status_port_to_ca: StatusPortToCa,
+			   recv_port_from_ca: RecvrPortFromCa) -> Result<Port,PortError>{
 		let port_id = try!(PortID::new(port_no.get_port_no()));
 		let temp_id = try!(port_id.add_component(&cell_id.get_name()));
 		let port = Port{ id: temp_id, port_no: port_no, is_border: is_border, is_connected: is_connected, 
-			is_broken: false, status_port_to_ca: status_port_to_ca, packet_port_to_pe: packet_port_to_pe };
+			is_broken: false, status_port_to_ca: status_port_to_ca, packet_port_to_pe: packet_port_to_pe,
+			recv_port_from_ca: recv_port_from_ca };
 		Ok(port)
 	}
 	pub fn get_id(&self) -> PortID { self.id.clone() }
@@ -36,24 +39,26 @@ impl Port {
 	pub fn is_connected(&self) -> bool { self.is_connected }
 	pub fn is_broken(&self) -> bool { self.is_broken }
 	pub fn is_border(&self) -> bool { self.is_border }
-	pub fn set_connected(&mut self, send_to_link: SendPacket, recv_from_link: RecvPacket) -> Result<(),PortStatusSendError> {
-		println!("Port {} connected", self.id); 
+	pub fn set_connected(&mut self, scope: &Scope, packet_port_to_link: PacketSend, 
+				packet_port_from_link: PacketRecv) -> Result<(),PortError> {
 		self.is_connected = true; 
-		try!(self.status_port_to_ca.send((self.port_no.get_port_no(), PortStatus::Connected)));
-		Ok(())
-	}
-	pub fn listen_for_outgoing(&self, scope: &Scope, 
-			send_to_link: SendPacket, recv_from_pe: RecvPacket) -> Result<(), PortError> {
+		let port_no = self.port_no.get_port_no();
+		try!(self.status_port_to_ca.send((port_no, PortStatus::Connected)));
+		let packet_port_from_pe = try!(self.recv_port_from_ca.recv());
 		let port_id = self.id.clone();
+		let packet_port_to_pe = self.packet_port_to_pe.clone();
 		scope.spawn( move || -> Result<(), PortError> {
-			println!("spawn Port {} listening for packets", port_id);
 			loop {
-				let packet = try!(recv_from_pe.recv());
-				try!(send_to_link.clone().send(packet));
-				println!("Port {} received packet {}", port_id, packet);
+				let packet = try!(packet_port_from_pe.recv());
+				try!(packet_port_to_link.send(packet));
 			}
-				Ok(())
 		});
+		scope.spawn( move || -> Result<(), PortError> {
+				loop {
+					let packet = try!(packet_port_from_link.recv());
+					try!(packet_port_to_pe.send(packet));
+				}
+			});
 		Ok(())
 	}
 	pub fn stringify(&self) -> String {
@@ -73,6 +78,7 @@ impl fmt::Display for Port {
 }
 // Errors
 use std::error::Error;
+use name::NameError;
 #[derive(Debug)]
 pub enum PortError {
 	Name(NameError),
