@@ -136,26 +136,6 @@ impl CellAgent {
 		});
 		Ok(())
 	}				
-	fn recv_packets(&self, scope: &Scope, cell_id: CellID, packet_ca_from_pe: PacketCaFromPe) -> 
-			Result<(), CellAgentError> {
-		let mut packet_assembler: HashMap<u64, Vec<Box<Packet>>> = HashMap::new();
-		scope.spawn( move || -> Result<(), CellAgentError> {
-			loop {
-				let (port_no, index, packet) = try!(packet_ca_from_pe.recv());
-				println!("CellAgent {} received packet on port number {}", cell_id, port_no);
-				let header = packet.get_header();
-				let last_packet_size = header.get_last_packet_size();
-				let uniquifier = header.get_uniquifier();
-				let packets = packet_assembler.entry(uniquifier).or_insert(Vec::new());
-				packets.push(Box::new(packet));
-				//let msg: Message;
-				if last_packet_size > 0 {
-					//msg = Packetizer::unpacketize(packets);
-				}
-			}	
-		});
-		Ok(())
-	}
 	fn send_msg<T>(msg: T, this_index: u32, other_index: u32, mask: u16,
 				packet_ca_to_pe: PacketCaToPe) -> Result<(), CellAgentError> 
 			where T: Message + Hash + serde::Serialize + fmt::Display {
@@ -165,24 +145,32 @@ impl CellAgent {
 		}
 		Ok(())
 	}
-	fn msg_from_packets<T>(&self, packets: Vec<Box<Packet>>) -> Result<(), CellAgentError>
-			where T: Message + Hash + serde::Deserialize + fmt::Display {
-		let msg: T = match Packetizer::unpacketize(&packets) {
-			Ok(m) => {
-				if packets[0].get_size() == 0 { // At least one packet if I get here
-					return Err(CellAgentError::Utility(UtilityError::Unimplemented(UnimplementedError::new("Streaming")))); 
-				} else {
-					m
+	fn recv_packets(&self, scope: &Scope, cell_id: CellID, packet_ca_from_pe: PacketCaFromPe) 		
+			-> Result<(), CellAgentError> {
+		let mut packet_assembler: HashMap<u64, Vec<Box<Packet>>> = HashMap::new();
+		scope.spawn( move || -> Result<(), CellAgentError> {
+			loop {
+				let (port_no, index, packet) = try!(packet_ca_from_pe.recv());
+				let header = packet.get_header();
+				let last_packet_size = header.get_last_packet_size();
+				let uniquifier = header.get_uniquifier();
+				let packets = packet_assembler.entry(uniquifier).or_insert(Vec::new());
+				packets.push(Box::new(packet));
+				let msg: Box<Message>;
+				if last_packet_size > 0 {
+					msg = try!(Packetizer::unpacketize(packets));
+					match msg.get_msg_type() {
+						MsgType::Discover => CellAgent::discover_handler(cell_id.clone(), msg),
+						_ => println!("other")
+					};
 				}
-			},
-			Err(e) => return Err(CellAgentError::Packetizer(e))
-		};
-		match msg.get_msg_type() {
-			MsgType::Discover  => return Err(CellAgentError::Utility(UtilityError::Unimplemented(UnimplementedError::new("Discover")))),
-			MsgType::DiscoverD => return Err(CellAgentError::Utility(UtilityError::Unimplemented(UnimplementedError::new("DiscoverD")))),
-		};
+			}	
+		});
 		Ok(())
 	}
+	fn discover_handler(cell_id: CellID, msg: Box<Message>) {
+		println!("Discover {} {} {}", cell_id, msg.get_header(), msg.get_payload().stringify());
+			}
 	fn use_index(&mut self) -> Result<usize,CellAgentError> {
 		match self.free_indices.pop() {
 			Some(i) => Ok(i),
@@ -194,9 +182,6 @@ impl CellAgent {
 			if !p.is_connected() & !p.is_border() { return Ok(p); }
 		}
 		Err(CellAgentError::NoFreePort(NoFreePortError::new(self.cell_id.clone())))
-	}
-	pub fn work(cell_id: CellID, packet_ca_to_pe: PacketCaToPe, recv_from_pe: PacketRecv) {
-		println!("Cell Agent on cell {} is working", cell_id);
 	}
 }
 // Errors
