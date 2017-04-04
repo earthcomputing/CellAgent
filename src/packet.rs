@@ -9,7 +9,7 @@ use std::collections::hash_map::DefaultHasher;
 use serde;
 use serde_json;
 use config::{PACKET_SMALL, PACKET_MEDIUM, PACKET_LARGE};
-use message::{Message, DiscoverMsg};
+use message::{Message, DiscoverMsg, MsgDirection};
 
 const PAYLOAD_DEFAULT_ELEMENT: u8 = 0;
 const PAYLOAD_SMALL:  usize = PACKET_SMALL  - PACKET_HEADER_SIZE;
@@ -40,7 +40,7 @@ impl Packet {
 		}
 	}
 	pub fn get_payload_bytes(&self) -> Vec<u8> { self.get_payload().iter().cloned().collect() }
-	pub fn get_size(&self) -> usize { 
+	pub fn get_size(&self) -> usize {
 		match *self {
 			Packet::Small  {header, payload} => PACKET_SMALL, 
 			Packet::Medium {header, payload} => PACKET_MEDIUM,
@@ -70,14 +70,16 @@ impl Packetizer {
 		let bytes = serialized.clone().into_bytes();
 		let payload_size = try!(Packetizer::packet_payload_size(bytes.len()));
 		let num_packets = (bytes.len() + payload_size - 1)/ payload_size; // Poor man's ceiling
+		let last_packet_size = bytes.len() - (num_packets-1)*payload_size;
 		//Packetizer::hash(&msg); // Can't use hash in case two cells send the same message
 		let unique_id = rand::random(); 
 		let direction = msg.is_rootward();
-		let mut packet_header = PacketHeader::new(unique_id, bytes.len(), other_index, direction, flags);
+		let mut packet_header = PacketHeader::new(unique_id, bytes.len() as u16, other_index, false);
 		let mut packets = Vec::new();
-		packet_header.set_msg_size(bytes.len());
+		packet_header.set_last_packet_size(0);
 		for i in 0..num_packets {
 			let mut packet_bytes = vec![PAYLOAD_DEFAULT_ELEMENT; payload_size];
+			if i == (num_packets-1) { packet_header.set_last_packet_size(last_packet_size as u16); }
 			for j in 0..payload_size {
 				if i*payload_size + j == bytes.len() { break; }
 				packet_bytes[j] = bytes[i*payload_size + j];
@@ -116,21 +118,18 @@ impl Packetizer {
 		Ok(packets)
 	}
 	pub fn unpacketize<T>(packets: &Vec<Box<Packet>>) -> Result<T, PacketizerError> 
-			where T: Message + serde::Deserialize {
-		let first = match packets.first() { 
-			Some(f) => f,
-			None => return Err(PacketizerError::Unpacketize(UnpacketizeError::new(0, 0)))
-		};
-		let header = first.get_header();
-		let msg_size = header.get_msg_size();
+			where T: Message + serde::Deserialize + fmt::Display {
 		let mut all_bytes = Vec::new();
 		for packet in packets {
-			let payload = &packet.get_payload();
-			all_bytes.extend_from_slice(payload);
+			let header = packet.get_header();
+			let last_packet_size = header.get_last_packet_size();
+			let mut payload = packet.get_payload();
+			if last_packet_size > 0 { payload.truncate(last_packet_size as usize); }
+			all_bytes.extend_from_slice(payload.as_slice());
 		}
-		all_bytes.truncate(msg_size as usize);
 		let serialized = try!(str::from_utf8(&all_bytes));
 		let deserialized: T = try!(serde_json::from_str(&serialized));
+		println!("Deserialized message {}", deserialized);
 		Ok(deserialized)
 	}
 	fn packet_payload_size(len: usize) -> Result<usize, PacketizerError> {
@@ -156,39 +155,48 @@ impl fmt::Debug for Packet {
 impl fmt::Display for Packet { 
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result { write!(f, "{}", self.stringify()) }
 }
-const PACKET_HEADER_SIZE: usize = 8 + 4 + 4 + 1 + 3 + 4; // Last value is padding
+const PACKET_HEADER_SIZE: usize = 8 + 2 + 4 + 1 + 9; // Last value is padding
 #[derive(Debug, Copy, Clone)]
 pub struct PacketHeader {
-	uniquifier: u64,	// Unique identifier of this message
-	msg_size: u32,		// Size of message in bytes, 0 => stream
-	other_index: u32,	// Routing table index on receiving cell
-	is_rootcast: bool,	// true for Rootcast, false for Leafcast
-	version: [bool; 3], // Version encoded as 3 bits
-	flags: [bool;4],    // 0000 => EC Protocol to CellAgent
-						// 0001 => EC Protocol to VirtualMachine
-						// 0010 => Legacy Protocol to VirtualMachine
+	uniquifier: u64,		// Unique identifier of this message
+	last_packet_size: u16,	// Size of message in bytes, 0 => stream
+	other_index: u32,		// Routing table index on receiving cell
+	flags: u8,    			// Various flags
+							// xxxx xxx0 => rootcast
+							// xxxx xxx1 => leafcast
+							// xx00 xxxx => EC Protocol to CellAgent
+							// xx01 xxxx => EC Protocol to VirtualMachine
+							// xx10 xxxx => Legacy Protocol to VirtualMachine
 }
 impl PacketHeader {
-	pub fn new(uniquifier: u64, msg_size: usize, other_index: u32, 
-			is_rootcast: bool, flags: [bool;4]) -> PacketHeader {
+	pub fn new(uniquifier: u64, last_packet_size: u16, other_index: u32, 
+			is_rootcast: bool) -> PacketHeader {
 		// Assertion fails if I forgot to change PACKET_HEADER_SIZE when I changed PacketHeader struct
 		assert_eq!(PACKET_HEADER_SIZE, mem::size_of::<PacketHeader>());
-		PacketHeader { uniquifier: uniquifier, msg_size: msg_size as u32, 
-			other_index: other_index, flags: flags, is_rootcast: is_rootcast, version: [false, false, true] }
+		let flags = if is_rootcast {  0 } else { 1 };
+		PacketHeader { uniquifier: uniquifier, last_packet_size: last_packet_size, 
+			other_index: other_index, flags: flags }
 	}
 	pub fn get_uniquifier(&self) -> u64 { self.uniquifier }
 	fn set_uniquifier(&mut self, uniquifier: u64) { self.uniquifier = uniquifier; }
-	pub fn get_msg_size(&self) -> u32 { self.msg_size }
-	fn set_msg_size(&mut self, msg_size: usize) { self.msg_size = msg_size as u32; }
-	pub fn is_rootcast(&self) -> bool { self.is_rootcast }
-	pub fn is_leafcast(&self) -> bool { self.is_rootcast }
-	fn set_direction(&mut self, direction: bool) { self.is_rootcast = direction; }
+	pub fn get_last_packet_size(&self) -> u16 { self.last_packet_size }
+	fn set_last_packet_size(&mut self, last_packet_size: u16) { 
+		self.last_packet_size = last_packet_size; 
+	}
+	pub fn is_rootcast(&self) -> bool { self.last_packet_size != 0 }
+	pub fn is_leafcast(&self) -> bool { !self.is_rootcast() }
+	fn set_direction(&mut self, direction: MsgDirection) { 
+		match direction {
+			MsgDirection::Leafward => self.flags = self.flags & 00000001,
+			MsgDirection::Rootward => self.flags = self.flags & 11111110
+		}
+	}
 	pub fn get_other_index(&self) -> u32 { self.other_index }
 	pub fn set_other_index(&mut self, other_index: u32) { self.other_index = other_index; }
 	pub fn stringify(&self) -> String {
-		let mut s = format!("Table Index {}, Message Size {}: ", self.other_index, self.msg_size);
-		if self.is_rootcast { s = s + "Rootward"; }
-		else                { s = s + "Leafward"; }
+		let mut s = format!("Table Index {}", self.other_index);
+		if self.is_rootcast() { s = s + "Rootward"; }
+		else                  { s = s + "Leafward"; }
 		s
 	}
 }
