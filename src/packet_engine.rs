@@ -4,10 +4,10 @@ use std::sync::mpsc;
 use std::sync::mpsc::channel;
 use crossbeam::Scope;
 use nalcell::{EntryPeFromCa, PacketSend, PacketRecv, PacketSendError, PacketCaToPe, PacketPeFromCa, 
-	PacketPeToCa, PacketPeCaSendError, PacketPeFromPort};
+	PacketPeToCa, PacketPeCaSendError, PacketPeFromPort, PortNumber, PortNumberError};
 use name::CellID;
-use packet::Packet;
-use routing_table::{RoutingTable, RoutingTableError};
+use packet::{Packet, PacketHeader};
+use routing_table::{RoutingTable, RoutingTableError, IndexError};
 use utility::{ints_from_mask, UtilityError};
 
 #[derive(Debug)]
@@ -25,7 +25,7 @@ impl PacketEngine {
 			packet_pe_to_ports: packet_pe_to_ports };
 		try!(pe.entry_channel(scope, recv_entry_from_ca));
 		try!(pe.ca_channel(scope, packet_pe_from_ca));
-		try!(pe.port_channel(scope, packet_pe_from_ports, packet_pe_to_ca));
+		try!(pe.packet_channel(scope, packet_pe_from_ports, packet_pe_to_ca));
 		Ok(pe)
 	}
 	fn ca_channel(&self, scope: &Scope,  packet_pe_from_ca: PacketPeFromCa) -> Result<(), PacketEngineError> {
@@ -35,7 +35,7 @@ impl PacketEngine {
 			loop {
 				let (index, mask, packet) = try!(packet_pe_from_ca.recv());
 				let unlocked = table.lock().unwrap();
-				let entry = (*unlocked).get_entry(index);
+				let entry = try!((*unlocked).get_entry(index));
 				let entry_mask = entry.get_mask();
 				let port_nos = try!(ints_from_mask(entry_mask & mask));
 				for port_no in port_nos.iter() {
@@ -49,14 +49,39 @@ impl PacketEngine {
 		});
 		Ok(())
 	}
-	fn port_channel(&self, scope: &Scope, packet_pe_from_ports: PacketPeFromPort, 
+	fn packet_channel(&self, scope: &Scope, packet_pe_from_ports: PacketPeFromPort, 
 			packet_pe_to_ca: PacketPeToCa) -> Result<(),PacketEngineError> {
 		let cell_id = self.cell_id.clone();
+		let table = self.get_table().clone();
+		let packet_pe_to_ports = self.packet_pe_to_ports.clone();
 		scope.spawn( move || -> Result<(), PacketEngineError> {
 			loop {
 				let (port_no, packet) = try!(packet_pe_from_ports.recv());
-				let index = packet.get_header().get_other_index();
-				try!(packet_pe_to_ca.send((port_no, index, packet)));
+				let mut header = packet.get_header();
+				let index = header.get_other_index();
+				let entry = try!(table.lock().unwrap().get_entry(index));
+				let mask = entry.get_mask();
+				let parent = entry.get_parent();
+				let other_indices = entry.get_other_indices();
+				if header.is_rootcast() {
+					let other_index = *other_indices.get(parent as usize).expect("PacketEngine: No such other index");
+					header.set_other_index(other_index as u32);
+					let sender = packet_pe_to_ports.get(parent as usize).unwrap();
+					try!(sender.send(packet));
+				}
+				// Verify that port_no is valid
+				try!(PortNumber::new(port_no, other_indices.len() as u8));
+				let port_nos = try!(ints_from_mask(mask));
+				for port_no in port_nos.iter() {
+					let other_index = *other_indices.get(*port_no as usize).expect("PacketEngine: No such other index");
+					header.set_other_index(other_index as u32);
+					if *port_no as usize == 0 { try!(packet_pe_to_ca.send((*port_no, index, packet))); }
+					else {
+						let sender = packet_pe_to_ports.get(*port_no as usize).unwrap();
+						try!(sender.send(packet));
+					}
+				} 
+				
 			}
 		});
 		Ok(())
@@ -87,6 +112,7 @@ pub enum PacketEngineError {
 	RoutingTable(RoutingTableError),
 	Utility(UtilityError),
 	Port(PortError),
+	PortNumber(PortNumberError),
 	Send(PacketSendError),
 	SendToCa(PacketPeCaSendError),
 	Recv(mpsc::RecvError),
@@ -97,6 +123,7 @@ impl Error for PacketEngineError {
 			PacketEngineError::RoutingTable(ref err) => err.description(),
 			PacketEngineError::Utility(ref err) => err.description(),
 			PacketEngineError::Port(ref err) => err.description(),
+			PacketEngineError::PortNumber(ref err) => err.description(),
 			PacketEngineError::SendToCa(ref err) => err.description(),
 			PacketEngineError::Send(ref err) => err.description(),
 			PacketEngineError::Recv(ref err) => err.description(),
@@ -107,6 +134,7 @@ impl Error for PacketEngineError {
 			PacketEngineError::RoutingTable(ref err) => Some(err),
 			PacketEngineError::Utility(ref err) => Some(err),
 			PacketEngineError::Port(ref err) => Some(err),
+			PacketEngineError::PortNumber(ref err) => Some(err),
 			PacketEngineError::SendToCa(ref err) => Some(err),
 			PacketEngineError::Send(ref err) => Some(err),
 			PacketEngineError::Recv(ref err) => Some(err),
@@ -119,6 +147,7 @@ impl fmt::Display for PacketEngineError {
 			PacketEngineError::RoutingTable(ref err) => write!(f, "Packet Engine Routing Table Error caused by {}", err),
 			PacketEngineError::Utility(ref err) => write!(f, "Packet Engine Utility Error caused by {}", err),
 			PacketEngineError::Port(ref err) => write!(f, "Packet Engine Port Error caused by {}", err),
+			PacketEngineError::PortNumber(ref err) => write!(f, "Packet Engine Port Number Error caused by {}", err),
 			PacketEngineError::SendToCa(ref err) => write!(f, "Packet Engine Send packet to Cell Agent Error caused by {}", err),
 			PacketEngineError::Send(ref err) => write!(f, "Packet Engine Send packet to port Error caused by {}", err),
 			PacketEngineError::Recv(ref err) => write!(f, "Packet Engine Receive Error caused by {}", err),
@@ -143,6 +172,9 @@ impl fmt::Display for PortError {
 }
 impl From<PortError> for PacketEngineError {
 	fn from(err: PortError) -> PacketEngineError { PacketEngineError::Port(err) }
+}
+impl From<PortNumberError> for PacketEngineError {
+	fn from(err: PortNumberError) -> PacketEngineError { PacketEngineError::PortNumber(err) }
 }
 impl From<RoutingTableError> for PacketEngineError {
 	fn from(err: RoutingTableError) -> PacketEngineError { PacketEngineError::RoutingTable(err) }

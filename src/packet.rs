@@ -180,8 +180,8 @@ impl PacketHeader {
 	fn set_uniquifier(&mut self, uniquifier: u64) { self.uniquifier = uniquifier; }
 	pub fn get_msg_size(&self) -> u32 { self.msg_size }
 	fn set_msg_size(&mut self, msg_size: usize) { self.msg_size = msg_size as u32; }
-	pub fn is_root_cast(&self) -> bool { self.is_rootcast }
-	pub fn is_leaf_cast(&self) -> bool { self.is_rootcast }
+	pub fn is_rootcast(&self) -> bool { self.is_rootcast }
+	pub fn is_leafcast(&self) -> bool { self.is_rootcast }
 	fn set_direction(&mut self, direction: bool) { self.is_rootcast = direction; }
 	pub fn get_other_index(&self) -> u32 { self.other_index }
 	pub fn set_other_index(&mut self, other_index: u32) { self.other_index = other_index; }
