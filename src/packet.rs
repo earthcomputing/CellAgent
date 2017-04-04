@@ -9,7 +9,7 @@ use std::collections::hash_map::DefaultHasher;
 use serde;
 use serde_json;
 use config::{PACKET_SMALL, PACKET_MEDIUM, PACKET_LARGE};
-use message::{Message, DiscoverMsg, MsgDirection};
+use message::{Message, DiscoverMsg, DiscoverDMsg, MsgDirection, MsgType};
 
 const PAYLOAD_DEFAULT_ELEMENT: u8 = 0;
 const PAYLOAD_SMALL:  usize = PACKET_SMALL  - PACKET_HEADER_SIZE;
@@ -73,8 +73,9 @@ impl Packetizer {
 		let last_packet_size = bytes.len() - (num_packets-1)*payload_size;
 		//Packetizer::hash(&msg); // Can't use hash in case two cells send the same message
 		let unique_id = rand::random(); 
-		let direction = msg.is_rootward();
+		let direction = msg.get_header().get_direction();
 		let mut packet_header = PacketHeader::new(unique_id, bytes.len() as u16, other_index, false);
+		packet_header.set_direction(direction);
 		let mut packets = Vec::new();
 		packet_header.set_last_packet_size(0);
 		for i in 0..num_packets {
@@ -117,8 +118,7 @@ impl Packetizer {
 		}
 		Ok(packets)
 	}
-	pub fn unpacketize<T>(packets: &Vec<Box<Packet>>) -> Result<T, PacketizerError> 
-			where T: Message + serde::Deserialize + fmt::Display {
+	pub fn unpacketize(packets: &Vec<Box<Packet>>) -> Result<Box<Message>, PacketizerError> {
 		let mut all_bytes = Vec::new();
 		for packet in packets {
 			let header = packet.get_header();
@@ -128,9 +128,8 @@ impl Packetizer {
 			all_bytes.extend_from_slice(payload.as_slice());
 		}
 		let serialized = try!(str::from_utf8(&all_bytes));
-		let deserialized: T = try!(serde_json::from_str(&serialized));
-		println!("Deserialized message {}", deserialized);
-		Ok(deserialized)
+		let deserialized: DiscoverMsg = try!(serde_json::from_str(&serialized));
+		Ok(Box::new(deserialized))
 	}
 	fn packet_payload_size(len: usize) -> Result<usize, PacketizerError> {
 		match len-1 { 
