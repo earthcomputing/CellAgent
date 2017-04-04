@@ -8,6 +8,7 @@ pub enum MsgType {
 	Discover,
 	DiscoverD,
 }
+
 pub trait Message {
 	fn get_msg_type(&self) -> MsgType;
 	fn get_header(&self) -> MsgHeader;

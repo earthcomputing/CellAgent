@@ -138,34 +138,19 @@ impl CellAgent {
 	}				
 	fn recv_packets(&self, scope: &Scope, cell_id: CellID, packet_ca_from_pe: PacketCaFromPe) -> 
 			Result<(), CellAgentError> {
-		let mut packet_assembler: HashMap<u64, Vec<u8>> = HashMap::new();
+		let mut packet_assembler: HashMap<u64, Vec<Box<Packet>>> = HashMap::new();
 		scope.spawn( move || -> Result<(), CellAgentError> {
 			loop {
 				let (port_no, index, packet) = try!(packet_ca_from_pe.recv());
 				println!("CellAgent {} received packet on port number {}", cell_id, port_no);
 				let header = packet.get_header();
-				let payload = packet.get_payload();
-				let payload_size = packet.get_payload_size();
-				let msg_len = header.get_msg_size();
+				let last_packet_size = header.get_last_packet_size();
 				let uniquifier = header.get_uniquifier();
-				if packet_assembler.contains_key(&uniquifier) {
-					let mut bytes = match packet_assembler.remove(&uniquifier) {
-						Some(p) => p,
-						None => return Err(CellAgentError::MsgAssembly(MsgAssemblyError::new()))
-					};
-					let payload_bytes = packet.get_payload_bytes();
-					bytes.append(&mut payload_bytes.clone());
-					if bytes.len() >= msg_len as usize {
-						packet_assembler.remove(&uniquifier);
-					} else {
-						packet_assembler.insert(uniquifier, bytes);
-					}
-				} else {
-					packet_assembler.insert(uniquifier, payload);
-					if payload_size >= msg_len as usize {
-						// unpacketize
-						packet_assembler.remove(&uniquifier);
-					}
+				let packets = packet_assembler.entry(uniquifier).or_insert(Vec::new());
+				packets.push(Box::new(packet));
+				//let msg: Message;
+				if last_packet_size > 0 {
+					//msg = Packetizer::unpacketize(packets);
 				}
 			}	
 		});
