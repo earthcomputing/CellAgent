@@ -151,7 +151,6 @@ impl CellAgent {
 					let payload_bytes = packet.get_payload_bytes();
 					bytes.append(&mut payload_bytes.clone());
 					if bytes.len() >= msg_len as usize {
-						// upacketize
 						packet_assembler.remove(&uniquifier);
 					} else {
 						packet_assembler.insert(uniquifier, bytes);

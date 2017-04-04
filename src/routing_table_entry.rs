@@ -1,5 +1,6 @@
 use std::fmt;
 use config;
+use routing_table::RoutingTableError;
 use utility::int_to_mask;
 
 const MAX_PORTS: usize = config::MAX_PORTS as usize;
@@ -19,7 +20,13 @@ impl RoutingTableEntry {
 			inuse: inuse, mask: mask, other_indices: indices }
 	}
 	pub fn get_index(&self) -> usize { self.index }
-	pub fn set_index(&mut self, index: usize) { self.index = index; }
+	pub fn set_index(&mut self, index: usize) -> Result<(), RoutingTableEntryError> { 
+		if index > config::MAX_ENTRIES { Err(RoutingTableEntryError::Index(IndexError::new(index as u32))) }
+		else {
+			self.index = index; 
+			Ok(())
+		}
+	}
 	pub fn get_inuse(&self) -> bool { self.inuse }
 	pub fn set_inuse(&mut self) { self.inuse = true; }
 	pub fn set_not_inuse(&mut self) { self.inuse = false; }
@@ -73,17 +80,20 @@ impl fmt::Display for RoutingTableEntry {
 use std::error::Error;
 #[derive(Debug)]
 pub enum RoutingTableEntryError {
-	Port(PortError)
+	Port(PortError),
+	Index(IndexError)
 }
 impl Error for RoutingTableEntryError {
 	fn description(&self) -> &str {
 		match *self {
 			RoutingTableEntryError::Port(ref err) => err.description(),
+			RoutingTableEntryError::Index(ref err) => err.description(),
 		}
 	}
 	fn cause(&self) -> Option<&Error> {
 		match *self {
 			RoutingTableEntryError::Port(ref err) => Some(err),
+			RoutingTableEntryError::Index(ref err) => Some(err),
 		}
 	}
 }
@@ -91,6 +101,7 @@ impl fmt::Display for RoutingTableEntryError {
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
 		match *self {
 			RoutingTableEntryError::Port(ref err) => write!(f, "Routing Table Entry Port Error caused by {}", err),
+			RoutingTableEntryError::Index(ref err) => write!(f, "Routing Table Entry Port Error caused by {}", err),
 		}
 	}
 }
@@ -112,4 +123,23 @@ impl fmt::Display for PortError {
 }
 impl From<PortError> for RoutingTableEntryError {
 	fn from(err: PortError) -> RoutingTableEntryError { RoutingTableEntryError::Port(err) }
+}
+#[derive(Debug)]
+pub struct IndexError { msg: String }
+impl IndexError { 
+	pub fn new(index: u32) -> IndexError {
+		IndexError { msg: format!("Index number {} is greater than the maximum of {}", index, config::MAX_ENTRIES) }
+	}
+}
+impl Error for IndexError {
+	fn description(&self) -> &str { &self.msg }
+	fn cause(&self) -> Option<&Error> { None }
+}
+impl fmt::Display for IndexError {
+	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+		write!(f, "{}", self.msg)
+	}
+}
+impl From<IndexError> for RoutingTableEntryError {
+	fn from(err: IndexError) -> RoutingTableEntryError { RoutingTableEntryError::Index(err) }
 }

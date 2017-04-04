@@ -22,7 +22,12 @@ impl RoutingTable {
 		}
 		Ok(RoutingTable { entries: entries, connected_ports: Vec::new() })
 	}
-	pub fn get_entry(&self, index: u32) -> RoutingTableEntry { self.entries[index as usize] }
+	pub fn get_entry(&self, index: u32) -> Result<RoutingTableEntry, RoutingTableError> { 
+		match self.entries.get(index as usize) {
+			Some(e) => Ok(*e),
+			None => Err(RoutingTableError::Index(IndexError::new(index)))
+		}
+	}
 	pub fn set_entry(&mut self, entry: RoutingTableEntry) { self.entries[entry.get_index()] = entry; }
 	pub fn stringify(&self) -> String {
 		let mut s = format!("\nRouting Table with {} Entries", MAX_ENTRIES);
