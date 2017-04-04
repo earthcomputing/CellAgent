@@ -33,6 +33,10 @@ pub type PacketCaPeSendError = mpsc::SendError<(u32, u16, Packet)>;
 pub type EntryCaToPe = mpsc::Sender<RoutingTableEntry>;
 pub type EntryPeFromCa = mpsc::Receiver<RoutingTableEntry>;
 pub type EntrySendError = mpsc::SendError<RoutingTableEntry>;
+// Tenant mask from CellAgent to PacketEngine, tenant mask
+pub type TenantMaskCaToPe = mpsc::Sender<u16>;
+pub type TenantMaskPeFromCa = mpsc::Receiver<u16>;
+pub type TenantMaskSendError = mpsc::SendError<u16>;
 // Port status from Port to CellAgent, (port_no, status)
 pub type StatusPortToCa = mpsc::Sender<(u8, PortStatus)>;
 pub type StatusCaFromPort = mpsc::Receiver<(u8, PortStatus)>;
@@ -55,6 +59,7 @@ impl NalCell {
 		if nports > MAX_PORTS { return Err(NalCellError::NumberPorts(NumberPortsError::new(nports))) }
 		let cell_id = try!(CellID::new(cell_no));
 		let (entry_ca_to_pe, entry_pe_from_ca): (EntryCaToPe, EntryPeFromCa) = channel();
+		let (tenant_ca_to_pe, tenant_pe_from_ca): (TenantMaskCaToPe, TenantMaskPeFromCa) = channel();
 		let (packet_ca_to_pe, packet_pe_from_ca): (PacketCaToPe, PacketPeFromCa) = channel();
 		let (packet_pe_to_ca, packet_ca_from_pe): (PacketPeToCa, PacketCaFromPe) = channel();
 		let (packet_port_to_pe, packet_pe_from_port): (PacketPortToPe, PacketPeFromPort) = channel();
@@ -80,10 +85,10 @@ impl NalCell {
 		}
 		let boxed_ports: Box<[Port]> = ports.into_boxed_slice();
 		let packet_engine = try!(PacketEngine::new(scope, &cell_id, packet_pe_to_ca, packet_pe_from_ca,
-								entry_pe_from_ca, packet_pe_from_port, packet_pe_to_ports));
+				entry_pe_from_ca, packet_pe_from_port, packet_pe_to_ports, tenant_pe_from_ca));
 		let cell_agent = try!(CellAgent::new(scope, &cell_id, boxed_ports, packet_port_to_pe, packet_engine,
 				packet_ca_to_pe, packet_ca_from_pe, entry_ca_to_pe, status_ca_from_port, ca_to_ports,
-				packet_ports_from_pe));
+				packet_ports_from_pe, tenant_ca_to_pe));
 		let nalcell = NalCell { id: cell_id, cell_no: cell_no, is_border: is_border,
 				cell_agent: cell_agent, vms: Vec::new()};
 		Ok(nalcell)

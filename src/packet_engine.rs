@@ -4,7 +4,7 @@ use std::sync::mpsc;
 use std::sync::mpsc::channel;
 use crossbeam::Scope;
 use nalcell::{EntryPeFromCa, PacketSend, PacketRecv, PacketSendError, PacketCaToPe, PacketPeFromCa, 
-	PacketPeToCa, PacketPeCaSendError, PacketPeFromPort, PortNumber, PortNumberError};
+	PacketPeToCa, PacketPeCaSendError, PacketPeFromPort, TenantMaskPeFromCa, PortNumber, PortNumberError};
 use name::CellID;
 use packet::{Packet, PacketHeader};
 use routing_table::{RoutingTable, RoutingTableError, IndexError};
@@ -13,20 +13,33 @@ use utility::{ints_from_mask, UtilityError};
 #[derive(Debug)]
 pub struct PacketEngine {
 	cell_id: CellID,
+	tenant_mask: Box<u16>,
 	routing_table: Arc<Mutex<RoutingTable>>,
 	packet_pe_to_ports: Vec<PacketSend>,
 }
 impl PacketEngine {
 	pub fn new(scope: &Scope, cell_id: &CellID, packet_pe_to_ca: PacketPeToCa, 
 		packet_pe_from_ca: PacketPeFromCa, recv_entry_from_ca: EntryPeFromCa, 
-		packet_pe_from_ports: PacketPeFromPort, packet_pe_to_ports: Vec<PacketSend>) -> Result<PacketEngine, PacketEngineError> {
+		packet_pe_from_ports: PacketPeFromPort, packet_pe_to_ports: Vec<PacketSend>,
+		tenant_pe_from_ca: TenantMaskPeFromCa) -> Result<PacketEngine, PacketEngineError> {
 		let routing_table = Arc::new(Mutex::new(try!(RoutingTable::new()))); 
 		let pe = PacketEngine { cell_id: cell_id.clone(), routing_table: routing_table, 
-			packet_pe_to_ports: packet_pe_to_ports };
+			packet_pe_to_ports: packet_pe_to_ports, tenant_mask: Box::new(255) };
 		try!(pe.entry_channel(scope, recv_entry_from_ca));
 		try!(pe.ca_channel(scope, packet_pe_from_ca));
 		try!(pe.packet_channel(scope, packet_pe_from_ports, packet_pe_to_ca));
+		try!(pe.tenant_channel(scope, tenant_pe_from_ca));
 		Ok(pe)
+	}
+	fn tenant_channel(&self, scope: &Scope,tenant_pe_from_ca: TenantMaskPeFromCa) -> Result<(), PacketEngineError> {
+		let mut tenant_mask = self.tenant_mask.clone();
+		scope.spawn( move || -> Result<(), PacketEngineError> {
+			loop {
+				let mask = try!(tenant_pe_from_ca.recv());
+				*tenant_mask = mask;
+			}
+		});
+		Ok(())
 	}
 	fn ca_channel(&self, scope: &Scope,  packet_pe_from_ca: PacketPeFromCa) -> Result<(), PacketEngineError> {
 		let table = self.routing_table.clone();
@@ -54,6 +67,7 @@ impl PacketEngine {
 		let cell_id = self.cell_id.clone();
 		let table = self.get_table().clone();
 		let packet_pe_to_ports = self.packet_pe_to_ports.clone();
+		let tenant_mask = *self.tenant_mask;
 		scope.spawn( move || -> Result<(), PacketEngineError> {
 			loop {
 				let (port_no, packet) = try!(packet_pe_from_ports.recv());
@@ -71,7 +85,7 @@ impl PacketEngine {
 				}
 				// Verify that port_no is valid
 				try!(PortNumber::new(port_no, other_indices.len() as u8));
-				let port_nos = try!(ints_from_mask(mask));
+				let port_nos = try!(ints_from_mask(mask & tenant_mask));
 				for port_no in port_nos.iter() {
 					let other_index = *other_indices.get(*port_no as usize).expect("PacketEngine: No such other index");
 					header.set_other_index(other_index as u32);
