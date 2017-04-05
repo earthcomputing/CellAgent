@@ -70,7 +70,7 @@ impl PacketEngine {
 		let tenant_mask = *self.tenant_mask;
 		scope.spawn( move || -> Result<(), PacketEngineError> {
 			loop {
-				let (port_no, packet) = try!(packet_pe_from_ports.recv());
+				let (recv_port_no, packet) = try!(packet_pe_from_ports.recv());
 				let mut header = packet.get_header();
 				let index = header.get_other_index();
 				let entry = try!(table.lock().unwrap().get_entry(index));
@@ -84,12 +84,12 @@ impl PacketEngine {
 					try!(sender.send(packet));
 				}
 				// Verify that port_no is valid
-				try!(PortNumber::new(port_no, other_indices.len() as u8));
+				try!(PortNumber::new(recv_port_no, other_indices.len() as u8));
 				let port_nos = try!(ints_from_mask(mask & tenant_mask));
 				for port_no in port_nos.iter() {
 					let other_index = *other_indices.get(*port_no as usize).expect("PacketEngine: No such other index");
 					header.set_other_index(other_index as u32);
-					if *port_no as usize == 0 { try!(packet_pe_to_ca.send((*port_no, index, packet))); }
+					if *port_no as usize == 0 { try!(packet_pe_to_ca.send((recv_port_no, index, packet))); }
 					else {
 						let sender = packet_pe_to_ports.get(*port_no as usize).unwrap();
 						try!(sender.send(packet));

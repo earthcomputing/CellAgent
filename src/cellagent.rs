@@ -160,7 +160,9 @@ impl CellAgent {
 				if last_packet_size > 0 {
 					msg = try!(Packetizer::unpacketize(packets));
 					match msg.get_msg_type() {
-						MsgType::Discover => CellAgent::discover_handler(cell_id.clone(), msg),
+						MsgType::Discover => {
+							CellAgent::discover_handler(cell_id.clone(), port_no, msg)
+						},
 						_ => println!("other")
 					};
 				}
@@ -168,9 +170,9 @@ impl CellAgent {
 		});
 		Ok(())
 	}
-	fn discover_handler(cell_id: CellID, msg: Box<Message>) {
-		println!("Discover {} {} {}", cell_id, msg.get_header(), msg.get_payload().stringify());
-			}
+	fn discover_handler(cell_id: CellID, port_no: u8, msg: Box<Message>) {
+		println!("Discover {} {} {} {}", cell_id, port_no, msg.get_header(), msg.get_payload().stringify());
+	}
 	fn use_index(&mut self) -> Result<usize,CellAgentError> {
 		match self.free_indices.pop() {
 			Some(i) => Ok(i),
