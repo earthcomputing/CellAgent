@@ -46,15 +46,16 @@ impl Port {
 		let port_no = self.port_no.get_port_no();
 		try!(self.status_port_to_ca.send((port_no, PortStatus::Connected)));
 		let packet_port_from_pe = try!(self.recv_port_from_ca.recv());
-		let port_id = self.id.clone();
 		let port_no = self.get_no();
 		let packet_port_to_pe = self.packet_port_to_pe.clone();
+		// Listen for outgoing packets
 		scope.spawn( move || -> Result<(), PortError> {
 			loop {
 				let packet = try!(packet_port_from_pe.recv());
 				try!(packet_port_to_link.send(packet));
 			}
 		});
+		// Listen for incoming packets
 		scope.spawn( move || -> Result<(), PortError> {
 				loop {
 					let packet = try!(packet_port_from_link.recv());
@@ -63,7 +64,9 @@ impl Port {
 			});
 		Ok(())
 	}
-	pub fn stringify(&self) -> String {
+}
+impl fmt::Display for Port { 
+	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result { 
 		let is_connected = self.is_connected;
 		let mut s = format!("Port {} {}", self.port_no, self.id);
 		if self.is_border { s = s + " is TCP  port,"; }
@@ -72,11 +75,8 @@ impl Port {
 		else              { s = s + " is not connected"; }
 		if self.is_broken { s = s + " and is broken"; }
 		else              { s = s + " and is not broken"; }
-		s
+		write!(f, "{}", s) 
 	}
-}
-impl fmt::Display for Port { 
-	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result { write!(f, "{}", self.stringify()) }
 }
 // Errors
 use std::error::Error;

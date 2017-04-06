@@ -18,18 +18,6 @@ impl Traph {
 		for _ in 0..MAX_PORTS { elements.push(default.clone()); }
 		Ok(Traph { tree_id: tree_id, table_index: table_index, elements: elements.into_boxed_slice() })
 	}
-	pub fn stringify(&self) -> String {
-		let mut s = format!("\nTraph for TreeID {} at routing table index {}", self.tree_id, self.table_index);
-		let mut connected = false;
-		for element in self.elements.iter() { if element.is_connected() { connected = true; } }
-		if connected {
-			s = s + &format!("\n PortID Port Other Connected Broken Status Hops Path"); 
-			for element in self.elements.iter() { s = s + &element.stringify(); }
-		} else {
-			s = s + &format!("\nNo entries yet for this tree"); 
-		}
-		s
-	}
 	pub fn add_element(&mut self, port: Port, other_index: usize) -> Result<(), TraphError> {
 		let port_no = port.get_no();
 		let port_id = port.get_id();
@@ -49,6 +37,20 @@ impl Traph {
 		if state { self.elements[port_no.get_port_no() as usize].set_connected(); }
 		else     { self.elements[port_no.get_port_no() as usize].set_disconnected(); }
 		Ok(())
+	}
+}
+impl fmt::Display for Traph {
+	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result { 
+		let mut s = format!("\nTraph for TreeID {} at routing table index {}", self.tree_id, self.table_index);
+		let mut connected = false;
+		for element in self.elements.iter() { if element.is_connected() { connected = true; } }
+		if connected {
+			s = s + &format!("\n PortID Port Other Connected Broken Status Hops Path"); 
+			for element in self.elements.iter() { s = s + &element.stringify(); }
+		} else {
+			s = s + &format!("\nNo entries yet for this tree"); 
+		}
+		write!(f, "{}", s) 
 	}
 }
 #[derive(Debug, Copy, Clone)]
