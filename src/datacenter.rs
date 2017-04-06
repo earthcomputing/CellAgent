@@ -53,7 +53,9 @@ impl<'a> Datacenter<'a> {
 	pub fn add_noc(&mut self, control: &'a NalCell, backup: &'a NalCell) {
 		self.noc = Some(NOC::new(control, backup));
 	}
-	pub fn stringify(&self) -> String {
+}
+impl<'b> fmt::Display for Datacenter<'b> { 
+	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result { 
 		let mut s = format!("Cells");
 		for i in 0..self.cells.len() {			
 			if i < 3 { s = s + &format!("\n {}", self.cells[i]); }
@@ -62,11 +64,8 @@ impl<'a> Datacenter<'a> {
 		for l in &self.links {
 			s = s + &format!("{}",l);
 		}
-		s
+		write!(f, "{}", s) 
 	}
-}
-impl<'b> fmt::Display for Datacenter<'b> { 
-	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result { write!(f, "{}", self.stringify()) }
 }
 // Errors
 use std::error::Error;

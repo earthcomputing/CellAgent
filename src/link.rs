@@ -54,15 +54,14 @@ impl Link {
 		);
 		Ok(())
 	}
-	pub fn stringify(&self) -> String {
+}
+impl fmt::Display for Link { 
+	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result { 
 		let mut s = format!("\nLink {}", self.id.get_name().to_string());
 		if self.is_connected { s = s + " is connected"; }
 		else                 { s = s + " is not connected"; }
-		s
+		write!(f, "{}", s) 
 	}
-}
-impl fmt::Display for Link { 
-	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result { write!(f, "{}", self.stringify()) }
 }
 // Errors
 use std::error::Error;

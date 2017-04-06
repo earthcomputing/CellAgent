@@ -1,6 +1,5 @@
 use std::fmt;
 use std::marker::Sized;
-use serde_derive;
 use config::SEPARATOR;
 // Using String means names are not Copy
 type NAME = String;

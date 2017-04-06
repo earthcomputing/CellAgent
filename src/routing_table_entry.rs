@@ -27,13 +27,14 @@ impl RoutingTableEntry {
 			Ok(())
 		}
 	}
+	pub fn or_with_mask(&mut self, mask: u16) { self.mask = self.mask | mask; }
+	pub fn and_with_mask(&mut self, mask: u16) { self.mask = self.mask & mask; }
 	pub fn get_inuse(&self) -> bool { self.inuse }
 	pub fn set_inuse(&mut self) { self.inuse = true; }
 	pub fn set_not_inuse(&mut self) { self.inuse = false; }
 	pub fn get_parent(&self) -> u8 { self.parent }
 	pub fn set_parent(&mut self, parent: u8) { self.parent = parent; }
 	pub fn get_mask(&self) -> u16 { self.mask }
-	pub fn set_mask(&mut self, mask: u16) { self.mask = mask; }
 	pub fn get_other_indices(&self) -> [usize; MAX_PORTS as usize] { self.other_indices }
 	pub fn set_other_index(&mut self, port_index: u8, other_index: usize) -> Result<(),RoutingTableEntryError> {
 		{
@@ -63,18 +64,17 @@ impl RoutingTableEntry {
 		Ok(RoutingTableEntry { index: self.index, parent: self.parent, inuse: self.inuse, mask: 0,
 							other_indices: indices })
 	}
-	pub fn stringify(&self) -> String {
+}
+impl fmt::Display for RoutingTableEntry {
+	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result { 
 		let mut s = format!("\n{:6}", self.index);
 		if self.inuse { s = s + &format!("  Yes  ") }
 		else          { s = s + &format!("  No   ") }
 		s = s + &format!("{:7}", self.parent);
 		s = s + &format!(" {:016.b}", self.mask);
 		s = s + &format!(" {:?}", self.other_indices.to_vec());
-		s
+		write!(f, "{}", s) 
 	}
-}
-impl fmt::Display for RoutingTableEntry {
-	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result { write!(f, "{}", self.stringify()) }
 }
 // Errors
 use std::error::Error;

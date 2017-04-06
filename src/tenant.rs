@@ -50,15 +50,14 @@ impl Tenant {
 			}
 		}
 	}
-	pub fn stringify(&self) -> String {
-		let mut s = "Tenant: ".to_string();
-		s = s + &format!("{:?} {} cells", self.id, self.ncells);
-		s
-	}
 }
 
 impl fmt::Debug for Tenant { 
-	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result { write!(f, "{}", self.stringify()) } 
+	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result { 
+		let mut s = "Tenant: ".to_string();
+		s = s + &format!("{:?} {} cells", self.id, self.ncells);
+		write!(f, "{}", s) 
+	} 
 }
 // Errors
 use name::{NameError};

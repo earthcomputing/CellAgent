@@ -77,6 +77,7 @@ impl PacketEngine {
 				let mask = entry.get_mask();
 				let parent = entry.get_parent();
 				let other_indices = entry.get_other_indices();
+				try!(PortNumber::new(recv_port_no, other_indices.len() as u8));
 				if header.is_rootcast() {
 					let other_index = *other_indices.get(parent as usize).expect("PacketEngine: No such other index");
 					header.set_other_index(other_index as u32);
@@ -84,7 +85,6 @@ impl PacketEngine {
 					try!(sender.send(packet));
 				}
 				// Verify that port_no is valid
-				try!(PortNumber::new(recv_port_no, other_indices.len() as u8));
 				let port_nos = try!(ints_from_mask(mask & tenant_mask));
 				for port_no in port_nos.iter() {
 					let other_index = *other_indices.get(*port_no as usize).expect("PacketEngine: No such other index");
@@ -113,11 +113,12 @@ impl PacketEngine {
 		Ok(())
 	}
 	pub fn get_table(&self) -> &Arc<Mutex<RoutingTable>> { &self.routing_table }
-	pub fn stringify(&self) -> String {
+}
+impl fmt::Display for PacketEngine {
+	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result { 
 		let mut s = format!("\nPacket Engine");
-		let mut s = s + &self.routing_table.lock().unwrap().stringify();
-		s
-	}
+		s = s + &format!("{}", *self.routing_table.lock().unwrap());
+		write!(f, "{}", s) }	
 }
 // Errors
 use std::error::Error;

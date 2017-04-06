@@ -29,14 +29,16 @@ impl RoutingTable {
 		}
 	}
 	pub fn set_entry(&mut self, entry: RoutingTableEntry) { self.entries[entry.get_index()] = entry; }
-	pub fn stringify(&self) -> String {
+}
+impl fmt::Display for RoutingTable {
+	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result { 
 		let mut s = format!("\nRouting Table with {} Entries", MAX_ENTRIES);
 		s = s + &format!("\n Index In Use Parent Mask             Indices");
 		for entry in self.entries.iter() {
-			if entry.get_index() < 8 { s = s + &entry.stringify(); }
+			s = s + &format!("{}", entry);
 		}
-		s
-	}
+		write!(f, "{}", s) 
+	}	
 }
 // Errors
 use std::error::Error;

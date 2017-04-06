@@ -9,7 +9,7 @@ use std::collections::hash_map::DefaultHasher;
 use serde;
 use serde_json;
 use config::{PACKET_SMALL, PACKET_MEDIUM, PACKET_LARGE};
-use message::{Message, DiscoverMsg, DiscoverDMsg, MsgDirection, MsgType};
+use message::{Message, DiscoverMsg, DiscoverDMsg, MsgDirection};
 
 const PAYLOAD_DEFAULT_ELEMENT: u8 = 0;
 const PAYLOAD_SMALL:  usize = PACKET_SMALL  - PACKET_HEADER_SIZE;
@@ -60,6 +60,20 @@ impl Packet {
 		s = s + &format!("{:?}", &payload[0..10]); 
 		s
 	}
+}
+impl fmt::Display for Packet {
+	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result { 
+		let mut s = format!("Header: {}, Payload: ", self.get_header());
+		let payload = self.get_payload();
+		s = s + &format!("{:?}", &payload[0..10]); 
+		write!(f, "{}", s)
+	} 	
+}
+impl Clone for Packet {
+	fn clone(&self) -> Packet { *self }
+}
+impl fmt::Debug for Packet { 
+	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result { self.fmt(f) }
 }
 pub struct Packetizer {}
 impl Packetizer {
@@ -144,15 +158,6 @@ impl Packetizer {
 	    t.hash(&mut s);
 	    s.finish()
 	}
-}
-impl Clone for Packet {
-	fn clone(&self) -> Packet { *self }
-}
-impl fmt::Debug for Packet { 
-	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result { write!(f, "{}", self.stringify()) }
-}
-impl fmt::Display for Packet { 
-	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result { write!(f, "{}", self.stringify()) }
 }
 const PACKET_HEADER_SIZE: usize = 8 + 2 + 4 + 1 + 9; // Last value is padding
 #[derive(Debug, Copy, Clone)]

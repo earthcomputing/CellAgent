@@ -47,7 +47,7 @@ pub type RecvrPortFromCa = mpsc::Receiver<PacketRecv>;
 pub type RecvrSendError = mpsc::SendError<PacketRecv>;
 
 #[derive(Debug)]
-pub struct NalCell {
+pub struct NalCell { // Does not include PacketEngine so CelAgent can own it
 	id: CellID,
 	cell_no: usize,
 	is_border: bool,
@@ -67,7 +67,7 @@ impl NalCell {
 		let mut ports = Vec::new();
 		let mut ca_to_ports = Vec::new();
 		let mut packet_pe_to_ports = Vec::new();
-		let mut packet_ports_from_pe = HashMap::new();
+		let mut packet_ports_from_pe = HashMap::new(); // So I can remove the item
 		let mut is_connected = true;
 		for i in 0..nports + 1 {
 			let is_border_port;
@@ -98,18 +98,14 @@ impl NalCell {
 	pub fn get_free_port_mut (&mut self) -> Result<&mut Port,NalCellError> {
 		Ok(try!(self.cell_agent.get_free_port_mut()))
 	}
-	pub fn stringify(&self) -> String {
+}
+impl fmt::Display for NalCell { 
+	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result { 
 		let mut s = String::new();
 		if self.is_border { s = s + &format!("Border Cell {}", self.id); }
 		else              { s = s + &format!("Cell {}", self.id); }
 
-		s = s + &format!("{}",self.cell_agent.stringify());
-		s
-	}
-}
-impl fmt::Display for NalCell { 
-	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result { 
-		let s = self.stringify();
+		s = s + &format!("{}",self.cell_agent);
 		write!(f, "{}", s) }
 }
 // Errors
