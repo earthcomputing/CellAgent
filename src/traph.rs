@@ -7,11 +7,11 @@ use port::Port;
 #[derive(Debug, Clone)]
 pub struct Traph {
 	tree_id: TreeID,
-	table_index: usize,
+	table_index: u32,
 	elements: Box<[TraphElement]>,
 }
 impl Traph {
-	pub fn new(tree_id: TreeID, table_index: usize) -> Result<Traph, TraphError> {
+	pub fn new(tree_id: TreeID, table_index: u32) -> Result<Traph, TraphError> {
 		let default_id = try!(PortID::new(MAX_PORTS+1));
 		let default = TraphElement::new(0, default_id, 0);
 		let mut elements = Vec::new();

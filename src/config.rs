@@ -3,7 +3,7 @@ pub const NCELLS: usize = 10;
 pub const NPORTS: u8    =  6;
 pub const NLINKS: usize = 40;
 // Size limits
-pub const MAX_ENTRIES: usize = 64; // Max number of active trees
+pub const MAX_ENTRIES: u32 = 64; // Max number of active trees
 pub const MAX_PORTS: u8 = 8; 	   // Limit on number of ports per cell
 pub const MAX_PACKETS: u16 = 255;  // Maximum number of packets collected before processing
 // Things used in constructing names

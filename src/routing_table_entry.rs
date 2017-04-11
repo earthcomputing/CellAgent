@@ -6,21 +6,21 @@ use utility::int_to_mask;
 const MAX_PORTS: usize = config::MAX_PORTS as usize;
 #[derive(Debug, Copy, Clone)]
 pub struct RoutingTableEntry {
-	index: usize,
+	index: u32,
 	inuse: bool,
 	parent: u8,
 	mask: u16,
 	other_indices: [usize; MAX_PORTS as usize]
 }
 impl RoutingTableEntry {
-	pub fn new(table_index: usize, inuse: bool, parent: u8, mask: u16, 
+	pub fn new(table_index: u32, inuse: bool, parent: u8, mask: u16, 
 			other_indices: [usize; MAX_PORTS]) -> RoutingTableEntry {
 		let mut indices = [0; MAX_PORTS as usize];
 		RoutingTableEntry { index: table_index, parent: 0,
 			inuse: inuse, mask: mask, other_indices: indices }
 	}
-	pub fn get_index(&self) -> usize { self.index }
-	pub fn set_index(&mut self, index: usize) -> Result<(), RoutingTableEntryError> { 
+	pub fn get_index(&self) -> u32 { self.index }
+	pub fn set_index(&mut self, index: u32) -> Result<(), RoutingTableEntryError> { 
 		if index > config::MAX_ENTRIES { Err(RoutingTableEntryError::Index(IndexError::new(index as u32))) }
 		else {
 			self.index = index; 
