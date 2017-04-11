@@ -28,7 +28,7 @@ impl RoutingTable {
 			None => Err(RoutingTableError::Index(IndexError::new(index)))
 		}
 	}
-	pub fn set_entry(&mut self, entry: RoutingTableEntry) { self.entries[entry.get_index()] = entry; }
+	pub fn set_entry(&mut self, entry: RoutingTableEntry) { self.entries[entry.get_index() as usize] = entry; }
 }
 impl fmt::Display for RoutingTable {
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result { 

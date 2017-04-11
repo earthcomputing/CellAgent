@@ -51,6 +51,7 @@ pub struct NalCell { // Does not include PacketEngine so CelAgent can own it
 	id: CellID,
 	cell_no: usize,
 	is_border: bool,
+	ports: Box<[Port]>,
 	cell_agent: CellAgent,
 	vms: Vec<VirtualMachine>,
 }
@@ -86,17 +87,20 @@ impl NalCell {
 		let boxed_ports: Box<[Port]> = ports.into_boxed_slice();
 		let packet_engine = try!(PacketEngine::new(scope, &cell_id, packet_pe_to_ca, packet_pe_from_ca,
 				entry_pe_from_ca, packet_pe_from_port, packet_pe_to_ports, tenant_pe_from_ca));
-		let cell_agent = try!(CellAgent::new(scope, &cell_id, boxed_ports, packet_port_to_pe, packet_engine,
+		let cell_agent = try!(CellAgent::new(scope, &cell_id, boxed_ports.len() as u8, packet_port_to_pe, packet_engine,
 				packet_ca_to_pe, packet_ca_from_pe, entry_ca_to_pe, status_ca_from_port, ca_to_ports,
 				packet_ports_from_pe, tenant_ca_to_pe));
 		let nalcell = NalCell { id: cell_id, cell_no: cell_no, is_border: is_border,
-				cell_agent: cell_agent, vms: Vec::new()};
+				ports: boxed_ports, cell_agent: cell_agent, vms: Vec::new()};
 		Ok(nalcell)
 	}
 	pub fn get_id(&self) -> CellID { self.id.clone() }
 	pub fn get_no(&self) -> usize { self.cell_no }
-	pub fn get_free_port_mut (&mut self) -> Result<&mut Port,NalCellError> {
-		Ok(try!(self.cell_agent.get_free_port_mut()))
+	pub fn get_free_port_mut (&mut self) -> Result<&mut Port, NalCellError> {
+		for p in &mut self.ports.iter_mut() {
+			if !p.is_connected() & !p.is_border() { return Ok(p); }
+		}
+		Err(NalCellError::NoFreePort(NoFreePortError::new(self.id.clone())))
 	}
 }
 impl fmt::Display for NalCell { 
@@ -116,6 +120,7 @@ use packet_engine::PacketEngineError;
 pub enum NalCellError {
 	Name(NameError),
 	Port(PortError),
+	NoFreePort(NoFreePortError),
 	CellAgent(CellAgentError),
 	PacketEngine(PacketEngineError),
 	NumberPorts(NumberPortsError)
@@ -125,6 +130,7 @@ impl Error for NalCellError {
 		match *self {
 			NalCellError::Name(ref err) => err.description(),
 			NalCellError::Port(ref err) => err.description(),
+			NalCellError::NoFreePort(ref err) => err.description(),
 			NalCellError::CellAgent(ref err) => err.description(),
 			NalCellError::NumberPorts(ref err) => err.description(),
 			NalCellError::PacketEngine(ref err) => err.description(),
@@ -134,6 +140,7 @@ impl Error for NalCellError {
 		match *self {
 			NalCellError::Name(ref err) => Some(err),
 			NalCellError::Port(ref err) => Some(err),
+			NalCellError::NoFreePort(ref err) => Some(err),
 			NalCellError::CellAgent(ref err) => Some(err),
 			NalCellError::NumberPorts(ref err) => Some(err),
 			NalCellError::PacketEngine(ref err) => Some(err),
@@ -145,6 +152,7 @@ impl fmt::Display for NalCellError {
 		match *self {
 			NalCellError::Name(ref err) => write!(f, "NalCell Name Error caused by {}", err),
 			NalCellError::Port(ref err) => write!(f, "NalCell Port Error caused by {}", err),
+			NalCellError::NoFreePort(ref err) => write!(f, "NalCell No Free Port Error caused by {}", err),
 			NalCellError::CellAgent(ref err) => write!(f, "NalCell Cell Agent Error caused by {}", err),
 			NalCellError::NumberPorts(ref err) => write!(f, "NalCell Number Ports Error caused by {}", err),
 			NalCellError::PacketEngine(ref err) => write!(f, "NalCell Number Ports Error caused by {}", err),
@@ -178,6 +186,25 @@ impl fmt::Display for NumberPortsError {
 }
 impl From<PortError> for NalCellError {
 	fn from(err: PortError) -> NalCellError { NalCellError::Port(err) }
+}
+#[derive(Debug)]
+pub struct NoFreePortError { msg: String }
+impl NoFreePortError { 
+	pub fn new(cell_id: CellID) -> NoFreePortError {
+		NoFreePortError { msg: format!("All ports have been assigned for cell {}", cell_id) }
+	}
+}
+impl Error for NoFreePortError {
+	fn description(&self) -> &str { &self.msg }
+	fn cause(&self) -> Option<&Error> { None }
+}
+impl fmt::Display for NoFreePortError {
+	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+		write!(f, "{}", self.msg)
+	}
+}
+impl From<NoFreePortError> for NalCellError {
+	fn from(err: NoFreePortError) -> NalCellError { NalCellError::NoFreePort(err) }
 }
 #[derive(Debug, Copy, Clone, Hash, Serialize, Deserialize)]
 pub struct PortNumber { pub port_no: u8 }

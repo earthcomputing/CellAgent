@@ -10,7 +10,7 @@ use packet::{Packet, PacketHeader};
 use routing_table::{RoutingTable, RoutingTableError, IndexError};
 use utility::{ints_from_mask, UtilityError};
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct PacketEngine {
 	cell_id: CellID,
 	tenant_mask: Box<u16>,
