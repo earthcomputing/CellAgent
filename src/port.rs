@@ -48,6 +48,7 @@ impl Port {
 		let packet_port_from_pe = try!(self.recv_port_from_ca.recv());
 		let port_no = self.get_no();
 		let packet_port_to_pe = self.packet_port_to_pe.clone();
+		let port_id = self.id.clone();
 		// Listen for outgoing packets
 		scope.spawn( move || -> Result<(), PortError> {
 			loop {

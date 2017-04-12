@@ -3,21 +3,24 @@ use config::MAX_PORTS;
 use nalcell::PortNumber;
 use name::{TreeID, PortID, NameError};
 use port::Port;
+use routing_table_entry::RoutingTableEntry;
 
 #[derive(Debug, Clone)]
 pub struct Traph {
 	tree_id: TreeID,
-	table_index: u32,
+	table_entry: RoutingTableEntry,
 	elements: Box<[TraphElement]>,
 }
 impl Traph {
-	pub fn new(tree_id: TreeID, table_index: u32) -> Result<Traph, TraphError> {
+	pub fn new(tree_id: TreeID, table_entry: RoutingTableEntry) -> Result<Traph, TraphError> {
 		let default_id = try!(PortID::new(MAX_PORTS+1));
 		let default = TraphElement::new(0, default_id, 0);
 		let mut elements = Vec::new();
 		for _ in 0..MAX_PORTS { elements.push(default.clone()); }
-		Ok(Traph { tree_id: tree_id, table_index: table_index, elements: elements.into_boxed_slice() })
+		Ok(Traph { tree_id: tree_id, table_entry: table_entry, elements: elements.into_boxed_slice() })
 	}
+	pub fn get_tree_id(&self) -> TreeID { self.tree_id.clone() }
+	pub fn get_table_index(&self) -> u32 { self.table_entry.get_index() }
 	pub fn add_element(&mut self, port: Port, other_index: usize) -> Result<(), TraphError> {
 		let port_no = port.get_no();
 		let port_id = port.get_id();
@@ -41,7 +44,7 @@ impl Traph {
 }
 impl fmt::Display for Traph {
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result { 
-		let mut s = format!("\nTraph for TreeID {} at routing table index {}", self.tree_id, self.table_index);
+		let mut s = format!("\nTraph for TreeID {} at routing table index {}", self.tree_id, self.table_entry);
 		let mut connected = false;
 		for element in self.elements.iter() { if element.is_connected() { connected = true; } }
 		if connected {

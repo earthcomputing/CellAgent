@@ -1,13 +1,12 @@
 use std::fmt;
 use std::sync::{Arc, Mutex};
 use std::sync::mpsc;
-use std::sync::mpsc::channel;
 use crossbeam::Scope;
-use nalcell::{EntryPeFromCa, PacketSend, PacketRecv, PacketSendError, PacketCaToPe, PacketPeFromCa, 
+use nalcell::{EntryPeFromCa, PacketSend, PacketSendError, PacketPeFromCa, 
 	PacketPeToCa, PacketPeCaSendError, PacketPeFromPort, TenantMaskPeFromCa, PortNumber, PortNumberError};
 use name::CellID;
-use packet::{Packet, PacketHeader};
-use routing_table::{RoutingTable, RoutingTableError, IndexError};
+use packet::{Packet};
+use routing_table::{RoutingTable, RoutingTableError};
 use utility::{ints_from_mask, UtilityError};
 
 #[derive(Debug, Clone)]
@@ -44,6 +43,7 @@ impl PacketEngine {
 	fn ca_channel(&self, scope: &Scope,  packet_pe_from_ca: PacketPeFromCa) -> Result<(), PacketEngineError> {
 		let table = self.routing_table.clone();
 		let packet_pe_to_ports = self.packet_pe_to_ports.clone();
+		let cell_id = self.cell_id.clone();
 		scope.spawn( move || -> Result<(), PacketEngineError> {
 			loop {
 				let (index, mask, packet) = try!(packet_pe_from_ca.recv());
@@ -102,13 +102,11 @@ impl PacketEngine {
 	}
 	pub fn entry_channel(&self, scope: &Scope, entry_pe_from_ca: EntryPeFromCa) -> Result<(),PacketEngineError> {
 		let table = self.routing_table.clone();
-		let cell_id = self.cell_id.clone(); // Debug only
 		scope.spawn( move || -> Result<(), PacketEngineError> {
 			loop { 
 				let entry = try!(entry_pe_from_ca.recv());
 				table.lock().unwrap().set_entry(entry);
 			}
-			Ok(())
 		});
 		Ok(())
 	}
