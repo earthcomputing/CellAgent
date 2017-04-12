@@ -77,24 +77,25 @@ impl fmt::Debug for Packet {
 }
 pub struct Packetizer {}
 impl Packetizer {
-	pub fn packetize<M>(msg: &M, other_index: u32, 
-				flags: [bool;4]) -> Result<Vec<Box<Packet>>, PacketizerError>
+	pub fn packetize<M>(msg: &M, flags: [bool;4]) -> Result<Vec<Box<Packet>>, PacketizerError>
 			where M: Message + Hash + serde::Serialize {
 		let serialized = try!(serde_json::to_string(&msg));
 		let bytes = serialized.clone().into_bytes();
 		let payload_size = try!(Packetizer::packet_payload_size(bytes.len()));
 		let num_packets = (bytes.len() + payload_size - 1)/ payload_size; // Poor man's ceiling
 		let last_packet_size = bytes.len() - (num_packets-1)*payload_size;
-		//Packetizer::hash(&msg); // Can't use hash in case two cells send the same message
-		let unique_id = rand::random(); 
+		let unique_id = rand::random(); // Can't use hash in case two cells send the same message
 		let direction = msg.get_header().get_direction();
-		let mut packet_header = PacketHeader::new(unique_id, bytes.len() as u16, other_index, false);
-		packet_header.set_direction(direction);
 		let mut packets = Vec::new();
-		packet_header.set_last_packet_size(0);
 		for i in 0..num_packets {
+			let (size, is_last_packet) = if i == (num_packets-1) {
+				(last_packet_size, true)
+			} else {
+				(num_packets, false)
+			};
+			let packet_header = PacketHeader::new(unique_id, size as u16, 0, direction, is_last_packet);
+			// Not a very Rusty way to put bytes into payload
 			let mut packet_bytes = vec![PAYLOAD_DEFAULT_ELEMENT; payload_size];
-			if i == (num_packets-1) { packet_header.set_last_packet_size(last_packet_size as u16); }
 			for j in 0..payload_size {
 				if i*payload_size + j == bytes.len() { break; }
 				packet_bytes[j] = bytes[i*payload_size + j];
@@ -105,6 +106,7 @@ impl Packetizer {
 						return Err(PacketizerError::Size(SizeError::new(bytes.len())))
 					}
 					let mut payload = [PAYLOAD_DEFAULT_ELEMENT; PAYLOAD_SMALL];	
+					// Not a very Rusty way to put bytes into payload
 					for i in 0..bytes.len() { payload[i as usize] = packet_bytes[i as usize]; }
 					let small = Packet::Small { header: packet_header, payload: payload }; 
 					packets.push(Box::new(small) as Box<Packet>);
@@ -114,6 +116,7 @@ impl Packetizer {
 						return Err(PacketizerError::Size(SizeError::new(bytes.len())))
 					}
 					let mut payload = [PAYLOAD_DEFAULT_ELEMENT; PAYLOAD_MEDIUM];				
+					// Not a very Rusty way to put bytes into payload
 					for i in 0..bytes.len() { payload[i as usize] = packet_bytes[i as usize]; }
 					let small = Packet::Medium { header: packet_header, payload: payload }; 
 					packets.push(Box::new(small) as Box<Packet>);
@@ -123,6 +126,7 @@ impl Packetizer {
 						return Err(PacketizerError::Size(SizeError::new(bytes.len())))
 					}
 					let mut payload = [PAYLOAD_DEFAULT_ELEMENT; PAYLOAD_LARGE];				
+					// Not a very Rusty way to put bytes into payload
 					for i in 0..bytes.len() { payload[i as usize] = packet_bytes[i as usize]; }
 					let small = Packet::Large { header: packet_header, payload: payload }; 
 					packets.push(Box::new(small) as Box<Packet>);
@@ -136,9 +140,10 @@ impl Packetizer {
 		let mut all_bytes = Vec::new();
 		for packet in packets {
 			let header = packet.get_header();
-			let last_packet_size = header.get_last_packet_size();
+			let is_last_packet = header.is_last_packet();
+			let last_packet_size = header.get_size();
 			let mut payload = packet.get_payload();
-			if last_packet_size > 0 { payload.truncate(last_packet_size as usize); }
+			if is_last_packet { payload.truncate(last_packet_size as usize); }
 			all_bytes.extend_from_slice(payload.as_slice());
 		}
 		let serialized = try!(str::from_utf8(&all_bytes));
@@ -162,33 +167,38 @@ impl Packetizer {
 const PACKET_HEADER_SIZE: usize = 8 + 2 + 4 + 1 + 9; // Last value is padding
 #[derive(Debug, Copy, Clone)]
 pub struct PacketHeader {
-	uniquifier: u64,		// Unique identifier of this message
-	last_packet_size: u16,	// Size of message in bytes, 0 => stream
-	other_index: u32,		// Routing table index on receiving cell
-	flags: u8,    			// Various flags
-							// xxxx xxx0 => rootcast
-							// xxxx xxx1 => leafcast
-							// xx00 xxxx => EC Protocol to CellAgent
-							// xx01 xxxx => EC Protocol to VirtualMachine
-							// xx10 xxxx => Legacy Protocol to VirtualMachine
+	uniquifier: u64,	// Unique identifier of this message
+	size: u16,			// Number of packets in message if not last packet, 0 => stream
+						// Number of bytes in last packet if last packet, 0 => Error
+	other_index: u32,	// Routing table index on receiving cell
+	flags: u8,    		// Various flags
+						// xxxx xxx0 => rootcast
+						// xxxx xxx1 => leafcast
+						// xxxx xx0x => Not last packet
+						// xxxx xx1x => Last packet
+						// xx00 xxxx => EC Protocol to CellAgent
+						// xx01 xxxx => EC Protocol to VirtualMachine
+						// xx10 xxxx => Legacy Protocol to VirtualMachine
 }
 impl PacketHeader {
-	pub fn new(uniquifier: u64, last_packet_size: u16, other_index: u32, 
-			is_rootcast: bool) -> PacketHeader {
+	pub fn new(uniquifier: u64, size: u16, other_index: u32, direction: MsgDirection,
+			is_last_packet: bool) -> PacketHeader {
 		// Assertion fails if I forgot to change PACKET_HEADER_SIZE when I changed PacketHeader struct
 		assert_eq!(PACKET_HEADER_SIZE, mem::size_of::<PacketHeader>());
-		let flags = if is_rootcast {  0 } else { 1 };
-		PacketHeader { uniquifier: uniquifier, last_packet_size: last_packet_size, 
+		let mut flags = match direction {
+			MsgDirection::Rootward => 0,
+			MsgDirection::Leafward => 1
+		};
+		flags = if is_last_packet { flags | 2 } else { flags };
+		PacketHeader { uniquifier: uniquifier, size: size, 
 			other_index: other_index, flags: flags }
 	}
 	pub fn get_uniquifier(&self) -> u64 { self.uniquifier }
 	fn set_uniquifier(&mut self, uniquifier: u64) { self.uniquifier = uniquifier; }
-	pub fn get_last_packet_size(&self) -> u16 { self.last_packet_size }
-	fn set_last_packet_size(&mut self, last_packet_size: u16) { 
-		self.last_packet_size = last_packet_size; 
-	}
-	pub fn is_rootcast(&self) -> bool { self.last_packet_size != 0 }
+	pub fn get_size(&self) -> u16 { self.size }
+	pub fn is_rootcast(&self) -> bool { (self.flags & 1) == 0 }
 	pub fn is_leafcast(&self) -> bool { !self.is_rootcast() }
+	pub fn is_last_packet(&self) -> bool { (self.flags & 2) == 2 }
 	fn set_direction(&mut self, direction: MsgDirection) { 
 		match direction {
 			MsgDirection::Leafward => self.flags = self.flags & 00000001,
@@ -197,15 +207,16 @@ impl PacketHeader {
 	}
 	pub fn get_other_index(&self) -> u32 { self.other_index }
 	pub fn set_other_index(&mut self, other_index: u32) { self.other_index = other_index; }
-	pub fn stringify(&self) -> String {
-		let mut s = format!("Table Index {}", self.other_index);
-		if self.is_rootcast() { s = s + "Rootward"; }
-		else                  { s = s + "Leafward"; }
-		s
-	}
 }
 impl fmt::Display for PacketHeader { 
-	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result { write!(f, "{}", self.stringify()) }
+	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result { 
+		let mut s = format!("Table Index {} ", self.other_index);
+		if self.is_rootcast() { s = s + "Rootward"; }
+		else                  { s = s + "Leafward"; }
+		if self.is_last_packet() { s = s + " Last packet"; }
+		else                     { s = s + " Not last packet"; }
+		write!(f, "{}", s) 
+	}
 }
 // Errors
 use std::error::Error;

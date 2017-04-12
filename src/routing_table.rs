@@ -4,7 +4,6 @@ use std::collections::HashMap;
 use config::{MAX_ENTRIES, MAX_PORTS};
 use name::{TreeID};
 use routing_table_entry::{RoutingTableEntry, RoutingTableEntryError};
-use traph::Traph;
 
 #[derive(Debug)]
 pub struct RoutingTable {
@@ -13,11 +12,10 @@ pub struct RoutingTable {
 }
 impl RoutingTable {
 	pub fn new() -> Result<RoutingTable,RoutingTableError> {
-		let default_entry = RoutingTableEntry::new(0, false, 0, 0, [0; MAX_PORTS as usize]);
 		let mut entries = Vec::new();
 		for i in 1..MAX_ENTRIES {
 			let mut entry = RoutingTableEntry::new(0, false, 0, 0, [0; MAX_PORTS as usize]); 
-			entry.set_index(i);
+			try!(entry.set_index(i));
 			entries.push(entry);
 		}
 		Ok(RoutingTable { entries: entries, connected_ports: Vec::new() })

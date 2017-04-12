@@ -1,6 +1,5 @@
 use std::fmt;
 use config;
-use routing_table::RoutingTableError;
 use utility::int_to_mask;
 
 const MAX_PORTS: usize = config::MAX_PORTS as usize;
@@ -15,9 +14,8 @@ pub struct RoutingTableEntry {
 impl RoutingTableEntry {
 	pub fn new(table_index: u32, inuse: bool, parent: u8, mask: u16, 
 			other_indices: [usize; MAX_PORTS]) -> RoutingTableEntry {
-		let mut indices = [0; MAX_PORTS as usize];
-		RoutingTableEntry { index: table_index, parent: 0,
-			inuse: inuse, mask: mask, other_indices: indices }
+		RoutingTableEntry { index: table_index, parent: parent,
+			inuse: inuse, mask: mask, other_indices: other_indices }
 	}
 	pub fn get_index(&self) -> u32 { self.index }
 	pub fn set_index(&mut self, index: u32) -> Result<(), RoutingTableEntryError> { 
