@@ -65,7 +65,7 @@ impl fmt::Display for Link {
 }
 // Errors
 use std::error::Error;
-use name::{NameError, FormatError};
+use name::{NameError};
 #[derive(Debug)]
 pub enum LinkError {
 	Name(NameError),

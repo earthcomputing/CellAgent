@@ -1,5 +1,5 @@
 use std::fmt;
-use config::MAX_PORTS;
+use config::{MAX_PORTS, PortNo, TableIndex};
 use nalcell::PortNumber;
 use name::{TreeID, PortID, NameError};
 use port::Port;
@@ -8,24 +8,27 @@ use routing_table_entry::RoutingTableEntry;
 #[derive(Debug, Clone)]
 pub struct Traph {
 	tree_id: TreeID,
+	my_index: TableIndex,
 	table_entry: RoutingTableEntry,
 	elements: Box<[TraphElement]>,
 }
 impl Traph {
 	pub fn new(tree_id: TreeID, table_entry: RoutingTableEntry) -> Result<Traph, TraphError> {
-		let default = TraphElement::new(0, table_entry.get_index(), 0);
+		let default = TraphElement::new(0, 0, PortStatus::Pruned);
 		let mut elements = Vec::new();
 		for _ in 0..MAX_PORTS { elements.push(default.clone()); }
-		Ok(Traph { tree_id: tree_id, table_entry: table_entry, elements: elements.into_boxed_slice() })
+		Ok(Traph { tree_id: tree_id, table_entry: table_entry, my_index: table_entry.get_index(),
+				elements: elements.into_boxed_slice() })
 	}
 	pub fn get_tree_id(&self) -> TreeID { self.tree_id.clone() }
-	pub fn get_table_index(&self) -> u32 { self.table_entry.get_index() }
-	pub fn add_element(&mut self, port_number: PortNumber, my_index: u32, other_index: u32) {
+	pub fn get_table_index(&self) -> TableIndex { self.table_entry.get_index() }
+	pub fn add_element(&mut self, port_number: PortNumber, my_index: TableIndex, other_index: TableIndex,
+			port_status: PortStatus) {
 		let port_no = port_number.get_port_no();
-		let element = TraphElement::new(port_no, my_index, other_index);
+		let element = TraphElement::new(port_no, other_index, port_status);
 		self.elements[port_no as usize] = element;
 	}
-	pub  fn get_other_indices(&self) -> [u32; MAX_PORTS as usize] {
+	pub  fn get_other_indices(&self) -> [TableIndex; MAX_PORTS as usize] {
 		let mut indices = [0; MAX_PORTS as usize];
 		for element in self.elements.iter() {
 			indices[element.get_port_no() as usize] = element.get_other_index();
@@ -52,8 +55,8 @@ impl fmt::Display for Traph {
 		let mut connected = false;
 		for element in self.elements.iter() { if element.is_connected() { connected = true; } }
 		if connected {
-			s = s + &format!("\nPort Index Other Connected Broken Status Hops Path"); 
-			for element in self.elements.iter() { s = s + &element.stringify(); }
+			s = s + &format!("\nPort Other Connected Broken Status Hops Path"); 
+			for element in self.elements.iter() { s = s + &format!("{}",element); }
 		} else {
 			s = s + &format!("\nNo entries yet for this tree"); 
 		}
@@ -129,9 +132,8 @@ impl From<NameError> for TraphError {
 
 #[derive(Debug, Clone)]
 struct TraphElement {
-	port_no: u8,
-	my_index: u32,
-	other_index: u32,
+	port_no: PortNo,
+	other_index: TableIndex,
 	is_connected: bool,
 	is_broken: bool,
 	status: PortStatus,
@@ -139,18 +141,20 @@ struct TraphElement {
 	path: Option<PortNumber> 
 }
 impl TraphElement {
-	fn new(port_no: u8, my_index: u32, other_index: u32) -> TraphElement {
-		TraphElement { port_no: port_no,  my_index: my_index, other_index: other_index, is_connected: true,
-					is_broken: false, status: PortStatus::Pruned, hops: 0, path: None } 
+	fn new(port_no: PortNo, other_index: TableIndex, status: PortStatus) -> TraphElement {
+		TraphElement { port_no: port_no,  other_index: other_index, is_connected: true,
+					is_broken: false, status: status, hops: 0, path: None } 
 	}
-	fn stringify(&self) -> String {
-		format!("\n{:4} {:6} {:5} {:9} {:6} {:6} {:4} {:?}", self.port_no, self.my_index, self.other_index,
-			self.is_connected, self.is_broken, self.status, self.hops, self.path)
-	}
-	fn get_port_no(&self) -> u8 { self.port_no }
-	fn get_other_index(&self) -> u32 { self.other_index }
+	fn get_port_no(&self) -> PortNo { self.port_no }
+	fn get_other_index(&self) -> TableIndex { self.other_index }
 	fn is_connected(&self) -> bool { self.is_connected }
 	fn set_connected(&mut self) { self.is_connected = true; }
 	fn set_disconnected(&mut self) { self.is_connected = false; }
 	
+}
+impl fmt::Display for TraphElement {
+	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result { 
+		write!(f, "\n{:4} {:5} {:9} {:6} {:6} {:4} {:?}", self.port_no, self.other_index,
+			self.is_connected, self.is_broken, self.status, self.hops, self.path)
+	}
 }

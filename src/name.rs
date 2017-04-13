@@ -69,7 +69,7 @@ impl TenantID {
 	pub fn new(n: &str) -> Result<TenantID,NameError> { 
 		match n.find(' ') {
 			None => Ok(TenantID { name: n.to_string()}),
-			Some(i) => Err(NameError::Format(FormatError::new(n)) )
+			Some(_) => Err(NameError::Format(FormatError::new(n)) )
 		}
 	}
 }

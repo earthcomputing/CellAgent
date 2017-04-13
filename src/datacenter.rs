@@ -2,6 +2,7 @@ use std::fmt;
 use std::cmp::max;
 use crossbeam::Scope;
 
+use config::{PortNo, CellNo, TableIndex};
 use nalcell::{NalCell,NalCellError};
 use link::{Link,LinkError};
 use noc::NOC;
@@ -13,7 +14,7 @@ pub struct Datacenter<'a> {
 	noc: Option<NOC<'a>>
 }
 impl<'a> Datacenter<'a> {
-	pub fn new(scope: &Scope, ncells: usize, nports: u8, edge_list: Vec<(usize,usize)>) -> 
+	pub fn new(scope: &Scope, ncells: CellNo, nports: PortNo, edge_list: Vec<(CellNo,CellNo)>) -> 
 				Result<Datacenter<'a>,DatacenterError> {
 		if ncells < 2  {
 			println!("ncells {}", ncells);
