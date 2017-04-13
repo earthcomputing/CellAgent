@@ -1,4 +1,4 @@
-use config::{MAX_PORTS, SEPARATOR};
+use config::{MAX_PORTS, SEPARATOR, Mask, PortNo};
 use nalcell::PortNumber;
 
 pub fn get_first_arg(a: Vec<String>) -> Option<i32> {
@@ -19,26 +19,26 @@ pub fn chars_to_string(chars: &[char]) -> String {
 	}
 	s
 }
-pub fn int_to_mask(i: u8) -> Result<u16, UtilityError> {
+pub fn int_to_mask(i: PortNo) -> Result<Mask, UtilityError> {
     if i > 15 {
         Err(UtilityError::Port(PortError::new(i)))
     } else {
-        let mask: u16 = (1 as u16).rotate_left(i as u32);
+        let mask: Mask = (1 as Mask).rotate_left(i as u32);
         Ok(mask)
     }
 }
-pub fn mask_from_port_nos(port_nos: Vec<PortNumber>) -> Result<u16, UtilityError> {
-	let mut mask: u16 = 0;
+pub fn mask_from_port_nos(port_nos: Vec<PortNumber>) -> Result<Mask, UtilityError> {
+	let mut mask: Mask = 0;
 	for port_no in port_nos.iter() {
 		mask = mask | try!(int_to_mask(port_no.get_port_no()));
 	}
 	Ok(mask)
 }
-pub fn ints_from_mask(mask: u16) -> Result<Vec<u8>, UtilityError> {
+pub fn ints_from_mask(mask: Mask) -> Result<Vec<PortNo>, UtilityError> {
 	let mut port_nos = Vec::new();
-	for i in 0..16 {
-		let test = try!(int_to_mask(i as u8));
-		if test & mask != 0 { port_nos.push(i as u8) }
+	for i in 0..MAX_PORTS {
+		let test = try!(int_to_mask(i as PortNo));
+		if test & mask != 0 { port_nos.push(i as PortNo) }
 	}
 	Ok(port_nos)
 }
@@ -75,7 +75,7 @@ impl fmt::Display for UtilityError {
 #[derive(Debug)]
 pub struct PortError { msg: String }
 impl PortError { 
-	pub fn new(port_no: u8) -> PortError {
+	pub fn new(port_no: PortNo) -> PortError {
 		PortError { msg: format!("Port number {} is larger than the maximum of {}", port_no, MAX_PORTS) }
 	}
 }

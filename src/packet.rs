@@ -8,7 +8,7 @@ use std::hash::{Hash, Hasher};
 use std::collections::hash_map::DefaultHasher;
 use serde;
 use serde_json;
-use config::{PACKET_SMALL, PACKET_MEDIUM, PACKET_LARGE};
+use config::{PACKET_SMALL, PACKET_MEDIUM, PACKET_LARGE, PacketNo, TableIndex, Uniquifier};
 use message::{Message, DiscoverMsg, DiscoverDMsg, MsgDirection};
 
 const PAYLOAD_DEFAULT_ELEMENT: u8 = 0;
@@ -17,12 +17,12 @@ const PAYLOAD_MEDIUM: usize = PACKET_MEDIUM - PACKET_HEADER_SIZE;
 const PAYLOAD_LARGE:  usize = PACKET_LARGE  - PACKET_HEADER_SIZE;
 const LARGEST_MSG: usize = std::u32::MAX as usize;
 
-type PacketElement = u8;
+type PacketElement = u8; // Packets are made up of bytes
 #[derive(Copy)]
 pub enum Packet {
-	Small  { header: PacketHeader, payload: [u8; PAYLOAD_SMALL]  },
-	Medium { header: PacketHeader, payload: [u8; PAYLOAD_MEDIUM] },
-	Large  { header: PacketHeader, payload: [u8; PAYLOAD_LARGE]  }
+	Small  { header: PacketHeader, payload: [PacketElement; PAYLOAD_SMALL]  },
+	Medium { header: PacketHeader, payload: [PacketElement; PAYLOAD_MEDIUM] },
+	Large  { header: PacketHeader, payload: [PacketElement; PAYLOAD_LARGE]  }
 }
 impl Packet {
 	pub fn get_header(&self) -> PacketHeader {
@@ -181,7 +181,7 @@ pub struct PacketHeader {
 						// xx10 xxxx => Legacy Protocol to VirtualMachine
 }
 impl PacketHeader {
-	pub fn new(uniquifier: u64, size: u16, other_index: u32, direction: MsgDirection,
+	pub fn new(uniquifier: Uniquifier, size: PacketNo, other_index: TableIndex, direction: MsgDirection,
 			is_last_packet: bool) -> PacketHeader {
 		// Assertion fails if I forgot to change PACKET_HEADER_SIZE when I changed PacketHeader struct
 		assert_eq!(PACKET_HEADER_SIZE, mem::size_of::<PacketHeader>());
@@ -193,9 +193,9 @@ impl PacketHeader {
 		PacketHeader { uniquifier: uniquifier, size: size, 
 			other_index: other_index, flags: flags }
 	}
-	pub fn get_uniquifier(&self) -> u64 { self.uniquifier }
-	fn set_uniquifier(&mut self, uniquifier: u64) { self.uniquifier = uniquifier; }
-	pub fn get_size(&self) -> u16 { self.size }
+	pub fn get_uniquifier(&self) -> Uniquifier { self.uniquifier }
+	fn set_uniquifier(&mut self, uniquifier: Uniquifier) { self.uniquifier = uniquifier; }
+	pub fn get_size(&self) -> PacketNo { self.size }
 	pub fn is_rootcast(&self) -> bool { (self.flags & 1) == 0 }
 	pub fn is_leafcast(&self) -> bool { !self.is_rootcast() }
 	pub fn is_last_packet(&self) -> bool { (self.flags & 2) == 2 }
@@ -206,7 +206,7 @@ impl PacketHeader {
 		}
 	}
 	pub fn get_other_index(&self) -> u32 { self.other_index }
-	pub fn set_other_index(&mut self, other_index: u32) { self.other_index = other_index; }
+	pub fn set_other_index(&mut self, other_index: TableIndex) { self.other_index = other_index; }
 }
 impl fmt::Display for PacketHeader { 
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result { 

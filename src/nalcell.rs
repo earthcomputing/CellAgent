@@ -5,7 +5,7 @@ use std::sync::mpsc::channel;
 use std::{thread, time};
 use crossbeam::Scope;
 use cellagent::{CellAgent, CellAgentError};
-use config::MAX_PORTS;
+use config::{MAX_PORTS, CellNo, PortNo, TableIndex, Mask};
 use name::{CellID, PortID};
 use packet::Packet;
 use packet_engine::{PacketEngine};
@@ -18,29 +18,29 @@ pub type PacketSend = mpsc::Sender<Packet>;
 pub type PacketRecv = mpsc::Receiver<Packet>;
 pub type PacketSendError = mpsc::SendError<Packet>;
 // Packet from Port to PacketEngine
-pub type PacketPortToPe = mpsc::Sender<(u8, Packet)>;
-pub type PacketPeFromPort = mpsc::Receiver<(u8, Packet)>;
-pub type PacketPortPeSendError = mpsc::SendError<(u8, Packet)>;
+pub type PacketPortToPe = mpsc::Sender<(PortNo, Packet)>;
+pub type PacketPeFromPort = mpsc::Receiver<(PortNo, Packet)>;
+pub type PacketPortPeSendError = mpsc::SendError<(PortNo, Packet)>;
 // Packet from PacketEngine to CellAgent, (port_no, table index, packet)
-pub type PacketPeToCa = mpsc::Sender<(u8, u32, Packet)>;
-pub type PacketCaFromPe = mpsc::Receiver<(u8, u32, Packet)>;
-pub type PacketPeCaSendError = mpsc::SendError<(u8, u32, Packet)>;
+pub type PacketPeToCa = mpsc::Sender<(PortNo, TableIndex, Packet)>;
+pub type PacketCaFromPe = mpsc::Receiver<(PortNo, TableIndex, Packet)>;
+pub type PacketPeCaSendError = mpsc::SendError<(PortNo, TableIndex, Packet)>;
 // Packet from CellAgent to PacketEngine, (table index, mask, packet)
-pub type PacketCaToPe = mpsc::Sender<(u32, u16, Packet)>;
-pub type PacketPeFromCa = mpsc::Receiver<(u32, u16, Packet)>;
-pub type PacketCaPeSendError = mpsc::SendError<(u32, u16, Packet)>;
+pub type PacketCaToPe = mpsc::Sender<(TableIndex, Mask, Packet)>;
+pub type PacketPeFromCa = mpsc::Receiver<(TableIndex, Mask, Packet)>;
+pub type PacketCaPeSendError = mpsc::SendError<(TableIndex, Mask, Packet)>;
 // Table entry from CellAgent to PacketEngine, table entry
 pub type EntryCaToPe = mpsc::Sender<RoutingTableEntry>;
 pub type EntryPeFromCa = mpsc::Receiver<RoutingTableEntry>;
 pub type EntrySendError = mpsc::SendError<RoutingTableEntry>;
 // Tenant mask from CellAgent to PacketEngine, tenant mask
-pub type TenantMaskCaToPe = mpsc::Sender<u16>;
-pub type TenantMaskPeFromCa = mpsc::Receiver<u16>;
-pub type TenantMaskSendError = mpsc::SendError<u16>;
+pub type TenantMaskCaToPe = mpsc::Sender<Mask>;
+pub type TenantMaskPeFromCa = mpsc::Receiver<Mask>;
+pub type TenantMaskSendError = mpsc::SendError<Mask>;
 // Port status from Port to CellAgent, (port_no, status)
-pub type StatusPortToCa = mpsc::Sender<(u8, PortStatus)>;
-pub type StatusCaFromPort = mpsc::Receiver<(u8, PortStatus)>;
-pub type PortStatusSendError = mpsc::SendError<(u8, PortStatus)>;
+pub type StatusPortToCa = mpsc::Sender<(PortNo, PortStatus)>;
+pub type StatusCaFromPort = mpsc::Receiver<(PortNo, PortStatus)>;
+pub type PortStatusSendError = mpsc::SendError<(PortNo, PortStatus)>;
 // Receiver from CellAgent to Port
 pub type RecvrCaToPort = mpsc::Sender<PacketRecv>;
 pub type RecvrPortFromCa = mpsc::Receiver<PacketRecv>;
@@ -56,7 +56,7 @@ pub struct NalCell { // Does not include PacketEngine so CelAgent can own it
 	vms: Vec<VirtualMachine>,
 }
 impl NalCell {
-	pub fn new(scope: &Scope, cell_no: usize, nports: u8, is_border: bool) -> Result<NalCell,NalCellError> {
+	pub fn new(scope: &Scope, cell_no: CellNo, nports: PortNo, is_border: bool) -> Result<NalCell,NalCellError> {
 		if nports > MAX_PORTS { return Err(NalCellError::NumberPorts(NumberPortsError::new(nports))) }
 		let cell_id = try!(CellID::new(cell_no));
 		let (entry_ca_to_pe, entry_pe_from_ca): (EntryCaToPe, EntryPeFromCa) = channel();
@@ -171,7 +171,7 @@ impl From<PacketEngineError> for NalCellError {
 #[derive(Debug)]
 pub struct NumberPortsError { msg: String }
 impl NumberPortsError { 
-	pub fn new(nports: u8) -> NumberPortsError {
+	pub fn new(nports: PortNo) -> NumberPortsError {
 		NumberPortsError { msg: format!("You asked for {} ports, but only {} are allowed", nports, MAX_PORTS) }
 	}
 }
@@ -207,16 +207,16 @@ impl From<NoFreePortError> for NalCellError {
 	fn from(err: NoFreePortError) -> NalCellError { NalCellError::NoFreePort(err) }
 }
 #[derive(Debug, Copy, Clone, Hash, Serialize, Deserialize)]
-pub struct PortNumber { pub port_no: u8 }
+pub struct PortNumber { pub port_no: PortNo }
 impl PortNumber {
-	pub fn new(no: u8, no_ports: u8) -> Result<PortNumber, PortNumberError> {
+	pub fn new(no: PortNo, no_ports: PortNo) -> Result<PortNumber, PortNumberError> {
 		if no > no_ports {
 			Err(PortNumberError::new(no, no_ports))
 		} else {
-			Ok(PortNumber { port_no: (no as u8) })
+			Ok(PortNumber { port_no: (no as PortNo) })
 		}
 	}
-	pub fn get_port_no(&self) -> u8 { self.port_no }
+	pub fn get_port_no(&self) -> PortNo { self.port_no }
 }
 impl fmt::Display for PortNumber {
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result { write!(f, "{}", self.port_no) }
@@ -224,7 +224,7 @@ impl fmt::Display for PortNumber {
 #[derive(Debug)]
 pub struct PortNumberError { msg: String }
 impl PortNumberError {
-	pub fn new(port_no: u8, no_ports: u8) -> PortNumberError {
+	pub fn new(port_no: PortNo, no_ports: PortNo) -> PortNumberError {
 		let msg = format!("You asked for port number {}, but this cell only has {} ports",
 			port_no, no_ports);
 		PortNumberError { msg: msg }

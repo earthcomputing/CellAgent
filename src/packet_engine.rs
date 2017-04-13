@@ -2,6 +2,7 @@ use std::fmt;
 use std::sync::{Arc, Mutex};
 use std::sync::mpsc;
 use crossbeam::Scope;
+use config::{Mask, PortNo};
 use nalcell::{EntryPeFromCa, PacketSend, PacketSendError, PacketPeFromCa, 
 	PacketPeToCa, PacketPeCaSendError, PacketPeFromPort, TenantMaskPeFromCa, PortNumber, PortNumberError};
 use name::CellID;
@@ -12,7 +13,7 @@ use utility::{ints_from_mask, UtilityError};
 #[derive(Debug, Clone)]
 pub struct PacketEngine {
 	cell_id: CellID,
-	tenant_mask: Box<u16>,
+	tenant_mask: Box<Mask>,
 	routing_table: Arc<Mutex<RoutingTable>>,
 	packet_pe_to_ports: Vec<PacketSend>,
 }
@@ -176,7 +177,7 @@ impl fmt::Display for PacketEngineError {
 #[derive(Debug)]
 pub struct PortError { msg: String }
 impl PortError { 
-	pub fn new(port_no: u8) -> PortError {
+	pub fn new(port_no: PortNo) -> PortError {
 		PortError { msg: format!("No sender for port {}", port_no) }
 	}
 }
