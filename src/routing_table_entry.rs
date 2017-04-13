@@ -1,5 +1,6 @@
 use std::fmt;
 use config;
+use nalcell::PortNumber;
 use utility::int_to_mask;
 
 const MAX_PORTS: usize = config::MAX_PORTS as usize;
@@ -9,12 +10,12 @@ pub struct RoutingTableEntry {
 	inuse: bool,
 	parent: u8,
 	mask: u16,
-	other_indices: [usize; MAX_PORTS as usize]
+	other_indices: [u32; MAX_PORTS as usize]
 }
 impl RoutingTableEntry {
-	pub fn new(table_index: u32, inuse: bool, parent: u8, mask: u16, 
-			other_indices: [usize; MAX_PORTS]) -> RoutingTableEntry {
-		RoutingTableEntry { index: table_index, parent: parent,
+	pub fn new(table_index: u32, inuse: bool, parent: PortNumber, mask: u16, 
+			other_indices: [u32; MAX_PORTS]) -> RoutingTableEntry {
+		RoutingTableEntry { index: table_index, parent: parent.get_port_no(),
 			inuse: inuse, mask: mask, other_indices: other_indices }
 	}
 	pub fn get_index(&self) -> u32 { self.index }
@@ -33,8 +34,8 @@ impl RoutingTableEntry {
 	pub fn get_parent(&self) -> u8 { self.parent }
 	pub fn set_parent(&mut self, parent: u8) { self.parent = parent; }
 	pub fn get_mask(&self) -> u16 { self.mask }
-	pub fn get_other_indices(&self) -> [usize; MAX_PORTS as usize] { self.other_indices }
-	pub fn set_other_index(&mut self, port_index: u8, other_index: usize) -> Result<(),RoutingTableEntryError> {
+	pub fn get_other_indices(&self) -> [u32; MAX_PORTS as usize] { self.other_indices }
+	pub fn set_other_index(&mut self, port_index: u8, other_index: u32) -> Result<(),RoutingTableEntryError> {
 		{
 			match self.other_indices.get(port_index as usize) {
 				Some(other) => (),
@@ -44,14 +45,14 @@ impl RoutingTableEntry {
 		self.other_indices[port_index as usize] = other_index;
 		Ok(())
 	}
-	pub fn update_parent(&self, parent: u8, other_index: usize) -> Result<RoutingTableEntry,RoutingTableEntryError> {
+	pub fn update_parent(&self, parent: u8, other_index: u32) -> Result<RoutingTableEntry,RoutingTableEntryError> {
 		if parent > MAX_PORTS as u8 { return Err(RoutingTableEntryError::Port(PortError::new(parent))); }
 		let mut indices = self.other_indices.clone();
 		indices[parent as usize] = other_index;
 		Ok(RoutingTableEntry { index: self.index, parent: parent, inuse: self.inuse, mask: self.mask,
 							other_indices: indices })
 	}
-	pub fn update_children(&self, child: u8, other_index: usize) -> Result<RoutingTableEntry,RoutingTableEntryError> {
+	pub fn update_children(&self, child: u8, other_index: u32) -> Result<RoutingTableEntry,RoutingTableEntryError> {
 		let mut indices = self.other_indices.clone();
 		let child_mask = match int_to_mask(child) {
 			Ok(m) => m,

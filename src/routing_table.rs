@@ -2,6 +2,7 @@ use std::fmt;
 use std::sync::{Arc, Mutex};
 use std::collections::HashMap;
 use config::{MAX_ENTRIES, MAX_PORTS};
+use nalcell::PortNumber;
 use name::{TreeID};
 use routing_table_entry::{RoutingTableEntry, RoutingTableEntryError};
 
@@ -14,7 +15,8 @@ impl RoutingTable {
 	pub fn new() -> Result<RoutingTable,RoutingTableError> {
 		let mut entries = Vec::new();
 		for i in 1..MAX_ENTRIES {
-			let mut entry = RoutingTableEntry::new(0, false, 0, 0, [0; MAX_PORTS as usize]); 
+			let port_number = try!(PortNumber::new(0,MAX_PORTS));
+			let mut entry = RoutingTableEntry::new(0, false, port_number, 0, [0; MAX_PORTS as usize]); 
 			try!(entry.set_index(i));
 			entries.push(entry);
 		}
@@ -40,12 +42,14 @@ impl fmt::Display for RoutingTable {
 }
 // Errors
 use std::error::Error;
+use nalcell::PortNumberError;
 use name::NameError;
 #[derive(Debug)]
 pub enum RoutingTableError {
 	Name(NameError),
 	Size(SizeError),
 	Index(IndexError),
+	PortNumber(PortNumberError),
 	RoutingTableEntry(RoutingTableEntryError)
 }
 impl Error for RoutingTableError {
@@ -54,6 +58,7 @@ impl Error for RoutingTableError {
 			RoutingTableError::Name(ref err) => err.description(),
 			RoutingTableError::Size(ref err) => err.description(),
 			RoutingTableError::Index(ref err) => err.description(),
+			RoutingTableError::PortNumber(ref err) => err.description(),
 			RoutingTableError::RoutingTableEntry(ref err) => err.description(),
 		}
 	}
@@ -62,6 +67,7 @@ impl Error for RoutingTableError {
 			RoutingTableError::Name(ref err) => Some(err),
 			RoutingTableError::Size(ref err) => Some(err),
 			RoutingTableError::Index(ref err) => Some(err),
+			RoutingTableError::PortNumber(ref err) => Some(err),
 			RoutingTableError::RoutingTableEntry(ref err) => Some(err),
 		}
 	}
@@ -72,12 +78,16 @@ impl fmt::Display for RoutingTableError {
 			RoutingTableError::Name(ref err) => write!(f, "Routing Table Name Error caused by {}", err),
 			RoutingTableError::Size(ref err) => write!(f, "Routing Table Size Error caused by {}", err),
 			RoutingTableError::Index(ref err) => write!(f, "Routing Table Index Error caused by {}", err),
+			RoutingTableError::PortNumber(ref err) => write!(f, "Routing Table Port Number Error caused by {}", err),
 			RoutingTableError::RoutingTableEntry(ref err) => write!(f, "Routing Table Entry Error caused by {}", err),
 		}
 	}
 }
 impl From<NameError> for RoutingTableError {
 	fn from(err: NameError) -> RoutingTableError { RoutingTableError::Name(err) }
+}
+impl From<PortNumberError> for RoutingTableError {
+	fn from(err: PortNumberError) -> RoutingTableError { RoutingTableError::PortNumber(err) }
 }
 impl From<RoutingTableEntryError> for RoutingTableError {
 	fn from(err: RoutingTableEntryError) -> RoutingTableError { RoutingTableError::RoutingTableEntry(err) }
