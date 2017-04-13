@@ -71,31 +71,37 @@ impl PacketEngine {
 		scope.spawn( move || -> Result<(), PacketEngineError> {
 			loop {
 				let (recv_port_no, packet) = try!(packet_pe_from_ports.recv());
+				//println!("Packet Engine {} got packet from port {}", cell_id, recv_port_no);
 				let mut header = packet.get_header();
 				let index = header.get_other_index();
 				let entry = try!(table.lock().unwrap().get_entry(index));
+				//println!("Cell Agent {} index {} entry {}", cell_id, index, entry);
 				let mask = entry.get_mask();
 				let parent = entry.get_parent();
 				let other_indices = entry.get_other_indices();
+				// Verify that port_no is valid
 				try!(PortNumber::new(recv_port_no, other_indices.len() as u8));
 				if header.is_rootcast() {
 					let other_index = *other_indices.get(parent as usize).expect("PacketEngine: No such other index");
 					header.set_other_index(other_index as u32);
 					let sender = packet_pe_to_ports.get(parent as usize).unwrap();
 					try!(sender.send(packet));
-				}
-				// Verify that port_no is valid
-				let port_nos = try!(ints_from_mask(mask & tenant_mask));
-				for port_no in port_nos.iter() {
-					let other_index = *other_indices.get(*port_no as usize).expect("PacketEngine: No such other index");
-					header.set_other_index(other_index as u32);
-					if *port_no as usize == 0 { try!(packet_pe_to_ca.send((recv_port_no, index, packet))); }
-					else {
-						let sender = packet_pe_to_ports.get(*port_no as usize).unwrap();
-						try!(sender.send(packet));
+					//println!("Packet Engine {} sent packets to port {}", cell_id, parent);
+				} else {
+					//println!("Cell Agent {} mask {} tenant mask {}", cell_id, mask, tenant_mask);
+					let port_nos = try!(ints_from_mask(mask & tenant_mask));
+					//println!("Cell Agent {} forwarding to ports {:?}", cell_id, port_nos);
+					for port_no in port_nos.iter() {
+						let other_index = *other_indices.get(*port_no as usize).expect("PacketEngine: No such other index");
+						header.set_other_index(other_index as u32);
+						if *port_no as usize == 0 { try!(packet_pe_to_ca.send((recv_port_no, index, packet))); }
+						else {
+							let sender = packet_pe_to_ports.get(*port_no as usize).unwrap();
+							try!(sender.send(packet));
+							//println!("Packet Engine {} sent packets to port {}", cell_id, port_no);
+						}
 					}
 				} 
-				
 			}
 		});
 		Ok(())

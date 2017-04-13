@@ -13,20 +13,24 @@ pub struct Traph {
 }
 impl Traph {
 	pub fn new(tree_id: TreeID, table_entry: RoutingTableEntry) -> Result<Traph, TraphError> {
-		let default_id = try!(PortID::new(MAX_PORTS+1));
-		let default = TraphElement::new(0, default_id, 0);
+		let default = TraphElement::new(0, table_entry.get_index(), 0);
 		let mut elements = Vec::new();
 		for _ in 0..MAX_PORTS { elements.push(default.clone()); }
 		Ok(Traph { tree_id: tree_id, table_entry: table_entry, elements: elements.into_boxed_slice() })
 	}
 	pub fn get_tree_id(&self) -> TreeID { self.tree_id.clone() }
 	pub fn get_table_index(&self) -> u32 { self.table_entry.get_index() }
-	pub fn add_element(&mut self, port: Port, other_index: usize) -> Result<(), TraphError> {
-		let port_no = port.get_no();
-		let port_id = port.get_id();
-		let element = TraphElement::new(port_no, port_id, other_index);
+	pub fn add_element(&mut self, port_number: PortNumber, my_index: u32, other_index: u32) {
+		let port_no = port_number.get_port_no();
+		let element = TraphElement::new(port_no, my_index, other_index);
 		self.elements[port_no as usize] = element;
-		Ok(())
+	}
+	pub  fn get_other_indices(&self) -> [u32; MAX_PORTS as usize] {
+		let mut indices = [0; MAX_PORTS as usize];
+		for element in self.elements.iter() {
+			indices[element.get_port_no() as usize] = element.get_other_index();
+		}
+		indices
 	}
 	pub fn set_connected(&mut self, port_no: PortNumber) -> Result<(), TraphError> { 
 		self.set_connected_state(port_no, true); 
@@ -44,11 +48,11 @@ impl Traph {
 }
 impl fmt::Display for Traph {
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result { 
-		let mut s = format!("\nTraph for TreeID {} at routing table index {}", self.tree_id, self.table_entry);
+		let mut s = format!("\nTraph for TreeID {}", self.tree_id);
 		let mut connected = false;
 		for element in self.elements.iter() { if element.is_connected() { connected = true; } }
 		if connected {
-			s = s + &format!("\n PortID Port Other Connected Broken Status Hops Path"); 
+			s = s + &format!("\nPort Index Other Connected Broken Status Hops Path"); 
 			for element in self.elements.iter() { s = s + &element.stringify(); }
 		} else {
 			s = s + &format!("\nNo entries yet for this tree"); 
@@ -57,17 +61,17 @@ impl fmt::Display for Traph {
 	}
 }
 #[derive(Debug, Copy, Clone)]
-pub enum TraphStatus {
+pub enum PortStatus {
 	Parent,
 	Child,
 	Pruned
 }
-impl fmt::Display for TraphStatus {
+impl fmt::Display for PortStatus {
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
 		match *self {
-			TraphStatus::Parent => write!(f, "Parent"),
-			TraphStatus::Child  => write!(f, "Child "),
-			TraphStatus::Pruned => write!(f, "Pruned")
+			PortStatus::Parent => write!(f, "Parent"),
+			PortStatus::Child  => write!(f, "Child "),
+			PortStatus::Pruned => write!(f, "Pruned")
 		}
 	}
 }
@@ -125,24 +129,26 @@ impl From<NameError> for TraphError {
 
 #[derive(Debug, Clone)]
 struct TraphElement {
-	port_id: PortID,
-	port_index: u8,
-	other_index: usize,
+	port_no: u8,
+	my_index: u32,
+	other_index: u32,
 	is_connected: bool,
 	is_broken: bool,
-	status: TraphStatus,
+	status: PortStatus,
 	hops: usize,
-	path: Option<TreeID> // or Option<PortID>
+	path: Option<PortNumber> 
 }
 impl TraphElement {
-	fn new(port_index: u8, port_id: PortID, other_index: usize) -> TraphElement {
-		TraphElement { port_index: port_index, port_id: port_id, other_index: other_index, is_connected: false,
-					is_broken: false, status: TraphStatus::Pruned, hops: 0, path: None } 
+	fn new(port_no: u8, my_index: u32, other_index: u32) -> TraphElement {
+		TraphElement { port_no: port_no,  my_index: my_index, other_index: other_index, is_connected: true,
+					is_broken: false, status: PortStatus::Pruned, hops: 0, path: None } 
 	}
 	fn stringify(&self) -> String {
-		format!("\n{:7} {:4} {:5} {:9} {:6} {:6} {:4} {:?}", self.port_id, self.port_index, self.other_index,
+		format!("\n{:4} {:6} {:5} {:9} {:6} {:6} {:4} {:?}", self.port_no, self.my_index, self.other_index,
 			self.is_connected, self.is_broken, self.status, self.hops, self.path)
 	}
+	fn get_port_no(&self) -> u8 { self.port_no }
+	fn get_other_index(&self) -> u32 { self.other_index }
 	fn is_connected(&self) -> bool { self.is_connected }
 	fn set_connected(&mut self) { self.is_connected = true; }
 	fn set_disconnected(&mut self) { self.is_connected = false; }
