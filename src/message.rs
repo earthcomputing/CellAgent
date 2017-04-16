@@ -1,9 +1,9 @@
 use std::fmt;
 use cellagent::{CellAgent, DEFAULT_OTHER_INDICES};
 use config::{CellNo, TableIndex};
-use nalcell::PortNumber;
 use name::{CellID, TreeID};
 use traph;
+use utility::{PortNumber};
 
 #[derive(Debug, Copy, Clone, Hash, Serialize, Deserialize)]
 pub enum MsgType {
@@ -143,7 +143,7 @@ pub struct DiscoverDPayload {}
 // Errors
 use std::error::Error;
 use cellagent::CellAgentError;
-use nalcell::PortNumberError;
+use utility::PortNumberError;
 #[derive(Debug)]
 pub enum MessageError {
 	CellAgent(CellAgentError),

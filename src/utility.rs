@@ -1,5 +1,4 @@
-use config::{MAX_PORTS, SEPARATOR, Mask, PortNo};
-use nalcell::PortNumber;
+use config::{MAX_PORTS, SEPARATOR, PortNo};
 
 pub fn get_first_arg(a: Vec<String>) -> Option<i32> {
 	if a.len() != 2 {
@@ -19,28 +18,49 @@ pub fn chars_to_string(chars: &[char]) -> String {
 	}
 	s
 }
-pub fn int_to_mask(i: PortNo) -> Result<Mask, UtilityError> {
-    if i > 15 {
-        Err(UtilityError::Port(PortError::new(i)))
-    } else {
-        let mask: Mask = (1 as Mask).rotate_left(i as u32);
-        Ok(mask)
-    }
-}
-pub fn mask_from_port_nos(port_nos: Vec<PortNumber>) -> Result<Mask, UtilityError> {
-	let mut mask: Mask = 0;
-	for port_no in port_nos.iter() {
-		mask = mask | try!(int_to_mask(port_no.get_port_no()));
+pub const BASE_TENANT_MASK: Mask = Mask { mask: 255 };   // All ports
+pub const DEFAULT_USER_MASK: Mask = Mask { mask: 254 };  // All ports except port 0
+#[derive(Debug, Copy, Clone, Serialize, Deserialize)]
+pub struct Mask { mask: u16 }
+impl Mask {
+	pub fn new(i: PortNo) -> Result<Mask, UtilityError> {
+	    if i > 15 {
+	        Err(UtilityError::Port(PortError::new(i)))
+	    } else {
+		    let mask = (1 as u16).rotate_left(i as u32);
+	        Ok(Mask { mask: mask} )
+	    }
 	}
-	Ok(mask)
-}
-pub fn ints_from_mask(mask: Mask) -> Result<Vec<PortNo>, UtilityError> {
-	let mut port_nos = Vec::new();
-	for i in 0..MAX_PORTS {
-		let test = try!(int_to_mask(i as PortNo));
-		if test & mask != 0 { port_nos.push(i as PortNo) }
+	pub fn or(&mut self, mask: Mask) {
+		self.mask = self.mask | mask.mask;
 	}
-	Ok(port_nos)
+	pub fn and(&mut self, mask: Mask) {
+		self.mask = self.mask & mask.mask;
+	}
+	pub fn not(&mut self) {
+		self.mask = !self.mask;
+	}
+	pub fn mask_from_port_nos(port_nos: Vec<PortNumber>) -> Result<Mask, UtilityError> {
+		let mut mask = try!(Mask::new(0));
+		for port_no in port_nos.iter() {
+			let port_mask = try!(Mask::new(port_no.get_port_no()));
+			mask.or(port_mask);
+		}
+		Ok(mask)
+	}
+	pub fn ints_from_mask(&self) -> Result<Vec<PortNo>, UtilityError> {
+		let mut port_nos = Vec::new();
+		for i in 0..MAX_PORTS {
+			let test = try!(Mask::new(i as PortNo));
+			if test.mask & self.mask != 0 { port_nos.push(i as PortNo) }
+		}
+		Ok(port_nos)
+	}
+}
+impl fmt::Display for Mask {
+	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result { 
+		write!(f, " {:016.b}", self.mask) 
+	}
 }
 // Errors
 use std::fmt;
@@ -106,4 +126,35 @@ impl fmt::Display for UnimplementedError {
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
 		write!(f, "{}", self.msg)
 	}
+}
+#[derive(Debug, Copy, Clone, Hash, Serialize, Deserialize)]
+pub struct PortNumber { pub port_no: PortNo }
+impl PortNumber {
+	pub fn new(no: PortNo, no_ports: PortNo) -> Result<PortNumber, PortNumberError> {
+		if no > no_ports {
+			Err(PortNumberError::new(no, no_ports))
+		} else {
+			Ok(PortNumber { port_no: (no as PortNo) })
+		}
+	}
+	pub fn get_port_no(&self) -> PortNo { self.port_no }
+}
+impl fmt::Display for PortNumber {
+	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result { write!(f, "{}", self.port_no) }
+}
+#[derive(Debug)]
+pub struct PortNumberError { msg: String }
+impl PortNumberError {
+	pub fn new(port_no: PortNo, no_ports: PortNo) -> PortNumberError {
+		let msg = format!("You asked for port number {}, but this cell only has {} ports",
+			port_no, no_ports);
+		PortNumberError { msg: msg }
+	}
+}
+impl Error for PortNumberError {
+	fn description(&self) -> &str { &self.msg }
+	fn cause(&self) -> Option<&Error> { None }
+}
+impl fmt::Display for PortNumberError {
+	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result { write!(f, "{}", self.msg) }
 }

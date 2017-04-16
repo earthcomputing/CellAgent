@@ -5,7 +5,7 @@ use crossbeam::Scope;
 use nalcell::{PacketSend,PacketRecv};
 use name::{Name, LinkID};
 use packet::Packet;
-use port::{Port, PortError};
+use port::{Port};
 
 #[derive(Debug)]
 pub struct Link {
@@ -66,6 +66,7 @@ impl fmt::Display for Link {
 // Errors
 use std::error::Error;
 use name::{NameError};
+use port::{PortError};
 #[derive(Debug)]
 pub enum LinkError {
 	Name(NameError),
