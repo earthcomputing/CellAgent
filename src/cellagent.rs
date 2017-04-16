@@ -1,30 +1,26 @@
 use std::fmt;
 use std::str;
 use std::sync::{Arc, Mutex};
-use std::sync::mpsc::{SendError, RecvError};
 use std::hash::Hash;
 use std::collections::HashMap;
 use serde;
 use crossbeam::Scope;
-use config::{MAX_ENTRIES, MAX_PORTS, Mask, TableIndex, PortNo};
-use nalcell::{PortNumber, PortNumberError, EntryCaToPe, StatusCaFromPort, RecvrCaToPort, RecvrSendError,
+use config::{MAX_ENTRIES, MAX_PORTS, TableIndex, PortNo};
+use nalcell::{EntryCaToPe, StatusCaFromPort, RecvrCaToPort, RecvrSendError,
 		PacketRecv, PacketSendError, PacketCaToPe, PacketCaFromPe, PacketPortToPe,
 		TenantMaskCaToPe, TenantMaskSendError};
 use message::{Message, DiscoverMsg};
 use name::{Name, CellID, TreeID};
-use packet::{Packet, Packetizer, PacketizerError, UnpacketizeError};
+use packet::{Packet, Packetizer};
 use packet_engine::PacketEngine;
 use port;
-use routing_table::RoutingTableError;
 use routing_table_entry::RoutingTableEntry;
 use traph;
-use traph::{Traph, TraphError};
-use utility::{int_to_mask, mask_from_port_nos, UnimplementedError};
+use traph::{Traph};
+use utility::{Mask, PortNumber, PortNumberError, BASE_TENANT_MASK, DEFAULT_USER_MASK, UnimplementedError};
 
 const CONTROL_TREE_NAME: &'static str = "Control";
 const CONNECTED_PORTS_TREE_NAME: &'static str = "Connected";
-const BASE_TENANT_MASK: Mask = 255;   // All ports
-const DEFAULT_USER_MASK: Mask = 254;  // All ports except port 0
 
 pub const DEFAULT_OTHER_INDICES: [TableIndex; MAX_PORTS as usize] = [0; MAX_PORTS as usize];
 
@@ -95,7 +91,7 @@ impl CellAgent {
 	pub fn update_traph(&mut self, tree_id: TreeID, port_number: PortNumber, port_status: traph::PortStatus,
 				children: Vec<PortNumber>, other_index: TableIndex, hops: usize, path: Option<PortNumber>) 
 			-> Result<RoutingTableEntry, CellAgentError> {
-		let mask = try!(mask_from_port_nos(children));
+		let mask = try!(Mask::mask_from_port_nos(children));
 		let mut traphs = self.traphs.lock().unwrap();
 		let traph = traphs.remove(&tree_id);  // Avoids lifetime problem
 		let (index, mut other_indices) = match traph {
@@ -127,7 +123,7 @@ impl CellAgent {
 			loop {
 				let (port_no, status) = try!(status_ca_from_port.recv());
 				let port_number = try!(PortNumber::new(port_no, ca.get_no_ports())); // Validates port_no
-				let port_no_mask = try!(int_to_mask(port_no));
+				let mut port_no_mask = try!(Mask::new(port_no));
 				match status {
 					port::PortStatus::Connected => {
 						if let Some(packet_port_from_pe) = packet_ports_from_pe.remove(&port_no) {
@@ -146,7 +142,8 @@ impl CellAgent {
 						try!(ca.send_msg(msg, DEFAULT_USER_MASK));
 					},
 					port::PortStatus::Disconnected => {
-						connected_entry.and_with_mask(!port_no_mask);
+						port_no_mask.not();
+						connected_entry.and_with_mask(port_no_mask);
 						try!(entry_ca_to_pe.send(connected_entry));
 					}
 				}
@@ -210,7 +207,11 @@ impl fmt::Display for CellAgent {
 }
 // Errors
 use std::error::Error;
+use std::sync::mpsc::{SendError, RecvError};
 use name::NameError;
+use packet::{PacketizerError, UnpacketizeError};
+use routing_table::RoutingTableError;
+use traph::TraphError;
 use utility::UtilityError;
 #[derive(Debug)]
 pub enum CellAgentError {
@@ -228,7 +229,7 @@ pub enum CellAgentError {
 	Utility(UtilityError),
 	Routing(RoutingTableError),
 	SendTableEntry(SendError<RoutingTableEntry>),
-	SendCaPe(SendError<(u32,u16,Packet)>),
+	SendCaPe(SendError<(u32,Mask,Packet)>),
 	SendPacket(PacketSendError),
 	SendTenant(TenantMaskSendError),
 	Recvr(RecvrError),
@@ -320,25 +321,25 @@ impl From<TraphError> for CellAgentError {
 impl From<UtilityError> for CellAgentError {
 	fn from(err: UtilityError) -> CellAgentError { CellAgentError::Utility(err) }
 }
-impl From<RoutingTableError> for CellAgentError{
+impl From<RoutingTableError> for CellAgentError {
 	fn from(err: RoutingTableError) -> CellAgentError { CellAgentError::Routing(err) }
 }
-impl From<SendError<RoutingTableEntry>> for CellAgentError{
+impl From<SendError<RoutingTableEntry>> for CellAgentError {
 	fn from(err: SendError<RoutingTableEntry>) -> CellAgentError { CellAgentError::SendTableEntry(err) }
 }
-impl From<SendError<(u32,u16,Packet)>> for CellAgentError{
-	fn from(err: SendError<(u32,u16,Packet)>) -> CellAgentError { CellAgentError::SendCaPe(err) }
+impl From<SendError<(u32,Mask,Packet)>> for CellAgentError {
+	fn from(err: SendError<(u32,Mask,Packet)>) -> CellAgentError { CellAgentError::SendCaPe(err) }
 }
-impl From<SendError<Packet>> for CellAgentError{
+impl From<SendError<Packet>> for CellAgentError {
 	fn from(err: SendError<Packet>) -> CellAgentError { CellAgentError::SendPacket(err) }
 }
-impl From<SendError<u16>> for CellAgentError{
-	fn from(err: SendError<u16>) -> CellAgentError { CellAgentError::SendTenant(err) }
+impl From<SendError<Mask>> for CellAgentError {
+	fn from(err: SendError<Mask>) -> CellAgentError { CellAgentError::SendTenant(err) }
 }
-impl From<RecvError> for CellAgentError{
+impl From<RecvError> for CellAgentError {
 	fn from(err: RecvError) -> CellAgentError { CellAgentError::Recv(err) }
 }
-impl From<RecvrSendError> for CellAgentError{
+impl From<RecvrSendError> for CellAgentError {
 	fn from(err: RecvrSendError) -> CellAgentError { CellAgentError::RecvrSend(err) }
 }
 #[derive(Debug)]

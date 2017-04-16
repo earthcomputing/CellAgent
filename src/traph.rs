@@ -1,9 +1,9 @@
 use std::fmt;
 use config::{MAX_PORTS, PortNo, TableIndex};
-use nalcell::PortNumber;
-use name::{TreeID, PortID, NameError};
+use name::{TreeID, PortID};
 use port::Port;
 use routing_table_entry::RoutingTableEntry;
+use utility::PortNumber;
 
 #[derive(Debug, Clone)]
 pub struct Traph {
@@ -80,6 +80,7 @@ impl fmt::Display for PortStatus {
 }
 // Errors
 use std::error::Error;
+use name::NameError;
 #[derive(Debug)]
 pub enum TraphError {
 	Name(NameError),

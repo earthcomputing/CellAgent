@@ -3,8 +3,8 @@ use std::cmp::max;
 use crossbeam::Scope;
 
 use config::{PortNo, CellNo, TableIndex};
-use nalcell::{NalCell,NalCellError};
-use link::{Link,LinkError};
+use nalcell::{NalCell};
+use link::{Link};
 use noc::NOC;
 
 #[derive(Debug)]
@@ -70,6 +70,8 @@ impl<'b> fmt::Display for Datacenter<'b> {
 }
 // Errors
 use std::error::Error;
+use link::LinkError;
+use nalcell::NalCellError;
 use name::NameError;
 #[derive(Debug)]
 pub enum DatacenterError {

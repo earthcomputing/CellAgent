@@ -2,15 +2,15 @@ use std::fmt;
 use std::collections::HashMap;
 use std::sync::mpsc;
 use std::sync::mpsc::channel;
-use std::{thread, time};
 use crossbeam::Scope;
-use cellagent::{CellAgent, CellAgentError};
-use config::{MAX_PORTS, CellNo, PortNo, TableIndex, Mask};
-use name::{CellID, PortID};
+use cellagent::{CellAgent};
+use config::{MAX_PORTS, CellNo, PortNo, TableIndex};
+use name::{CellID};
 use packet::Packet;
 use packet_engine::{PacketEngine};
-use port::{Port, PortStatus, PortError};
+use port::{Port, PortStatus};
 use routing_table_entry::RoutingTableEntry;
+use utility::{Mask, PortNumber};
 use vm::VirtualMachine;
 
 // Packet from PacketEngine to Port, Port to Link, Link to Port
@@ -114,8 +114,10 @@ impl fmt::Display for NalCell {
 }
 // Errors
 use std::error::Error;
+use cellagent::CellAgentError;
 use name::NameError;
 use packet_engine::PacketEngineError;
+use port::PortError;
 #[derive(Debug)]
 pub enum NalCellError {
 	Name(NameError),
@@ -205,37 +207,6 @@ impl fmt::Display for NoFreePortError {
 }
 impl From<NoFreePortError> for NalCellError {
 	fn from(err: NoFreePortError) -> NalCellError { NalCellError::NoFreePort(err) }
-}
-#[derive(Debug, Copy, Clone, Hash, Serialize, Deserialize)]
-pub struct PortNumber { pub port_no: PortNo }
-impl PortNumber {
-	pub fn new(no: PortNo, no_ports: PortNo) -> Result<PortNumber, PortNumberError> {
-		if no > no_ports {
-			Err(PortNumberError::new(no, no_ports))
-		} else {
-			Ok(PortNumber { port_no: (no as PortNo) })
-		}
-	}
-	pub fn get_port_no(&self) -> PortNo { self.port_no }
-}
-impl fmt::Display for PortNumber {
-	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result { write!(f, "{}", self.port_no) }
-}
-#[derive(Debug)]
-pub struct PortNumberError { msg: String }
-impl PortNumberError {
-	pub fn new(port_no: PortNo, no_ports: PortNo) -> PortNumberError {
-		let msg = format!("You asked for port number {}, but this cell only has {} ports",
-			port_no, no_ports);
-		PortNumberError { msg: msg }
-	}
-}
-impl Error for PortNumberError {
-	fn description(&self) -> &str { &self.msg }
-	fn cause(&self) -> Option<&Error> { None }
-}
-impl fmt::Display for PortNumberError {
-	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result { write!(f, "{}", self.msg) }
 }
 impl From<NumberPortsError> for NalCellError {
 	fn from(err: NumberPortsError) -> NalCellError { NalCellError::NumberPorts(err) }

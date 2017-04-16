@@ -3,7 +3,6 @@ pub type PortNo     = u8;
 pub type TableIndex = u32;
 pub type CellNo     = usize;
 pub type LinkNo     = usize;
-pub type Mask       = u16;
 pub type PacketNo   = u16;
 pub type Uniquifier = u64;
 // Default inputs

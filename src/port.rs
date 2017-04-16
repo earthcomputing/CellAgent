@@ -2,10 +2,11 @@ use std::fmt;
 use std::sync::mpsc;
 use crossbeam::Scope;
 use config::PortNo;
-use nalcell::{PortNumber, StatusPortToCa, PortStatusSendError, PacketSend, PacketRecv, 
+use nalcell::{StatusPortToCa, PacketSend, PacketRecv, 
 	RecvrPortFromCa, PacketPortToPe};
-use packet::Packet;
 use name::{Name, PortID, CellID};
+use packet::Packet;
+use utility::PortNumber;
 
 #[derive(Debug, Copy, Clone)]
 pub enum PortStatus {
@@ -83,6 +84,7 @@ impl fmt::Display for Port {
 }
 // Errors
 use std::error::Error;
+use nalcell::PortStatusSendError;
 use name::NameError;
 #[derive(Debug)]
 pub enum PortError {
