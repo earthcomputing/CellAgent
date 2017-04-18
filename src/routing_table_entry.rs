@@ -25,14 +25,15 @@ impl RoutingTableEntry {
 			Ok(())
 		}
 	}
-	pub fn or_with_mask(&mut self, mask: Mask) { self.mask.or(mask); }
-	pub fn and_with_mask(&mut self, mask: Mask) { self.mask.and(mask); }
+	pub fn or_with_mask(&mut self, mask: Mask) { self.mask = self.mask.or(mask); }
+	pub fn and_with_mask(&mut self, mask: Mask) { self.mask = self.mask.and(mask); }
 	pub fn get_inuse(&self) -> bool { self.inuse }
 	pub fn set_inuse(&mut self) { self.inuse = true; }
 	pub fn set_not_inuse(&mut self) { self.inuse = false; }
 	pub fn get_parent(&self) -> u8 { self.parent }
 	pub fn set_parent(&mut self, parent: u8) { self.parent = parent; }
 	pub fn get_mask(&self) -> Mask { self.mask }
+	pub fn set_mask(&mut self, mask: Mask) { self.mask = mask; }
 	pub fn get_other_indices(&self) -> [u32; MAX_PORTS as usize] { self.other_indices }
 	pub fn set_other_index(&mut self, port_index: u8, other_index: u32) -> Result<(),RoutingTableEntryError> {
 		{
@@ -57,10 +58,10 @@ impl RoutingTableEntry {
 			Ok(m) => m,
 			Err(_) => return Err(RoutingTableEntryError::Port(PortError::new(child)))
 		};
-		self.mask.or(child_mask);
+		self.mask = self.mask.or(child_mask);
 		indices[child as usize] = other_index;
-		Ok(RoutingTableEntry { index: self.index, parent: self.parent, inuse: self.inuse, mask: self.mask,
-							other_indices: indices })
+		Ok(RoutingTableEntry { index: self.index, parent: self.parent, inuse: self.inuse, 
+				mask: self.mask, other_indices: indices })
 	}
 }
 impl fmt::Display for RoutingTableEntry {

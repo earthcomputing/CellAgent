@@ -4,7 +4,7 @@ use std::sync::mpsc;
 use crossbeam::Scope;
 use config::{PortNo};
 use nalcell::{EntryPeFromCa, PacketSend, PacketPeFromCa, 
-	PacketPeToCa, PacketPeFromPort, TenantMaskPeFromCa};
+	PacketPeToCa, PacketPeFromPort};
 use name::CellID;
 use packet::{Packet};
 use routing_table::{RoutingTable};
@@ -13,33 +13,21 @@ use utility::{Mask, PortNumber};
 #[derive(Debug, Clone)]
 pub struct PacketEngine {
 	cell_id: CellID,
-	tenant_mask: Box<Mask>,
 	routing_table: Arc<Mutex<RoutingTable>>,
 	packet_pe_to_ports: Vec<PacketSend>,
 }
 impl PacketEngine {
 	pub fn new(scope: &Scope, cell_id: &CellID, packet_pe_to_ca: PacketPeToCa, 
 		packet_pe_from_ca: PacketPeFromCa, recv_entry_from_ca: EntryPeFromCa, 
-		packet_pe_from_ports: PacketPeFromPort, packet_pe_to_ports: Vec<PacketSend>,
-		tenant_pe_from_ca: TenantMaskPeFromCa) -> Result<PacketEngine, PacketEngineError> {
+		packet_pe_from_ports: PacketPeFromPort, packet_pe_to_ports: Vec<PacketSend>) 
+				-> Result<PacketEngine, PacketEngineError> {
 		let routing_table = Arc::new(Mutex::new(try!(RoutingTable::new()))); 
 		let pe = PacketEngine { cell_id: cell_id.clone(), routing_table: routing_table, 
-			packet_pe_to_ports: packet_pe_to_ports, tenant_mask: Box::new(try!(Mask::new(15))) };
+			packet_pe_to_ports: packet_pe_to_ports };
 		try!(pe.entry_channel(scope, recv_entry_from_ca));
 		try!(pe.ca_channel(scope, packet_pe_from_ca));
 		try!(pe.packet_channel(scope, packet_pe_from_ports, packet_pe_to_ca));
-		try!(pe.tenant_channel(scope, tenant_pe_from_ca));
 		Ok(pe)
-	}
-	fn tenant_channel(&self, scope: &Scope,tenant_pe_from_ca: TenantMaskPeFromCa) -> Result<(), PacketEngineError> {
-		let mut tenant_mask = self.tenant_mask.clone();
-		scope.spawn( move || -> Result<(), PacketEngineError> {
-			loop {
-				let mask = try!(tenant_pe_from_ca.recv());
-				*tenant_mask = mask;
-			}
-		});
-		Ok(())
 	}
 	fn ca_channel(&self, scope: &Scope,  packet_pe_from_ca: PacketPeFromCa) -> Result<(), PacketEngineError> {
 		let table = self.routing_table.clone();
@@ -50,7 +38,7 @@ impl PacketEngine {
 				let (index, mut mask, packet) = try!(packet_pe_from_ca.recv());
 				let unlocked = table.lock().unwrap();
 				let entry = try!((*unlocked).get_entry(index));
-				mask.and(entry.get_mask());
+				mask = mask.and(entry.get_mask());
 				let port_nos = try!(Mask::ints_from_mask(&mask));
 				for port_no in port_nos.iter() {
 					let sender = packet_pe_to_ports.get(*port_no as usize);
@@ -68,11 +56,9 @@ impl PacketEngine {
 		let cell_id = self.cell_id.clone();
 		let table = self.get_table().clone();
 		let packet_pe_to_ports = self.packet_pe_to_ports.clone();
-		let tenant_mask = *self.tenant_mask;
 		scope.spawn( move || -> Result<(), PacketEngineError> {
 			loop {
 				let (recv_port_no, packet) = try!(packet_pe_from_ports.recv());
-				//println!("Packet Engine {} got packet from port {}", cell_id, recv_port_no);
 				let mut header = packet.get_header();
 				let index = header.get_other_index();
 				let entry = try!(table.lock().unwrap().get_entry(index));
@@ -89,8 +75,6 @@ impl PacketEngine {
 					try!(sender.send(packet));
 					//println!("Packet Engine {} sent packets to port {}", cell_id, parent);
 				} else {
-					//println!("Cell Agent {} mask {} tenant mask {}", cell_id, mask, tenant_mask);
-					mask.and(tenant_mask);
 					let port_nos = try!(mask.ints_from_mask());
 					//println!("Cell Agent {} forwarding to ports {:?}", cell_id, port_nos);
 					for port_no in port_nos.iter() {

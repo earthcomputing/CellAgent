@@ -13,7 +13,8 @@ impl RoutingTable {
 		let mut entries = Vec::new();
 		for i in 1..MAX_ENTRIES {
 			let port_number = try!(PortNumber::new(0,MAX_PORTS));
-			let mut entry = RoutingTableEntry::new(0, false, port_number, try!(Mask::new(0)), [0; MAX_PORTS as usize]); 
+			let mut entry = RoutingTableEntry::new(0, false, port_number, 
+				try!(Mask::new(0)), [0; MAX_PORTS as usize]); 
 			try!(entry.set_index(i));
 			entries.push(entry);
 		}

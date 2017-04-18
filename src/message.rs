@@ -1,6 +1,6 @@
 use std::fmt;
 use cellagent::{CellAgent, DEFAULT_OTHER_INDICES};
-use config::{CellNo, TableIndex};
+use config::{CellNo, TableIndex, PathLength};
 use name::{CellID, TreeID};
 use traph;
 use utility::{PortNumber};
@@ -68,7 +68,7 @@ pub struct DiscoverMsg {
 }
 impl DiscoverMsg {
 	pub fn new(connected_ports_id: TreeID, tree_id: TreeID, sending_node_id: CellID, 
-			my_index: TableIndex, hops: CellNo, path: PortNumber) -> DiscoverMsg {
+			my_index: TableIndex, hops: PathLength, path: PortNumber) -> DiscoverMsg {
 		let payload = DiscoverPayload::new(tree_id, sending_node_id, my_index, hops, path);
 		let header = MsgHeader::new(connected_ports_id, MsgType::Discover, MsgDirection::Leafward);
 		DiscoverMsg { header: header, payload: payload }
@@ -83,14 +83,14 @@ impl Message for DiscoverMsg {
 		println!("Message: Cell {} port {} {}", cell_agent.get_id(), port_no, self.payload);
 		if cell_agent.exists(&tree_id) { return Ok(()); } // Ignore if traph exists for this tree - Simple quenching
 		let senders_index = self.payload.get_senders_index();
-		let hops = self.payload.get_hops() + 1;
+		let hops = self.payload.get_hops();
 		let path = self.payload.get_path();
 		let entry = try!(cell_agent.update_traph(tree_id.clone(), port_number, traph::PortStatus::Parent,
 				Vec::new(), senders_index, hops, Some(path)));
 		let index = entry.get_index();
 		println!("Message: Cell {} entry {}", cell_agent.get_id(), entry);
 		let discover_msg = DiscoverMsg::new(cell_agent.get_connected_ports_tree_id(), tree_id.clone(), 
-									cell_agent.get_id(), index, hops, path);
+									cell_agent.get_id(), index, hops+1, path);
 		// Send DiscoverD to sender
 		// Forward Discover on all except port_no
 		// Return TreeID 
@@ -108,19 +108,19 @@ struct DiscoverPayload {
 	tree_id: TreeID,
 	sending_node_id: CellID,
 	senders_index: TableIndex,
-	hops: usize,
+	hops: PathLength,
 	path: PortNumber,
 }
 impl DiscoverPayload {
 	fn new(tree_id: TreeID, sending_node_id: CellID, senders_index: TableIndex,  
-			hops: CellNo, path: PortNumber) -> DiscoverPayload {
+			hops: PathLength, path: PortNumber) -> DiscoverPayload {
 		DiscoverPayload { tree_id: tree_id, sending_node_id: sending_node_id, 
 			senders_index: senders_index, hops: hops, path: path }
 	}
 	fn get_tree_id(&self) -> TreeID { self.tree_id.clone() }
 	fn get_sending_node(&self) -> CellID { self.sending_node_id.clone() }
 	fn get_senders_index(&self) -> TableIndex { self.senders_index }
-	fn get_hops(&self) -> usize { self.hops }
+	fn get_hops(&self) -> PathLength { self.hops }
 	fn get_path(&self) -> PortNumber { self.path }
 }
 impl MsgPayload for DiscoverPayload {
@@ -128,7 +128,7 @@ impl MsgPayload for DiscoverPayload {
 }
 impl fmt::Display for DiscoverPayload { 
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result { 
-		let s = format!("Tree {}, sending cell {}, senders_index {} hops {}, path {}", self.tree_id, self.sending_node_id,
+		let s = format!("Tree {}, sending cell {}, senders_index {}, hops {}, path {}", self.tree_id, self.sending_node_id,
 				self.senders_index, self.hops, self.path);
 		write!(f, "{}", s) 
 	}

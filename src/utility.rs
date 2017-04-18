@@ -24,27 +24,31 @@ pub const DEFAULT_USER_MASK: Mask = Mask { mask: 254 };  // All ports except por
 pub struct Mask { mask: u16 }
 impl Mask {
 	pub fn new(i: PortNo) -> Result<Mask, UtilityError> {
-	    if i > 15 {
+	    if i > MAX_PORTS {
 	        Err(UtilityError::Port(PortError::new(i)))
 	    } else {
 		    let mask = (1 as u16).rotate_left(i as u32);
 	        Ok(Mask { mask: mask} )
 	    }
 	}
-	pub fn or(&mut self, mask: Mask) {
-		self.mask = self.mask | mask.mask;
+	pub fn or(&self, mask: Mask) -> Mask {
+		Mask { mask: self.mask | mask.mask }
 	}
-	pub fn and(&mut self, mask: Mask) {
-		self.mask = self.mask & mask.mask;
+	pub fn and(&self, mask: Mask) -> Mask {
+		Mask { mask: self.mask & mask.mask }
 	}
-	pub fn not(&mut self) {
-		self.mask = !self.mask;
+	pub fn not(&self) -> Mask {
+		Mask { mask: !self.mask }
 	}
-	pub fn mask_from_port_nos(port_nos: Vec<PortNumber>) -> Result<Mask, UtilityError> {
+	pub fn all_but_port(&self, port_no: PortNo) -> Result<Mask, UtilityError> {
+		let port_mask = try!(Mask::new(port_no));
+		Ok(self.and(port_mask.not()))
+	}
+	pub fn mask_from_port_numbers(port_nos: Vec<PortNumber>) -> Result<Mask, UtilityError> {
 		let mut mask = try!(Mask::new(0));
 		for port_no in port_nos.iter() {
 			let port_mask = try!(Mask::new(port_no.get_port_no()));
-			mask.or(port_mask);
+			mask = mask.or(port_mask);
 		}
 		Ok(mask)
 	}
@@ -124,7 +128,7 @@ impl Error for UnimplementedError {
 }
 impl fmt::Display for UnimplementedError {
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-		write!(f, "{}", self.msg)
+		write!(f, "{}", self.msg) 
 	}
 }
 #[derive(Debug, Copy, Clone, Hash, Serialize, Deserialize)]
