@@ -28,7 +28,7 @@ impl Mask {
 	        Err(UtilityError::Port(PortError::new(i)))
 	    } else {
 		    let mask = (1 as u16).rotate_left(i as u32);
-	        Ok(Mask { mask: mask} )
+	        Ok(Mask { mask: mask } )
 	    }
 	}
 	pub fn or(&self, mask: Mask) -> Mask {
@@ -45,7 +45,7 @@ impl Mask {
 		Ok(self.and(port_mask.not()))
 	}
 	pub fn mask_from_port_numbers(port_nos: Vec<PortNumber>) -> Result<Mask, UtilityError> {
-		let mut mask = try!(Mask::new(0));
+		let mut mask = Mask { mask: 0 };
 		for port_no in port_nos.iter() {
 			let port_mask = try!(Mask::new(port_no.get_port_no()));
 			mask = mask.or(port_mask);

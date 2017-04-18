@@ -102,7 +102,7 @@ impl CellAgent {
 		let entry = RoutingTableEntry::new(index, true, port_number, mask, other_indices);
 		let mut traph = try!(Traph::new(tree_id.clone(), entry));
 		traph.add_element(port_number, index, other_index, port_status, hops, path); 
-		println!("CellAgent: {} Tree {} {} {}", self.cell_id, tree_id, entry, traph);
+		println!("CellAgent {}: Tree {} {} {}", self.cell_id, tree_id, entry, traph);
 		traphs.insert(tree_id.clone(), traph);
 		self.trees.lock().unwrap().insert(index, tree_id);
 		try!(self.entry_ca_to_pe.send(entry));
