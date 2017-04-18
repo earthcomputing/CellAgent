@@ -1,25 +1,24 @@
 use std::fmt;
-use config;
+use config::{MAX_PORTS, MAX_ENTRIES, PortNo, TableIndex};
 use utility::{Mask, PortNumber};
 
-const MAX_PORTS: usize = config::MAX_PORTS as usize;
 #[derive(Debug, Copy, Clone)]
 pub struct RoutingTableEntry {
-	index: u32,
+	index: TableIndex,
 	inuse: bool,
-	parent: u8,
+	parent: PortNo,
 	mask: Mask,
-	other_indices: [u32; MAX_PORTS as usize]
+	other_indices: [TableIndex; MAX_PORTS as usize]
 }
 impl RoutingTableEntry {
-	pub fn new(table_index: u32, inuse: bool, parent: PortNumber, mask: Mask, 
-			other_indices: [u32; MAX_PORTS]) -> RoutingTableEntry {
+	pub fn new(table_index: TableIndex, inuse: bool, parent: PortNumber, mask: Mask, 
+			other_indices: [TableIndex; MAX_PORTS as usize]) -> RoutingTableEntry {
 		RoutingTableEntry { index: table_index, parent: parent.get_port_no(),
 			inuse: inuse, mask: mask, other_indices: other_indices }
 	}
-	pub fn get_index(&self) -> u32 { self.index }
-	pub fn set_index(&mut self, index: u32) -> Result<(), RoutingTableEntryError> { 
-		if index > config::MAX_ENTRIES { Err(RoutingTableEntryError::Index(IndexError::new(index as u32))) }
+	pub fn get_index(&self) -> TableIndex { self.index }
+	pub fn set_index(&mut self, index: TableIndex) -> Result<(), RoutingTableEntryError> { 
+		if index > MAX_ENTRIES { Err(RoutingTableEntryError::Index(IndexError::new(index as TableIndex))) }
 		else {
 			self.index = index; 
 			Ok(())
@@ -30,12 +29,12 @@ impl RoutingTableEntry {
 	pub fn get_inuse(&self) -> bool { self.inuse }
 	pub fn set_inuse(&mut self) { self.inuse = true; }
 	pub fn set_not_inuse(&mut self) { self.inuse = false; }
-	pub fn get_parent(&self) -> u8 { self.parent }
-	pub fn set_parent(&mut self, parent: u8) { self.parent = parent; }
+	pub fn get_parent(&self) -> PortNo { self.parent }
+	pub fn set_parent(&mut self, parent: PortNo) { self.parent = parent; }
 	pub fn get_mask(&self) -> Mask { self.mask }
 	pub fn set_mask(&mut self, mask: Mask) { self.mask = mask; }
-	pub fn get_other_indices(&self) -> [u32; MAX_PORTS as usize] { self.other_indices }
-	pub fn set_other_index(&mut self, port_index: u8, other_index: u32) -> Result<(),RoutingTableEntryError> {
+	pub fn get_other_indices(&self) -> [TableIndex; MAX_PORTS as usize] { self.other_indices }
+	pub fn set_other_index(&mut self, port_index: PortNo, other_index: TableIndex) -> Result<(),RoutingTableEntryError> {
 		{
 			match self.other_indices.get(port_index as usize) {
 				Some(other) => (),
@@ -127,7 +126,7 @@ impl From<PortError> for RoutingTableEntryError {
 pub struct IndexError { msg: String }
 impl IndexError { 
 	pub fn new(index: u32) -> IndexError {
-		IndexError { msg: format!("Index number {} is greater than the maximum of {}", index, config::MAX_ENTRIES) }
+		IndexError { msg: format!("Index number {} is greater than the maximum of {}", index, MAX_ENTRIES) }
 	}
 }
 impl Error for IndexError {
