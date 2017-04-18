@@ -57,15 +57,14 @@ impl Port {
 				let packet = try!(packet_port_from_pe.recv());
 				try!(packet_port_to_link.send(packet));
 			}
-		});
+		}); 
 		// Listen for incoming packets
 		scope.spawn( move || -> Result<(), PortError> {
-				loop {
-					let packet = try!(packet_port_from_link.recv());
-					try!(packet_port_to_pe.send((port_no, packet)));
-					//println!("Port {} sent packets to Packet Engine", port_no);
-				}
-			});
+			loop {
+				let packet = try!(packet_port_from_link.recv());
+				try!(packet_port_to_pe.send((port_no, packet)));
+			}
+		});
 		Ok(())
 	}
 }

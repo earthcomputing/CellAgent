@@ -5,10 +5,9 @@ use std::hash::Hash;
 use std::collections::HashMap;
 use serde;
 use crossbeam::Scope;
-use config::{MAX_ENTRIES, MAX_PORTS, TableIndex, PortNo};
+use config::{MAX_ENTRIES, MAX_PORTS, TableIndex, PortNo, PathLength};
 use nalcell::{EntryCaToPe, StatusCaFromPort, RecvrCaToPort, RecvrSendError,
-		PacketRecv, PacketSendError, PacketCaToPe, PacketCaFromPe, PacketPortToPe,
-		TenantMaskCaToPe, TenantMaskSendError};
+		PacketRecv, PacketSendError, PacketCaToPe, PacketCaFromPe, PacketPortToPe};
 use message::{Message, DiscoverMsg};
 use name::{Name, CellID, TreeID};
 use packet::{Packet, Packetizer};
@@ -38,7 +37,6 @@ pub struct CellAgent {
 	entry_ca_to_pe: EntryCaToPe,
 	packet_port_to_pe: PacketPortToPe,
 	packet_ca_to_pe: PacketCaToPe,
-	tenant_ca_to_pe: TenantMaskCaToPe,
 	recvr_ca_to_ports: Vec<RecvrCaToPort>,
 	packet_engine: PacketEngine,
 }
@@ -46,8 +44,8 @@ impl CellAgent {
 	pub fn new(scope: &Scope, cell_id: &CellID, no_ports: PortNo, packet_port_to_pe: PacketPortToPe, 
 			packet_engine: PacketEngine, packet_ca_to_pe: PacketCaToPe, packet_ca_from_pe: PacketCaFromPe, 
 			entry_ca_to_pe: EntryCaToPe, recv_status_from_port: StatusCaFromPort, recvr_ca_to_ports: Vec<RecvrCaToPort>, 
-			packet_ports_from_pe: HashMap<PortNo,PacketRecv>,
-			tenant_ca_to_pe: TenantMaskCaToPe) -> Result<CellAgent, CellAgentError> {
+			packet_ports_from_pe: HashMap<PortNo,PacketRecv>) 
+				-> Result<CellAgent, CellAgentError> {
 		let tenant_masks = vec![BASE_TENANT_MASK];
 		let my_tree_id = try!(TreeID::new(cell_id.get_name()));
 		let control_tree_id = try!(TreeID::new(CONTROL_TREE_NAME));
@@ -66,7 +64,7 @@ impl CellAgent {
 			tenant_masks: tenant_masks, trees: Arc::new(Mutex::new(trees)), 
 			packet_ca_to_pe: packet_ca_to_pe.clone(), entry_ca_to_pe: entry_ca_to_pe,
 			packet_port_to_pe: packet_port_to_pe, packet_engine: packet_engine,
-			recvr_ca_to_ports: recvr_ca_to_ports, tenant_ca_to_pe: tenant_ca_to_pe};
+			recvr_ca_to_ports: recvr_ca_to_ports};
 		// Set up predefined trees - Must be first two in this order
 		let port_number_0 = try!(PortNumber::new(0, no_ports));
 		let control_entry = try!(ca.update_traph(control_tree_id, port_number_0, 
@@ -89,9 +87,10 @@ impl CellAgent {
 		(*self.traphs.lock().unwrap()).contains_key(tree_id)
 	}
 	pub fn update_traph(&mut self, tree_id: TreeID, port_number: PortNumber, port_status: traph::PortStatus,
-				children: Vec<PortNumber>, other_index: TableIndex, hops: usize, path: Option<PortNumber>) 
+				children: Vec<PortNumber>, other_index: TableIndex, 
+				hops: PathLength, path: Option<PortNumber>) 
 			-> Result<RoutingTableEntry, CellAgentError> {
-		let mask = try!(Mask::mask_from_port_nos(children));
+		let mask = try!(Mask::mask_from_port_numbers(children));
 		let mut traphs = self.traphs.lock().unwrap();
 		let traph = traphs.remove(&tree_id);  // Avoids lifetime problem
 		let (index, mut other_indices) = match traph {
@@ -102,7 +101,7 @@ impl CellAgent {
 		other_indices[port_no as usize] = other_index;
 		let entry = RoutingTableEntry::new(index, true, port_number, mask, other_indices);
 		let mut traph = try!(Traph::new(tree_id.clone(), entry));
-		traph.add_element(port_number, index, other_index, port_status); 
+		traph.add_element(port_number, index, other_index, port_status, hops, path); 
 		println!("CellAgent: {} Tree {} {} {}", self.cell_id, tree_id, entry, traph);
 		traphs.insert(tree_id.clone(), traph);
 		self.trees.lock().unwrap().insert(index, tree_id);
@@ -116,14 +115,12 @@ impl CellAgent {
 		let my_table_index = my_entry.get_index();
 		let entry_ca_to_pe = self.entry_ca_to_pe.clone();
 		let mut connected_entry = connected_tree_entry.clone();	
-		let tenant_mask = self.tenant_masks[0];//.last().expect("CellAgent: initiate_discover: No tenant mask");
-		try!(self.tenant_ca_to_pe.send(tenant_mask));
 		let ca = self.clone();
 		scope.spawn( move || -> Result<(), CellAgentError> {
 			loop {
 				let (port_no, status) = try!(status_ca_from_port.recv());
 				let port_number = try!(PortNumber::new(port_no, ca.get_no_ports())); // Validates port_no
-				let mut port_no_mask = try!(Mask::new(port_no));
+				let port_no_mask = try!(Mask::new(port_no));
 				match status {
 					port::PortStatus::Connected => {
 						if let Some(packet_port_from_pe) = packet_ports_from_pe.remove(&port_no) {
@@ -135,15 +132,22 @@ impl CellAgent {
 						} else {
 							return Err(CellAgentError::PortTaken(PortTakenError::new(port_no)))
 						};
-						connected_entry.or_with_mask(port_no_mask); 
+						connected_entry.or_with_mask(port_no_mask);
 						try!(ca.entry_ca_to_pe.send(connected_entry));
 						let msg = DiscoverMsg::new(connected_tree_id.clone(), tree_id.clone(), 
-									ca.cell_id.clone(), my_table_index, 0, port_number);
-						try!(ca.send_msg(msg, DEFAULT_USER_MASK));
+									ca.cell_id.clone(), my_table_index, 1, port_number);
+						if let Some(tenant_mask) = ca.tenant_masks.last() {
+							try!(ca.send_msg(msg, tenant_mask.and(DEFAULT_USER_MASK)));
+						} else {
+							// I have no idea why the following line says it can't infer type
+							//Err(CellAgentError::Mask(MaskError::new(ca.cell_id)));
+							let msg = format!("Cell Agent {} has no tenant mask", ca.cell_id);
+							println!("{}",msg);
+						}
 					},
 					port::PortStatus::Disconnected => {
-						port_no_mask.not();
-						connected_entry.and_with_mask(port_no_mask);
+						println!("Cell Agent {} got disconnected on port {}", ca.cell_id, port_no);
+						connected_entry.and_with_mask(port_no_mask.not());
 						try!(entry_ca_to_pe.send(connected_entry));
 					}
 				}
@@ -163,6 +167,7 @@ impl CellAgent {
 			}
 			//println!("Cell Agent {} sent packets", self.cell_id);
 		} else {
+			println!("CellAgent {}: error sending msg", self.cell_id);
 			return Err(CellAgentError::Tree(TreeError::new(&tree_id)));
 		};
 		Ok(())
@@ -173,7 +178,6 @@ impl CellAgent {
 		scope.spawn( move || -> Result<(), CellAgentError> {
 			loop {
 				let (port_no, index, packet) = try!(packet_ca_from_pe.recv());
-				//println!("Cell Agent {} got packet", ca.cell_id);
 				let header = packet.get_header();
 				let uniquifier = header.get_uniquifier();
 				let packets = packet_assembler.entry(uniquifier).or_insert(Vec::new());
@@ -218,6 +222,7 @@ pub enum CellAgentError {
 	Name(NameError),
 	Size(SizeError),
 	Tree(TreeError),
+	Mask(MaskError),
 	TreeIndex(TreeIndexError),
 	Traph(TraphError),
 	Packetizer(PacketizerError),
@@ -231,7 +236,6 @@ pub enum CellAgentError {
 	SendTableEntry(SendError<RoutingTableEntry>),
 	SendCaPe(SendError<(u32,Mask,Packet)>),
 	SendPacket(PacketSendError),
-	SendTenant(TenantMaskSendError),
 	Recvr(RecvrError),
 	RecvrSend(RecvrSendError),
 	Recv(RecvError),
@@ -248,6 +252,7 @@ impl Error for CellAgentError {
 			CellAgentError::Name(ref err) => err.description(),
 			CellAgentError::Size(ref err) => err.description(),
 			CellAgentError::Tree(ref err) => err.description(),
+			CellAgentError::Mask(ref err) => err.description(),
 			CellAgentError::TreeIndex(ref err) => err.description(),
 			CellAgentError::Traph(ref err) => err.description(),
 			CellAgentError::Utility(ref err) => err.description(),
@@ -255,7 +260,6 @@ impl Error for CellAgentError {
 			CellAgentError::SendTableEntry(ref err) => err.description(),
 			CellAgentError::SendCaPe(ref err) => err.description(),
 			CellAgentError::SendPacket(ref err) => err.description(),
-			CellAgentError::SendTenant(ref err) => err.description(),
 			CellAgentError::Recvr(ref err) => err.description(),
 			CellAgentError::RecvrSend(ref err) => err.description(),
 			CellAgentError::Recv(ref err) => err.description(),
@@ -272,6 +276,7 @@ impl Error for CellAgentError {
 			CellAgentError::Name(ref err) => Some(err),
 			CellAgentError::Size(ref err) => Some(err),
 			CellAgentError::Tree(ref err) => Some(err),
+			CellAgentError::Mask(ref err) => Some(err),
 			CellAgentError::TreeIndex(ref err) => Some(err),
 			CellAgentError::Traph(ref err) => Some(err),
 			CellAgentError::Utility(ref err) => Some(err),
@@ -279,7 +284,6 @@ impl Error for CellAgentError {
 			CellAgentError::SendTableEntry(ref err) => Some(err),
 			CellAgentError::SendCaPe(ref err) => Some(err),
 			CellAgentError::SendPacket(ref err) => Some(err),
-			CellAgentError::SendTenant(ref err) => Some(err),
 			CellAgentError::Recvr(ref err) => Some(err),
 			CellAgentError::RecvrSend(ref err) => Some(err),
 			CellAgentError::Recv(ref err) => Some(err),
@@ -298,6 +302,7 @@ impl fmt::Display for CellAgentError {
 			CellAgentError::Name(ref err) => write!(f, "Cell Agent Name Error caused by {}", err),
 			CellAgentError::Size(ref err) => write!(f, "Cell Agent Size Error caused by {}", err),
 			CellAgentError::Tree(ref err) => write!(f, "Cell Agent Tree Error caused by {}", err),
+			CellAgentError::Mask(ref err) => write!(f, "Cell Agent Mask Error caused by {}", err),
 			CellAgentError::TreeIndex(ref err) => write!(f, "Cell Agent Tree Error caused by {}", err),
 			CellAgentError::Traph(ref err) => write!(f, "Cell Agent Traph Error caused by {}", err),
 			CellAgentError::Utility(ref err) => write!(f, "Cell Agent Utility Error caused by {}", err),
@@ -305,7 +310,6 @@ impl fmt::Display for CellAgentError {
 			CellAgentError::SendTableEntry(ref err) => write!(f, "Cell Agent Send Table Entry Error caused by {}", err),
 			CellAgentError::SendCaPe(ref err) => write!(f, "Cell Agent Send Packet to Packet Engine Error caused by {}", err),
 			CellAgentError::SendPacket(ref err) => write!(f, "Cell Agent Send Packet to Packet Engine Error caused by {}", err),
-			CellAgentError::SendTenant(ref err) => write!(f, "Cell Agent Send Tenant Mask to Packet Engine Error caused by {}", err),
 			CellAgentError::Recvr(ref err) => write!(f, "Cell Agent Receiver Error caused by {}", err),
 			CellAgentError::RecvrSend(ref err) => write!(f, "Cell Agent Send Receiver Error caused by {}", err),
 			CellAgentError::Recv(ref err) => write!(f, "Cell Agent Receive Error caused by {}", err),
@@ -333,9 +337,6 @@ impl From<SendError<(u32,Mask,Packet)>> for CellAgentError {
 impl From<SendError<Packet>> for CellAgentError {
 	fn from(err: SendError<Packet>) -> CellAgentError { CellAgentError::SendPacket(err) }
 }
-impl From<SendError<Mask>> for CellAgentError {
-	fn from(err: SendError<Mask>) -> CellAgentError { CellAgentError::SendTenant(err) }
-}
 impl From<RecvError> for CellAgentError {
 	fn from(err: RecvError) -> CellAgentError { CellAgentError::Recv(err) }
 }
@@ -360,6 +361,25 @@ impl fmt::Display for SizeError {
 }
 impl From<SizeError> for CellAgentError {
 	fn from(err: SizeError) -> CellAgentError { CellAgentError::Size(err) }
+}
+#[derive(Debug)]
+pub struct MaskError { msg: String }
+impl MaskError { 
+	pub fn new(cell_id: CellID) -> MaskError {
+		MaskError { msg: format!("Cell {} has no tenant mask", cell_id) }
+	}
+}
+impl Error for MaskError {
+	fn description(&self) -> &str { &self.msg }
+	fn cause(&self) -> Option<&Error> { None }
+}
+impl fmt::Display for MaskError {
+	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+		write!(f, "{}", self.msg)
+	}
+}
+impl From<MaskError> for CellAgentError {
+	fn from(err: MaskError) -> CellAgentError { CellAgentError::Mask(err) }
 }
 #[derive(Debug)]
 pub struct InvalidMsgTypeError { msg: String }

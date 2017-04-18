@@ -1,5 +1,5 @@
 use std::fmt;
-use config::{MAX_PORTS, PortNo, TableIndex};
+use config::{MAX_PORTS, PortNo, TableIndex, PathLength};
 use name::{TreeID, PortID};
 use port::Port;
 use routing_table_entry::RoutingTableEntry;
@@ -14,18 +14,19 @@ pub struct Traph {
 }
 impl Traph {
 	pub fn new(tree_id: TreeID, table_entry: RoutingTableEntry) -> Result<Traph, TraphError> {
-		let default = TraphElement::new(0, 0, PortStatus::Pruned);
 		let mut elements = Vec::new();
-		for _ in 0..MAX_PORTS { elements.push(default.clone()); }
+		for i in 0..MAX_PORTS { 
+			elements.push(TraphElement::new(false, i as u8, 0, PortStatus::Pruned, 0, None)); 
+		}
 		Ok(Traph { tree_id: tree_id, table_entry: table_entry, my_index: table_entry.get_index(),
 				elements: elements.into_boxed_slice() })
 	}
 	pub fn get_tree_id(&self) -> TreeID { self.tree_id.clone() }
 	pub fn get_table_index(&self) -> TableIndex { self.table_entry.get_index() }
 	pub fn add_element(&mut self, port_number: PortNumber, my_index: TableIndex, other_index: TableIndex,
-			port_status: PortStatus) {
+			port_status: PortStatus, hops: PathLength, path: Option<PortNumber>) {
 		let port_no = port_number.get_port_no();
-		let element = TraphElement::new(port_no, other_index, port_status);
+		let element = TraphElement::new(true, port_no, other_index, port_status, hops, path);
 		self.elements[port_no as usize] = element;
 	}
 	pub  fn get_other_indices(&self) -> [TableIndex; MAX_PORTS as usize] {
@@ -56,7 +57,9 @@ impl fmt::Display for Traph {
 		for element in self.elements.iter() { if element.is_connected() { connected = true; } }
 		if connected {
 			s = s + &format!("\nPort Other Connected Broken Status Hops Path"); 
-			for element in self.elements.iter() { s = s + &format!("{}",element); }
+			for element in self.elements.iter() { 
+				if element.is_connected() { s = s + &format!("{}",element);} 
+			}
 		} else {
 			s = s + &format!("\nNo entries yet for this tree"); 
 		}
@@ -138,13 +141,15 @@ struct TraphElement {
 	is_connected: bool,
 	is_broken: bool,
 	status: PortStatus,
-	hops: usize,
+	hops: PathLength,
 	path: Option<PortNumber> 
 }
 impl TraphElement {
-	fn new(port_no: PortNo, other_index: TableIndex, status: PortStatus) -> TraphElement {
-		TraphElement { port_no: port_no,  other_index: other_index, is_connected: true,
-					is_broken: false, status: status, hops: 0, path: None } 
+	fn new(is_connected: bool, port_no: PortNo, other_index: TableIndex, 
+			status: PortStatus, hops: PathLength, path: Option<PortNumber>) -> TraphElement {
+		TraphElement { port_no: port_no,  other_index: other_index, 
+			is_connected: is_connected, is_broken: false, status: status, 
+			hops: hops, path: path } 
 	}
 	fn get_port_no(&self) -> PortNo { self.port_no }
 	fn get_other_index(&self) -> TableIndex { self.other_index }
@@ -154,8 +159,14 @@ impl TraphElement {
 	
 }
 impl fmt::Display for TraphElement {
-	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result { 
-		write!(f, "\n{:4} {:5} {:9} {:6} {:6} {:4} {:?}", self.port_no, self.other_index,
-			self.is_connected, self.is_broken, self.status, self.hops, self.path)
+	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+		let mut s = format!("\n{:4} {:5} {:9} {:6} {:6} {:4}", 
+			self.port_no, self.other_index, self.is_connected, 
+			self.is_broken, self.status, self.hops);
+		match self.path {
+			Some(p) => s = s + &format!(" {:4}", p.get_port_no()),
+			None    => s = s + &format!(" None")
+		}
+		write!(f, "{}", s)
 	}
 }

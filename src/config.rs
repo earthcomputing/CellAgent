@@ -5,6 +5,7 @@ pub type CellNo     = usize;
 pub type LinkNo     = usize;
 pub type PacketNo   = u16;
 pub type Uniquifier = u64;
+pub type PathLength = u32;
 // Default inputs
 pub const NCELLS: CellNo = 10;
 pub const NPORTS: PortNo =  6;

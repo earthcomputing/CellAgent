@@ -33,10 +33,6 @@ pub type PacketCaPeSendError = mpsc::SendError<(TableIndex, Mask, Packet)>;
 pub type EntryCaToPe = mpsc::Sender<RoutingTableEntry>;
 pub type EntryPeFromCa = mpsc::Receiver<RoutingTableEntry>;
 pub type EntrySendError = mpsc::SendError<RoutingTableEntry>;
-// Tenant mask from CellAgent to PacketEngine, tenant mask
-pub type TenantMaskCaToPe = mpsc::Sender<Mask>;
-pub type TenantMaskPeFromCa = mpsc::Receiver<Mask>;
-pub type TenantMaskSendError = mpsc::SendError<Mask>;
 // Port status from Port to CellAgent, (port_no, status)
 pub type StatusPortToCa = mpsc::Sender<(PortNo, PortStatus)>;
 pub type StatusCaFromPort = mpsc::Receiver<(PortNo, PortStatus)>;
@@ -60,13 +56,12 @@ impl NalCell {
 		if nports > MAX_PORTS { return Err(NalCellError::NumberPorts(NumberPortsError::new(nports))) }
 		let cell_id = try!(CellID::new(cell_no));
 		let (entry_ca_to_pe, entry_pe_from_ca): (EntryCaToPe, EntryPeFromCa) = channel();
-		let (tenant_ca_to_pe, tenant_pe_from_ca): (TenantMaskCaToPe, TenantMaskPeFromCa) = channel();
 		let (packet_ca_to_pe, packet_pe_from_ca): (PacketCaToPe, PacketPeFromCa) = channel();
 		let (packet_pe_to_ca, packet_ca_from_pe): (PacketPeToCa, PacketCaFromPe) = channel();
 		let (packet_port_to_pe, packet_pe_from_port): (PacketPortToPe, PacketPeFromPort) = channel();
 		let (status_port_to_ca, status_ca_from_port): (StatusPortToCa, StatusCaFromPort) = channel();
 		let mut ports = Vec::new();
-		let mut ca_to_ports = Vec::new();
+		let mut recvr_ca_to_ports = Vec::new();
 		let mut packet_pe_to_ports = Vec::new();
 		let mut packet_ports_from_pe = HashMap::new(); // So I can remove the item
 		let mut is_connected = true;
@@ -74,22 +69,22 @@ impl NalCell {
 			let is_border_port;
 			if is_border & (i == 2) { is_border_port = true; }
 			else                    { is_border_port = false; }
-			let (recv_ca_to_port, recv_port_from_ca): (RecvrCaToPort, RecvrPortFromCa) = channel();
-			ca_to_ports.push(recv_ca_to_port);
+			let (recvr_ca_to_port, recvr_port_from_ca): (RecvrCaToPort, RecvrPortFromCa) = channel();
+			recvr_ca_to_ports.push(recvr_ca_to_port);
 			let (packet_pe_to_port, packet_port_from_pe): (PacketSend, PacketRecv) = channel();
 			packet_pe_to_ports.push(packet_pe_to_port);
 			packet_ports_from_pe.insert(i, packet_port_from_pe);
 			let port = try!(Port::new(&cell_id, PortNumber { port_no: i as u8 }, is_border_port, 
-				is_connected, packet_port_to_pe.clone(), status_port_to_ca.clone(), recv_port_from_ca));
+				is_connected, packet_port_to_pe.clone(), status_port_to_ca.clone(), recvr_port_from_ca));
 			ports.push(port);
 			is_connected = false;
 		}
 		let boxed_ports: Box<[Port]> = ports.into_boxed_slice();
 		let packet_engine = try!(PacketEngine::new(scope, &cell_id, packet_pe_to_ca, packet_pe_from_ca,
-				entry_pe_from_ca, packet_pe_from_port, packet_pe_to_ports, tenant_pe_from_ca));
-		let cell_agent = try!(CellAgent::new(scope, &cell_id, boxed_ports.len() as u8, packet_port_to_pe, packet_engine,
-				packet_ca_to_pe, packet_ca_from_pe, entry_ca_to_pe, status_ca_from_port, ca_to_ports,
-				packet_ports_from_pe, tenant_ca_to_pe));
+				entry_pe_from_ca, packet_pe_from_port, packet_pe_to_ports));
+		let cell_agent = try!(CellAgent::new(scope, &cell_id, boxed_ports.len() as u8, 
+				packet_port_to_pe, packet_engine, packet_ca_to_pe, packet_ca_from_pe, 
+				entry_ca_to_pe, status_ca_from_port, recvr_ca_to_ports, packet_ports_from_pe));
 		let nalcell = NalCell { id: cell_id, cell_no: cell_no, is_border: is_border,
 				ports: boxed_ports, cell_agent: cell_agent, vms: Vec::new()};
 		Ok(nalcell)
