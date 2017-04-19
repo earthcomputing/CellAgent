@@ -137,7 +137,8 @@ impl CellAgent {
 						let msg = DiscoverMsg::new(connected_tree_id.clone(), tree_id.clone(), 
 									ca.cell_id.clone(), my_table_index, 1, port_number);
 						if let Some(tenant_mask) = ca.tenant_masks.last() {
-							try!(ca.send_msg(msg, tenant_mask.and(DEFAULT_USER_MASK)));
+							let packets = try!(Packetizer::packetize(&msg, [false;4]));
+							try!(ca.send_msg(&connected_tree_id, packets, tenant_mask.and(DEFAULT_USER_MASK)));
 						} else {
 							// I have no idea why the following line says it can't infer type
 							//Err(CellAgentError::Mask(MaskError::new(ca.cell_id)));
@@ -155,13 +156,11 @@ impl CellAgent {
 		});
 		Ok(())
 	}				
-	fn send_msg<T>(&self, msg: T, user_mask: Mask) -> Result<(), CellAgentError> 
-			where T: Message + Hash + serde::Serialize + fmt::Display {
-		let tree_id = msg.get_header().get_tree_id();
+	fn send_msg(&self, tree_id: &TreeID, packets: Vec<Box<Packet>>, user_mask: Mask) -> Result<(), CellAgentError> 
+			 {
 		let index;
 		if let Some(traph) = self.traphs.lock().unwrap().get(&tree_id) {
 			index = traph.get_table_index();			
-			let packets = try!(Packetizer::packetize(&msg, [false;4]));
 			for packet in packets.iter() {
 				try!(self.packet_ca_to_pe.send((index, user_mask, **packet)));
 			}
