@@ -34,13 +34,12 @@ impl RoutingTableEntry {
 	pub fn get_mask(&self) -> Mask { self.mask }
 	pub fn set_mask(&mut self, mask: Mask) { self.mask = mask; }
 	pub fn get_other_indices(&self) -> [TableIndex; MAX_PORTS as usize] { self.other_indices }
-	pub fn set_other_index(&mut self, port_index: PortNo, other_index: TableIndex) -> Result<(),RoutingTableEntryError> {
-		{
-			match self.other_indices.get(port_index as usize) {
-				Some(other) => (),
-				None => return Err(RoutingTableEntryError::Port(PortError::new(port_index)))
-			};
-		}
+	pub fn set_other_index(&mut self, port_index: PortNo, other_index: TableIndex) 
+			-> Result<(),RoutingTableEntryError> {
+		match self.other_indices.get(port_index as usize) {
+			Some(other) => (),
+			None => return Err(RoutingTableEntryError::Port(PortError::new(port_index)))
+		};
 		self.other_indices[port_index as usize] = other_index;
 		Ok(())
 	}
