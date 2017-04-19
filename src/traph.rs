@@ -1,4 +1,5 @@
 use std::fmt;
+use std::collections::BTreeSet;
 use config::{MAX_PORTS, PortNo, TableIndex, PathLength};
 use name::{TreeID, PortID};
 use port::Port;
@@ -23,6 +24,11 @@ impl Traph {
 	}
 	pub fn get_tree_id(&self) -> TreeID { self.tree_id.clone() }
 	pub fn get_table_index(&self) -> TableIndex { self.table_entry.get_index() }
+	fn get_all_hops(&self) -> BTreeSet<PathLength> {
+		let mut set = BTreeSet::new();
+		self.elements.iter().map(|e| set.insert(e.get_hops()));
+		set
+	}
 	pub fn add_element(&mut self, port_number: PortNumber, my_index: TableIndex, other_index: TableIndex,
 			port_status: PortStatus, hops: PathLength, path: Option<PortNumber>) {
 		let port_no = port_number.get_port_no();
@@ -31,9 +37,7 @@ impl Traph {
 	}
 	pub  fn get_other_indices(&self) -> [TableIndex; MAX_PORTS as usize] {
 		let mut indices = [0; MAX_PORTS as usize];
-		for element in self.elements.iter() {
-			indices[element.get_port_no() as usize] = element.get_other_index();
-		}
+		self.elements.iter().map(|e| indices[e.get_port_no() as usize] = e.get_other_index());
 		indices
 	}
 	pub fn set_connected(&mut self, port_no: PortNumber) -> Result<(), TraphError> { 
@@ -56,7 +60,8 @@ impl fmt::Display for Traph {
 		let mut connected = false;
 		for element in self.elements.iter() { if element.is_connected() { connected = true; } }
 		if connected {
-			s = s + &format!("\nPort Other Connected Broken Status Hops Path"); 
+			s = s + &format!("\nPort Other Connected Broken Status Hops Path");
+			// Can't replace with map() because s gets moved into closure 
 			for element in self.elements.iter() { 
 				if element.is_connected() { s = s + &format!("{}",element);} 
 			}
@@ -152,6 +157,7 @@ impl TraphElement {
 			hops: hops, path: path } 
 	}
 	fn get_port_no(&self) -> PortNo { self.port_no }
+	fn get_hops(&self) -> PathLength { self.hops }
 	fn get_other_index(&self) -> TableIndex { self.other_index }
 	fn is_connected(&self) -> bool { self.is_connected }
 	fn set_connected(&mut self) { self.is_connected = true; }

@@ -46,6 +46,7 @@ impl Mask {
 	}
 	pub fn mask_from_port_numbers(port_nos: Vec<PortNumber>) -> Result<Mask, UtilityError> {
 		let mut mask = Mask { mask: 0 };
+		// Using map() is more complicated because of try!
 		for port_no in port_nos.iter() {
 			let port_mask = try!(Mask::new(port_no.get_port_no()));
 			mask = mask.or(port_mask);

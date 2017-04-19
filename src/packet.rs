@@ -54,12 +54,6 @@ impl Packet {
 			Packet::Large  {header, payload} => PAYLOAD_LARGE
 		}
 	}
-	pub fn stringify(&self) -> String {
-		let mut s = format!("Header: {}, Payload: ", self.get_header());
-		let payload = self.get_payload();
-		s = s + &format!("{:?}", &payload[0..10]); 
-		s
-	}
 }
 impl fmt::Display for Packet {
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result { 
