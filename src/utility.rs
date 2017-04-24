@@ -31,6 +31,7 @@ impl Mask {
 	        Ok(Mask { mask: mask } )
 	    }
 	}
+	pub fn empty() -> Mask { Mask { mask: 0 } }
 	pub fn or(&self, mask: Mask) -> Mask {
 		Mask { mask: self.mask | mask.mask }
 	}
@@ -45,7 +46,7 @@ impl Mask {
 		Ok(self.and(port_mask.not()))
 	}
 	pub fn mask_from_port_numbers(port_nos: Vec<PortNumber>) -> Result<Mask, UtilityError> {
-		let mut mask = Mask { mask: 0 };
+		let mut mask = Mask::empty();
 		// Using map() is more complicated because of try!
 		for port_no in port_nos.iter() {
 			let port_mask = try!(Mask::new(port_no.get_port_no()));
@@ -53,7 +54,7 @@ impl Mask {
 		}
 		Ok(mask)
 	}
-	pub fn ints_from_mask(&self) -> Result<Vec<PortNo>, UtilityError> {
+	pub fn port_nos_from_mask(&self) -> Result<Vec<PortNo>, UtilityError> {
 		let mut port_nos = Vec::new();
 		for i in 0..MAX_PORTS {
 			let test = try!(Mask::new(i as PortNo));
@@ -162,4 +163,16 @@ impl Error for PortNumberError {
 }
 impl fmt::Display for PortNumberError {
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result { write!(f, "{}", self.msg) }
+}
+#[derive(Debug, Copy, Clone, Hash, Serialize, Deserialize)]
+pub struct Path { port_number: PortNumber }
+impl Path {
+	pub fn new(port_no: PortNo, no_ports: PortNo) -> Result<Path, PortNumberError> {
+		let port_number = try!(PortNumber::new(port_no, no_ports));
+		Ok(Path { port_number: port_number })
+	}
+	pub fn get_port_no(&self) -> PortNo { self.port_number.get_port_no() }
+}
+impl fmt::Display for Path {
+	fn fmt(&self, f:&mut fmt::Formatter) -> fmt::Result { write!(f, "{}", self.port_number) }
 }

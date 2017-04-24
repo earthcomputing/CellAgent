@@ -36,10 +36,13 @@ impl PacketEngine {
 		scope.spawn( move || -> Result<(), PacketEngineError> {
 			loop {
 				let (index, mut mask, packet) = try!(packet_pe_from_ca.recv());
-				let unlocked = table.lock().unwrap();
-				let entry = try!((*unlocked).get_entry(index));
+				let entry;
+				{
+					let unlocked = table.lock().unwrap();
+					entry = try!((*unlocked).get_entry(index));
+				}
 				mask = mask.and(entry.get_mask());
-				let port_nos = try!(Mask::ints_from_mask(&mask));
+				let port_nos = try!(Mask::port_nos_from_mask(&mask));
 				for port_no in port_nos.iter() {
 					let sender = packet_pe_to_ports.get(*port_no as usize);
 					match sender {
@@ -61,7 +64,10 @@ impl PacketEngine {
 				let (recv_port_no, packet) = try!(packet_pe_from_ports.recv());
 				let mut header = packet.get_header();
 				let index = header.get_other_index();
-				let entry = try!(table.lock().unwrap().get_entry(index));
+				let entry;
+				{
+					entry = try!(table.lock().unwrap().get_entry(index));
+				}
 				//println!("Cell Agent {} index {} entry {}", cell_id, index, entry);
 				let mut mask = entry.get_mask();
 				let parent = entry.get_parent();
@@ -75,7 +81,7 @@ impl PacketEngine {
 					try!(sender.send(packet));
 					//println!("Packet Engine {} sent packets to port {}", cell_id, parent);
 				} else {
-					let port_nos = try!(mask.ints_from_mask());
+					let port_nos = try!(mask.port_nos_from_mask());
 					//println!("Cell Agent {} forwarding to ports {:?}", cell_id, port_nos);
 					for port_no in port_nos.iter() {
 						let other_index = *other_indices.get(*port_no as usize).expect("PacketEngine: No such other index");
