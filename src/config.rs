@@ -1,11 +1,12 @@
+use utility::PortNumber;
 // Size of various fields
-pub type PortNo     = u8;
-pub type TableIndex = u32;
 pub type CellNo     = usize;
 pub type LinkNo     = usize;
 pub type PacketNo   = u16;
-pub type Uniquifier = u64;
+pub type PortNo     = u8;
 pub type PathLength = u32;
+pub type TableIndex = u32;
+pub type Uniquifier = u64;
 // Default inputs
 pub const NCELLS: CellNo = 10;
 pub const NPORTS: PortNo =  6;

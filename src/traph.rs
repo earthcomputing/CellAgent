@@ -1,10 +1,10 @@
 use std::fmt;
 use std::collections::BTreeSet;
-use config::{MAX_PORTS, PortNo, TableIndex, PathLength};
+use config::{MAX_PORTS, PathLength, PortNo, TableIndex};
 use name::{TreeID, PortID};
 use port::Port;
 use routing_table_entry::RoutingTableEntry;
-use utility::PortNumber;
+use utility::{Path, PortNumber};
 
 #[derive(Debug, Clone)]
 pub struct Traph {
@@ -30,7 +30,7 @@ impl Traph {
 		set
 	}
 	pub fn add_element(&mut self, port_number: PortNumber, my_index: TableIndex, other_index: TableIndex,
-			port_status: PortStatus, hops: PathLength, path: Option<PortNumber>) {
+			port_status: PortStatus, hops: PathLength, path: Option<Path>) {
 		let port_no = port_number.get_port_no();
 		let element = TraphElement::new(true, port_no, other_index, port_status, hops, path);
 		self.elements[port_no as usize] = element;
@@ -147,11 +147,11 @@ struct TraphElement {
 	is_broken: bool,
 	status: PortStatus,
 	hops: PathLength,
-	path: Option<PortNumber> 
+	path: Option<Path> 
 }
 impl TraphElement {
 	fn new(is_connected: bool, port_no: PortNo, other_index: TableIndex, 
-			status: PortStatus, hops: PathLength, path: Option<PortNumber>) -> TraphElement {
+			status: PortStatus, hops: PathLength, path: Option<Path>) -> TraphElement {
 		TraphElement { port_no: port_no,  other_index: other_index, 
 			is_connected: is_connected, is_broken: false, status: status, 
 			hops: hops, path: path } 
