@@ -11,6 +11,14 @@ pub enum MsgType {
 	Discover,
 	DiscoverD,
 }
+impl fmt::Display for MsgType {
+	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+		match *self {
+			MsgType::Discover => write!(f, "Discover"),
+			MsgType::DiscoverD => write!(f, "DiscoverD"),
+		}
+	}
+}
 #[derive(Debug, Copy, Clone, Hash, Serialize, Deserialize)]
 pub enum MsgDirection {
 	Rootward,
@@ -35,28 +43,26 @@ pub trait Message {
 		}
 	}
 	fn is_leafward(&self) -> bool { !self.is_rootward() }
-	fn process(&self, cell_agent: &mut CellAgent, port_no: u8, index: TableIndex) -> Result<(), MessageError>;
+	fn process(&self, cell_agent: &mut CellAgent, port_no: u8, index: TableIndex) 
+			-> Result<(), ProcessMsgError>;
 }
 pub trait MsgPayload {}
 #[derive(Debug, Clone, Hash, Serialize, Deserialize)]
 pub struct MsgHeader {
-	tree_id: TreeID,
 	msg_type: MsgType,
 	direction: MsgDirection,
 }
 impl MsgHeader {
-	pub fn new(tree_id: TreeID, msg_type: MsgType, direction: MsgDirection) -> MsgHeader {
-		MsgHeader { tree_id: tree_id, msg_type: msg_type, direction: direction }
+	pub fn new(msg_type: MsgType, direction: MsgDirection) -> MsgHeader {
+		MsgHeader { msg_type: msg_type, direction: direction }
 	}
-	pub fn get_tree_id(&self) -> TreeID { self.tree_id.clone() }
 	pub fn get_msg_type(&self) -> MsgType { self.msg_type }
 	pub fn get_direction(&self) -> MsgDirection { self.direction }
-	pub fn set_tree_id(&mut self, tree_id: TreeID) { self.tree_id = tree_id; }
 	pub fn set_direction(&mut self, direction: MsgDirection) { self.direction = direction; }
 }
 impl fmt::Display for MsgHeader { 
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result { 
-		let s = format!("Message {} on Tree '{}'", self.direction, self.tree_id);
+		let s = format!("Message {} toward '{}'", self.msg_type, self.direction);
 		write!(f, "{}", s) 
 	}
 }
@@ -66,9 +72,9 @@ pub struct DiscoverMsg {
 	payload: DiscoverPayload
 }
 impl DiscoverMsg {
-	pub fn new(connected_ports_id: TreeID, tree_id: TreeID, sending_node_id: CellID, 
+	pub fn new(tree_id: TreeID, sending_node_id: CellID, 
 			my_index: TableIndex, hops: PathLength, path: Path) -> DiscoverMsg {
-		let header = MsgHeader::new(connected_ports_id, MsgType::Discover, MsgDirection::Leafward);
+		let header = MsgHeader::new(MsgType::Discover, MsgDirection::Leafward);
 		let payload = DiscoverPayload::new(tree_id, sending_node_id, my_index, hops, path);
 		DiscoverMsg { header: header, payload: payload }
 	}
@@ -76,29 +82,28 @@ impl DiscoverMsg {
 impl Message for DiscoverMsg {
 	fn get_header(&self) -> MsgHeader { self.header.clone() }
 	fn get_payload(&self) -> Box<MsgPayload> { Box::new(self.payload.clone()) }
-	fn process(&self, cell_agent: &mut CellAgent, port_no: u8, index: u32) -> Result<(), MessageError> {
-		let tree_id = self.header.get_tree_id();
+	fn process(&self, ca: &mut CellAgent, port_no: u8, index: u32) -> Result<(), ProcessMsgError> {
+		let tree_id = try!(ca.get_tree_id(index));
 		let new_tree_id = self.payload.get_tree_id();
-		let port_number = try!(PortNumber::new(port_no, cell_agent.get_no_ports()));
-		println!("Message: Cell {} port {} {}", cell_agent.get_id(), port_no, self.payload);
-		if cell_agent.exists(&new_tree_id) { return Ok(()); } // Ignore if traph exists for this tree - Simple quenching
-		println!("Message: Cell {}: parsing discover msg", cell_agent.get_id());
+		let port_number = try!(PortNumber::new(port_no, ca.get_no_ports()));
+		println!("Message {}: port {} {}", ca.get_id(), port_no, self.payload);
+		if ca.exists(&new_tree_id) { return Ok(()); } // Ignore if traph exists for this tree - Simple quenching
 		let senders_index = self.payload.get_senders_index();
 		let hops = self.payload.get_hops();
 		let path = self.payload.get_path();
-		let entry = try!(cell_agent.update_traph(new_tree_id.clone(), port_number, traph::PortStatus::Parent,
+		let entry = try!(ca.update_traph(new_tree_id.clone(), port_number, traph::PortStatus::Parent,
 				Vec::new(), senders_index, hops, Some(path)));
+		println!("Message {}: entry {}", ca.get_id(), entry);
 		let index = entry.get_index();
 		// Send DiscoverD to sender
-		let discoverd_msg = DiscoverDMsg::new(tree_id.clone(), cell_agent.get_id(), index);
-		let tenant_mask = try!(cell_agent.get_tenant_mask());
+		let discoverd_msg = DiscoverDMsg::new(ca.get_id(), index);
+		let tenant_mask = try!(ca.get_tenant_mask());
 		let port_mask = try!(Mask::new(port_no));
 		let packets = try!(Packetizer::packetize(&discoverd_msg, [false;4]));
-		println!("DiscoverMsg {}: Sending discoverD",cell_agent.get_id());
-		try!(cell_agent.send_msg(&tree_id, packets, tenant_mask.and(port_mask)));
+		println!("DiscoverMsg {}: Sending discoverD tree {}",ca.get_id(), new_tree_id);
+		try!(ca.send_msg(&tree_id, packets, tenant_mask.and(port_mask)));
 		// Forward Discover on all except port_no
-		let discover_msg = DiscoverMsg::new(cell_agent.get_connected_ports_tree_id(), tree_id.clone(), 
-									cell_agent.get_id(), index, hops+1, path);
+		let discover_msg = DiscoverMsg::new(tree_id.clone(), ca.get_id(), index, hops+1, path);
 		Ok(())
 	}
 }
@@ -142,8 +147,8 @@ pub struct DiscoverDMsg {
 	payload: DiscoverDPayload
 }
 impl DiscoverDMsg {
-	fn new(tree_id: TreeID, sending_cell_id: CellID, index: TableIndex) -> DiscoverDMsg {
-		let header = MsgHeader::new(tree_id, MsgType::DiscoverD, MsgDirection::Rootward);
+	fn new(sending_cell_id: CellID, index: TableIndex) -> DiscoverDMsg {
+		let header = MsgHeader::new(MsgType::DiscoverD, MsgDirection::Rootward);
 		let payload = DiscoverDPayload::new(index);
 		DiscoverDMsg { header: header, payload: payload }
 	}
@@ -153,7 +158,7 @@ impl Message for DiscoverDMsg {
 	fn get_payload(&self) -> Box<MsgPayload> { Box::new(self.payload.clone()) }
 	
 	fn process(&self, cell_agent: &mut CellAgent, port_no: u8, index: u32) 
-			-> Result<(), MessageError> {
+			-> Result<(), ProcessMsgError> {
 		println!("DiscoverDMsg: processing {} {} {}", cell_agent, port_no, index);
 		Ok(())
 	}
@@ -225,4 +230,40 @@ impl From<PacketizerError> for MessageError {
 }
 impl From<UtilityError> for MessageError {
 	fn from(err: UtilityError) -> MessageError { MessageError::Utility(err) }
+}
+#[derive(Debug)]
+pub struct ProcessMsgError { msg: String }
+impl ProcessMsgError { 
+	pub fn new(err: &Error) -> ProcessMsgError {
+		ProcessMsgError { msg: format!("Error {}", err) }
+	}
+}
+impl Error for ProcessMsgError {
+	fn description(&self) -> &str { &self.msg }
+	fn cause(&self) -> Option<&Error> { None }
+}
+impl fmt::Display for ProcessMsgError {
+	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+		write!(f, "{}", self.msg)
+	}
+}
+impl From<PortNumberError> for ProcessMsgError {
+	fn from(err: PortNumberError) -> ProcessMsgError {
+		ProcessMsgError::new(&err)
+	}
+}
+impl From<CellAgentError> for ProcessMsgError {
+	fn from(err: CellAgentError) -> ProcessMsgError {
+		ProcessMsgError::new(&err)
+	}
+}
+impl From<UtilityError> for ProcessMsgError {
+	fn from(err: UtilityError) -> ProcessMsgError {
+		ProcessMsgError::new(&err)
+	}
+}
+impl From<PacketizerError> for ProcessMsgError {
+	fn from(err: PacketizerError) -> ProcessMsgError {
+		ProcessMsgError::new(&err)
+	}
 }

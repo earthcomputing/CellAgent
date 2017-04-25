@@ -68,14 +68,16 @@ impl PacketEngine {
 				{
 					entry = try!(table.lock().unwrap().get_entry(index));
 				}
-				//println!("Cell Agent {} index {} entry {}", cell_id, index, entry);
-				let mut mask = entry.get_mask();
+				println!("PacketEngine {}: index {} entry {}", cell_id, index, entry);
+				let mask = entry.get_mask();
 				let parent = entry.get_parent();
 				let other_indices = entry.get_other_indices();
 				// Verify that port_no is valid
 				try!(PortNumber::new(recv_port_no, other_indices.len() as u8));
 				if header.is_rootcast() {
+					println!("PacketEngine {}: other indices {:?}", cell_id, other_indices);
 					let other_index = *other_indices.get(parent as usize).expect("PacketEngine: No such other index");
+					println!("PacketEngine {}: Sending rootward to {} {}", cell_id, parent, other_index);
 					header.set_other_index(other_index as u32);
 					let sender = packet_pe_to_ports.get(parent as usize).unwrap();
 					try!(sender.send(packet));
