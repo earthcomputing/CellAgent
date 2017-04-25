@@ -82,6 +82,13 @@ impl CellAgent {
 	pub fn get_no_ports(&self) -> PortNo { self.no_ports }	
 	pub fn get_id(&self) -> CellID { self.cell_id.clone() }
 	pub fn get_trees(&self) -> &Arc<Mutex<HashMap<TableIndex,TreeID>>> { &self.trees }
+	pub fn get_tree_id(&self, index: TableIndex) -> Result<TreeID, CellAgentError> {
+		let tree_id = match self.trees.lock().unwrap().get(&index) {
+			Some(t) => t.clone(),
+			None => return Err(CellAgentError::TreeIndex(TreeIndexError::new(index)))
+		};
+		Ok(tree_id)
+	}
 	pub fn get_tenant_mask(&self) -> Result<&Mask, CellAgentError> {
 		if let Some(tenant_mask) = self.tenant_masks.last() {
 			Ok(tenant_mask)
@@ -144,7 +151,7 @@ impl CellAgent {
 						};
 						connected_entry.or_with_mask(port_no_mask);
 						try!(ca.entry_ca_to_pe.send(connected_entry));
-						let msg = DiscoverMsg::new(connected_tree_id.clone(), tree_id.clone(), 
+						let msg = DiscoverMsg::new(tree_id.clone(), 
 									ca.cell_id.clone(), my_table_index, 1, path);
 						let tenant_mask = try!(ca.get_tenant_mask());
 						let packets = try!(Packetizer::packetize(&msg, [false;4]));
@@ -163,14 +170,16 @@ impl CellAgent {
 	pub fn send_msg(&self, tree_id: &TreeID, packets: Vec<Box<Packet>>, user_mask: Mask) -> Result<(), CellAgentError> 
 			 {
 		let index;
-		if let Some(traph) = self.traphs.lock().unwrap().get(&tree_id) {
-			index = traph.get_table_index();			
-			for packet in packets.iter() {
-				try!(self.packet_ca_to_pe.send((index, user_mask, **packet)));
-			}
-		} else {
-			return Err(CellAgentError::Tree(TreeError::new(&tree_id)));
-		};
+		{
+			if let Some(traph) = self.traphs.lock().unwrap().get(&tree_id) {
+				index = traph.get_table_index();			
+			} else {
+				return Err(CellAgentError::Tree(TreeError::new(&tree_id)));
+			};
+		}
+		for packet in packets.iter() {
+			try!(self.packet_ca_to_pe.send((index, user_mask, **packet)));
+		}
 		Ok(())
 	}
 	fn recv_packets(&self, scope: &Scope, packet_ca_from_pe: PacketCaFromPe) -> Result<(), CellAgentError> {
@@ -185,7 +194,7 @@ impl CellAgent {
 				packets.push(Box::new(packet));
 				if header.is_last_packet() {
 					let msg = try!(Packetizer::unpacketize(packets));
-					msg.process(&mut ca.clone(), port_no, index);
+					try!(msg.process(&mut ca.clone(), port_no, index));
 				}
 			}	
 		});
@@ -209,6 +218,7 @@ impl fmt::Display for CellAgent {
 // Errors
 use std::error::Error;
 use std::sync::mpsc::{SendError, RecvError};
+use message::ProcessMsgError;
 use name::NameError;
 use packet::{PacketizerError, UnpacketizeError};
 use routing_table::RoutingTableError;
@@ -226,6 +236,7 @@ pub enum CellAgentError {
 	Packetizer(PacketizerError),
 	PortNumber(PortNumberError),
 	PortTaken(PortTakenError),
+	ProcessMsg(ProcessMsgError),
 	InvalidMsgType(InvalidMsgTypeError),
 	MsgAssembly(MsgAssemblyError),
 	BadPacket(BadPacketError),
@@ -244,6 +255,7 @@ impl Error for CellAgentError {
 			CellAgentError::Packetizer(ref err) => err.description(),
 			CellAgentError::PortNumber(ref err) => err.description(),
 			CellAgentError::PortTaken(ref err) => err.description(),
+			CellAgentError::ProcessMsg(ref err) => err.description(),
 			CellAgentError::BadPacket(ref err) => err.description(),
 			CellAgentError::InvalidMsgType(ref err) => err.description(),
 			CellAgentError::MsgAssembly(ref err) => err.description(),
@@ -269,6 +281,7 @@ impl Error for CellAgentError {
 			CellAgentError::Packetizer(ref err) => Some(err),
 			CellAgentError::PortNumber(ref err) => Some(err),
 			CellAgentError::PortTaken(ref err) => Some(err),
+			CellAgentError::ProcessMsg(ref err) => Some(err),
 			CellAgentError::BadPacket(ref err) => Some(err),
 			CellAgentError::InvalidMsgType(ref err) => Some(err),
 			CellAgentError::MsgAssembly(ref err) => Some(err),
@@ -296,6 +309,7 @@ impl fmt::Display for CellAgentError {
 			CellAgentError::Packetizer(ref err) => write!(f, "Cell Agent Packetizer Error caused by {}", err),
 			CellAgentError::PortNumber(ref err) => write!(f, "Cell Agent PortNumber Error caused by {}", err),
 			CellAgentError::PortTaken(ref err) => write!(f, "Cell Agent PortNumber Error caused by {}", err),
+			CellAgentError::ProcessMsg(ref err) => write!(f, "Cell Agent ProcessMsg Error caused by {}", err),
 			CellAgentError::BadPacket(ref err) => write!(f, "Cell Agent Bad Packet Error caused by {}", err),
 			CellAgentError::InvalidMsgType(ref err) => write!(f, "Cell Agent Invalid Message Type Error caused by {}", err),
 			CellAgentError::MsgAssembly(ref err) => write!(f, "Cell Agent Message Assembly Error caused by {}", err),
@@ -539,4 +553,7 @@ impl From<PacketizerError> for CellAgentError {
 }
 impl From<PortNumberError> for CellAgentError {
 	fn from(err: PortNumberError) -> CellAgentError { CellAgentError::PortNumber(err) }
+}
+impl From<ProcessMsgError> for CellAgentError {
+	fn from(err: ProcessMsgError) -> CellAgentError { CellAgentError::ProcessMsg(ProcessMsgError::new(&err)) }
 }
