@@ -56,14 +56,17 @@ impl Port {
 		scope.spawn( move || -> Result<(), PortError> {
 			loop {
 				let (packet_count, packet) = try!(packet_port_from_pe.recv());
+				//println!("Port {}: sent packet {} to link", port_id, packet_count);
 				try!(packet_port_to_link.send((packet_count, packet)));
 			}
 		}); 
 		// Listen for incoming packets
+		let port_id = self.id.clone();
 		scope.spawn( move || -> Result<(), PortError> {
 			loop {
 				let (packet_count,packet) = try!(packet_port_from_link.recv());
 				try!(packet_port_to_pe.send((packet_count,port_no, packet)));
+				//println!("Port {}: sent packet {} to packet engine", port_id, packet_count);
 			}
 		});
 		Ok(())

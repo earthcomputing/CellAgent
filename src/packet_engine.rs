@@ -42,7 +42,7 @@ impl PacketEngine {
 					entry = try!((*unlocked).get_entry(index));
 				}
 				let mask = mask.and(entry.get_mask());
-				println!("PacketEngine {}: mask {}", cell_id, mask);
+				//println!("PacketEngine {}: mask {}", cell_id, mask);
 				let port_nos = try!(Mask::port_nos_from_mask(&mask));
 				for port_no in port_nos.iter() {
 					let sender = packet_pe_to_ports.get(*port_no as usize);
@@ -50,7 +50,7 @@ impl PacketEngine {
 						Some(s) => try!(s.send((packet_count, packet))),
 						None => return Err(PacketEngineError::Port(PortError::new(*port_no)))
 					};
-					println!("PacketEngine {}: sent packet {} to port {}", cell_id, packet_count, port_no);
+					//println!("PacketEngine {}: sent packet {} to port {}", cell_id, packet_count, port_no);
 				}
 			}
 		});
@@ -70,7 +70,7 @@ impl PacketEngine {
 				{
 					entry = try!(table.lock().unwrap().get_entry(index));
 				}
-				//println!("PacketEngine {}: index {} entry {}", cell_id, index, entry);
+				//println!("PacketEngine {}: packet {} index {} entry {}", cell_id, packet_count, index, entry);
 				let mask = entry.get_mask();
 				let parent = entry.get_parent();
 				let other_indices = entry.get_other_indices();
@@ -79,22 +79,23 @@ impl PacketEngine {
 				if header.is_rootcast() {
 					//println!("PacketEngine {}: other indices {:?}", cell_id, other_indices);
 					let other_index = *other_indices.get(parent as usize).expect("PacketEngine: No such other index");
-					//println!("PacketEngine {}: Sending rootward to {} {}", cell_id, parent, other_index);
+					//println!("PacketEngine {}: Sending packet {} rootward to {} {}", cell_id, packet_count, parent, other_index);
 					header.set_other_index(other_index as u32);
 					let sender = packet_pe_to_ports.get(parent as usize).unwrap();
 					try!(sender.send((packet_count, packet)));
-					println!("Packet Engine {} sent packet {} to port {}", cell_id, packet_count, parent);
+					//println!("Packet Engine {} sent packet {} to port {}", cell_id, packet_count, parent);
 				} else {
 					let port_nos = try!(mask.port_nos_from_mask());
-					//println!("PacketEngine {} forwarding to ports {:?}", cell_id, port_nos);
 					for port_no in port_nos.iter() {
 						let other_index = *other_indices.get(*port_no as usize).expect("PacketEngine: No such other index");
 						header.set_other_index(other_index as u32);
-						if *port_no as usize == 0 { try!(packet_pe_to_ca.send((packet_count, recv_port_no, index, packet))); }
-						else {
+						if *port_no as usize == 0 { 
+							try!(packet_pe_to_ca.send((packet_count, recv_port_no, index, packet)));
+							//println!("PacketEngine {}: forwarding packet {} to cell agent", cell_id, packet_count);
+						} else {
 							let sender = packet_pe_to_ports.get(*port_no as usize).unwrap();
 							try!(sender.send((packet_count, packet)));
-							println!("Packet Engine {} sent packet {} to port {}", cell_id, packet_count, port_no);
+							//println!("Packet Engine {} sent packet {} to port {}", cell_id, packet_count, port_no);
 						}
 					}
 				} 

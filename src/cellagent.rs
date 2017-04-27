@@ -131,7 +131,7 @@ impl CellAgent {
 		let mut connected_entry = connected_tree_entry.clone();	
 		let ca = self.clone();
 		scope.spawn( move || -> Result<(), CellAgentError> {
-			println!("CellAgent {}: waiting for status", ca.cell_id);	
+			//println!("CellAgent {}: waiting for status", ca.cell_id);	
 			loop {
 				let (port_no, status) = try!(status_ca_from_port.recv());
 				//println!("CellAgent {}: got status on port {}", ca.cell_id, port_no);
@@ -152,12 +152,12 @@ impl CellAgent {
 							return Err(CellAgentError::PortTaken(PortTakenError::new(port_no)))
 						};
 						connected_entry.or_with_mask(port_no_mask);
-						println!("CellAgent {}: connected_entry {}", ca.cell_id, connected_entry);
 						try!(ca.entry_ca_to_pe.send(connected_entry));
 						let msg = DiscoverMsg::new(tree_id.clone(), 
 									ca.cell_id.clone(), my_table_index, 1, path);
+						println!("CellAgent {}: sending msg {}", ca.cell_id, msg.get_count());
 						let packets = try!(Packetizer::packetize(&msg, [false;4]));
-						try!(ca.send_msg(&connected_tree_id, packets, DEFAULT_USER_MASK));
+						try!(ca.send_msg(&connected_tree_id, packets, port_no_mask));
 					},
 					port::PortStatus::Disconnected => {
 						println!("Cell Agent {} got disconnected on port {}", ca.cell_id, port_no);
@@ -182,7 +182,7 @@ impl CellAgent {
 		for packet in packets.iter() {
 			let packet_count = get_next_count();
 			try!(self.packet_ca_to_pe.send((packet_count, index, user_mask, **packet)));
-			println!("CellAgent {}: sent packet {}", self.cell_id, packet_count);
+			//println!("CellAgent {}: sent packet {} to packet engine", self.cell_id, packet_count);
 		}
 		Ok(())
 	}
@@ -192,12 +192,14 @@ impl CellAgent {
 		scope.spawn( move || -> Result<(), CellAgentError> {
 			loop {
 				let (packet_count, port_no, index, packet) = try!(packet_ca_from_pe.recv());
+				//println!("CellAgent {}: got packet {} from packet engine", ca.cell_id, packet_count);
 				let header = packet.get_header();
 				let uniquifier = header.get_uniquifier();
 				let packets = packet_assembler.entry(uniquifier).or_insert(Vec::new());
 				packets.push(Box::new(packet));
 				if header.is_last_packet() {
 					let msg = try!(Packetizer::unpacketize(packets));
+					println!("CellAgent {}: got msg {}", ca.cell_id, msg.get_count());
 					try!(msg.process(&mut ca.clone(), port_no, index));
 				}
 			}	
