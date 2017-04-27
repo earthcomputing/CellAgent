@@ -20,7 +20,7 @@ impl<'a> Datacenter<'a> {
 			println!("ncells {}", ncells);
 			return Err(DatacenterError::Size(SizeError::new(ncells)));
 		}
-		if edge_list.len() < ncells {
+		if edge_list.len() < ncells - 1 {
 			println!("nlinks {}", edge_list.len());
 			return Err(DatacenterError::Size(SizeError::new(edge_list.len())));			
 		}
@@ -47,7 +47,8 @@ impl<'a> Datacenter<'a> {
 				None => return Err(DatacenterError::Wire(WireError::new(edge)))
 			};
 			let mut p2 = try!(cell.get_free_port_mut());
-			links.push(try!(Link::new(scope, p1,p2)));
+			println!("Datacenter: edge {:?}", edge);
+			links.push(try!(Link::new(scope, p1, p2)));
 		} 
 		Ok(Datacenter { cells: cells, links: links, noc: None })
 	}
@@ -104,11 +105,11 @@ impl Error for DatacenterError {
 impl fmt::Display for DatacenterError {
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
 		match *self {
-			DatacenterError::Name(_) => write!(f, "Link Name Error caused by"),
-			DatacenterError::Link(_) => write!(f, "Link Error caused by"),
-			DatacenterError::Cell(_) => write!(f, "Cell Error caused by"),
-			DatacenterError::Wire(_) => write!(f, "Wire Error caused by"),
-			DatacenterError::Size(_) => write!(f, "Size Error caused by"),
+			DatacenterError::Name(ref err) => write!(f, "Link Name Error caused by {}", err),
+			DatacenterError::Link(ref err) => write!(f, "Link Error caused by {}", err),
+			DatacenterError::Cell(ref err) => write!(f, "Cell Error caused by {}", err),
+			DatacenterError::Wire(ref err) => write!(f, "Wire Error caused by {}", err),
+			DatacenterError::Size(ref err) => write!(f, "Size Error caused by {}", err),
 		}
 	}
 }

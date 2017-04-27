@@ -62,7 +62,7 @@ impl MsgHeader {
 }
 impl fmt::Display for MsgHeader { 
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result { 
-		let s = format!("Message {} toward '{}'", self.msg_type, self.direction);
+		let s = format!("Message {} '{}'", self.msg_type, self.direction);
 		write!(f, "{}", s) 
 	}
 }
@@ -86,22 +86,22 @@ impl Message for DiscoverMsg {
 		let tree_id = try!(ca.get_tree_id(index));
 		let new_tree_id = self.payload.get_tree_id();
 		let port_number = try!(PortNumber::new(port_no, ca.get_no_ports()));
-		println!("Message {}: port {} {}", ca.get_id(), port_no, self.payload);
+		//println!("Message {}: port {} {}", ca.get_id(), port_no, self.payload);
 		if ca.exists(&new_tree_id) { return Ok(()); } // Ignore if traph exists for this tree - Simple quenching
 		let senders_index = self.payload.get_senders_index();
 		let hops = self.payload.get_hops();
 		let path = self.payload.get_path();
-		let entry = try!(ca.update_traph(new_tree_id.clone(), port_number, traph::PortStatus::Parent,
+		let tree_id = try!(ca.get_tree_id(index));
+		let entry = try!(ca.update_traph(tree_id.clone(), port_number, traph::PortStatus::Parent,
 				Vec::new(), senders_index, hops, Some(path)));
-		println!("Message {}: entry {}", ca.get_id(), entry);
+		//println!("Message {}: entry {}", ca.get_id(), entry);
 		let index = entry.get_index();
 		// Send DiscoverD to sender
 		let discoverd_msg = DiscoverDMsg::new(ca.get_id(), index);
-		let tenant_mask = try!(ca.get_tenant_mask());
 		let port_mask = try!(Mask::new(port_no));
 		let packets = try!(Packetizer::packetize(&discoverd_msg, [false;4]));
-		println!("DiscoverMsg {}: Sending discoverD tree {}",ca.get_id(), new_tree_id);
-		try!(ca.send_msg(&tree_id, packets, tenant_mask.and(port_mask)));
+		//println!("DiscoverMsg {}: Sending discoverD tree {}",ca.get_id(), new_tree_id);
+		try!(ca.send_msg(&tree_id, packets, port_mask));
 		// Forward Discover on all except port_no
 		let discover_msg = DiscoverMsg::new(tree_id.clone(), ca.get_id(), index, hops+1, path);
 		Ok(())

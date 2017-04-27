@@ -1,6 +1,7 @@
 use std;
 use std::fmt;
 use std::mem;
+use std::sync::atomic::{ATOMIC_USIZE_INIT, AtomicUsize, Ordering};
 use rand;
 use std::str;
 use std::str::Utf8Error;
@@ -18,6 +19,9 @@ const PAYLOAD_LARGE:  usize = PACKET_LARGE  - PACKET_HEADER_SIZE;
 const LARGEST_MSG: usize = std::u32::MAX as usize;
 
 type PacketElement = u8; // Packets are made up of bytes
+
+static packet_count: AtomicUsize = ATOMIC_USIZE_INIT;
+pub fn get_next_count() -> usize { packet_count.fetch_add(1, Ordering::SeqCst) } 
 #[derive(Copy)]
 pub enum Packet {
 	Small  { header: PacketHeader, payload: [PacketElement; PAYLOAD_SMALL]  },

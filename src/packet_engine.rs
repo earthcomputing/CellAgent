@@ -35,20 +35,22 @@ impl PacketEngine {
 		let cell_id = self.cell_id.clone();
 		scope.spawn( move || -> Result<(), PacketEngineError> {
 			loop {
-				let (index, mut mask, packet) = try!(packet_pe_from_ca.recv());
+				let (packet_count, index, mut mask, packet) = try!(packet_pe_from_ca.recv());
 				let entry;
 				{
 					let unlocked = table.lock().unwrap();
 					entry = try!((*unlocked).get_entry(index));
 				}
-				mask = mask.and(entry.get_mask());
+				let mask = mask.and(entry.get_mask());
+				println!("PacketEngine {}: mask {}", cell_id, mask);
 				let port_nos = try!(Mask::port_nos_from_mask(&mask));
 				for port_no in port_nos.iter() {
 					let sender = packet_pe_to_ports.get(*port_no as usize);
 					match sender {
-						Some(s) => try!(s.send(packet)),
+						Some(s) => try!(s.send((packet_count, packet))),
 						None => return Err(PacketEngineError::Port(PortError::new(*port_no)))
 					};
+					println!("PacketEngine {}: sent packet {} to port {}", cell_id, packet_count, port_no);
 				}
 			}
 		});
@@ -61,38 +63,38 @@ impl PacketEngine {
 		let packet_pe_to_ports = self.packet_pe_to_ports.clone();
 		scope.spawn( move || -> Result<(), PacketEngineError> {
 			loop {
-				let (recv_port_no, packet) = try!(packet_pe_from_ports.recv());
+				let (packet_count, recv_port_no, packet) = try!(packet_pe_from_ports.recv());
 				let mut header = packet.get_header();
 				let index = header.get_other_index();
 				let entry;
 				{
 					entry = try!(table.lock().unwrap().get_entry(index));
 				}
-				println!("PacketEngine {}: index {} entry {}", cell_id, index, entry);
+				//println!("PacketEngine {}: index {} entry {}", cell_id, index, entry);
 				let mask = entry.get_mask();
 				let parent = entry.get_parent();
 				let other_indices = entry.get_other_indices();
 				// Verify that port_no is valid
 				try!(PortNumber::new(recv_port_no, other_indices.len() as u8));
 				if header.is_rootcast() {
-					println!("PacketEngine {}: other indices {:?}", cell_id, other_indices);
+					//println!("PacketEngine {}: other indices {:?}", cell_id, other_indices);
 					let other_index = *other_indices.get(parent as usize).expect("PacketEngine: No such other index");
-					println!("PacketEngine {}: Sending rootward to {} {}", cell_id, parent, other_index);
+					//println!("PacketEngine {}: Sending rootward to {} {}", cell_id, parent, other_index);
 					header.set_other_index(other_index as u32);
 					let sender = packet_pe_to_ports.get(parent as usize).unwrap();
-					try!(sender.send(packet));
-					//println!("Packet Engine {} sent packets to port {}", cell_id, parent);
+					try!(sender.send((packet_count, packet)));
+					println!("Packet Engine {} sent packet {} to port {}", cell_id, packet_count, parent);
 				} else {
 					let port_nos = try!(mask.port_nos_from_mask());
-					//println!("Cell Agent {} forwarding to ports {:?}", cell_id, port_nos);
+					//println!("PacketEngine {} forwarding to ports {:?}", cell_id, port_nos);
 					for port_no in port_nos.iter() {
 						let other_index = *other_indices.get(*port_no as usize).expect("PacketEngine: No such other index");
 						header.set_other_index(other_index as u32);
-						if *port_no as usize == 0 { try!(packet_pe_to_ca.send((recv_port_no, index, packet))); }
+						if *port_no as usize == 0 { try!(packet_pe_to_ca.send((packet_count, recv_port_no, index, packet))); }
 						else {
 							let sender = packet_pe_to_ports.get(*port_no as usize).unwrap();
-							try!(sender.send(packet));
-							//println!("Packet Engine {} sent packets to port {}", cell_id, port_no);
+							try!(sender.send((packet_count, packet)));
+							println!("Packet Engine {} sent packet {} to port {}", cell_id, packet_count, port_no);
 						}
 					}
 				} 
@@ -198,11 +200,11 @@ impl From<RoutingTableError> for PacketEngineError {
 impl From<mpsc::RecvError> for PacketEngineError {
 	fn from(err: mpsc::RecvError) -> PacketEngineError { PacketEngineError::Recv(err) }
 }
-impl From<mpsc::SendError<Packet>> for PacketEngineError {
-	fn from(err: mpsc::SendError<Packet>) -> PacketEngineError { PacketEngineError::Send(err) }
+impl From<mpsc::SendError<(usize,Packet)>> for PacketEngineError {
+	fn from(err: mpsc::SendError<(usize,Packet)>) -> PacketEngineError { PacketEngineError::Send(err) }
 }
-impl From<mpsc::SendError<(u8,u32,Packet)>> for PacketEngineError {
-	fn from(err: mpsc::SendError<(u8,u32,Packet)>) -> PacketEngineError { PacketEngineError::SendToCa(err) }
+impl From<mpsc::SendError<(usize,u8,u32,Packet)>> for PacketEngineError {
+	fn from(err: mpsc::SendError<(usize,u8,u32,Packet)>) -> PacketEngineError { PacketEngineError::SendToCa(err) }
 }
 impl From<UtilityError> for PacketEngineError {
 	fn from(err: UtilityError) -> PacketEngineError { PacketEngineError::Utility(err) }

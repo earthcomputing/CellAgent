@@ -39,30 +39,20 @@ impl Link {
 		let link_id = self.id.clone();
 		scope.spawn( move || -> Result<(), LinkError> {
 				loop {
-					let packet = try!(packet_link_from_left.recv());
-					//try!(packet_link_to_rite.send(packet));
-					match packet_link_to_rite.send(packet) {
-						Ok(_) => (),
-						Err(_) => {
-							let s = format!("+++ Link {} sending rite error", link_id);
-							println!("{}",s);
-						}
-					}
+					println!("Link {}: waiting to recv left", link_id);
+					let (packet_count,packet) = try!(packet_link_from_left.recv());
+					try!(packet_link_to_rite.send((packet_count,packet)));
+					println!("Link {}: sent packet {} right", link_id, packet_count);
 				}
 			}
 		);
 		let link_id = self.id.clone();
 		scope.spawn( move || -> Result<(), LinkError> {
 				loop {
-					let packet = try!(packet_link_from_rite.recv());
-					//try!(packet_link_to_left.send(packet));
-					match packet_link_to_left.send(packet) {
-						Ok(_) => (),
-						Err(_) => {
-							let s = format!("Link {} sending left error", link_id);
-							println!("{}",s);							
-						}
-					}
+					println!("Link {}: waiting to recv right", link_id);
+					let (packet_count,packet) = try!(packet_link_from_rite.recv());
+					try!(packet_link_to_left.send((packet_count,packet)));
+					println!("Link {}: sent packet {} left", link_id, packet_count);
 				}
 			}
 		);
@@ -85,7 +75,7 @@ use port::{PortError};
 pub enum LinkError {
 	Name(NameError),
 	Port(PortError),
-	Send(mpsc::SendError<Packet>),
+	Send(mpsc::SendError<(usize,Packet)>),
 	Recv(mpsc::RecvError)
 }
 impl Error for LinkError {
@@ -122,8 +112,8 @@ impl From<NameError> for LinkError {
 impl From<PortError> for LinkError {
 	fn from(err: PortError) -> LinkError { LinkError::Port(err) }
 }
-impl From<mpsc::SendError<Packet>> for LinkError {
-	fn from(err: mpsc::SendError<Packet>) -> LinkError { LinkError::Send(err) }
+impl From<mpsc::SendError<(usize,Packet)>> for LinkError {
+	fn from(err: mpsc::SendError<(usize,Packet)>) -> LinkError { LinkError::Send(err) }
 }
 impl From<mpsc::RecvError> for LinkError {
 	fn from(err: mpsc::RecvError) -> LinkError { LinkError::Recv(err) }
