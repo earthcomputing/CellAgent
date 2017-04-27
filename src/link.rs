@@ -39,20 +39,20 @@ impl Link {
 		let link_id = self.id.clone();
 		scope.spawn( move || -> Result<(), LinkError> {
 				loop {
-					println!("Link {}: waiting to recv left", link_id);
+					//println!("Link {}: waiting to recv left", link_id);
 					let (packet_count,packet) = try!(packet_link_from_left.recv());
 					try!(packet_link_to_rite.send((packet_count,packet)));
-					println!("Link {}: sent packet {} right", link_id, packet_count);
+					//println!("Link {}: sent packet {} right", link_id, packet_count);
 				}
 			}
 		);
 		let link_id = self.id.clone();
 		scope.spawn( move || -> Result<(), LinkError> {
 				loop {
-					println!("Link {}: waiting to recv right", link_id);
+					//println!("Link {}: waiting to recv right", link_id);
 					let (packet_count,packet) = try!(packet_link_from_rite.recv());
 					try!(packet_link_to_left.send((packet_count,packet)));
-					println!("Link {}: sent packet {} left", link_id, packet_count);
+					//println!("Link {}: sent packet {} left", link_id, packet_count);
 				}
 			}
 		);

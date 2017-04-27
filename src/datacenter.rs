@@ -47,7 +47,7 @@ impl<'a> Datacenter<'a> {
 				None => return Err(DatacenterError::Wire(WireError::new(edge)))
 			};
 			let mut p2 = try!(cell.get_free_port_mut());
-			println!("Datacenter: edge {:?}", edge);
+			//println!("Datacenter: edge {:?}", edge);
 			links.push(try!(Link::new(scope, p1, p2)));
 		} 
 		Ok(Datacenter { cells: cells, links: links, noc: None })

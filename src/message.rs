@@ -1,4 +1,6 @@
 use std::fmt;
+use std::sync::Arc;
+use std::sync::atomic::{ATOMIC_USIZE_INIT, AtomicUsize, Ordering};
 use cellagent::{DEFAULT_OTHER_INDICES, CellAgent};
 use config::{CellNo, PathLength, TableIndex};
 use name::{CellID, TreeID};
@@ -6,6 +8,8 @@ use packet::Packetizer;
 use traph;
 use utility::{Mask, Path, PortNumber};
 
+static message_count: AtomicUsize = ATOMIC_USIZE_INIT;
+pub fn get_next_count() -> usize { message_count.fetch_add(1, Ordering::SeqCst) } 
 #[derive(Debug, Copy, Clone, Hash, Serialize, Deserialize)]
 pub enum MsgType {
 	Discover,
@@ -36,6 +40,7 @@ impl fmt::Display for MsgDirection {
 pub trait Message {
 	fn get_header(&self) -> MsgHeader;
 	fn get_payload(&self) -> Box<MsgPayload>;
+	fn get_count(&self) -> usize { self.get_header().get_count() }
 	fn is_rootward(&self) -> bool {
 		match self.get_header().get_direction() {
 			MsgDirection::Rootward => true,
@@ -49,14 +54,17 @@ pub trait Message {
 pub trait MsgPayload {}
 #[derive(Debug, Clone, Hash, Serialize, Deserialize)]
 pub struct MsgHeader {
+	msg_count: usize,
 	msg_type: MsgType,
 	direction: MsgDirection,
 }
 impl MsgHeader {
 	pub fn new(msg_type: MsgType, direction: MsgDirection) -> MsgHeader {
-		MsgHeader { msg_type: msg_type, direction: direction }
+		let msg_count = get_next_count();
+		MsgHeader { msg_type: msg_type, direction: direction, msg_count: msg_count }
 	}
 	pub fn get_msg_type(&self) -> MsgType { self.msg_type }
+	pub fn get_count(&self) -> usize { self.msg_count }
 	pub fn get_direction(&self) -> MsgDirection { self.direction }
 	pub fn set_direction(&mut self, direction: MsgDirection) { self.direction = direction; }
 }
@@ -86,7 +94,7 @@ impl Message for DiscoverMsg {
 		let tree_id = try!(ca.get_tree_id(index));
 		let new_tree_id = self.payload.get_tree_id();
 		let port_number = try!(PortNumber::new(port_no, ca.get_no_ports()));
-		//println!("Message {}: port {} {}", ca.get_id(), port_no, self.payload);
+		println!("Message {}: msg {} port {} {}", ca.get_id(), self.get_count(), port_no, self.payload);
 		if ca.exists(&new_tree_id) { return Ok(()); } // Ignore if traph exists for this tree - Simple quenching
 		let senders_index = self.payload.get_senders_index();
 		let hops = self.payload.get_hops();
@@ -156,7 +164,6 @@ impl DiscoverDMsg {
 impl Message for DiscoverDMsg {
 	fn get_header(&self) -> MsgHeader { self.header.clone() }
 	fn get_payload(&self) -> Box<MsgPayload> { Box::new(self.payload.clone()) }
-	
 	fn process(&self, cell_agent: &mut CellAgent, port_no: u8, index: u32) 
 			-> Result<(), ProcessMsgError> {
 		println!("DiscoverDMsg: processing {} {} {}", cell_agent, port_no, index);
