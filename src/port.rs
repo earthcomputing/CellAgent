@@ -17,7 +17,7 @@ pub enum PortStatus {
 #[derive(Debug)]
 pub struct Port {
 	id: PortID,
-	port_no: PortNumber,
+	port_number: PortNumber,
 	is_border: bool,
 	is_connected: bool,
 	is_broken: bool,
@@ -26,43 +26,44 @@ pub struct Port {
 	recv_port_from_ca: RecvrPortFromCa,
 }
 impl Port {
-	pub fn new(cell_id: &CellID, port_no: PortNumber, is_border: bool, is_connected: bool,
+	pub fn new(cell_id: &CellID, port_number: PortNumber, is_border: bool, is_connected: bool,
 			   packet_port_to_pe: PacketPortToPe, status_port_to_ca: StatusPortToCa,
 			   recv_port_from_ca: RecvrPortFromCa) -> Result<Port,PortError>{
-		let port_id = try!(PortID::new(port_no.get_port_no()));
+		let port_id = try!(PortID::new(port_number.get_port_no()));
 		let temp_id = try!(port_id.add_component(&cell_id.get_name()));
-		let port = Port{ id: temp_id, port_no: port_no, is_border: is_border, is_connected: is_connected, 
+		let port = Port{ id: temp_id, port_number: port_number, is_border: is_border, is_connected: is_connected, 
 			is_broken: false, status_port_to_ca: status_port_to_ca, packet_port_to_pe: packet_port_to_pe,
 			recv_port_from_ca: recv_port_from_ca };
 		Ok(port)
 	}
 	pub fn get_id(&self) -> PortID { self.id.clone() }
-	pub fn get_no(&self) -> PortNo { self.port_no.get_port_no() }
-	pub fn get_port_number(&self) -> PortNumber { self.port_no }
+	pub fn get_port_no(&self) -> PortNo { self.port_number.get_port_no() }
+	pub fn get_port_number(&self) -> PortNumber { self.port_number }
 	pub fn is_connected(&self) -> bool { self.is_connected }
 	pub fn is_broken(&self) -> bool { self.is_broken }
 	pub fn is_border(&self) -> bool { self.is_border }
 	pub fn set_connected(&mut self, scope: &Scope, packet_port_to_link: PacketSend, 
 				packet_port_from_link: PacketRecv) -> Result<(),PortError> {
 		self.is_connected = true; 
-		let port_no = self.port_no.get_port_no();
+		let port_no = self.get_port_no();
+		//println!("Port {}: sending status", self.id);
 		try!(self.status_port_to_ca.send((port_no, PortStatus::Connected)));
 		let packet_port_from_pe = try!(self.recv_port_from_ca.recv());
-		let port_no = self.get_no();
+		//println!("Port {}: got recvr", self.id);
 		let packet_port_to_pe = self.packet_port_to_pe.clone();
 		let port_id = self.id.clone();
 		// Listen for outgoing packets
 		scope.spawn( move || -> Result<(), PortError> {
 			loop {
-				let packet = try!(packet_port_from_pe.recv());
-				try!(packet_port_to_link.send(packet));
+				let (packet_count, packet) = try!(packet_port_from_pe.recv());
+				try!(packet_port_to_link.send((packet_count, packet)));
 			}
 		}); 
 		// Listen for incoming packets
 		scope.spawn( move || -> Result<(), PortError> {
 			loop {
-				let packet = try!(packet_port_from_link.recv());
-				try!(packet_port_to_pe.send((port_no, packet)));
+				let (packet_count,packet) = try!(packet_port_from_link.recv());
+				try!(packet_port_to_pe.send((packet_count,port_no, packet)));
 			}
 		});
 		Ok(())
@@ -71,7 +72,7 @@ impl Port {
 impl fmt::Display for Port { 
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result { 
 		let is_connected = self.is_connected;
-		let mut s = format!("Port {} {}", self.port_no, self.id);
+		let mut s = format!("Port {} {}", self.port_number, self.id);
 		if self.is_border { s = s + " is TCP  port,"; }
 		else              { s = s + " is ECLP port,"; }
 		if is_connected   { s = s + " is connected"; }
@@ -90,8 +91,8 @@ pub enum PortError {
 	Name(NameError),
 	Channel(ChannelError),
 	SendStatus(PortStatusSendError),
-	SendToPe(mpsc::SendError<(u8,Packet)>),
-	Send(mpsc::SendError<Packet>),
+	SendToPe(mpsc::SendError<(usize,u8,Packet)>),
+	Send(mpsc::SendError<(usize,Packet)>),
 	Recv(mpsc::RecvError)
 }
 impl Error for PortError {
@@ -153,11 +154,11 @@ impl From<ChannelError> for PortError {
 impl From<PortStatusSendError> for PortError {
 	fn from(err: PortStatusSendError) -> PortError { PortError::SendStatus(err) }
 }
-impl From<mpsc::SendError<Packet>> for PortError {
-	fn from(err: mpsc::SendError<Packet>) -> PortError { PortError::Send(err) }
+impl From<mpsc::SendError<(usize,Packet)>> for PortError {
+	fn from(err: mpsc::SendError<(usize,Packet)>) -> PortError { PortError::Send(err) }
 }
-impl From<mpsc::SendError<(u8,Packet)>> for PortError {
-	fn from(err: mpsc::SendError<(u8,Packet)>) -> PortError { PortError::SendToPe(err) }
+impl From<mpsc::SendError<(usize,u8,Packet)>> for PortError {
+	fn from(err: mpsc::SendError<(usize,u8,Packet)>) -> PortError { PortError::SendToPe(err) }
 }
 impl From<mpsc::RecvError> for PortError {
 	fn from(err: mpsc::RecvError) -> PortError { PortError::Recv(err) }

@@ -2,6 +2,7 @@ use std::fmt;
 use std::collections::HashMap;
 use std::sync::mpsc;
 use std::sync::mpsc::channel;
+use std::sync::atomic::AtomicUsize;
 use crossbeam::Scope;
 use cellagent::{CellAgent};
 use config::{MAX_PORTS, CellNo, PortNo, TableIndex};
@@ -14,21 +15,21 @@ use utility::{Mask, PortNumber};
 use vm::VirtualMachine;
 
 // Packet from PacketEngine to Port, Port to Link, Link to Port
-pub type PacketSend = mpsc::Sender<Packet>;
-pub type PacketRecv = mpsc::Receiver<Packet>;
-pub type PacketSendError = mpsc::SendError<Packet>;
+pub type PacketSend = mpsc::Sender<(usize,Packet)>;
+pub type PacketRecv = mpsc::Receiver<(usize,Packet)>;
+pub type PacketSendError = mpsc::SendError<(usize,Packet)>;
 // Packet from Port to PacketEngine
-pub type PacketPortToPe = mpsc::Sender<(PortNo, Packet)>;
-pub type PacketPeFromPort = mpsc::Receiver<(PortNo, Packet)>;
-pub type PacketPortPeSendError = mpsc::SendError<(PortNo, Packet)>;
+pub type PacketPortToPe = mpsc::Sender<(usize, PortNo, Packet)>;
+pub type PacketPeFromPort = mpsc::Receiver<(usize, PortNo, Packet)>;
+pub type PacketPortPeSendError = mpsc::SendError<(usize, PortNo, Packet)>;
 // Packet from PacketEngine to CellAgent, (port_no, table index, packet)
-pub type PacketPeToCa = mpsc::Sender<(PortNo, TableIndex, Packet)>;
-pub type PacketCaFromPe = mpsc::Receiver<(PortNo, TableIndex, Packet)>;
-pub type PacketPeCaSendError = mpsc::SendError<(PortNo, TableIndex, Packet)>;
+pub type PacketPeToCa = mpsc::Sender<(usize, PortNo, TableIndex, Packet)>;
+pub type PacketCaFromPe = mpsc::Receiver<(usize, PortNo, TableIndex, Packet)>;
+pub type PacketPeCaSendError = mpsc::SendError<(usize, PortNo, TableIndex, Packet)>;
 // Packet from CellAgent to PacketEngine, (table index, mask, packet)
-pub type PacketCaToPe = mpsc::Sender<(TableIndex, Mask, Packet)>;
-pub type PacketPeFromCa = mpsc::Receiver<(TableIndex, Mask, Packet)>;
-pub type PacketCaPeSendError = mpsc::SendError<(TableIndex, Mask, Packet)>;
+pub type PacketCaToPe = mpsc::Sender<(usize, TableIndex, Mask, Packet)>;
+pub type PacketPeFromCa = mpsc::Receiver<(usize, TableIndex, Mask, Packet)>;
+pub type PacketCaPeSendError = mpsc::SendError<(usize, TableIndex, Mask, Packet)>;
 // Table entry from CellAgent to PacketEngine, table entry
 pub type EntryCaToPe = mpsc::Sender<RoutingTableEntry>;
 pub type EntryPeFromCa = mpsc::Receiver<RoutingTableEntry>;
