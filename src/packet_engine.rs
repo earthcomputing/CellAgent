@@ -36,6 +36,7 @@ impl PacketEngine {
 		scope.spawn( move || -> Result<(), PacketEngineError> {
 			loop {
 				let (packet_count, index, mut mask, packet) = try!(packet_pe_from_ca.recv());
+				println!("PacketEngine {}: received packet {} from cell agent", cell_id, packet_count);
 				let entry;
 				{
 					let unlocked = table.lock().unwrap();
@@ -105,10 +106,12 @@ impl PacketEngine {
 	}
 	pub fn entry_channel(&self, scope: &Scope, entry_pe_from_ca: EntryPeFromCa) -> Result<(),PacketEngineError> {
 		let table = self.routing_table.clone();
+		let id = self.cell_id.clone();
 		scope.spawn( move || -> Result<(), PacketEngineError> {
 			loop { 
-				let entry = try!(entry_pe_from_ca.recv());
-				table.lock().unwrap().set_entry(entry);
+					let entry = try!(entry_pe_from_ca.recv());
+					table.lock().unwrap().set_entry(entry);
+					println!("PacketEngine {}: updated entry {} mask {}", id, entry.get_index(), entry.get_mask());
 			}
 		});
 		Ok(())

@@ -1,10 +1,10 @@
-use utility::PortNumber;
 // Size of various fields
 pub type CellNo     = usize;
 pub type LinkNo     = usize;
 pub type PacketNo   = u16;
-pub type PortNo     = u8;
+pub type PacketElement = u8; // Packets are made up of bytes
 pub type PathLength = u32;
+pub type PortNo     = u8;
 pub type TableIndex = u32;
 pub type Uniquifier = u64;
 // Default inputs
@@ -18,8 +18,8 @@ pub const MAX_PACKETS: PacketNo   = 255; // Maximum number of packets collected 
 // Things used in constructing names
 pub const SEPARATOR: &'static str = "+"; // Separator for compound names
 // Packet sizes in bytes including header
-pub const PACKET_SMALL: usize = 64;
-pub const PACKET_MEDIUM: usize = 1500;
-pub const PACKET_LARGE: usize = 4096;
+pub const PAYLOAD_DEFAULT_ELEMENT: u8 = 0;
+pub const PACKET_MIN: usize = 64;
+pub const PACKET_MAX: usize = 9000;
 // Size of chunk identifier 
 pub const CHUNK_ID_SIZE: u64 = 48;

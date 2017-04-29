@@ -153,10 +153,11 @@ impl CellAgent {
 						};
 						connected_entry.or_with_mask(port_no_mask);
 						try!(ca.entry_ca_to_pe.send(connected_entry));
+						println!("CellAgent {}: sent entry {} mask {}", ca.cell_id, connected_entry.get_index(), connected_entry.get_mask());
 						let msg = DiscoverMsg::new(tree_id.clone(), 
 									ca.cell_id.clone(), my_table_index, 1, path);
-						println!("CellAgent {}: sending msg {}", ca.cell_id, msg.get_count());
 						let packets = try!(Packetizer::packetize(&msg, [false;4]));
+						println!("CellAgent {}: send msg {}", ca.cell_id, msg.get_count());
 						try!(ca.send_msg(&connected_tree_id, packets, port_no_mask));
 					},
 					port::PortStatus::Disconnected => {
@@ -182,7 +183,7 @@ impl CellAgent {
 		for packet in packets.iter() {
 			let packet_count = get_next_count();
 			try!(self.packet_ca_to_pe.send((packet_count, index, user_mask, **packet)));
-			//println!("CellAgent {}: sent packet {} to packet engine", self.cell_id, packet_count);
+			println!("CellAgent {}: {} sent packet {} to packet engine", self.cell_id, tree_id, packet_count);
 		}
 		Ok(())
 	}
