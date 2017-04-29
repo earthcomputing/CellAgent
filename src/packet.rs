@@ -9,61 +9,32 @@ use std::hash::{Hash, Hasher};
 use std::collections::hash_map::DefaultHasher;
 use serde;
 use serde_json;
-use config::{PACKET_SMALL, PACKET_MEDIUM, PACKET_LARGE, PacketNo, TableIndex, Uniquifier};
+use config::{PACKET_MIN, PACKET_MAX, PAYLOAD_DEFAULT_ELEMENT, PacketElement, PacketNo, TableIndex, Uniquifier};
 use message::{Message, DiscoverMsg, DiscoverDMsg, MsgDirection};
 
-const PAYLOAD_DEFAULT_ELEMENT: u8 = 0;
-const PAYLOAD_SMALL:  usize = PACKET_SMALL  - PACKET_HEADER_SIZE;
-const PAYLOAD_MEDIUM: usize = PACKET_MEDIUM - PACKET_HEADER_SIZE;
-const PAYLOAD_LARGE:  usize = PACKET_LARGE  - PACKET_HEADER_SIZE;
 const LARGEST_MSG: usize = std::u32::MAX as usize;
-
-type PacketElement = u8; // Packets are made up of bytes
+const PAYLOAD_MIN: usize = PACKET_MAX - PACKET_HEADER_SIZE;
+const PAYLOAD_MAX: usize = PACKET_MAX - PACKET_HEADER_SIZE;
 
 static packet_count: AtomicUsize = ATOMIC_USIZE_INIT;
 pub fn get_next_count() -> usize { packet_count.fetch_add(1, Ordering::SeqCst) } 
 #[derive(Copy)]
-pub enum Packet {
-	Small  { header: PacketHeader, payload: [PacketElement; PAYLOAD_SMALL]  },
-	Medium { header: PacketHeader, payload: [PacketElement; PAYLOAD_MEDIUM] },
-	Large  { header: PacketHeader, payload: [PacketElement; PAYLOAD_LARGE]  }
+pub struct Packet {
+	header: PacketHeader, 
+	payload: Payload,
 }
 impl Packet {
-	pub fn get_header(&self) -> PacketHeader {
-		match *self {
-			Packet::Small  { header, payload } => header,
-			Packet::Medium { header, payload } => header,
-			Packet::Large  { header, payload } => header,
-		}
+	fn new(header: PacketHeader, payload: Payload) -> Packet {
+		Packet { header: header, payload: payload }
 	}
-	pub fn get_payload(&self) -> Vec<PacketElement> {
-		match *self {
-			Packet::Small  { header, payload } => payload.iter().cloned().collect(),
-			Packet::Medium { header, payload } => payload.iter().cloned().collect(),
-			Packet::Large  { header, payload } => payload.iter().cloned().collect(),
-		}
-	}
-	pub fn get_payload_bytes(&self) -> Vec<u8> { self.get_payload().iter().cloned().collect() }
-	pub fn get_size(&self) -> usize {
-		match *self {
-			Packet::Small  {header, payload} => PACKET_SMALL, 
-			Packet::Medium {header, payload} => PACKET_MEDIUM,
-			Packet::Large  {header, payload} => PACKET_LARGE
-		}
-	}
-	pub fn get_payload_size(&self) -> usize { 
-		match *self {
-			Packet::Small  {header, payload} => PAYLOAD_SMALL, 
-			Packet::Medium {header, payload} => PAYLOAD_MEDIUM,
-			Packet::Large  {header, payload} => PAYLOAD_LARGE
-		}
-	}
+	pub fn get_header(&self) -> PacketHeader { self.header }
+	pub fn get_payload(&self) -> Payload { self.payload }
+	pub fn get_payload_bytes(&self) -> Vec<u8> { self.get_payload().get_bytes() }
+	pub fn get_payload_size(&self) -> usize { self.payload.get_no_bytes() }
 }
 impl fmt::Display for Packet {
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result { 
-		let mut s = format!("Header: {}, Payload: ", self.get_header());
-		let payload = self.get_payload();
-		s = s + &format!("{:?}", &payload[0..10]); 
+		let mut s = format!("Header: {}, Payload: {}", self.header, self.payload);
 		write!(f, "{}", s)
 	} 	
 }
@@ -73,15 +44,46 @@ impl Clone for Packet {
 impl fmt::Debug for Packet { 
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result { self.fmt(f) }
 }
+#[derive(Copy)]
+struct Payload {
+	no_data_bytes: u16,
+	bytes: [PacketElement; PAYLOAD_MAX],
+}
+impl Payload {
+	pub fn new(data_bytes: Vec<PacketElement>) -> Payload {
+		let no_data_bytes = data_bytes.len();
+		let mut bytes = [0; PAYLOAD_MAX];
+		for i in 0..no_data_bytes { bytes[i] = data_bytes[i]; }
+		Payload { no_data_bytes : no_data_bytes as u16, bytes: bytes }
+	}
+	fn get_bytes(&self) -> Vec<PacketElement> { self.bytes.iter().cloned().collect() }
+	fn get_no_bytes(&self) -> usize { self.get_bytes().len() }
+	fn get_msg_bytes(&self) -> Vec<PacketElement> {
+		let total_bytes = self.get_bytes();
+		total_bytes[0..self.no_data_bytes as usize].iter().cloned().collect()
+	}
+}
+impl fmt::Display for Payload {
+	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result { 
+		let s = &format!("{:?}", &self.bytes[0..10]); 
+		write!(f, "{}", s)
+	} 	
+}
+impl Clone for Payload {
+	fn clone(&self) -> Payload { *self }
+}
+impl fmt::Debug for Payload { 
+	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result { self.fmt(f) }
+}
 pub struct Packetizer {}
 impl Packetizer {
 	pub fn packetize<M>(msg: &M, flags: [bool;4]) -> Result<Vec<Box<Packet>>, PacketizerError>
 			where M: Message + Hash + serde::Serialize {
 		let serialized = try!(serde_json::to_string(&msg));
-		let bytes = serialized.clone().into_bytes();
-		let payload_size = try!(Packetizer::packet_payload_size(bytes.len()));
-		let num_packets = (bytes.len() + payload_size - 1)/ payload_size; // Poor man's ceiling
-		let last_packet_size = bytes.len() - (num_packets-1)*payload_size;
+		let msg_bytes = serialized.clone().into_bytes();
+		let payload_size = Packetizer::packet_payload_size(msg_bytes.len());
+		let num_packets = (msg_bytes.len() + payload_size - 1)/ payload_size; // Poor man's ceiling
+		let last_packet_size = msg_bytes.len() - (num_packets-1)*payload_size;
 		let unique_id = rand::random(); // Can't use hash in case two cells send the same message
 		let direction = msg.get_header().get_direction();
 		let mut packets = Vec::new();
@@ -95,42 +97,12 @@ impl Packetizer {
 			// Not a very Rusty way to put bytes into payload
 			let mut packet_bytes = vec![PAYLOAD_DEFAULT_ELEMENT; payload_size];
 			for j in 0..payload_size {
-				if i*payload_size + j == bytes.len() { break; }
-				packet_bytes[j] = bytes[i*payload_size + j];
+				if i*payload_size + j == msg_bytes.len() { break; }
+				packet_bytes[j] = msg_bytes[i*payload_size + j];
 			}
-			match payload_size {
-				PAYLOAD_SMALL => {
-					if bytes.len() > PAYLOAD_SMALL { 
-						return Err(PacketizerError::Size(SizeError::new(bytes.len())))
-					}
-					let mut payload = [PAYLOAD_DEFAULT_ELEMENT; PAYLOAD_SMALL];	
-					// Not a very Rusty way to put bytes into payload
-					for i in 0..bytes.len() { payload[i as usize] = packet_bytes[i as usize]; }
-					let small = Packet::Small { header: packet_header, payload: payload }; 
-					packets.push(Box::new(small) as Box<Packet>);
-				},
-				PAYLOAD_MEDIUM => {
-					if bytes.len() > PAYLOAD_MEDIUM { 
-						return Err(PacketizerError::Size(SizeError::new(bytes.len())))
-					}
-					let mut payload = [PAYLOAD_DEFAULT_ELEMENT; PAYLOAD_MEDIUM];				
-					// Not a very Rusty way to put bytes into payload
-					for i in 0..bytes.len() { payload[i as usize] = packet_bytes[i as usize]; }
-					let small = Packet::Medium { header: packet_header, payload: payload }; 
-					packets.push(Box::new(small) as Box<Packet>);
-				},
-				PAYLOAD_LARGE => {
-					if bytes.len() > PAYLOAD_LARGE { 
-						return Err(PacketizerError::Size(SizeError::new(bytes.len())))
-					}
-					let mut payload = [PAYLOAD_DEFAULT_ELEMENT; PAYLOAD_LARGE];				
-					// Not a very Rusty way to put bytes into payload
-					for i in 0..bytes.len() { payload[i as usize] = packet_bytes[i as usize]; }
-					let small = Packet::Large { header: packet_header, payload: payload }; 
-					packets.push(Box::new(small) as Box<Packet>);
-				}
-				_ => return Err(PacketizerError::Size(SizeError::new(payload_size)))
-			}
+			let payload = Payload::new(packet_bytes);
+			let packet = Box::new(Packet::new(packet_header, payload));
+			packets.push(packet);
 		}
 		Ok(packets)
 	}
@@ -140,20 +112,19 @@ impl Packetizer {
 			let header = packet.get_header();
 			let is_last_packet = header.is_last_packet();
 			let last_packet_size = header.get_size();
-			let mut payload = packet.get_payload();
-			if is_last_packet { payload.truncate(last_packet_size as usize); }
-			all_bytes.extend_from_slice(payload.as_slice());
+			let mut payload = packet.get_payload(); 
+			if is_last_packet { payload.get_bytes().truncate(last_packet_size as usize); }
+			all_bytes.extend_from_slice(payload.get_bytes().as_slice());
 		}
 		let serialized = try!(str::from_utf8(&all_bytes));
 		let deserialized: DiscoverMsg = try!(serde_json::from_str(&serialized));
 		Ok(Box::new(deserialized))
 	}
-	fn packet_payload_size(len: usize) -> Result<usize, PacketizerError> {
+	fn packet_payload_size(len: usize) -> usize {
 		match len-1 { 
-			0...PAYLOAD_SMALL              => Ok(PAYLOAD_SMALL),
-			PAYLOAD_SMALL...PAYLOAD_MEDIUM => Ok(PAYLOAD_MEDIUM),
-			PAYLOAD_MEDIUM...LARGEST_MSG   => Ok(PAYLOAD_LARGE),
-			_ => Err(PacketizerError::Size(SizeError::new(len)))
+			0...PACKET_MIN           => PAYLOAD_MIN,
+			PAYLOAD_MIN...PAYLOAD_MAX => len,
+			_                         => PAYLOAD_MAX
 		}		
 	}
 	fn hash<T: Hash>(t: &T) -> u64 {
