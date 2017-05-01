@@ -29,29 +29,57 @@ impl PacketEngine {
 		try!(pe.packet_channel(scope, packet_pe_from_ports, packet_pe_to_ca));
 		Ok(pe)
 	}
+	pub fn get_table(&self) -> &Arc<Mutex<RoutingTable>> { &self.routing_table }
 	fn ca_channel(&self, scope: &Scope,  packet_pe_from_ca: PacketPeFromCa) -> Result<(), PacketEngineError> {
 		let table = self.routing_table.clone();
 		let packet_pe_to_ports = self.packet_pe_to_ports.clone();
-		let cell_id = self.cell_id.clone();
+		let pe = self.clone();
 		scope.spawn( move || -> Result<(), PacketEngineError> {
 			loop {
-				let (packet_count, index, mut mask, packet) = try!(packet_pe_from_ca.recv());
-				println!("PacketEngine {}: received packet {} from cell agent", cell_id, packet_count);
+				let (packet_count, index, mask, packet) = try!(packet_pe_from_ca.recv());
 				let entry;
 				{
 					let unlocked = table.lock().unwrap();
 					entry = try!((*unlocked).get_entry(index));
 				}
+				//println!("PacketEngine {}: received packet {} from cell agent entry mask {}", pe.cell_id, packet_count, entry.get_mask());
 				let mask = mask.and(entry.get_mask());
-				//println!("PacketEngine {}: mask {}", cell_id, mask);
-				let port_nos = try!(Mask::port_nos_from_mask(&mask));
-				for port_no in port_nos.iter() {
-					let sender = packet_pe_to_ports.get(*port_no as usize);
-					match sender {
-						Some(s) => try!(s.send((packet_count, packet))),
-						None => return Err(PacketEngineError::Port(PortError::new(*port_no)))
-					};
-					//println!("PacketEngine {}: sent packet {} to port {}", cell_id, packet_count, port_no);
+				pe.forward(&packet_pe_to_ports, mask, packet_count, packet);
+			}
+		});
+		Ok(())
+	}
+	fn forward(&self,packet_pe_to_ports: &Vec<PacketSend>, mask: Mask, 
+				packet_count: usize, packet: Packet) -> Result<(), PacketEngineError>{
+		//println!("PacketEngine {}: mask {}", cell_id, mask);
+		let port_nos = try!(Mask::port_nos_from_mask(&mask));
+		for port_no in port_nos.iter() {
+			let sender = packet_pe_to_ports.get(*port_no as usize);
+
+			match sender {
+				Some(s) => try!(s.send((packet_count, packet))),
+				None => return Err(PacketEngineError::Port(PortError::new(*port_no)))
+			};
+		}
+		Ok(())
+	}
+	pub fn entry_channel(&self, scope: &Scope, entry_pe_from_ca: EntryPeFromCa) -> Result<(),PacketEngineError> {
+		let table = self.routing_table.clone();
+		let packet_pe_to_ports = self.packet_pe_to_ports.clone();
+		let pe = self.clone();
+		scope.spawn( move || -> Result<(), PacketEngineError> {
+			loop { 
+				let (entry,opt_packet) = try!(entry_pe_from_ca.recv());
+				let packet_count = Packet::get_next_count();
+				table.lock().unwrap().set_entry(entry);
+				//println!("PacketEngine {}: updated entry {} mask {}", pe.cell_id, entry.get_index(), entry.get_mask());
+				match opt_packet {
+					Some((mask,packet)) => {
+						try!(pe.forward(&packet_pe_to_ports, mask, packet_count, packet));
+						let ports = try!(mask.port_nos_from_mask());
+						//println!("PacketEngine {}: send discover to ports {:?}", pe.cell_id, ports);
+					}
+					None => ()				
 				}
 			}
 		});
@@ -104,19 +132,6 @@ impl PacketEngine {
 		});
 		Ok(())
 	}
-	pub fn entry_channel(&self, scope: &Scope, entry_pe_from_ca: EntryPeFromCa) -> Result<(),PacketEngineError> {
-		let table = self.routing_table.clone();
-		let id = self.cell_id.clone();
-		scope.spawn( move || -> Result<(), PacketEngineError> {
-			loop { 
-					let entry = try!(entry_pe_from_ca.recv());
-					table.lock().unwrap().set_entry(entry);
-					println!("PacketEngine {}: updated entry {} mask {}", id, entry.get_index(), entry.get_mask());
-			}
-		});
-		Ok(())
-	}
-	pub fn get_table(&self) -> &Arc<Mutex<RoutingTable>> { &self.routing_table }
 }
 impl fmt::Display for PacketEngine {
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result { 
