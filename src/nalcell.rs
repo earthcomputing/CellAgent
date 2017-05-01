@@ -31,9 +31,9 @@ pub type PacketCaToPe = mpsc::Sender<(usize, TableIndex, Mask, Packet)>;
 pub type PacketPeFromCa = mpsc::Receiver<(usize, TableIndex, Mask, Packet)>;
 pub type PacketCaPeSendError = mpsc::SendError<(usize, TableIndex, Mask, Packet)>;
 // Table entry from CellAgent to PacketEngine, table entry
-pub type EntryCaToPe = mpsc::Sender<RoutingTableEntry>;
-pub type EntryPeFromCa = mpsc::Receiver<RoutingTableEntry>;
-pub type EntrySendError = mpsc::SendError<RoutingTableEntry>;
+pub type EntryCaToPe = mpsc::Sender<(RoutingTableEntry,Option<(Mask,Packet)>)>;
+pub type EntryPeFromCa = mpsc::Receiver<(RoutingTableEntry,Option<(Mask,Packet)>)>;
+pub type EntrySendError = mpsc::SendError<(RoutingTableEntry,Option<(Mask,Packet)>)>;
 // Port status from Port to CellAgent, (port_no, status)
 pub type StatusPortToCa = mpsc::Sender<(PortNo, PortStatus)>;
 pub type StatusCaFromPort = mpsc::Receiver<(PortNo, PortStatus)>;

@@ -10,7 +10,8 @@ use nalcell::{EntryCaToPe, StatusCaFromPort, RecvrCaToPort, RecvrSendError,
 		PacketRecv, PacketSendError, PacketCaToPe, PacketCaFromPe, PacketPortToPe};
 use message::{Message, DiscoverMsg};
 use name::{Name, CellID, TreeID};
-use packet::{Packet, Packetizer, get_next_count};
+use packet;
+use packet::{Packet, Packetizer};
 use packet_engine::PacketEngine;
 use port;
 use routing_table_entry::RoutingTableEntry;
@@ -100,8 +101,14 @@ impl CellAgent {
 	pub fn exists(&self, tree_id: &TreeID) -> bool { 
 		(*self.traphs.lock().unwrap()).contains_key(tree_id)
 	}
-	pub fn update_traph(&mut self, tree_id: TreeID, port_number: PortNumber, port_status: traph::PortStatus,
-				children: Vec<PortNumber>, other_index: TableIndex, 
+	fn use_index(&mut self) -> Result<TableIndex,CellAgentError> {
+		match self.free_indices.lock().unwrap().pop() {
+			Some(i) => Ok(i),
+			None => Err(CellAgentError::Size(SizeError::new()))
+		}
+	}
+	pub fn update_traph(&mut self, tree_id: TreeID, port_number: PortNumber, 
+				port_status: traph::PortStatus, children: Vec<PortNumber>, other_index: TableIndex, 
 				hops: PathLength, path: Option<Path>) 
 			-> Result<RoutingTableEntry, CellAgentError> {
 		let mask = try!(Mask::mask_from_port_numbers(children));
@@ -119,7 +126,7 @@ impl CellAgent {
 		//println!("CellAgent {}: Tree {} {} {}", self.cell_id, tree_id, entry, traph);
 		traphs.insert(tree_id.clone(), traph);
 		self.trees.lock().unwrap().insert(index, tree_id);
-		try!(self.entry_ca_to_pe.send(entry));
+		try!(self.entry_ca_to_pe.send((entry,None)));
 		Ok(entry)
 	}
 	fn port_status(&mut self, scope: &Scope, connected_tree_id: TreeID, connected_tree_entry: RoutingTableEntry,
@@ -151,19 +158,20 @@ impl CellAgent {
 							println!("CellAgent {}: port {} already connected", ca.cell_id, port_no);
 							return Err(CellAgentError::PortTaken(PortTakenError::new(port_no)))
 						};
-						connected_entry.or_with_mask(port_no_mask);
-						try!(ca.entry_ca_to_pe.send(connected_entry));
-						println!("CellAgent {}: sent entry {} mask {}", ca.cell_id, connected_entry.get_index(), connected_entry.get_mask());
 						let msg = DiscoverMsg::new(tree_id.clone(), 
 									ca.cell_id.clone(), my_table_index, 1, path);
 						let packets = try!(Packetizer::packetize(&msg, [false;4]));
-						println!("CellAgent {}: send msg {}", ca.cell_id, msg.get_count());
-						try!(ca.send_msg(&connected_tree_id, packets, port_no_mask));
+						//println!("CellAgent {}: send msg {}", ca.cell_id, msg.get_count());
+						connected_entry.or_with_mask(port_no_mask);
+						// Assumes Discover message fits in one packet
+						try!(ca.entry_ca_to_pe.send((connected_entry, Some((port_no_mask,*packets[0])))));
+						//println!("CellAgent {}: sent entry {} mask {}", ca.cell_id, connected_entry.get_index(), connected_entry.get_mask());
+						//try!(ca.send_msg(&connected_tree_id, packets, port_no_mask));
 					},
 					port::PortStatus::Disconnected => {
 						println!("Cell Agent {} got disconnected on port {}", ca.cell_id, port_no);
 						connected_entry.and_with_mask(port_no_mask.not());
-						try!(entry_ca_to_pe.send(connected_entry));
+						try!(entry_ca_to_pe.send((connected_entry,None)));
 					}
 				}
  			}
@@ -181,9 +189,9 @@ impl CellAgent {
 			};
 		}
 		for packet in packets.iter() {
-			let packet_count = get_next_count();
+			let packet_count = Packet::get_next_count();
 			try!(self.packet_ca_to_pe.send((packet_count, index, user_mask, **packet)));
-			println!("CellAgent {}: {} sent packet {} to packet engine", self.cell_id, tree_id, packet_count);
+			//println!("CellAgent {}: {} sent packet {} to packet engine", self.cell_id, tree_id, packet_count);
 		}
 		Ok(())
 	}
@@ -199,19 +207,14 @@ impl CellAgent {
 				let packets = packet_assembler.entry(uniquifier).or_insert(Vec::new());
 				packets.push(Box::new(packet));
 				if header.is_last_packet() {
+				//println!("CellAgent {}: header {}", ca.cell_id, header);
 					let msg = try!(Packetizer::unpacketize(packets));
-					println!("CellAgent {}: got msg {}", ca.cell_id, msg.get_count());
+					//println!("CellAgent {}: got msg {}", ca.cell_id, msg.get_count());
 					try!(msg.process(&mut ca.clone(), port_no, index));
 				}
 			}	
 		});
 		Ok(())
-	}
-	fn use_index(&mut self) -> Result<TableIndex,CellAgentError> {
-		match self.free_indices.lock().unwrap().pop() {
-			Some(i) => Ok(i),
-			None => Err(CellAgentError::Size(SizeError::new()))
-		}
 	}
 }
 impl fmt::Display for CellAgent { 
@@ -249,7 +252,7 @@ pub enum CellAgentError {
 	BadPacket(BadPacketError),
 	Utility(UtilityError),
 	Routing(RoutingTableError),
-	SendTableEntry(SendError<RoutingTableEntry>),
+	SendTableEntry(SendError<(RoutingTableEntry,Option<(Mask,Packet)>)>),
 	SendCaPe(SendError<(usize,u32,Mask,Packet)>),
 	SendPacket(PacketSendError),
 	Recvr(RecvrError),
@@ -350,8 +353,9 @@ impl From<UtilityError> for CellAgentError {
 impl From<RoutingTableError> for CellAgentError {
 	fn from(err: RoutingTableError) -> CellAgentError { CellAgentError::Routing(err) }
 }
-impl From<SendError<RoutingTableEntry>> for CellAgentError {
-	fn from(err: SendError<RoutingTableEntry>) -> CellAgentError { CellAgentError::SendTableEntry(err) }
+impl From<SendError<(RoutingTableEntry,Option<(Mask,Packet)>)>> for CellAgentError {
+	fn from(err: SendError<(RoutingTableEntry, Option<(Mask,Packet)>)>) 
+			-> CellAgentError { CellAgentError::SendTableEntry(err) }
 }
 impl From<SendError<(usize,u32,Mask,Packet)>> for CellAgentError {
 	fn from(err: SendError<(usize,u32,Mask,Packet)>) -> CellAgentError { CellAgentError::SendCaPe(err) }

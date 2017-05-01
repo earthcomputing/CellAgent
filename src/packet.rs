@@ -17,7 +17,6 @@ const PAYLOAD_MIN: usize = PACKET_MAX - PACKET_HEADER_SIZE;
 const PAYLOAD_MAX: usize = PACKET_MAX - PACKET_HEADER_SIZE;
 
 static packet_count: AtomicUsize = ATOMIC_USIZE_INIT;
-pub fn get_next_count() -> usize { packet_count.fetch_add(1, Ordering::SeqCst) } 
 #[derive(Copy)]
 pub struct Packet {
 	header: PacketHeader, 
@@ -27,6 +26,7 @@ impl Packet {
 	fn new(header: PacketHeader, payload: Payload) -> Packet {
 		Packet { header: header, payload: payload }
 	}
+	pub fn get_next_count() -> usize { packet_count.fetch_add(1, Ordering::SeqCst) } 
 	pub fn get_header(&self) -> PacketHeader { self.header }
 	pub fn get_payload(&self) -> Payload { self.payload }
 	pub fn get_payload_bytes(&self) -> Vec<u8> { self.get_payload().get_bytes() }
@@ -43,6 +43,61 @@ impl Clone for Packet {
 }
 impl fmt::Debug for Packet { 
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result { self.fmt(f) }
+}
+const PACKET_HEADER_SIZE: usize = 8 + 2 + 4 + 1 + 9; // Last value is padding
+#[derive(Debug, Copy, Clone)]
+pub struct PacketHeader {
+	uniquifier: u64,	// Unique identifier of this message
+	size: u16,			// Number of packets in message if not last packet, 0 => stream
+						// Number of bytes in last packet if last packet, 0 => Error
+	other_index: u32,	// Routing table index on receiving cell
+	flags: u8,    		// Various flags
+						// xxxx xxx0 => rootcast
+						// xxxx xxx1 => leafcast
+						// xxxx xx0x => Not last packet
+						// xxxx xx1x => Last packet
+						// xx00 xxxx => EC Protocol to CellAgent
+						// xx01 xxxx => EC Protocol to VirtualMachine
+						// xx10 xxxx => Legacy Protocol to VirtualMachine
+}
+impl PacketHeader {
+	pub fn new(uniquifier: Uniquifier, size: PacketNo, other_index: TableIndex, direction: MsgDirection,
+			is_last_packet: bool) -> PacketHeader {
+		// Assertion fails if I forgot to change PACKET_HEADER_SIZE when I changed PacketHeader struct
+		assert_eq!(PACKET_HEADER_SIZE, mem::size_of::<PacketHeader>());
+		let mut flags = match direction {
+			MsgDirection::Rootward => 0,
+			MsgDirection::Leafward => 1
+		};
+		flags = if is_last_packet { flags | 2 } else { flags };
+		PacketHeader { uniquifier: uniquifier, size: size, 
+			other_index: other_index, flags: flags }
+	}
+	pub fn get_uniquifier(&self) -> Uniquifier { self.uniquifier }
+	fn set_uniquifier(&mut self, uniquifier: Uniquifier) { self.uniquifier = uniquifier; }
+	pub fn get_size(&self) -> PacketNo { self.size }
+	pub fn is_rootcast(&self) -> bool { (self.flags & 1) == 0 }
+	pub fn is_leafcast(&self) -> bool { !self.is_rootcast() }
+	pub fn is_last_packet(&self) -> bool { (self.flags & 2) == 2 }
+	fn set_direction(&mut self, direction: MsgDirection) { 
+		match direction {
+			MsgDirection::Leafward => self.flags = self.flags & 00000001,
+			MsgDirection::Rootward => self.flags = self.flags & 11111110
+		}
+	}
+	pub fn get_other_index(&self) -> u32 { self.other_index }
+	pub fn set_other_index(&mut self, other_index: TableIndex) { self.other_index = other_index; }
+}
+impl fmt::Display for PacketHeader { 
+	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result { 
+		let mut s = format!("Table Index {} ", self.other_index);
+		if self.is_rootcast() { s = s + "Rootward"; }
+		else                  { s = s + "Leafward"; }
+		if self.is_last_packet() { s = s + ", Last packet"; }
+		else                     { s = s + ", Not last packet"; }
+		s = s + &format!(", Size {}", self.size);
+		write!(f, "{}", s) 
+	}
 }
 #[derive(Copy)]
 struct Payload {
@@ -112,9 +167,9 @@ impl Packetizer {
 			let header = packet.get_header();
 			let is_last_packet = header.is_last_packet();
 			let last_packet_size = header.get_size();
-			let mut payload = packet.get_payload(); 
-			if is_last_packet { payload.get_bytes().truncate(last_packet_size as usize); }
+			let payload = packet.get_payload(); 
 			all_bytes.extend_from_slice(payload.get_bytes().as_slice());
+			if is_last_packet { all_bytes.truncate(last_packet_size as usize); }
 		}
 		let serialized = try!(str::from_utf8(&all_bytes));
 		let deserialized: DiscoverMsg = try!(serde_json::from_str(&serialized));
@@ -131,60 +186,6 @@ impl Packetizer {
 	    let mut s = DefaultHasher::new();
 	    t.hash(&mut s);
 	    s.finish()
-	}
-}
-const PACKET_HEADER_SIZE: usize = 8 + 2 + 4 + 1 + 9; // Last value is padding
-#[derive(Debug, Copy, Clone)]
-pub struct PacketHeader {
-	uniquifier: u64,	// Unique identifier of this message
-	size: u16,			// Number of packets in message if not last packet, 0 => stream
-						// Number of bytes in last packet if last packet, 0 => Error
-	other_index: u32,	// Routing table index on receiving cell
-	flags: u8,    		// Various flags
-						// xxxx xxx0 => rootcast
-						// xxxx xxx1 => leafcast
-						// xxxx xx0x => Not last packet
-						// xxxx xx1x => Last packet
-						// xx00 xxxx => EC Protocol to CellAgent
-						// xx01 xxxx => EC Protocol to VirtualMachine
-						// xx10 xxxx => Legacy Protocol to VirtualMachine
-}
-impl PacketHeader {
-	pub fn new(uniquifier: Uniquifier, size: PacketNo, other_index: TableIndex, direction: MsgDirection,
-			is_last_packet: bool) -> PacketHeader {
-		// Assertion fails if I forgot to change PACKET_HEADER_SIZE when I changed PacketHeader struct
-		assert_eq!(PACKET_HEADER_SIZE, mem::size_of::<PacketHeader>());
-		let mut flags = match direction {
-			MsgDirection::Rootward => 0,
-			MsgDirection::Leafward => 1
-		};
-		flags = if is_last_packet { flags | 2 } else { flags };
-		PacketHeader { uniquifier: uniquifier, size: size, 
-			other_index: other_index, flags: flags }
-	}
-	pub fn get_uniquifier(&self) -> Uniquifier { self.uniquifier }
-	fn set_uniquifier(&mut self, uniquifier: Uniquifier) { self.uniquifier = uniquifier; }
-	pub fn get_size(&self) -> PacketNo { self.size }
-	pub fn is_rootcast(&self) -> bool { (self.flags & 1) == 0 }
-	pub fn is_leafcast(&self) -> bool { !self.is_rootcast() }
-	pub fn is_last_packet(&self) -> bool { (self.flags & 2) == 2 }
-	fn set_direction(&mut self, direction: MsgDirection) { 
-		match direction {
-			MsgDirection::Leafward => self.flags = self.flags & 00000001,
-			MsgDirection::Rootward => self.flags = self.flags & 11111110
-		}
-	}
-	pub fn get_other_index(&self) -> u32 { self.other_index }
-	pub fn set_other_index(&mut self, other_index: TableIndex) { self.other_index = other_index; }
-}
-impl fmt::Display for PacketHeader { 
-	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result { 
-		let mut s = format!("Table Index {} ", self.other_index);
-		if self.is_rootcast() { s = s + "Rootward"; }
-		else                  { s = s + "Leafward"; }
-		if self.is_last_packet() { s = s + " Last packet"; }
-		else                     { s = s + " Not last packet"; }
-		write!(f, "{}", s) 
 	}
 }
 // Errors
