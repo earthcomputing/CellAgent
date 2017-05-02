@@ -21,12 +21,14 @@ static packet_count: AtomicUsize = ATOMIC_USIZE_INIT;
 pub struct Packet {
 	header: PacketHeader, 
 	payload: Payload,
+	packet_count: usize
 }
 impl Packet {
 	fn new(header: PacketHeader, payload: Payload) -> Packet {
-		Packet { header: header, payload: payload }
+		Packet { header: header, payload: payload, packet_count: Packet::get_next_count() }
 	}
 	pub fn get_next_count() -> usize { packet_count.fetch_add(1, Ordering::SeqCst) } 
+	pub fn get_packet_count(&self) -> usize { self.packet_count }
 	pub fn get_header(&self) -> PacketHeader { self.header }
 	pub fn get_payload(&self) -> Payload { self.payload }
 	pub fn get_payload_bytes(&self) -> Vec<u8> { self.get_payload().get_bytes() }

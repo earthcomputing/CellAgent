@@ -70,12 +70,11 @@ impl PacketEngine {
 		scope.spawn( move || -> Result<(), PacketEngineError> {
 			loop { 
 				let (entry,opt_packet) = try!(entry_pe_from_ca.recv());
-				let packet_count = Packet::get_next_count();
 				table.lock().unwrap().set_entry(entry);
 				//println!("PacketEngine {}: updated entry {} mask {}", pe.cell_id, entry.get_index(), entry.get_mask());
 				match opt_packet {
 					Some((mask,packet)) => {
-						try!(pe.forward(&packet_pe_to_ports, mask, packet_count, packet));
+						try!(pe.forward(&packet_pe_to_ports, mask, packet.get_packet_count(), packet));
 						let ports = try!(mask.port_nos_from_mask());
 						//println!("PacketEngine {}: send discover to ports {:?}", pe.cell_id, ports);
 					}

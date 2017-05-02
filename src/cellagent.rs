@@ -161,11 +161,10 @@ impl CellAgent {
 						let msg = DiscoverMsg::new(tree_id.clone(), 
 									ca.cell_id.clone(), my_table_index, 1, path);
 						let packets = try!(Packetizer::packetize(&msg, [false;4]));
-						//println!("CellAgent {}: send msg {}", ca.cell_id, msg.get_count());
 						connected_entry.or_with_mask(port_no_mask);
 						// Assumes Discover message fits in one packet
 						try!(ca.entry_ca_to_pe.send((connected_entry, Some((port_no_mask,*packets[0])))));
-						//println!("CellAgent {}: sent entry {} mask {}", ca.cell_id, connected_entry.get_index(), connected_entry.get_mask());
+						println!("CellAgent {}: sent msg {} on port {} as packet {}", ca.cell_id, msg.get_count(), port_no, packets[0].get_packet_count());
 						//try!(ca.send_msg(&connected_tree_id, packets, port_no_mask));
 					},
 					port::PortStatus::Disconnected => {
@@ -189,7 +188,7 @@ impl CellAgent {
 			};
 		}
 		for packet in packets.iter() {
-			let packet_count = Packet::get_next_count();
+			let packet_count = packet.get_packet_count();
 			try!(self.packet_ca_to_pe.send((packet_count, index, user_mask, **packet)));
 			//println!("CellAgent {}: {} sent packet {} to packet engine", self.cell_id, tree_id, packet_count);
 		}
@@ -209,7 +208,7 @@ impl CellAgent {
 				if header.is_last_packet() {
 				//println!("CellAgent {}: header {}", ca.cell_id, header);
 					let msg = try!(Packetizer::unpacketize(packets));
-					//println!("CellAgent {}: got msg {}", ca.cell_id, msg.get_count());
+					println!("CellAgent {}: got msg {} on port {}", ca.cell_id, msg.get_count(), port_no);
 					try!(msg.process(&mut ca.clone(), port_no, index));
 				}
 			}	

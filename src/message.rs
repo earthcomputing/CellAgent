@@ -94,7 +94,7 @@ impl Message for DiscoverMsg {
 		let tree_id = try!(ca.get_tree_id(index));
 		let new_tree_id = self.payload.get_tree_id();
 		let port_number = try!(PortNumber::new(port_no, ca.get_no_ports()));
-		println!("Message {}: msg {} port {} {}", ca.get_id(), self.get_count(), port_no, self.payload);
+		//println!("Message {}: msg {} port {} {}", ca.get_id(), self.get_count(), port_no, self.payload);
 		if ca.exists(&new_tree_id) { return Ok(()); } // Ignore if traph exists for this tree - Simple quenching
 		let senders_index = self.payload.get_senders_index();
 		let hops = self.payload.get_hops();
@@ -105,13 +105,13 @@ impl Message for DiscoverMsg {
 		//println!("Message {}: entry {}", ca.get_id(), entry);
 		let index = entry.get_index();
 		// Send DiscoverD to sender
-		let discoverd_msg = DiscoverDMsg::new(ca.get_id(), index);
-		let port_mask = try!(Mask::new(port_no));
-		let packets = try!(Packetizer::packetize(&discoverd_msg, [false;4]));
+		//let discoverd_msg = DiscoverDMsg::new(ca.get_id(), index);
+		//let port_mask = try!(Mask::new(port_no));
+		//let packets = try!(Packetizer::packetize(&discoverd_msg, [false;4]));
 		//println!("DiscoverMsg {}: Sending discoverD tree {}",ca.get_id(), new_tree_id);
-		try!(ca.send_msg(&tree_id, packets, port_mask));
+		//try!(ca.send_msg(&tree_id, packets, port_mask));
 		// Forward Discover on all except port_no
-		let discover_msg = DiscoverMsg::new(tree_id.clone(), ca.get_id(), index, hops+1, path);
+		//let discover_msg = DiscoverMsg::new(tree_id.clone(), ca.get_id(), index, hops+1, path);
 		Ok(())
 	}
 }
