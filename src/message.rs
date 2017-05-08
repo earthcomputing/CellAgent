@@ -99,8 +99,8 @@ impl Message for DiscoverMsg {
 		let senders_index = self.payload.get_senders_index();
 		let hops = self.payload.get_hops();
 		let path = self.payload.get_path();
-		let tree_id = try!(ca.get_tree_id(index));
-		let entry = try!(ca.update_traph(tree_id.clone(), port_number, traph::PortStatus::Parent,
+		//println!("Message: tree_id {}, port_number {}", tree_id, port_number);
+		let entry = try!(ca.update_traph(new_tree_id.clone(), port_number, traph::PortStatus::Parent,
 				Vec::new(), senders_index, hops, Some(path)));
 		//println!("Message {}: entry {}", ca.get_id(), entry);
 		let index = entry.get_index();

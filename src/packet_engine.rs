@@ -21,7 +21,7 @@ impl PacketEngine {
 		packet_pe_from_ca: PacketPeFromCa, recv_entry_from_ca: EntryPeFromCa, 
 		packet_pe_from_ports: PacketPeFromPort, packet_pe_to_ports: Vec<PacketSend>) 
 				-> Result<PacketEngine, PacketEngineError> {
-		let routing_table = Arc::new(Mutex::new(try!(RoutingTable::new()))); 
+		let routing_table = Arc::new(Mutex::new(try!(RoutingTable::new(cell_id.clone())))); 
 		let pe = PacketEngine { cell_id: cell_id.clone(), routing_table: routing_table, 
 			packet_pe_to_ports: packet_pe_to_ports };
 		try!(pe.entry_channel(scope, recv_entry_from_ca));
@@ -44,18 +44,17 @@ impl PacketEngine {
 				}
 				//println!("PacketEngine {}: received packet {} from cell agent entry mask {}", pe.cell_id, packet_count, entry.get_mask());
 				let mask = mask.and(entry.get_mask());
-				pe.forward(&packet_pe_to_ports, mask, packet_count, packet);
+				try!(pe.forward(&packet_pe_to_ports, mask, packet_count, packet));
 			}
 		});
 		Ok(())
 	}
 	fn forward(&self,packet_pe_to_ports: &Vec<PacketSend>, mask: Mask, 
 				packet_count: usize, packet: Packet) -> Result<(), PacketEngineError>{
-		//println!("PacketEngine {}: mask {}", cell_id, mask);
+		//println!("PacketEngine {}: forward packet {}", self.cell_id, packet.get_packet_count());
 		let port_nos = try!(Mask::port_nos_from_mask(&mask));
 		for port_no in port_nos.iter() {
 			let sender = packet_pe_to_ports.get(*port_no as usize);
-
 			match sender {
 				Some(s) => try!(s.send((packet_count, packet))),
 				None => return Err(PacketEngineError::Port(PortError::new(*port_no)))
@@ -98,7 +97,7 @@ impl PacketEngine {
 				{
 					entry = try!(table.lock().unwrap().get_entry(index));
 				}
-				//println!("PacketEngine {}: packet {} index {} entry {}", cell_id, packet_count, index, entry);
+				//println!("PacketEngine {}: packet {} index {} mask {}", cell_id, packet_count, index, entry.get_mask());
 				let mask = entry.get_mask();
 				let parent = entry.get_parent();
 				let other_indices = entry.get_other_indices();
@@ -117,9 +116,9 @@ impl PacketEngine {
 					for port_no in port_nos.iter() {
 						let other_index = *other_indices.get(*port_no as usize).expect("PacketEngine: No such other index");
 						header.set_other_index(other_index as u32);
+						//println!("PacketEngine {}: forwarding packet {} on port {}", cell_id, packet_count, port_no);
 						if *port_no as usize == 0 { 
 							try!(packet_pe_to_ca.send((packet_count, recv_port_no, index, packet)));
-							//println!("PacketEngine {}: forwarding packet {} to cell agent", cell_id, packet_count);
 						} else {
 							let sender = packet_pe_to_ports.get(*port_no as usize).unwrap();
 							try!(sender.send((packet_count, packet)));
