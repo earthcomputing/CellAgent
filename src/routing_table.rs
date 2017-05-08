@@ -1,15 +1,17 @@
 use std::fmt;
 use config::{MAX_ENTRIES, MAX_PORTS};
+use name::CellID;
 use routing_table_entry::{RoutingTableEntry};
 use utility::{Mask, PortNumber};
 
 #[derive(Debug)]
 pub struct RoutingTable {
+	id: CellID,
 	entries: Vec<RoutingTableEntry>,
 	connected_ports: Vec<u8>
 }
 impl RoutingTable {
-	pub fn new() -> Result<RoutingTable,RoutingTableError> {
+	pub fn new(id: CellID) -> Result<RoutingTable,RoutingTableError> {
 		let mut entries = Vec::new();
 		for i in 1..MAX_ENTRIES {
 			let port_number = try!(PortNumber::new(0,MAX_PORTS));
@@ -18,7 +20,7 @@ impl RoutingTable {
 			try!(entry.set_index(i));
 			entries.push(entry);
 		}
-		Ok(RoutingTable { entries: entries, connected_ports: Vec::new() })
+		Ok(RoutingTable { id: id, entries: entries, connected_ports: Vec::new() })
 	}
 	pub fn get_entry(&self, index: u32) -> Result<RoutingTableEntry, RoutingTableError> { 
 		match self.entries.get(index as usize) {
@@ -26,7 +28,10 @@ impl RoutingTable {
 			None => Err(RoutingTableError::Index(IndexError::new(index)))
 		}
 	}
-	pub fn set_entry(&mut self, entry: RoutingTableEntry) { self.entries[entry.get_index() as usize] = entry; }
+	pub fn set_entry(&mut self, entry: RoutingTableEntry) { 
+		self.entries[entry.get_index() as usize] = entry; 
+		//println!("Routing Table {}: index {}, mask {}", self.id, entry.get_index(), entry.get_mask());
+	}
 }
 impl fmt::Display for RoutingTable {
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result { 
