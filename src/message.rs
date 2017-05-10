@@ -6,7 +6,7 @@ use config::{CellNo, PathLength, TableIndex};
 use name::{CellID, TreeID};
 use packet::Packetizer;
 use traph;
-use utility::{Mask, Path, PortNumber};
+use utility::{DEFAULT_USER_MASK, Mask, Path, PortNumber};
 
 static message_count: AtomicUsize = ATOMIC_USIZE_INIT;
 pub fn get_next_count() -> usize { message_count.fetch_add(1, Ordering::SeqCst) } 
@@ -87,29 +87,29 @@ impl DiscoverMsg {
 		DiscoverMsg { header: header, payload: payload }
 	}
 }
+#[deny(unused_must_use)]
 impl Message for DiscoverMsg {
 	fn get_header(&self) -> MsgHeader { self.header.clone() }
 	fn get_payload(&self) -> Box<MsgPayload> { Box::new(self.payload.clone()) }
 	fn process(&self, ca: &mut CellAgent, port_no: u8, index: u32) -> Result<(), ProcessMsgError> {
-		let tree_id = try!(ca.get_tree_id(index));
+		let tree_id = ca.get_tree_id(index)?;
 		let new_tree_id = self.payload.get_tree_id();
-		let port_number = try!(PortNumber::new(port_no, ca.get_no_ports()));
+		let port_number = PortNumber::new(port_no, ca.get_no_ports())?;
 		//println!("Message {}: msg {} port {} {}", ca.get_id(), self.get_count(), port_no, self.payload);
 		if ca.exists(&new_tree_id) { return Ok(()); } // Ignore if traph exists for this tree - Simple quenching
 		let senders_index = self.payload.get_senders_index();
 		let hops = self.payload.get_hops();
 		let path = self.payload.get_path();
 		//println!("Message: tree_id {}, port_number {}", tree_id, port_number);
-		let entry = try!(ca.update_traph(new_tree_id.clone(), port_number, traph::PortStatus::Parent,
-				Vec::new(), senders_index, hops, Some(path)));
+		let entry = ca.update_traph(new_tree_id.clone(), port_number, traph::PortStatus::Parent,
+				Vec::new(), senders_index, hops, Some(path))?;
 		//println!("Message {}: entry {}", ca.get_id(), entry);
 		let index = entry.get_index();
 		// Send DiscoverD to sender
-		//let discoverd_msg = DiscoverDMsg::new(ca.get_id(), index);
-		//let port_mask = try!(Mask::new(port_no));
-		//let packets = try!(Packetizer::packetize(&discoverd_msg, [false;4]));
-		//println!("DiscoverMsg {}: Sending discoverD tree {}",ca.get_id(), new_tree_id);
-		//try!(ca.send_msg(&tree_id, packets, port_mask));
+		let discoverd_msg = DiscoverDMsg::new(ca.get_id(), index);
+		let packets = Packetizer::packetize(&discoverd_msg, index, [false;4])?;
+		println!("DiscoverMsg {}: Sending discoverD on tree {}, packet {}",ca.get_id(), new_tree_id, packets[0].get_packet_count());
+		try!(ca.send_msg(&new_tree_id, packets, Mask::new(0)?));
 		// Forward Discover on all except port_no
 		//let discover_msg = DiscoverMsg::new(tree_id.clone(), ca.get_id(), index, hops+1, path);
 		Ok(())
@@ -161,6 +161,7 @@ impl DiscoverDMsg {
 		DiscoverDMsg { header: header, payload: payload }
 	}
 }
+#[deny(unused_must_use)]
 impl Message for DiscoverDMsg {
 	fn get_header(&self) -> MsgHeader { self.header.clone() }
 	fn get_payload(&self) -> Box<MsgPayload> { Box::new(self.payload.clone()) }

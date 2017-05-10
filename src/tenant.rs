@@ -10,7 +10,7 @@ pub struct Tenant {
 	ncells: usize, 
 	children: HashMap<TenantID,Box<Tenant>>,
 }
-
+#[deny(unused_must_use)]
 impl Tenant {
 	pub fn new(id: &'static str, n: usize, parent_id: Option<TenantID>) -> Result<Tenant,TenantError> {
 		let name = match parent_id {

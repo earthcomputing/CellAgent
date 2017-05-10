@@ -68,10 +68,11 @@ fn main() {
 	});
 	println!("Main exit");
 }
+#[deny(unused_must_use)]
 fn build_datacenter<'a>(scope: &crossbeam::Scope, nports: u8, ncells: usize) -> Result<Datacenter<'a>,Box<Error>>{
 	//let edges = vec![(0,1),(1,2),(2,3),(3,4),(5,6),(6,7),(7,8),(8,9),(0,5),(1,6),(2,7),(3,8),(4,9)];
 	let edges = vec![(0,1),(1,2),(1,6),(3,4),(5,6),(6,7),(7,8),(8,9),(0,5),(2,3),(2,7),(3,8),(4,9)];
-	let dc = try!(Datacenter::new(scope, ncells, nports, edges));
+	let dc = Datacenter::new(scope, ncells, nports, edges)?;
 	let nap = time::Duration::from_millis(1000);
 	thread::sleep(nap);
 	Ok(dc)

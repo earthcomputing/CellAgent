@@ -6,6 +6,7 @@ pub struct NOC<'a> {
 	control: &'a NalCell,
 	backup: &'a NalCell
 }
+#[deny(unused_must_use)]
 impl<'a> NOC<'a> {
 	pub fn new(control: &'a NalCell, backup: &'a NalCell) -> NOC<'a> { 
 		NOC { control: control, backup: backup }

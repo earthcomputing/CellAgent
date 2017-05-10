@@ -52,6 +52,7 @@ pub struct NalCell { // Does not include PacketEngine so CelAgent can own it
 	cell_agent: CellAgent,
 	vms: Vec<VirtualMachine>,
 }
+#[deny(unused_must_use)]
 impl NalCell {
 	pub fn new(scope: &Scope, cell_no: CellNo, nports: PortNo, is_border: bool) -> Result<NalCell,NalCellError> {
 		if nports > MAX_PORTS { return Err(NalCellError::NumberPorts(NumberPortsError::new(nports))) }

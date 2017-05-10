@@ -10,6 +10,7 @@ pub struct RoutingTable {
 	entries: Vec<RoutingTableEntry>,
 	connected_ports: Vec<u8>
 }
+#[deny(unused_must_use)]
 impl RoutingTable {
 	pub fn new(id: CellID) -> Result<RoutingTable,RoutingTableError> {
 		let mut entries = Vec::new();
