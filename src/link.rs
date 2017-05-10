@@ -13,6 +13,7 @@ pub struct Link {
 	is_broken: bool,
 	is_connected: bool,		      //     Left Port        Link        Right Port
 }
+#[deny(unused_must_use)]
 impl Link {
 	pub fn new(scope: &Scope, left: &mut Port, rite: &mut Port) -> Result<Link,LinkError> {
 		let left_id = left.get_id();

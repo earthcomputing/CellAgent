@@ -25,6 +25,7 @@ pub struct Port {
 	packet_port_to_pe: PacketPortToPe,
 	recv_port_from_ca: RecvrPortFromCa,
 }
+#[deny(unused_must_use)]
 impl Port {
 	pub fn new(cell_id: &CellID, port_number: PortNumber, is_border: bool, is_connected: bool,
 			   packet_port_to_pe: PacketPortToPe, status_port_to_ca: StatusPortToCa,

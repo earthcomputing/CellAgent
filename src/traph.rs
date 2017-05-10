@@ -13,6 +13,7 @@ pub struct Traph {
 	table_entry: RoutingTableEntry,
 	elements: Box<[TraphElement]>,
 }
+//#[deny(unused_must_use)] Need to figure out get_all_hops and get_other_indices with this enabled
 impl Traph {
 	pub fn new(tree_id: TreeID, table_entry: RoutingTableEntry) -> Result<Traph, TraphError> {
 		let mut elements = Vec::new();
@@ -26,7 +27,10 @@ impl Traph {
 	pub fn get_table_index(&self) -> TableIndex { self.table_entry.get_index() }
 	fn get_all_hops(&self) -> BTreeSet<PathLength> {
 		let mut set = BTreeSet::new();
-		self.elements.iter().map(|e| set.insert(e.get_hops()));
+		//self.elements.iter().map(|e| set.insert(e.get_hops()));
+		for e in self.elements.iter() {
+			set.insert(e.get_hops());
+		}
 		set
 	}
 	pub fn add_element(&mut self, port_number: PortNumber, my_index: TableIndex, other_index: TableIndex,
@@ -37,7 +41,11 @@ impl Traph {
 	}
 	pub  fn get_other_indices(&self) -> [TableIndex; MAX_PORTS as usize] {
 		let mut indices = [0; MAX_PORTS as usize];
-		self.elements.iter().map(|e| indices[e.get_port_no() as usize] = e.get_other_index());
+		// Not sure why map gives warning about unused result
+		//self.elements.iter().map(|e| indices[e.get_port_no() as usize] = e.get_other_index());
+		for e in self.elements.iter() {
+			indices[e.get_port_no() as usize] = e.get_other_index();
+		}
 		indices
 	}
 	pub fn set_connected(&mut self, port_no: PortNumber) -> Result<(), TraphError> { 
@@ -149,6 +157,7 @@ struct TraphElement {
 	hops: PathLength,
 	path: Option<Path> 
 }
+#[deny(unused_must_use)]
 impl TraphElement {
 	fn new(is_connected: bool, port_no: PortNo, other_index: TableIndex, 
 			status: PortStatus, hops: PathLength, path: Option<Path>) -> TraphElement {

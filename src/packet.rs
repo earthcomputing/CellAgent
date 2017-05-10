@@ -23,6 +23,7 @@ pub struct Packet {
 	payload: Payload,
 	packet_count: usize
 }
+#[deny(unused_must_use)]
 impl Packet {
 	fn new(header: PacketHeader, payload: Payload) -> Packet {
 		Packet { header: header, payload: payload, packet_count: Packet::get_next_count() }
@@ -62,28 +63,27 @@ pub struct PacketHeader {
 						// xx01 xxxx => EC Protocol to VirtualMachine
 						// xx10 xxxx => Legacy Protocol to VirtualMachine
 }
+#[deny(unused_must_use)]
 impl PacketHeader {
 	pub fn new(uniquifier: Uniquifier, size: PacketNo, other_index: TableIndex, direction: MsgDirection,
 			is_last_packet: bool) -> PacketHeader {
 		// Assertion fails if I forgot to change PACKET_HEADER_SIZE when I changed PacketHeader struct
 		assert_eq!(PACKET_HEADER_SIZE, mem::size_of::<PacketHeader>());
-		let mut flags = match direction {
-			MsgDirection::Rootward => 0,
-			MsgDirection::Leafward => 1
-		};
-		flags = if is_last_packet { flags | 2 } else { flags };
-		PacketHeader { uniquifier: uniquifier, size: size, 
-			other_index: other_index, flags: flags }
+		let flags = if is_last_packet { 2 } else { 0 };
+		let mut ph = PacketHeader { uniquifier: uniquifier, size: size, 
+			other_index: other_index, flags: flags };
+		ph.set_direction(direction);
+		ph
 	}
 	pub fn get_uniquifier(&self) -> Uniquifier { self.uniquifier }
 	fn set_uniquifier(&mut self, uniquifier: Uniquifier) { self.uniquifier = uniquifier; }
 	pub fn get_size(&self) -> PacketNo { self.size }
-	pub fn is_rootcast(&self) -> bool { (self.flags & 1) == 0 }
-	pub fn is_leafcast(&self) -> bool { !self.is_rootcast() }
+	pub fn is_leafcast(&self) -> bool { (self.flags & 1) == 1 }
+	pub fn is_rootcast(&self) -> bool { !self.is_leafcast() }
 	pub fn is_last_packet(&self) -> bool { (self.flags & 2) == 2 }
 	fn set_direction(&mut self, direction: MsgDirection) { 
 		match direction {
-			MsgDirection::Leafward => self.flags = self.flags & 00000001,
+			MsgDirection::Leafward => self.flags = self.flags | 00000001,
 			MsgDirection::Rootward => self.flags = self.flags & 11111110
 		}
 	}
@@ -106,6 +106,7 @@ struct Payload {
 	no_data_bytes: u16,
 	bytes: [PacketElement; PAYLOAD_MAX],
 }
+#[deny(unused_must_use)]
 impl Payload {
 	pub fn new(data_bytes: Vec<PacketElement>) -> Payload {
 		let no_data_bytes = data_bytes.len();
@@ -130,11 +131,15 @@ impl Clone for Payload {
 	fn clone(&self) -> Payload { *self }
 }
 impl fmt::Debug for Payload { 
-	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result { self.fmt(f) }
+	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result { 
+		let s = &format!("{:?}", &self.bytes[0..10]); 
+		write!(f, "{}", s)
+	}
 }
 pub struct Packetizer {}
+#[deny(unused_must_use)]
 impl Packetizer {
-	pub fn packetize<M>(msg: &M, flags: [bool;4]) -> Result<Vec<Box<Packet>>, PacketizerError>
+	pub fn packetize<M>(msg: &M, other_index: TableIndex, flags: [bool;4]) -> Result<Vec<Box<Packet>>, PacketizerError>
 			where M: Message + Hash + serde::Serialize {
 		let serialized = try!(serde_json::to_string(&msg));
 		let msg_bytes = serialized.clone().into_bytes();
@@ -248,6 +253,7 @@ impl From<SizeError> for PacketizerError {
 }
 #[derive(Debug)]
 pub struct UnpacketizeError { msg: String }
+#[deny(unused_must_use)]
 impl UnpacketizeError { 
 	pub fn new(supplied: usize, required: usize) -> UnpacketizeError {
 		if supplied == 0 {

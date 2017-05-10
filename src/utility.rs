@@ -22,6 +22,7 @@ pub const BASE_TENANT_MASK: Mask = Mask { mask: 255 };   // All ports
 pub const DEFAULT_USER_MASK: Mask = Mask { mask: 254 };  // All ports except port 0
 #[derive(Debug, Copy, Clone, Serialize, Deserialize)]
 pub struct Mask { mask: u16 }
+#[deny(unused_must_use)]
 impl Mask {
 	pub fn new(i: PortNo) -> Result<Mask, UtilityError> {
 	    if i > MAX_PORTS {
@@ -135,6 +136,7 @@ impl fmt::Display for UnimplementedError {
 }
 #[derive(Debug, Copy, Clone, Hash, Serialize, Deserialize)]
 pub struct PortNumber { pub port_no: PortNo }
+#[deny(unused_must_use)]
 impl PortNumber {
 	pub fn new(no: PortNo, no_ports: PortNo) -> Result<PortNumber, PortNumberError> {
 		if no > no_ports {
@@ -166,6 +168,7 @@ impl fmt::Display for PortNumberError {
 }
 #[derive(Debug, Copy, Clone, Hash, Serialize, Deserialize)]
 pub struct Path { port_number: PortNumber }
+#[deny(unused_must_use)]
 impl Path {
 	pub fn new(port_no: PortNo, no_ports: PortNo) -> Result<Path, PortNumberError> {
 		let port_number = try!(PortNumber::new(port_no, no_ports));

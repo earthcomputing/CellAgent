@@ -10,6 +10,7 @@ pub struct RoutingTableEntry {
 	mask: Mask,
 	other_indices: [TableIndex; MAX_PORTS as usize]
 }
+#[deny(unused_must_use)]
 impl RoutingTableEntry {
 	pub fn new(table_index: TableIndex, inuse: bool, parent: PortNumber, mask: Mask, 
 			other_indices: [TableIndex; MAX_PORTS as usize]) -> RoutingTableEntry {

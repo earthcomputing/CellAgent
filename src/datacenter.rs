@@ -13,6 +13,7 @@ pub struct Datacenter<'a> {
 	links: Vec<Link>,
 	noc: Option<NOC<'a>>
 }
+#[deny(unused_must_use)]
 impl<'a> Datacenter<'a> {
 	pub fn new(scope: &Scope, ncells: CellNo, nports: PortNo, edge_list: Vec<(CellNo,CellNo)>) -> 
 				Result<Datacenter<'a>,DatacenterError> {
