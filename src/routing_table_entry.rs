@@ -35,30 +35,32 @@ impl RoutingTableEntry {
 	pub fn get_mask(&self) -> Mask { self.mask }
 	pub fn set_mask(&mut self, mask: Mask) { self.mask = mask; }
 	pub fn get_other_indices(&self) -> [TableIndex; MAX_PORTS as usize] { self.other_indices }
-	pub fn set_other_index(&mut self, port_index: PortNo, other_index: TableIndex) 
+	pub fn set_other_index(&mut self, port_index: PortNumber, other_index: TableIndex) 
 			-> Result<(),RoutingTableEntryError> {
-		match self.other_indices.get(port_index as usize) {
+		let port_no = port_index.get_port_no();
+		match self.other_indices.get(port_no as usize) {
 			Some(other) => (),
 			None => return Err(RoutingTableEntryError::Port(PortError::new(port_index)))
 		};
-		self.other_indices[port_index as usize] = other_index;
+		self.other_indices[port_no as usize] = other_index;
 		Ok(())
 	}
-	pub fn update_parent(&self, parent: u8, other_index: u32) -> Result<RoutingTableEntry,RoutingTableEntryError> {
-		if parent > MAX_PORTS as u8 { return Err(RoutingTableEntryError::Port(PortError::new(parent))); }
+	pub fn update_parent(&self, p: PortNumber, other_index: u32) -> Result<RoutingTableEntry,RoutingTableEntryError> {
+		let parent = p.get_port_no();
+		if parent > MAX_PORTS as u8 { return Err(RoutingTableEntryError::Port(PortError::new(p))); }
 		let mut indices = self.other_indices.clone();
 		indices[parent as usize] = other_index;
 		Ok(RoutingTableEntry { index: self.index, parent: parent, inuse: self.inuse, mask: self.mask,
 							other_indices: indices })
 	}
-	pub fn update_children(&mut self, child: u8, other_index: u32) -> Result<RoutingTableEntry,RoutingTableEntryError> {
+	pub fn update_children(&mut self, child: PortNumber, other_index: u32) -> Result<RoutingTableEntry,RoutingTableEntryError> {
 		let mut indices = self.other_indices.clone();
-		let child_mask = match Mask::new(child) {
+		let child_mask = match Mask::new(child.get_port_no()) {
 			Ok(m) => m,
 			Err(_) => return Err(RoutingTableEntryError::Port(PortError::new(child)))
 		};
 		self.mask = self.mask.or(child_mask);
-		indices[child as usize] = other_index;
+		indices[child.get_port_no() as usize] = other_index;
 		Ok(RoutingTableEntry { index: self.index, parent: self.parent, inuse: self.inuse, 
 				mask: self.mask, other_indices: indices })
 	}
@@ -106,8 +108,8 @@ impl fmt::Display for RoutingTableEntryError {
 #[derive(Debug)]
 pub struct PortError { msg: String }
 impl PortError { 
-	pub fn new(port_no: u8) -> PortError {
-		PortError { msg: format!("Port number {} is greater than the maximum of {}", port_no, MAX_PORTS) }
+	pub fn new(port_number: PortNumber) -> PortError {
+		PortError { msg: format!("Port number {} is greater than the maximum of {}", port_number, MAX_PORTS) }
 	}
 }
 impl Error for PortError {

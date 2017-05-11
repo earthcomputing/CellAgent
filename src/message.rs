@@ -38,7 +38,7 @@ impl fmt::Display for MsgDirection {
 	}
 }
 
-pub trait Message {
+pub trait Message: fmt::Display {
 	fn get_header(&self) -> MsgHeader;
 	fn get_payload(&self) -> Box<MsgPayload>;
 	fn get_count(&self) -> usize { self.get_header().get_count() }
@@ -54,7 +54,7 @@ pub trait Message {
 }
 pub trait MsgPayload {}
 #[derive(Debug, Clone, Hash, Serialize, Deserialize)]
-// Header may not contain config::MSG_HEADER_DELIMITER
+// Header may not contain '{' or '}' or a separate object, such as TreeID
 pub struct MsgHeader {
 	msg_count: usize,
 	msg_type: MsgType,
@@ -113,8 +113,8 @@ impl Message for DiscoverMsg {
 		// Send DiscoverD to sender
 		let discoverd_msg = DiscoverDMsg::new(ca.get_id(), index);
 		let packets = Packetizer::packetize(&discoverd_msg, index, [false;4])?;
-		println!("DiscoverMsg {}: Sending discoverD on tree {}, packet {}",ca.get_id(), new_tree_id, packets[0].get_packet_count());
-		try!(ca.send_msg(&new_tree_id, packets, Mask::new(0)?));
+		println!("DiscoverMsg {}: Sending DiscoverD on tree {}, index {}",ca.get_id(), new_tree_id, index);
+		ca.send_msg(&new_tree_id, packets, Mask::new(0)?)?;
 		// Forward Discover on all except port_no
 		//let discover_msg = DiscoverMsg::new(tree_id.clone(), ca.get_id(), index, hops+1, path);
 		Ok(())
@@ -173,10 +173,18 @@ impl DiscoverDMsg {
 impl Message for DiscoverDMsg {
 	fn get_header(&self) -> MsgHeader { self.header.clone() }
 	fn get_payload(&self) -> Box<MsgPayload> { Box::new(self.payload.clone()) }
-	fn process(&self, cell_agent: &mut CellAgent, port_no: u8, index: u32) 
+	fn process(&self, ca: &mut CellAgent, port_no: u8, index: u32) 
 			-> Result<(), ProcessMsgError> {
-		println!("DiscoverDMsg: processing {} {} {}", cell_agent, port_no, index);
+		let my_index = self.payload.get_table_index();
+		let tree_id = ca.get_tree_id(my_index)?;
+		println!("DiscoverDMsg: processing {} {} {} {}", ca.get_id(), port_no, my_index, tree_id);
+		ca.add_child(&tree_id, port_no, index)?;
 		Ok(())
+	}
+}
+impl fmt::Display for DiscoverDMsg {
+	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+		write!(f, "{} {}", self.header, self.payload)
 	}
 }
 #[derive(Debug, Clone, Hash, Serialize, Deserialize)]
