@@ -14,7 +14,7 @@ use packet;
 use packet::{Packet, Packetizer};
 use packet_engine::PacketEngine;
 use port;
-use routing_table_entry::RoutingTableEntry;
+use routing_table_entry::{RoutingTableEntry, RoutingTableEntryError};
 use traph;
 use traph::{Traph};
 use utility::{BASE_TENANT_MASK, DEFAULT_USER_MASK, Mask, Path, PortNumber, PortNumberError, UnimplementedError};
@@ -112,10 +112,11 @@ impl CellAgent {
 				hops: PathLength, path: Option<Path>) 
 			-> Result<RoutingTableEntry, CellAgentError> {
 		let mask = Mask::mask_from_port_numbers(children)?;
+		// Note that traphs is updated transactionally; I remove an entry, update it, then put it back.
 		let mut traphs = self.traphs.lock().unwrap();
 		let traph = traphs.remove(&tree_id);  // Avoids lifetime problem
 		let (index, mut other_indices) = match traph {
-			Some(t) => (t.get_table_index(), t.get_other_indices()),         // Tree exists 		
+			Some(t) => (t.get_table_index(), t.get_other_indices()),    // Tree exists 		
 			None => (self.clone().use_index()?, DEFAULT_OTHER_INDICES)  // Need to create tree
 		};
 		let port_no = port_number.get_port_no();
@@ -124,12 +125,28 @@ impl CellAgent {
 		let mut traph = Traph::new(tree_id.clone(), entry)?;
 		traph.add_element(port_number, index, other_index, port_status, hops, path); 
 		//println!("CellAgent {}: Tree {} {} {}", self.cell_id, tree_id, entry, traph);
+		// Here's the end of teh transaction
 		traphs.insert(tree_id.clone(), traph);
 		{
 			self.trees.lock().unwrap().insert(index, tree_id);
 		}
 		self.entry_ca_to_pe.send((entry,None))?;
 		Ok(entry)
+	}
+	pub fn add_child(&self, tree_id: &TreeID, port_no: PortNo, other_index: TableIndex)
+			-> Result<(), CellAgentError> {
+		let mut traphs = self.traphs.lock().unwrap();
+		let traph = traphs.remove(&tree_id);
+		match traph {
+			Some(mut t) => {
+				let port_number = PortNumber::new(port_no, self.no_ports)?;
+				let mut entry = t.add_child(port_number)?;
+				entry.set_other_index(port_number, other_index)?;
+				self.entry_ca_to_pe.send((entry,None))?;
+			},
+			None => return Err(CellAgentError::Tree(TreeError::new(tree_id)))
+		}
+		Ok(())
 	}
 	fn port_status(&mut self, scope: &Scope, connected_tree_id: TreeID, connected_tree_entry: RoutingTableEntry,
 			my_entry: RoutingTableEntry, status_ca_from_port: StatusCaFromPort, 
@@ -213,13 +230,13 @@ impl CellAgent {
 				packets.push(Box::new(packet));
 				if header.is_last_packet() {
 					//println!("CellAgent {}: unpacketizing packet {}", ca.cell_id, packet_count);
-					let msg = match Packetizer::unpacketize(packets) {
-						Ok(m) => {
-							println!("CellAgent {}: got msg {} of type {} on port {}", ca.cell_id, m.get_count(), m.get_header().get_msg_type(), port_no);							
-							m.process(&mut ca.clone(), port_no, index)?;
+					match Packetizer::unpacketize(packets) {
+						Ok(msg) => {
+							println!("CellAgent {}: got msg {} on port {} {}", ca.cell_id, msg.get_count(), port_no, msg);							
+							msg.process(&mut ca.clone(), port_no, index)?;
 						}
 						Err(err) => {
-							println!("CellAgent {}: unpacketizer error {}", ca.cell_id, err);
+							//println!("CellAgent {}: unpacketizer error {}", ca.cell_id, err);
 							return Err(CellAgentError::Packetizer(err))
 						}
 					};
@@ -264,6 +281,7 @@ pub enum CellAgentError {
 	BadPacket(BadPacketError),
 	Utility(UtilityError),
 	Routing(RoutingTableError),
+	RoutingTableEntry(RoutingTableEntryError),
 	SendTableEntry(SendError<(RoutingTableEntry,Option<(Mask,Packet)>)>),
 	SendCaPe(SendError<(usize,u32,Mask,Packet)>),
 	SendPacket(PacketSendError),
@@ -290,6 +308,7 @@ impl Error for CellAgentError {
 			CellAgentError::Traph(ref err) => err.description(),
 			CellAgentError::Utility(ref err) => err.description(),
 			CellAgentError::Routing(ref err) => err.description(),
+			CellAgentError::RoutingTableEntry(ref err) => err.description(),
 			CellAgentError::SendTableEntry(ref err) => err.description(),
 			CellAgentError::SendCaPe(ref err) => err.description(),
 			CellAgentError::SendPacket(ref err) => err.description(),
@@ -316,6 +335,7 @@ impl Error for CellAgentError {
 			CellAgentError::Traph(ref err) => Some(err),
 			CellAgentError::Utility(ref err) => Some(err),
 			CellAgentError::Routing(ref err) => Some(err),
+			CellAgentError::RoutingTableEntry(ref err) => Some(err),
 			CellAgentError::SendTableEntry(ref err) => Some(err),
 			CellAgentError::SendCaPe(ref err) => Some(err),
 			CellAgentError::SendPacket(ref err) => Some(err),
@@ -344,6 +364,7 @@ impl fmt::Display for CellAgentError {
 			CellAgentError::Traph(ref err) => write!(f, "Cell Agent Traph Error caused by {}", err),
 			CellAgentError::Utility(ref err) => write!(f, "Cell Agent Utility Error caused by {}", err),
 			CellAgentError::Routing(ref err) => write!(f, "Cell Agent Routing Table Error caused by {}", err),
+			CellAgentError::RoutingTableEntry(ref err) => write!(f, "Cell Agent Routing Table Entry Error caused by {}", err),
 			CellAgentError::SendTableEntry(ref err) => write!(f, "Cell Agent Send Table Entry Error caused by {}", err),
 			CellAgentError::SendCaPe(ref err) => write!(f, "Cell Agent Send Packet to Packet Engine Error caused by {}", err),
 			CellAgentError::SendPacket(ref err) => write!(f, "Cell Agent Send Packet to Packet Engine Error caused by {}", err),
@@ -364,6 +385,9 @@ impl From<UtilityError> for CellAgentError {
 }
 impl From<RoutingTableError> for CellAgentError {
 	fn from(err: RoutingTableError) -> CellAgentError { CellAgentError::Routing(err) }
+}
+impl From<RoutingTableEntryError> for CellAgentError {
+	fn from(err: RoutingTableEntryError) -> CellAgentError { CellAgentError::RoutingTableEntry(err) }
 }
 impl From<SendError<(RoutingTableEntry,Option<(Mask,Packet)>)>> for CellAgentError {
 	fn from(err: SendError<(RoutingTableEntry, Option<(Mask,Packet)>)>) 

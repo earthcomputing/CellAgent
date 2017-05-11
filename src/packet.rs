@@ -203,8 +203,8 @@ impl Packetizer {
 		let part1 = iter1.next().unwrap();
 		let mut iter2 = part1.splitn(3,'{');
 		// The serialization if the header follows the second '{'
-		let foo = iter2.next().unwrap();
-		let bar = iter2.next().unwrap();
+		iter2.next().unwrap();
+		iter2.next().unwrap();
 		let part2 = iter2.next().unwrap();
 		let serialized_header = format!("{{ {} }}", part2);
 		let msg_header: MsgHeader = serde_json::from_str(&serialized_header)?;

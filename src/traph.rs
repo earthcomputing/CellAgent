@@ -4,7 +4,7 @@ use config::{MAX_PORTS, PathLength, PortNo, TableIndex};
 use name::{TreeID, PortID};
 use port::Port;
 use routing_table_entry::RoutingTableEntry;
-use utility::{Path, PortNumber};
+use utility::{Mask, Path, PortNumber, UtilityError};
 
 #[derive(Debug, Clone)]
 pub struct Traph {
@@ -25,6 +25,16 @@ impl Traph {
 	}
 	pub fn get_tree_id(&self) -> TreeID { self.tree_id.clone() }
 	pub fn get_table_index(&self) -> TableIndex { self.table_entry.get_index() }
+	pub fn add_child(&mut self, port_number: PortNumber) -> Result<RoutingTableEntry, TraphError> {
+		let port_no = port_number.get_port_no();
+		if let Some(element) = self.elements.get_mut(port_no as usize) {
+			element.set_status(PortStatus::Child);
+			self.table_entry.or_with_mask(Mask::new(port_no)?);
+			Ok(self.table_entry)
+		} else {
+			return Err(TraphError::Lookup(LookupError::new(port_number)))
+		}
+	}
 	fn get_all_hops(&self) -> BTreeSet<PathLength> {
 		let mut set = BTreeSet::new();
 		//self.elements.iter().map(|e| set.insert(e.get_hops()));
@@ -101,18 +111,21 @@ use name::NameError;
 pub enum TraphError {
 	Name(NameError),
 	Lookup(LookupError),
+	Utility(UtilityError)
 }
 impl Error for TraphError {
 	fn description(&self) -> &str {
 		match *self {
 			TraphError::Name(ref err) => err.description(),
 			TraphError::Lookup(ref err) => err.description(),
+			TraphError::Utility(ref err) => err.description(),
 		}
 	}
 	fn cause(&self) -> Option<&Error> {
 		match *self {
 			TraphError::Name(ref err) => Some(err),
 			TraphError::Lookup(ref err) => Some(err),
+			TraphError::Utility(ref err) => Some(err),
 		}
 	}
 }
@@ -121,14 +134,15 @@ impl fmt::Display for TraphError {
 		match *self {
 			TraphError::Name(ref err) => write!(f, "Traph Name Error caused by {}", err),
 			TraphError::Lookup(ref err) => write!(f, "Traph Lookup Error caused by {}", err),
+			TraphError::Utility(ref err) => write!(f, "Traph Utility Error caused by {}", err),
 		}
 	}
 }
 #[derive(Debug)]
 pub struct LookupError { msg: String }
 impl LookupError { 
-	pub fn new(port_id: PortID) -> LookupError {
-		LookupError { msg: format!("No traph entry for port {}", port_id) }
+	pub fn new(port_number: PortNumber) -> LookupError {
+		LookupError { msg: format!("No traph entry for port {}", port_number) }
 	}
 }
 impl Error for LookupError {
@@ -145,6 +159,9 @@ impl From<LookupError> for TraphError {
 }
 impl From<NameError> for TraphError {
 	fn from(err: NameError) -> TraphError { TraphError::Name(err) }
+}
+impl From<UtilityError> for TraphError {
+	fn from(err: UtilityError) -> TraphError { TraphError::Utility(err) }
 }
 
 #[derive(Debug, Clone)]
@@ -171,7 +188,7 @@ impl TraphElement {
 	fn is_connected(&self) -> bool { self.is_connected }
 	fn set_connected(&mut self) { self.is_connected = true; }
 	fn set_disconnected(&mut self) { self.is_connected = false; }
-	
+	fn set_status(&mut self, status: PortStatus) { self.status = status; }	
 }
 impl fmt::Display for TraphElement {
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
