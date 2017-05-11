@@ -1,6 +1,7 @@
 use std::fmt;
 use std::sync::Arc;
 use std::sync::atomic::{ATOMIC_USIZE_INIT, AtomicUsize, Ordering};
+use serde;
 use cellagent::{DEFAULT_OTHER_INDICES, CellAgent};
 use config::{CellNo, PathLength, TableIndex};
 use name::{CellID, TreeID};
@@ -53,6 +54,7 @@ pub trait Message {
 }
 pub trait MsgPayload {}
 #[derive(Debug, Clone, Hash, Serialize, Deserialize)]
+// Header may not contain config::MSG_HEADER_DELIMITER
 pub struct MsgHeader {
 	msg_count: usize,
 	msg_type: MsgType,
@@ -80,10 +82,13 @@ pub struct DiscoverMsg {
 	payload: DiscoverPayload
 }
 impl DiscoverMsg {
-	pub fn new(tree_id: TreeID, sending_node_id: CellID, 
+	pub fn new(tree_id: TreeID, sending_cell_id: CellID, 
 			my_index: TableIndex, hops: PathLength, path: Path) -> DiscoverMsg {
 		let header = MsgHeader::new(MsgType::Discover, MsgDirection::Leafward);
-		let payload = DiscoverPayload::new(tree_id, sending_node_id, my_index, hops, path);
+		let payload = DiscoverPayload::new(tree_id, sending_cell_id, my_index, hops, path);
+		DiscoverMsg { header: header, payload: payload }
+	}
+	pub fn build(header: MsgHeader, payload: DiscoverPayload) -> DiscoverMsg {
 		DiscoverMsg { header: header, payload: payload }
 	}
 }
@@ -122,21 +127,21 @@ impl fmt::Display for DiscoverMsg {
 	}
 }
 #[derive(Debug, Clone, Hash, Serialize, Deserialize)]
-struct DiscoverPayload {
+pub struct DiscoverPayload {
 	tree_id: TreeID,
-	sending_node_id: CellID,
+	sending_cell_id: CellID,
 	senders_index: TableIndex,
 	hops: PathLength,
 	path: Path,
 }
 impl DiscoverPayload {
-	fn new(tree_id: TreeID, sending_node_id: CellID, senders_index: TableIndex,  
+	fn new(tree_id: TreeID, sending_cell_id: CellID, senders_index: TableIndex,  
 			hops: PathLength, path: Path) -> DiscoverPayload {
-		DiscoverPayload { tree_id: tree_id, sending_node_id: sending_node_id, 
+		DiscoverPayload { tree_id: tree_id, sending_cell_id: sending_cell_id, 
 			senders_index: senders_index, hops: hops, path: path }
 	}
 	fn get_tree_id(&self) -> TreeID { self.tree_id.clone() }
-	fn get_sending_node(&self) -> CellID { self.sending_node_id.clone() }
+	fn get_sending_cell(&self) -> CellID { self.sending_cell_id.clone() }
 	fn get_senders_index(&self) -> TableIndex { self.senders_index }
 	fn get_hops(&self) -> PathLength { self.hops }
 	fn get_path(&self) -> Path { self.path }
@@ -144,7 +149,7 @@ impl DiscoverPayload {
 impl MsgPayload for DiscoverPayload {}
 impl fmt::Display for DiscoverPayload { 
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result { 
-		let s = format!("Tree {}, sending cell {}, senders_index {}, hops {}, path {}", self.tree_id, self.sending_node_id,
+		let s = format!("Tree {}, sending cell {}, senders_index {}, hops {}, path {}", self.tree_id, self.sending_cell_id,
 				self.senders_index, self.hops, self.path);
 		write!(f, "{}", s) 
 	}
@@ -155,9 +160,12 @@ pub struct DiscoverDMsg {
 	payload: DiscoverDPayload
 }
 impl DiscoverDMsg {
-	fn new(sending_cell_id: CellID, index: TableIndex) -> DiscoverDMsg {
+	pub fn new(sending_cell_id: CellID, index: TableIndex) -> DiscoverDMsg {
 		let header = MsgHeader::new(MsgType::DiscoverD, MsgDirection::Rootward);
 		let payload = DiscoverDPayload::new(index);
+		DiscoverDMsg { header: header, payload: payload }
+	}
+	pub fn build(header: MsgHeader, payload: DiscoverDPayload) -> DiscoverDMsg {
 		DiscoverDMsg { header: header, payload: payload }
 	}
 }
@@ -175,6 +183,7 @@ impl Message for DiscoverDMsg {
 pub struct DiscoverDPayload {
 	my_index: TableIndex,
 }
+#[deny(unused_must_use)]
 impl DiscoverDPayload {
 	fn new(index: TableIndex) -> DiscoverDPayload {
 		DiscoverDPayload { my_index: index }

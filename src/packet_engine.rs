@@ -44,7 +44,7 @@ impl PacketEngine {
 					let unlocked = table.lock().unwrap();
 					entry = (*unlocked).get_entry(index)?;
 				}
-				println!("PacketEngine {}: received packet {} from cell agent index {}", pe.cell_id, packet_count, index);
+				//println!("PacketEngine {}: received packet {} from cell agent index {}", pe.cell_id, packet_count, index);
 				pe.forward(packet_count, 0 as u8, entry, mask, packet)?;
 			}
 		});
@@ -52,7 +52,7 @@ impl PacketEngine {
 	}
 	fn forward(&self, packet_count: usize, recv_port_no: u8, entry: RoutingTableEntry, mask: Mask, packet: Packet) 
 			-> Result<(), PacketEngineError>{
-		println!("PacketEngine {}: forward packet {}, recv_port {}", self.cell_id, packet.get_packet_count(), recv_port_no);
+		//println!("PacketEngine {}: forward packet {}, recv_port {}", self.cell_id, packet.get_packet_count(), recv_port_no);
 		let mut header = packet.get_header();
 		let parent = entry.get_parent();
 		let index = header.get_other_index();
@@ -67,7 +67,7 @@ impl PacketEngine {
 				} else {
 					if let Some(sender) = self.packet_pe_to_ports.get(parent as usize) {
 						sender.send((packet_count, packet))?;
-						println!("PacketEngine {}: sent packet {} rootward on port {}", self.cell_id, packet.get_packet_count(), parent);
+						//println!("PacketEngine {}: sent packet {} rootward on port {}", self.cell_id, packet.get_packet_count(), parent);
 					} else {
 						let max_ports = self.packet_pe_to_ports.len() as u8;
 						return Err(PacketEngineError::PortNumber(PortNumberError::new(parent, max_ports)));
@@ -127,7 +127,7 @@ impl PacketEngine {
 				{
 					entry = table.lock().unwrap().get_entry(index)?;
 				}
-				println!("PacketEngine {}: got packet {} index {} port {}", cell_id, packet_count, index, recv_port_no);
+				//println!("PacketEngine {}: got packet {} index {} port {}", cell_id, packet_count, index, recv_port_no);
 				let mask = entry.get_mask();
 				let other_indices = entry.get_other_indices();
 				// Verify that port_no is valid

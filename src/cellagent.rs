@@ -195,7 +195,7 @@ impl CellAgent {
 			//println!("CellAgent {}: Sending packet {}", self.cell_id, packets[0].get_packet_count());
 			let packet_count = packet.get_packet_count();
 			self.packet_ca_to_pe.send((packet_count, index, user_mask, **packet))?;
-			println!("CellAgent {}: sent packet {} on tree {} to packet engine with index {}", self.cell_id, packet_count, tree_id, index);
+			//println!("CellAgent {}: sent packet {} on tree {} to packet engine with index {}", self.cell_id, packet_count, tree_id, index);
 		}
 		Ok(())
 	}
@@ -207,15 +207,22 @@ impl CellAgent {
 				let (packet_count, port_no, index, packet) = packet_ca_from_pe.recv()?;
 				let header = packet.get_header();
 				let is_rootcast = header.is_rootcast();
-				println!("CellAgent {}: got packet {} rootward? {} is_last? {}", ca.cell_id, packet_count, is_rootcast, header.is_last_packet());
+				//println!("CellAgent {}: got packet {} rootward? {} is_last? {}", ca.cell_id, packet_count, is_rootcast, header.is_last_packet());
 				let uniquifier = header.get_uniquifier();
 				let packets = packet_assembler.entry(uniquifier).or_insert(Vec::new());
 				packets.push(Box::new(packet));
 				if header.is_last_packet() {
-					println!("CellAgent {}: unpacketizing packet {}", ca.cell_id, packet_count);
-					let msg = Packetizer::unpacketize(packets)?;
-					println!("CellAgent {}: got msg {} of type {} on port {}", ca.cell_id, msg.get_count(), msg.get_header().get_msg_type(), port_no);
-					msg.process(&mut ca.clone(), port_no, index)?;
+					//println!("CellAgent {}: unpacketizing packet {}", ca.cell_id, packet_count);
+					let msg = match Packetizer::unpacketize(packets) {
+						Ok(m) => {
+							println!("CellAgent {}: got msg {} of type {} on port {}", ca.cell_id, m.get_count(), m.get_header().get_msg_type(), port_no);							
+							m.process(&mut ca.clone(), port_no, index)?;
+						}
+						Err(err) => {
+							println!("CellAgent {}: unpacketizer error {}", ca.cell_id, err);
+							return Err(CellAgentError::Packetizer(err))
+						}
+					};
 				}
 			}	
 		});

@@ -9,8 +9,10 @@ use std::hash::{Hash, Hasher};
 use std::collections::hash_map::DefaultHasher;
 use serde;
 use serde_json;
-use config::{PACKET_MIN, PACKET_MAX, PAYLOAD_DEFAULT_ELEMENT, PacketElement, PacketNo, TableIndex, Uniquifier};
-use message::{Message, DiscoverMsg, DiscoverDMsg, MsgDirection};
+use config::{MSG_HEADER_DELIMITER, PACKET_MIN, PACKET_MAX, PAYLOAD_DEFAULT_ELEMENT, 
+	PacketElement, PacketNo, TableIndex, Uniquifier};
+use message::{Message, DiscoverMsg, DiscoverPayload, DiscoverDMsg, DiscoverDPayload, 
+	MsgDirection, MsgHeader, MsgType};
 
 const LARGEST_MSG: usize = std::u32::MAX as usize;
 const PAYLOAD_MIN: usize = PACKET_MAX - PACKET_HEADER_SIZE;
@@ -141,7 +143,7 @@ pub struct Packetizer {}
 impl Packetizer {
 	pub fn packetize<M>(msg: &M, other_index: TableIndex, flags: [bool;4]) -> Result<Vec<Box<Packet>>, PacketizerError>
 			where M: Message + Hash + serde::Serialize {
-		let serialized = try!(serde_json::to_string(&msg));
+		let serialized = serde_json::to_string(&msg)?;
 		let msg_bytes = serialized.clone().into_bytes();
 		let payload_size = Packetizer::packet_payload_size(msg_bytes.len());
 		let num_packets = (msg_bytes.len() + payload_size - 1)/ payload_size; // Poor man's ceiling
@@ -153,7 +155,7 @@ impl Packetizer {
 			let (size, is_last_packet) = if i == (num_packets-1) {
 				(last_packet_size, true)
 			} else {
-				(num_packets, false)
+				(num_packets - i, false)
 			};
 			let packet_header = PacketHeader::new(unique_id, size as u16, 0, direction, is_last_packet);
 			// Not a very Rusty way to put bytes into payload
@@ -178,9 +180,35 @@ impl Packetizer {
 			all_bytes.extend_from_slice(payload.get_bytes().as_slice());
 			if is_last_packet { all_bytes.truncate(last_packet_size as usize); }
 		}
-		let serialized = try!(str::from_utf8(&all_bytes));
-		let deserialized: DiscoverMsg = try!(serde_json::from_str(&serialized));
-		Ok(Box::new(deserialized))
+		let serialized = str::from_utf8(&all_bytes)?;
+		let deserialized = match Packetizer::msg_type(serialized)? {
+			MsgType::Discover  => Packetizer::make_discover(serialized)?,
+			MsgType::DiscoverD => Packetizer::make_discoverd(serialized)?,
+		};
+		Ok(deserialized)
+	}
+	fn make_discover(serialized: &str) -> Result<Box<Message>, PacketizerError>{
+		let msg: DiscoverMsg = serde_json::from_str(&serialized)?;
+		Ok(Box::new(msg))
+	}
+	fn make_discoverd(serialized: &str) -> Result<Box<Message>, PacketizerError>{
+		let msg: DiscoverDMsg = serde_json::from_str(&serialized)?;
+		Ok(Box::new(msg))
+	}
+
+	// I need this method to figure out the message type for deserialization
+	// I tried to serialized the msg header and payload separately, but Rust says MsgPayload isn't serializable
+	fn msg_type(serialized: &str) -> Result<MsgType,PacketizerError> {
+		let mut iter1 = serialized.splitn(2,'}');
+		let part1 = iter1.next().unwrap();
+		let mut iter2 = part1.splitn(3,'{');
+		// The serialization if the header follows the second '{'
+		let foo = iter2.next().unwrap();
+		let bar = iter2.next().unwrap();
+		let part2 = iter2.next().unwrap();
+		let serialized_header = format!("{{ {} }}", part2);
+		let msg_header: MsgHeader = serde_json::from_str(&serialized_header)?;
+		Ok(msg_header.get_msg_type())
 	}
 	fn packet_payload_size(len: usize) -> usize {
 		match len-1 { 
@@ -228,7 +256,7 @@ impl fmt::Display for PacketizerError {
 			PacketizerError::Size(ref err) => write!(f, "Packetizer Size Error caused by {}", err),
 			PacketizerError::Utf8(ref err) => write!(f, "Packetizer Utf8 Error caused by {}", err),
 			PacketizerError::Unpacketize(ref err) => write!(f, "Packetizer Unpacketize Error caused by {}", err),
-			PacketizerError::Serde(ref err) => write!(f, "Packetizer Serialization Error caused by {}", err),
+			PacketizerError::Serde(ref err) => write!(f, "Packetizer Serde Error caused by {}", err),
 		}
 	}
 }
@@ -255,12 +283,8 @@ impl From<SizeError> for PacketizerError {
 pub struct UnpacketizeError { msg: String }
 #[deny(unused_must_use)]
 impl UnpacketizeError { 
-	pub fn new(supplied: usize, required: usize) -> UnpacketizeError {
-		if supplied == 0 {
-			UnpacketizeError { msg: format!("Zero bytes supplied") }
-		} else {
-			UnpacketizeError { msg: format!("Only {} bytes of {} required", supplied, required) }
-		}
+	pub fn new(serialized: &str) -> UnpacketizeError {
+		UnpacketizeError { msg: format!("Cannot deserialize {}", serialized) }
 	}
 }
 impl Error for UnpacketizeError {

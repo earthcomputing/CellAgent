@@ -23,3 +23,5 @@ pub const PACKET_MIN: usize = 64;
 pub const PACKET_MAX: usize = 9000;
 // Size of chunk identifier 
 pub const CHUNK_ID_SIZE: u64 = 48;
+// Delimiter between serialized message header and serialized payload
+pub const MSG_HEADER_DELIMITER: char = '\0';
