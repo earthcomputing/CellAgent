@@ -1,6 +1,6 @@
 use std::fmt;
 use config::{MAX_PORTS, MAX_ENTRIES, PortNo, TableIndex};
-use utility::{Mask, PortNumber};
+use utility::{Mask, PortNumber, PortNumberError};
 
 #[derive(Debug, Copy, Clone)]
 pub struct RoutingTableEntry {
@@ -12,62 +12,46 @@ pub struct RoutingTableEntry {
 }
 #[deny(unused_must_use)]
 impl RoutingTableEntry {
-	pub fn new(table_index: TableIndex, inuse: bool, parent: PortNumber, mask: Mask, 
+	pub fn new(index: TableIndex, inuse: bool, parent: PortNumber, mask: Mask, 
 			other_indices: [TableIndex; MAX_PORTS as usize]) -> RoutingTableEntry {
-		RoutingTableEntry { index: table_index, parent: parent.get_port_no(),
+		RoutingTableEntry { index: index, parent: parent.get_port_no(),
 			inuse: inuse, mask: mask, other_indices: other_indices }
 	}
-	pub fn get_index(&self) -> TableIndex { self.index }
-	pub fn set_index(&mut self, index: TableIndex) -> Result<(), RoutingTableEntryError> { 
-		if index > MAX_ENTRIES { Err(RoutingTableEntryError::Index(IndexError::new(index as TableIndex))) }
-		else {
-			self.index = index; 
-			Ok(())
-		}
+	pub fn default(index: TableIndex) -> Result<RoutingTableEntry, RoutingTableEntryError> {
+		let port_number = PortNumber::new(0, MAX_PORTS)?;
+		Ok(RoutingTableEntry::new(index, false, port_number, Mask::empty(), [0; MAX_PORTS as usize]))
 	}
+	pub fn get_index(&self) -> TableIndex { self.index }
 	pub fn or_with_mask(&mut self, mask: Mask) { self.mask = self.mask.or(mask); }
 	pub fn and_with_mask(&mut self, mask: Mask) { self.mask = self.mask.and(mask); }
-	pub fn get_inuse(&self) -> bool { self.inuse }
-	pub fn set_inuse(&mut self) { self.inuse = true; }
-	pub fn set_not_inuse(&mut self) { self.inuse = false; }
+//	pub fn get_inuse(&self) -> bool { self.inuse }
+//	pub fn set_inuse(&mut self) { self.inuse = true; }
+//	pub fn set_not_inuse(&mut self) { self.inuse = false; }
 	pub fn get_parent(&self) -> PortNo { self.parent }
-	pub fn set_parent(&mut self, parent: PortNo) { self.parent = parent; }
+//	pub fn set_parent(&mut self, parent: PortNo) { self.parent = parent; }
 	pub fn get_mask(&self) -> Mask { self.mask }
-	pub fn set_mask(&mut self, mask: Mask) { self.mask = mask; }
+//	pub fn set_mask(&mut self, mask: Mask) { self.mask = mask; }
 	pub fn get_other_indices(&self) -> [TableIndex; MAX_PORTS as usize] { self.other_indices }
-	pub fn set_other_index(&mut self, port_index: PortNumber, other_index: TableIndex) 
-			-> Result<(),RoutingTableEntryError> {
+	pub fn get_other_index(&self, port_number: PortNumber) -> TableIndex {
+		let port_no = port_number.get_port_no() as usize;
+		self.other_indices[port_no]
+	}
+	pub fn set_other_index(&mut self, port_index: PortNumber, other_index: TableIndex) {
 		let port_no = port_index.get_port_no();
-		match self.other_indices.get(port_no as usize) {
-			Some(other) => (),
-			None => return Err(RoutingTableEntryError::Port(PortError::new(port_index)))
-		};
 		self.other_indices[port_no as usize] = other_index;
+	}
+	pub fn add_children(&mut self, port_numbers: Vec<PortNumber>) -> Result<(), RoutingTableEntryError> {
+		let mask = Mask::mask_from_port_numbers(port_numbers)?;
+		self.or_with_mask(mask);
 		Ok(())
 	}
-	pub fn update_parent(&self, p: PortNumber, other_index: u32) -> Result<RoutingTableEntry,RoutingTableEntryError> {
-		let parent = p.get_port_no();
-		if parent > MAX_PORTS as u8 { return Err(RoutingTableEntryError::Port(PortError::new(p))); }
-		let mut indices = self.other_indices.clone();
-		indices[parent as usize] = other_index;
-		Ok(RoutingTableEntry { index: self.index, parent: parent, inuse: self.inuse, mask: self.mask,
-							other_indices: indices })
-	}
-	pub fn update_children(&mut self, child: PortNumber, other_index: u32) -> Result<RoutingTableEntry,RoutingTableEntryError> {
-		let mut indices = self.other_indices.clone();
-		let child_mask = match Mask::new(child.get_port_no()) {
-			Ok(m) => m,
-			Err(_) => return Err(RoutingTableEntryError::Port(PortError::new(child)))
-		};
-		self.mask = self.mask.or(child_mask);
-		indices[child.get_port_no() as usize] = other_index;
-		Ok(RoutingTableEntry { index: self.index, parent: self.parent, inuse: self.inuse, 
-				mask: self.mask, other_indices: indices })
+	pub fn set_parent(&mut self, port_number: PortNumber) {
+		self.parent = port_number.get_port_no();
 	}
 }
 impl fmt::Display for RoutingTableEntry {
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result { 
-		let mut s = format!("\n{:6}", self.index);
+		let mut s = format!("{:6}", self.index);
 		if self.inuse { s = s + &format!("  Yes  ") }
 		else          { s = s + &format!("  No   ") }
 		s = s + &format!("{:7}", self.parent);
@@ -78,22 +62,29 @@ impl fmt::Display for RoutingTableEntry {
 }
 // Errors
 use std::error::Error;
+use utility::UtilityError;
 #[derive(Debug)]
 pub enum RoutingTableEntryError {
 	Port(PortError),
-	Index(IndexError)
+	PortNumber(PortNumberError),
+	Index(IndexError),
+	Utility(UtilityError)
 }
 impl Error for RoutingTableEntryError {
 	fn description(&self) -> &str {
 		match *self {
 			RoutingTableEntryError::Port(ref err) => err.description(),
+			RoutingTableEntryError::PortNumber(ref err) => err.description(),
 			RoutingTableEntryError::Index(ref err) => err.description(),
+			RoutingTableEntryError::Utility(ref err) => err.description(),
 		}
 	}
 	fn cause(&self) -> Option<&Error> {
 		match *self {
 			RoutingTableEntryError::Port(ref err) => Some(err),
+			RoutingTableEntryError::PortNumber(ref err) => Some(err),
 			RoutingTableEntryError::Index(ref err) => Some(err),
+			RoutingTableEntryError::Utility(ref err) => Some(err),
 		}
 	}
 }
@@ -101,7 +92,9 @@ impl fmt::Display for RoutingTableEntryError {
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
 		match *self {
 			RoutingTableEntryError::Port(ref err) => write!(f, "Routing Table Entry Port Error caused by {}", err),
+			RoutingTableEntryError::PortNumber(ref err) => write!(f, "Routing Table Entry Port Number Error caused by {}", err),
 			RoutingTableEntryError::Index(ref err) => write!(f, "Routing Table Entry Port Error caused by {}", err),
+			RoutingTableEntryError::Utility(ref err) => write!(f, "Routing Table Utility Error caused by {}", err),
 		}
 	}
 }
@@ -142,4 +135,10 @@ impl fmt::Display for IndexError {
 }
 impl From<IndexError> for RoutingTableEntryError {
 	fn from(err: IndexError) -> RoutingTableEntryError { RoutingTableEntryError::Index(err) }
+}
+impl From<PortNumberError> for RoutingTableEntryError {
+	fn from(err: PortNumberError) -> RoutingTableEntryError { RoutingTableEntryError::PortNumber(err) }
+}
+impl From<UtilityError> for RoutingTableEntryError {
+	fn from(err: UtilityError) -> RoutingTableEntryError { RoutingTableEntryError::Utility(err) }
 }

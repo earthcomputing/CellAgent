@@ -1,5 +1,5 @@
-use config::{MAX_PORTS, SEPARATOR, PortNo};
-
+use config::{MAX_PORTS, PortNo};
+/*
 pub fn get_first_arg(a: Vec<String>) -> Option<i32> {
 	if a.len() != 2 {
 		None
@@ -18,6 +18,7 @@ pub fn chars_to_string(chars: &[char]) -> String {
 	}
 	s
 }
+*/
 pub const BASE_TENANT_MASK: Mask = Mask { mask: 255 };   // All ports
 pub const DEFAULT_USER_MASK: Mask = Mask { mask: 254 };  // All ports except port 0
 #[derive(Debug, Copy, Clone, Serialize, Deserialize)]
@@ -100,6 +101,22 @@ impl fmt::Display for UtilityError {
 	}
 }
 #[derive(Debug)]
+pub struct MaskError { msg: String }
+impl MaskError { 
+//	pub fn new(cell_id: CellID) -> MaskError {
+//		MaskError { msg: format!("Cell {} has no tenant mask", cell_id) }
+//	}
+}
+impl Error for MaskError {
+	fn description(&self) -> &str { &self.msg }
+	fn cause(&self) -> Option<&Error> { None }
+}
+impl fmt::Display for MaskError {
+	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+		write!(f, "{}", self.msg)
+	}
+}
+#[derive(Debug)]
 pub struct PortError { msg: String }
 impl PortError { 
 	pub fn new(port_no: PortNo) -> PortError {
@@ -121,9 +138,9 @@ impl From<PortError> for UtilityError {
 #[derive(Debug)]
 pub struct UnimplementedError { msg: String }
 impl UnimplementedError { 
-	pub fn new(feature: &str) -> UnimplementedError {
-		UnimplementedError { msg: format!("{} is not implemented", feature) }
-	}
+//	pub fn new(feature: &str) -> UnimplementedError {
+//		UnimplementedError { msg: format!("{} is not implemented", feature) }
+//	}
 }
 impl Error for UnimplementedError {
 	fn description(&self) -> &str { &self.msg }

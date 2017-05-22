@@ -2,7 +2,7 @@ use std::fmt;
 use std::cmp::max;
 use crossbeam::Scope;
 
-use config::{PortNo, CellNo, TableIndex};
+use config::{PortNo, CellNo};
 use nalcell::{NalCell};
 use link::{Link};
 use noc::NOC;
@@ -53,9 +53,9 @@ impl<'a> Datacenter<'a> {
 		} 
 		Ok(Datacenter { cells: cells, links: links, noc: None })
 	}
-	pub fn add_noc(&mut self, control: &'a NalCell, backup: &'a NalCell) {
-		self.noc = Some(NOC::new(control, backup));
-	}
+//	pub fn add_noc(&mut self, control: &'a NalCell, backup: &'a NalCell) {
+//		self.noc = Some(NOC::new(control, backup));
+//	}
 }
 impl<'b> fmt::Display for Datacenter<'b> { 
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result { 

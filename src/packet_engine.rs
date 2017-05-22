@@ -52,10 +52,10 @@ impl PacketEngine {
 	}
 	fn forward(&self, packet_count: usize, recv_port_no: u8, entry: RoutingTableEntry, mask: Mask, packet: Packet) 
 			-> Result<(), PacketEngineError>{
-		//println!("PacketEngine {}: forward packet {}, recv_port {}", self.cell_id, packet.get_packet_count(), recv_port_no);
 		let mut header = packet.get_header();
 		let parent = entry.get_parent();
-		let index = header.get_other_index();
+		let my_index = header.get_other_index();
+		//println!("PacketEngine {}: forward packet {}, mask {}, entry mask {}", self.cell_id, packet.get_packet_count(), mask, entry.get_mask());
 		let mask = mask.and(entry.get_mask());
 		let other_indices = entry.get_other_indices();
 		PortNumber::new(recv_port_no, other_indices.len() as u8)?;
@@ -63,7 +63,7 @@ impl PacketEngine {
 			if let Some(other_index) = other_indices.get(parent as usize) {
 				header.set_other_index(*other_index);
 				if parent == 0 {
-					self.packet_pe_to_ca.send((packet_count, recv_port_no, index, packet))?;
+					self.packet_pe_to_ca.send((packet_count, recv_port_no, packet))?;
 				} else {
 					if let Some(sender) = self.packet_pe_to_ports.get(parent as usize) {
 						sender.send((packet_count, packet))?;
@@ -76,12 +76,12 @@ impl PacketEngine {
 			}
 		} else {
 			let port_nos = mask.port_nos_from_mask()?;
+			// println!("PacketEngine {}: forwarding packet {} on ports {:?}", self.cell_id, packet_count, port_nos);
 			for port_no in port_nos.iter() {
 				let other_index = *other_indices.get(*port_no as usize).expect("PacketEngine: No such other index");
 				header.set_other_index(other_index as u32);
-				//println!("PacketEngine {}: forwarding packet {} on port {}", cell_id, packet_count, port_no);
 				if *port_no as usize == 0 { 
-					self.packet_pe_to_ca.send((packet_count, recv_port_no, index, packet))?;
+					self.packet_pe_to_ca.send((packet_count, recv_port_no, packet))?;
 				} else {
 					match self.packet_pe_to_ports.get(*port_no as usize) {
 						Some(s) => s.send((packet_count, packet))?,
@@ -95,17 +95,19 @@ impl PacketEngine {
 	}
 	pub fn entry_channel(&self, scope: &Scope, entry_pe_from_ca: EntryPeFromCa) -> Result<(),PacketEngineError> {
 		let table = self.routing_table.clone();
-		let packet_pe_to_ports = self.packet_pe_to_ports.clone();
 		let pe = self.clone();
 		scope.spawn( move || -> Result<(), PacketEngineError> {
 			loop { 
 				let (entry,opt_packet) = try!(entry_pe_from_ca.recv());
-				table.lock().unwrap().set_entry(entry);
-				//println!("PacketEngine {}: updated entry {} mask {}", pe.cell_id, entry.get_index(), entry.get_mask());
+				{
+					table.lock().unwrap().set_entry(entry);
+					//println!("PacketEngine {}: {}", pe.cell_id, entry);
+				}
 				match opt_packet {
 					Some((mask,packet)) => {
-						try!(pe.forward(packet.get_packet_count(), 0 as u8, entry, mask, packet));
-						let ports = try!(mask.port_nos_from_mask());
+						let port_no = 0 as PortNo;
+						pe.forward(packet.get_packet_count(), port_no, entry, mask, packet)?;
+						//let ports = mask.port_nos_from_mask()?;
 						//println!("PacketEngine {}: send discover to ports {:?}", pe.cell_id, ports);
 					}
 					None => ()				
@@ -115,19 +117,19 @@ impl PacketEngine {
 		Ok(())
 	}
 	fn packet_channel(&self, scope: &Scope, packet_pe_from_ports: PacketPeFromPort) -> Result<(),PacketEngineError> {
-		let cell_id = self.cell_id.clone();
+		//let cell_id = self.cell_id.clone();
 		let table = self.get_table().clone();
 		let pe = self.clone();
 		scope.spawn( move || -> Result<(), PacketEngineError> {
 			loop {
 				let (packet_count, recv_port_no, packet) = try!(packet_pe_from_ports.recv());
+				//println!("PacketEngine {}: received packet {} on port {}", cell_id, packet_count, recv_port_no);
 				let header = packet.get_header();
 				let index = header.get_other_index();
 				let entry;
 				{
 					entry = table.lock().unwrap().get_entry(index)?;
 				}
-				//println!("PacketEngine {}: got packet {} index {} port {}", cell_id, packet_count, index, recv_port_no);
 				let mask = entry.get_mask();
 				let other_indices = entry.get_other_indices();
 				// Verify that port_no is valid
@@ -227,8 +229,8 @@ impl From<mpsc::RecvError> for PacketEngineError {
 impl From<mpsc::SendError<(usize,Packet)>> for PacketEngineError {
 	fn from(err: mpsc::SendError<(usize,Packet)>) -> PacketEngineError { PacketEngineError::Send(err) }
 }
-impl From<mpsc::SendError<(usize,u8,u32,Packet)>> for PacketEngineError {
-	fn from(err: mpsc::SendError<(usize,u8,u32,Packet)>) -> PacketEngineError { PacketEngineError::SendToCa(err) }
+impl From<mpsc::SendError<(usize,u8,Packet)>> for PacketEngineError {
+	fn from(err: mpsc::SendError<(usize,u8,Packet)>) -> PacketEngineError { PacketEngineError::SendToCa(err) }
 }
 impl From<UtilityError> for PacketEngineError {
 	fn from(err: UtilityError) -> PacketEngineError { PacketEngineError::Utility(err) }
