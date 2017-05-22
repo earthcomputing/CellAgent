@@ -1,9 +1,7 @@
 use std::fmt;
-use std::collections::BTreeSet;
 use config::{MAX_PORTS, PathLength, PortNo, TableIndex};
-use name::{TreeID, PortID};
-use port::Port;
-use routing_table_entry::RoutingTableEntry;
+use name::{TreeID};
+use routing_table_entry::{RoutingTableEntry, RoutingTableEntryError};
 use utility::{Mask, Path, PortNumber, UtilityError};
 
 #[derive(Debug, Clone)]
@@ -15,40 +13,51 @@ pub struct Traph {
 }
 //#[deny(unused_must_use)] Need to figure out get_all_hops and get_other_indices with this enabled
 impl Traph {
-	pub fn new(tree_id: TreeID, table_entry: RoutingTableEntry) -> Result<Traph, TraphError> {
+	pub fn new(tree_id: TreeID, index: TableIndex) -> Result<Traph, TraphError> {
 		let mut elements = Vec::new();
-		for i in 0..MAX_PORTS { 
-			elements.push(TraphElement::new(false, i as u8, 0, PortStatus::Pruned, 0, None)); 
+		for i in 1..MAX_PORTS { 
+			elements.push(TraphElement::new(false, i as PortNo, 0 as TableIndex, PortStatus::Pruned, 
+					0 as PathLength, None)); 
 		}
-		Ok(Traph { tree_id: tree_id, table_entry: table_entry, my_index: table_entry.get_index(),
-				elements: elements.into_boxed_slice() })
+		let entry = RoutingTableEntry::default(index)?;
+		Ok(Traph { tree_id: tree_id, my_index: index, table_entry: entry, elements: elements.into_boxed_slice() })
 	}
-	pub fn get_tree_id(&self) -> TreeID { self.tree_id.clone() }
+//	pub fn get_tree_id(&self) -> TreeID { self.tree_id.clone() }
+	pub fn get_table_entry(&self) -> RoutingTableEntry { self.table_entry }
 	pub fn get_table_index(&self) -> TableIndex { self.table_entry.get_index() }
+	pub fn add_element(&mut self, port_number: PortNumber, port_status: PortStatus, children: Vec<PortNumber>, 
+			hops: PathLength, path: Option<Path>) -> Result<RoutingTableEntry, TraphError> {
+		let port_no = port_number.get_port_no();
+		let other_index = self.table_entry.get_other_index(port_number);
+		match port_status {
+			PortStatus::Parent => self.table_entry.set_parent(port_number),
+			_ => ()
+		};
+		let index = self.table_entry.get_index();
+		self.table_entry.set_other_index(port_number, other_index);
+		self.table_entry.add_children(children)?;
+		let element = TraphElement::new(true, port_no, other_index, port_status, hops, path);
+		self.elements[port_no as usize] = element;
+		Ok(self.table_entry)
+	}
 	pub fn add_child(&mut self, port_number: PortNumber) -> Result<RoutingTableEntry, TraphError> {
 		let port_no = port_number.get_port_no();
 		if let Some(element) = self.elements.get_mut(port_no as usize) {
 			element.set_status(PortStatus::Child);
-			self.table_entry.or_with_mask(Mask::new(port_no)?);
+			self.table_entry.add_children(vec![port_number])?;
 			Ok(self.table_entry)
 		} else {
 			return Err(TraphError::Lookup(LookupError::new(port_number)))
 		}
 	}
-	fn get_all_hops(&self) -> BTreeSet<PathLength> {
-		let mut set = BTreeSet::new();
-		//self.elements.iter().map(|e| set.insert(e.get_hops()));
-		for e in self.elements.iter() {
-			set.insert(e.get_hops());
-		}
-		set
-	}
-	pub fn add_element(&mut self, port_number: PortNumber, my_index: TableIndex, other_index: TableIndex,
-			port_status: PortStatus, hops: PathLength, path: Option<Path>) {
-		let port_no = port_number.get_port_no();
-		let element = TraphElement::new(true, port_no, other_index, port_status, hops, path);
-		self.elements[port_no as usize] = element;
-	}
+//	fn get_all_hops(&self) -> BTreeSet<PathLength> {
+//		let mut set = BTreeSet::new();
+//		//self.elements.iter().map(|e| set.insert(e.get_hops()));
+//		for e in self.elements.iter() {
+//			set.insert(e.get_hops());
+//		}
+//		set
+//	}
 	pub  fn get_other_indices(&self) -> [TableIndex; MAX_PORTS as usize] {
 		let mut indices = [0; MAX_PORTS as usize];
 		// Not sure why map gives warning about unused result
@@ -58,19 +67,19 @@ impl Traph {
 		}
 		indices
 	}
-	pub fn set_connected(&mut self, port_no: PortNumber) -> Result<(), TraphError> { 
-		self.set_connected_state(port_no, true); 
-		Ok(())
-	}
-	pub fn set_disconnected(&mut self, port_no: PortNumber) -> Result<(), TraphError> { 
-		self.set_connected_state(port_no, false); 
-		Ok(())
-	}
-	fn set_connected_state(&mut self, port_no: PortNumber, state: bool) -> Result<(),TraphError> {
-		if state { self.elements[port_no.get_port_no() as usize].set_connected(); }
-		else     { self.elements[port_no.get_port_no() as usize].set_disconnected(); }
-		Ok(())
-	}
+//	pub fn set_connected(&mut self, port_no: PortNumber) -> Result<(), TraphError> { 
+//		self.set_connected_state(port_no, true); 
+//		Ok(())
+//	}
+//	pub fn set_disconnected(&mut self, port_no: PortNumber) -> Result<(), TraphError> { 
+//		self.set_connected_state(port_no, false); 
+//		Ok(())
+//	}
+//	fn set_connected_state(&mut self, port_no: PortNumber, state: bool) -> Result<(),TraphError> {
+//		if state { self.elements[port_no.get_port_no() as usize].set_connected(); }
+//		else     { self.elements[port_no.get_port_no() as usize].set_disconnected(); }
+//		Ok(())
+//	}
 }
 impl fmt::Display for Traph {
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result { 
@@ -111,7 +120,8 @@ use name::NameError;
 pub enum TraphError {
 	Name(NameError),
 	Lookup(LookupError),
-	Utility(UtilityError)
+	Utility(UtilityError),
+	RoutingTable(RoutingTableEntryError)
 }
 impl Error for TraphError {
 	fn description(&self) -> &str {
@@ -119,6 +129,7 @@ impl Error for TraphError {
 			TraphError::Name(ref err) => err.description(),
 			TraphError::Lookup(ref err) => err.description(),
 			TraphError::Utility(ref err) => err.description(),
+			TraphError::RoutingTable(ref err) => err.description(),
 		}
 	}
 	fn cause(&self) -> Option<&Error> {
@@ -126,6 +137,7 @@ impl Error for TraphError {
 			TraphError::Name(ref err) => Some(err),
 			TraphError::Lookup(ref err) => Some(err),
 			TraphError::Utility(ref err) => Some(err),
+			TraphError::RoutingTable(ref err) => Some(err),
 		}
 	}
 }
@@ -135,6 +147,7 @@ impl fmt::Display for TraphError {
 			TraphError::Name(ref err) => write!(f, "Traph Name Error caused by {}", err),
 			TraphError::Lookup(ref err) => write!(f, "Traph Lookup Error caused by {}", err),
 			TraphError::Utility(ref err) => write!(f, "Traph Utility Error caused by {}", err),
+			TraphError::RoutingTable(ref err) => write!(f, "Traph Utility Error caused by {}", err),
 		}
 	}
 }
@@ -163,6 +176,9 @@ impl From<NameError> for TraphError {
 impl From<UtilityError> for TraphError {
 	fn from(err: UtilityError) -> TraphError { TraphError::Utility(err) }
 }
+impl From<RoutingTableEntryError> for TraphError {
+	fn from(err: RoutingTableEntryError) -> TraphError { TraphError::RoutingTable(err) }
+}
 
 #[derive(Debug, Clone)]
 struct TraphElement {
@@ -183,16 +199,16 @@ impl TraphElement {
 			hops: hops, path: path } 
 	}
 	fn get_port_no(&self) -> PortNo { self.port_no }
-	fn get_hops(&self) -> PathLength { self.hops }
+//	fn get_hops(&self) -> PathLength { self.hops }
 	fn get_other_index(&self) -> TableIndex { self.other_index }
 	fn is_connected(&self) -> bool { self.is_connected }
-	fn set_connected(&mut self) { self.is_connected = true; }
-	fn set_disconnected(&mut self) { self.is_connected = false; }
+//	fn set_connected(&mut self) { self.is_connected = true; }
+//	fn set_disconnected(&mut self) { self.is_connected = false; }
 	fn set_status(&mut self, status: PortStatus) { self.status = status; }	
 }
 impl fmt::Display for TraphElement {
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-		let mut s = format!("\n{:4} {:5} {:9} {:6} {:6} {:4}", 
+		let mut s = format!("{:4} {:5} {:9} {:6} {:6} {:4}", 
 			self.port_no, self.other_index, self.is_connected, 
 			self.is_broken, self.status, self.hops);
 		match self.path {

@@ -15,10 +15,11 @@ impl ECArgs {
 			Err(ECArgsError::NumberPorts(NumberPortsError::new(nports as usize)))
 		}	
 	}
-	pub fn get_nports(&self) -> u8 { return self.nports }
-	pub fn get_ncells(&self) -> usize { return self.ncells }
-	pub fn get_nlinks(&self) -> usize { return self.nlinks }
+//	pub fn get_nports(&self) -> u8 { return self.nports }
+//	pub fn get_ncells(&self) -> usize { return self.ncells }
+//	pub fn get_nlinks(&self) -> usize { return self.nlinks }
 	pub fn get_args(&self) -> (usize,u8) { (self.ncells, self.nports) } 
+/*
 	pub fn args(args: Vec<String>)-> Result<ECArgs,ECArgsError> {
 		if args.len() != 3 { Err(ECArgsError::NumberArgs(NumberArgsError::new(args.len()-1,2))) }
 		else {
@@ -46,8 +47,9 @@ impl ECArgs {
 			}
 		}
 	}
+*/
 	pub fn to_string(&self) -> String {
-		let mut s = format!("{} cells, {} ports per cell, {} links", 
+		let s = format!("{} cells, {} ports per cell, {} links", 
 			self.ncells, self.nports, self.nlinks);
 		s
 	}
@@ -91,9 +93,9 @@ impl fmt::Display for ECArgsError {
 #[derive(Debug)]
 pub struct NumberArgsError { msg: String }
 impl NumberArgsError { 
-	pub fn new(n: usize, needed: usize) -> NumberArgsError {
-		NumberArgsError { msg: format!("You entered {} args, but {} are required", n, needed) }
-	}
+//	pub fn new(n: usize, needed: usize) -> NumberArgsError {
+//		NumberArgsError { msg: format!("You entered {} args, but {} are required", n, needed) }
+//	}
 }
 impl Error for NumberArgsError {
 	fn description(&self) -> &str { &self.msg }
@@ -110,9 +112,9 @@ impl From<NumberArgsError> for ECArgsError {
 #[derive(Debug)]
 pub struct ArgTypeError { msg: String }
 impl ArgTypeError { 
-	pub fn new(v: &str, n: usize, needed: &str) -> ArgTypeError {
-		ArgTypeError { msg: format!("You entered {} for arg {}, but {} is required", v, n, needed) }
-	}
+//	pub fn new(v: &str, n: usize, needed: &str) -> ArgTypeError {
+//		ArgTypeError { msg: format!("You entered {} for arg {}, but {} is required", v, n, needed) }
+//	}
 }
 impl Error for ArgTypeError {
 	fn description(&self) -> &str { &self.msg }

@@ -37,7 +37,7 @@ impl Link {
 	}
 	fn listen(&self, scope: &Scope, packet_link_from_left: PacketRecv, packet_link_to_rite: PacketSend,
 					 packet_link_from_rite: PacketRecv, packet_link_to_left: PacketSend) -> Result<(), LinkError> {
-		let link_id = self.id.clone();
+		//let link_id = self.id.clone();
 		scope.spawn( move || -> Result<(), LinkError> {
 				loop {
 					//println!("Link {}: waiting to recv left", link_id);
@@ -47,7 +47,7 @@ impl Link {
 				}
 			}
 		);
-		let link_id = self.id.clone();
+		//let link_id = self.id.clone();
 		scope.spawn( move || -> Result<(), LinkError> {
 				loop {
 					//println!("Link {}: waiting to recv right", link_id);

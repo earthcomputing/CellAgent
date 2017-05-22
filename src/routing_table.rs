@@ -1,5 +1,5 @@
 use std::fmt;
-use config::{MAX_ENTRIES, MAX_PORTS};
+use config::{MAX_ENTRIES, MAX_PORTS, TableIndex};
 use name::CellID;
 use routing_table_entry::{RoutingTableEntry};
 use utility::{Mask, PortNumber};
@@ -16,9 +16,8 @@ impl RoutingTable {
 		let mut entries = Vec::new();
 		for i in 1..MAX_ENTRIES {
 			let port_number = try!(PortNumber::new(0,MAX_PORTS));
-			let mut entry = RoutingTableEntry::new(0, false, port_number, 
-				try!(Mask::new(0)), [0; MAX_PORTS as usize]); 
-			try!(entry.set_index(i));
+			let entry = RoutingTableEntry::new(i as TableIndex, false, port_number, 
+				Mask::new(0)?, [0; MAX_PORTS as usize]); 
 			entries.push(entry);
 		}
 		Ok(RoutingTable { id: id, entries: entries, connected_ports: Vec::new() })
@@ -39,7 +38,7 @@ impl fmt::Display for RoutingTable {
 		let mut s = format!("\nRouting Table with {} Entries", MAX_ENTRIES);
 		s = s + &format!("\n Index In Use Parent Mask             Indices");
 		for entry in self.entries.iter() {
-			s = s + &format!("{}", entry);
+			s = s + &format!("\n{}", entry);
 		}
 		write!(f, "{}", s) 
 	}	
@@ -108,9 +107,9 @@ impl From<RoutingTableEntryError> for RoutingTableError {
 #[derive(Debug)]
 pub struct SizeError { msg: String }
 impl SizeError { 
-	pub fn new() -> SizeError {
-		SizeError { msg: format!("No more room in routing table") }
-	}
+//	pub fn new() -> SizeError {
+//		SizeError { msg: format!("No more room in routing table") }
+//	}
 }
 impl Error for SizeError {
 	fn description(&self) -> &str { &self.msg }

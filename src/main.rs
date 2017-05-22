@@ -77,29 +77,16 @@ fn build_datacenter<'a>(scope: &crossbeam::Scope, nports: u8, ncells: usize) -> 
 	thread::sleep(nap);
 	Ok(dc)
 }
-// Test mutability
-#[derive(Debug)]
-pub struct Test<'a> { pub x: &'a str }
-impl<'a> Test<'a> { pub fn new() -> Test<'a> { Test { x: "foo" } } }
-fn test_mut() {
-	let mut vm = Test::new();
-	let vm_mut = &mut vm;
-	f1(vm_mut);
-	f2(vm_mut);	
-}
-fn f1<'a>(dc: &'a mut Test    ) { println!("f1: {:?}", dc); } // Compiles
-//fn f1<'a>(dc: &'a mut Test<'a>) { println!("f1: {:?}", dc); } // Doesn't
-fn f2(dc: &mut Test) { println!("f2: {:?}", dc); }
 // Other tests
 fn tests() -> Result<(),Box<Error>> {
-	let cell_id = try!(CellID::new(42));
+	try!(CellID::new(42));
 	let mut base_tenant = try!(Tenant::new("Base", 100, None));
 	println!("Main: {:?}", base_tenant);
 	let mut sub_tenant = try!(base_tenant.create_subtenant("A", 75));
 	println!("Main: {:?}", sub_tenant);
 	let sub_sub_tenant = try!(sub_tenant.create_subtenant("B", 25));
 	println!("Main: {:?}", sub_sub_tenant);
-	let sub_tenant = try!(base_tenant.create_subtenant("B",20));
+	try!(base_tenant.create_subtenant("B",20));
 	let children = base_tenant.get_children();
 	for child in children {
 		println!("Main: child of ({:?}) is ({:?})", base_tenant, child);

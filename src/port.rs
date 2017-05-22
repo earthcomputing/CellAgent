@@ -39,9 +39,9 @@ impl Port {
 	}
 	pub fn get_id(&self) -> PortID { self.id.clone() }
 	pub fn get_port_no(&self) -> PortNo { self.port_number.get_port_no() }
-	pub fn get_port_number(&self) -> PortNumber { self.port_number }
+//	pub fn get_port_number(&self) -> PortNumber { self.port_number }
 	pub fn is_connected(&self) -> bool { self.is_connected }
-	pub fn is_broken(&self) -> bool { self.is_broken }
+//	pub fn is_broken(&self) -> bool { self.is_broken }
 	pub fn is_border(&self) -> bool { self.is_border }
 	pub fn set_connected(&mut self, scope: &Scope, packet_port_to_link: PacketSend, 
 				packet_port_from_link: PacketRecv) -> Result<(),PortError> {
@@ -52,7 +52,7 @@ impl Port {
 		let packet_port_from_pe = try!(self.recv_port_from_ca.recv());
 		//println!("Port {}: got recvr", self.id);
 		let packet_port_to_pe = self.packet_port_to_pe.clone();
-		let port_id = self.id.clone();
+		//let port_id = self.id.clone();
 		// Listen for outgoing packets
 		scope.spawn( move || -> Result<(), PortError> {
 			loop {
@@ -62,7 +62,7 @@ impl Port {
 			}
 		}); 
 		// Listen for incoming packets
-		let port_id = self.id.clone();
+		//let port_id = self.id.clone();
 		scope.spawn( move || -> Result<(), PortError> {
 			loop {
 				let (packet_count,packet) = try!(packet_port_from_link.recv());
@@ -136,9 +136,9 @@ impl fmt::Display for PortError {
 #[derive(Debug)]
 pub struct ChannelError { msg: String }
 impl ChannelError { 
-	pub fn new() -> ChannelError {
-		ChannelError { msg: format!("No channel to link") }
-	}
+//	pub fn new() -> ChannelError {
+//		ChannelError { msg: format!("No channel to link") }
+//	}
 }
 impl Error for ChannelError {
 	fn description(&self) -> &str { &self.msg }

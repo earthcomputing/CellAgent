@@ -8,6 +8,7 @@ pub struct NOC<'a> {
 }
 #[deny(unused_must_use)]
 impl<'a> NOC<'a> {
+/*	
 	pub fn new(control: &'a NalCell, backup: &'a NalCell) -> NOC<'a> { 
 		NOC { control: control, backup: backup }
 	}
@@ -16,6 +17,7 @@ impl<'a> NOC<'a> {
 			self.control.get_id(), self.backup.get_id());
 		s
 	}
+*/	
 }
 // Errors
 use std::error::Error;

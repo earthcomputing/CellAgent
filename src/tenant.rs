@@ -1,5 +1,4 @@
 use std::fmt;
-use std::hash::{Hash,Hasher};
 use std::collections::HashMap;
 use std::error::Error;
 use name::{Name,TenantID};
@@ -23,15 +22,15 @@ impl Tenant {
 		}
 	}
 	pub fn get_id(&self) -> TenantID { self.id.clone() }
-	pub fn get_ncells(&self) -> usize { self.ncells }
+//	pub fn get_ncells(&self) -> usize { self.ncells }
 	//pub fn get_size(&self) -> usize { self.ncells }
 	pub fn get_children(&self) -> &HashMap<TenantID,Box<Tenant>> { &self.children }
-	pub fn get_subtenant(&self, id: TenantID) -> Option<&Box<Tenant>> {
-		self.children.get(&id)
-	}
-	pub fn get_mut_subtenant(&mut self, id: TenantID) -> Option<&mut Box<Tenant>> {
-		self.children.get_mut(&id)
-	}
+//	pub fn get_subtenant(&self, id: TenantID) -> Option<&Box<Tenant>> {
+//		self.children.get(&id)
+//	}
+//	pub fn get_mut_subtenant(&mut self, id: TenantID) -> Option<&mut Box<Tenant>> {
+//		self.children.get_mut(&id)
+//	}
 	pub fn create_subtenant(&mut self, id: &'static str, n:usize) -> Result<Tenant,TenantError> {
 		if self.ncells < n {
 			Err(TenantError::Quota(QuotaError::new(n, self.ncells) ))
