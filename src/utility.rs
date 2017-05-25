@@ -1,4 +1,4 @@
-use config::{MAX_PORTS, PortNo};
+use config::{MAX_PORTS, MaskValue, PortNo};
 /*
 pub fn get_first_arg(a: Vec<String>) -> Option<i32> {
 	if a.len() != 2 {
@@ -22,18 +22,16 @@ pub fn chars_to_string(chars: &[char]) -> String {
 pub const BASE_TENANT_MASK: Mask = Mask { mask: 255 };   // All ports
 pub const DEFAULT_USER_MASK: Mask = Mask { mask: 254 };  // All ports except port 0
 #[derive(Debug, Copy, Clone, Serialize, Deserialize)]
-pub struct Mask { mask: u16 }
+pub struct Mask { mask: MaskValue }
 #[deny(unused_must_use)]
 impl Mask {
-	pub fn new(i: PortNo) -> Result<Mask, UtilityError> {
-	    if i > MAX_PORTS {
-	        Err(UtilityError::Port(PortError::new(i)))
-	    } else {
-		    let mask = (1 as u16).rotate_left(i as u32);
-	        Ok(Mask { mask: mask } )
-	    }
+	pub fn new(i: PortNumber) -> Mask {
+	    let mask = (1 as u16).rotate_left(i.get_port_no() as u32);
+        Mask { mask: mask } 
 	}
+	pub fn new0() -> Mask { Mask { mask: 1 } }
 	pub fn empty() -> Mask { Mask { mask: 0 } }
+	pub fn get_as_value(&self) -> MaskValue { self.mask }
 	pub fn or(&self, mask: Mask) -> Mask {
 		Mask { mask: self.mask | mask.mask }
 	}
@@ -43,26 +41,30 @@ impl Mask {
 	pub fn not(&self) -> Mask {
 		Mask { mask: !self.mask }
 	}
-	pub fn all_but_port(&self, port_no: PortNo) -> Result<Mask, UtilityError> {
-		let port_mask = try!(Mask::new(port_no));
-		Ok(self.and(port_mask.not()))
+	pub fn all_but_port(&self, port_number: PortNumber) -> Mask {
+		let port_mask = Mask::new(port_number);
+		self.and(port_mask.not())
 	}
-	pub fn mask_from_port_numbers(port_nos: Vec<PortNumber>) -> Result<Mask, UtilityError> {
+	pub fn mask_from_port_numbers(port_numbers: Vec<PortNumber>) -> Mask {
 		let mut mask = Mask::empty();
 		// Using map() is more complicated because of try!
-		for port_no in port_nos.iter() {
-			let port_mask = try!(Mask::new(port_no.get_port_no()));
+		for port_number in port_numbers.iter() {
+			let port_mask = Mask::new(*port_number);
 			mask = mask.or(port_mask);
 		}
-		Ok(mask)
+		mask
 	}
-	pub fn port_nos_from_mask(&self) -> Result<Vec<PortNo>, UtilityError> {
+	pub fn port_nos_from_mask(&self) -> Vec<PortNo> {
 		let mut port_nos = Vec::new();
 		for i in 0..MAX_PORTS {
-			let test = try!(Mask::new(i as PortNo));
+			let port_number = match PortNumber::new(i, MAX_PORTS) {
+				Ok(n) => n,
+				Err(_) => panic!("Mask port_nos_from_mask cannont generate an error")
+			};
+			let test = Mask::new(port_number);
 			if test.mask & self.mask != 0 { port_nos.push(i as PortNo) }
 		}
-		Ok(port_nos)
+		port_nos
 	}
 }
 impl fmt::Display for Mask {
@@ -162,6 +164,7 @@ impl PortNumber {
 			Ok(PortNumber { port_no: (no as PortNo) })
 		}
 	}
+	pub fn new0() -> PortNumber { PortNumber { port_no: (0 as PortNo) } }
 	pub fn get_port_no(&self) -> PortNo { self.port_no }
 }
 impl fmt::Display for PortNumber {

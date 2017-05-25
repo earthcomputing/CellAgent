@@ -25,7 +25,7 @@ impl RoutingTableEntry {
 	pub fn or_with_mask(&mut self, mask: Mask) { self.mask = self.mask.or(mask); }
 	pub fn and_with_mask(&mut self, mask: Mask) { self.mask = self.mask.and(mask); }
 //	pub fn get_inuse(&self) -> bool { self.inuse }
-//	pub fn set_inuse(&mut self) { self.inuse = true; }
+	pub fn set_inuse(&mut self) { self.inuse = true; }
 //	pub fn set_not_inuse(&mut self) { self.inuse = false; }
 	pub fn get_parent(&self) -> PortNo { self.parent }
 //	pub fn set_parent(&mut self, parent: PortNo) { self.parent = parent; }
@@ -40,10 +40,9 @@ impl RoutingTableEntry {
 		let port_no = port_index.get_port_no();
 		self.other_indices[port_no as usize] = other_index;
 	}
-	pub fn add_children(&mut self, port_numbers: Vec<PortNumber>) -> Result<(), RoutingTableEntryError> {
-		let mask = Mask::mask_from_port_numbers(port_numbers)?;
+	pub fn add_children(&mut self, port_numbers: Vec<PortNumber>) {
+		let mask = Mask::mask_from_port_numbers(port_numbers);
 		self.or_with_mask(mask);
-		Ok(())
 	}
 	pub fn set_parent(&mut self, port_number: PortNumber) {
 		self.parent = port_number.get_port_no();
