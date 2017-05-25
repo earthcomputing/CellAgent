@@ -6,7 +6,7 @@ use crossbeam::Scope;
 use config::{MAX_ENTRIES, PathLength, PortNo, TableIndex};
 use nalcell::{EntryCaToPe, StatusCaFromPort, RecvrCaToPort, RecvrSendError,
 		PacketRecv, PacketSendError, PacketCaToPe, PacketCaFromPe, PacketPortToPe};
-use message::{Message, DiscoverMsg, MsgType};
+use message::{DiscoverMsg};
 use name::{Name, CellID, TreeID};
 use packet::{Packet, Packetizer};
 use packet_engine::PacketEngine;
@@ -14,7 +14,7 @@ use port;
 use routing_table_entry::{RoutingTableEntry, RoutingTableEntryError};
 use traph;
 use traph::{Traph};
-use utility::{BASE_TENANT_MASK, Mask, Path, PortNumber, PortNumberError};
+use utility::{BASE_TENANT_MASK, DEFAULT_USER_MASK, Mask, Path, PortNumber, PortNumberError};
 
 const CONTROL_TREE_NAME: &'static str = "Control";
 const CONNECTED_PORTS_TREE_NAME: &'static str = "Connected";
@@ -25,11 +25,13 @@ pub struct CellAgent {
 	my_tree_id: TreeID,
 	no_ports: PortNo,
 	control_tree_id: TreeID,
+	my_entry: RoutingTableEntry,
+	connected_tree_entry: Arc<Mutex<RoutingTableEntry>>,
 	connected_ports_tree_id: TreeID,
-	discover_msgs: Vec<DiscoverMsg>,
+	discover_msgs: Arc<Mutex<Vec<(Mask,DiscoverMsg)>>>,
 	free_indices: Arc<Mutex<Vec<TableIndex>>>,
-	trees: Arc<Mutex<HashMap<TableIndex,TreeID>>>,
-	traphs: Arc<Mutex<HashMap<TreeID,Traph>>>,
+	trees: Arc<Mutex<HashMap<TableIndex,String>>>,
+	traphs: Arc<Mutex<HashMap<String,Traph>>>,
 	tenant_masks: Vec<Mask>,
 	entry_ca_to_pe: EntryCaToPe,
 	packet_port_to_pe: PacketPortToPe,
@@ -58,7 +60,8 @@ impl CellAgent {
 		let mut ca = CellAgent { cell_id: cell_id.clone(), my_tree_id: my_tree_id.clone(), 
 			no_ports: no_ports, traphs: traphs, control_tree_id: control_tree_id.clone(), 
 			connected_ports_tree_id: connected_tree_id.clone(), free_indices: Arc::new(Mutex::new(free_indices)),
-			discover_msgs: Vec::new(),
+			discover_msgs: Arc::new(Mutex::new(Vec::new())), my_entry: RoutingTableEntry::default(0)?, 
+			connected_tree_entry: Arc::new(Mutex::new(RoutingTableEntry::default(0)?)),
 			tenant_masks: tenant_masks, trees: Arc::new(Mutex::new(trees)), 
 			packet_ca_to_pe: packet_ca_to_pe.clone(), entry_ca_to_pe: entry_ca_to_pe,
 			packet_port_to_pe: packet_port_to_pe, packet_engine: packet_engine,
@@ -67,26 +70,35 @@ impl CellAgent {
 		let port_number_0 = PortNumber::new(0, no_ports)?;
 		let other_index = 0;
 		let hops = 0;
-		let mut control_entry = ca.update_traph(control_tree_id, port_number_0, 
-				traph::PortStatus::Parent, vec![port_number_0], other_index, hops, None)?;
-		let mut connected_entry = ca.update_traph(connected_tree_id.clone(), port_number_0, 
-				traph::PortStatus::Parent, vec![port_number_0], other_index, hops, None)?;
+		let path = None;
+		ca.update_traph(&control_tree_id, port_number_0, 
+				traph::PortStatus::Parent, vec![port_number_0], other_index, hops, path)?;
+		let connected_tree_entry = ca.update_traph(&connected_tree_id, port_number_0, 
+				traph::PortStatus::Parent, vec![port_number_0], other_index, hops, path)?;
+		ca.connected_tree_entry = Arc::new(Mutex::new(connected_tree_entry));
 		// Create my tree
-		let mut my_entry = ca.update_traph(my_tree_id, port_number_0, 
-				traph::PortStatus::Parent, vec![port_number_0], other_index, hops, None)?; 
-		ca.port_status(scope, connected_entry, my_entry, recv_status_from_port, packet_ports_from_pe)?;
+		let my_entry = ca.update_traph(&my_tree_id, port_number_0, 
+				traph::PortStatus::Parent, vec![port_number_0], other_index, hops, path)?; 
+		ca.my_entry = my_entry;
+		ca.port_status(scope, recv_status_from_port, packet_ports_from_pe)?;
 		ca.recv_packets(scope, packet_ca_from_pe)?;
 		Ok(ca)
 	}
 	pub fn get_no_ports(&self) -> PortNo { self.no_ports }	
 	pub fn get_id(&self) -> CellID { self.cell_id.clone() }
-	pub fn get_tree_id(&self, index: TableIndex) -> Result<TreeID, CellAgentError> {
-		println!("CellAgent {}: trees table {:?}", self.cell_id, *self.trees.lock().unwrap());
-		let tree_id = match self.trees.lock().unwrap().get(&index) {
+	pub fn get_tree_id(&self, index: TableIndex) -> Result<String, CellAgentError> {
+		let trees = self.trees.lock().unwrap();
+		let tree_id = match trees.get(&index) {
 			Some(t) => t.clone(),
-			None => return Err(CellAgentError::TreeIndex(TreeIndexError::new(index)))
+			None => {
+				println!("CellAgent {}: index {} in trees table {:?}", self.cell_id, index, *trees);
+				return Err(CellAgentError::TreeIndex(TreeIndexError::new(index)))}
+			
 		};
 		Ok(tree_id)
+	}
+	pub fn get_discover_msgs(&self) -> Vec<(Mask,DiscoverMsg)> {
+		self.discover_msgs.lock().unwrap().to_vec()
 	}
 	//pub fn get_tenant_mask(&self) -> Result<&Mask, CellAgentError> {
 	//	if let Some(tenant_mask) = self.tenant_masks.last() {
@@ -96,13 +108,14 @@ impl CellAgent {
 	//	}
 	//}
 	//pub fn get_control_tree_id(&self) -> &TreeID { &self.control_tree_id }
-	pub fn add_discover_msg(&mut self, msg: DiscoverMsg) { 
-		println!("CellAgent {}: added msg {} as entry {} for tree {}", self.cell_id, msg.get_count(), self.discover_msgs.len()+1, msg); 
-		self.discover_msgs.push(msg);
+	pub fn add_discover_msg(&mut self, user_mask: Mask, msg: DiscoverMsg) { 
+		let mut discover_msgs = self.discover_msgs.lock().unwrap();
+		//println!("CellAgent {}: added msg {} as entry {} for tree {}", self.cell_id, msg.get_count(), discover_msgs.len()+1, msg); 
+		discover_msgs.push((user_mask, msg));
 	}
 	pub fn get_connected_ports_tree_id(&self) -> TreeID { self.connected_ports_tree_id.clone() }
 	pub fn exists(&self, tree_id: &TreeID) -> bool { 
-		(*self.traphs.lock().unwrap()).contains_key(tree_id)
+		(*self.traphs.lock().unwrap()).contains_key(tree_id.get_name())
 	}
 	fn use_index(&mut self) -> Result<TableIndex,CellAgentError> {
 		match self.free_indices.lock().unwrap().pop() {
@@ -110,47 +123,49 @@ impl CellAgent {
 			None => Err(CellAgentError::Size(SizeError::new()))
 		}
 	}
-	pub fn update_traph(&mut self, tree_id: TreeID, port_number: PortNumber, port_status: traph::PortStatus, 
+	pub fn update_traph(&mut self, tree_id: &TreeID, port_number: PortNumber, port_status: traph::PortStatus, 
 				children: Vec<PortNumber>, other_index: TableIndex, hops: PathLength, path: Option<Path>) 
 			-> Result<RoutingTableEntry, CellAgentError> {
 		// Note that traphs is updated transactionally; I remove an entry, update it, then put it back.
 		let mut traphs = self.traphs.lock().unwrap();
-		let mut traph = match traphs.remove(&tree_id) { // Avoids lifetime problem
+		let mut traph = match traphs.remove(tree_id.get_name()) { // Avoids lifetime problem
 			Some(t) => t,
 			None => Traph::new(tree_id.clone(), self.clone().use_index()?)?
 		};
-		let entry = traph.add_element(port_number, port_status, children, hops, path)?;
+		let traph_status = traph.get_port_status(port_number);
+		let port_status = match traph_status {
+			traph::PortStatus::Pruned => port_status,
+			_ => traph_status  // Don't replace if Parent or Child
+		};
+		let entry = traph.new_element(port_number, port_status, other_index, children, hops, path)?;
 		// Here's the end of the transaction
-		traphs.insert(tree_id.clone(), traph);
+		traphs.insert(tree_id.stringify(), traph);
 		{
-			self.trees.lock().unwrap().insert(entry.get_index(), tree_id.clone());
+			self.trees.lock().unwrap().insert(entry.get_index(), tree_id.stringify());
 		}
-		println!("CellAgent {}: Tree {:10} {}", self.cell_id, tree_id, entry);
 		self.entry_ca_to_pe.send((entry,None))?;
 		Ok(entry)
 	}
-	pub fn add_child(&self, tree_id: &TreeID, port_no: PortNo, other_index: TableIndex)
+	pub fn add_child(&self, tree_id: &String, port_no: PortNo, other_index: TableIndex)
 			-> Result<(), CellAgentError> {
 		let mut traphs = self.traphs.lock().unwrap();
-		if let Some(mut traph) = traphs.remove(&tree_id) {
+		if let Some(mut traph) = traphs.remove(tree_id) {
 			let port_number = PortNumber::new(port_no, self.no_ports)?;
 			let mut entry = traph.add_child(port_number)?;
 			entry.set_other_index(port_number, other_index);
 			println!("CellAgent {}: child {}   {}", self.cell_id, tree_id, entry);
 			self.entry_ca_to_pe.send((entry,None))?;
 		} else {
+			println!("CellAgent {}: add_child tree {} does not exist in traphs {:?}", self.cell_id, tree_id, traphs.keys());
 			return Err(CellAgentError::Tree(TreeError::new(tree_id)));
 		}
 		Ok(())
 	}
-	fn port_status(&mut self, scope: &Scope, connected_tree_entry: RoutingTableEntry,
-			my_entry: RoutingTableEntry, status_ca_from_port: StatusCaFromPort, 
+	fn port_status(&mut self, scope: &Scope, status_ca_from_port: StatusCaFromPort, 
 			mut packet_ports_from_pe: HashMap<PortNo,PacketRecv>) -> Result<(), CellAgentError>{
 		let tree_id = self.my_tree_id.clone();
-		let my_table_index = my_entry.get_index();
 		let entry_ca_to_pe = self.entry_ca_to_pe.clone();
-		let mut connected_entry = connected_tree_entry.clone();	
-		let mut ca = self.clone();
+		let ca = self.clone();
 		let no_ports = self.get_no_ports();
 		scope.spawn( move || -> Result<(), CellAgentError> {
 			//println!("CellAgent {}: waiting for status", ca.cell_id);	
@@ -158,7 +173,7 @@ impl CellAgent {
 				let (port_no, status) = try!(status_ca_from_port.recv());
 				//println!("CellAgent {}: got status on port {}", ca.cell_id, port_no);
 				let path = Path::new(port_no, no_ports)?;
-				let port_no_mask = Mask::new(port_no)?;
+				let port_no_mask = Mask::new(PortNumber::new(port_no, ca.no_ports)?);
 				match status {
 					port::PortStatus::Connected => {
 						println!("CellAgent {}: port {} connected", ca.cell_id, port_no);
@@ -174,49 +189,64 @@ impl CellAgent {
 							println!("CellAgent {}: port {} already connected", ca.cell_id, port_no);
 							return Err(CellAgentError::PortTaken(PortTakenError::new(port_no)))
 						};
-						connected_entry.or_with_mask(port_no_mask);
-						//println!("CellAgent {}: connected entry {}", ca.cell_id, connected_entry);
+						ca.connected_tree_entry.lock().unwrap().or_with_mask(port_no_mask);
 						let hops = 1;
 						let msg = DiscoverMsg::new(tree_id.clone(), ca.cell_id.clone(), hops, path);
-						ca.discover_msgs.push(msg.clone());
-						println!("CellAgent {}: {} old msgs", ca.cell_id, ca.discover_msgs.len());
-						for msg in &ca.discover_msgs {
-							if ca.discover_msgs.len() > 1 {
-								println!("CellAgent {}: old msg {}", ca.cell_id, msg);
-							}						
-							let packets = Packetizer::packetize(msg, my_table_index, [false;4])?;
-							println!("CellAgent {}: sending msg {} discover", ca.cell_id, msg.get_count());
-							// Assumes Discover message fits in one packet and path doesn't change when forwarded
-							ca.entry_ca_to_pe.send((connected_entry, Some((port_no_mask,*packets[0]))))?;
-						}
-						ca.discover_msgs.pop(); // This DiscoverMsg is different for each port
-						//println!("CellAgent {}: sent packet {} on port {} as msg {}", ca.cell_id, packets[0].get_packet_count(), port_no, msg.get_count());
-						//try!(ca.send_msg(&connected_tree_id, packets, port_no_mask));
+						let my_table_index = ca.my_entry.get_index();
+						let packets = Packetizer::packetize(&msg, my_table_index, [false;4])?;						
+						println!("CellAgent {}: sending {} {} ", ca.cell_id, port_no_mask, msg);
+						ca.entry_ca_to_pe.send((*ca.connected_tree_entry.lock().unwrap(), Some((port_no_mask,*packets[0]))))?;
 					},
 					port::PortStatus::Disconnected => {
 						println!("Cell Agent {} got disconnected on port {}", ca.cell_id, port_no);
-						connected_entry.and_with_mask(port_no_mask.not());
-						entry_ca_to_pe.send((connected_entry,None))?;
+						ca.connected_tree_entry.lock().unwrap().and_with_mask(port_no_mask.not());
+						entry_ca_to_pe.send((*ca.connected_tree_entry.lock().unwrap(),None))?;
 					}
 				}
  			}
 		});
 		Ok(())
-	}				
-	pub fn send_msg(&self, tree_id: &TreeID, packets: Vec<Box<Packet>>, user_mask: Mask) -> Result<(), CellAgentError> 
-			 {
+	}			
+	pub fn forward_discover(&mut self, discover_msgs: &Vec<(Mask,DiscoverMsg)>) -> Result<(), CellAgentError> {
+		let my_table_index = self.my_entry.get_index();
+		//let discover_msgs = self.discover_msgs.clone().lock().unwrap();
+		let mut new_discover_msgs = Vec::new();
+		for mask_msg in discover_msgs.iter() {
+			let port_no_mask = mask_msg.0;
+			let ref msg = mask_msg.1;
+			let packets = Packetizer::packetize(msg, my_table_index, [false;4])?;
+			let m = self.connected_tree_entry.lock().unwrap().get_mask().and(port_no_mask);
+			let ports = m.port_nos_from_mask();
+			println!("CellAgent {}: forward on ports {:?} {}", self.cell_id, ports, msg);
+			// Assumes Discover message fits in one packet and path doesn't change when forwarded
+			self.entry_ca_to_pe.send((*self.connected_tree_entry.lock().unwrap(), Some((port_no_mask,*packets[0]))))?;
+			let new_mask = port_no_mask.and(port_no_mask.not());
+			new_discover_msgs.push((new_mask, msg.clone()));
+		}
+		self.discover_msgs = Arc::new(Mutex::new(new_discover_msgs));
+		Ok(())	
+	}
+	pub fn send_msg(&self, tree_id: &TreeID, packets: Vec<Box<Packet>>, user_mask: Mask) 
+			-> Result<(), CellAgentError> {
 		let index;
 		{
-			if let Some(traph) = self.traphs.lock().unwrap().get(&tree_id) {
+			if let Some(traph) = self.traphs.lock().unwrap().get(tree_id.get_name()) {
 				index = traph.get_table_index();			
 			} else {
-				return Err(CellAgentError::Tree(TreeError::new(&tree_id)));
+				println!("CellAgent {}: send_msg tree {} does not exist in traph", self.cell_id, tree_id);
+				return Err(CellAgentError::Tree(TreeError::new(tree_id.get_name())));
 			};
 		}
 		for packet in packets.iter() {
 			//println!("CellAgent {}: Sending packet {}", self.cell_id, packets[0].get_packet_count());
 			let packet_count = packet.get_packet_count();
-			self.packet_ca_to_pe.send((packet_count, index, user_mask, **packet))?;
+			match self.packet_ca_to_pe.send((packet_count, index, user_mask, **packet)) {
+				Ok(_) => (),
+				Err(err) => {
+					println!("CellAgent {}: err {} sending packet {}", self.cell_id, err, packet_count);
+					return Err(CellAgentError::SendCaPe(err));
+				}
+			};
 			//println!("CellAgent {}: sent packet {} on tree {} to packet engine with index {}", self.cell_id, packet_count, tree_id, index);
 		}
 		Ok(())
@@ -238,8 +268,14 @@ impl CellAgent {
 				if header.is_last_packet() {
 					//println!("CellAgent {}: unpacketizing packet {}", ca.cell_id, packet_count);
 					let msg = Packetizer::unpacketize(packets)?;
-					println!("CellAgent {}: got msg {} on port {} {}", ca.cell_id, msg.get_count(), port_no, msg);							
-					msg.process(&mut ca, port_no, my_index)?;
+					println!("CellAgent {}: port {} got msg {} ", ca.cell_id, port_no, msg);							
+					match msg.process(&mut ca, port_no, my_index){
+						Ok(_) => Ok(()),
+						Err(err) => {
+							println!("CellAgent {}: error {} processing msg {}", ca.cell_id, err, msg);
+							Err(err)
+						}
+					}?;
 				}
 			}	
 		});
@@ -487,7 +523,7 @@ impl From<MsgAssemblyError> for CellAgentError {
 #[derive(Debug)]
 pub struct TreeError { msg: String }
 impl TreeError { 
-	pub fn new(tree_id: &TreeID) -> TreeError {
+	pub fn new(tree_id: &str) -> TreeError {
 		TreeError { msg: format!("TreeID {} does not exist", tree_id) }
 	}
 }

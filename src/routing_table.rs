@@ -15,9 +15,9 @@ impl RoutingTable {
 	pub fn new(id: CellID) -> Result<RoutingTable,RoutingTableError> {
 		let mut entries = Vec::new();
 		for i in 1..MAX_ENTRIES {
-			let port_number = try!(PortNumber::new(0,MAX_PORTS));
+			let port_number = PortNumber::new0();
 			let entry = RoutingTableEntry::new(i as TableIndex, false, port_number, 
-				Mask::new(0)?, [0; MAX_PORTS as usize]); 
+				Mask::new(port_number), [0; MAX_PORTS as usize]); 
 			entries.push(entry);
 		}
 		Ok(RoutingTable { id: id, entries: entries, connected_ports: Vec::new() })

@@ -1,6 +1,7 @@
 // Size of various fields
 pub type CellNo     = usize;
 pub type LinkNo     = usize;
+pub type MaskValue  = u16;
 pub type PacketNo   = u16;
 pub type PacketElement = u8; // Packets are made up of bytes
 pub type PathLength = u32;

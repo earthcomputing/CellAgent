@@ -24,7 +24,7 @@ impl PacketEngine {
 		packet_pe_from_ca: PacketPeFromCa, recv_entry_from_ca: EntryPeFromCa, 
 		packet_pe_from_ports: PacketPeFromPort, packet_pe_to_ports: Vec<PacketSend>) 
 				-> Result<PacketEngine, PacketEngineError> {
-		let routing_table = Arc::new(Mutex::new(try!(RoutingTable::new(cell_id.clone())))); 
+		let routing_table = Arc::new(Mutex::new(RoutingTable::new(cell_id.clone())?)); 
 		let pe = PacketEngine { cell_id: cell_id.clone(), routing_table: routing_table, 
 			packet_pe_to_ca: packet_pe_to_ca, packet_pe_to_ports: packet_pe_to_ports };
 		pe.entry_channel(scope, recv_entry_from_ca)?;
@@ -55,7 +55,7 @@ impl PacketEngine {
 		let mut header = packet.get_header();
 		let parent = entry.get_parent();
 		let my_index = header.get_other_index();
-		//println!("PacketEngine {}: forward packet {}, mask {}, entry mask {}", self.cell_id, packet.get_packet_count(), mask, entry.get_mask());
+		println!("PacketEngine {}: forward packet {}, mask {}, entry mask {}", self.cell_id, packet.get_packet_count(), mask, entry.get_mask());
 		let mask = mask.and(entry.get_mask());
 		let other_indices = entry.get_other_indices();
 		PortNumber::new(recv_port_no, other_indices.len() as u8)?;
@@ -75,8 +75,8 @@ impl PacketEngine {
 				}
 			}
 		} else {
-			let port_nos = mask.port_nos_from_mask()?;
-			// println!("PacketEngine {}: forwarding packet {} on ports {:?}", self.cell_id, packet_count, port_nos);
+			let port_nos = mask.port_nos_from_mask();
+			println!("PacketEngine {}: forwarding packet {} on ports {:?}", self.cell_id, packet_count, port_nos);
 			for port_no in port_nos.iter() {
 				let other_index = *other_indices.get(*port_no as usize).expect("PacketEngine: No such other index");
 				header.set_other_index(other_index as u32);
@@ -98,7 +98,7 @@ impl PacketEngine {
 		let pe = self.clone();
 		scope.spawn( move || -> Result<(), PacketEngineError> {
 			loop { 
-				let (entry,opt_packet) = try!(entry_pe_from_ca.recv());
+				let (entry,opt_packet) = entry_pe_from_ca.recv()?;
 				{
 					table.lock().unwrap().set_entry(entry);
 					//println!("PacketEngine {}: {}", pe.cell_id, entry);

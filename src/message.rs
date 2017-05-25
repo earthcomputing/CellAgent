@@ -5,7 +5,7 @@ use config::{PathLength, TableIndex};
 use name::{CellID, TreeID};
 use packet::Packetizer;
 use traph;
-use utility::{DEFAULT_USER_MASK, Mask, Path, PortNumber};
+use utility::{DEFAULT_USER_MASK, Path, PortNumber};
 
 static MESSAGE_COUNT: AtomicUsize = ATOMIC_USIZE_INIT;
 pub fn get_next_count() -> usize { MESSAGE_COUNT.fetch_add(1, Ordering::SeqCst) } 
@@ -70,7 +70,7 @@ impl MsgHeader {
 }
 impl fmt::Display for MsgHeader { 
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result { 
-		let s = format!("Message {} '{}'", self.msg_type, self.direction);
+		let s = format!("Message {} {} '{}'", self.msg_count, self.msg_type, self.direction);
 		write!(f, "{}", s) 
 	}
 }
@@ -96,26 +96,31 @@ impl Message for DiscoverMsg {
 		let port_number = PortNumber::new(port_no, ca.get_no_ports())?;
 		let hops = self.payload.get_hops();
 		let path = self.payload.get_path();
+		let children = Vec::new();
 		//println!("Message: tree_id {}, port_number {}", tree_id, port_number);
 		let exists = ca.exists(&new_tree_id);  // Have I seen this tree before?
 		let status = if exists { traph::PortStatus::Pruned } else { traph::PortStatus::Parent };
-		let entry = ca.update_traph(new_tree_id.clone(), port_number, status,
-				Vec::new(), senders_index, hops, Some(path))?;
+		let entry = ca.update_traph(&new_tree_id, port_number, status,
+				children, senders_index, hops, Some(path))?;
 		//println!("Message {}: entry {}", ca.get_id(), entry);
-		if exists { return Ok(()); } // Don't forward if traph exists for this tree - Simple quenching
+		if exists { 
+			return Ok(()); 
+		} // Don't forward if traph exists for this tree - Simple quenching
+		let discover_msgs = ca.get_discover_msgs(); // Doesn't compile if argument is ca.get_discover_msgs()
+		ca.forward_discover(&discover_msgs)?; // Forward previous Discover msgs
 		let index = entry.get_index();
 		// Send DiscoverD to sender
 		let discoverd_msg = DiscoverDMsg::new(index);
-		let packets = Packetizer::packetize(&discoverd_msg, index, [false; 4])?;
-		//println!("DiscoverMsg {}: sending msg {} discoverd on tree {}",ca.get_id(), discoverd_msg.get_count(), new_tree_id);
-		ca.send_msg(&new_tree_id, packets, Mask::new(0)?)?;
+		let packets = Packetizer::packetize(&discoverd_msg, senders_index, [false; 4])?;
+		//println!("DiscoverMsg {}: sending msg {} discoverd on tree {} {}",ca.get_id(), discoverd_msg.get_count(), new_tree_id, discoverd_msg);
+		//ca.send_msg(&new_tree_id, packets, Mask::new(PortNumber::new(0, ca.get_no_ports())?))?;
 		// Forward Discover on all except port_no
 		let discover_msg = DiscoverMsg::new(new_tree_id.clone(), ca.get_id(), hops+1, path);
 		let packets = Packetizer::packetize(&discover_msg, index, [false; 4])?;
-		println!("DiscoverMsg {}: forwarding msg {} discover tree {}", ca.get_id(), discover_msg.get_count(), new_tree_id);
-		ca.add_discover_msg(discover_msg);
-		let mask = DEFAULT_USER_MASK.all_but_port(port_no)?;
-		ca.send_msg(&ca.get_connected_ports_tree_id(), packets, mask)?;
+		println!("DiscoverMsg {}: forwarding {}", ca.get_id(), discover_msg);
+		let user_mask = DEFAULT_USER_MASK.all_but_port(PortNumber::new(port_no, ca.get_no_ports())?);
+		ca.add_discover_msg(user_mask, discover_msg);
+		ca.send_msg(&ca.get_connected_ports_tree_id(), packets, user_mask)?;
 		Ok(())
 	}
 }
@@ -140,6 +145,7 @@ impl DiscoverPayload {
 	//fn get_sending_cell(&self) -> CellID { self.sending_cell_id.clone() }
 	fn get_hops(&self) -> PathLength { self.hops }
 	fn get_path(&self) -> Path { self.path }
+	fn set_hops(&mut self, hops: PathLength) { self.hops = hops; }
 }
 impl MsgPayload for DiscoverPayload {}
 impl fmt::Display for DiscoverPayload { 
