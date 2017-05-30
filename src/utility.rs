@@ -45,7 +45,7 @@ impl Mask {
 		let port_mask = Mask::new(port_number);
 		self.and(port_mask.not())
 	}
-	pub fn mask_from_port_numbers(port_numbers: Vec<PortNumber>) -> Mask {
+	pub fn make(port_numbers: Vec<PortNumber>) -> Mask {
 		let mut mask = Mask::empty();
 		// Using map() is more complicated because of try!
 		for port_number in port_numbers.iter() {
@@ -54,7 +54,7 @@ impl Mask {
 		}
 		mask
 	}
-	pub fn port_nos_from_mask(&self) -> Vec<PortNo> {
+	pub fn get_port_nos(&self) -> Vec<PortNo> {
 		let mut port_nos = Vec::new();
 		for i in 0..MAX_PORTS {
 			let port_number = match PortNumber::new(i, MAX_PORTS) {

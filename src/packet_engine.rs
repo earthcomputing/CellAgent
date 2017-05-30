@@ -55,7 +55,7 @@ impl PacketEngine {
 		let mut header = packet.get_header();
 		let parent = entry.get_parent();
 		let my_index = header.get_other_index();
-		println!("PacketEngine {}: forward packet {}, mask {}, entry mask {}", self.cell_id, packet.get_packet_count(), mask, entry.get_mask());
+		//println!("PacketEngine {}: forward packet {}, mask {}, entry mask {}", self.cell_id, packet.get_packet_count(), mask, entry.get_mask());
 		let mask = mask.and(entry.get_mask());
 		let other_indices = entry.get_other_indices();
 		PortNumber::new(recv_port_no, other_indices.len() as u8)?;
@@ -75,8 +75,8 @@ impl PacketEngine {
 				}
 			}
 		} else {
-			let port_nos = mask.port_nos_from_mask();
-			println!("PacketEngine {}: forwarding packet {} on ports {:?}", self.cell_id, packet_count, port_nos);
+			let port_nos = mask.get_port_nos();
+			//println!("PacketEngine {}: forwarding packet {} on ports {:?}", self.cell_id, packet_count, port_nos);
 			for port_no in port_nos.iter() {
 				let other_index = *other_indices.get(*port_no as usize).expect("PacketEngine: No such other index");
 				header.set_other_index(other_index as u32);
