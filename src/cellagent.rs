@@ -6,7 +6,7 @@ use crossbeam::Scope;
 use config::{MAX_ENTRIES, PathLength, PortNo, TableIndex};
 use nalcell::{EntryCaToPe, StatusCaFromPort, RecvrCaToPort, RecvrSendError,
 		PacketRecv, PacketSendError, PacketCaToPe, PacketCaFromPe, PacketPortToPe};
-use message::{DiscoverMsg};
+use message::{Message, DiscoverMsg};
 use name::{Name, CellID, TreeID};
 use packet::{Packet, Packetizer};
 use packet_engine::PacketEngine;
@@ -28,7 +28,7 @@ pub struct CellAgent {
 	my_entry: RoutingTableEntry,
 	connected_tree_entry: Arc<Mutex<RoutingTableEntry>>,
 	connected_ports_tree_id: TreeID,
-	discover_msgs: Arc<Mutex<Vec<(Mask,DiscoverMsg)>>>,
+	discover_msgs: Arc<Mutex<Vec<DiscoverMsg>>>,
 	free_indices: Arc<Mutex<Vec<TableIndex>>>,
 	trees: Arc<Mutex<HashMap<TableIndex,String>>>,
 	traphs: Arc<Mutex<HashMap<String,Traph>>>,
@@ -97,8 +97,16 @@ impl CellAgent {
 		};
 		Ok(tree_id)
 	}
-	pub fn get_discover_msgs(&self) -> Vec<(Mask,DiscoverMsg)> {
+	pub fn get_discover_msgs(&self) -> Vec<DiscoverMsg> {
 		self.discover_msgs.lock().unwrap().to_vec()
+	}
+	pub fn add_discover_msg(&mut self, msg: DiscoverMsg) -> Vec<DiscoverMsg> {
+		{ 
+			let mut discover_msgs = self.discover_msgs.lock().unwrap();
+			println!("CellAgent {}: added msg {} as entry {} for tree {}", self.cell_id, msg.get_header().get_count(), discover_msgs.len()+1, msg); 
+			discover_msgs.push(msg);
+		}
+		self.get_discover_msgs()
 	}
 	//pub fn get_tenant_mask(&self) -> Result<&Mask, CellAgentError> {
 	//	if let Some(tenant_mask) = self.tenant_masks.last() {
@@ -108,10 +116,8 @@ impl CellAgent {
 	//	}
 	//}
 	//pub fn get_control_tree_id(&self) -> &TreeID { &self.control_tree_id }
-	pub fn add_discover_msg(&mut self, user_mask: Mask, msg: DiscoverMsg) { 
-		let mut discover_msgs = self.discover_msgs.lock().unwrap();
-		//println!("CellAgent {}: added msg {} as entry {} for tree {}", self.cell_id, msg.get_count(), discover_msgs.len()+1, msg); 
-		discover_msgs.push((user_mask, msg));
+	pub fn get_connected_tree_mask(&self) -> Mask {
+		self.connected_tree_entry.lock().unwrap().get_mask()
 	}
 	pub fn get_connected_ports_tree_id(&self) -> TreeID { self.connected_ports_tree_id.clone() }
 	pub fn exists(&self, tree_id: &TreeID) -> bool { 
@@ -165,7 +171,7 @@ impl CellAgent {
 			mut packet_ports_from_pe: HashMap<PortNo,PacketRecv>) -> Result<(), CellAgentError>{
 		let tree_id = self.my_tree_id.clone();
 		let entry_ca_to_pe = self.entry_ca_to_pe.clone();
-		let ca = self.clone();
+		let mut ca = self.clone();
 		let no_ports = self.get_no_ports();
 		scope.spawn( move || -> Result<(), CellAgentError> {
 			//println!("CellAgent {}: waiting for status", ca.cell_id);	
@@ -194,8 +200,11 @@ impl CellAgent {
 						let msg = DiscoverMsg::new(tree_id.clone(), ca.cell_id.clone(), hops, path);
 						let my_table_index = ca.my_entry.get_index();
 						let packets = Packetizer::packetize(&msg, my_table_index, [false;4])?;						
-						println!("CellAgent {}: sending {} {} ", ca.cell_id, port_no_mask, msg);
+						println!("CellAgent {}: sending on port {} {} ", ca.cell_id, port_no, msg);
 						ca.entry_ca_to_pe.send((*ca.connected_tree_entry.lock().unwrap(), Some((port_no_mask,*packets[0]))))?;
+						let discover_msgs  = ca.get_discover_msgs();
+						println!("CellAgent {}: {} discover msgs", ca.cell_id, discover_msgs.len());
+						ca.forward_discover(&discover_msgs, port_no_mask)?;
 					},
 					port::PortStatus::Disconnected => {
 						println!("Cell Agent {} got disconnected on port {}", ca.cell_id, port_no);
@@ -207,23 +216,13 @@ impl CellAgent {
 		});
 		Ok(())
 	}			
-	pub fn forward_discover(&mut self, discover_msgs: &Vec<(Mask,DiscoverMsg)>) -> Result<(), CellAgentError> {
+	pub fn forward_discover(&mut self, discover_msgs: &Vec<DiscoverMsg>, mask: Mask) -> Result<(), CellAgentError> {
 		let my_table_index = self.my_entry.get_index();
-		//let discover_msgs = self.discover_msgs.clone().lock().unwrap();
-		let mut new_discover_msgs = Vec::new();
-		for mask_msg in discover_msgs.iter() {
-			let port_no_mask = mask_msg.0;
-			let ref msg = mask_msg.1;
+		for msg in discover_msgs.iter() {
 			let packets = Packetizer::packetize(msg, my_table_index, [false;4])?;
-			let m = self.connected_tree_entry.lock().unwrap().get_mask().and(port_no_mask);
-			let ports = m.port_nos_from_mask();
-			println!("CellAgent {}: forward on ports {:?} {}", self.cell_id, ports, msg);
-			// Assumes Discover message fits in one packet and path doesn't change when forwarded
-			self.entry_ca_to_pe.send((*self.connected_tree_entry.lock().unwrap(), Some((port_no_mask,*packets[0]))))?;
-			let new_mask = port_no_mask.and(port_no_mask.not());
-			new_discover_msgs.push((new_mask, msg.clone()));
+			self.send_msg(&self.connected_ports_tree_id, packets, mask)?;
+			println!("CellAgent {}: forward on port {:?} {}", self.cell_id, mask.get_port_nos(), msg);
 		}
-		self.discover_msgs = Arc::new(Mutex::new(new_discover_msgs));
 		Ok(())	
 	}
 	pub fn send_msg(&self, tree_id: &TreeID, packets: Vec<Box<Packet>>, user_mask: Mask) 

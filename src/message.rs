@@ -86,6 +86,14 @@ impl DiscoverMsg {
 		let payload = DiscoverPayload::new(tree_id, sending_cell_id, hops, path);
 		DiscoverMsg { header: header, payload: payload }
 	}
+	pub fn update_discover(&self, ca_id: CellID) -> DiscoverMsg {
+		let tree_id = self.payload.get_tree_id();
+		let hops = self.update_hops();
+		let path = self.update_path();
+		DiscoverMsg::new(tree_id, ca_id, hops, path)
+	}
+	fn update_hops(&self) -> PathLength { self.payload.get_hops() + 1 }
+	fn update_path(&self) -> Path { self.payload.get_path() } // No change per hop
 }
 #[deny(unused_must_use)]
 impl Message for DiscoverMsg {
@@ -106,20 +114,23 @@ impl Message for DiscoverMsg {
 		if exists { 
 			return Ok(()); 
 		} // Don't forward if traph exists for this tree - Simple quenching
-		let discover_msgs = ca.get_discover_msgs(); // Doesn't compile if argument is ca.get_discover_msgs()
-		ca.forward_discover(&discover_msgs)?; // Forward previous Discover msgs
 		let index = entry.get_index();
 		// Send DiscoverD to sender
 		let discoverd_msg = DiscoverDMsg::new(index);
 		let packets = Packetizer::packetize(&discoverd_msg, senders_index, [false; 4])?;
 		//println!("DiscoverMsg {}: sending msg {} discoverd on tree {} {}",ca.get_id(), discoverd_msg.get_count(), new_tree_id, discoverd_msg);
 		//ca.send_msg(&new_tree_id, packets, Mask::new(PortNumber::new(0, ca.get_no_ports())?))?;
-		// Forward Discover on all except port_no
-		let discover_msg = DiscoverMsg::new(new_tree_id.clone(), ca.get_id(), hops+1, path);
+		// Forward Discover on all except port_no with updated hops and path
+		let discover_msg = self.update_discover(ca.get_id());
 		let packets = Packetizer::packetize(&discover_msg, index, [false; 4])?;
-		println!("DiscoverMsg {}: forwarding {}", ca.get_id(), discover_msg);
 		let user_mask = DEFAULT_USER_MASK.all_but_port(PortNumber::new(port_no, ca.get_no_ports())?);
-		ca.add_discover_msg(user_mask, discover_msg);
+		let connected_mask = ca.get_connected_tree_mask();
+		let mask = connected_mask.and(user_mask);
+		let ports = mask.get_port_nos();
+		//println!("DiscoverMsg {}: forwarding {} as {} on ports {:?}", ca.get_id(), self.get_count(), discover_msg.get_count(), ports);
+		let discover_msgs = ca.add_discover_msg(discover_msg);
+		//ca.forward_discover(&discover_msgs)?; // Forward this and previous Discover msgs
+		println!("DiscoverMsg {}: forwarding on connected ports {}", ca.get_id(), self.get_count());
 		ca.send_msg(&ca.get_connected_ports_tree_id(), packets, user_mask)?;
 		Ok(())
 	}

@@ -41,7 +41,7 @@ impl RoutingTableEntry {
 		self.other_indices[port_no as usize] = other_index;
 	}
 	pub fn add_children(&mut self, port_numbers: Vec<PortNumber>) {
-		let mask = Mask::mask_from_port_numbers(port_numbers);
+		let mask = Mask::make(port_numbers);
 		self.or_with_mask(mask);
 	}
 	pub fn set_parent(&mut self, port_number: PortNumber) {
