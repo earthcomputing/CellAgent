@@ -42,12 +42,12 @@ impl<'a> Datacenter<'a> {
 				None => return Err(DatacenterError::Wire(WireError::new(edge)))
 
 			};
-			let mut p1 = try!(cell.get_free_port_mut());
+			let mut p1 = cell.get_free_port_mut()?;
 			let mut cell = match split.1.first_mut() {
 				Some(c) => c,
 				None => return Err(DatacenterError::Wire(WireError::new(edge)))
 			};
-			let mut p2 = try!(cell.get_free_port_mut());
+			let mut p2 = cell.get_free_port_mut()?;
 			//println!("Datacenter: edge {:?}", edge);
 			links.push(try!(Link::new(scope, p1, p2)));
 		} 

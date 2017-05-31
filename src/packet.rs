@@ -28,7 +28,7 @@ impl Packet {
 		Packet { header: header, payload: payload, packet_count: Packet::get_next_count() }
 	}
 	pub fn get_next_count() -> usize { PACKET_COUNT.fetch_add(1, Ordering::SeqCst) } 
-	pub fn get_packet_count(&self) -> usize { self.packet_count }
+	pub fn get_count(&self) -> usize { self.packet_count }
 	pub fn get_header(&self) -> PacketHeader { self.header }
 	pub fn get_payload(&self) -> Payload { self.payload }
 //	pub fn get_payload_bytes(&self) -> Vec<u8> { self.get_payload().get_bytes() }

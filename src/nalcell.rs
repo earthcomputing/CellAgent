@@ -14,25 +14,21 @@ use utility::{Mask, PortNumber};
 use vm::VirtualMachine;
 
 // Packet from PacketEngine to Port, Port to Link, Link to Port
-pub type PacketSend = mpsc::Sender<(usize,Packet)>;
-pub type PacketRecv = mpsc::Receiver<(usize,Packet)>;
-pub type PacketSendError = mpsc::SendError<(usize,Packet)>;
+pub type PacketSend = mpsc::Sender<Packet>;
+pub type PacketRecv = mpsc::Receiver<Packet>;
+pub type PacketSendError = mpsc::SendError<Packet>;
 // Packet from Port to PacketEngine
-pub type PacketPortToPe = mpsc::Sender<(usize, PortNo, Packet)>;
-pub type PacketPeFromPort = mpsc::Receiver<(usize, PortNo, Packet)>;
-//pub type PacketPortPeSendError = mpsc::SendError<(usize, PortNo, Packet)>;
+pub type PacketPortToPe = mpsc::Sender<(PortNo, Packet)>;
+pub type PacketPeFromPort = mpsc::Receiver<(PortNo, Packet)>;
+pub type PacketPortPeSendError = mpsc::SendError<(PortNo, Packet)>;
 // Packet from PacketEngine to CellAgent, (port_no, table index, packet)
-pub type PacketPeToCa = mpsc::Sender<(usize, PortNo, Packet)>;
-pub type PacketCaFromPe = mpsc::Receiver<(usize, PortNo, Packet)>;
-pub type PacketPeCaSendError = mpsc::SendError<(usize, PortNo, Packet)>;
-// Packet from CellAgent to PacketEngine, (table index, mask, packet)
-pub type PacketCaToPe = mpsc::Sender<(usize, TableIndex, Mask, Packet)>;
-pub type PacketPeFromCa = mpsc::Receiver<(usize, TableIndex, Mask, Packet)>;
-//pub type PacketCaPeSendError = mpsc::SendError<(usize, TableIndex, Mask, Packet)>;
+pub type PacketPeToCa = mpsc::Sender<(PortNo, TableIndex, Packet)>;
+pub type PacketCaFromPe = mpsc::Receiver<(PortNo, TableIndex, Packet)>;
+pub type PacketPeCaSendError = mpsc::SendError<(PortNo, TableIndex, Packet)>;
 // Table entry from CellAgent to PacketEngine, table entry
-pub type EntryCaToPe = mpsc::Sender<(RoutingTableEntry,Option<(Mask,Packet)>)>;
-pub type EntryPeFromCa = mpsc::Receiver<(RoutingTableEntry,Option<(Mask,Packet)>)>;
-//pub type EntrySendError = mpsc::SendError<(RoutingTableEntry,Option<(Mask,Packet)>)>;
+pub type EntryCaToPe = mpsc::Sender<(Option<RoutingTableEntry>,Option<(TableIndex,Mask,Packet)>)>;
+pub type EntryPeFromCa = mpsc::Receiver<(Option<RoutingTableEntry>,Option<(TableIndex,Mask,Packet)>)>;
+pub type EntrySendError = mpsc::SendError<(Option<RoutingTableEntry>,Option<(TableIndex,Mask,Packet)>)>;
 // Port status from Port to CellAgent, (port_no, status)
 pub type StatusPortToCa = mpsc::Sender<(PortNo, PortStatus)>;
 pub type StatusCaFromPort = mpsc::Receiver<(PortNo, PortStatus)>;
@@ -57,7 +53,6 @@ impl NalCell {
 		if nports > MAX_PORTS { return Err(NalCellError::NumberPorts(NumberPortsError::new(nports))) }
 		let cell_id = try!(CellID::new(cell_no));
 		let (entry_ca_to_pe, entry_pe_from_ca): (EntryCaToPe, EntryPeFromCa) = channel();
-		let (packet_ca_to_pe, packet_pe_from_ca): (PacketCaToPe, PacketPeFromCa) = channel();
 		let (packet_pe_to_ca, packet_ca_from_pe): (PacketPeToCa, PacketCaFromPe) = channel();
 		let (packet_port_to_pe, packet_pe_from_port): (PacketPortToPe, PacketPeFromPort) = channel();
 		let (status_port_to_ca, status_ca_from_port): (StatusPortToCa, StatusCaFromPort) = channel();
@@ -81,10 +76,10 @@ impl NalCell {
 			is_connected = false;
 		}
 		let boxed_ports: Box<[Port]> = ports.into_boxed_slice();
-		let packet_engine = try!(PacketEngine::new(scope, &cell_id, packet_pe_to_ca, packet_pe_from_ca,
+		let packet_engine = try!(PacketEngine::new(scope, &cell_id, packet_pe_to_ca,
 				entry_pe_from_ca, packet_pe_from_port, packet_pe_to_ports));
 		let cell_agent = try!(CellAgent::new(scope, &cell_id, boxed_ports.len() as u8, 
-				packet_port_to_pe, packet_engine, packet_ca_to_pe, packet_ca_from_pe, 
+				packet_port_to_pe, packet_engine, packet_ca_from_pe, 
 				entry_ca_to_pe, status_ca_from_port, recvr_ca_to_ports, packet_ports_from_pe));
 		let nalcell = NalCell { id: cell_id, cell_no: cell_no, is_border: is_border,
 				ports: boxed_ports, cell_agent: cell_agent, vms: Vec::new()};
