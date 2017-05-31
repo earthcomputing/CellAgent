@@ -47,7 +47,7 @@ pub trait Message: fmt::Display {
 		}
 	}
 	fn is_leafward(&self) -> bool { !self.is_rootward() }
-	fn process(&self, cell_agent: &mut CellAgent, port_no: u8, index: TableIndex) 
+	fn process(&mut self, cell_agent: &mut CellAgent, port_no: u8, index: TableIndex) 
 			-> Result<(), ProcessMsgError>;
 }
 pub trait MsgPayload {}
@@ -86,11 +86,12 @@ impl DiscoverMsg {
 		let payload = DiscoverPayload::new(tree_id, sending_cell_id, hops, path);
 		DiscoverMsg { header: header, payload: payload }
 	}
-	pub fn update_discover(&self, ca_id: CellID) -> DiscoverMsg {
-		let tree_id = self.payload.get_tree_id();
+	pub fn update_discover(&mut self, cell_id: CellID) {
 		let hops = self.update_hops();
 		let path = self.update_path();
-		DiscoverMsg::new(tree_id, ca_id, hops, path)
+		self.payload.set_hops(hops);
+		self.payload.set_path(path);
+		self.payload.set_sending_cell(cell_id);
 	}
 	fn update_hops(&self) -> PathLength { self.payload.get_hops() + 1 }
 	fn update_path(&self) -> Path { self.payload.get_path() } // No change per hop
@@ -99,7 +100,7 @@ impl DiscoverMsg {
 impl Message for DiscoverMsg {
 	fn get_header(&self) -> MsgHeader { self.header.clone() }
 	fn get_payload(&self) -> Box<MsgPayload> { Box::new(self.payload.clone()) }
-	fn process(&self, ca: &mut CellAgent, port_no: u8, senders_index: u32) -> Result<(), ProcessMsgError> {
+	fn process(&mut self, ca: &mut CellAgent, port_no: u8, senders_index: u32) -> Result<(), ProcessMsgError> {
 		let new_tree_id = self.payload.get_tree_id();
 		let port_number = PortNumber::new(port_no, ca.get_no_ports())?;
 		let hops = self.payload.get_hops();
@@ -112,25 +113,26 @@ impl Message for DiscoverMsg {
 				children, senders_index, hops, Some(path))?;
 		//println!("Message {}: entry {}", ca.get_id(), entry);
 		if exists { 
+			println!("DiscoverMsg {}: exists {}", ca.get_id(), self);
 			return Ok(()); 
 		} // Don't forward if traph exists for this tree - Simple quenching
 		let index = entry.get_index();
 		// Send DiscoverD to sender
-		let discoverd_msg = DiscoverDMsg::new(index);
-		let packets = Packetizer::packetize(&discoverd_msg, senders_index, [false; 4])?;
+		//let discoverd_msg = DiscoverDMsg::new(index);
+		//let packets = Packetizer::packetize(&discoverd_msg, senders_index, [false; 4])?;
 		//println!("DiscoverMsg {}: sending msg {} discoverd on tree {} {}",ca.get_id(), discoverd_msg.get_count(), new_tree_id, discoverd_msg);
 		//ca.send_msg(&new_tree_id, packets, Mask::new(PortNumber::new(0, ca.get_no_ports())?))?;
 		// Forward Discover on all except port_no with updated hops and path
-		let discover_msg = self.update_discover(ca.get_id());
-		let packets = Packetizer::packetize(&discover_msg, index, [false; 4])?;
+		self.update_discover(ca.get_id());
+		let packets = Packetizer::packetize(self, index, [false; 4])?;
 		let user_mask = DEFAULT_USER_MASK.all_but_port(PortNumber::new(port_no, ca.get_no_ports())?);
-		let connected_mask = ca.get_connected_tree_mask();
-		let mask = connected_mask.and(user_mask);
-		let ports = mask.get_port_nos();
+		//let connected_mask = ca.get_connected_tree_mask();
+		//let mask = connected_mask.and(user_mask);
+		//let ports = mask.get_port_nos();
 		//println!("DiscoverMsg {}: forwarding {} as {} on ports {:?}", ca.get_id(), self.get_count(), discover_msg.get_count(), ports);
-		let discover_msgs = ca.add_discover_msg(discover_msg);
+		let discover_msgs = ca.add_discover_msg(self.clone());
 		//ca.forward_discover(&discover_msgs)?; // Forward this and previous Discover msgs
-		println!("DiscoverMsg {}: forwarding on connected ports {}", ca.get_id(), self.get_count());
+		println!("DiscoverMsg {}: forwarding on connected ports {}", ca.get_id(), self);
 		ca.send_msg(&ca.get_connected_ports_tree_id(), packets, user_mask)?;
 		Ok(())
 	}
@@ -157,6 +159,8 @@ impl DiscoverPayload {
 	fn get_hops(&self) -> PathLength { self.hops }
 	fn get_path(&self) -> Path { self.path }
 	fn set_hops(&mut self, hops: PathLength) { self.hops = hops; }
+	fn set_path(&mut self, path: Path) { self.path = path; }
+	fn set_sending_cell(&mut self, sending_cell_id: CellID) { self.sending_cell_id = sending_cell_id; }
 }
 impl MsgPayload for DiscoverPayload {}
 impl fmt::Display for DiscoverPayload { 
@@ -182,7 +186,7 @@ impl DiscoverDMsg {
 impl Message for DiscoverDMsg {
 	fn get_header(&self) -> MsgHeader { self.header.clone() }
 	fn get_payload(&self) -> Box<MsgPayload> { Box::new(self.payload.clone()) }
-	fn process(&self, ca: &mut CellAgent, port_no: u8, my_index: u32) 
+	fn process(&mut self, ca: &mut CellAgent, port_no: u8, my_index: u32) 
 			-> Result<(), ProcessMsgError> {
 		let tree_id = ca.get_tree_id(my_index)?;
 		//println!("DiscoverDMsg {}: process msg {:03} processing {} {} {}", ca.get_id(), self.get_count(), port_no, my_index, tree_id);

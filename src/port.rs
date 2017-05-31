@@ -48,7 +48,7 @@ impl Port {
 		self.is_connected = true; 
 		let port_no = self.get_port_no();
 		//println!("Port {}: sending status", self.id);
-		try!(self.status_port_to_ca.send((port_no, PortStatus::Connected)));
+		self.status_port_to_ca.send((port_no, PortStatus::Connected))?;
 		let packet_port_from_pe = try!(self.recv_port_from_ca.recv());
 		//println!("Port {}: got recvr", self.id);
 		let packet_port_to_pe = self.packet_port_to_pe.clone();
@@ -56,17 +56,17 @@ impl Port {
 		// Listen for outgoing packets
 		scope.spawn( move || -> Result<(), PortError> {
 			loop {
-				let (packet_count, packet) = try!(packet_port_from_pe.recv());
+				let packet = try!(packet_port_from_pe.recv());
 				//println!("Port {}: sent packet {} to link", port_id, packet_count);
-				try!(packet_port_to_link.send((packet_count, packet)));
+				try!(packet_port_to_link.send(packet));
 			}
 		}); 
 		// Listen for incoming packets
 		//let port_id = self.id.clone();
 		scope.spawn( move || -> Result<(), PortError> {
 			loop {
-				let (packet_count,packet) = try!(packet_port_from_link.recv());
-				try!(packet_port_to_pe.send((packet_count,port_no, packet)));
+				let packet = try!(packet_port_from_link.recv());
+				try!(packet_port_to_pe.send((port_no, packet)));
 				//println!("Port {}: sent packet {} to packet engine", port_id, packet_count);
 			}
 		});
@@ -95,8 +95,8 @@ pub enum PortError {
 	Name(NameError),
 	Channel(ChannelError),
 	SendStatus(PortStatusSendError),
-	SendToPe(mpsc::SendError<(usize,u8,Packet)>),
-	Send(mpsc::SendError<(usize,Packet)>),
+	SendToPe(mpsc::SendError<(PortNo,Packet)>),
+	Send(mpsc::SendError<Packet>),
 	Recv(mpsc::RecvError)
 }
 impl Error for PortError {
@@ -158,11 +158,11 @@ impl From<ChannelError> for PortError {
 impl From<PortStatusSendError> for PortError {
 	fn from(err: PortStatusSendError) -> PortError { PortError::SendStatus(err) }
 }
-impl From<mpsc::SendError<(usize,Packet)>> for PortError {
-	fn from(err: mpsc::SendError<(usize,Packet)>) -> PortError { PortError::Send(err) }
+impl From<mpsc::SendError<Packet>> for PortError {
+	fn from(err: mpsc::SendError<Packet>) -> PortError { PortError::Send(err) }
 }
-impl From<mpsc::SendError<(usize,u8,Packet)>> for PortError {
-	fn from(err: mpsc::SendError<(usize,u8,Packet)>) -> PortError { PortError::SendToPe(err) }
+impl From<mpsc::SendError<(PortNo,Packet)>> for PortError {
+	fn from(err: mpsc::SendError<(PortNo,Packet)>) -> PortError { PortError::SendToPe(err) }
 }
 impl From<mpsc::RecvError> for PortError {
 	fn from(err: mpsc::RecvError) -> PortError { PortError::Recv(err) }

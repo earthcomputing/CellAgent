@@ -23,16 +23,16 @@ impl Link {
 			Ok(x) => x,
 			Err(err) => return Err(LinkError::Name(err))
 		};
-		let id = try!(LinkID::new(&temp_id.get_name()));
+		let id = LinkID::new(&temp_id.get_name())?;
 		let (packet_link_to_left, packet_left_from_link) = channel();
 		let (packet_link_to_rite, packet_rite_from_link) = channel();
 		let (packet_left_to_link, packet_link_from_left)  = channel();
 		let (packet_rite_to_link, packet_link_from_rite) = channel();
 		let link = Link { id: id, is_broken: false, is_connected: true };
-		try!(link.listen(scope, packet_link_from_left, packet_link_to_rite, 
-							    packet_link_from_rite, packet_link_to_left));
-		try!(left.set_connected(scope, packet_left_to_link, packet_left_from_link));
-		try!(rite.set_connected(scope, packet_rite_to_link, packet_rite_from_link));
+		link.listen(scope, packet_link_from_left, packet_link_to_rite, 
+							    packet_link_from_rite, packet_link_to_left)?;
+		left.set_connected(scope, packet_left_to_link, packet_left_from_link)?;
+		rite.set_connected(scope, packet_rite_to_link, packet_rite_from_link)?;
 		Ok(link)
 	}
 	fn listen(&self, scope: &Scope, packet_link_from_left: PacketRecv, packet_link_to_rite: PacketSend,
@@ -41,8 +41,8 @@ impl Link {
 		scope.spawn( move || -> Result<(), LinkError> {
 				loop {
 					//println!("Link {}: waiting to recv left", link_id);
-					let (packet_count,packet) = try!(packet_link_from_left.recv());
-					try!(packet_link_to_rite.send((packet_count,packet)));
+					let packet = packet_link_from_left.recv()?;
+					packet_link_to_rite.send(packet)?;
 					//println!("Link {}: sent packet {} right", link_id, packet_count);
 				}
 			}
@@ -51,8 +51,8 @@ impl Link {
 		scope.spawn( move || -> Result<(), LinkError> {
 				loop {
 					//println!("Link {}: waiting to recv right", link_id);
-					let (packet_count,packet) = try!(packet_link_from_rite.recv());
-					try!(packet_link_to_left.send((packet_count,packet)));
+					let packet = packet_link_from_rite.recv()?;
+					packet_link_to_left.send(packet)?;
 					//println!("Link {}: sent packet {} left", link_id, packet_count);
 				}
 			}
@@ -76,7 +76,7 @@ use port::{PortError};
 pub enum LinkError {
 	Name(NameError),
 	Port(PortError),
-	Send(mpsc::SendError<(usize,Packet)>),
+	Send(mpsc::SendError<Packet>),
 	Recv(mpsc::RecvError)
 }
 impl Error for LinkError {
@@ -113,8 +113,8 @@ impl From<NameError> for LinkError {
 impl From<PortError> for LinkError {
 	fn from(err: PortError) -> LinkError { LinkError::Port(err) }
 }
-impl From<mpsc::SendError<(usize,Packet)>> for LinkError {
-	fn from(err: mpsc::SendError<(usize,Packet)>) -> LinkError { LinkError::Send(err) }
+impl From<mpsc::SendError<Packet>> for LinkError {
+	fn from(err: mpsc::SendError<Packet>) -> LinkError { LinkError::Send(err) }
 }
 impl From<mpsc::RecvError> for LinkError {
 	fn from(err: mpsc::RecvError) -> LinkError { LinkError::Recv(err) }
