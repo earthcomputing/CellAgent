@@ -1,11 +1,13 @@
 use std::fmt;
 use std::cmp::max;
+use std::sync::mpsc::channel;
 use crossbeam::Scope;
 
 use config::{PortNo, CellNo};
-use nalcell::{NalCell};
+use nalcell::{NalCell, LinkToPort, PortFromLink, PortToLink, LinkFromPort};
 use link::{Link};
 use noc::NOC;
+use port::PortError;
 
 #[derive(Debug)]
 pub struct Datacenter<'a> {
@@ -29,7 +31,7 @@ impl<'a> Datacenter<'a> {
 		for i in 0..ncells {
 			let mut is_border = false;
 			if i % 3 == 1 { is_border = true; }
-			let cell = try!(NalCell::new(scope, i, nports, is_border));
+			let cell = NalCell::new(scope, i, nports, is_border)?;
 			cells.push(cell);
 		}	
 		let mut links: Vec<Link> = Vec::new();
@@ -42,14 +44,21 @@ impl<'a> Datacenter<'a> {
 				None => return Err(DatacenterError::Wire(WireError::new(edge)))
 
 			};
-			let mut p1 = cell.get_free_port_mut()?;
+			let (left,left_from_pe) = cell.get_free_port_mut()?;
 			let mut cell = match split.1.first_mut() {
 				Some(c) => c,
 				None => return Err(DatacenterError::Wire(WireError::new(edge)))
 			};
-			let mut p2 = cell.get_free_port_mut()?;
+			let (rite, rite_from_pe) = cell.get_free_port_mut()?;
 			//println!("Datacenter: edge {:?}", edge);
-			links.push(try!(Link::new(scope, p1, p2)));
+			let (link_to_left, left_from_link): (LinkToPort, PortFromLink) = channel();
+			let (link_to_rite, rite_from_link): (LinkToPort, PortFromLink) = channel();
+			let (left_to_link, link_from_left): (PortToLink, LinkFromPort) = channel();
+			let (rite_to_link, link_from_rite): (PortToLink, LinkFromPort) = channel();
+			left.link_channel(scope, left_to_link, left_from_link, left_from_pe)?;
+			rite.link_channel(scope, rite_to_link, rite_from_link, rite_from_pe)?;
+			links.push(Link::new(scope, &left.get_id(), &rite.get_id(), 
+				link_to_left, link_from_left, link_to_rite, link_from_rite)?);
 		} 
 		Ok(Datacenter { cells: cells, links: links, noc: None })
 	}
@@ -82,6 +91,7 @@ pub enum DatacenterError {
 	Cell(NalCellError),
 	Wire(WireError),
 	Size(SizeError),
+	Port(PortError),
 }
 impl Error for DatacenterError {
 	fn description(&self) -> &str {
@@ -91,6 +101,7 @@ impl Error for DatacenterError {
 			DatacenterError::Cell(ref err) => err.description(),
 			DatacenterError::Wire(ref err) => err.description(),
 			DatacenterError::Size(ref err) => err.description(),
+			DatacenterError::Port(ref err) => err.description(),
 		}
 	}
 	fn cause(&self) -> Option<&Error> {
@@ -100,6 +111,7 @@ impl Error for DatacenterError {
 			DatacenterError::Cell(ref err) => Some(err),
 			DatacenterError::Wire(ref err) => Some(err),
 			DatacenterError::Size(ref err) => Some(err),
+			DatacenterError::Port(ref err) => Some(err),
 		}
 	}
 }
@@ -111,6 +123,7 @@ impl fmt::Display for DatacenterError {
 			DatacenterError::Cell(ref err) => write!(f, "Cell Error caused by {}", err),
 			DatacenterError::Wire(ref err) => write!(f, "Wire Error caused by {}", err),
 			DatacenterError::Size(ref err) => write!(f, "Size Error caused by {}", err),
+			DatacenterError::Port(ref err) => write!(f, "Port Error caused by {}", err),
 		}
 	}
 }
@@ -161,4 +174,7 @@ impl From<LinkError> for DatacenterError {
 }
 impl From<NalCellError> for DatacenterError {
 	fn from(err: NalCellError) -> DatacenterError { DatacenterError::Cell(err) }
+}
+impl From<PortError> for DatacenterError {
+	fn from(err: PortError) -> DatacenterError { DatacenterError::Port(err) }
 }

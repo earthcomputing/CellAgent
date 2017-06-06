@@ -13,83 +13,93 @@ use routing_table_entry::RoutingTableEntry;
 use utility::{Mask, PortNumber};
 use vm::VirtualMachine;
 
-// Packet from PacketEngine to Port, Port to Link, Link to Port
-pub type PacketSend = mpsc::Sender<Packet>;
-pub type PacketRecv = mpsc::Receiver<Packet>;
-pub type PacketSendError = mpsc::SendError<Packet>;
-// Packet from Port to PacketEngine
-pub type PacketPortToPe = mpsc::Sender<(PortNo, Packet)>;
-pub type PacketPeFromPort = mpsc::Receiver<(PortNo, Packet)>;
-pub type PacketPortPeSendError = mpsc::SendError<(PortNo, Packet)>;
-// Packet from PacketEngine to CellAgent, (port_no, table index, packet)
-pub type PacketPeToCa = mpsc::Sender<(PortNo, TableIndex, Packet)>;
-pub type PacketCaFromPe = mpsc::Receiver<(PortNo, TableIndex, Packet)>;
-pub type PacketPeCaSendError = mpsc::SendError<(PortNo, TableIndex, Packet)>;
-// Table entry from CellAgent to PacketEngine, table entry
-pub type EntryCaToPe = mpsc::Sender<(Option<RoutingTableEntry>,Option<(TableIndex,Mask,Packet)>)>;
-pub type EntryPeFromCa = mpsc::Receiver<(Option<RoutingTableEntry>,Option<(TableIndex,Mask,Packet)>)>;
-pub type EntrySendError = mpsc::SendError<(Option<RoutingTableEntry>,Option<(TableIndex,Mask,Packet)>)>;
-// Port status from Port to CellAgent, (port_no, status)
-pub type StatusPortToCa = mpsc::Sender<(PortNo, PortStatus)>;
-pub type StatusCaFromPort = mpsc::Receiver<(PortNo, PortStatus)>;
-pub type PortStatusSendError = mpsc::SendError<(PortNo, PortStatus)>;
-// Receiver from CellAgent to Port
-pub type RecvrCaToPort = mpsc::Sender<PacketRecv>;
-pub type RecvrPortFromCa = mpsc::Receiver<PacketRecv>;
-pub type RecvrSendError = mpsc::SendError<PacketRecv>;
+// CellAgent to PacketEngine
+type CaToPeMsg = (Option<RoutingTableEntry>,Option<(TableIndex,Mask,Packet)>);
+pub type CaToPe = mpsc::Sender<CaToPeMsg>;
+pub type PeFromCa = mpsc::Receiver<CaToPeMsg>;
+//pub type CaPeError = mpsc::SendError<CaToPeMsg>;
+// PacketEngine to Port
+pub type PeToPort = mpsc::Sender<Packet>;
+pub type PortFromPe = mpsc::Receiver<Packet>;
+pub type PePortError = mpsc::SendError<Packet>;
+// PacketEngine to Port, Port to Link
+pub type PortToLink = mpsc::Sender<Packet>;
+pub type LinkFromPort = mpsc::Receiver<Packet>;
+pub type PortLinkError = mpsc::SendError<Packet>;
+// Link to Port
+type LinkToPortMsg = (Option<PortStatus>,Option<Packet>);
+pub type LinkToPort = mpsc::Sender<LinkToPortMsg>;
+pub type PortFromLink = mpsc::Receiver<LinkToPortMsg>;
+pub type LinkPortError = mpsc::SendError<LinkToPortMsg>;
+// Port to PacketEngine
+type PortToPeMsg = (Option<(PortNo, PortStatus)>,Option<(PortNo, Packet)>);
+pub type PortToPe = mpsc::Sender<PortToPeMsg>;
+pub type PeFromPort = mpsc::Receiver<PortToPeMsg>;
+pub type PortPeError = mpsc::SendError<PortToPeMsg>;
+// PacketEngine to CellAgent
+type PeToCaMsg = (Option<(PortNo, PortStatus)>,Option<(PortNo, TableIndex, Packet)>);
+pub type PeToCa = mpsc::Sender<PeToCaMsg>;
+pub type CaFromPe = mpsc::Receiver<PeToCaMsg>;
+pub type PeCaError = mpsc::SendError<PeToCaMsg>;
 
 #[derive(Debug)]
-pub struct NalCell { // Does not include PacketEngine so CelAgent can own it
+pub struct NalCell { // Does not include PacketEngine so CellAgent can own it
 	id: CellID,
 	cell_no: usize,
 	is_border: bool,
 	ports: Box<[Port]>,
 	cell_agent: CellAgent,
 	vms: Vec<VirtualMachine>,
+	ports_from_pe: HashMap<PortNo,PortFromPe>
 }
 #[deny(unused_must_use)]
 impl NalCell {
 	pub fn new(scope: &Scope, cell_no: CellNo, nports: PortNo, is_border: bool) -> Result<NalCell,NalCellError> {
 		if nports > MAX_PORTS { return Err(NalCellError::NumberPorts(NumberPortsError::new(nports))) }
 		let cell_id = try!(CellID::new(cell_no));
-		let (entry_ca_to_pe, entry_pe_from_ca): (EntryCaToPe, EntryPeFromCa) = channel();
-		let (packet_pe_to_ca, packet_ca_from_pe): (PacketPeToCa, PacketCaFromPe) = channel();
-		let (packet_port_to_pe, packet_pe_from_port): (PacketPortToPe, PacketPeFromPort) = channel();
-		let (status_port_to_ca, status_ca_from_port): (StatusPortToCa, StatusCaFromPort) = channel();
+		let (ca_to_pe, pe_from_ca): (CaToPe, PeFromCa) = channel();
+		let (pe_to_ca, ca_from_pe): (PeToCa, CaFromPe) = channel();
+		let (port_to_pe, pe_from_ports): (PortToPe, PeFromPort) = channel();
 		let mut ports = Vec::new();
-		let mut recvr_ca_to_ports = Vec::new();
-		let mut packet_pe_to_ports = Vec::new();
-		let mut packet_ports_from_pe = HashMap::new(); // So I can remove the item
-		let mut is_connected = true;
+		let mut pe_to_ports = Vec::new();
+		let mut ports_from_pe = HashMap::new(); // So I can remove the item
 		for i in 0..nports + 1 {
 			let is_border_port;
 			if is_border & (i == 2) { is_border_port = true; }
 			else                    { is_border_port = false; }
-			let (recvr_ca_to_port, recvr_port_from_ca): (RecvrCaToPort, RecvrPortFromCa) = channel();
-			recvr_ca_to_ports.push(recvr_ca_to_port);
-			let (packet_pe_to_port, packet_port_from_pe): (PacketSend, PacketRecv) = channel();
-			packet_pe_to_ports.push(packet_pe_to_port);
-			packet_ports_from_pe.insert(i, packet_port_from_pe);
-			let port = try!(Port::new(&cell_id, PortNumber { port_no: i as u8 }, is_border_port, 
-				is_connected, packet_port_to_pe.clone(), status_port_to_ca.clone(), recvr_port_from_ca));
+			let (pe_to_port, port_from_pe): (PeToPort, PortFromPe) = channel();
+			pe_to_ports.push(pe_to_port);
+			ports_from_pe.insert(i, port_from_pe);
+			let is_connected = if i == 0 { true } else { false };
+			let port = Port::new(&cell_id, PortNumber { port_no: i as u8 }, is_border_port, 
+				is_connected, port_to_pe.clone())?;
 			ports.push(port);
-			is_connected = false;
 		}
 		let boxed_ports: Box<[Port]> = ports.into_boxed_slice();
-		let packet_engine = try!(PacketEngine::new(scope, &cell_id, packet_pe_to_ca,
-				entry_pe_from_ca, packet_pe_from_port, packet_pe_to_ports));
-		let cell_agent = try!(CellAgent::new(scope, &cell_id, boxed_ports.len() as u8, 
-				packet_port_to_pe, packet_engine, packet_ca_from_pe, 
-				entry_ca_to_pe, status_ca_from_port, recvr_ca_to_ports, packet_ports_from_pe));
+		PacketEngine::new(scope, &cell_id, pe_to_ca,
+				pe_from_ca, pe_from_ports, pe_to_ports)?;
+		let cell_agent = CellAgent::new(scope, &cell_id, boxed_ports.len() as u8, 
+			ca_from_pe, ca_to_pe)?;
 		let nalcell = NalCell { id: cell_id, cell_no: cell_no, is_border: is_border,
-				ports: boxed_ports, cell_agent: cell_agent, vms: Vec::new()};
+				ports: boxed_ports, cell_agent: cell_agent, vms: Vec::new(),
+				ports_from_pe: ports_from_pe};
 		Ok(nalcell)
 	}
 //	pub fn get_id(&self) -> CellID { self.id.clone() }
 //	pub fn get_no(&self) -> usize { self.cell_no }
-	pub fn get_free_port_mut (&mut self) -> Result<&mut Port, NalCellError> {
+	pub fn get_free_port_mut (&mut self) -> Result<(&mut Port, PortFromPe), NalCellError> {
 		for p in &mut self.ports.iter_mut() {
-			if !p.is_connected() & !p.is_border() { return Ok(p); }
+			//println!("NalCell {}: port {} is connected {}", self.id, p.get_port_no(), p.is_connected());
+			if !p.is_connected() & !p.is_border() & (p.get_port_no() != 0 as u8) {
+				let port_no = p.get_port_no();
+				match self.ports_from_pe.remove(&port_no) { // Remove avoids a borrowed context error
+					Some(recvr) => {
+						p.set_connected();
+						return Ok((p,recvr))
+					},
+					None => return Err(NalCellError::Channel(ChannelError::new(port_no)))
+				} 
+			}
 		}
 		Err(NalCellError::NoFreePort(NoFreePortError::new(self.id.clone())))
 	}
@@ -116,7 +126,8 @@ pub enum NalCellError {
 	NoFreePort(NoFreePortError),
 	CellAgent(CellAgentError),
 	PacketEngine(PacketEngineError),
-	NumberPorts(NumberPortsError)
+	NumberPorts(NumberPortsError),
+	Channel(ChannelError)
 }
 impl Error for NalCellError {
 	fn description(&self) -> &str {
@@ -127,6 +138,7 @@ impl Error for NalCellError {
 			NalCellError::CellAgent(ref err) => err.description(),
 			NalCellError::NumberPorts(ref err) => err.description(),
 			NalCellError::PacketEngine(ref err) => err.description(),
+			NalCellError::Channel(ref err) => err.description(),
 		}
 	}
 	fn cause(&self) -> Option<&Error> {
@@ -137,6 +149,7 @@ impl Error for NalCellError {
 			NalCellError::CellAgent(ref err) => Some(err),
 			NalCellError::NumberPorts(ref err) => Some(err),
 			NalCellError::PacketEngine(ref err) => Some(err),
+			NalCellError::Channel(ref err) => Some(err),
 		}
 	}
 }
@@ -149,6 +162,7 @@ impl fmt::Display for NalCellError {
 			NalCellError::CellAgent(ref err) => write!(f, "NalCell Cell Agent Error caused by {}", err),
 			NalCellError::NumberPorts(ref err) => write!(f, "NalCell Number Ports Error caused by {}", err),
 			NalCellError::PacketEngine(ref err) => write!(f, "NalCell Number Ports Error caused by {}", err),
+			NalCellError::Channel(ref err) => write!(f, "NalCell Channel Error caused by {}", err),
 		}
 	}
 }
@@ -173,6 +187,22 @@ impl Error for NumberPortsError {
 	fn cause(&self) -> Option<&Error> { None }
 }
 impl fmt::Display for NumberPortsError {
+	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+		write!(f, "{}", self.msg)
+	}
+}
+#[derive(Debug)]
+pub struct ChannelError { msg: String }
+impl ChannelError { 
+	pub fn new(port_no: PortNo) -> ChannelError {
+		ChannelError { msg: format!("No receiver for port {}", port_no) }
+	}
+}
+impl Error for ChannelError {
+	fn description(&self) -> &str { &self.msg }
+	fn cause(&self) -> Option<&Error> { None }
+}
+impl fmt::Display for ChannelError {
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
 		write!(f, "{}", self.msg)
 	}

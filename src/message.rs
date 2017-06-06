@@ -5,7 +5,7 @@ use config::{PathLength, TableIndex};
 use name::{CellID, TreeID};
 use packet::Packetizer;
 use traph;
-use utility::{DEFAULT_USER_MASK, Path, PortNumber};
+use utility::{DEFAULT_USER_MASK, Mask, Path, PortNumber};
 
 static MESSAGE_COUNT: AtomicUsize = ATOMIC_USIZE_INIT;
 pub fn get_next_count() -> usize { MESSAGE_COUNT.fetch_add(1, Ordering::SeqCst) } 
@@ -39,7 +39,7 @@ impl fmt::Display for MsgDirection {
 pub trait Message: fmt::Display {
 	fn get_header(&self) -> MsgHeader;
 	fn get_payload(&self) -> Box<MsgPayload>;
-	fn get_count(&self) -> usize { self.get_header().get_count() }
+	//fn get_count(&self) -> usize { self.get_count() }
 	fn is_rootward(&self) -> bool {
 		match self.get_header().get_direction() {
 			MsgDirection::Rootward => true,
@@ -64,7 +64,7 @@ impl MsgHeader {
 		MsgHeader { msg_type: msg_type, direction: direction, msg_count: msg_count }
 	}
 	pub fn get_msg_type(&self) -> MsgType { self.msg_type }
-	pub fn get_count(&self) -> usize { self.msg_count }
+	//pub fn get_count(&self) -> usize { self.msg_count }
 	pub fn get_direction(&self) -> MsgDirection { self.direction }
 	//pub fn set_direction(&mut self, direction: MsgDirection) { self.direction = direction; }
 }
@@ -86,7 +86,7 @@ impl DiscoverMsg {
 		let payload = DiscoverPayload::new(tree_id, sending_cell_id, hops, path);
 		DiscoverMsg { header: header, payload: payload }
 	}
-	pub fn update_discover(&mut self, cell_id: CellID) {
+	pub fn update_discover_msg(&mut self, cell_id: CellID) {
 		let hops = self.update_hops();
 		let path = self.update_path();
 		self.payload.set_hops(hops);
@@ -106,33 +106,29 @@ impl Message for DiscoverMsg {
 		let hops = self.payload.get_hops();
 		let path = self.payload.get_path();
 		let children = Vec::new();
-		//println!("Message: tree_id {}, port_number {}", tree_id, port_number);
+		//println!("DiscoverMsg: tree_id {}, port_number {}", tree_id, port_number);
 		let exists = ca.exists(&new_tree_id);  // Have I seen this tree before?
 		let status = if exists { traph::PortStatus::Pruned } else { traph::PortStatus::Parent };
 		let entry = ca.update_traph(&new_tree_id, port_number, status,
 				children, senders_index, hops, Some(path))?;
-		//println!("Message {}: entry {}", ca.get_id(), entry);
+		//println!("DiscoverMsg {}: entry {}", ca.get_id(), entry);
 		if exists { 
 			println!("DiscoverMsg {}: exists {}", ca.get_id(), self);
 			return Ok(()); 
 		} // Don't forward if traph exists for this tree - Simple quenching
 		let index = entry.get_index();
 		// Send DiscoverD to sender
-		//let discoverd_msg = DiscoverDMsg::new(index);
-		//let packets = Packetizer::packetize(&discoverd_msg, senders_index, [false; 4])?;
-		//println!("DiscoverMsg {}: sending msg {} discoverd on tree {} {}",ca.get_id(), discoverd_msg.get_count(), new_tree_id, discoverd_msg);
-		//ca.send_msg(&new_tree_id, packets, Mask::new(PortNumber::new(0, ca.get_no_ports())?))?;
+		let discoverd_msg = DiscoverDMsg::new(index);
+		let packets = Packetizer::packetize(&discoverd_msg, senders_index, [false; 4])?;
+		//println!("DiscoverMsg {}: sending discoverd on tree {} {}",ca.get_id(), new_tree_id, discoverd_msg);
+		//ca.send_msg(&new_tree_id, packets, Mask::new0())?;
 		// Forward Discover on all except port_no with updated hops and path
-		self.update_discover(ca.get_id());
-		let packets = Packetizer::packetize(self, index, [false; 4])?;
+		self.update_discover_msg(ca.get_id());
+		let control_tree_index = 0;
+		let packets = Packetizer::packetize(self, control_tree_index, [false; 4])?;
 		let user_mask = DEFAULT_USER_MASK.all_but_port(PortNumber::new(port_no, ca.get_no_ports())?);
-		//let connected_mask = ca.get_connected_tree_mask();
-		//let mask = connected_mask.and(user_mask);
-		//let ports = mask.get_port_nos();
-		//println!("DiscoverMsg {}: forwarding {} as {} on ports {:?}", ca.get_id(), self.get_count(), discover_msg.get_count(), ports);
-		let discover_msgs = ca.add_discover_msg(self.clone());
-		//ca.forward_discover(&discover_msgs)?; // Forward this and previous Discover msgs
-		println!("DiscoverMsg {}: forwarding on connected ports {}", ca.get_id(), self);
+		ca.add_discover_msg(self.clone());
+		println!("DiscoverMsg {}: forwarding packet {} on connected ports {}", ca.get_id(), packets[0].get_count(), self);
 		ca.send_msg(&ca.get_connected_ports_tree_id(), packets, user_mask)?;
 		Ok(())
 	}

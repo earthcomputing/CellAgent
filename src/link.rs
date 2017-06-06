@@ -1,13 +1,11 @@
 use std::fmt;
 use std::sync::mpsc;
-use std::sync::mpsc::channel;
 use crossbeam::Scope;
-use nalcell::{PacketSend,PacketRecv};
-use name::{Name, LinkID};
-use packet::Packet;
-use port::{Port};
+use nalcell::{LinkToPort, LinkFromPort, LinkPortError};
+use name::{Name, LinkID, PortID};
+use port::{PortStatus};
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Link {
 	id: LinkID,
 	is_broken: bool,
@@ -15,49 +13,43 @@ pub struct Link {
 }
 #[deny(unused_must_use)]
 impl Link {
-	pub fn new(scope: &Scope, left: &mut Port, rite: &mut Port) -> Result<Link,LinkError> {
-		let left_id = left.get_id();
-		let rite_id = rite.get_id();
+	pub fn new(scope: &Scope, left_id: &PortID, rite_id: &PortID,
+			link_to_left: LinkToPort, link_from_left: LinkFromPort,
+			link_to_rite: LinkToPort, link_from_rite: LinkFromPort )
+				-> Result<Link,LinkError> {
 		let rite_name = rite_id.get_name();
 		let temp_id = match left_id.add_component(&rite_name) {
 			Ok(x) => x,
 			Err(err) => return Err(LinkError::Name(err))
 		};
 		let id = LinkID::new(&temp_id.get_name())?;
-		let (packet_link_to_left, packet_left_from_link) = channel();
-		let (packet_link_to_rite, packet_rite_from_link) = channel();
-		let (packet_left_to_link, packet_link_from_left)  = channel();
-		let (packet_rite_to_link, packet_link_from_rite) = channel();
 		let link = Link { id: id, is_broken: false, is_connected: true };
-		link.listen(scope, packet_link_from_left, packet_link_to_rite, 
-							    packet_link_from_rite, packet_link_to_left)?;
-		left.set_connected(scope, packet_left_to_link, packet_left_from_link)?;
-		rite.set_connected(scope, packet_rite_to_link, packet_rite_from_link)?;
+		link.listen(scope, link_to_left.clone(), link_from_left, link_to_rite.clone())?;
+		link.listen(scope, link_to_rite, link_from_rite, link_to_left)?;
 		Ok(link)
 	}
-	fn listen(&self, scope: &Scope, packet_link_from_left: PacketRecv, packet_link_to_rite: PacketSend,
-					 packet_link_from_rite: PacketRecv, packet_link_to_left: PacketSend) -> Result<(), LinkError> {
-		//let link_id = self.id.clone();
+	fn listen(&self, scope: &Scope, status: LinkToPort, link_from: LinkFromPort, link_to: LinkToPort) 
+				-> Result<(), LinkError> {
+		let link = self.clone();
 		scope.spawn( move || -> Result<(), LinkError> {
-				loop {
-					//println!("Link {}: waiting to recv left", link_id);
-					let packet = packet_link_from_left.recv()?;
-					packet_link_to_rite.send(packet)?;
-					//println!("Link {}: sent packet {} right", link_id, packet_count);
+			status.send((Some(PortStatus::Connected),None))?;
+			match link.listen_loop(link_from, link_to) {
+				Ok(val) => Ok(val),
+				Err(err) => {
+					println!("--- Link {}: from left {}", link.id, err);
+					Err(err)
 				}
 			}
-		);
-		//let link_id = self.id.clone();
-		scope.spawn( move || -> Result<(), LinkError> {
-				loop {
-					//println!("Link {}: waiting to recv right", link_id);
-					let packet = packet_link_from_rite.recv()?;
-					packet_link_to_left.send(packet)?;
-					//println!("Link {}: sent packet {} left", link_id, packet_count);
-				}
-			}
-		);
+		});
 		Ok(())
+	}			
+	fn listen_loop(&self, link_from: LinkFromPort, link_to: LinkToPort) -> Result<(),LinkError> {
+		loop {
+			//println!("Link {}: waiting to recv left", link_id);
+			let packet = link_from.recv()?;
+			link_to.send((None,Some(packet)))?;
+			//println!("Link {}: sent packet {} right", link_id, packet.get_count());
+		}
 	}
 }
 impl fmt::Display for Link { 
@@ -76,8 +68,8 @@ use port::{PortError};
 pub enum LinkError {
 	Name(NameError),
 	Port(PortError),
-	Send(mpsc::SendError<Packet>),
-	Recv(mpsc::RecvError)
+	Send(LinkPortError),
+	Recv(mpsc::RecvError),
 }
 impl Error for LinkError {
 	fn description(&self) -> &str {
@@ -113,8 +105,8 @@ impl From<NameError> for LinkError {
 impl From<PortError> for LinkError {
 	fn from(err: PortError) -> LinkError { LinkError::Port(err) }
 }
-impl From<mpsc::SendError<Packet>> for LinkError {
-	fn from(err: mpsc::SendError<Packet>) -> LinkError { LinkError::Send(err) }
+impl From<LinkPortError> for LinkError {
+	fn from(err: LinkPortError) -> LinkError { LinkError::Send(err) }
 }
 impl From<mpsc::RecvError> for LinkError {
 	fn from(err: mpsc::RecvError) -> LinkError { LinkError::Recv(err) }
