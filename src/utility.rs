@@ -31,6 +31,7 @@ impl Mask {
 	}
 	pub fn new0() -> Mask { Mask { mask: 1 } }
 	pub fn empty() -> Mask { Mask { mask: 0 } }
+	pub fn equal(&self, other: Mask) -> bool { self.mask == other.mask }
 	pub fn get_as_value(&self) -> MaskValue { self.mask }
 	pub fn or(&self, mask: Mask) -> Mask {
 		Mask { mask: self.mask | mask.mask }
@@ -45,7 +46,7 @@ impl Mask {
 		let port_mask = Mask::new(port_number);
 		self.and(port_mask.not())
 	}
-	pub fn make(port_numbers: Vec<PortNumber>) -> Mask {
+	pub fn make(port_numbers: &Vec<PortNumber>) -> Mask {
 		let mut mask = Mask::empty();
 		// Using map() is more complicated because of try!
 		for port_number in port_numbers.iter() {
