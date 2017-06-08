@@ -32,26 +32,28 @@ impl Traph {
 	pub fn get_table_entry(&self) -> RoutingTableEntry { self.table_entry }
 	pub fn get_table_index(&self) -> TableIndex { self.table_entry.get_index() }
 	pub fn new_element(&mut self, port_number: PortNumber, port_status: PortStatus, 
-			other_index: TableIndex, children: Vec<PortNumber>, 
+			other_index: TableIndex, children: &Vec<PortNumber>, 
 			hops: PathLength, path: Option<Path>) -> Result<RoutingTableEntry, TraphError> {
 		let port_no = port_number.get_port_no();
 		match port_status {
 			PortStatus::Parent => self.table_entry.set_parent(port_number),
-			PortStatus::Child => self.table_entry.add_children(vec![port_number]),
+			PortStatus::Child => self.table_entry.add_children(&vec![port_number]),
 			_ => ()
 		};
-		self.table_entry.set_other_index(port_number, other_index);
+		self.table_entry.add_other_index(port_number, other_index);
 		self.table_entry.add_children(children);
 		self.table_entry.set_inuse();
 		let element = TraphElement::new(true, port_no, other_index, port_status, hops, path);
 		self.elements[port_no as usize] = element;
 		Ok(self.table_entry)
 	}
-	pub fn add_child(&mut self, port_number: PortNumber) -> Result<RoutingTableEntry, TraphError> {
+	pub fn add_child(&mut self, port_number: PortNumber, other_index: TableIndex) 
+			-> Result<RoutingTableEntry, TraphError> {
 		let port_no = port_number.get_port_no();
 		if let Some(element) = self.elements.get_mut(port_no as usize) {
 			element.set_status(PortStatus::Child);
-			self.table_entry.add_children(vec![port_number]); 
+			self.table_entry.add_children(&vec![port_number]); 
+			self.table_entry.add_other_index(port_number, other_index);
 			Ok(self.table_entry)
 		} else {
 			return Err(TraphError::Lookup(LookupError::new(port_number)))

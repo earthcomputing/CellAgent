@@ -55,9 +55,8 @@ pub struct PacketHeader {
 						// xxxx xxx1 => leafcast
 						// xxxx xx0x => Not last packet
 						// xxxx xx1x => Last packet
-						// xx00 xxxx => EC Protocol to CellAgent
-						// xx01 xxxx => EC Protocol to VirtualMachine
-						// xx10 xxxx => Legacy Protocol to VirtualMachine
+						// xx00 xxxx => EC Protocol to VirtualMachine
+						// xx01 xxxx => Legacy Protocol to VirtualMachine
 }
 #[deny(unused_must_use)]
 impl PacketHeader {
@@ -134,7 +133,7 @@ impl fmt::Debug for Payload {
 pub struct Packetizer {}
 #[deny(unused_must_use)]
 impl Packetizer {
-	pub fn packetize<M>(msg: &M, other_index: TableIndex, flags: [bool;4]) -> Result<Vec<Box<Packet>>, PacketizerError>
+	pub fn packetize<M>(msg: &M, other_index: TableIndex) -> Result<Vec<Box<Packet>>, PacketizerError>
 			where M: Message + Hash + serde::Serialize {
 		let msg_type = msg.get_header().get_msg_type();
 		let serialized_msg_type = serde_json::to_string(&msg_type)?;
@@ -148,7 +147,7 @@ impl Packetizer {
 		let unique_id = rand::random(); // Can't use hash in case two cells send the same message
 		let direction = msg.get_header().get_direction();
 		let mut packets = Vec::new();
-				for i in 0..num_packets {
+		for i in 0..num_packets {
 			let (size, is_last_packet) = if i == (num_packets-1) {
 				(last_packet_size, true)
 			} else {

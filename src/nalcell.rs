@@ -14,7 +14,7 @@ use utility::{Mask, PortNumber};
 use vm::VirtualMachine;
 
 // CellAgent to PacketEngine
-type CaToPeMsg = (Option<RoutingTableEntry>,Option<(TableIndex,Mask,Packet)>);
+pub type CaToPeMsg = (Option<RoutingTableEntry>,Option<(TableIndex,Mask,Packet)>);
 pub type CaToPe = mpsc::Sender<CaToPeMsg>;
 pub type PeFromCa = mpsc::Receiver<CaToPeMsg>;
 //pub type CaPeError = mpsc::SendError<CaToPeMsg>;
@@ -27,17 +27,17 @@ pub type PortToLink = mpsc::Sender<Packet>;
 pub type LinkFromPort = mpsc::Receiver<Packet>;
 pub type PortLinkError = mpsc::SendError<Packet>;
 // Link to Port
-type LinkToPortMsg = (Option<PortStatus>,Option<Packet>);
+pub type LinkToPortMsg = (Option<PortStatus>,Option<Packet>);
 pub type LinkToPort = mpsc::Sender<LinkToPortMsg>;
 pub type PortFromLink = mpsc::Receiver<LinkToPortMsg>;
 pub type LinkPortError = mpsc::SendError<LinkToPortMsg>;
 // Port to PacketEngine
-type PortToPeMsg = (Option<(PortNo, PortStatus)>,Option<(PortNo, Packet)>);
+pub type PortToPeMsg = (Option<(PortNo, PortStatus)>,Option<(PortNo, Packet)>);
 pub type PortToPe = mpsc::Sender<PortToPeMsg>;
 pub type PeFromPort = mpsc::Receiver<PortToPeMsg>;
 pub type PortPeError = mpsc::SendError<PortToPeMsg>;
 // PacketEngine to CellAgent
-type PeToCaMsg = (Option<(PortNo, PortStatus)>,Option<(PortNo, TableIndex, Packet)>);
+pub type PeToCaMsg = (Option<(PortNo, PortStatus)>,Option<(PortNo, TableIndex, Packet)>);
 pub type PeToCa = mpsc::Sender<PeToCaMsg>;
 pub type CaFromPe = mpsc::Receiver<PeToCaMsg>;
 pub type PeCaError = mpsc::SendError<PeToCaMsg>;
