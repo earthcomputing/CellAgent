@@ -122,15 +122,16 @@ impl CellAgent {
 		let mut traphs = self.traphs.lock().unwrap();
 		let mut traph = match traphs.remove(tree_id.get_name()) { // Avoids lifetime problem
 			Some(t) => t,
-			None => Traph::new(tree_id.clone(), self.clone().use_index()?)?
+			None => Traph::new(self.cell_id.clone(), tree_id.clone(), self.clone().use_index()?)?
 		};
 		let traph_status = traph.get_port_status(port_number);
 		let port_status = match traph_status {
 			traph::PortStatus::Pruned => port_status,
 			_ => traph_status  // Don't replace if Parent or Child
 		};
-		let entry = traph.new_element(port_number, port_status, other_index, children, hops, path)?;
+		let entry = traph.new_element(port_number, port_status, other_index, children, hops, path)?; 
 		// Here's the end of the transaction
+		println!("CellAgent {}: entry {}\n{}", self.cell_id, entry, traph); 
 		traphs.insert(tree_id.stringify(), traph);
 		{
 			self.trees.lock().unwrap().insert(entry.get_index(), tree_id.stringify());
