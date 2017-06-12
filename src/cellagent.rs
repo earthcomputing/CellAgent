@@ -124,6 +124,13 @@ impl CellAgent {
 			Some(t) => t,
 			None => Traph::new(self.cell_id.clone(), tree_id.clone(), self.clone().use_index()?)?
 		};
+		let (hops, path) = match port_status{
+			traph::PortStatus::Child => {
+				let element = traph.get_parent_element()?;
+				(element.get_hops()+1, element.get_path())
+			},
+			_ => (hops, path)
+		};
 		let traph_status = traph.get_port_status(port_number);
 		let port_status = match traph_status {
 			traph::PortStatus::Pruned => port_status,
