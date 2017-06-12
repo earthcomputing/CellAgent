@@ -58,6 +58,7 @@ impl Traph {
 			self.table_entry.add_other_index(port_number, other_index);
 			Ok(self.table_entry)
 		} else {
+			println!("--- Traph for cell {} tree {}: port_no {}", self.cell_id, self.tree_id, port_no);
 			return Err(TraphError::Lookup(LookupError::new(port_number)))
 		}
 	}

@@ -118,7 +118,7 @@ impl CellAgent {
 	pub fn update_traph(&mut self, tree_id: &TreeID, port_number: PortNumber, port_status: traph::PortStatus, 
 				children: &Vec<PortNumber>, other_index: TableIndex, hops: PathLength, path: Option<Path>) 
 			-> Result<RoutingTableEntry, CellAgentError> {
-		// Note that traphs is updated transactionally; I remove an entry, update it, then put it back.
+// Note that traphs is updated transactionally; I remove an entry, update it, then put it back.
 		let mut traphs = self.traphs.lock().unwrap();
 		let mut traph = match traphs.remove(tree_id.get_name()) { // Avoids lifetime problem
 			Some(t) => t,
@@ -130,7 +130,7 @@ impl CellAgent {
 			_ => traph_status  // Don't replace if Parent or Child
 		};
 		let entry = traph.new_element(port_number, port_status, other_index, children, hops, path)?; 
-		// Here's the end of the transaction
+// Here's the end of the transaction
 		println!("CellAgent {}: entry {}\n{}", self.cell_id, entry, traph); 
 		traphs.insert(tree_id.stringify(), traph);
 		{
@@ -144,27 +144,6 @@ impl CellAgent {
 			}
 		};
 		Ok(entry)
-	}
-	pub fn add_child(&self, tree_id: &String, port_no: PortNo, other_index: TableIndex)
-			-> Result<(), CellAgentError> {
-		let mut traphs = self.traphs.lock().unwrap();
-		if let Some(mut traph) = traphs.remove(tree_id) { // Avoids a lifetime error
-			let port_number = PortNumber::new(port_no, self.no_ports)?;
-			let entry = traph.add_child(port_number, other_index)?;
-			traphs.insert(tree_id.clone(),traph);
-			println!("CellAgent {}: child {}   {}", self.cell_id, tree_id, entry);
-			match self.ca_to_pe.send((Some(entry),None)) {
-				Ok(_) => (),
-				Err(err) => {
-					println!("CellAgent {}: add_child EntryCaToPe error {}", self.cell_id, err);
-					return Err(CellAgentError::SendCaPe(err));
-				}
-			};
-		} else {
-			println!("CellAgent {}: add_child tree {} does not exist in traphs {:?}", self.cell_id, tree_id, traphs.keys());
-			return Err(CellAgentError::Tree(TreeError::new(tree_id)));
-		}
-		Ok(())
 	}
 	fn listen(&mut self, scope: &Scope, ca_from_pe: CaFromPe) -> Result<(), CellAgentError>{
 		let mut ca = self.clone();
