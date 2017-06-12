@@ -1,7 +1,7 @@
 use std::fmt;
 use std::sync::atomic::{ATOMIC_USIZE_INIT, AtomicUsize, Ordering};
 use cellagent::{CellAgent};
-use config::{PathLength, PortNo, TableIndex};
+use config::{MAX_PORTS, PathLength, PortNo, TableIndex};
 use name::{Name, CellID, TreeID};
 use packet::Packetizer;
 use traph;
@@ -194,10 +194,12 @@ impl Message for DiscoverDMsg {
 	fn get_payload(&self) -> Box<MsgPayload> { Box::new(self.payload.clone()) }
 	fn process(&mut self, ca: &mut CellAgent, port_no: u8) 
 			-> Result<(), ProcessMsgError> {
-		let tree_id = self.payload.get_tree_id().stringify();
+		let tree_id = self.payload.get_tree_id();
 		let my_index = self.payload.get_table_index();
+		let port_number = PortNumber::new(port_no, MAX_PORTS)?;
 		println!("DiscoverDMsg {}: process msg {} processing {} {} {}", ca.get_id(), self.get_header().get_count(), port_no, my_index, tree_id);
-		ca.add_child(&tree_id, port_no, my_index)?;
+		//ca.add_child(&tree_id, port_no, my_index)?;
+		ca.update_traph(&tree_id, port_number, traph::PortStatus::Child, &vec![port_number], my_index, 0, None)?;
 		Ok(())
 	}
 }
