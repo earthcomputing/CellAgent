@@ -31,6 +31,15 @@ impl Traph {
 			None => PortStatus::Pruned
 		}
 	}
+	pub fn get_parent_element(&self) -> Result<&TraphElement, TraphError> {
+		for element in &self.elements {
+			match element.get_status() {
+				PortStatus::Parent => return Ok(element),
+				_ => ()
+			}
+		}
+		Err(TraphError::Parent(ParentError::new(&self.cell_id, &self.tree_id)))
+	}
 	pub fn get_table_entry(&self) -> RoutingTableEntry { self.table_entry }
 	pub fn get_table_index(&self) -> TableIndex { self.table_entry.get_index() }
 	pub fn new_element(&mut self, port_number: PortNumber, port_status: PortStatus, 
@@ -128,6 +137,7 @@ use utility::PortNumberError;
 pub enum TraphError {
 	Name(NameError),
 	Lookup(LookupError),
+	Parent(ParentError),
 	PortNumber(PortNumberError),
 	Utility(UtilityError),
 	RoutingTable(RoutingTableEntryError)
@@ -137,6 +147,7 @@ impl Error for TraphError {
 		match *self {
 			TraphError::Name(ref err) => err.description(),
 			TraphError::Lookup(ref err) => err.description(),
+			TraphError::Parent(ref err) => err.description(),
 			TraphError::PortNumber(ref err) => err.description(),
 			TraphError::Utility(ref err) => err.description(),
 			TraphError::RoutingTable(ref err) => err.description(),
@@ -146,6 +157,7 @@ impl Error for TraphError {
 		match *self {
 			TraphError::Name(ref err) => Some(err),
 			TraphError::Lookup(ref err) => Some(err),
+			TraphError::Parent(ref err) => Some(err),
 			TraphError::PortNumber(ref err) => Some(err),
 			TraphError::Utility(ref err) => Some(err),
 			TraphError::RoutingTable(ref err) => Some(err),
@@ -157,6 +169,7 @@ impl fmt::Display for TraphError {
 		match *self {
 			TraphError::Name(ref err) => write!(f, "Traph Name Error caused by {}", err),
 			TraphError::Lookup(ref err) => write!(f, "Traph Lookup Error caused by {}", err),
+			TraphError::Parent(ref err) => write!(f, "Traph Parent Error caused by {}", err),
 			TraphError::PortNumber(ref err) => write!(f, "Traph Port Number Error caused by {}", err),
 			TraphError::Utility(ref err) => write!(f, "Traph Utility Error caused by {}", err),
 			TraphError::RoutingTable(ref err) => write!(f, "Traph Utility Error caused by {}", err),
@@ -181,6 +194,25 @@ impl fmt::Display for LookupError {
 }
 impl From<LookupError> for TraphError {
 	fn from(err: LookupError) -> TraphError { TraphError::Lookup(err) }
+}
+#[derive(Debug)]
+pub struct ParentError { msg: String }
+impl ParentError { 
+	pub fn new(cell_id: &CellID, tree_id: &TreeID) -> ParentError {
+		ParentError { msg: format!("No parent for tree {} on cell {}", tree_id, cell_id) }
+	}
+}
+impl Error for ParentError {
+	fn description(&self) -> &str { &self.msg }
+	fn cause(&self) -> Option<&Error> { None }
+}
+impl fmt::Display for ParentError {
+	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+		write!(f, "{}", self.msg)
+	}
+}
+impl From<ParentError> for TraphError {
+	fn from(err: ParentError) -> TraphError { TraphError::Parent(err) }
 }
 impl From<NameError> for TraphError {
 	fn from(err: NameError) -> TraphError { TraphError::Name(err) }
@@ -219,7 +251,8 @@ impl TraphElement {
 					0 as PathLength, None)
 	}
 	fn get_port_no(&self) -> PortNo { self.port_no }
-//	fn get_hops(&self) -> PathLength { self.hops }
+	pub fn get_hops(&self) -> PathLength { self.hops }
+	pub fn get_path(&self) -> Option<Path> { self.path }
 	fn get_status(&self) -> PortStatus { self.status }
 	fn get_other_index(&self) -> TableIndex { self.other_index }
 	fn is_connected(&self) -> bool { self.is_connected }
