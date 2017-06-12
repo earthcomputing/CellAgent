@@ -85,11 +85,12 @@ impl DiscoverMsg {
 		let payload = DiscoverPayload::new(tree_id, my_index, sending_cell_id, hops, path);
 		DiscoverMsg { header: header, payload: payload }
 	}
-	pub fn update_discover_msg(&mut self, cell_id: CellID) {
+	pub fn update_discover_msg(&mut self, cell_id: CellID, index: TableIndex) {
 		let hops = self.update_hops();
 		let path = self.update_path();
 		self.payload.set_hops(hops);
 		self.payload.set_path(path);
+		self.payload.set_index(index);
 		self.payload.set_sending_cell(cell_id);
 	}
 	fn update_hops(&self) -> PathLength { self.payload.get_hops() + 1 }
@@ -119,12 +120,13 @@ impl Message for DiscoverMsg {
 		let my_index = entry.get_index();
 		// Send DiscoverD to sender
 		let discoverd_msg = DiscoverDMsg::new(new_tree_id.clone(), my_index);
-		let packets = Packetizer::packetize(&discoverd_msg, senders_index)?;
+		let other_index = 0;
+		let packets = Packetizer::packetize(&discoverd_msg, other_index)?;
 		println!("DiscoverMsg {}: sending discoverd for tree {} packet {} {}",ca.get_id(), new_tree_id, packets[0].get_count(), discoverd_msg);
 		let mask = Mask::new(port_number);
 		ca.send_msg(&ca.get_connected_ports_tree_id(), packets, mask)?;
 		// Forward Discover on all except port_no with updated hops and path
-		self.update_discover_msg(ca.get_id());
+		self.update_discover_msg(ca.get_id(), my_index);
 		let control_tree_index = 0;
 		let packets = Packetizer::packetize(self, control_tree_index)?;
 		let user_mask = DEFAULT_USER_MASK.all_but_port(PortNumber::new(port_no, ca.get_no_ports())?);
@@ -161,6 +163,7 @@ impl DiscoverPayload {
 	fn get_index(&self) -> TableIndex { self.index }
 	fn set_hops(&mut self, hops: PathLength) { self.hops = hops; }
 	fn set_path(&mut self, path: Path) { self.path = path; }
+	fn set_index(&mut self, index: TableIndex) { self.index = index; }
 	fn set_sending_cell(&mut self, sending_cell_id: CellID) { self.sending_cell_id = sending_cell_id; }
 }
 impl MsgPayload for DiscoverPayload {}

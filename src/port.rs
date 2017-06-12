@@ -69,6 +69,7 @@ impl Port {
 	}
 	fn listen_link(&self, port_from_link: PortFromLink) -> Result<(),PortError> {
 		let port_no = self.get_port_no();
+		//println!("PortID {}: port_no {}", self.id, port_no);
 		loop {
 			//println!("Port {}: waiting for status or packet from link", port.id);
 			let (opt_status, opt_packet) = port_from_link.recv()?;

@@ -1,11 +1,12 @@
 use std::fmt;
 use config::{MAX_PORTS, PathLength, PortNo, TableIndex};
-use name::{TreeID};
+use name::{CellID, TreeID};
 use routing_table_entry::{RoutingTableEntry};
 use utility::{Path, PortNumber, UtilityError};
 
 #[derive(Debug, Clone)]
 pub struct Traph {
+	cell_id: CellID,
 	tree_id: TreeID,
 	my_index: TableIndex,
 	table_entry: RoutingTableEntry,
@@ -13,13 +14,14 @@ pub struct Traph {
 }
 #[deny(unused_must_use)] // Need to figure out get_all_hops and get_other_indices with this enabled
 impl Traph {
-	pub fn new(tree_id: TreeID, index: TableIndex) -> Result<Traph, TraphError> {
+	pub fn new(cell_id: CellID, tree_id: TreeID, index: TableIndex) -> Result<Traph, TraphError> {
 		let mut elements = Vec::new();
 		for i in 1..MAX_PORTS { 
 			elements.push(TraphElement::default(PortNumber::new(i, MAX_PORTS)?)); 
 		}
 		let entry = RoutingTableEntry::default(index)?;
-		Ok(Traph { tree_id: tree_id, my_index: index, table_entry: entry, elements: elements })
+		Ok(Traph { cell_id: cell_id, tree_id: tree_id, my_index: index, 
+				table_entry: entry, elements: elements })
 	}
 //	pub fn get_tree_id(&self) -> TreeID { self.tree_id.clone() }
 	pub fn get_port_status(&self, port_number: PortNumber) -> PortStatus { 
@@ -32,8 +34,8 @@ impl Traph {
 	pub fn get_table_entry(&self) -> RoutingTableEntry { self.table_entry }
 	pub fn get_table_index(&self) -> TableIndex { self.table_entry.get_index() }
 	pub fn new_element(&mut self, port_number: PortNumber, port_status: PortStatus, 
-			other_index: TableIndex, children: &Vec<PortNumber>, 
-			hops: PathLength, path: Option<Path>) -> Result<RoutingTableEntry, TraphError> {
+			other_index: TableIndex, children: &Vec<PortNumber>, hops: PathLength, path: Option<Path>) 
+			-> Result<RoutingTableEntry, TraphError> {
 		let port_no = port_number.get_port_no();
 		match port_status {
 			PortStatus::Parent => self.table_entry.set_parent(port_number),
@@ -92,17 +94,11 @@ impl Traph {
 }
 impl fmt::Display for Traph {
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result { 
-		let mut s = format!("Traph for TreeID {}", self.tree_id);
-		let mut connected = false;
-		for element in self.elements.iter() { if element.is_connected() { connected = true; } }
-		if connected {
-			s = s + &format!("\nPort Other Connected Broken Status Hops Path\n");
-			// Can't replace with map() because s gets moved into closure 
-			for element in self.elements.iter() { 
-				if element.is_connected() { s = s + &format!("{}",element);} 
-			}
-		} else {
-			s = s + &format!("\nNo entries yet for this tree"); 
+		let mut s = format!("Traph for TreeID {} on cell {}", self.tree_id, self.cell_id);
+		s = s + &format!("\nPort Other Connected Broken Status Hops Path");
+		// Can't replace with map() because s gets moved into closure 
+		for element in self.elements.iter() { 
+			if element.is_connected() { s = s + &format!("\n{}",element); } 
 		}
 		write!(f, "{}", s) 
 	}
@@ -198,7 +194,7 @@ impl From<PortNumberError> for TraphError {
 	fn from(err: PortNumberError) -> TraphError { TraphError::PortNumber(err) }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Copy, Clone)]
 struct TraphElement {
 	port_no: PortNo,
 	other_index: TableIndex,
@@ -233,8 +229,7 @@ impl TraphElement {
 impl fmt::Display for TraphElement {
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
 		let mut s = format!("{:4} {:5} {:9} {:6} {:6} {:4}", 
-			self.port_no, self.other_index, self.is_connected, 
-			self.is_broken, self.status, self.hops);
+			self.port_no, self.other_index, self.is_connected, self.is_broken, self.status, self.hops);
 		match self.path {
 			Some(p) => s = s + &format!(" {:4}", p.get_port_no()),
 			None    => s = s + &format!(" None")

@@ -61,7 +61,7 @@ impl PacketEngine {
 		} else {
 			let mask = user_mask.and(entry.get_mask());
 			let port_nos = mask.get_port_nos();
-			println!("PacketEngine {}: forwarding packet {} on ports {:?}, {}", self.cell_id, packet.get_count(), port_nos, entry);
+			//println!("PacketEngine {}: forwarding packet {} on ports {:?}, {}", self.cell_id, packet.get_count(), port_nos, entry);
 			for port_no in port_nos.iter() {
 				let other_index = *other_indices.get(*port_no as usize).expect("PacketEngine: No such other index");
 				header.set_other_index(other_index as u32);
@@ -111,7 +111,7 @@ impl PacketEngine {
 			let entry = match opt_entry {
 				Some(e) => {
 					self.routing_table.lock().unwrap().set_entry(e);
-					//println!("PacketEngine {}: {}", pe.cell_id, e);
+					//println!("PacketEngine {}: {}", self.cell_id, e);
 					e
 				},
 				None => match opt_packet {
@@ -148,7 +148,7 @@ impl PacketEngine {
 				None => {
 					match opt_packet {
 						Some((port_no, packet)) => {
-							println!("PacketEngine {}: received packet {} from port {}", self.cell_id, packet.get_count(), port_no);
+							//println!("PacketEngine {}: received packet {} from port {}", self.cell_id, packet.get_count(), port_no);
 							self.process_packet(port_no, packet)?
 						},
 						None => println!("PacketEngine {}: Empty message", self.cell_id)
@@ -165,7 +165,7 @@ impl PacketEngine {
 		{
 			entry = self.routing_table.lock().unwrap().get_entry(my_index)?;
 		}
-		println!("PacketEngine {}: packet {} entry {}", self.cell_id, packet.get_count(), entry);
+		//println!("PacketEngine {}: packet {} entry {}", self.cell_id, packet.get_count(), entry);
 		let mask = entry.get_mask();
 		let other_indices = entry.get_other_indices();
 		PortNumber::new(port_no, other_indices.len() as u8)?; // Verify that port_no is valid
