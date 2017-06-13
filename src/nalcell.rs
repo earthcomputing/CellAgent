@@ -49,6 +49,7 @@ pub struct NalCell { // Does not include PacketEngine so CellAgent can own it
 	is_border: bool,
 	ports: Box<[Port]>,
 	cell_agent: CellAgent,
+	packet_engine: PacketEngine,
 	vms: Vec<VirtualMachine>,
 	ports_from_pe: HashMap<PortNo,PortFromPe>
 }
@@ -76,17 +77,18 @@ impl NalCell {
 			ports.push(port);
 		}
 		let boxed_ports: Box<[Port]> = ports.into_boxed_slice();
-		PacketEngine::new(scope, &cell_id, pe_to_ca,
+		let packet_engine = PacketEngine::new(scope, &cell_id, pe_to_ca,
 				pe_from_ca, pe_from_ports, pe_to_ports)?;
 		let cell_agent = CellAgent::new(scope, &cell_id, boxed_ports.len() as u8, 
 			ca_from_pe, ca_to_pe)?;
 		let nalcell = NalCell { id: cell_id, cell_no: cell_no, is_border: is_border,
 				ports: boxed_ports, cell_agent: cell_agent, vms: Vec::new(),
-				ports_from_pe: ports_from_pe};
+				packet_engine: packet_engine, ports_from_pe: ports_from_pe};
 		Ok(nalcell)
 	}
 //	pub fn get_id(&self) -> CellID { self.id.clone() }
 //	pub fn get_no(&self) -> usize { self.cell_no }
+	pub fn get_cell_agent(&self) -> &CellAgent { &self.cell_agent }
 	pub fn get_free_port_mut (&mut self) -> Result<(&mut Port, PortFromPe), NalCellError> {
 		for p in &mut self.ports.iter_mut() {
 			//println!("NalCell {}: port {} is connected {}", self.id, p.get_port_no(), p.is_connected());
@@ -110,7 +112,8 @@ impl fmt::Display for NalCell {
 		if self.is_border { s = s + &format!("Border Cell {}", self.id); }
 		else              { s = s + &format!("Cell {}", self.id); }
 
-		s = s + &format!("{}",self.cell_agent);
+		s = s + &format!("{}", self.cell_agent);
+		s = s + &format!("\n{}", self.packet_engine);
 		write!(f, "{}", s) }
 }
 // Errors

@@ -75,6 +75,7 @@ fn build_datacenter<'a>(scope: &crossbeam::Scope, nports: u8, ncells: usize) -> 
 	let dc = Datacenter::new(scope, ncells, nports, edges)?;
 	let nap = time::Duration::from_millis(1000);
 	thread::sleep(nap);
+	println!("{}", dc);
 	Ok(dc)
 }
 // Other tests

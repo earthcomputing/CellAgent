@@ -62,7 +62,8 @@ impl<'a> Datacenter<'a> {
 		} 
 		Ok(Datacenter { cells: cells, links: links, noc: None })
 	}
-//	pub fn add_noc(&mut self, control: &'a NalCell, backup: &'a NalCell) {
+	pub fn get_cells(&self) -> &Vec<NalCell> { &self.cells }
+				//	pub fn add_noc(&mut self, control: &'a NalCell, backup: &'a NalCell) {
 //		self.noc = Some(NOC::new(control, backup));
 //	}
 }
