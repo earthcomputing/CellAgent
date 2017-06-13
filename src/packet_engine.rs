@@ -175,7 +175,7 @@ impl PacketEngine {
 }
 impl fmt::Display for PacketEngine {
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result { 
-		let mut s = format!("\nPacket Engine");
+		let mut s = format!("Packet Engine for cell {}", self.cell_id);
 		s = s + &format!("{}", *self.routing_table.lock().unwrap());
 		write!(f, "{}", s) }	
 }

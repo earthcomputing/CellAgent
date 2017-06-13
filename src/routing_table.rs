@@ -38,7 +38,7 @@ impl fmt::Display for RoutingTable {
 		let mut s = format!("\nRouting Table with {} Entries", MAX_ENTRIES);
 		s = s + &format!("\n Index In Use Parent Mask             Indices");
 		for entry in self.entries.iter() {
-			s = s + &format!("\n{}", entry);
+			if entry.is_inuse() { s = s + &format!("\n{}", entry); }
 		}
 		write!(f, "{}", s) 
 	}	

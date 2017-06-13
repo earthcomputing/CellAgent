@@ -2,7 +2,7 @@ use std::fmt;
 use std::sync::atomic::{ATOMIC_USIZE_INIT, AtomicUsize, Ordering};
 use cellagent::{CellAgent};
 use config::{MAX_PORTS, PathLength, PortNo, TableIndex};
-use name::{Name, CellID, TreeID};
+use name::{CellID, TreeID};
 use packet::Packetizer;
 use traph;
 use utility::{DEFAULT_USER_MASK, Mask, Path, PortNumber};
@@ -114,7 +114,7 @@ impl Message for DiscoverMsg {
 				children, senders_index, hops, Some(path))?;
 		//println!("DiscoverMsg {}: entry {}", ca.get_id(), entry);
 		if exists { 
-			println!("DiscoverMsg {}: exists {}", ca.get_id(), self);
+			//println!("DiscoverMsg {}: exists {}", ca.get_id(), self);
 			return Ok(()); // Don't forward if traph exists for this tree - Simple quenching
 		} 
 		let my_index = entry.get_index();
@@ -122,7 +122,7 @@ impl Message for DiscoverMsg {
 		let discoverd_msg = DiscoverDMsg::new(new_tree_id.clone(), my_index);
 		let other_index = 0;
 		let packets = Packetizer::packetize(&discoverd_msg, other_index)?;
-		println!("DiscoverMsg {}: sending discoverd for tree {} packet {} {}",ca.get_id(), new_tree_id, packets[0].get_count(), discoverd_msg);
+		//println!("DiscoverMsg {}: sending discoverd for tree {} packet {} {}",ca.get_id(), new_tree_id, packets[0].get_count(), discoverd_msg);
 		let mask = Mask::new(port_number);
 		ca.send_msg(&ca.get_connected_ports_tree_id(), packets, mask)?;
 		// Forward Discover on all except port_no with updated hops and path
@@ -131,7 +131,7 @@ impl Message for DiscoverMsg {
 		let packets = Packetizer::packetize(self, control_tree_index)?;
 		let user_mask = DEFAULT_USER_MASK.all_but_port(PortNumber::new(port_no, ca.get_no_ports())?);
 		ca.add_discover_msg(self.clone());
-		println!("DiscoverMsg {}: forwarding packet {} on connected ports {}", ca.get_id(), packets[0].get_count(), self);
+		//println!("DiscoverMsg {}: forwarding packet {} on connected ports {}", ca.get_id(), packets[0].get_count(), self);
 		ca.send_msg(&ca.get_connected_ports_tree_id(), packets, user_mask)?;
 		Ok(())
 	}
@@ -197,7 +197,7 @@ impl Message for DiscoverDMsg {
 		let tree_id = self.payload.get_tree_id();
 		let my_index = self.payload.get_table_index();
 		let port_number = PortNumber::new(port_no, MAX_PORTS)?;
-		println!("DiscoverDMsg {}: process msg {} processing {} {} {}", ca.get_id(), self.get_header().get_count(), port_no, my_index, tree_id);
+		//println!("DiscoverDMsg {}: process msg {} processing {} {} {}", ca.get_id(), self.get_header().get_count(), port_no, my_index, tree_id);
 		//ca.add_child(&tree_id, port_no, my_index)?;
 		ca.update_traph(&tree_id, port_number, traph::PortStatus::Child, &vec![port_number], my_index, 0, None)?;
 		Ok(())

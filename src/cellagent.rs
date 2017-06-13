@@ -17,6 +17,7 @@ use utility::{BASE_TENANT_MASK, Mask, Path, PortNumber, PortNumberError};
 const CONTROL_TREE_NAME: &'static str = "Control";
 const CONNECTED_PORTS_TREE_NAME: &'static str = "Connected";
 
+pub type Traphs = Arc<Mutex<HashMap<String,Traph>>>;
 #[derive(Debug, Clone)]
 pub struct CellAgent {
 	cell_id: CellID,
@@ -29,7 +30,7 @@ pub struct CellAgent {
 	discover_msgs: Arc<Mutex<Vec<DiscoverMsg>>>,
 	free_indices: Arc<Mutex<Vec<TableIndex>>>,
 	trees: Arc<Mutex<HashMap<TableIndex,String>>>,
-	traphs: Arc<Mutex<HashMap<String,Traph>>>,
+	traphs: Traphs,
 	tenant_masks: Vec<Mask>,
 	ca_to_pe: CaToPe,
 }
@@ -75,6 +76,7 @@ impl CellAgent {
 	}
 	pub fn get_no_ports(&self) -> PortNo { self.no_ports }	
 	pub fn get_id(&self) -> CellID { self.cell_id.clone() }
+	pub fn get_traphs(&self) -> &Traphs { &self.traphs }
 	pub fn get_tree_id(&self, index: TableIndex) -> Result<String, CellAgentError> {
 		let trees = self.trees.lock().unwrap();
 		let tree_id = match trees.get(&index) {
@@ -127,7 +129,8 @@ impl CellAgent {
 		let (hops, path) = match port_status{
 			traph::PortStatus::Child => {
 				let element = traph.get_parent_element()?;
-				(element.get_hops()+1, element.get_path())
+				// Need to coordinate the following with DiscoverMsg.update_discover_msg
+				(element.get_hops()+1, element.get_path()) 
 			},
 			_ => (hops, path)
 		};
@@ -138,7 +141,7 @@ impl CellAgent {
 		};
 		let entry = traph.new_element(port_number, port_status, other_index, children, hops, path)?; 
 // Here's the end of the transaction
-		println!("CellAgent {}: entry {}\n{}", self.cell_id, entry, traph); 
+		//println!("CellAgent {}: entry {}\n{}", self.cell_id, entry, traph); 
 		traphs.insert(tree_id.stringify(), traph);
 		{
 			self.trees.lock().unwrap().insert(entry.get_index(), tree_id.stringify());
@@ -193,14 +196,14 @@ impl CellAgent {
 		packets.push(Box::new(packet));
 		if header.is_last_packet() {
 			let mut msg = Packetizer::unpacketize(packets)?;
-			println!("CellAgent {}: port {} got packet {} msg {} ", self.cell_id, port_no, packets[0].get_count(), msg);							
+			//println!("CellAgent {}: port {} got packet {} msg {} ", self.cell_id, port_no, packets[0].get_count(), msg);							
 			msg.process(&mut self.clone(), port_no)?;
 // Need to update entry for my index with other_index
 		}
 		Ok(())
 	}
 	fn port_connected(&mut self, port_no: PortNo) -> Result<(), CellAgentError> {
-		println!("CellAgent {}: port {} connected", self.cell_id, port_no);
+		//println!("CellAgent {}: port {} connected", self.cell_id, port_no);
 		let tree_id = self.my_tree_id.clone();
 		let port_no_mask = Mask::new(PortNumber::new(port_no, self.no_ports)?);
 		let path = Path::new(port_no, self.no_ports)?;
@@ -210,7 +213,7 @@ impl CellAgent {
 		let msg = DiscoverMsg::new(tree_id.clone(), my_table_index, self.cell_id.clone(), hops, path);
 		let other_index = 0;
 		let packets = Packetizer::packetize(&msg, other_index)?;
-		println!("CellAgent {}: sending packet {} on port {} {} ", self.cell_id, packets[0].get_count(), port_no, msg);
+		//println!("CellAgent {}: sending packet {} on port {} {} ", self.cell_id, packets[0].get_count(), port_no, msg);
 		let index = (*self.connected_tree_entry.lock().unwrap()).get_index();
 		for packet in packets {
 			self.ca_to_pe.send((Some(*self.connected_tree_entry.lock().unwrap()), 
@@ -222,7 +225,7 @@ impl CellAgent {
 		Ok(())		
 	}
 	fn port_disconnected(&self, port_no: PortNo) -> Result<(), CellAgentError> {
-		println!("Cell Agent {} got disconnected on port {}", self.cell_id, port_no);
+		//println!("Cell Agent {} got disconnected on port {}", self.cell_id, port_no);
 		let port_no_mask = Mask::new(PortNumber::new(port_no, self.no_ports)?);
 		self.connected_tree_entry.lock().unwrap().and_with_mask(port_no_mask.not());
 		self.ca_to_pe.send((Some(*self.connected_tree_entry.lock().unwrap()),None))?;	
@@ -233,7 +236,7 @@ impl CellAgent {
 		for msg in discover_msgs.iter() {
 			let packets = Packetizer::packetize(msg, my_table_index)?;
 			self.send_msg(&self.connected_ports_tree_id, packets, mask)?;
-			println!("CellAgent {}: forward on ports {:?} {}", self.cell_id, mask.get_port_nos(), msg);
+			//println!("CellAgent {}: forward on ports {:?} {}", self.cell_id, mask.get_port_nos(), msg);
 		}
 		Ok(())	
 	}
@@ -258,7 +261,7 @@ impl fmt::Display for CellAgent {
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result { 
 		let mut s = format!(" Cell Agent");
 		for (_, traph) in self.traphs.lock().unwrap().iter() {
-			s = s + &format!("{}", traph);
+			s = s + &format!("\n{}", traph);
 		}
 		write!(f, "{}", s) }
 }
