@@ -43,7 +43,7 @@ impl fmt::Display for Packet {
 impl Clone for Packet {
 	fn clone(&self) -> Packet { *self }
 }
-const PACKET_HEADER_SIZE: usize = 8 + 2 + 4 + 1 + 9; // Last value is padding
+const PACKET_HEADER_SIZE: usize = 8 + 2 + 4 + 1 + 1; // Last value is padding
 #[derive(Debug, Copy, Clone)]
 pub struct PacketHeader {
 	uniquifier: u64,	// Unique identifier of this message
