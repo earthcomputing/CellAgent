@@ -104,7 +104,8 @@ impl Traph {
 }
 impl fmt::Display for Traph {
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result { 
-		let mut s = format!("Traph for TreeID {} on cell {}", self.tree_id, self.cell_id);
+		let mut s = format!("Cell {}: Traph for TreeID {}\nTable Entry Index {}", 
+			self.cell_id, self.tree_id, self.table_entry.get_index());
 		s = s + &format!("\nPort Other Connected Broken Status Hops Path");
 		// Can't replace with map() because s gets moved into closure 
 		for element in self.elements.iter() { 
