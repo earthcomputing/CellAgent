@@ -1,6 +1,7 @@
 use std::fmt;
 use std::marker::Sized;
 use config::SEPARATOR;
+use errors::*;
 // Using String means names are not Copy
 type NAME = String;
 pub trait Name: Sized {
@@ -8,16 +9,16 @@ pub trait Name: Sized {
 	fn create_from_string(&self, n: String) -> Self;
 	// Default implementations
 	fn stringify(&self) -> String { self.get_name().to_string() }
-	fn from_str(&self, s: &str) -> Result<Self,NameError> {
+	fn from_str(&self, s: &str) -> Result<Self> {
 		// Names may not contain blanks
 		match s.find(' ') {
-			Some(_) => Err(NameError::Format(FormatError::new(s))),
-			None => Ok(self.create_from_string(s.to_string()) )
+			Some(_) => Err(ErrorKind::FormatError(s.to_string()).into()),
+			None => Ok(self.create_from_string(s.to_string()))
 		}
 	}
-	fn add_component(&self, s: &str) -> Result<Self,NameError> {	
+	fn add_component(&self, s: &str) -> Result<Self> {	
 		match s.find(' ') {
-			Some(_) => Err(NameError::Format( FormatError::new(s) )),
+			Some(_) => Err(ErrorKind::FormatError(s.to_string()).into()),
 			None => self.from_str(&([self.get_name(),s].join(SEPARATOR)))
 		}
 	}		
@@ -25,7 +26,7 @@ pub trait Name: Sized {
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct CellID { name: NAME, }
 impl<'a> CellID {
-	pub fn new(n: usize) -> Result<CellID,NameError> { 
+	pub fn new(n: usize) -> Result<CellID> { 
 		let n = format!("C:{}",n);
 		Ok(CellID { name: n})
 	}
@@ -38,7 +39,7 @@ impl fmt::Display for CellID { fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Res
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct PortID { name: NAME, }
 impl PortID {
-	pub fn new(n: u8) -> Result<PortID,NameError> { 
+	pub fn new(n: u8) -> Result<PortID> { 
 		let n = format!("P:{}",n);
 		Ok(PortID { name: n })
 	}
@@ -51,10 +52,11 @@ impl fmt::Display for PortID { fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Res
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct TreeID { name: NAME, }
 impl<'a> TreeID {
-	pub fn new(n: &str) -> Result<TreeID,NameError> { 
+	pub fn new(n: &str) -> Result<TreeID> { 
+		let str = n.to_string();
 		match n.find(' ') {
-			None => Ok(TreeID { name: n.to_string()}),
-			Some(_) => Err(NameError::Format(FormatError::new(n)))
+			None => Ok(TreeID { name: str}),
+			Some(_) => Err(ErrorKind::FormatError(str).into())
 		}
 	}
 }
@@ -66,10 +68,11 @@ impl fmt::Display for TreeID { fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Res
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct TenantID { name: NAME, }
 impl TenantID {
-	pub fn new(n: &str) -> Result<TenantID,NameError> { 
+	pub fn new(n: &str) -> Result<TenantID> { 
+		let str = n.to_string();
 		match n.find(' ') {
-			None => Ok(TenantID { name: n.to_string()}),
-			Some(_) => Err(NameError::Format(FormatError::new(n)) )
+			None => Ok(TenantID { name: str}),
+			Some(_) => Err(ErrorKind::FormatError(str).into())
 		}
 	}
 }
@@ -81,10 +84,11 @@ impl fmt::Display for TenantID { fn fmt(&self, f: &mut fmt::Formatter) -> fmt::R
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct LinkID { name: NAME, }
 impl LinkID {
-	pub fn new(n: &str) -> Result<LinkID,NameError> { 
+	pub fn new(n: &str) -> Result<LinkID> { 
+		let str = n.to_string();
 		match n.find(' ') {
-			None => Ok(LinkID { name: n.to_string(), }),
-			Some(_) => Err(NameError::Format(FormatError::new(n)) )
+			None => Ok(LinkID { name: str, }),
+			Some(_) => Err(ErrorKind::FormatError(str).into())
 		}
 	}
 }
@@ -93,48 +97,16 @@ impl Name for LinkID {
 	fn create_from_string(&self, n: String) -> LinkID { LinkID { name: n } }
 }
 impl fmt::Display for LinkID { fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result { self.name.fmt(f) } }
-
 // Errors
-use std::error::Error;
-#[derive(Debug)]
-pub enum NameError {
-	Format(FormatError),
-}
-impl Error for NameError {
-	fn description(&self) -> &str { 
-		match *self {
-			NameError::Format(ref err) => err.description(),
-		}	 
-	}
-	fn cause(&self) -> Option<&Error> {  
-		match *self {
-			NameError::Format(_) => None,
+error_chain! {
+	errors {
+		FormatError(name: String) {
+			description("Name cannot contain blanks")
+			display("'{}' contains blanks.", name)
+		}
+		SizeError(name: String) {
+			description("Name is too long")
+			display("'{}' is longer than {} characters", name, ::config::MAX_CHARS)
 		}
 	}
-}
-impl fmt::Display for NameError {
-	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-		match *self {
-			NameError::Format(ref err) => write!(f, "Name Format Error: {}", err),
-		}
-	}
-}
-#[derive(Debug)]
-pub struct FormatError { msg: String }
-impl FormatError {
-	pub fn new(s: &str) -> FormatError { 
-		FormatError { msg: format!("'{}' contains blanks.", s) }
-	}
-}
-impl Error for FormatError {
-	fn description(&self) -> &str { &self.msg }
-	fn cause(&self) -> Option<&Error> { None }
-}
-impl fmt::Display for FormatError {
-	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result { 
-		write!(f, "{}", self.msg) 
-	}
-}
-impl From<FormatError> for NameError {
-	fn from(err: FormatError) -> NameError { NameError::Format(err) }
 }

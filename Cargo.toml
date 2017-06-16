@@ -9,3 +9,4 @@ serde = "0.9"
 serde_derive = "0.9"
 serde_json = "0.9.9"
 rand = "*" # Or a specific version
+error-chain = "*"

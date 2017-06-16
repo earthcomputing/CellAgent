@@ -20,31 +20,8 @@ impl<'a> NOC<'a> {
 */	
 }
 // Errors
-use std::error::Error;
-use name::NameError;
-#[derive(Debug)]
-pub enum NocError {
-	Name(NameError),
-}
-impl Error for NocError {
-	fn description(&self) -> &str {
-		match *self {
-			NocError::Name(ref err) => err.description()
-		}
+error_chain! {
+	links {
+		Name(::name::Error, ::name::ErrorKind);
 	}
-	fn cause(&self) -> Option<&Error> {
-		match *self {
-			NocError::Name(ref err) => Some(err)
-		}
-	}
-}
-impl fmt::Display for NocError {
-	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-		match *self {
-			NocError::Name(_) => write!(f, "Link Name Error caused by")
-		}
-	}
-}
-impl From<NameError> for NocError {
-	fn from(err: NameError) -> NocError { NocError::Name(err) }
 }

@@ -1,3 +1,4 @@
+use std::fmt;
 use config::{MAX_PORTS, MaskValue, PortNo};
 /*
 pub fn get_first_arg(a: Vec<String>) -> Option<i32> {
@@ -73,94 +74,13 @@ impl fmt::Display for Mask {
 		write!(f, " {:016.b}", self.mask) 
 	}
 }
-// Errors
-use std::fmt;
-use std::error::Error;
-#[derive(Debug)]
-pub enum UtilityError {
-	Port(PortError),
-	Unimplemented(UnimplementedError),
-}
-impl Error for UtilityError {
-	fn description(&self) -> &str {
-		match *self {
-			UtilityError::Port(ref err) => err.description(),
-			UtilityError::Unimplemented(ref err) => err.description(),
-		}
-	}
-	fn cause(&self) -> Option<&Error> {
-		match *self {
-			UtilityError::Port(ref err) => Some(err),
-			UtilityError::Unimplemented(ref err) => Some(err),
-		}
-	}
-}
-impl fmt::Display for UtilityError {
-	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-		match *self {
-			UtilityError::Port(_) => write!(f, "Cell Agent Name Error caused by"),
-			UtilityError::Unimplemented(_) => write!(f, "Cell Agent Unimplemented Feature Error caused by"),
-		}
-	}
-}
-#[derive(Debug)]
-pub struct MaskError { msg: String }
-impl MaskError { 
-//	pub fn new(cell_id: CellID) -> MaskError {
-//		MaskError { msg: format!("Cell {} has no tenant mask", cell_id) }
-//	}
-}
-impl Error for MaskError {
-	fn description(&self) -> &str { &self.msg }
-	fn cause(&self) -> Option<&Error> { None }
-}
-impl fmt::Display for MaskError {
-	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-		write!(f, "{}", self.msg)
-	}
-}
-#[derive(Debug)]
-pub struct PortError { msg: String }
-impl PortError { 
-	pub fn new(port_no: PortNo) -> PortError {
-		PortError { msg: format!("Port number {} is larger than the maximum of {}", port_no, MAX_PORTS) }
-	}
-}
-impl Error for PortError {
-	fn description(&self) -> &str { &self.msg }
-	fn cause(&self) -> Option<&Error> { None }
-}
-impl fmt::Display for PortError {
-	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-		write!(f, "{}", self.msg)
-	}
-}
-impl From<PortError> for UtilityError {
-	fn from(err: PortError) -> UtilityError { UtilityError::Port(err) }
-}
-#[derive(Debug)]
-pub struct UnimplementedError { msg: String }
-impl UnimplementedError { 
-//	pub fn new(feature: &str) -> UnimplementedError {
-//		UnimplementedError { msg: format!("{} is not implemented", feature) }
-//	}
-}
-impl Error for UnimplementedError {
-	fn description(&self) -> &str { &self.msg }
-	fn cause(&self) -> Option<&Error> { None }
-}
-impl fmt::Display for UnimplementedError {
-	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-		write!(f, "{}", self.msg) 
-	}
-}
 #[derive(Debug, Copy, Clone, Hash, Serialize, Deserialize)]
 pub struct PortNumber { pub port_no: PortNo }
 #[deny(unused_must_use)]
 impl PortNumber {
-	pub fn new(no: PortNo, no_ports: PortNo) -> Result<PortNumber, PortNumberError> {
+	pub fn new(no: PortNo, no_ports: PortNo) -> Result<PortNumber> {
 		if no > no_ports {
-			Err(PortNumberError::new(no, no_ports))
+			Err(ErrorKind::PortNumber(no, no_ports).into())
 		} else {
 			Ok(PortNumber { port_no: (no as PortNo) })
 		}
@@ -171,27 +91,11 @@ impl PortNumber {
 impl fmt::Display for PortNumber {
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result { write!(f, "{}", self.port_no) }
 }
-#[derive(Debug)]
-pub struct PortNumberError { msg: String }
-impl PortNumberError {
-	pub fn new(port_no: PortNo, no_ports: PortNo) -> PortNumberError {
-		let msg = format!("You asked for port number {}, but this cell only has {} ports",
-			port_no, no_ports);
-		PortNumberError { msg: msg }
-	}
-}
-impl Error for PortNumberError {
-	fn description(&self) -> &str { &self.msg }
-	fn cause(&self) -> Option<&Error> { None }
-}
-impl fmt::Display for PortNumberError {
-	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result { write!(f, "{}", self.msg) }
-}
 #[derive(Debug, Copy, Clone, Hash, Serialize, Deserialize)]
 pub struct Path { port_number: PortNumber }
 #[deny(unused_must_use)]
 impl Path {
-	pub fn new(port_no: PortNo, no_ports: PortNo) -> Result<Path, PortNumberError> {
+	pub fn new(port_no: PortNo, no_ports: PortNo) -> Result<Path> {
 		let port_number = try!(PortNumber::new(port_no, no_ports));
 		Ok(Path { port_number: port_number })
 	}
@@ -199,4 +103,22 @@ impl Path {
 }
 impl fmt::Display for Path {
 	fn fmt(&self, f:&mut fmt::Formatter) -> fmt::Result { write!(f, "{}", self.port_number) }
+}
+// Errors
+use name::CellID;
+error_chain! {
+	errors {
+		Mask(cell_id: CellID) {
+			description("Mask error")
+			display("Cell {} has no tenant mask", cell_id)
+		}
+		PortNumber(port_no: PortNo, max: PortNo) {
+			description("Invalid port number")
+			display("Port number {} is larger than the maximum of {}", port_no, max)
+		}
+		Unimplemented(feature: String) {
+			description("Feature is not implemented")
+			display("{} is not implemented", feature)
+		}
+	}
 }

@@ -1,6 +1,6 @@
 use std::fmt;
 use config::{MAX_PORTS, MAX_ENTRIES, PortNo, TableIndex};
-use utility::{Mask, PortNumber, PortNumberError};
+use utility::{Mask, PortNumber};
 
 #[derive(Debug, Copy, Clone)]
 pub struct RoutingTableEntry {
@@ -17,7 +17,7 @@ impl RoutingTableEntry {
 		RoutingTableEntry { index: index, parent: parent.get_port_no(),
 			inuse: inuse, mask: mask, other_indices: other_indices }
 	}
-	pub fn default(index: TableIndex) -> Result<RoutingTableEntry, RoutingTableEntryError> {
+	pub fn default(index: TableIndex) -> Result<RoutingTableEntry> {
 		let port_number = PortNumber::new(0, MAX_PORTS)?;
 		Ok(RoutingTableEntry::new(index, false, port_number, Mask::empty(), [0; MAX_PORTS as usize]))
 	}
@@ -61,84 +61,14 @@ impl fmt::Display for RoutingTableEntry {
 	}
 }
 // Errors
-use std::error::Error;
-use utility::UtilityError;
-#[derive(Debug)]
-pub enum RoutingTableEntryError {
-	Port(PortError),
-	PortNumber(PortNumberError),
-	Index(IndexError),
-	Utility(UtilityError)
-}
-impl Error for RoutingTableEntryError {
-	fn description(&self) -> &str {
-		match *self {
-			RoutingTableEntryError::Port(ref err) => err.description(),
-			RoutingTableEntryError::PortNumber(ref err) => err.description(),
-			RoutingTableEntryError::Index(ref err) => err.description(),
-			RoutingTableEntryError::Utility(ref err) => err.description(),
+error_chain! {
+	links {
+		Utility(::utility::Error, ::utility::ErrorKind);
+	}
+	errors {
+		Index(index: TableIndex) {
+			description("Specified table index is too large")
+			display("Index number {} is greater than the maximum of {}", index, MAX_ENTRIES)
 		}
 	}
-	fn cause(&self) -> Option<&Error> {
-		match *self {
-			RoutingTableEntryError::Port(ref err) => Some(err),
-			RoutingTableEntryError::PortNumber(ref err) => Some(err),
-			RoutingTableEntryError::Index(ref err) => Some(err),
-			RoutingTableEntryError::Utility(ref err) => Some(err),
-		}
-	}
-}
-impl fmt::Display for RoutingTableEntryError {
-	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-		match *self {
-			RoutingTableEntryError::Port(ref err) => write!(f, "Routing Table Entry Port Error caused by {}", err),
-			RoutingTableEntryError::PortNumber(ref err) => write!(f, "Routing Table Entry Port Number Error caused by {}", err),
-			RoutingTableEntryError::Index(ref err) => write!(f, "Routing Table Entry Port Error caused by {}", err),
-			RoutingTableEntryError::Utility(ref err) => write!(f, "Routing Table Utility Error caused by {}", err),
-		}
-	}
-}
-#[derive(Debug)]
-pub struct PortError { msg: String }
-impl PortError { 
-	pub fn new(port_number: PortNumber) -> PortError {
-		PortError { msg: format!("Port number {} is greater than the maximum of {}", port_number, MAX_PORTS) }
-	}
-}
-impl Error for PortError {
-	fn description(&self) -> &str { &self.msg }
-	fn cause(&self) -> Option<&Error> { None }
-}
-impl fmt::Display for PortError {
-	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-		write!(f, "{}", self.msg)
-	}
-}
-impl From<PortError> for RoutingTableEntryError {
-	fn from(err: PortError) -> RoutingTableEntryError { RoutingTableEntryError::Port(err) }
-}
-#[derive(Debug)]
-pub struct IndexError { msg: String }
-impl IndexError { 
-	pub fn new(index: u32) -> IndexError {
-		IndexError { msg: format!("Index number {} is greater than the maximum of {}", index, MAX_ENTRIES) }
-	}
-}
-impl Error for IndexError {
-	fn description(&self) -> &str { &self.msg }
-	fn cause(&self) -> Option<&Error> { None }
-}
-impl fmt::Display for IndexError {
-	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-		write!(f, "{}", self.msg)
-	}
-}
-impl From<IndexError> for RoutingTableEntryError {
-	fn from(err: IndexError) -> RoutingTableEntryError { RoutingTableEntryError::Index(err) }
-}
-impl From<PortNumberError> for RoutingTableEntryError {
-	fn from(err: PortNumberError) -> RoutingTableEntryError { RoutingTableEntryError::PortNumber(err) }
-}
-impl From<UtilityError> for RoutingTableEntryError {
-	fn from(err: UtilityError) -> RoutingTableEntryError { RoutingTableEntryError::Utility(err) }
 }

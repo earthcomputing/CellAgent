@@ -133,7 +133,7 @@ impl fmt::Debug for Payload {
 pub struct Packetizer {}
 #[deny(unused_must_use)]
 impl Packetizer {
-	pub fn packetize<M>(msg: &M, other_index: TableIndex) -> Result<Vec<Box<Packet>>, PacketizerError>
+	pub fn packetize<M>(msg: &M, other_index: TableIndex) -> Result<Vec<Box<Packet>>>
 			where M: Message + Hash + serde::Serialize {
 		let msg_type = msg.get_header().get_msg_type();
 		let serialized_msg_type = serde_json::to_string(&msg_type)?;
@@ -167,7 +167,7 @@ impl Packetizer {
 		}
 		Ok(packets)
 	}
-	pub fn unpacketize(packets: &Vec<Box<Packet>>) -> Result<Box<Message>, PacketizerError> {
+	pub fn unpacketize(packets: &Vec<Box<Packet>>) -> Result<Box<Message>> {
 		let mut all_bytes = Vec::new();
 		for packet in packets {
 			let header = packet.get_header();
@@ -188,18 +188,18 @@ impl Packetizer {
 					MsgType::DiscoverD => Packetizer::make_discoverd(serialized_msg)?,
 				};
 			} else {
-				return Err(PacketizerError::Unpacketize(UnpacketizeError::new(serialized)))
+				return Err(ErrorKind::Unpacketize(serialized.to_string()).into())
 			}
 		} else {
-			return Err(PacketizerError::Unpacketize(UnpacketizeError::new(serialized)))			
+			return Err(ErrorKind::Unpacketize(serialized.to_string()).into())			
 		}
 		Ok(deserialized)
 	}
-	fn make_discover(serialized: &str) -> Result<Box<Message>, PacketizerError>{
+	fn make_discover(serialized: &str) -> Result<Box<Message>>{
 		let msg: DiscoverMsg = serde_json::from_str(&serialized)?;
 		Ok(Box::new(msg))
 	}
-	fn make_discoverd(serialized: &str) -> Result<Box<Message>, PacketizerError>{
+	fn make_discoverd(serialized: &str) -> Result<Box<Message>>{
 		let msg: DiscoverDMsg = serde_json::from_str(&serialized)?;
 		Ok(Box::new(msg))
 	}
@@ -212,84 +212,19 @@ impl Packetizer {
 	}
 }
 // Errors
-use std::error::Error;
-#[derive(Debug)]
-pub enum PacketizerError {
-	Size(SizeError),
-	Utf8(str::Utf8Error),
-	Unpacketize(UnpacketizeError),
-	Serde(serde_json::Error)
-}
-impl Error for PacketizerError {
-	fn description(&self) -> &str {
-		match *self {
-			PacketizerError::Size(ref err) => err.description(),
-			PacketizerError::Utf8(ref err) => err.description(),
-			PacketizerError::Unpacketize(ref err) => err.description(),
-			PacketizerError::Serde(ref err) => err.description(),
+error_chain! {
+	foreign_links {
+		Serde(serde_json::Error);
+		Utf8(::std::str::Utf8Error);
+	}
+	errors {
+		Size(size: usize) {
+			description("Invalid packet size")
+			display("{} is not a valid packet size", size)
+		}
+		Unpacketize(serialized: String) {
+			description("Malformed packet")
+			display("Cannot deserialize {}", serialized)
 		}
 	}
-	fn cause(&self) -> Option<&Error> {
-		match *self {
-			PacketizerError::Size(ref err) => Some(err),
-			PacketizerError::Utf8(ref err) => Some(err),
-			PacketizerError::Unpacketize(ref err) => Some(err),
-			PacketizerError::Serde(ref err) => Some(err),
-		}
-	}
-}
-impl fmt::Display for PacketizerError {
-	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-		match *self {
-			PacketizerError::Size(ref err) => write!(f, "Packetizer Size Error caused by {}", err),
-			PacketizerError::Utf8(ref err) => write!(f, "Packetizer Utf8 Error caused by {}", err),
-			PacketizerError::Unpacketize(ref err) => write!(f, "Packetizer Unpacketize Error caused by {}", err),
-			PacketizerError::Serde(ref err) => write!(f, "Packetizer Serde Error caused by {}", err),
-		}
-	}
-}
-#[derive(Debug)]
-pub struct SizeError { msg: String }
-impl SizeError { 
-//	pub fn new(size: usize) -> SizeError {
-//		SizeError { msg: format!("{} is not a valid packet size", size) }
-//	}
-}
-impl Error for SizeError {
-	fn description(&self) -> &str { &self.msg }
-	fn cause(&self) -> Option<&Error> { None }
-}
-impl fmt::Display for SizeError {
-	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-		write!(f, "{}", self.msg)
-	}
-}
-impl From<SizeError> for PacketizerError {
-	fn from(err: SizeError) -> PacketizerError { PacketizerError::Size(err) }
-}
-#[derive(Debug)]
-pub struct UnpacketizeError { msg: String }
-#[deny(unused_must_use)]
-impl UnpacketizeError { 
-	pub fn new(serialized: &str) -> UnpacketizeError {
-		UnpacketizeError { msg: format!("Cannot deserialize {}", serialized) }
-	}
-}
-impl Error for UnpacketizeError {
-	fn description(&self) -> &str { &self.msg }
-	fn cause(&self) -> Option<&Error> { None }
-}
-impl fmt::Display for UnpacketizeError {
-	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-		write!(f, "{}", self.msg)
-	}
-}
-impl From<UnpacketizeError> for PacketizerError {
-	fn from(err: UnpacketizeError) -> PacketizerError { PacketizerError::Unpacketize(err) }
-}
-impl From<serde_json::Error> for PacketizerError{
-	fn from(err: serde_json::Error) -> PacketizerError { PacketizerError::Serde(err) }
-}
-impl From<Utf8Error> for PacketizerError{
-	fn from(err: Utf8Error) -> PacketizerError { PacketizerError::Utf8(err) }
 }
