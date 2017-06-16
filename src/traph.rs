@@ -2,7 +2,7 @@ use std::fmt;
 use config::{MAX_PORTS, PathLength, PortNo, TableIndex};
 use name::{CellID, TreeID};
 use routing_table_entry::{RoutingTableEntry};
-use utility::{Path, PortNumber, UtilityError};
+use utility::{Path, PortNumber};
 
 #[derive(Debug, Clone)]
 pub struct Traph {
@@ -12,9 +12,9 @@ pub struct Traph {
 	table_entry: RoutingTableEntry,
 	elements: Vec<TraphElement>,
 }
-#[deny(unused_must_use)] // Need to figure out get_all_hops and get_other_indices with this enabled
+
 impl Traph {
-	pub fn new(cell_id: CellID, tree_id: TreeID, index: TableIndex) -> Result<Traph, TraphError> {
+	pub fn new(cell_id: CellID, tree_id: TreeID, index: TableIndex) -> Result<Traph> {
 		let mut elements = Vec::new();
 		for i in 1..MAX_PORTS { 
 			elements.push(TraphElement::default(PortNumber::new(i, MAX_PORTS)?)); 
@@ -31,20 +31,20 @@ impl Traph {
 			None => PortStatus::Pruned
 		}
 	}
-	pub fn get_parent_element(&self) -> Result<&TraphElement, TraphError> {
+	pub fn get_parent_element(&self) -> Result<&TraphElement> {
 		for element in &self.elements {
 			match element.get_status() {
 				PortStatus::Parent => return Ok(element),
 				_ => ()
 			}
 		}
-		Err(TraphError::Parent(ParentError::new(&self.cell_id, &self.tree_id)))
+		Err(ErrorKind::Parent(self.tree_id.clone(), self.cell_id.clone()).into())
 	}
 	pub fn get_table_entry(&self) -> RoutingTableEntry { self.table_entry }
 	pub fn get_table_index(&self) -> TableIndex { self.table_entry.get_index() }
 	pub fn new_element(&mut self, port_number: PortNumber, port_status: PortStatus, 
 			other_index: TableIndex, children: &Vec<PortNumber>, hops: PathLength, path: Option<Path>) 
-			-> Result<RoutingTableEntry, TraphError> {
+			-> Result<RoutingTableEntry> {
 		let port_no = port_number.get_port_no();
 		match port_status {
 			PortStatus::Parent => self.table_entry.set_parent(port_number),
@@ -57,19 +57,6 @@ impl Traph {
 		let element = TraphElement::new(true, port_no, other_index, port_status, hops, path);
 		self.elements[port_no as usize] = element;
 		Ok(self.table_entry)
-	}
-	pub fn add_child(&mut self, port_number: PortNumber, other_index: TableIndex) 
-			-> Result<RoutingTableEntry, TraphError> {
-		let port_no = port_number.get_port_no();
-		if let Some(element) = self.elements.get_mut(port_no as usize) {
-			element.set_status(PortStatus::Child);
-			self.table_entry.add_children(&vec![port_number]); 
-			self.table_entry.add_other_index(port_number, other_index);
-			Ok(self.table_entry)
-		} else {
-			println!("--- Traph for cell {} tree {}: port_no {}", self.cell_id, self.tree_id, port_no);
-			return Err(TraphError::Lookup(LookupError::new(port_number)))
-		}
 	}
 //	fn get_all_hops(&self) -> BTreeSet<PathLength> {
 //		let mut set = BTreeSet::new();
@@ -130,6 +117,25 @@ impl fmt::Display for PortStatus {
 	}
 }
 // Errors
+error_chain! {
+	links {
+		Name(::name::Error, ::name::ErrorKind);
+		RoutingTable(::routing_table::Error, ::routing_table::ErrorKind);
+		RoutingtableEntry(::routing_table_entry::Error, ::routing_table_entry::ErrorKind);
+		Utility(::utility::Error, ::utility::ErrorKind);
+	}
+	errors {
+		Lookup(port_number: PortNumber) {
+			description("No traph for port number")
+			display("No traph entry for port {}", port_number)
+		}
+		Parent(tree_id: TreeID, cell_id: CellID) {
+			description("No parent")
+			display("No parent for tree {} on cell {}", tree_id, cell_id)
+		}
+	}
+}
+/*
 use std::error::Error;
 use name::NameError;
 use routing_table_entry::RoutingTableEntryError;
@@ -227,9 +233,9 @@ impl From<RoutingTableEntryError> for TraphError {
 impl From<PortNumberError> for TraphError {
 	fn from(err: PortNumberError) -> TraphError { TraphError::PortNumber(err) }
 }
-
+*/
 #[derive(Debug, Copy, Clone)]
-struct TraphElement {
+pub struct TraphElement {
 	port_no: PortNo,
 	other_index: TableIndex,
 	is_connected: bool,
@@ -238,7 +244,6 @@ struct TraphElement {
 	hops: PathLength,
 	path: Option<Path> 
 }
-#[deny(unused_must_use)]
 impl TraphElement {
 	fn new(is_connected: bool, port_no: PortNo, other_index: TableIndex, 
 			status: PortStatus, hops: PathLength, path: Option<Path>) -> TraphElement {

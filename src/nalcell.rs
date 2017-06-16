@@ -17,7 +17,7 @@ use vm::VirtualMachine;
 pub type CaToPeMsg = (Option<RoutingTableEntry>,Option<(TableIndex,Mask,Packet)>);
 pub type CaToPe = mpsc::Sender<CaToPeMsg>;
 pub type PeFromCa = mpsc::Receiver<CaToPeMsg>;
-//pub type CaPeError = mpsc::SendError<CaToPeMsg>;
+pub type CaPeError = mpsc::SendError<CaToPeMsg>;
 // PacketEngine to Port
 pub type PeToPort = mpsc::Sender<Packet>;
 pub type PortFromPe = mpsc::Receiver<Packet>;
@@ -55,8 +55,8 @@ pub struct NalCell { // Does not include PacketEngine so CellAgent can own it
 }
 #[deny(unused_must_use)]
 impl NalCell {
-	pub fn new(scope: &Scope, cell_no: CellNo, nports: PortNo, is_border: bool) -> Result<NalCell,NalCellError> {
-		if nports > MAX_PORTS { return Err(NalCellError::NumberPorts(NumberPortsError::new(nports))) }
+	pub fn new(scope: &Scope, cell_no: CellNo, nports: PortNo, is_border: bool) -> Result<NalCell> {
+		if nports > MAX_PORTS { return Err(ErrorKind::NumberPorts(nports).into()) }
 		let cell_id = try!(CellID::new(cell_no));
 		let (ca_to_pe, pe_from_ca): (CaToPe, PeFromCa) = channel();
 		let (pe_to_ca, ca_from_pe): (PeToCa, CaFromPe) = channel();
@@ -89,7 +89,7 @@ impl NalCell {
 //	pub fn get_id(&self) -> CellID { self.id.clone() }
 //	pub fn get_no(&self) -> usize { self.cell_no }
 	pub fn get_cell_agent(&self) -> &CellAgent { &self.cell_agent }
-	pub fn get_free_port_mut (&mut self) -> Result<(&mut Port, PortFromPe), NalCellError> {
+	pub fn get_free_port_mut (&mut self) -> Result<(&mut Port, PortFromPe)> {
 		for p in &mut self.ports.iter_mut() {
 			//println!("NalCell {}: port {} is connected {}", self.id, p.get_port_no(), p.is_connected());
 			if !p.is_connected() & !p.is_border() & (p.get_port_no() != 0 as u8) {
@@ -99,11 +99,11 @@ impl NalCell {
 						p.set_connected();
 						return Ok((p,recvr))
 					},
-					None => return Err(NalCellError::Channel(ChannelError::new(port_no)))
+					None => return Err(ErrorKind::Channel(port_no).into())
 				} 
 			}
 		}
-		Err(NalCellError::NoFreePort(NoFreePortError::new(self.id.clone())))
+		Err(ErrorKind::NoFreePorts(self.id.clone()).into())
 	}
 }
 impl fmt::Display for NalCell { 
@@ -117,121 +117,25 @@ impl fmt::Display for NalCell {
 		write!(f, "{}", s) }
 }
 // Errors
-use std::error::Error;
-use cellagent::CellAgentError;
-use name::NameError;
-use packet_engine::PacketEngineError;
-use port::PortError;
-#[derive(Debug)]
-pub enum NalCellError {
-	Name(NameError),
-	Port(PortError),
-	NoFreePort(NoFreePortError),
-	CellAgent(CellAgentError),
-	PacketEngine(PacketEngineError),
-	NumberPorts(NumberPortsError),
-	Channel(ChannelError)
-}
-impl Error for NalCellError {
-	fn description(&self) -> &str {
-		match *self {
-			NalCellError::Name(ref err) => err.description(),
-			NalCellError::Port(ref err) => err.description(),
-			NalCellError::NoFreePort(ref err) => err.description(),
-			NalCellError::CellAgent(ref err) => err.description(),
-			NalCellError::NumberPorts(ref err) => err.description(),
-			NalCellError::PacketEngine(ref err) => err.description(),
-			NalCellError::Channel(ref err) => err.description(),
+error_chain! {
+	links {
+		CellAgent(::cellagent::Error, ::cellagent::ErrorKind);
+		Name(::name::Error, ::name::ErrorKind);
+		PacketEngine(::packet_engine::Error, ::packet_engine::ErrorKind);
+		Port(::port::Error, ::port::ErrorKind);
+	}
+	errors {
+		Channel(port_no: PortNo) {
+			description("No receiver for port")
+			display("No receiver for port {}", port_no)
+		}
+		NoFreePorts(cell_id: CellID) {
+			description("All ports have been assigned")
+			display("All ports have been assigned for cell {}", cell_id)
+		}
+		NumberPorts(nports: PortNo) {
+			description("You are asking for too many ports.")
+			display("You asked for {} ports, but only {} are allowed", nports, MAX_PORTS)
 		}
 	}
-	fn cause(&self) -> Option<&Error> {
-		match *self {
-			NalCellError::Name(ref err) => Some(err),
-			NalCellError::Port(ref err) => Some(err),
-			NalCellError::NoFreePort(ref err) => Some(err),
-			NalCellError::CellAgent(ref err) => Some(err),
-			NalCellError::NumberPorts(ref err) => Some(err),
-			NalCellError::PacketEngine(ref err) => Some(err),
-			NalCellError::Channel(ref err) => Some(err),
-		}
-	}
-}
-impl fmt::Display for NalCellError {
-	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-		match *self {
-			NalCellError::Name(ref err) => write!(f, "NalCell Name Error caused by {}", err),
-			NalCellError::Port(ref err) => write!(f, "NalCell Port Error caused by {}", err),
-			NalCellError::NoFreePort(ref err) => write!(f, "NalCell No Free Port Error caused by {}", err),
-			NalCellError::CellAgent(ref err) => write!(f, "NalCell Cell Agent Error caused by {}", err),
-			NalCellError::NumberPorts(ref err) => write!(f, "NalCell Number Ports Error caused by {}", err),
-			NalCellError::PacketEngine(ref err) => write!(f, "NalCell Number Ports Error caused by {}", err),
-			NalCellError::Channel(ref err) => write!(f, "NalCell Channel Error caused by {}", err),
-		}
-	}
-}
-impl From<NameError> for NalCellError {
-	fn from(err: NameError) -> NalCellError { NalCellError::Name(err) }
-}
-impl From<CellAgentError> for NalCellError {
-	fn from(err: CellAgentError) -> NalCellError { NalCellError::CellAgent(err) }
-}
-impl From<PacketEngineError> for NalCellError {
-	fn from(err: PacketEngineError) -> NalCellError { NalCellError::PacketEngine(err) }
-}
-#[derive(Debug)]
-pub struct NumberPortsError { msg: String }
-impl NumberPortsError { 
-	pub fn new(nports: PortNo) -> NumberPortsError {
-		NumberPortsError { msg: format!("You asked for {} ports, but only {} are allowed", nports, MAX_PORTS) }
-	}
-}
-impl Error for NumberPortsError {
-	fn description(&self) -> &str { &self.msg }
-	fn cause(&self) -> Option<&Error> { None }
-}
-impl fmt::Display for NumberPortsError {
-	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-		write!(f, "{}", self.msg)
-	}
-}
-#[derive(Debug)]
-pub struct ChannelError { msg: String }
-impl ChannelError { 
-	pub fn new(port_no: PortNo) -> ChannelError {
-		ChannelError { msg: format!("No receiver for port {}", port_no) }
-	}
-}
-impl Error for ChannelError {
-	fn description(&self) -> &str { &self.msg }
-	fn cause(&self) -> Option<&Error> { None }
-}
-impl fmt::Display for ChannelError {
-	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-		write!(f, "{}", self.msg)
-	}
-}
-impl From<PortError> for NalCellError {
-	fn from(err: PortError) -> NalCellError { NalCellError::Port(err) }
-}
-#[derive(Debug)]
-pub struct NoFreePortError { msg: String }
-impl NoFreePortError { 
-	pub fn new(cell_id: CellID) -> NoFreePortError {
-		NoFreePortError { msg: format!("All ports have been assigned for cell {}", cell_id) }
-	}
-}
-impl Error for NoFreePortError {
-	fn description(&self) -> &str { &self.msg }
-	fn cause(&self) -> Option<&Error> { None }
-}
-impl fmt::Display for NoFreePortError {
-	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-		write!(f, "{}", self.msg)
-	}
-}
-impl From<NoFreePortError> for NalCellError {
-	fn from(err: NoFreePortError) -> NalCellError { NalCellError::NoFreePort(err) }
-}
-impl From<NumberPortsError> for NalCellError {
-	fn from(err: NumberPortsError) -> NalCellError { NalCellError::NumberPorts(err) }
 }

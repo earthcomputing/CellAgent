@@ -46,7 +46,7 @@ pub trait Message: fmt::Display {
 		}
 	}
 	fn is_leafward(&self) -> bool { !self.is_rootward() }
-	fn process(&mut self, cell_agent: &mut CellAgent, port_no: PortNo) -> Result<(), ProcessMsgError>;
+	fn process(&mut self, cell_agent: &mut CellAgent, port_no: PortNo) -> Result<()>;
 }
 pub trait MsgPayload {}
 #[derive(Debug, Clone, Hash, Serialize, Deserialize)]
@@ -96,11 +96,10 @@ impl DiscoverMsg {
 	fn update_hops(&self) -> PathLength { self.payload.get_hops() + 1 }
 	fn update_path(&self) -> Path { self.payload.get_path() } // No change per hop
 }
-#[deny(unused_must_use)]
 impl Message for DiscoverMsg {
 	fn get_header(&self) -> MsgHeader { self.header.clone() }
 	fn get_payload(&self) -> Box<MsgPayload> { Box::new(self.payload.clone()) }
-	fn process(&mut self, ca: &mut CellAgent, port_no: u8) -> Result<(), ProcessMsgError> {
+	fn process(&mut self, ca: &mut CellAgent, port_no: u8) -> Result<()> {
 		let new_tree_id = self.payload.get_tree_id();
 		let port_number = PortNumber::new(port_no, ca.get_no_ports())?;
 		let hops = self.payload.get_hops();
@@ -188,12 +187,11 @@ impl DiscoverDMsg {
 		DiscoverDMsg { header: header, payload: payload }
 	}
 }
-#[deny(unused_must_use)]
 impl Message for DiscoverDMsg {
 	fn get_header(&self) -> MsgHeader { self.header.clone() }
 	fn get_payload(&self) -> Box<MsgPayload> { Box::new(self.payload.clone()) }
 	fn process(&mut self, ca: &mut CellAgent, port_no: u8) 
-			-> Result<(), ProcessMsgError> {
+			-> Result<()> {
 		let tree_id = self.payload.get_tree_id();
 		let my_index = self.payload.get_table_index();
 		let port_number = PortNumber::new(port_no, MAX_PORTS)?;
@@ -213,7 +211,6 @@ pub struct DiscoverDPayload {
 	tree_id: TreeID,
 	my_index: TableIndex,
 }
-#[deny(unused_must_use)]
 impl DiscoverDPayload {
 	fn new(tree_id: TreeID, index: TableIndex) -> DiscoverDPayload {
 		DiscoverDPayload { tree_id: tree_id, my_index: index }
@@ -228,83 +225,10 @@ impl fmt::Display for DiscoverDPayload {
 	}
 }
 // Errors
-use std::error::Error;
-use cellagent::CellAgentError;
-use packet::PacketizerError;
-use utility::{PortNumberError, UtilityError};
-#[derive(Debug)]
-pub enum MessageError {
-	Packetizer(PacketizerError),
-	PortNumber(PortNumberError),
-	Utility(UtilityError),
-}
-impl Error for MessageError {
-	fn description(&self) -> &str {
-		match *self {
-			MessageError::Packetizer(ref err) => err.description(),
-			MessageError::PortNumber(ref err) => err.description(),
-			MessageError::Utility(ref err) => err.description(),
-		}
-	}
-	fn cause(&self) -> Option<&Error> {
-		match *self {
-			MessageError::Packetizer(ref err) => Some(err),
-			MessageError::PortNumber(ref err) => Some(err),
-			MessageError::Utility(ref err) => Some(err),
-		}
-	}
-}
-impl fmt::Display for MessageError {
-	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-		match *self {
-			MessageError::Packetizer(ref err) => write!(f, "Packetizer Error caused by {}", err),
-			MessageError::PortNumber(ref err) => write!(f, "Port Number Error caused by {}", err),
-			MessageError::Utility(ref err) => write!(f, "Utility Error caused by {}", err),
-		}
-	}
-}
-impl From<PortNumberError> for MessageError {
-	fn from(err: PortNumberError) -> MessageError { MessageError::PortNumber(err) }
-}
-impl From<PacketizerError> for MessageError {
-	fn from(err: PacketizerError) -> MessageError { MessageError::Packetizer(err) }
-}
-impl From<UtilityError> for MessageError {
-	fn from(err: UtilityError) -> MessageError { MessageError::Utility(err) }
-}
-#[derive(Debug)]
-pub struct ProcessMsgError { msg: String }
-impl ProcessMsgError { 
-	pub fn new(err: &Error) -> ProcessMsgError {
-		ProcessMsgError { msg: format!("Error {}", err) }
-	}
-}
-impl Error for ProcessMsgError {
-	fn description(&self) -> &str { &self.msg }
-	fn cause(&self) -> Option<&Error> { None }
-}
-impl fmt::Display for ProcessMsgError {
-	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-		write!(f, "{}", self.msg)
-	}
-}
-impl From<PortNumberError> for ProcessMsgError {
-	fn from(err: PortNumberError) -> ProcessMsgError {
-		ProcessMsgError::new(&err)
-	}
-}
-impl From<CellAgentError> for ProcessMsgError {
-	fn from(err: CellAgentError) -> ProcessMsgError {
-		ProcessMsgError::new(&err)
-	}
-}
-impl From<UtilityError> for ProcessMsgError {
-	fn from(err: UtilityError) -> ProcessMsgError {
-		ProcessMsgError::new(&err)
-	}
-}
-impl From<PacketizerError> for ProcessMsgError {
-	fn from(err: PacketizerError) -> ProcessMsgError {
-		ProcessMsgError::new(&err)
+error_chain! {
+	links {
+		CellAgent(::cellagent::Error, ::cellagent::ErrorKind);
+		Packetizer(::packet::Error, ::packet::ErrorKind);
+		Utility(::utility::Error, ::utility::ErrorKind);
 	}
 }
