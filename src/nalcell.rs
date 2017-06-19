@@ -53,7 +53,7 @@ pub struct NalCell { // Does not include PacketEngine so CellAgent can own it
 	vms: Vec<VirtualMachine>,
 	ports_from_pe: HashMap<PortNo,PortFromPe>
 }
-#[deny(unused_must_use)]
+
 impl NalCell {
 	pub fn new(scope: &Scope, cell_no: CellNo, nports: PortNo, is_border: bool) -> Result<NalCell> {
 		if nports > MAX_PORTS { return Err(ErrorKind::NumberPorts(nports).into()) }
@@ -73,14 +73,14 @@ impl NalCell {
 			ports_from_pe.insert(i, port_from_pe);
 			let is_connected = if i == 0 { true } else { false };
 			let port = Port::new(&cell_id, PortNumber { port_no: i as u8 }, is_border_port, 
-				is_connected, port_to_pe.clone())?;
+				is_connected, port_to_pe.clone()).chain_err(|| ErrorKind::NalCellError)?;
 			ports.push(port);
 		}
 		let boxed_ports: Box<[Port]> = ports.into_boxed_slice();
 		let packet_engine = PacketEngine::new(scope, &cell_id, pe_to_ca,
-				pe_from_ca, pe_from_ports, pe_to_ports)?;
+				pe_from_ca, pe_from_ports, pe_to_ports).chain_err(|| ErrorKind::NalCellError)?;
 		let cell_agent = CellAgent::new(scope, &cell_id, boxed_ports.len() as u8, 
-			ca_from_pe, ca_to_pe)?;
+			ca_from_pe, ca_to_pe).chain_err(|| ErrorKind::NalCellError)?;
 		let nalcell = NalCell { id: cell_id, cell_no: cell_no, is_border: is_border,
 				ports: boxed_ports, cell_agent: cell_agent, vms: Vec::new(),
 				packet_engine: packet_engine, ports_from_pe: ports_from_pe};
@@ -124,7 +124,7 @@ error_chain! {
 		PacketEngine(::packet_engine::Error, ::packet_engine::ErrorKind);
 		Port(::port::Error, ::port::ErrorKind);
 	}
-	errors {
+	errors { NalCellError
 		Channel(port_no: PortNo) {
 			description("No receiver for port")
 			display("No receiver for port {}", port_no)

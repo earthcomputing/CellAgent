@@ -101,7 +101,7 @@ impl Message for DiscoverMsg {
 	fn get_payload(&self) -> Box<MsgPayload> { Box::new(self.payload.clone()) }
 	fn process(&mut self, ca: &mut CellAgent, port_no: u8) -> Result<()> {
 		let new_tree_id = self.payload.get_tree_id();
-		let port_number = PortNumber::new(port_no, ca.get_no_ports())?;
+		let port_number = PortNumber::new(port_no, ca.get_no_ports()).chain_err(|| ErrorKind::MessageError)?;
 		let hops = self.payload.get_hops();
 		let path = self.payload.get_path();
 		let senders_index = self.payload.get_index();
@@ -110,7 +110,7 @@ impl Message for DiscoverMsg {
 		let exists = ca.exists(&new_tree_id);  // Have I seen this tree before?
 		let status = if exists { traph::PortStatus::Pruned } else { traph::PortStatus::Parent };
 		let entry = ca.update_traph(&new_tree_id, port_number, status,
-				children, senders_index, hops, Some(path))?;
+				children, senders_index, hops, Some(path)).chain_err(|| ErrorKind::MessageError)?;
 		//println!("DiscoverMsg {}: entry {}", ca.get_id(), entry);
 		if exists { 
 			//println!("DiscoverMsg {}: exists {}", ca.get_id(), self);
@@ -120,18 +120,18 @@ impl Message for DiscoverMsg {
 		// Send DiscoverD to sender
 		let discoverd_msg = DiscoverDMsg::new(new_tree_id.clone(), my_index);
 		let other_index = 0;
-		let packets = Packetizer::packetize(&discoverd_msg, other_index)?;
+		let packets = Packetizer::packetize(&discoverd_msg, other_index).chain_err(|| ErrorKind::MessageError)?;
 		//println!("DiscoverMsg {}: sending discoverd for tree {} packet {} {}",ca.get_id(), new_tree_id, packets[0].get_count(), discoverd_msg);
 		let mask = Mask::new(port_number);
-		ca.send_msg(&ca.get_connected_ports_tree_id(), packets, mask)?;
+		ca.send_msg(&ca.get_connected_ports_tree_id(), packets, mask).chain_err(|| ErrorKind::MessageError)?;
 		// Forward Discover on all except port_no with updated hops and path
 		self.update_discover_msg(ca.get_id(), my_index);
 		let control_tree_index = 0;
-		let packets = Packetizer::packetize(self, control_tree_index)?;
-		let user_mask = DEFAULT_USER_MASK.all_but_port(PortNumber::new(port_no, ca.get_no_ports())?);
+		let packets = Packetizer::packetize(self, control_tree_index).chain_err(|| ErrorKind::MessageError)?;
+		let user_mask = DEFAULT_USER_MASK.all_but_port(PortNumber::new(port_no, ca.get_no_ports()).chain_err(|| ErrorKind::MessageError)?);
 		ca.add_discover_msg(self.clone());
 		//println!("DiscoverMsg {}: forwarding packet {} on connected ports {}", ca.get_id(), packets[0].get_count(), self);
-		ca.send_msg(&ca.get_connected_ports_tree_id(), packets, user_mask)?;
+		ca.send_msg(&ca.get_connected_ports_tree_id(), packets, user_mask).chain_err(|| ErrorKind::MessageError)?;
 		Ok(())
 	}
 }
@@ -194,10 +194,9 @@ impl Message for DiscoverDMsg {
 			-> Result<()> {
 		let tree_id = self.payload.get_tree_id();
 		let my_index = self.payload.get_table_index();
-		let port_number = PortNumber::new(port_no, MAX_PORTS)?;
+		let port_number = PortNumber::new(port_no, MAX_PORTS).chain_err(|| ErrorKind::MessageError)?;
 		//println!("DiscoverDMsg {}: process msg {} processing {} {} {}", ca.get_id(), self.get_header().get_count(), port_no, my_index, tree_id);
-		//ca.add_child(&tree_id, port_no, my_index)?;
-		ca.update_traph(&tree_id, port_number, traph::PortStatus::Child, &vec![port_number], my_index, 0, None)?;
+		ca.update_traph(&tree_id, port_number, traph::PortStatus::Child, &vec![port_number], my_index, 0, None).chain_err(|| ErrorKind::MessageError)?;
 		Ok(())
 	}
 }
@@ -230,5 +229,12 @@ error_chain! {
 		CellAgent(::cellagent::Error, ::cellagent::ErrorKind);
 		Packetizer(::packet::Error, ::packet::ErrorKind);
 		Utility(::utility::Error, ::utility::ErrorKind);
+	}
+	errors { MessageError
+		// Recursive type error if left in
+//		Message(cell_id: CellID, msg_no: usize) {
+//			description("Error processing message")
+//			display("Error processing message {} on cell {}", msg_no, cell_id)
+//		}		
 	}
 }

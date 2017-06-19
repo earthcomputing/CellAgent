@@ -107,7 +107,7 @@ impl fmt::Display for Path {
 // Errors
 use name::CellID;
 error_chain! {
-	errors {
+	errors { UtilityError
 		Mask(cell_id: CellID) {
 			description("Mask error")
 			display("Cell {} has no tenant mask", cell_id)

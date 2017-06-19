@@ -46,6 +46,7 @@ fn main() {
 		}
 		::std::process::exit(1);
 	}
+	println!("Main exit");
 }
 
 fn run() -> Result<()> {
@@ -66,11 +67,19 @@ fn run() -> Result<()> {
 	let (ncells,nports) = ecargs.get_args();
 	println!("Main: {} ports for each of {} cells", nports, ncells);
 	crossbeam::scope( |scope| { 
-		if nports > 0 {
-			let _ = build_datacenter(scope, nports, ncells); 	
+		if let Err(ref e) = build_datacenter(scope, nports, ncells) {
+			use ::std::io::Write;
+			let stderr = &mut ::std::io::stderr();
+			let _ = writeln!(stderr, "Error: {}", e);
+			for e in e.iter().skip(1) {
+				let _ = writeln!(stderr, "Caused by: {}", e);
+			}
+			if let Some(backtrace) = e.backtrace() {
+				let _ = writeln!(stderr, "Backtrace: {:?}", backtrace);
+			}
+			//::std::process::exit(1);
 		}
 	});
-	println!("Main exit");
 	Ok(())
 }
 fn build_datacenter<'a>(scope: &crossbeam::Scope, nports: u8, ncells: usize) -> Result<Datacenter<'a>>{

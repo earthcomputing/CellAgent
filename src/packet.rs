@@ -136,8 +136,8 @@ impl Packetizer {
 	pub fn packetize<M>(msg: &M, other_index: TableIndex) -> Result<Vec<Box<Packet>>>
 			where M: Message + Hash + serde::Serialize {
 		let msg_type = msg.get_header().get_msg_type();
-		let serialized_msg_type = serde_json::to_string(&msg_type)?;
-		let serialized = serde_json::to_string(&msg)?;
+		let serialized_msg_type = serde_json::to_string(&msg_type).chain_err(|| ErrorKind::PacketError)?;
+		let serialized = serde_json::to_string(&msg).chain_err(|| ErrorKind::PacketError)?;
 		let mut msg_bytes = serialized_msg_type.clone().into_bytes();
 		msg_bytes.push(MSG_HEADER_DELIMITER as u8);
 		msg_bytes.append(&mut serialized.into_bytes());
@@ -177,15 +177,15 @@ impl Packetizer {
 			all_bytes.extend_from_slice(payload.get_bytes().as_slice());
 			if is_last_packet { all_bytes.truncate(last_packet_size as usize); }
 		}
-		let serialized = str::from_utf8(&all_bytes)?;
+		let serialized = str::from_utf8(&all_bytes).chain_err(|| ErrorKind::PacketError)?;
 		let mut split = serialized.splitn(2, PAYLOAD_DEFAULT_ELEMENT as char);
 		let deserialized;
 		if let Some(serialized_msg_type) = split.next() {
-			let msg_type = serde_json::from_str(serialized_msg_type)?;
+			let msg_type = serde_json::from_str(serialized_msg_type).chain_err(|| ErrorKind::PacketError)?;
 			if let Some(serialized_msg) = split.next() {
 				deserialized = match msg_type {
-					MsgType::Discover  => Packetizer::make_discover(serialized_msg)?,
-					MsgType::DiscoverD => Packetizer::make_discoverd(serialized_msg)?,
+					MsgType::Discover  => Packetizer::make_discover(serialized_msg).chain_err(|| ErrorKind::PacketError)?,
+					MsgType::DiscoverD => Packetizer::make_discoverd(serialized_msg).chain_err(|| ErrorKind::PacketError)?,
 				};
 			} else {
 				return Err(ErrorKind::Unpacketize(serialized.to_string()).into())
@@ -196,11 +196,11 @@ impl Packetizer {
 		Ok(deserialized)
 	}
 	fn make_discover(serialized: &str) -> Result<Box<Message>>{
-		let msg: DiscoverMsg = serde_json::from_str(&serialized)?;
+		let msg: DiscoverMsg = serde_json::from_str(&serialized).chain_err(|| ErrorKind::PacketError)?;
 		Ok(Box::new(msg))
 	}
 	fn make_discoverd(serialized: &str) -> Result<Box<Message>>{
-		let msg: DiscoverDMsg = serde_json::from_str(&serialized)?;
+		let msg: DiscoverDMsg = serde_json::from_str(&serialized).chain_err(|| ErrorKind::PacketError)?;
 		Ok(Box::new(msg))
 	}
 	fn packet_payload_size(len: usize) -> usize {
@@ -217,7 +217,7 @@ error_chain! {
 		Serde(serde_json::Error);
 		Utf8(::std::str::Utf8Error);
 	}
-	errors {
+	errors { PacketError 
 		Size(size: usize) {
 			description("Invalid packet size")
 			display("{} is not a valid packet size", size)

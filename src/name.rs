@@ -1,7 +1,6 @@
 use std::fmt;
 use std::marker::Sized;
 use config::SEPARATOR;
-use errors::*;
 // Using String means names are not Copy
 type NAME = String;
 pub trait Name: Sized {
@@ -12,13 +11,13 @@ pub trait Name: Sized {
 	fn from_str(&self, s: &str) -> Result<Self> {
 		// Names may not contain blanks
 		match s.find(' ') {
-			Some(_) => Err(ErrorKind::FormatError(s.to_string()).into()),
+			Some(_) => Err(ErrorKind::Format(s.to_string()).into()),
 			None => Ok(self.create_from_string(s.to_string()))
 		}
 	}
 	fn add_component(&self, s: &str) -> Result<Self> {	
 		match s.find(' ') {
-			Some(_) => Err(ErrorKind::FormatError(s.to_string()).into()),
+			Some(_) => Err(ErrorKind::Format(s.to_string()).into()),
 			None => self.from_str(&([self.get_name(),s].join(SEPARATOR)))
 		}
 	}		
@@ -56,7 +55,7 @@ impl<'a> TreeID {
 		let str = n.to_string();
 		match n.find(' ') {
 			None => Ok(TreeID { name: str}),
-			Some(_) => Err(ErrorKind::FormatError(str).into())
+			Some(_) => Err(ErrorKind::Format(str).into())
 		}
 	}
 }
@@ -72,7 +71,7 @@ impl TenantID {
 		let str = n.to_string();
 		match n.find(' ') {
 			None => Ok(TenantID { name: str}),
-			Some(_) => Err(ErrorKind::FormatError(str).into())
+			Some(_) => Err(ErrorKind::Format(str).into())
 		}
 	}
 }
@@ -88,7 +87,7 @@ impl LinkID {
 		let str = n.to_string();
 		match n.find(' ') {
 			None => Ok(LinkID { name: str, }),
-			Some(_) => Err(ErrorKind::FormatError(str).into())
+			Some(_) => Err(ErrorKind::Format(str).into())
 		}
 	}
 }
@@ -100,13 +99,13 @@ impl fmt::Display for LinkID { fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Res
 // Errors
 error_chain! {
 	errors {
-		FormatError(name: String) {
+		Format(name: String) {
 			description("Name cannot contain blanks")
-			display("'{}' contains blanks.", name)
+			display("NameError: '{}' contains blanks.", name)
 		}
-		SizeError(name: String) {
+		Size(name: String) {
 			description("Name is too long")
-			display("'{}' is longer than {} characters", name, ::config::MAX_CHARS)
+			display("NameError: '{}' is longer than {} characters", name, ::config::MAX_CHARS)
 		}
 	}
 }

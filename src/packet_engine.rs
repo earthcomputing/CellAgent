@@ -1,6 +1,5 @@
 use std::fmt;
 use std::sync::{Arc, Mutex};
-use std::sync::mpsc;
 use crossbeam::Scope;
 use config::{PortNo, TableIndex};
 use nalcell::{PeFromCa, PeToCa, PeToPort, PeFromPort};
@@ -22,11 +21,11 @@ impl PacketEngine {
 	pub fn new(scope: &Scope, cell_id: &CellID, packet_pe_to_ca: PeToCa, 
 		pe_from_ca: PeFromCa, pe_from_ports: PeFromPort, pe_to_ports: Vec<PeToPort>) 
 				-> Result<PacketEngine> {
-		let routing_table = Arc::new(Mutex::new(RoutingTable::new(cell_id.clone())?)); 
+		let routing_table = Arc::new(Mutex::new(RoutingTable::new(cell_id.clone()).chain_err(|| ErrorKind::PacketEngineError)?)); 
 		let pe = PacketEngine { cell_id: cell_id.clone(), routing_table: routing_table, 
 			pe_to_ca: packet_pe_to_ca, pe_to_ports: pe_to_ports };
-		pe.ca_channel(scope, pe_from_ca)?;
-		pe.port_channel(scope, pe_from_ports)?;
+		pe.ca_channel(scope, pe_from_ca).chain_err(|| ErrorKind::PacketEngineError)?;
+		pe.port_channel(scope, pe_from_ports).chain_err(|| ErrorKind::PacketEngineError)?;
 		Ok(pe)
 	}
 	//pub fn get_table(&self) -> &Arc<Mutex<RoutingTable>> { &self.routing_table }
@@ -36,21 +35,21 @@ impl PacketEngine {
 		let mut header = packet.get_header();
 		//println!("PacketEngine {}: forward packet {}, mask {}, entry {}", self.cell_id, packet.get_count(), mask, entry);
 		let other_indices = entry.get_other_indices();
-		PortNumber::new(recv_port_no, other_indices.len() as u8)?; // Make sure recv_port_no is valid
+		PortNumber::new(recv_port_no, other_indices.len() as u8).chain_err(|| ErrorKind::PacketEngineError)?; // Make sure recv_port_no is valid
 		if header.is_rootcast() {
 			let parent = entry.get_parent();
 			if let Some(other_index) = other_indices.get(parent as usize) {
 				header.set_other_index(*other_index);
 				if parent == 0 {
-					self.pe_to_ca.send((None,Some((recv_port_no, *other_index, packet))))?;
+					self.pe_to_ca.send((None,Some((recv_port_no, *other_index, packet)))).chain_err(|| ErrorKind::PacketEngineError)?;
 				} else {
 					if let Some(sender) = self.pe_to_ports.get(parent as usize) {
-						sender.send(packet)?;
+						sender.send(packet).chain_err(|| ErrorKind::PacketEngineError)?;
 						//println!("PacketEngine {}: sent packet {} rootward on port {}", self.cell_id, packet.get_packet_count(), parent);
 						let is_up = entry.get_mask().equal(Mask::new0());
 						if is_up { // Send to cell agent, too
 							let other_index: TableIndex = 0;
-							self.pe_to_ca.send((None,Some((recv_port_no, other_index, packet))))?;
+							self.pe_to_ca.send((None,Some((recv_port_no, other_index, packet)))).chain_err(|| ErrorKind::PacketEngineError)?;
 						}
 					} else {
 						let max_ports = self.pe_to_ports.len() as u8;
@@ -66,10 +65,10 @@ impl PacketEngine {
 				let other_index = *other_indices.get(*port_no as usize).expect("PacketEngine: No such other index");
 				header.set_other_index(other_index as u32);
 				if *port_no as usize == 0 { 
-					self.pe_to_ca.send((None,Some((recv_port_no, other_index, packet))))?;
+					self.pe_to_ca.send((None,Some((recv_port_no, other_index, packet)))).chain_err(|| ErrorKind::PacketEngineError)?;
 				} else {
 					match self.pe_to_ports.get(*port_no as usize) {
-						Some(s) => s.send(packet)?,
+						Some(s) => s.send(packet).chain_err(|| ErrorKind::PacketEngineError)?,
 						None => return Err(ErrorKind::Sender(self.cell_id.clone(), *port_no).into())
 					};
 					//println!("Packet Engine {} sent packet {} to port {}", cell_id, packet_count, port_no);
@@ -107,7 +106,7 @@ impl PacketEngine {
 	}
 	fn listen_ca(&self, entry_pe_from_ca: PeFromCa) -> Result<()> {
 		loop { 
-			let (opt_entry, opt_packet) = entry_pe_from_ca.recv()?; 
+			let (opt_entry, opt_packet) = entry_pe_from_ca.recv().chain_err(|| ErrorKind::PacketEngineError)?; 
 			let entry = match opt_entry {
 				Some(e) => {
 					self.routing_table.lock().unwrap().set_entry(e);
@@ -115,7 +114,7 @@ impl PacketEngine {
 					e
 				},
 				None => match opt_packet {
-					Some((index, _, _)) => self.routing_table.lock().unwrap().get_entry(index)?,
+					Some((index, _, _)) => self.routing_table.lock().unwrap().get_entry(index).chain_err(|| ErrorKind::PacketEngineError)?,
 					None => panic!("entry and packet empty")
 				}
 			};
@@ -123,7 +122,7 @@ impl PacketEngine {
 				Some((_, user_mask, packet)) => {
 					//println!("PacketEngine {}: received packet {} from ca", self.cell_id, packet.get_count());
 					let port_no = 0 as PortNo;
-					self.forward(port_no, entry, user_mask, packet)?;
+					self.forward(port_no, entry, user_mask, packet).chain_err(|| ErrorKind::PacketEngineError)?;
 					//let ports = mask.get_port_nos();
 					//println!("PacketEngine {}: send discover to ports {:?}", pe.cell_id, ports);
 				}
@@ -143,13 +142,13 @@ impl PacketEngine {
 			};
 			match opt_status { // Status or packet, never both
 				Some(status) => {
-					self.pe_to_ca.send((Some(status),None))?
+					self.pe_to_ca.send((Some(status),None)).chain_err(|| ErrorKind::PacketEngineError)?
 				},
 				None => {
 					match opt_packet {
 						Some((port_no, packet)) => {
 							//println!("PacketEngine {}: received packet {} from port {}", self.cell_id, packet.get_count(), port_no);
-							self.process_packet(port_no, packet)?
+							self.process_packet(port_no, packet).chain_err(|| ErrorKind::PacketEngineError)?
 						},
 						None => println!("PacketEngine {}: Empty message", self.cell_id)
 					};
@@ -163,13 +162,13 @@ impl PacketEngine {
 		let my_index = header.get_other_index();
 		let entry;
 		{
-			entry = self.routing_table.lock().unwrap().get_entry(my_index)?;
+			entry = self.routing_table.lock().unwrap().get_entry(my_index).chain_err(|| ErrorKind::PacketEngineError)?;
 		}
 		//println!("PacketEngine {}: packet {} entry {}", self.cell_id, packet.get_count(), entry);
 		let mask = entry.get_mask();
 		let other_indices = entry.get_other_indices();
-		PortNumber::new(port_no, other_indices.len() as u8)?; // Verify that port_no is valid
-		self.forward(port_no, entry, mask, packet)?;	
+		PortNumber::new(port_no, other_indices.len() as u8).chain_err(|| ErrorKind::PacketEngineError)?; // Verify that port_no is valid
+		self.forward(port_no, entry, mask, packet).chain_err(|| ErrorKind::PacketEngineError)?;	
 		Ok(())	
 	}
 }
@@ -191,7 +190,7 @@ error_chain! {
 		RoutingTable(::routing_table::Error, ::routing_table::ErrorKind);
 		Utility(::utility::Error, ::utility::ErrorKind);
 	}
-	errors {
+	errors { PacketEngineError
 		Sender(cell_id: CellID, port_no: PortNo) {
 			description("No sender for port")
 			display("No sender for port {} on cell {}", port_no, cell_id)

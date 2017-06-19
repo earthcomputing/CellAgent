@@ -17,9 +17,9 @@ impl Traph {
 	pub fn new(cell_id: CellID, tree_id: TreeID, index: TableIndex) -> Result<Traph> {
 		let mut elements = Vec::new();
 		for i in 1..MAX_PORTS { 
-			elements.push(TraphElement::default(PortNumber::new(i, MAX_PORTS)?)); 
+			elements.push(TraphElement::default(PortNumber::new(i, MAX_PORTS).chain_err(|| ErrorKind::TraphError)?)); 
 		}
-		let entry = RoutingTableEntry::default(index)?;
+		let entry = RoutingTableEntry::default(index).chain_err(|| ErrorKind::TraphError)?;
 		Ok(Traph { cell_id: cell_id, tree_id: tree_id, my_index: index, 
 				table_entry: entry, elements: elements })
 	}
@@ -124,7 +124,7 @@ error_chain! {
 		RoutingtableEntry(::routing_table_entry::Error, ::routing_table_entry::ErrorKind);
 		Utility(::utility::Error, ::utility::ErrorKind);
 	}
-	errors {
+	errors { TraphError
 		Lookup(port_number: PortNumber) {
 			description("No traph for port number")
 			display("No traph entry for port {}", port_number)
@@ -135,105 +135,6 @@ error_chain! {
 		}
 	}
 }
-/*
-use std::error::Error;
-use name::NameError;
-use routing_table_entry::RoutingTableEntryError;
-use utility::PortNumberError;
-#[derive(Debug)]
-pub enum TraphError {
-	Name(NameError),
-	Lookup(LookupError),
-	Parent(ParentError),
-	PortNumber(PortNumberError),
-	Utility(UtilityError),
-	RoutingTable(RoutingTableEntryError)
-}
-impl Error for TraphError {
-	fn description(&self) -> &str {
-		match *self {
-			TraphError::Name(ref err) => err.description(),
-			TraphError::Lookup(ref err) => err.description(),
-			TraphError::Parent(ref err) => err.description(),
-			TraphError::PortNumber(ref err) => err.description(),
-			TraphError::Utility(ref err) => err.description(),
-			TraphError::RoutingTable(ref err) => err.description(),
-		}
-	}
-	fn cause(&self) -> Option<&Error> {
-		match *self {
-			TraphError::Name(ref err) => Some(err),
-			TraphError::Lookup(ref err) => Some(err),
-			TraphError::Parent(ref err) => Some(err),
-			TraphError::PortNumber(ref err) => Some(err),
-			TraphError::Utility(ref err) => Some(err),
-			TraphError::RoutingTable(ref err) => Some(err),
-		}
-	}
-}
-impl fmt::Display for TraphError {
-	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-		match *self {
-			TraphError::Name(ref err) => write!(f, "Traph Name Error caused by {}", err),
-			TraphError::Lookup(ref err) => write!(f, "Traph Lookup Error caused by {}", err),
-			TraphError::Parent(ref err) => write!(f, "Traph Parent Error caused by {}", err),
-			TraphError::PortNumber(ref err) => write!(f, "Traph Port Number Error caused by {}", err),
-			TraphError::Utility(ref err) => write!(f, "Traph Utility Error caused by {}", err),
-			TraphError::RoutingTable(ref err) => write!(f, "Traph Utility Error caused by {}", err),
-		}
-	}
-}
-#[derive(Debug)]
-pub struct LookupError { msg: String }
-impl LookupError { 
-	pub fn new(port_number: PortNumber) -> LookupError {
-		LookupError { msg: format!("No traph entry for port {}", port_number) }
-	}
-}
-impl Error for LookupError {
-	fn description(&self) -> &str { &self.msg }
-	fn cause(&self) -> Option<&Error> { None }
-}
-impl fmt::Display for LookupError {
-	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-		write!(f, "{}", self.msg)
-	}
-}
-impl From<LookupError> for TraphError {
-	fn from(err: LookupError) -> TraphError { TraphError::Lookup(err) }
-}
-#[derive(Debug)]
-pub struct ParentError { msg: String }
-impl ParentError { 
-	pub fn new(cell_id: &CellID, tree_id: &TreeID) -> ParentError {
-		ParentError { msg: format!("No parent for tree {} on cell {}", tree_id, cell_id) }
-	}
-}
-impl Error for ParentError {
-	fn description(&self) -> &str { &self.msg }
-	fn cause(&self) -> Option<&Error> { None }
-}
-impl fmt::Display for ParentError {
-	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-		write!(f, "{}", self.msg)
-	}
-}
-impl From<ParentError> for TraphError {
-	fn from(err: ParentError) -> TraphError { TraphError::Parent(err) }
-}
-impl From<NameError> for TraphError {
-	fn from(err: NameError) -> TraphError { TraphError::Name(err) }
-}
-impl From<UtilityError> for TraphError {
-	fn from(err: UtilityError) -> TraphError { TraphError::Utility(err) }
-}
-impl From<RoutingTableEntryError> for TraphError {
-	fn from(err: RoutingTableEntryError) -> TraphError { TraphError::RoutingTable(err) }
-}
-impl From<PortNumberError> for TraphError {
-	fn from(err: PortNumberError) -> TraphError { TraphError::PortNumber(err) }
-}
-*/
 #[derive(Debug, Copy, Clone)]
 pub struct TraphElement {
 	port_no: PortNo,
