@@ -12,7 +12,7 @@ pub struct Tenant {
 impl Tenant {
 	pub fn new(id: &'static str, n: usize, parent_id: Option<TenantID>) -> Result<Tenant> {
 		let name = match parent_id {
-			Some(p) => Ok(p.add_component(id)?),
+			Some(p) => Ok(p.add_component(id).chain_err(|| ErrorKind::TenantError)?),
 			None => TenantID::new(id)
 		}; 
 		match name {
@@ -63,7 +63,7 @@ error_chain! {
 	links {
 		Name(::name::Error, ::name::ErrorKind);
 	}
-	errors {
+	errors { TenantError
 		DuplicateName(tenant_id: String) {
 			description("Tenant name already exists")
 			display("A tenant named '{}' already exists.", tenant_id)

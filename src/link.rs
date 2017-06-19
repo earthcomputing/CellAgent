@@ -1,7 +1,6 @@
 use std::fmt;
-use std::sync::mpsc;
 use crossbeam::Scope;
-use nalcell::{LinkToPort, LinkFromPort, LinkPortError};
+use nalcell::{LinkToPort, LinkFromPort};
 use name::{Name, LinkID, PortID};
 use port::{PortStatus};
 
@@ -11,43 +10,34 @@ pub struct Link {
 	is_broken: bool,
 	is_connected: bool,		      //     Left Port        Link        Right Port
 }
-#[deny(unused_must_use)]
 impl Link {
 	pub fn new(scope: &Scope, left_id: &PortID, rite_id: &PortID,
 			link_to_left: LinkToPort, link_from_left: LinkFromPort,
 			link_to_rite: LinkToPort, link_from_rite: LinkFromPort )
 				-> Result<Link> {
 		let rite_name = rite_id.get_name();
-		let temp_id = match left_id.add_component(&rite_name) {
-			Ok(x) => x,
-			Err(err) => return Err(err.into())
-		};
-		let id = LinkID::new(&temp_id.get_name())?;
+		let temp_id = left_id.add_component(&rite_name).chain_err(|| ErrorKind::LinkError)?;
+		let id = LinkID::new(&temp_id.get_name()).chain_err(|| ErrorKind::LinkError)?;
 		let link = Link { id: id, is_broken: false, is_connected: true };
-		link.listen(scope, link_to_left.clone(), link_from_left, link_to_rite.clone())?;
-		link.listen(scope, link_to_rite, link_from_rite, link_to_left)?;
+		link.listen(scope, link_to_left.clone(), link_from_left, link_to_rite.clone()).chain_err(|| ErrorKind::LinkError)?;
+		link.listen(scope, link_to_rite, link_from_rite, link_to_left).chain_err(|| ErrorKind::LinkError)?;
 		Ok(link)
 	}
 	fn listen(&self, scope: &Scope, status: LinkToPort, link_from: LinkFromPort, link_to: LinkToPort) 
 				-> Result<()> {
 		let link = self.clone();
 		scope.spawn( move || -> Result<()> {
-			status.send((Some(PortStatus::Connected),None))?;
-			match link.listen_loop(link_from, link_to) {
-				Ok(val) => Ok(val),
-				Err(err) => {
-					println!("--- Link {}: from left {}", link.id, err);
-					Err(err)
-				}
-			}
+			status.send((Some(PortStatus::Connected),None)).chain_err(|| ErrorKind::LinkError)?;
+			link.listen_loop(link_from, link_to).chain_err(|| ErrorKind::LinkError)?;
+			Ok(())
 		});
 		Ok(())
 	}			
 	fn listen_loop(&self, link_from: LinkFromPort, link_to: LinkToPort) -> Result<()> {
 		loop {
 			//println!("Link {}: waiting to recv left", link_id);
-			let packet = link_from.recv()?;
-			link_to.send((None,Some(packet)))?;
+			let packet = link_from.recv().chain_err(|| ErrorKind::LinkError)?;
+			link_to.send((None,Some(packet))).chain_err(|| ErrorKind::LinkError)?;
 			//println!("Link {}: sent packet {} right", link_id, packet.get_count());
 		}
 	}
@@ -69,5 +59,8 @@ error_chain! {
 	links {
 		Name(::name::Error, ::name::ErrorKind);
 		Port(::port::Error, ::port::ErrorKind);
+	}
+	errors {
+		LinkError
 	}
 }

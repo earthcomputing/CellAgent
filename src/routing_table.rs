@@ -49,7 +49,7 @@ error_chain! {
 		RoutingTabeEntry(::routing_table_entry::Error, ::routing_table_entry::ErrorKind);
 		Utility(::utility::Error, ::utility::ErrorKind);
 	}
-	errors {
+	errors { RoutingTableError
 		Index(index: TableIndex) {
 			description("Invalid table index")
 			display("{} is not a valid routing table index", index)

@@ -71,17 +71,17 @@ impl Port {
 		//println!("PortID {}: port_no {}", self.id, port_no);
 		loop {
 			//println!("Port {}: waiting for status or packet from link", port.id);
-			let (opt_status, opt_packet) = port_from_link.recv()?;
+			let (opt_status, opt_packet) = port_from_link.recv().chain_err(|| ErrorKind::PortError)?;
 			match opt_status {
 				Some(status) => {
 					match status {
 						PortStatus::Connected => self.set_connected(),
 						PortStatus::Disconnected => self.set_disconnected()
 					};
-					self.port_to_pe.send((Some((port_no,status)),None))?;
+					self.port_to_pe.send((Some((port_no,status)),None)).chain_err(|| ErrorKind::PortError)?;
 				},
 				None => match opt_packet {
-					Some(packet) => self.port_to_pe.send((None,Some((port_no,packet))))?,
+					Some(packet) => self.port_to_pe.send((None,Some((port_no,packet)))).chain_err(|| ErrorKind::PortError)?,
 					None => ()
 				}
 			};
@@ -91,7 +91,7 @@ impl Port {
 		loop {
 			//println!("Port {}: waiting for packet from pe", port.id);
 			let packet = port_from_pe.recv()?;
-			port_to_link.send(packet)?;
+			port_to_link.send(packet).chain_err(|| ErrorKind::PortError)?;
 		}		
 	}
 }
@@ -118,5 +118,7 @@ error_chain! {
 	}
 	links {
 		Name(::name::Error, ::name::ErrorKind);
+	}
+	errors { PortError
 	}
 }

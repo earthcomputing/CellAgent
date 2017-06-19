@@ -24,4 +24,7 @@ error_chain! {
 	links {
 		Name(::name::Error, ::name::ErrorKind);
 	}
+	errors { NOCError
+		
+	}
 }

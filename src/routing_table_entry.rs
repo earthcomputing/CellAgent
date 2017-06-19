@@ -18,7 +18,7 @@ impl RoutingTableEntry {
 			inuse: inuse, mask: mask, other_indices: other_indices }
 	}
 	pub fn default(index: TableIndex) -> Result<RoutingTableEntry> {
-		let port_number = PortNumber::new(0, MAX_PORTS)?;
+		let port_number = PortNumber::new(0, MAX_PORTS).chain_err(|| ErrorKind::RoutingTableEntryError)?;
 		Ok(RoutingTableEntry::new(index, false, port_number, Mask::empty(), [0; MAX_PORTS as usize]))
 	}
 	pub fn is_inuse(&self) -> bool { self.inuse }
@@ -65,7 +65,7 @@ error_chain! {
 	links {
 		Utility(::utility::Error, ::utility::ErrorKind);
 	}
-	errors {
+	errors { RoutingTableEntryError
 		Index(index: TableIndex) {
 			description("Specified table index is too large")
 			display("Index number {} is greater than the maximum of {}", index, MAX_ENTRIES)
