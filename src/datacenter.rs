@@ -69,13 +69,13 @@ impl<'a> Datacenter<'a> {
 }
 impl<'b> fmt::Display for Datacenter<'b> { 
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result { 
-		let mut s = format!("Cells");
-		for i in 0..self.cells.len() {			
-			if i < 3 { s = s + &format!("\n{}", self.cells[i]); }
-		}
-		s = s + "\nLinks";
+		let mut s = format!("Links");
 		for l in &self.links {
 			s = s + &format!("{}",l);
+		}
+		s = s + "\nCells";
+		for i in 0..self.cells.len() {			
+			if i < 50 { s = s + &format!("\n{}", self.cells[i]); }
 		}
 		write!(f, "{}", s) 
 	}

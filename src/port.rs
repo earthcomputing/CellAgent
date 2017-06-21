@@ -46,25 +46,28 @@ impl Port {
 			port_from_link: PortFromLink, port_from_pe: PortFromPe) -> Result<()> {
 		let port = self.clone();
 		scope.spawn( move || -> Result<()> {
-			match port.listen_link(port_from_link) {
-				Ok(_) => Ok(()),
-				Err(err) => {
-					println!("--- Port {}: listen_link {}", port.id, err);
-					Err(err)
-				}
-			}
+			port.listen_link(port_from_link).chain_err(|| ErrorKind::PortError)
 		});
 		let port = self.clone();
 		scope.spawn( move || -> Result<()> {
 			match port.listen_pe(port_to_link, port_from_pe) {
-				Ok(_) => Ok(()),
-				Err(err) => {
-					println!("--- Port {}: listen_pe {}", port.id, err);
-					Err(err)
-				}
+				Ok(r) => Ok(r),
+				Err(e) => port.write_err(e)
 			}
 		});
 		Ok(())
+	}
+	fn write_err(&self, e: Error) -> Result<()>{
+		use ::std::io::Write;
+		let stderr = &mut ::std::io::stderr();
+		let _ = writeln!(stderr, "Port {}: {}", self.id, e);
+		for e in e.iter().skip(1) {
+			let _ = writeln!(stderr, "Caused by: {}", e);
+		}
+		if let Some(backtrace) = e.backtrace() {
+			let _ = writeln!(stderr, "Backtrace: {:?}", backtrace);
+		}
+		Err(e)
 	}
 	fn listen_link(&self, port_from_link: PortFromLink) -> Result<()> {
 		let port_no = self.get_port_no();
