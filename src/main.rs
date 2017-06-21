@@ -70,7 +70,7 @@ fn run() -> Result<()> {
 		if let Err(ref e) = build_datacenter(scope, nports, ncells) {
 			use ::std::io::Write;
 			let stderr = &mut ::std::io::stderr();
-			let _ = writeln!(stderr, "Error: {}", e);
+			let _ = writeln!(stderr, "Datacenter: {}", e);
 			for e in e.iter().skip(1) {
 				let _ = writeln!(stderr, "Caused by: {}", e);
 			}

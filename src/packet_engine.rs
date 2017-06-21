@@ -81,11 +81,8 @@ impl PacketEngine {
 		let pe = self.clone();
 		scope.spawn( move || -> Result<()> {
 			match pe.listen_ca(entry_pe_from_ca) {
-				Ok(_) => Ok(()),
-				Err(err) => {
-					println!("--- PacketEngine {}: ca_channel {}", pe.cell_id, err);
-					Err(err)
-				}
+				Ok(r) => Ok(r),
+				Err(err) => pe.write_err(err)
 			}
 		});
 		Ok(())
@@ -95,14 +92,23 @@ impl PacketEngine {
 		let pe = self.clone();
 		scope.spawn( move || -> Result<()> {
 			match pe.listen_port(pe_from_ports) {
-				Ok(_) => Ok(()),
-				Err(err) => {
-					println!("--- PacketEngine {}: port_channel {}", pe.cell_id, err);
-					Err(err)
-				}
+				Ok(r) => Ok(r),
+				Err(err) => pe.write_err(err)
 			}
 		});
 		Ok(())
+	}
+	fn write_err(&self, e: Error) -> Result<()>{
+		use ::std::io::Write;
+		let stderr = &mut ::std::io::stderr();
+		let _ = writeln!(stderr, "PacketEngine {}: {}", self.cell_id, e);
+		for e in e.iter().skip(1) {
+			let _ = writeln!(stderr, "Caused by: {}", e);
+		}
+		if let Some(backtrace) = e.backtrace() {
+			let _ = writeln!(stderr, "Backtrace: {:?}", backtrace);
+		}
+		Err(e)
 	}
 	fn listen_ca(&self, entry_pe_from_ca: PeFromCa) -> Result<()> {
 		loop { 
@@ -133,13 +139,7 @@ impl PacketEngine {
 	fn listen_port(&self, pe_from_ports: PeFromPort) -> Result<()> {
 		loop {
 			//println!("PacketEngine {}: waiting for status or packet", pe.cell_id);
-			let (opt_status, opt_packet) = match pe_from_ports.recv() {
-				Ok((s,p)) => (s,p),
-				Err(err) => {
-					println!("PacketEngine {}: packet channel error {}", self.cell_id, err);
-					return Err(ErrorKind::Recv(err).into());
-				}
-			};
+			let (opt_status, opt_packet) = pe_from_ports.recv()?;
 			match opt_status { // Status or packet, never both
 				Some(status) => {
 					self.pe_to_ca.send((Some(status),None)).chain_err(|| ErrorKind::PacketEngineError)?

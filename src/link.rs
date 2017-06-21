@@ -23,13 +23,30 @@ impl Link {
 		link.listen(scope, link_to_rite, link_from_rite, link_to_left).chain_err(|| ErrorKind::LinkError)?;
 		Ok(link)
 	}
+	fn write_err(&self, e: Error) -> Result<()>{
+		use ::std::io::Write;
+		let stderr = &mut ::std::io::stderr();
+		let _ = writeln!(stderr, "Link {}: {}", self.id, e);
+		for e in e.iter().skip(1) {
+			let _ = writeln!(stderr, "Caused by: {}", e);
+		}
+		if let Some(backtrace) = e.backtrace() {
+			let _ = writeln!(stderr, "Backtrace: {:?}", backtrace);
+		}
+		Err(e)
+	}
 	fn listen(&self, scope: &Scope, status: LinkToPort, link_from: LinkFromPort, link_to: LinkToPort) 
 				-> Result<()> {
 		let link = self.clone();
 		scope.spawn( move || -> Result<()> {
-			status.send((Some(PortStatus::Connected),None)).chain_err(|| ErrorKind::LinkError)?;
-			link.listen_loop(link_from, link_to).chain_err(|| ErrorKind::LinkError)?;
-			Ok(())
+			match status.send((Some(PortStatus::Connected),None)).chain_err(|| ErrorKind::LinkError){
+				Ok(r) => Ok(r),
+				Err(e) => link.write_err(e)
+			}?;
+			match link.listen_loop(link_from, link_to).chain_err(|| ErrorKind::LinkError) {
+				Ok(r) => Ok(r),
+				Err(e) => link.write_err(e)
+			}		
 		});
 		Ok(())
 	}			

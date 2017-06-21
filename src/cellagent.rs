@@ -150,11 +150,25 @@ impl CellAgent {
 		self.ca_to_pe.send((Some(entry),None)).chain_err(|| ErrorKind::CellagentError)?;
 		Ok(entry)
 	}
+	fn write_err(&self, e: Error) -> Result<()>{
+		use ::std::io::Write;
+		let stderr = &mut ::std::io::stderr();
+		let _ = writeln!(stderr, "CellAgent {}: {}", self.cell_id, e);
+		for e in e.iter().skip(1) {
+			let _ = writeln!(stderr, "Caused by: {}", e);
+		}
+		if let Some(backtrace) = e.backtrace() {
+			let _ = writeln!(stderr, "Backtrace: {:?}", backtrace);
+		}
+		Err(e)
+	}
 	fn listen(&mut self, scope: &Scope, ca_from_pe: CaFromPe) -> Result<()>{
 		let mut ca = self.clone();
 		scope.spawn( move || -> Result<()> { 
-			ca.listen_loop(ca_from_pe).chain_err(|| ErrorKind::CellagentError)?;
-			Ok(())
+			match ca.listen_loop(ca_from_pe).chain_err(|| ErrorKind::CellagentError) {
+				Ok(r) => Ok(r),
+				Err(err) => ca.write_err(err)
+			}
 		});
 		Ok(())
 	}
