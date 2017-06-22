@@ -2,7 +2,7 @@ use std::fmt;
 use std::sync::atomic::AtomicBool;
 use std::sync::{mpsc, Arc};
 use std::sync::atomic::Ordering::SeqCst;
-use crossbeam::{Scope};
+use crossbeam::{Scope, ScopedJoinHandle};
 use config::PortNo;
 use nalcell::{PortToLink, PortFromLink, PortToPe, PortFromPe};
 use name::{Name, PortID, CellID};
@@ -26,13 +26,12 @@ pub struct Port {
 #[deny(unused_must_use)]
 impl Port {
 	pub fn new(cell_id: &CellID, port_number: PortNumber, is_border: bool, is_connected: bool,
-			   port_to_pe: PortToPe) -> Result<Port>{
-		let port_id = try!(PortID::new(port_number.get_port_no()));
-		let temp_id = try!(port_id.add_component(&cell_id.get_name()));
-		let port = Port{ id: temp_id, port_number: port_number, is_border: is_border, 
+			   port_to_pe: PortToPe) -> Result<Port> {
+		let port_id = PortID::new(port_number.get_port_no())?;
+		let temp_id = port_id.add_component(&cell_id.get_name())?;
+		Ok(Port{ id: temp_id, port_number: port_number, is_border: is_border, 
 			is_connected: Arc::new(AtomicBool::new(is_connected)), 
-			is_broken: Arc::new(AtomicBool::new(false)), port_to_pe: port_to_pe};
-		Ok(port)
+			is_broken: Arc::new(AtomicBool::new(false)), port_to_pe: port_to_pe})
 	}
 	pub fn get_id(&self) -> PortID { self.id.clone() }
 	pub fn get_port_no(&self) -> PortNo { self.port_number.get_port_no() }
@@ -43,21 +42,22 @@ impl Port {
 	pub fn is_broken(&self) -> bool { self.is_broken.load(SeqCst) }
 	pub fn is_border(&self) -> bool { self.is_border }
 	pub fn link_channel(&self, scope: &Scope, port_to_link: PortToLink, 
-			port_from_link: PortFromLink, port_from_pe: PortFromPe) -> Result<()> {
+			port_from_link: PortFromLink, port_from_pe: PortFromPe) 
+				-> Result<(ScopedJoinHandle<()>,ScopedJoinHandle<()>)> {
 		let port = self.clone();
-		scope.spawn( move || -> Result<()> {
-			port.listen_link(port_from_link).chain_err(|| ErrorKind::PortError)
+		let link_handle = scope.spawn( move || {
+			let _ = port.listen_link(port_from_link).chain_err(|| ErrorKind::PortError).map_err(|e| port.write_err(e));
 		});
 		let port = self.clone();
-		scope.spawn( move || -> Result<()> {
-			match port.listen_pe(port_to_link, port_from_pe) {
-				Ok(r) => Ok(r),
+		let pe_handle = scope.spawn( move || {
+			match port.listen_pe(port_to_link, port_from_pe).chain_err(|| ErrorKind::PortError) {
+				Ok(r) => r,
 				Err(e) => port.write_err(e)
 			}
 		});
-		Ok(())
+		Ok((link_handle, pe_handle))
 	}
-	fn write_err(&self, e: Error) -> Result<()>{
+	fn write_err(&self, e: Error) {
 		use ::std::io::Write;
 		let stderr = &mut ::std::io::stderr();
 		let _ = writeln!(stderr, "Port {}: {}", self.id, e);
@@ -67,7 +67,6 @@ impl Port {
 		if let Some(backtrace) = e.backtrace() {
 			let _ = writeln!(stderr, "Backtrace: {:?}", backtrace);
 		}
-		Err(e)
 	}
 	fn listen_link(&self, port_from_link: PortFromLink) -> Result<()> {
 		let port_no = self.get_port_no();
