@@ -1,5 +1,5 @@
 use std::fmt;
-use crossbeam::Scope;
+use crossbeam::{Scope, ScopedJoinHandle};
 use nalcell::{LinkToPort, LinkFromPort};
 use name::{Name, LinkID, PortID};
 use port::{PortStatus};
@@ -11,19 +11,21 @@ pub struct Link {
 	is_connected: bool,		      //     Left Port        Link        Right Port
 }
 impl Link {
-	pub fn new(scope: &Scope, left_id: &PortID, rite_id: &PortID,
-			link_to_left: LinkToPort, link_from_left: LinkFromPort,
-			link_to_rite: LinkToPort, link_from_rite: LinkFromPort )
-				-> Result<Link> {
+	pub fn new(left_id: &PortID, rite_id: &PortID) -> Result<Link> {
 		let rite_name = rite_id.get_name();
 		let temp_id = left_id.add_component(&rite_name).chain_err(|| ErrorKind::LinkError)?;
 		let id = LinkID::new(&temp_id.get_name()).chain_err(|| ErrorKind::LinkError)?;
-		let link = Link { id: id, is_broken: false, is_connected: true };
-		link.listen(scope, link_to_left.clone(), link_from_left, link_to_rite.clone()).chain_err(|| ErrorKind::LinkError)?;
-		link.listen(scope, link_to_rite, link_from_rite, link_to_left).chain_err(|| ErrorKind::LinkError)?;
-		Ok(link)
+		Ok(Link { id: id, is_broken: false, is_connected: true })
 	}
-	fn write_err(&self, e: Error) -> Result<()>{
+	pub fn start_threads(&self, scope: &Scope,
+			link_to_left: LinkToPort, link_from_left: LinkFromPort,
+			link_to_rite: LinkToPort, link_from_rite: LinkFromPort ) 
+				-> Result<(ScopedJoinHandle<()>, ScopedJoinHandle<()>)> {
+		let left_handle = self.listen(scope, link_to_left.clone(), link_from_left, link_to_rite.clone());
+		let rite_handle = self.listen(scope, link_to_rite, link_from_rite, link_to_left);
+		Ok((left_handle, rite_handle))
+	}
+	fn write_err(&self, e: Error) {
 		use ::std::io::Write;
 		let stderr = &mut ::std::io::stderr();
 		let _ = writeln!(stderr, "Link {}: {}", self.id, e);
@@ -33,22 +35,14 @@ impl Link {
 		if let Some(backtrace) = e.backtrace() {
 			let _ = writeln!(stderr, "Backtrace: {:?}", backtrace);
 		}
-		Err(e)
 	}
 	fn listen(&self, scope: &Scope, status: LinkToPort, link_from: LinkFromPort, link_to: LinkToPort) 
-				-> Result<()> {
+				-> ScopedJoinHandle<()> {
 		let link = self.clone();
-		scope.spawn( move || -> Result<()> {
-			match status.send((Some(PortStatus::Connected),None)).chain_err(|| ErrorKind::LinkError){
-				Ok(r) => Ok(r),
-				Err(e) => link.write_err(e)
-			}?;
-			match link.listen_loop(link_from, link_to).chain_err(|| ErrorKind::LinkError) {
-				Ok(r) => Ok(r),
-				Err(e) => link.write_err(e)
-			}		
-		});
-		Ok(())
+		scope.spawn( move || {
+			let _ = status.send((Some(PortStatus::Connected),None)).chain_err(|| ErrorKind::LinkError).map_err(|e| link.write_err(e));
+			let _ = link.listen_loop(link_from, link_to).chain_err(|| ErrorKind::LinkError).map_err(|e| link.write_err(e));
+		})
 	}			
 	fn listen_loop(&self, link_from: LinkFromPort, link_to: LinkToPort) -> Result<()> {
 		loop {

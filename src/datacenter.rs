@@ -57,8 +57,9 @@ impl<'a> Datacenter<'a> {
 			let (rite_to_link, link_from_rite): (PortToLink, LinkFromPort) = channel();
 			left.link_channel(scope, left_to_link, left_from_link, left_from_pe).chain_err(|| ErrorKind::DatacenterError)?;
 			rite.link_channel(scope, rite_to_link, rite_from_link, rite_from_pe).chain_err(|| ErrorKind::DatacenterError)?;
-			links.push(Link::new(scope, &left.get_id(), &rite.get_id(), 
-				link_to_left, link_from_left, link_to_rite, link_from_rite).chain_err(|| ErrorKind::DatacenterError)?);
+			let link = Link::new(&left.get_id(), &rite.get_id())?;
+			let link_handles = link.start_threads(scope, link_to_left, link_from_left, link_to_rite, link_from_rite)?;
+			links.push(link); 
 		} 
 		Ok(Datacenter { cells: cells, links: links, noc: None })
 	}
