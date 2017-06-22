@@ -2,7 +2,7 @@ use std::fmt;
 use std::str;
 use std::sync::{Arc, Mutex};
 use std::collections::HashMap;
-use crossbeam::Scope;
+use crossbeam::{Scope, ScopedJoinHandle};
 use config::{MAX_ENTRIES, PathLength, PortNo, TableIndex};
 use nalcell::{CaToPe, CaFromPe, CaToPeMsg};
 use message::{DiscoverMsg};
@@ -21,12 +21,12 @@ pub type Traphs = Arc<Mutex<HashMap<String,Traph>>>;
 #[derive(Debug, Clone)]
 pub struct CellAgent {
 	cell_id: CellID,
-	my_tree_id: TreeID,
 	no_ports: PortNo,
+	my_tree_id: TreeID,
 	control_tree_id: TreeID,
+	connected_tree_id: TreeID,
 	my_entry: RoutingTableEntry,
 	connected_tree_entry: Arc<Mutex<RoutingTableEntry>>,
-	connected_ports_tree_id: TreeID,
 	discover_msgs: Arc<Mutex<Vec<DiscoverMsg>>>,
 	free_indices: Arc<Mutex<Vec<TableIndex>>>,
 	trees: Arc<Mutex<HashMap<TableIndex,String>>>,
@@ -36,7 +36,7 @@ pub struct CellAgent {
 }
 #[deny(unused_must_use)]
 impl CellAgent {
-	pub fn new(scope: &Scope, cell_id: &CellID, no_ports: PortNo, ca_from_pe: CaFromPe, ca_to_pe: CaToPe ) 
+	pub fn new(cell_id: &CellID, no_ports: PortNo, ca_to_pe: CaToPe ) 
 				-> Result<CellAgent> {
 		let tenant_masks = vec![BASE_TENANT_MASK];
 		let my_tree_id = TreeID::new(cell_id.get_name()).chain_err(|| ErrorKind::CellagentError)?;
@@ -49,30 +49,36 @@ impl CellAgent {
 		}
 		free_indices.reverse();
 		let traphs = Arc::new(Mutex::new(HashMap::new()));
-		let mut ca = CellAgent { cell_id: cell_id.clone(), my_tree_id: my_tree_id.clone(), 
-			no_ports: no_ports, traphs: traphs, control_tree_id: control_tree_id.clone(), 
-			connected_ports_tree_id: connected_tree_id.clone(), free_indices: Arc::new(Mutex::new(free_indices)),
+		Ok(CellAgent { cell_id: cell_id.clone(), my_tree_id: my_tree_id.clone(), 
+			control_tree_id: control_tree_id, connected_tree_id: connected_tree_id,	
+			no_ports: no_ports, traphs: traphs,  
+			free_indices: Arc::new(Mutex::new(free_indices)),
 			discover_msgs: Arc::new(Mutex::new(Vec::new())), my_entry: RoutingTableEntry::default(0).chain_err(|| ErrorKind::CellagentError)?, 
 			connected_tree_entry: Arc::new(Mutex::new(RoutingTableEntry::default(0).chain_err(|| ErrorKind::CellagentError)?)),
 			tenant_masks: tenant_masks, trees: Arc::new(Mutex::new(trees)), 
-			ca_to_pe: ca_to_pe};
+			ca_to_pe: ca_to_pe})
+		}
+	pub fn initialize(&mut self, scope: &Scope, ca_from_pe: CaFromPe) -> Result<()> {
 		// Set up predefined trees - Must be first two in this order
-		let port_number_0 = PortNumber::new(0, no_ports).chain_err(|| ErrorKind::CellagentError)?;
+		let port_number_0 = PortNumber::new(0, self.no_ports).chain_err(|| ErrorKind::CellagentError)?;
 		let other_index = 0;
 		let hops = 0;
 		let path = None;
 		let children = vec![port_number_0];
-		ca.update_traph(&control_tree_id, port_number_0, 
+		let control_tree_id = self.control_tree_id.clone();
+		let connected_tree_id = self.connected_tree_id.clone();
+		let my_tree_id = self.my_tree_id.clone();
+		self.update_traph(&control_tree_id, port_number_0, 
 				traph::PortStatus::Parent, &children, other_index, hops, path).chain_err(|| ErrorKind::CellagentError)?;
-		let connected_tree_entry = ca.update_traph(&connected_tree_id, port_number_0, 
+		let connected_tree_entry = self.update_traph(&connected_tree_id, port_number_0, 
 				traph::PortStatus::Parent, &Vec::new(), other_index, hops, path).chain_err(|| ErrorKind::CellagentError)?;
-		ca.connected_tree_entry = Arc::new(Mutex::new(connected_tree_entry));
+		self.connected_tree_entry = Arc::new(Mutex::new(connected_tree_entry));
 		// Create my tree
-		let my_entry = ca.update_traph(&my_tree_id, port_number_0, 
+		let my_entry = self.update_traph(&my_tree_id, port_number_0, 
 				traph::PortStatus::Parent, &children, other_index, hops, path).chain_err(|| ErrorKind::CellagentError)?; 
-		ca.my_entry = my_entry;
-		ca.listen(scope, ca_from_pe).chain_err(|| ErrorKind::CellagentError)?;
-		Ok(ca)
+		self.my_entry = my_entry;
+		self.listen(scope, ca_from_pe).chain_err(|| ErrorKind::CellagentError)?;
+		Ok(())
 	}
 	pub fn get_no_ports(&self) -> PortNo { self.no_ports }	
 	pub fn get_id(&self) -> CellID { self.cell_id.clone() }
@@ -107,7 +113,7 @@ impl CellAgent {
 	//	}
 	//}
 	//pub fn get_control_tree_id(&self) -> &TreeID { &self.control_tree_id }
-	pub fn get_connected_ports_tree_id(&self) -> TreeID { self.connected_ports_tree_id.clone() }
+	pub fn get_connected_ports_tree_id(&self) -> TreeID { self.connected_tree_id.clone() }
 	pub fn exists(&self, tree_id: &TreeID) -> bool { 
 		(*self.traphs.lock().unwrap()).contains_key(tree_id.get_name())
 	}
@@ -150,7 +156,7 @@ impl CellAgent {
 		self.ca_to_pe.send((Some(entry),None)).chain_err(|| ErrorKind::CellagentError)?;
 		Ok(entry)
 	}
-	fn write_err(&self, e: Error) -> Result<()>{
+	fn write_err(&self, e: Error) -> Result<()> {
 		use ::std::io::Write;
 		let stderr = &mut ::std::io::stderr();
 		let _ = writeln!(stderr, "CellAgent {}: {}", self.cell_id, e);
@@ -162,15 +168,12 @@ impl CellAgent {
 		}
 		Err(e)
 	}
-	fn listen(&mut self, scope: &Scope, ca_from_pe: CaFromPe) -> Result<()>{
+	fn listen(&mut self, scope: &Scope, ca_from_pe: CaFromPe) -> Result<ScopedJoinHandle<()>>{
 		let mut ca = self.clone();
-		scope.spawn( move || -> Result<()> { 
-			match ca.listen_loop(ca_from_pe).chain_err(|| ErrorKind::CellagentError) {
-				Ok(r) => Ok(r),
-				Err(err) => ca.write_err(err)
-			}
+		let join_handle = scope.spawn( move || { 
+			let _ = ca.listen_loop(ca_from_pe).chain_err(|| ErrorKind::CellagentError).map_err(|e| ca.write_err(e));
 		});
-		Ok(())
+		Ok(join_handle)
 	}
 	fn listen_loop(&mut self, ca_from_pe: CaFromPe) -> Result<()> {
 		loop {
@@ -241,7 +244,7 @@ impl CellAgent {
 		let my_table_index = self.my_entry.get_index();
 		for msg in discover_msgs.iter() {
 			let packets = Packetizer::packetize(msg, my_table_index).chain_err(|| ErrorKind::CellagentError)?;
-			self.send_msg(&self.connected_ports_tree_id, packets, mask).chain_err(|| ErrorKind::CellagentError)?;
+			self.send_msg(&self.connected_tree_id, packets, mask).chain_err(|| ErrorKind::CellagentError)?;
 			//println!("CellAgent {}: forward on ports {:?} {}", self.cell_id, mask.get_port_nos(), msg);
 		}
 		Ok(())	

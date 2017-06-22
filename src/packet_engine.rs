@@ -18,15 +18,16 @@ pub struct PacketEngine {
 }
 #[deny(unused_must_use)]
 impl PacketEngine {
-	pub fn new(scope: &Scope, cell_id: &CellID, packet_pe_to_ca: PeToCa, 
-		pe_from_ca: PeFromCa, pe_from_ports: PeFromPort, pe_to_ports: Vec<PeToPort>) 
+	pub fn new(cell_id: &CellID, packet_pe_to_ca: PeToCa, pe_to_ports: Vec<PeToPort>) 
 				-> Result<PacketEngine> {
 		let routing_table = Arc::new(Mutex::new(RoutingTable::new(cell_id.clone()).chain_err(|| ErrorKind::PacketEngineError)?)); 
-		let pe = PacketEngine { cell_id: cell_id.clone(), routing_table: routing_table, 
-			pe_to_ca: packet_pe_to_ca, pe_to_ports: pe_to_ports };
-		pe.ca_channel(scope, pe_from_ca).chain_err(|| ErrorKind::PacketEngineError)?;
-		pe.port_channel(scope, pe_from_ports).chain_err(|| ErrorKind::PacketEngineError)?;
-		Ok(pe)
+		Ok(PacketEngine { cell_id: cell_id.clone(), routing_table: routing_table, 
+			pe_to_ca: packet_pe_to_ca, pe_to_ports: pe_to_ports })
+	}
+	pub fn start_threads(&self, scope: &Scope, pe_from_ca: PeFromCa, pe_from_ports: PeFromPort) -> Result<()> {			
+		self.ca_channel(scope, pe_from_ca).chain_err(|| ErrorKind::PacketEngineError)?;
+		self.port_channel(scope, pe_from_ports).chain_err(|| ErrorKind::PacketEngineError)?;
+		Ok(())
 	}
 	//pub fn get_table(&self) -> &Arc<Mutex<RoutingTable>> { &self.routing_table }
 	
@@ -79,22 +80,16 @@ impl PacketEngine {
 	}
 	pub fn ca_channel(&self, scope: &Scope, entry_pe_from_ca: PeFromCa) -> Result<()> {
 		let pe = self.clone();
-		scope.spawn( move || -> Result<()> {
-			match pe.listen_ca(entry_pe_from_ca) {
-				Ok(r) => Ok(r),
-				Err(err) => pe.write_err(err)
-			}
+		scope.spawn( move ||  {
+			let _ = pe.listen_ca(entry_pe_from_ca).map_err(|e| pe.write_err(e));
 		});
 		Ok(())
 	}
 	fn port_channel(&self, scope: &Scope, pe_from_ports: PeFromPort) -> Result<()> {
 		//let cell_id = self.cell_id.clone();
 		let pe = self.clone();
-		scope.spawn( move || -> Result<()> {
-			match pe.listen_port(pe_from_ports) {
-				Ok(r) => Ok(r),
-				Err(err) => pe.write_err(err)
-			}
+		scope.spawn( move || {
+			let _ = pe.listen_port(pe_from_ports).map_err(|e| pe.write_err(e));
 		});
 		Ok(())
 	}
