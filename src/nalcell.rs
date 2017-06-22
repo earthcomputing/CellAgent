@@ -57,7 +57,7 @@ pub struct NalCell { // Does not include PacketEngine so CellAgent can own it
 impl NalCell {
 	pub fn new(scope: &Scope, cell_no: CellNo, nports: PortNo, is_border: bool) -> Result<NalCell> {
 		if nports > MAX_PORTS { return Err(ErrorKind::NumberPorts(nports).into()) }
-		let cell_id = try!(CellID::new(cell_no));
+		let cell_id = CellID::new(cell_no)?;
 		let (ca_to_pe, pe_from_ca): (CaToPe, PeFromCa) = channel();
 		let (pe_to_ca, ca_from_pe): (PeToCa, CaFromPe) = channel();
 		let (port_to_pe, pe_from_ports): (PortToPe, PeFromPort) = channel();
@@ -77,18 +77,17 @@ impl NalCell {
 			ports.push(port);
 		}
 		let boxed_ports: Box<[Port]> = ports.into_boxed_slice();
-		let packet_engine = PacketEngine::new(scope, &cell_id, pe_to_ca,
-				pe_from_ca, pe_from_ports, pe_to_ports).chain_err(|| ErrorKind::NalCellError)?;
-		let cell_agent = CellAgent::new(scope, &cell_id, boxed_ports.len() as u8, 
-			ca_from_pe, ca_to_pe).chain_err(|| ErrorKind::NalCellError)?;
-		let nalcell = NalCell { id: cell_id, cell_no: cell_no, is_border: is_border,
+		let packet_engine = PacketEngine::new(&cell_id, pe_to_ca, pe_to_ports).chain_err(|| ErrorKind::NalCellError)?;
+		packet_engine.start_threads(scope, pe_from_ca, pe_from_ports)?;
+		let mut cell_agent = CellAgent::new(&cell_id, boxed_ports.len() as u8, ca_to_pe).chain_err(|| ErrorKind::NalCellError)?;
+		cell_agent.initialize(scope, ca_from_pe)?;
+		Ok(NalCell { id: cell_id, cell_no: cell_no, is_border: is_border,
 				ports: boxed_ports, cell_agent: cell_agent, vms: Vec::new(),
-				packet_engine: packet_engine, ports_from_pe: ports_from_pe};
-		Ok(nalcell)
+				packet_engine: packet_engine, ports_from_pe: ports_from_pe})
 	}
 //	pub fn get_id(&self) -> CellID { self.id.clone() }
 //	pub fn get_no(&self) -> usize { self.cell_no }
-	pub fn get_cell_agent(&self) -> &CellAgent { &self.cell_agent }
+//	pub fn get_cell_agent(&self) -> &CellAgent { &self.cell_agent }
 	pub fn get_free_port_mut (&mut self) -> Result<(&mut Port, PortFromPe)> {
 		for p in &mut self.ports.iter_mut() {
 			//println!("NalCell {}: port {} is connected {}", self.id, p.get_port_no(), p.is_connected());
