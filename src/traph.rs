@@ -1,4 +1,5 @@
 use std::fmt;
+use std::collections::HashSet;
 use config::{MAX_PORTS, PathLength, PortNo, TableIndex};
 use name::{CellID, TreeID};
 use routing_table_entry::{RoutingTableEntry};
@@ -43,12 +44,16 @@ impl Traph {
 	pub fn get_table_entry(&self) -> RoutingTableEntry { self.table_entry }
 	pub fn get_table_index(&self) -> TableIndex { self.table_entry.get_index() }
 	pub fn new_element(&mut self, port_number: PortNumber, port_status: PortStatus, 
-			other_index: TableIndex, children: &Vec<PortNumber>, hops: PathLength, path: Option<Path>) 
+			other_index: TableIndex, children: &HashSet<PortNumber>, hops: PathLength, path: Option<Path>) 
 			-> Result<RoutingTableEntry> {
 		let port_no = port_number.get_port_no();
 		match port_status {
 			PortStatus::Parent => self.table_entry.set_parent(port_number),
-			PortStatus::Child => self.table_entry.add_children(&vec![port_number]),
+			PortStatus::Child => {
+				let mut children = HashSet::new();
+				children.insert(port_number);
+				self.table_entry.add_children(&children)
+			},
 			_ => ()
 		};
 		self.table_entry.add_other_index(port_number, other_index);

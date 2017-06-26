@@ -2,7 +2,7 @@ use std::fmt;
 use std::sync::{Arc, Mutex};
 use crossbeam::Scope;
 use config::{PortNo, TableIndex};
-use nalcell::{PeFromCa, PeToCa, PeToPort, PeFromPort};
+use nalcell::{PeFromCa, PeToCa, PeToPort, PeFromPort, CaToPeMsg, PortToPeMsg, PeToCaMsg};
 use name::CellID;
 use packet::{Packet};
 use routing_table::{RoutingTable};
@@ -42,7 +42,7 @@ impl PacketEngine {
 			if let Some(other_index) = other_indices.get(parent as usize) {
 				header.set_other_index(*other_index);
 				if parent == 0 {
-					self.pe_to_ca.send((None,Some((recv_port_no, *other_index, packet)))).chain_err(|| ErrorKind::PacketEngineError)?;
+					self.pe_to_ca.send(PeToCaMsg::Msg(recv_port_no, *other_index, packet)).chain_err(|| ErrorKind::PacketEngineError)?;
 				} else {
 					if let Some(sender) = self.pe_to_ports.get(parent as usize) {
 						sender.send(packet).chain_err(|| ErrorKind::PacketEngineError)?;
@@ -50,7 +50,7 @@ impl PacketEngine {
 						let is_up = entry.get_mask().equal(Mask::new0());
 						if is_up { // Send to cell agent, too
 							let other_index: TableIndex = 0;
-							self.pe_to_ca.send((None,Some((recv_port_no, other_index, packet)))).chain_err(|| ErrorKind::PacketEngineError)?;
+							self.pe_to_ca.send(PeToCaMsg::Msg(recv_port_no, other_index, packet)).chain_err(|| ErrorKind::PacketEngineError)?;
 						}
 					} else {
 						let max_ports = self.pe_to_ports.len() as u8;
@@ -66,7 +66,7 @@ impl PacketEngine {
 				let other_index = *other_indices.get(*port_no as usize).expect("PacketEngine: No such other index");
 				header.set_other_index(other_index as u32);
 				if *port_no as usize == 0 { 
-					self.pe_to_ca.send((None,Some((recv_port_no, other_index, packet)))).chain_err(|| ErrorKind::PacketEngineError)?;
+					self.pe_to_ca.send(PeToCaMsg::Msg(recv_port_no, other_index, packet)).chain_err(|| ErrorKind::PacketEngineError)?;
 				} else {
 					match self.pe_to_ports.get(*port_no as usize) {
 						Some(s) => s.send(packet).chain_err(|| ErrorKind::PacketEngineError)?,
@@ -107,47 +107,22 @@ impl PacketEngine {
 	}
 	fn listen_ca(&self, entry_pe_from_ca: PeFromCa) -> Result<()> {
 		loop { 
-			let (opt_entry, opt_packet) = entry_pe_from_ca.recv().chain_err(|| ErrorKind::PacketEngineError)?; 
-			let entry = match opt_entry {
-				Some(e) => {
-					self.routing_table.lock().unwrap().set_entry(e);
-					//println!("PacketEngine {}: {}", self.cell_id, e);
-					e
-				},
-				None => match opt_packet {
-					Some((index, _, _)) => self.routing_table.lock().unwrap().get_entry(index).chain_err(|| ErrorKind::PacketEngineError)?,
-					None => panic!("entry and packet empty")
-				}
-			};
-			match opt_packet {
-				Some((_, user_mask, packet)) => {
-					//println!("PacketEngine {}: received packet {} from ca", self.cell_id, packet.get_count());
+			match entry_pe_from_ca.recv().chain_err(|| ErrorKind::PacketEngineError)? {
+				CaToPeMsg::Entry(e) => self.routing_table.lock().unwrap().set_entry(e),
+				CaToPeMsg::Msg((index, user_mask, packet)) => {
+					let entry = self.routing_table.lock().unwrap().get_entry(index).chain_err(|| ErrorKind::PacketEngineError)?;
 					let port_no = 0 as PortNo;
 					self.forward(port_no, entry, user_mask, packet).chain_err(|| ErrorKind::PacketEngineError)?;
-					//let ports = mask.get_port_nos();
-					//println!("PacketEngine {}: send discover to ports {:?}", pe.cell_id, ports);
 				}
-				None => ()				
-			}
-		}		
+			}; 
+		}
 	}
 	fn listen_port(&self, pe_from_ports: PeFromPort) -> Result<()> {
 		loop {
 			//println!("PacketEngine {}: waiting for status or packet", pe.cell_id);
-			let (opt_status, opt_packet) = pe_from_ports.recv()?;
-			match opt_status { // Status or packet, never both
-				Some(status) => {
-					self.pe_to_ca.send((Some(status),None)).chain_err(|| ErrorKind::PacketEngineError)?
-				},
-				None => {
-					match opt_packet {
-						Some((port_no, packet)) => {
-							//println!("PacketEngine {}: received packet {} from port {}", self.cell_id, packet.get_count(), port_no);
-							self.process_packet(port_no, packet).chain_err(|| ErrorKind::PacketEngineError)?
-						},
-						None => println!("PacketEngine {}: Empty message", self.cell_id)
-					};
-				}
+			match pe_from_ports.recv()? {
+				PortToPeMsg::Status((port_no,status)) => self.pe_to_ca.send(PeToCaMsg::Status(port_no,status)).chain_err(|| ErrorKind::PacketEngineError)?,
+				PortToPeMsg::Msg((port_no, packet)) => self.process_packet(port_no, packet).chain_err(|| ErrorKind::PacketEngineError)?
 			};
 		}		
 	}

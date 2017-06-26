@@ -1,10 +1,11 @@
 use std::fmt;
 use std::str;
 use std::sync::{Arc, Mutex};
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use crossbeam::{Scope, ScopedJoinHandle};
 use config::{MAX_ENTRIES, PathLength, PortNo, TableIndex};
-use nalcell::{CaToPe, CaFromPe, CaToPeMsg};
+use gvm_equation::{ GvmEquation, GvmVariables};
+use nalcell::{CaToPe, CaFromPe, CaToPeMsg, PeToCaMsg};
 use message::{DiscoverMsg};
 use name::{Name, CellID, TreeID};
 use packet::{Packet, Packetizer};
@@ -64,18 +65,23 @@ impl CellAgent {
 		let other_index = 0;
 		let hops = 0;
 		let path = None;
-		let children = vec![port_number_0];
 		let control_tree_id = self.control_tree_id.clone();
 		let connected_tree_id = self.connected_tree_id.clone();
 		let my_tree_id = self.my_tree_id.clone();
+		let gvm_equation = GvmEquation::new("true", GvmVariables::empty());
 		self.update_traph(&control_tree_id, port_number_0, 
-				traph::PortStatus::Parent, &children, other_index, hops, path).chain_err(|| ErrorKind::CellagentError)?;
+				traph::PortStatus::Parent, Some(gvm_equation), 
+				&mut HashSet::new(), other_index, hops, path).chain_err(|| ErrorKind::CellagentError)?;
+		let gvm_equation = GvmEquation::new("false", GvmVariables::empty());
 		let connected_tree_entry = self.update_traph(&connected_tree_id, port_number_0, 
-				traph::PortStatus::Parent, &Vec::new(), other_index, hops, path).chain_err(|| ErrorKind::CellagentError)?;
+			traph::PortStatus::Parent, Some(gvm_equation),
+			&mut HashSet::new(), other_index, hops, path).chain_err(|| ErrorKind::CellagentError)?;
 		self.connected_tree_entry = Arc::new(Mutex::new(connected_tree_entry));
 		// Create my tree
+		let gvm_equation = GvmEquation::new("true", GvmVariables::empty());
 		let my_entry = self.update_traph(&my_tree_id, port_number_0, 
-				traph::PortStatus::Parent, &children, other_index, hops, path).chain_err(|| ErrorKind::CellagentError)?; 
+				traph::PortStatus::Parent, Some(gvm_equation), 
+				&mut HashSet::new(), other_index, hops, path).chain_err(|| ErrorKind::CellagentError)?; 
 		self.my_entry = my_entry;
 		self.listen(scope, ca_from_pe).chain_err(|| ErrorKind::CellagentError)?;
 		Ok(())
@@ -123,8 +129,9 @@ impl CellAgent {
 			None => Err(ErrorKind::Size(self.cell_id.clone()).into())
 		}
 	}
-	pub fn update_traph(&mut self, tree_id: &TreeID, port_number: PortNumber, port_status: traph::PortStatus, 
-				children: &Vec<PortNumber>, other_index: TableIndex, hops: PathLength, path: Option<Path>) 
+	pub fn update_traph(&mut self, tree_id: &TreeID, port_number: PortNumber, port_status: traph::PortStatus,
+				gvm_equation: Option<GvmEquation>, 
+				children: &mut HashSet<PortNumber>, other_index: TableIndex, hops: PathLength, path: Option<Path>) 
 			-> Result<RoutingTableEntry> {
 // Note that traphs is updated transactionally; I remove an entry, update it, then put it back.
 		let mut traphs = self.traphs.lock().unwrap();
@@ -146,6 +153,11 @@ impl CellAgent {
 			traph::PortStatus::Pruned => port_status,
 			_ => traph_status  // Don't replace if Parent or Child
 		};
+		let gvm_result = match gvm_equation {
+			Some(eqn) => eqn.evaluate(HashMap::new()).chain_err(|| ErrorKind::CellagentError)?,
+			None => false,
+		};
+		if gvm_result { children.insert(PortNumber::new(0, self.no_ports)?); }
 		let entry = traph.new_element(port_number, port_status, other_index, children, hops, path).chain_err(|| ErrorKind::CellagentError)?; 
 // Here's the end of the transaction
 		//println!("CellAgent {}: entry {}\n{}", self.cell_id, entry, traph); 
@@ -153,7 +165,7 @@ impl CellAgent {
 		{
 			self.trees.lock().unwrap().insert(entry.get_index(), tree_id.stringify());
 		}
-		self.ca_to_pe.send((Some(entry),None)).chain_err(|| ErrorKind::CellagentError)?;
+		self.ca_to_pe.send(CaToPeMsg::Entry(entry)).chain_err(|| ErrorKind::CellagentError)?;
 		Ok(entry)
 	}
 	fn write_err(&self, e: Error) -> Result<()> {
@@ -178,19 +190,12 @@ impl CellAgent {
 	fn listen_loop(&mut self, ca_from_pe: CaFromPe) -> Result<()> {
 		loop {
 			//println!("CellAgent {}: waiting for status or packet", ca.cell_id);
-			let (opt_status, opt_packet) = ca_from_pe.recv().chain_err(|| ErrorKind::CellagentError)?; 
-			match opt_status {
-				Some((port_no, status)) => {
-					//println!("CellAgent {}: got status on port {}", ca.cell_id, port_no);
-					match status {
-						port::PortStatus::Connected => self.port_connected(port_no).chain_err(|| ErrorKind::CellagentError)?,
-						port::PortStatus::Disconnected => self.port_disconnected(port_no).chain_err(|| ErrorKind::CellagentError)?
-					};
+			match ca_from_pe.recv().chain_err(|| ErrorKind::CellagentError)? {
+				PeToCaMsg::Status(port_no, status) => match status {
+					port::PortStatus::Connected => self.port_connected(port_no).chain_err(|| ErrorKind::CellagentError)?,
+					port::PortStatus::Disconnected => self.port_disconnected(port_no).chain_err(|| ErrorKind::CellagentError)?
 				},
-				None => match opt_packet {
-					Some((port_no, index, packet)) => self.process_packets(port_no, index, packet).chain_err(|| ErrorKind::CellagentError)?,
-					None => ()
-				}
+				PeToCaMsg::Msg(port_no, index, packet) => self.process_packets(port_no,index, packet).chain_err(|| ErrorKind::CellagentError)?
 			};
 		}
 	}
@@ -225,8 +230,12 @@ impl CellAgent {
 		//println!("CellAgent {}: sending packet {} on port {} {} ", self.cell_id, packets[0].get_count(), port_no, msg);
 		let index = (*self.connected_tree_entry.lock().unwrap()).get_index();
 		for packet in packets {
-			self.ca_to_pe.send((Some(*self.connected_tree_entry.lock().unwrap()), 
-			                    Some((index, port_no_mask, *packet)))).chain_err(|| ErrorKind::CellagentError)?;
+			let entry = CaToPeMsg::Entry(*self.connected_tree_entry.lock().unwrap());
+			self.ca_to_pe.send(entry).chain_err(|| ErrorKind::CellagentError)?;
+			let msg = CaToPeMsg::Msg((index, port_no_mask, *packet));
+			self.ca_to_pe.send(msg).chain_err(|| ErrorKind::CellagentError)?;
+//			self.ca_to_pe.send((Some(*self.connected_tree_entry.lock().unwrap()), 
+//			                    Some((index, port_no_mask, *packet)))).chain_err(|| ErrorKind::CellagentError)?;
 		}
 		let discover_msgs  = self.get_discover_msgs();
 		//println!("CellAgent {}: {} discover msgs", ca.cell_id, discover_msgs.len());
@@ -237,7 +246,9 @@ impl CellAgent {
 		//println!("Cell Agent {} got disconnected on port {}", self.cell_id, port_no);
 		let port_no_mask = Mask::new(PortNumber::new(port_no, self.no_ports).chain_err(|| ErrorKind::CellagentError)?);
 		self.connected_tree_entry.lock().unwrap().and_with_mask(port_no_mask.not());
-		self.ca_to_pe.send((Some(*self.connected_tree_entry.lock().unwrap()),None)).chain_err(|| ErrorKind::CellagentError)?;	
+		let entry = CaToPeMsg::Entry(*self.connected_tree_entry.lock().unwrap());
+		self.ca_to_pe.send(entry).chain_err(|| ErrorKind::CellagentError)?;
+		//self.ca_to_pe.send((Some(*self.connected_tree_entry.lock().unwrap()),None)).chain_err(|| ErrorKind::CellagentError)?;	
 		Ok(())	
 	}		
 	pub fn forward_discover(&mut self, discover_msgs: &Vec<DiscoverMsg>, mask: Mask) -> Result<()> {
@@ -260,7 +271,8 @@ impl CellAgent {
 		};
 		for packet in packets.iter() {
 			//println!("CellAgent {}: Sending packet {}", self.cell_id, packets[0].get_packet_count());
-			self.ca_to_pe.send((None, Some((index, user_mask, **packet)))).chain_err(|| ErrorKind::CellagentError)?;
+			let msg = CaToPeMsg::Msg((index, user_mask, **packet));
+			self.ca_to_pe.send(msg).chain_err(|| ErrorKind::CellagentError)?;
 			//println!("CellAgent {}: sent packet {} on tree {} to packet engine with index {}", self.cell_id, packet_count, tree_id, index);
 		}
 		Ok(())
@@ -282,6 +294,7 @@ error_chain! {
 	}
 	links {
 		//Message(::message::Error, ::message::ErrorKind); // Recursive type error if left in
+		Gvm(::gvm_equation::Error, ::gvm_equation::ErrorKind);
 		Name(::name::Error, ::name::ErrorKind);
 		Packetizer(::packet::Error, ::packet::ErrorKind);
 		RoutingTable(::routing_table::Error, ::routing_table::ErrorKind);

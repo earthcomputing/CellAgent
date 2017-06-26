@@ -1,7 +1,9 @@
 use std::fmt;
+use std::collections::HashSet;
 use std::sync::atomic::{ATOMIC_USIZE_INIT, AtomicUsize, Ordering};
 use cellagent::{CellAgent};
 use config::{MAX_PORTS, PathLength, PortNo, TableIndex};
+use gvm_equation::{GvmEquation, GvmVariables};
 use name::{CellID, TreeID};
 use packet::Packetizer;
 use traph;
@@ -105,11 +107,12 @@ impl Message for DiscoverMsg {
 		let hops = self.payload.get_hops();
 		let path = self.payload.get_path();
 		let senders_index = self.payload.get_index();
-		let children = &Vec::new();
+		let children = &mut HashSet::new();
 		//println!("DiscoverMsg: tree_id {}, port_number {}", tree_id, port_number);
 		let exists = ca.exists(&new_tree_id);  // Have I seen this tree before?
 		let status = if exists { traph::PortStatus::Pruned } else { traph::PortStatus::Parent };
-		let entry = ca.update_traph(&new_tree_id, port_number, status,
+		let gvm_equation = GvmEquation::new("true", GvmVariables::empty());
+		let entry = ca.update_traph(&new_tree_id, port_number, status, Some(gvm_equation),
 				children, senders_index, hops, Some(path)).chain_err(|| ErrorKind::MessageError)?;
 		//println!("DiscoverMsg {}: entry {}", ca.get_id(), entry);
 		if exists { 
@@ -194,9 +197,12 @@ impl Message for DiscoverDMsg {
 			-> Result<()> {
 		let tree_id = self.payload.get_tree_id();
 		let my_index = self.payload.get_table_index();
+		let mut children = HashSet::new();
 		let port_number = PortNumber::new(port_no, MAX_PORTS).chain_err(|| ErrorKind::MessageError)?;
+		children.insert(port_number);
 		//println!("DiscoverDMsg {}: process msg {} processing {} {} {}", ca.get_id(), self.get_header().get_count(), port_no, my_index, tree_id);
-		ca.update_traph(&tree_id, port_number, traph::PortStatus::Child, &vec![port_number], my_index, 0, None).chain_err(|| ErrorKind::MessageError)?;
+		ca.update_traph(&tree_id, port_number, traph::PortStatus::Child, None, 
+			&mut children, my_index, 0, None).chain_err(|| ErrorKind::MessageError)?;
 		Ok(())
 	}
 }
