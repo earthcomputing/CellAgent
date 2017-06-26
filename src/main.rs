@@ -3,7 +3,8 @@
 extern crate crossbeam;
 #[macro_use]
 extern crate error_chain;
-extern crate rand;
+extern crate eval;
+extern crate rand; 
 extern crate serde;
 #[macro_use]
 extern crate serde_derive;
@@ -13,6 +14,7 @@ mod config;
 mod datacenter;
 mod ecargs;
 mod errors;
+mod gvm_equation;
 mod link;
 mod message;
 mod nalcell;

@@ -4,7 +4,7 @@ use std::sync::{mpsc, Arc};
 use std::sync::atomic::Ordering::SeqCst;
 use crossbeam::{Scope, ScopedJoinHandle};
 use config::PortNo;
-use nalcell::{PortToLink, PortFromLink, PortToPe, PortFromPe};
+use nalcell::{PortToLink, PortFromLink, PortToPe, PortFromPe, LinkToPortMsg, PortToPeMsg};
 use name::{Name, PortID, CellID};
 use utility::PortNumber;
 
@@ -73,20 +73,18 @@ impl Port {
 		//println!("PortID {}: port_no {}", self.id, port_no);
 		loop {
 			//println!("Port {}: waiting for status or packet from link", port.id);
-			let (opt_status, opt_packet) = port_from_link.recv().chain_err(|| ErrorKind::PortError)?;
-			match opt_status {
-				Some(status) => {
+			match port_from_link.recv().chain_err(|| ErrorKind::PortError)? {
+				LinkToPortMsg::Status(status) => {
 					match status {
 						PortStatus::Connected => self.set_connected(),
 						PortStatus::Disconnected => self.set_disconnected()
 					};
-					self.port_to_pe.send((Some((port_no,status)),None)).chain_err(|| ErrorKind::PortError)?;
-				},
-				None => match opt_packet {
-					Some(packet) => self.port_to_pe.send((None,Some((port_no,packet)))).chain_err(|| ErrorKind::PortError)?,
-					None => ()
+					self.port_to_pe.send(PortToPeMsg::Status((port_no, status))).chain_err(|| ErrorKind::PortError)?;
 				}
-			};
+				LinkToPortMsg::Msg(msg) => {
+					self.port_to_pe.send(PortToPeMsg::Msg((port_no, msg))).chain_err(|| ErrorKind::PortError)?;
+				}
+			}
 		}
 	}
 	fn listen_pe(&self, port_to_link: PortToLink, port_from_pe: PortFromPe) -> Result<()> {

@@ -1,4 +1,5 @@
 use std::fmt;
+use std::collections::HashSet;
 use config::{MAX_PORTS, MAX_ENTRIES, PortNo, TableIndex};
 use utility::{Mask, PortNumber};
 
@@ -41,7 +42,7 @@ impl RoutingTableEntry {
 		let port_no = port_index.get_port_no();
 		self.other_indices[port_no as usize] = other_index;
 	}
-	pub fn add_children(&mut self, children: &Vec<PortNumber>) {
+	pub fn add_children(&mut self, children: &HashSet<PortNumber>) {
 		let mask = Mask::make(children);
 		self.or_with_mask(mask);
 	}

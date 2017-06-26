@@ -1,4 +1,5 @@
 use std::fmt;
+use std::collections::HashSet;
 use config::{MAX_PORTS, MaskValue, PortNo};
 /*
 pub fn get_first_arg(a: Vec<String>) -> Option<i32> {
@@ -47,7 +48,7 @@ impl Mask {
 		let port_mask = Mask::new(port_number);
 		self.and(port_mask.not())
 	}
-	pub fn make(port_numbers: &Vec<PortNumber>) -> Mask {
+	pub fn make(port_numbers: &HashSet<PortNumber>) -> Mask {
 		let mut mask = Mask::empty();
 		// Using map() is more complicated because of try!
 		for port_number in port_numbers.iter() {
@@ -74,7 +75,7 @@ impl fmt::Display for Mask {
 		write!(f, " {:016.b}", self.mask) 
 	}
 }
-#[derive(Debug, Copy, Clone, Hash, Serialize, Deserialize)]
+#[derive(Debug, Copy, Clone, Hash, PartialEq, Eq, Serialize, Deserialize)]
 pub struct PortNumber { pub port_no: PortNo }
 #[deny(unused_must_use)]
 impl PortNumber {
