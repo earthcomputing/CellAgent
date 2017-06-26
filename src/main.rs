@@ -68,21 +68,36 @@ fn run() -> Result<()> {
 	//let cell_id = CellID::new("foo bar").chain_err(|| "testing bad name")?;
 	let (ncells,nports) = ecargs.get_args();
 	println!("Main: {} ports for each of {} cells", nports, ncells);
-	crossbeam::scope( |scope| { 
-		if let Err(ref e) = build_datacenter(scope, nports, ncells) {
-			use ::std::io::Write;
-			let stderr = &mut ::std::io::stderr();
-			let _ = writeln!(stderr, "Datacenter: {}", e);
-			for e in e.iter().skip(1) {
-				let _ = writeln!(stderr, "Caused by: {}", e);
-			}
-			if let Some(backtrace) = e.backtrace() {
-				let _ = writeln!(stderr, "Backtrace: {:?}", backtrace);
-			}
-			//::std::process::exit(1);
+	crossbeam::scope( |scope| -> Result<()> { 
+		match build_datacenter(scope, nports, ncells) {
+			Ok(dc) => {
+				let boundary_cells = dc.get_boundary_cells()?;
+				if let Some(boundary_cell) = boundary_cells.first() {
+					if let Some(outside_channel) = boundary_cell.get_outside_channels().values().next() {
+						loop {
+							let msg = outside_channel.1.recv();
+						}
+					}
+				}
+				Ok(())
+			},
+			Err(e) =>  write_err(e)
 		}
-	});
+	})?;
 	Ok(())
+}
+fn write_err(e: Error) -> Result<()> {
+	use ::std::io::Write;
+	let stderr = &mut ::std::io::stderr();
+	let _ = writeln!(stderr, "Main: {}", e);
+	for e in e.iter().skip(1) {
+		let _ = writeln!(stderr, "Caused by: {}", e);
+	}
+	if let Some(backtrace) = e.backtrace() {
+		let _ = writeln!(stderr, "Backtrace: {:?}", backtrace);
+	}
+	//::std::process::exit(1);
+	Err(e)	
 }
 fn build_datacenter<'a>(scope: &crossbeam::Scope, nports: u8, ncells: usize) -> Result<Datacenter<'a>>{
 	//let edges = vec![(0,1),(1,2),(2,3),(3,4),(5,6),(6,7),(7,8),(8,9),(0,5),(1,6),(2,7),(3,8),(4,9)];

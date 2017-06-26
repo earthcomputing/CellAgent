@@ -64,6 +64,17 @@ impl<'a> Datacenter<'a> {
 		Ok(Datacenter { cells: cells, links: links, noc: None })
 	}
 	pub fn get_cells(&self) -> &Vec<NalCell> { &self.cells }
+	pub fn get_boundary_cells(&self) -> Result<Vec<&NalCell>> {
+		let mut boundary_cells = Vec::new();
+		for cell in &self.cells {
+			if cell.is_border() { boundary_cells.push(cell); }
+		}
+		if boundary_cells.len() == 0 {
+			Err(ErrorKind::Boundary.into())
+		} else {
+			Ok(boundary_cells)
+		}
+	}
 				//	pub fn add_noc(&mut self, control: &'a NalCell, backup: &'a NalCell) {
 //		self.noc = Some(NOC::new(control, backup));
 //	}
@@ -89,6 +100,9 @@ error_chain! {
 		Port(::port::Error, ::port::ErrorKind);
 	}
 	errors { DatacenterError
+		Boundary {
+			description("No boundary cells")
+		}
 		CellsSize(n: usize) {
 			description("Not enough cells")
 			display("The number of cells {} must be at least 2", n)

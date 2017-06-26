@@ -59,7 +59,7 @@ impl CellAgent {
 			tenant_masks: tenant_masks, trees: Arc::new(Mutex::new(trees)), 
 			ca_to_pe: ca_to_pe})
 		}
-	pub fn initialize(&mut self, scope: &Scope, ca_from_pe: CaFromPe) -> Result<()> {
+	pub fn initialize(&mut self, scope: &Scope, ca_from_pe: CaFromPe) -> Result<ScopedJoinHandle<()>> {
 		// Set up predefined trees - Must be first two in this order
 		let port_number_0 = PortNumber::new(0, self.no_ports).chain_err(|| ErrorKind::CellagentError)?;
 		let other_index = 0;
@@ -83,8 +83,8 @@ impl CellAgent {
 				traph::PortStatus::Parent, Some(gvm_equation), 
 				&mut HashSet::new(), other_index, hops, path).chain_err(|| ErrorKind::CellagentError)?; 
 		self.my_entry = my_entry;
-		self.listen(scope, ca_from_pe).chain_err(|| ErrorKind::CellagentError)?;
-		Ok(())
+		let listen_handle = self.listen(scope, ca_from_pe).chain_err(|| ErrorKind::CellagentError)?;
+		Ok(listen_handle)
 	}
 	pub fn get_no_ports(&self) -> PortNo { self.no_ports }	
 	pub fn get_id(&self) -> CellID { self.cell_id.clone() }
