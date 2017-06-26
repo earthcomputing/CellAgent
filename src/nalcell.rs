@@ -41,7 +41,18 @@ pub enum PeToCaMsg { Status(PortNo, PortStatus), Msg(PortNo, TableIndex, Packet)
 pub type PeToCa = mpsc::Sender<PeToCaMsg>;
 pub type CaFromPe = mpsc::Receiver<PeToCaMsg>;
 pub type PeCaError = mpsc::SendError<PeToCaMsg>;
+// Port to Outside World
+pub type PortToOutsideMsg = String;
+pub type PortToOutside = mpsc::Sender<PortToOutsideMsg>;
+pub type OutsideFromPort = mpsc::Receiver<PortToOutsideMsg>;
+pub type PortOutsideError = mpsc::SendError<PortToOutsideMsg>;
+// Outside World to Port
+pub type OutsideToPortMsg = String;
+pub type OutsideToPort = mpsc::Sender<OutsideToPortMsg>;
+pub type PortFromOutside = mpsc::Receiver<OutsideToPortMsg>;
+pub type OutsidePortError = mpsc::SendError<OutsideToPortMsg>;
 
+type OutsideChannels = HashMap<PortNo, (OutsideToPort, OutsideFromPort)>;
 #[derive(Debug)]
 pub struct NalCell { // Does not include PacketEngine so CellAgent can own it
 	id: CellID,
@@ -51,7 +62,8 @@ pub struct NalCell { // Does not include PacketEngine so CellAgent can own it
 	cell_agent: CellAgent,
 	packet_engine: PacketEngine,
 	vms: Vec<VirtualMachine>,
-	ports_from_pe: HashMap<PortNo,PortFromPe>
+	ports_from_pe: HashMap<PortNo, PortFromPe>,
+	outside_channels: OutsideChannels,
 }
 
 impl NalCell {
@@ -63,6 +75,7 @@ impl NalCell {
 		let (port_to_pe, pe_from_ports): (PortToPe, PeFromPort) = channel();
 		let mut ports = Vec::new();
 		let mut pe_to_ports = Vec::new();
+		let mut outside_channels = HashMap::new();
 		let mut ports_from_pe = HashMap::new(); // So I can remove the item
 		for i in 0..nports + 1 {
 			let is_border_port;
@@ -72,8 +85,16 @@ impl NalCell {
 			pe_to_ports.push(pe_to_port);
 			ports_from_pe.insert(i, port_from_pe);
 			let is_connected = if i == 0 { true } else { false };
-			let port = Port::new(&cell_id, PortNumber { port_no: i as u8 }, is_border_port, 
+			let mut port = Port::new(&cell_id, PortNumber { port_no: i as u8 }, is_border_port, 
 				is_connected, port_to_pe.clone()).chain_err(|| ErrorKind::NalCellError)?;
+			if is_border_port { 
+				let (port_to_outside, outside_from_port): (PortToOutside, OutsideFromPort) = channel();
+				let (outside_to_port, port_from_outside): (OutsideToPort, PortFromOutside) = channel();
+				if is_border_port { 
+					port.setup_outside_channel(scope, port_to_outside, port_from_outside); 
+				}
+				outside_channels.insert(i as PortNo, (outside_to_port, outside_from_port));
+			}
 			ports.push(port);
 		}
 		let boxed_ports: Box<[Port]> = ports.into_boxed_slice();
@@ -81,13 +102,15 @@ impl NalCell {
 		packet_engine.start_threads(scope, pe_from_ca, pe_from_ports)?;
 		let mut cell_agent = CellAgent::new(&cell_id, boxed_ports.len() as u8, ca_to_pe).chain_err(|| ErrorKind::NalCellError)?;
 		cell_agent.initialize(scope, ca_from_pe)?;
-		Ok(NalCell { id: cell_id, cell_no: cell_no, is_border: is_border,
+		Ok(NalCell { id: cell_id, cell_no: cell_no, is_border: is_border, outside_channels: outside_channels,
 				ports: boxed_ports, cell_agent: cell_agent, vms: Vec::new(),
 				packet_engine: packet_engine, ports_from_pe: ports_from_pe})
 	}
 //	pub fn get_id(&self) -> CellID { self.id.clone() }
 //	pub fn get_no(&self) -> usize { self.cell_no }
 //	pub fn get_cell_agent(&self) -> &CellAgent { &self.cell_agent }
+	pub fn get_outside_channels(&self) -> &OutsideChannels { &self.outside_channels }
+	pub fn is_border(&self) -> bool { self.is_border }
 	pub fn get_free_port_mut (&mut self) -> Result<(&mut Port, PortFromPe)> {
 		for p in &mut self.ports.iter_mut() {
 			//println!("NalCell {}: port {} is connected {}", self.id, p.get_port_no(), p.is_connected());

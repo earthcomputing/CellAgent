@@ -4,7 +4,8 @@ use std::sync::{mpsc, Arc};
 use std::sync::atomic::Ordering::SeqCst;
 use crossbeam::{Scope, ScopedJoinHandle};
 use config::PortNo;
-use nalcell::{PortToLink, PortFromLink, PortToPe, PortFromPe, LinkToPortMsg, PortToPeMsg};
+use nalcell::{PortToLink, PortFromLink, PortToPe, PortFromPe, LinkToPortMsg, PortToPeMsg,
+			  PortToOutside, PortFromOutside, PortToOutsideMsg};
 use name::{Name, PortID, CellID};
 use utility::PortNumber;
 
@@ -22,6 +23,7 @@ pub struct Port {
 	is_connected: Arc<AtomicBool>,
 	is_broken: Arc<AtomicBool>,
 	port_to_pe: PortToPe,
+	port_to_outside: Option<PortToOutside>,
 }
 #[deny(unused_must_use)]
 impl Port {
@@ -30,7 +32,7 @@ impl Port {
 		let port_id = PortID::new(port_number.get_port_no())?;
 		let temp_id = port_id.add_component(&cell_id.get_name())?;
 		Ok(Port{ id: temp_id, port_number: port_number, is_border: is_border, 
-			is_connected: Arc::new(AtomicBool::new(is_connected)), 
+			is_connected: Arc::new(AtomicBool::new(is_connected)), port_to_outside: None,
 			is_broken: Arc::new(AtomicBool::new(false)), port_to_pe: port_to_pe})
 	}
 	pub fn get_id(&self) -> PortID { self.id.clone() }
@@ -41,6 +43,21 @@ impl Port {
 	pub fn set_disconnected(&self) { self.is_connected.store(false, SeqCst); }
 	pub fn is_broken(&self) -> bool { self.is_broken.load(SeqCst) }
 	pub fn is_border(&self) -> bool { self.is_border }
+	pub fn setup_outside_channel(&mut self, scope: &Scope, port_to_outside: PortToOutside, port_from_outside: PortFromOutside) {
+		self.port_to_outside = Some(port_to_outside);
+		let port = self.clone();
+		let outside_handle = scope.spawn( move || {
+			let _ = port.outside_channel(port_from_outside).chain_err(|| ErrorKind::PortError).map_err(|e| port.write_err(e));
+		});
+	}
+	pub fn outside_channel(&self, port_from_outside: PortFromOutside) -> Result<()> {
+		let port = self.clone();
+		loop {
+			let msg = port_from_outside.recv().chain_err(||ErrorKind::PortError)?;
+			println!("Port {}: msg from outside {}", port.id, msg);
+		}
+		Ok(())
+	}
 	pub fn link_channel(&self, scope: &Scope, port_to_link: PortToLink, 
 			port_from_link: PortFromLink, port_from_pe: PortFromPe) 
 				-> Result<(ScopedJoinHandle<()>,ScopedJoinHandle<()>)> {
@@ -56,17 +73,6 @@ impl Port {
 			}
 		});
 		Ok((link_handle, pe_handle))
-	}
-	fn write_err(&self, e: Error) {
-		use ::std::io::Write;
-		let stderr = &mut ::std::io::stderr();
-		let _ = writeln!(stderr, "Port {}: {}", self.id, e);
-		for e in e.iter().skip(1) {
-			let _ = writeln!(stderr, "Caused by: {}", e);
-		}
-		if let Some(backtrace) = e.backtrace() {
-			let _ = writeln!(stderr, "Backtrace: {:?}", backtrace);
-		}
 	}
 	fn listen_link(&self, port_from_link: PortFromLink) -> Result<()> {
 		let port_no = self.get_port_no();
@@ -93,6 +99,17 @@ impl Port {
 			let packet = port_from_pe.recv()?;
 			port_to_link.send(packet).chain_err(|| ErrorKind::PortError)?;
 		}		
+	}
+	fn write_err(&self, e: Error) {
+		use ::std::io::Write;
+		let stderr = &mut ::std::io::stderr();
+		let _ = writeln!(stderr, "Port {}: {}", self.id, e);
+		for e in e.iter().skip(1) {
+			let _ = writeln!(stderr, "Caused by: {}", e);
+		}
+		if let Some(backtrace) = e.backtrace() {
+			let _ = writeln!(stderr, "Backtrace: {:?}", backtrace);
+		}
 	}
 }
 impl fmt::Display for Port { 

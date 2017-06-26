@@ -56,7 +56,7 @@ impl fmt::Display for RoutingTableEntry {
 		if self.inuse { s = s + &format!("  Yes  ") }
 		else          { s = s + &format!("  No   ") }
 		s = s + &format!("{:7}", self.parent);
-		s = s + &format!(" {}", self.mask);
+		s = s + &format!("{}", self.mask);
 		s = s + &format!(" {:?}", self.other_indices.to_vec());
 		write!(f, "{}", s) 
 	}
