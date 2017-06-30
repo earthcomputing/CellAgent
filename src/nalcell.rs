@@ -1,5 +1,5 @@
 use std::fmt;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::sync::mpsc;
 use std::sync::mpsc::channel;
 use crossbeam::Scope;
@@ -74,19 +74,21 @@ impl NalCell {
 		let mut ports = Vec::new();
 		let mut pe_to_ports = Vec::new();
 		let mut ports_from_pe = HashMap::new(); // So I can remove the item
+		let mut tcp_port_nos = HashSet::new();
 		for i in 0..nports + 1 {
 			let is_border_port = is_border & (i == 2);
+			if is_border_port { tcp_port_nos.insert(i); }
 			let (pe_to_port, port_from_pe): (PeToPort, PortFromPe) = channel();
 			pe_to_ports.push(pe_to_port);
 			ports_from_pe.insert(i, port_from_pe);
 			let is_connected = if i == 0 { true } else { false };
 			let port_number = PortNumber::new(i, nports).chain_err(|| ErrorKind::NalCellError)?;
-			let mut port = Port::new(&cell_id, port_number, is_border_port, is_connected, 
+			let port = Port::new(&cell_id, port_number, is_border_port, is_connected, 
 				port_to_pe.clone()).chain_err(|| ErrorKind::NalCellError)?;
 			ports.push(port);
 		}
 		let boxed_ports: Box<[Port]> = ports.into_boxed_slice();
-		let packet_engine = PacketEngine::new(&cell_id, pe_to_ca, pe_to_ports).chain_err(|| ErrorKind::NalCellError)?;
+		let packet_engine = PacketEngine::new(&cell_id, pe_to_ca, pe_to_ports, tcp_port_nos).chain_err(|| ErrorKind::NalCellError)?;
 		packet_engine.start_threads(scope, pe_from_ca, pe_from_ports)?;
 		let mut cell_agent = CellAgent::new(&cell_id, boxed_ports.len() as u8, ca_to_pe).chain_err(|| ErrorKind::NalCellError)?;
 		cell_agent.initialize(scope, ca_from_pe)?;
@@ -99,24 +101,21 @@ impl NalCell {
 //	pub fn get_cell_agent(&self) -> &CellAgent { &self.cell_agent }
 	pub fn is_border(&self) -> bool { self.is_border }
 	pub fn get_free_ec_port_mut(&mut self) -> Result<(&mut Port, PortFromPe)> {
-		let (port, port_from_pe) = self.get_free_port_mut(false)?;
-		Ok((port, port_from_pe))
+		self.get_free_port_mut(false)
 	}
 	pub fn get_free_tcp_port_mut(&mut self) -> Result<(&mut Port, PortFromPe)> {
-		let cell_id = self.id.clone();
-		let (port, port_from_pe) = self.get_free_port_mut(true)?;
-		Ok((port, port_from_pe))
+		self.get_free_port_mut(true)
 	}
-	pub fn get_free_port_mut(&mut self, is_tcp_port: bool) 
+	pub fn get_free_port_mut(&mut self, want_tcp_port: bool) 
 			-> Result<(&mut Port, PortFromPe)> {
-		for p in &mut self.ports.iter_mut() {
+		for port in &mut self.ports.iter_mut() {
 			//println!("NalCell {}: port {} is connected {}", self.id, p.get_port_no(), p.is_connected());
-			if !p.is_connected() && !(is_tcp_port ^ p.is_border()) && (p.get_port_no() != 0 as u8) {
-				let port_no = p.get_port_no();
+			if !port.is_connected() && !(want_tcp_port ^ port.is_border()) && (port.get_port_no() != 0 as u8) {
+				let port_no = port.get_port_no();
 				match self.ports_from_pe.remove(&port_no) { // Remove avoids a borrowed context error
 					Some(recvr) => {
-						p.set_connected();
-						return Ok((p, recvr))
+						port.set_connected();
+						return Ok((port, recvr))
 					},
 					None => return Err(ErrorKind::Channel(port_no).into())
 				} 
