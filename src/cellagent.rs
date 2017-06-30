@@ -1,24 +1,36 @@
 use std::fmt;
-use std::str;
+use std::sync::mpsc;
+use std::sync::mpsc::channel;
 use std::sync::{Arc, Mutex};
 use std::collections::{HashMap, HashSet};
 use crossbeam::{Scope, ScopedJoinHandle};
-use config::{MAX_ENTRIES, PathLength, PortNo, TableIndex};
+use config::{MAX_ENTRIES, PathLength, PortNo, TableIndex, Uniquifier};
+use container::Service;
 use gvm_equation::{ GvmEquation, GvmVariables};
 use nalcell::{CaToPe, CaFromPe, CaToPeMsg, PeToCaMsg};
-use message::{DiscoverMsg};
-use name::{Name, CellID, TreeID};
-use packet::{Packet, Packetizer};
+use message::{DiscoverMsg, Message};
+use name::{Name, CellID, TreeID, VMID};
+use packet::{Packet, Packetizer, PacketAssembler, PacketAssemblers};
 use port;
 use routing_table_entry::{RoutingTableEntry};
 use traph;
 use traph::{Traph};
 use utility::{BASE_TENANT_MASK, Mask, Path, PortNumber};
+use vm::VirtualMachine;
 
 const CONTROL_TREE_NAME: &'static str = "Control";
 const CONNECTED_PORTS_TREE_NAME: &'static str = "Connected";
 
 pub type Traphs = Arc<Mutex<HashMap<String,Traph>>>;
+pub type CaToVmMsg = String;
+pub type CaToVm = mpsc::Sender<CaToVmMsg>;
+pub type VmFromCa = mpsc::Receiver<CaToVmMsg>;
+pub type CaVmError = mpsc::SendError<CaToVmMsg>;
+pub type VmToCaMsg = String;
+pub type VmToCa = mpsc::Sender<VmToCaMsg>;
+pub type CaFromVm = mpsc::Receiver<VmToCaMsg>;
+pub type VmCaError = mpsc::SendError<VmToCaMsg>;
+
 #[derive(Debug, Clone)]
 pub struct CellAgent {
 	cell_id: CellID,
@@ -34,8 +46,9 @@ pub struct CellAgent {
 	traphs: Traphs,
 	tenant_masks: Vec<Mask>,
 	ca_to_pe: CaToPe,
+	up_trees: HashMap<TreeID,Vec<CaToVm>>,
+	packet_assemblers: PacketAssemblers,
 }
-#[deny(unused_must_use)]
 impl CellAgent {
 	pub fn new(cell_id: &CellID, no_ports: PortNo, ca_to_pe: CaToPe ) 
 				-> Result<CellAgent> {
@@ -56,8 +69,8 @@ impl CellAgent {
 			free_indices: Arc::new(Mutex::new(free_indices)),
 			discover_msgs: Arc::new(Mutex::new(Vec::new())), my_entry: RoutingTableEntry::default(0).chain_err(|| ErrorKind::CellagentError)?, 
 			connected_tree_entry: Arc::new(Mutex::new(RoutingTableEntry::default(0).chain_err(|| ErrorKind::CellagentError)?)),
-			tenant_masks: tenant_masks, trees: Arc::new(Mutex::new(trees)), 
-			ca_to_pe: ca_to_pe})
+			tenant_masks: tenant_masks, trees: Arc::new(Mutex::new(trees)), up_trees: HashMap::new(),
+			ca_to_pe: ca_to_pe, packet_assemblers: HashMap::new()})
 		}
 	pub fn initialize(&mut self, scope: &Scope, ca_from_pe: CaFromPe) -> Result<ScopedJoinHandle<()>> {
 		// Set up predefined trees - Must be first two in this order
@@ -129,6 +142,22 @@ impl CellAgent {
 			None => Err(ErrorKind::Size(self.cell_id.clone()).into())
 		}
 	}
+	pub fn create_vms(&mut self, service_sets: Vec<Vec<Service>>) -> Result<()> {
+		let up_tree_id = TreeID::new(&format!("UpTree:{}+{}", self.cell_id, self.up_trees.len())).chain_err(|| ErrorKind::CellagentError)?;
+		let mut id_no = 0;
+		let mut ca_to_vms = Vec::new();
+		for mut services in service_sets {
+			let id_no = id_no + 1;
+			let vm_id = VMID::new(&format!("VM:{}+{}", self.cell_id, id_no)).chain_err(|| ErrorKind::CellagentError)?;
+			let (ca_to_vm, vm_from_ca): (CaToVm, VmFromCa) = channel();
+			let (vm_to_ca, ca_from_vm): (VmToCa, CaFromVm) = channel();
+			let mut vm = VirtualMachine::new(vm_id);
+			vm.initialize(&mut services, vm_to_ca, vm_from_ca).chain_err(|| ErrorKind::CellagentError)?;
+			ca_to_vms.push(ca_to_vm);
+		}
+		self.up_trees.insert(up_tree_id, ca_to_vms);
+		Ok(())
+	}
 	pub fn update_traph(&mut self, tree_id: &TreeID, port_number: PortNumber, port_status: traph::PortStatus,
 				gvm_equation: Option<GvmEquation>, 
 				children: &mut HashSet<PortNumber>, other_index: TableIndex, hops: PathLength, path: Option<Path>) 
@@ -195,26 +224,14 @@ impl CellAgent {
 					port::PortStatus::Connected => self.port_connected(port_no).chain_err(|| ErrorKind::CellagentError)?,
 					port::PortStatus::Disconnected => self.port_disconnected(port_no).chain_err(|| ErrorKind::CellagentError)?
 				},
-				PeToCaMsg::Msg(port_no, index, packet) => self.process_packets(port_no,index, packet).chain_err(|| ErrorKind::CellagentError)?
-			};
+				PeToCaMsg::Msg(port_no, index, packet) => {
+					if let Some(packets) = Packetizer::process_packet(&mut self.packet_assemblers, packet) {
+						let mut msg = Packetizer::get_msg(packets).chain_err(|| ErrorKind::CellagentError)?;
+						msg.process(&mut self.clone(), port_no).chain_err(|| ErrorKind::CellagentError)?;
+					}
+				}
+			}
 		}
-	}
-	fn process_packets(&mut self, port_no: PortNo, my_index: TableIndex, packet: Packet) 
-				-> Result<()> {
-		let mut packet_assembler: HashMap<u64, Vec<Box<Packet>>> = HashMap::new();
-		let header = packet.get_header();
-		let uniquifier = header.get_uniquifier();
-		let packets = packet_assembler.entry(uniquifier).or_insert(Vec::new());
-		packets.push(Box::new(packet));
-		if header.is_last_packet() {
-			let mut msg = Packetizer::unpacketize(packets).chain_err(|| ErrorKind::CellagentError)?;
-			//println!("CellAgent {}: port {} got packet {} msg {} ", self.cell_id, port_no, packets[0].get_count(), msg);							
-			match msg.process(&mut self.clone(), port_no) {
-				Ok(_) => (),
-				Err(_) => return Err(ErrorKind::Message(self.cell_id.clone(), msg.get_header().get_count()).into())
-			};
-		}
-		Ok(())
 	}
 	fn port_connected(&mut self, port_no: PortNo) -> Result<()> {
 		//println!("CellAgent {}: port {} connected", self.cell_id, port_no);

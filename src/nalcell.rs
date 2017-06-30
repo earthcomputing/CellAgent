@@ -4,7 +4,7 @@ use std::sync::mpsc;
 use std::sync::mpsc::channel;
 use crossbeam::Scope;
 use cellagent::{CellAgent};
-use config::{MAX_PORTS, CellNo, PortNo, TableIndex};
+use config::{MAX_PORTS, CellNo, Json, PortNo, TableIndex};
 use name::{CellID};
 use packet::Packet;
 use packet_engine::{PacketEngine};
@@ -42,19 +42,18 @@ pub type PeToCa = mpsc::Sender<PeToCaMsg>;
 pub type CaFromPe = mpsc::Receiver<PeToCaMsg>;
 pub type PeCaError = mpsc::SendError<PeToCaMsg>;
 // Port to Outside World
-pub type PortToOutsideMsg = String;
+pub type PortToOutsideMsg = Json;
 pub type PortToOutside = mpsc::Sender<PortToOutsideMsg>;
 pub type OutsideFromPort = mpsc::Receiver<PortToOutsideMsg>;
 pub type PortOutsideError = mpsc::SendError<PortToOutsideMsg>;
 // Outside World to Port
-pub type OutsideToPortMsg = String;
+pub type OutsideToPortMsg = Json;
 pub type OutsideToPort = mpsc::Sender<OutsideToPortMsg>;
 pub type PortFromOutside = mpsc::Receiver<OutsideToPortMsg>;
 pub type OutsidePortError = mpsc::SendError<OutsideToPortMsg>;
 
-type OutsideChannels = HashMap<PortNo, (OutsideToPort, OutsideFromPort)>;
 #[derive(Debug)]
-pub struct NalCell { // Does not include PacketEngine so CellAgent can own it
+pub struct NalCell {
 	id: CellID,
 	cell_no: usize,
 	is_border: bool,
@@ -63,7 +62,6 @@ pub struct NalCell { // Does not include PacketEngine so CellAgent can own it
 	packet_engine: PacketEngine,
 	vms: Vec<VirtualMachine>,
 	ports_from_pe: HashMap<PortNo, PortFromPe>,
-	outside_channels: OutsideChannels,
 }
 
 impl NalCell {
@@ -75,26 +73,16 @@ impl NalCell {
 		let (port_to_pe, pe_from_ports): (PortToPe, PeFromPort) = channel();
 		let mut ports = Vec::new();
 		let mut pe_to_ports = Vec::new();
-		let mut outside_channels = HashMap::new();
 		let mut ports_from_pe = HashMap::new(); // So I can remove the item
 		for i in 0..nports + 1 {
-			let is_border_port;
-			if is_border & (i == 2) { is_border_port = true; }
-			else                    { is_border_port = false; }
+			let is_border_port = is_border & (i == 2);
 			let (pe_to_port, port_from_pe): (PeToPort, PortFromPe) = channel();
 			pe_to_ports.push(pe_to_port);
 			ports_from_pe.insert(i, port_from_pe);
 			let is_connected = if i == 0 { true } else { false };
-			let mut port = Port::new(&cell_id, PortNumber { port_no: i as u8 }, is_border_port, 
-				is_connected, port_to_pe.clone()).chain_err(|| ErrorKind::NalCellError)?;
-			if is_border_port { 
-				let (port_to_outside, outside_from_port): (PortToOutside, OutsideFromPort) = channel();
-				let (outside_to_port, port_from_outside): (OutsideToPort, PortFromOutside) = channel();
-				if is_border_port { 
-					port.setup_outside_channel(scope, port_to_outside, port_from_outside); 
-				}
-				outside_channels.insert(i as PortNo, (outside_to_port, outside_from_port));
-			}
+			let port_number = PortNumber::new(i, nports).chain_err(|| ErrorKind::NalCellError)?;
+			let mut port = Port::new(&cell_id, port_number, is_border_port, is_connected, 
+				port_to_pe.clone()).chain_err(|| ErrorKind::NalCellError)?;
 			ports.push(port);
 		}
 		let boxed_ports: Box<[Port]> = ports.into_boxed_slice();
@@ -102,24 +90,33 @@ impl NalCell {
 		packet_engine.start_threads(scope, pe_from_ca, pe_from_ports)?;
 		let mut cell_agent = CellAgent::new(&cell_id, boxed_ports.len() as u8, ca_to_pe).chain_err(|| ErrorKind::NalCellError)?;
 		cell_agent.initialize(scope, ca_from_pe)?;
-		Ok(NalCell { id: cell_id, cell_no: cell_no, is_border: is_border, outside_channels: outside_channels,
+		Ok(NalCell { id: cell_id, cell_no: cell_no, is_border: is_border, 
 				ports: boxed_ports, cell_agent: cell_agent, vms: Vec::new(),
-				packet_engine: packet_engine, ports_from_pe: ports_from_pe})
+				packet_engine: packet_engine, ports_from_pe: ports_from_pe, })
 	}
-//	pub fn get_id(&self) -> CellID { self.id.clone() }
+	pub fn get_id(&self) -> CellID { self.id.clone() }
 //	pub fn get_no(&self) -> usize { self.cell_no }
 //	pub fn get_cell_agent(&self) -> &CellAgent { &self.cell_agent }
-	pub fn get_outside_channels(&self) -> &OutsideChannels { &self.outside_channels }
 	pub fn is_border(&self) -> bool { self.is_border }
-	pub fn get_free_port_mut (&mut self) -> Result<(&mut Port, PortFromPe)> {
+	pub fn get_free_ec_port_mut(&mut self) -> Result<(&mut Port, PortFromPe)> {
+		let (port, port_from_pe) = self.get_free_port_mut(false)?;
+		Ok((port, port_from_pe))
+	}
+	pub fn get_free_tcp_port_mut(&mut self) -> Result<(&mut Port, PortFromPe)> {
+		let cell_id = self.id.clone();
+		let (port, port_from_pe) = self.get_free_port_mut(true)?;
+		Ok((port, port_from_pe))
+	}
+	pub fn get_free_port_mut(&mut self, is_tcp_port: bool) 
+			-> Result<(&mut Port, PortFromPe)> {
 		for p in &mut self.ports.iter_mut() {
 			//println!("NalCell {}: port {} is connected {}", self.id, p.get_port_no(), p.is_connected());
-			if !p.is_connected() & !p.is_border() & (p.get_port_no() != 0 as u8) {
+			if !p.is_connected() && !(is_tcp_port ^ p.is_border()) && (p.get_port_no() != 0 as u8) {
 				let port_no = p.get_port_no();
 				match self.ports_from_pe.remove(&port_no) { // Remove avoids a borrowed context error
 					Some(recvr) => {
 						p.set_connected();
-						return Ok((p,recvr))
+						return Ok((p, recvr))
 					},
 					None => return Err(ErrorKind::Channel(port_no).into())
 				} 
@@ -145,8 +142,13 @@ error_chain! {
 		Name(::name::Error, ::name::ErrorKind);
 		PacketEngine(::packet_engine::Error, ::packet_engine::ErrorKind);
 		Port(::port::Error, ::port::ErrorKind);
+		Utility(::utility::Error, ::utility::ErrorKind);
 	}
 	errors { NalCellError
+		Border(cell_id: CellID) {
+			description("Not a border cell")
+			display("{} is not a border cell", cell_id)
+		}
 		Channel(port_no: PortNo) {
 			description("No receiver for port")
 			display("No receiver for port {}", port_no)
@@ -158,6 +160,10 @@ error_chain! {
 		NumberPorts(nports: PortNo) {
 			description("You are asking for too many ports.")
 			display("You asked for {} ports, but only {} are allowed", nports, MAX_PORTS)
+		}
+		TcpPort(cell_id: CellID, port_no: PortNo) {
+			description("No outside receiver for TCP port")
+			display("Cell {} has no outside receiver for TCP port {}", cell_id, port_no)
 		}
 	}
 }

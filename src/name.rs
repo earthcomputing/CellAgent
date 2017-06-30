@@ -1,6 +1,6 @@
 use std::fmt;
 use std::marker::Sized;
-use config::SEPARATOR;
+use config::{SEPARATOR, ContainerNo, VMNo};
 // Using String means names are not Copy
 type NAME = String;
 pub trait Name: Sized {
@@ -96,6 +96,38 @@ impl Name for LinkID {
 	fn create_from_string(&self, n: String) -> LinkID { LinkID { name: n } }
 }
 impl fmt::Display for LinkID { fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result { self.name.fmt(f) } }
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct VMID { name: NAME, }
+impl VMID {
+	pub fn new(n: &str) -> Result<VMID> { 
+		let str = n.to_string();
+		match n.find(' ') {
+			None => Ok(VMID { name: str}),
+			Some(_) => Err(ErrorKind::Format(str).into())
+		}
+	}
+}
+impl Name for VMID {
+	fn get_name(&self) -> &str { &self.name }
+	fn create_from_string(&self, n: String) -> VMID { VMID { name: n } }
+}
+impl fmt::Display for VMID { fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result { self.name.fmt(f) } }
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub struct ContainerID { name: NAME, }
+impl ContainerID {
+	pub fn new(n: &str) -> Result<ContainerID> { 
+		let str = n.to_string();
+		match n.find(' ') {
+			None => Ok(ContainerID { name: str}),
+			Some(_) => Err(ErrorKind::Format(str).into())
+		}
+	}
+}
+impl Name for ContainerID {
+	fn get_name(&self) -> &str { &self.name }
+	fn create_from_string(&self, n: String) -> ContainerID { ContainerID { name: n } }
+}
+impl fmt::Display for ContainerID { fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result { self.name.fmt(f) } }
 // Errors
 error_chain! {
 	errors {
