@@ -63,11 +63,11 @@ impl Port {
 	}
 	fn listen_outside(&self, port_from_outside: PortFromOutside) -> Result<()> {
 		let port = self.clone();
-		let port_no = 0 as TableIndex;
+		let other_index = 0 as TableIndex;
 		loop {
 			let json_msg = port_from_outside.recv().chain_err(|| "Receive from outside")?;
 			let msg = OutsideMsg::new(&json_msg);
-			let packets = Packetizer::packetize(&msg, port_no)?;
+			let packets = Packetizer::packetize(&msg, other_index)?;
 			println!("Port {}: msg from outside {}", port.id, msg);
 			for packet in packets {
 				self.port_to_pe.send(PortToPeMsg::Msg((port.port_number.get_port_no(), *packet))).chain_err(|| ErrorKind::PortError)?;

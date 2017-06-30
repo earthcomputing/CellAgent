@@ -1,5 +1,6 @@
 use std::fmt;
 use std::sync::{Arc, Mutex};
+use std::collections::HashSet;
 use crossbeam::Scope;
 use config::{PortNo, TableIndex};
 use nalcell::{PeFromCa, PeToCa, PeToPort, PeFromPort, CaToPeMsg, PortToPeMsg, PeToCaMsg};
@@ -12,25 +13,75 @@ use utility::{Mask, PortNumber};
 #[derive(Debug, Clone)]
 pub struct PacketEngine {
 	cell_id: CellID,
+	tcp_port_nos: HashSet<PortNo>,
 	routing_table: Arc<Mutex<RoutingTable>>,
 	pe_to_ca: PeToCa,
 	pe_to_ports: Vec<PeToPort>,
 }
 #[deny(unused_must_use)]
 impl PacketEngine {
-	pub fn new(cell_id: &CellID, packet_pe_to_ca: PeToCa, pe_to_ports: Vec<PeToPort>) 
-				-> Result<PacketEngine> {
+	pub fn new(cell_id: &CellID, packet_pe_to_ca: PeToCa, pe_to_ports: Vec<PeToPort>, 
+			tcp_port_nos: HashSet<PortNo>) -> Result<PacketEngine> {
 		let routing_table = Arc::new(Mutex::new(RoutingTable::new(cell_id.clone()).chain_err(|| ErrorKind::PacketEngineError)?)); 
 		Ok(PacketEngine { cell_id: cell_id.clone(), routing_table: routing_table, 
-			pe_to_ca: packet_pe_to_ca, pe_to_ports: pe_to_ports })
+			tcp_port_nos: tcp_port_nos, pe_to_ca: packet_pe_to_ca, pe_to_ports: pe_to_ports })
 	}
 	pub fn start_threads(&self, scope: &Scope, pe_from_ca: PeFromCa, pe_from_ports: PeFromPort) -> Result<()> {			
-		self.ca_channel(scope, pe_from_ca).chain_err(|| ErrorKind::PacketEngineError)?;
-		self.port_channel(scope, pe_from_ports).chain_err(|| ErrorKind::PacketEngineError)?;
+		let pe = self.clone();
+		scope.spawn( move ||  {
+			let _ = pe.listen_ca(pe_from_ca).map_err(|e| pe.write_err(e));
+		});
+		let pe = self.clone();
+		scope.spawn( move || {
+			let _ = pe.listen_port(pe_from_ports).map_err(|e| pe.write_err(e));
+		});
 		Ok(())
 	}
 	//pub fn get_table(&self) -> &Arc<Mutex<RoutingTable>> { &self.routing_table }
 	
+	fn listen_ca(&self, entry_pe_from_ca: PeFromCa) -> Result<()> {
+		loop { 
+			match entry_pe_from_ca.recv().chain_err(|| ErrorKind::PacketEngineError)? {
+				CaToPeMsg::Entry(e) => self.routing_table.lock().unwrap().set_entry(e),
+				CaToPeMsg::Msg((index, user_mask, packet)) => {
+					let entry = self.routing_table.lock().unwrap().get_entry(index).chain_err(|| ErrorKind::PacketEngineError)?;
+					let port_no = 0 as PortNo;
+					self.forward(port_no, entry, user_mask, packet).chain_err(|| ErrorKind::PacketEngineError)?;
+				}
+			}; 
+		}
+	}
+	fn listen_port(&self, pe_from_ports: PeFromPort) -> Result<()> {
+		loop {
+			//println!("PacketEngine {}: waiting for status or packet", pe.cell_id);
+			match pe_from_ports.recv()? {
+				PortToPeMsg::Status((port_no,status)) => self.pe_to_ca.send(PeToCaMsg::Status(port_no,status)).chain_err(|| ErrorKind::PacketEngineError)?,
+				PortToPeMsg::Msg((port_no, packet)) => self.process_packet(port_no, packet).chain_err(|| ErrorKind::PacketEngineError)?
+			};
+		}		
+	}
+	fn process_packet(&self, port_no: PortNo, packet: Packet) -> Result<()> {
+		//println!("PacketEngine {}: received packet {} on port {}", cell_id, packet_count, recv_port_no);
+		let header = packet.get_header();
+		let my_index = header.get_other_index();
+		// The cell agent processes all messages coming in on border ports.
+		// I'm already checking this in Port when I packetize the message,
+		// but packetization doesn't really belong there.  I'm leaving this
+		// code here in case I forget about the problem when I move packetization.
+		let entry;
+		{   
+			entry = match self.tcp_port_nos.get(&port_no) {
+				Some(_) => self.routing_table.lock().unwrap().get_entry(0).chain_err(|| ErrorKind::PacketEngineError)?,
+				None => self.routing_table.lock().unwrap().get_entry(my_index).chain_err(|| ErrorKind::PacketEngineError)?
+			}
+		}
+		//println!("PacketEngine {}: packet {} entry {}", self.cell_id, packet.get_count(), entry);
+		let mask = entry.get_mask();
+		let other_indices = entry.get_other_indices();
+		PortNumber::new(port_no, other_indices.len() as u8).chain_err(|| ErrorKind::PacketEngineError)?; // Verify that port_no is valid
+		self.forward(port_no, entry, mask, packet).chain_err(|| ErrorKind::PacketEngineError)?;	
+		Ok(())	
+	}
 	fn forward(&self, recv_port_no: PortNo, entry: RoutingTableEntry, user_mask: Mask, packet: Packet) 
 			-> Result<()>{
 		let mut header = packet.get_header();
@@ -78,21 +129,6 @@ impl PacketEngine {
 		}
 		Ok(())
 	}
-	pub fn ca_channel(&self, scope: &Scope, entry_pe_from_ca: PeFromCa) -> Result<()> {
-		let pe = self.clone();
-		scope.spawn( move ||  {
-			let _ = pe.listen_ca(entry_pe_from_ca).map_err(|e| pe.write_err(e));
-		});
-		Ok(())
-	}
-	fn port_channel(&self, scope: &Scope, pe_from_ports: PeFromPort) -> Result<()> {
-		//let cell_id = self.cell_id.clone();
-		let pe = self.clone();
-		scope.spawn( move || {
-			let _ = pe.listen_port(pe_from_ports).map_err(|e| pe.write_err(e));
-		});
-		Ok(())
-	}
 	fn write_err(&self, e: Error) -> Result<()>{
 		use ::std::io::Write;
 		let stderr = &mut ::std::io::stderr();
@@ -104,42 +140,6 @@ impl PacketEngine {
 			let _ = writeln!(stderr, "Backtrace: {:?}", backtrace);
 		}
 		Err(e)
-	}
-	fn listen_ca(&self, entry_pe_from_ca: PeFromCa) -> Result<()> {
-		loop { 
-			match entry_pe_from_ca.recv().chain_err(|| ErrorKind::PacketEngineError)? {
-				CaToPeMsg::Entry(e) => self.routing_table.lock().unwrap().set_entry(e),
-				CaToPeMsg::Msg((index, user_mask, packet)) => {
-					let entry = self.routing_table.lock().unwrap().get_entry(index).chain_err(|| ErrorKind::PacketEngineError)?;
-					let port_no = 0 as PortNo;
-					self.forward(port_no, entry, user_mask, packet).chain_err(|| ErrorKind::PacketEngineError)?;
-				}
-			}; 
-		}
-	}
-	fn listen_port(&self, pe_from_ports: PeFromPort) -> Result<()> {
-		loop {
-			//println!("PacketEngine {}: waiting for status or packet", pe.cell_id);
-			match pe_from_ports.recv()? {
-				PortToPeMsg::Status((port_no,status)) => self.pe_to_ca.send(PeToCaMsg::Status(port_no,status)).chain_err(|| ErrorKind::PacketEngineError)?,
-				PortToPeMsg::Msg((port_no, packet)) => self.process_packet(port_no, packet).chain_err(|| ErrorKind::PacketEngineError)?
-			};
-		}		
-	}
-	fn process_packet(&self, port_no: PortNo, packet: Packet) -> Result<()> {
-		//println!("PacketEngine {}: received packet {} on port {}", cell_id, packet_count, recv_port_no);
-		let header = packet.get_header();
-		let my_index = header.get_other_index();
-		let entry;
-		{
-			entry = self.routing_table.lock().unwrap().get_entry(my_index).chain_err(|| ErrorKind::PacketEngineError)?;
-		}
-		//println!("PacketEngine {}: packet {} entry {}", self.cell_id, packet.get_count(), entry);
-		let mask = entry.get_mask();
-		let other_indices = entry.get_other_indices();
-		PortNumber::new(port_no, other_indices.len() as u8).chain_err(|| ErrorKind::PacketEngineError)?; // Verify that port_no is valid
-		self.forward(port_no, entry, mask, packet).chain_err(|| ErrorKind::PacketEngineError)?;	
-		Ok(())	
 	}
 }
 impl fmt::Display for PacketEngine {
