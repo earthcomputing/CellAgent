@@ -1,5 +1,6 @@
 use std::fmt;
 use std::mem;
+use std::collections::HashMap;
 use std::sync::atomic::{ATOMIC_USIZE_INIT, AtomicUsize, Ordering};
 use rand;
 use std::str;
@@ -9,11 +10,13 @@ use serde;
 use serde_json;
 use config::{MSG_HEADER_DELIMITER, PACKET_MIN, PACKET_MAX, PAYLOAD_DEFAULT_ELEMENT, 
 	PacketElement, PacketNo, TableIndex, Uniquifier};
-use message::{Message, DiscoverMsg, DiscoverDMsg, MsgDirection, MsgType};
+use message::{Message, MsgDirection, MsgType, DiscoverMsg, DiscoverDMsg, SetupVMsMsg};
  
 //const LARGEST_MSG: usize = std::u32::MAX as usize;
 const PAYLOAD_MIN: usize = PACKET_MAX - PACKET_HEADER_SIZE;
 const PAYLOAD_MAX: usize = PACKET_MAX - PACKET_HEADER_SIZE;
+
+pub type PacketAssemblers = HashMap<Uniquifier, PacketAssembler>;
 
 static PACKET_COUNT: AtomicUsize = ATOMIC_USIZE_INIT;
 #[derive(Debug, Copy)]
@@ -131,8 +134,24 @@ impl fmt::Debug for Payload {
 	}
 }
 pub struct Packetizer {}
-#[deny(unused_must_use)]
 impl Packetizer {
+	pub fn process_packet(packet_assemblers: &mut PacketAssemblers, packet: Packet) -> Option<Vec<Packet>> {
+		let uniquifier = packet.get_header().get_uniquifier();
+		let mut packet_assembler = match packet_assemblers.remove(&uniquifier) {
+			Some(pa) => pa,
+			None => {
+				let packet_assembler = PacketAssembler::new(uniquifier);
+				packet_assemblers.insert(uniquifier, packet_assembler);
+				packet_assemblers.remove(&uniquifier).unwrap()
+			}
+		};
+		if let Some(packets) = packet_assembler.add(packet) {
+			Some(packets)
+		} else {
+			packet_assemblers.insert(uniquifier, packet_assembler);
+			None
+		}
+	}
 	pub fn packetize<M>(msg: &M, other_index: TableIndex) -> Result<Vec<Box<Packet>>>
 			where M: Message + Hash + serde::Serialize {
 		let msg_type = msg.get_header().get_msg_type();
@@ -167,7 +186,11 @@ impl Packetizer {
 		}
 		Ok(packets)
 	}
-	pub fn unpacketize(packets: &Vec<Box<Packet>>) -> Result<Box<Message>> {
+	pub fn get_msg(packets: Vec<Packet>) -> Result<Box<Message>> {
+		let serialized = Packetizer::unpacketize(packets).chain_err(|| ErrorKind::PacketError)?;
+		Packetizer::deserialize(serialized)
+	}
+	pub fn unpacketize(packets: Vec<Packet>) -> Result<String> {
 		let mut all_bytes = Vec::new();
 		for packet in packets {
 			let header = packet.get_header();
@@ -177,7 +200,9 @@ impl Packetizer {
 			all_bytes.extend_from_slice(payload.get_bytes().as_slice());
 			if is_last_packet { all_bytes.truncate(last_packet_size as usize); }
 		}
-		let serialized = str::from_utf8(&all_bytes).chain_err(|| ErrorKind::PacketError)?;
+		Ok(str::from_utf8(&all_bytes).chain_err(|| ErrorKind::PacketError)?.to_string())
+	}
+	pub fn deserialize(serialized: String) -> Result<Box<Message>> {
 		let mut split = serialized.splitn(2, PAYLOAD_DEFAULT_ELEMENT as char);
 		let deserialized;
 		if let Some(serialized_msg_type) = split.next() {
@@ -186,6 +211,7 @@ impl Packetizer {
 				deserialized = match msg_type {
 					MsgType::Discover  => Packetizer::make_discover(serialized_msg).chain_err(|| ErrorKind::PacketError)?,
 					MsgType::DiscoverD => Packetizer::make_discoverd(serialized_msg).chain_err(|| ErrorKind::PacketError)?,
+					MsgType::SetupVM   => Packetizer::make_setup_vm(serialized_msg).chain_err(|| ErrorKind::PacketError)?,
 				};
 			} else {
 				return Err(ErrorKind::Unpacketize(serialized.to_string()).into())
@@ -195,20 +221,44 @@ impl Packetizer {
 		}
 		Ok(deserialized)
 	}
-	fn make_discover(serialized: &str) -> Result<Box<Message>>{
+	fn make_discover(serialized: &str) -> Result<Box<Message>> {
 		let msg: DiscoverMsg = serde_json::from_str(&serialized).chain_err(|| ErrorKind::PacketError)?;
 		Ok(Box::new(msg))
 	}
-	fn make_discoverd(serialized: &str) -> Result<Box<Message>>{
+	fn make_discoverd(serialized: &str) -> Result<Box<Message>> {
 		let msg: DiscoverDMsg = serde_json::from_str(&serialized).chain_err(|| ErrorKind::PacketError)?;
 		Ok(Box::new(msg))
 	}
+	fn make_setup_vm(serialized: &str) -> Result<Box<Message>> {
+		let msg: SetupVMsMsg = serde_json::from_str(&serialized).chain_err(|| ErrorKind::PacketError)?;
+		Ok(Box::new(msg))
+	} 
 	fn packet_payload_size(len: usize) -> usize {
 		match len-1 { 
 			0...PACKET_MIN           => PAYLOAD_MIN,
 			PAYLOAD_MIN...PAYLOAD_MAX => len,
 			_                         => PAYLOAD_MAX
 		}		
+	}
+}
+#[derive(Debug, Clone)]
+pub struct PacketAssembler {
+	uniquifier: Uniquifier,
+	packets: Vec<Packet>,
+}
+impl PacketAssembler {
+	pub fn new(uniquifier: Uniquifier) -> PacketAssembler {
+		PacketAssembler { uniquifier: uniquifier, packets: Vec::new() }
+	}
+	pub fn get_uniquifier(&self) -> Uniquifier { self.uniquifier }
+	pub fn add(&mut self, packet: Packet) -> Option<Vec<Packet>> { 
+		self.packets.push(packet); 
+		let header = packet.get_header();
+		if header.is_last_packet() {
+			Some(self.packets.clone())
+		} else {
+			None
+		}
 	}
 }
 // Errors

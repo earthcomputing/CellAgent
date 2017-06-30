@@ -11,6 +11,7 @@ extern crate serde_derive;
 extern crate serde_json;
 mod cellagent;
 mod config;
+mod container;
 mod datacenter;
 mod ecargs;
 mod errors;
@@ -30,9 +31,16 @@ mod traph;
 mod utility;
 mod vm;
 use std::{thread, time};
+use crossbeam::Scope;
 use config::{NCELLS,NPORTS,NLINKS};
+use container::Service;
 use datacenter::{Datacenter};
 use ecargs::{ECArgs};
+use message::SetupVMsMsg;
+use nalcell::{OutsideToPort, OutsideFromPort};
+use name::TreeID;
+use noc::Noc;
+use packet::Packetizer;
 
 fn main() {
 	if let Err(ref e) = run() {
@@ -70,20 +78,23 @@ fn run() -> Result<()> {
 	println!("Main: {} ports for each of {} cells", nports, ncells);
 	crossbeam::scope( |scope| -> Result<()> { 
 		match build_datacenter(scope, nports, ncells) {
-			Ok(dc) => {
-				let boundary_cells = dc.get_boundary_cells()?;
-				if let Some(boundary_cell) = boundary_cells.first() {
-					if let Some(outside_channel) = boundary_cell.get_outside_channels().values().next() {
-						loop {
-							let msg = outside_channel.1.recv();
-						}
-					}
-				}
-				Ok(())
-			},
+			Ok(dc) => control(scope, dc),
 			Err(e) =>  write_err(e)
 		}
 	})?;
+	Ok(())
+}
+fn control(scope: &Scope, dc: Datacenter) -> Result<()> {
+	//let noc = Noc::new(dc);
+	//noc.initialize();
+	Ok(())
+}
+fn setup_vms(outside_to_port: nalcell::OutsideToPort) -> Result<()> {
+	let msg = SetupVMsMsg::new("NocMaster", vec![vec![Service::NocMaster]])?;
+	let packets = Packetizer::packetize(&msg, 0)?;
+	for packet in packets.iter() {
+		//outside_to_port.send(**packet)?;
+	}
 	Ok(())
 }
 fn write_err(e: Error) -> Result<()> {
@@ -99,7 +110,7 @@ fn write_err(e: Error) -> Result<()> {
 	//::std::process::exit(1);
 	Err(e)	
 }
-fn build_datacenter<'a>(scope: &crossbeam::Scope, nports: u8, ncells: usize) -> Result<Datacenter<'a>>{
+fn build_datacenter(scope: &crossbeam::Scope, nports: u8, ncells: usize) -> Result<Datacenter>{
 	//let edges = vec![(0,1),(1,2),(2,3),(3,4),(5,6),(6,7),(7,8),(8,9),(0,5),(1,6),(2,7),(3,8),(4,9)];
 	let edges = vec![(0,1),(1,2),(1,6),(3,4),(5,6),(6,7),(7,8),(8,9),(0,5),(2,3),(2,7),(3,8),(4,9)];
 	let dc = Datacenter::new(scope, ncells, nports, edges)?;
@@ -109,7 +120,17 @@ fn build_datacenter<'a>(scope: &crossbeam::Scope, nports: u8, ncells: usize) -> 
 	Ok(dc)
 }
 error_chain! {
+	foreign_links {
+		Recv(::std::sync::mpsc::RecvError);
+		send(::nalcell::OutsidePortError);
+	}
 	links {
 		DatacenterError(datacenter::Error, datacenter::ErrorKind);
+		Message(::message::Error, ::message::ErrorKind);
+		Name(::name::Error, ::name::ErrorKind);
+		Packet(::packet::Error, ::packet::ErrorKind);
+	}
+	errors {
+		Control
 	}
 }

@@ -1,8 +1,11 @@
 use std::fmt;
 use std::collections::HashSet;
 use std::sync::atomic::{ATOMIC_USIZE_INIT, AtomicUsize, Ordering};
+use serde;
+use serde_json;
 use cellagent::{CellAgent};
 use config::{MAX_PORTS, PathLength, PortNo, TableIndex};
+use container::Service;
 use gvm_equation::{GvmEquation, GvmVariables};
 use name::{CellID, TreeID};
 use packet::Packetizer;
@@ -15,12 +18,14 @@ pub fn get_next_count() -> usize { MESSAGE_COUNT.fetch_add(1, Ordering::SeqCst) 
 pub enum MsgType {
 	Discover,
 	DiscoverD,
+	SetupVM,
 }
 impl fmt::Display for MsgType {
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
 		match *self {
-			MsgType::Discover => write!(f, "Discover"),
+			MsgType::Discover =>  write!(f, "Discover"),
 			MsgType::DiscoverD => write!(f, "DiscoverD"),
+			MsgType::SetupVM =>   write!(f, "SetupVM"),
 		}
 	}
 }
@@ -227,6 +232,99 @@ impl MsgPayload for DiscoverDPayload {}
 impl fmt::Display for DiscoverDPayload {
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
 		write!(f, "My table index {}", self.my_index)
+	}
+}
+#[derive(Debug, Clone, Hash, Serialize, Deserialize)]
+pub struct SetupVMsMsg {
+	header: MsgHeader,
+	payload: SetupVMsMsgPayload
+}
+impl SetupVMsMsg {
+	pub fn new(id: &str, service_sets: Vec<Vec<Service>>) -> Result<SetupVMsMsg> {
+		// Note that direction is rootward so cell agent will get the message
+		let tree_id = TreeID::new(id).chain_err(|| ErrorKind::MessageError)?;
+		let header = MsgHeader::new(MsgType::SetupVM, MsgDirection::Rootward);
+		let payload = SetupVMsMsgPayload::new(tree_id, service_sets);
+		Ok(SetupVMsMsg { header: header, payload: payload })
+	}
+}
+impl Message for SetupVMsMsg {
+	fn get_header(&self) -> MsgHeader { self.header.clone() }
+	fn get_payload(&self) -> Box<MsgPayload> { Box::new(self.payload.clone()) }
+	fn process(&mut self, ca: &mut CellAgent, port_no: u8) -> Result<()> {
+		let mut service_sets = self.payload.get_service_sets().clone();
+		ca.create_vms(service_sets).chain_err(|| ErrorKind::MessageError)?;		
+		Ok(())
+	}
+}
+impl fmt::Display for SetupVMsMsg {
+	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+		write!(f, "{} {}", self.header, self.payload)
+	}
+}
+#[derive(Debug, Clone, Hash, Serialize, Deserialize)]
+pub struct SetupVMsMsgPayload {
+	id: TreeID,
+	// Each set of services runs on a single VM
+	// All the VMs setup in a single message are on an up-tree
+	service_sets: Vec<Vec<Service>>,
+}
+impl SetupVMsMsgPayload {
+	fn new(id: TreeID, service_sets: Vec<Vec<Service>>) -> SetupVMsMsgPayload {
+		SetupVMsMsgPayload { id: id, service_sets: service_sets }
+	}
+	pub fn get_service_sets(&self) -> &Vec<Vec<Service>> { &self.service_sets }
+}
+impl MsgPayload for SetupVMsMsgPayload {}
+impl fmt::Display for SetupVMsMsgPayload {
+	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+		let mut s = format!("Setup virtual machine with containers");
+		for services in &self.service_sets {
+			for container in services.iter() {
+				s = s + &format!("{}", container);
+			}
+		}
+		write!(f, "{}", s)
+	}
+}
+#[derive(Debug, Clone, Hash, Serialize, Deserialize)]
+pub struct OutsideMsg {
+	header: MsgHeader,
+	payload: OutsideMsgPayload
+}
+impl OutsideMsg {
+	pub fn new(msg: &str) -> OutsideMsg {
+		// Note that direction is rootward so cell agent will get the message
+		let header = MsgHeader::new(MsgType::SetupVM, MsgDirection::Rootward);
+		let payload = OutsideMsgPayload::new(msg);
+		OutsideMsg { header: header, payload: payload }
+	}
+}
+impl Message for OutsideMsg {
+	fn get_header(&self) -> MsgHeader { self.header.clone() }
+	fn get_payload(&self) -> Box<MsgPayload> { Box::new(self.payload.clone()) }
+	fn process(&mut self, ca: &mut CellAgent, port_no: u8) -> Result<()> {
+		Ok(())
+	}
+}
+impl fmt::Display for OutsideMsg {
+	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+		write!(f, "{} {}", self.header, self.payload)
+	}
+}
+#[derive(Debug, Clone, Hash, Serialize, Deserialize)]
+pub struct OutsideMsgPayload {
+	msg: String,
+}
+impl OutsideMsgPayload {
+	fn new(msg: &str) -> OutsideMsgPayload {
+		OutsideMsgPayload { msg: msg.to_string() }
+	}
+}
+impl MsgPayload for OutsideMsgPayload {}
+impl fmt::Display for OutsideMsgPayload {
+	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+		write!(f, "Message to the outside world {}", self.msg)
 	}
 }
 // Errors
