@@ -1,7 +1,7 @@
 use std::fmt;
 use std::io::{stdin, stdout, Read, Write};
 use crossbeam::Scope;
-use nalcell::{OutsideToPort, OutsideFromPort};
+use message_types::{OutsideToPort, OutsideFromPort};
 
 #[derive(Debug, Clone)]
 pub struct Noc {}

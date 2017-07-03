@@ -5,6 +5,7 @@ use std::sync::mpsc::channel;
 use crossbeam::Scope;
 use cellagent::{CellAgent};
 use config::{MAX_PORTS, CellNo, Json, PortNo, TableIndex};
+use message_types::{CaToPe, PeFromCa, PeToCa, CaFromPe, PortToPe, PeFromPort, PeToPort,PortFromPe};
 use name::{CellID};
 use packet::Packet;
 use packet_engine::{PacketEngine};
@@ -12,45 +13,6 @@ use port::{Port, PortStatus};
 use routing_table_entry::RoutingTableEntry;
 use utility::{Mask, PortNumber};
 use vm::VirtualMachine;
-
-// CellAgent to PacketEngine
-pub enum CaToPeMsg { Entry(RoutingTableEntry), Msg((TableIndex,Mask,Packet)) }
-pub type CaToPe = mpsc::Sender<CaToPeMsg>;
-pub type PeFromCa = mpsc::Receiver<CaToPeMsg>;
-pub type CaPeError = mpsc::SendError<CaToPeMsg>;
-// PacketEngine to Port
-pub type PeToPort = mpsc::Sender<Packet>;
-pub type PortFromPe = mpsc::Receiver<Packet>;
-pub type PePortError = mpsc::SendError<Packet>;
-// PacketEngine to Port, Port to Link
-pub type PortToLink = mpsc::Sender<Packet>;
-pub type LinkFromPort = mpsc::Receiver<Packet>;
-pub type PortLinkError = mpsc::SendError<Packet>;
-// Link to Port
-pub enum LinkToPortMsg { Status(PortStatus),Msg(Packet) }
-pub type LinkToPort = mpsc::Sender<LinkToPortMsg>;
-pub type PortFromLink = mpsc::Receiver<LinkToPortMsg>;
-pub type LinkPortError = mpsc::SendError<LinkToPortMsg>;
-// Port to PacketEngine
-pub enum PortToPeMsg { Status((PortNo, PortStatus)), Msg((PortNo, Packet)) }
-pub type PortToPe = mpsc::Sender<PortToPeMsg>;
-pub type PeFromPort = mpsc::Receiver<PortToPeMsg>;
-pub type PortPeError = mpsc::SendError<PortToPeMsg>;
-// PacketEngine to CellAgent
-pub enum PeToCaMsg { Status(PortNo, PortStatus), Msg(PortNo, TableIndex, Packet) }
-pub type PeToCa = mpsc::Sender<PeToCaMsg>;
-pub type CaFromPe = mpsc::Receiver<PeToCaMsg>;
-pub type PeCaError = mpsc::SendError<PeToCaMsg>;
-// Port to Outside World
-pub type PortToOutsideMsg = Json;
-pub type PortToOutside = mpsc::Sender<PortToOutsideMsg>;
-pub type OutsideFromPort = mpsc::Receiver<PortToOutsideMsg>;
-pub type PortOutsideError = mpsc::SendError<PortToOutsideMsg>;
-// Outside World to Port
-pub type OutsideToPortMsg = Json;
-pub type OutsideToPort = mpsc::Sender<OutsideToPortMsg>;
-pub type PortFromOutside = mpsc::Receiver<OutsideToPortMsg>;
-pub type OutsidePortError = mpsc::SendError<OutsideToPortMsg>;
 
 #[derive(Debug)]
 pub struct NalCell {

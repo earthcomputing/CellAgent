@@ -1,6 +1,6 @@
 use std::fmt;
+use message_types::{ContainerToVm, ContainerFromVm};
 use name::ContainerID;
-use vm::{ContainerToVm, ContainerFromVm};
 
 #[derive(Copy, Debug, Clone, Hash, Serialize, Deserialize, PartialEq, Eq)]
 pub enum Service {

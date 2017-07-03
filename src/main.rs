@@ -18,6 +18,7 @@ mod errors;
 mod gvm_equation;
 mod link;
 mod message;
+mod message_types;
 mod nalcell;
 mod name;
 mod noc;
@@ -37,7 +38,7 @@ use container::Service;
 use datacenter::{Datacenter};
 use ecargs::{ECArgs};
 use message::SetupVMsMsg;
-use nalcell::{OutsideToPort, OutsideFromPort};
+use message_types::{OutsideToPort, OutsideFromPort};
 use name::TreeID;
 use noc::Noc;
 use packet::Packetizer;
@@ -89,7 +90,7 @@ fn control(scope: &Scope, dc: Datacenter) -> Result<()> {
 	//noc.initialize();
 	Ok(())
 }
-fn setup_vms(outside_to_port: nalcell::OutsideToPort) -> Result<()> {
+fn setup_vms(outside_to_port: message_types::OutsideToPort) -> Result<()> {
 	let msg = SetupVMsMsg::new("NocMaster", vec![vec![Service::NocMaster]])?;
 	let packets = Packetizer::packetize(&msg, 0)?;
 	for packet in packets.iter() {
@@ -122,7 +123,7 @@ fn build_datacenter(scope: &crossbeam::Scope, nports: u8, ncells: usize) -> Resu
 error_chain! {
 	foreign_links {
 		Recv(::std::sync::mpsc::RecvError);
-		send(::nalcell::OutsidePortError);
+		send(::message_types::OutsidePortError);
 	}
 	links {
 		DatacenterError(datacenter::Error, datacenter::ErrorKind);
