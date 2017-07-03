@@ -6,9 +6,9 @@ use std::collections::{HashMap, HashSet};
 use crossbeam::{Scope, ScopedJoinHandle};
 use config::{MAX_ENTRIES, PathLength, PortNo, TableIndex, Uniquifier};
 use container::Service;
-use gvm_equation::{ GvmEquation, GvmVariables};
-use nalcell::{CaToPe, CaFromPe, CaToPeMsg, PeToCaMsg};
+use gvm_equation::{GvmEquation, GvmVariables};
 use message::{DiscoverMsg, Message};
+use message_types::{CaToPe, CaFromPe, CaToVm, VmFromCa, VmToCa, CaFromVm, CaToPeMsg, PeToCaMsg};
 use name::{Name, CellID, TreeID, VMID};
 use packet::{Packet, Packetizer, PacketAssembler, PacketAssemblers};
 use port;
@@ -22,14 +22,6 @@ const CONTROL_TREE_NAME: &'static str = "Control";
 const CONNECTED_PORTS_TREE_NAME: &'static str = "Connected";
 
 pub type Traphs = Arc<Mutex<HashMap<String,Traph>>>;
-pub type CaToVmMsg = String;
-pub type CaToVm = mpsc::Sender<CaToVmMsg>;
-pub type VmFromCa = mpsc::Receiver<CaToVmMsg>;
-pub type CaVmError = mpsc::SendError<CaToVmMsg>;
-pub type VmToCaMsg = String;
-pub type VmToCa = mpsc::Sender<VmToCaMsg>;
-pub type CaFromVm = mpsc::Receiver<VmToCaMsg>;
-pub type VmCaError = mpsc::SendError<VmToCaMsg>;
 
 #[derive(Debug, Clone)]
 pub struct CellAgent {
@@ -307,7 +299,7 @@ impl fmt::Display for CellAgent {
 error_chain! {
 	foreign_links {
 		Recv(::std::sync::mpsc::RecvError);
-		CaToPe(::nalcell::CaPeError);
+		CaToPe(::message_types::CaPeError);
 	}
 	links {
 		//Message(::message::Error, ::message::ErrorKind); // Recursive type error if left in

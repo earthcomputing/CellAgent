@@ -1,18 +1,11 @@
 use std::collections::HashMap;
 use std::sync::mpsc;
 use std::sync::mpsc::channel;
-use cellagent::{VmToCa, VmFromCa};
 use container::{Container, Service};
+use message_types::{VmToCa, VmFromCa, VmToContainerMsg, VmToContainer, ContainerFromVm,
+	ContainerToVmMsg, ContainerToVm, VmFromContainer, ContainerVmError};
 use name::{ContainerID, VMID};
 
-pub type VmToContainerMsg = String;
-pub type VmToContainer = mpsc::Sender<VmToContainerMsg>;
-pub type ContainerFromVm = mpsc::Receiver<VmToContainerMsg>;
-pub type VmContainerError = mpsc::SendError<VmToContainerMsg>;
-pub type ContainerToVmMsg = String;
-pub type ContainerToVm = mpsc::Sender<ContainerToVmMsg>;
-pub type VmFromContainer = mpsc::Receiver<ContainerToVmMsg>;
-pub type ContainerVmError = mpsc::SendError<ContainerToVmMsg>;
 #[derive(Debug, Clone)]
 pub struct VirtualMachine {
 	id: VMID,

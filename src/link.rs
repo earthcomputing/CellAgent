@@ -1,6 +1,6 @@
 use std::fmt;
 use crossbeam::{Scope, ScopedJoinHandle};
-use nalcell::{LinkToPort, LinkFromPort, LinkToPortMsg};
+use message_types::{LinkToPort, LinkFromPort, LinkToPortMsg};
 use name::{Name, LinkID, PortID};
 use port::{PortStatus};
 
@@ -65,7 +65,7 @@ impl fmt::Display for Link {
 error_chain! {
 	foreign_links {
 		Recv(::std::sync::mpsc::RecvError);
-		Send(::nalcell::LinkPortError);
+		Send(::message_types::LinkPortError);
 	}
 	links {
 		Name(::name::Error, ::name::ErrorKind);

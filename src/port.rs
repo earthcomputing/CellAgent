@@ -8,7 +8,7 @@ use serde;
 use serde_json;
 use config::{PortNo, TableIndex, Uniquifier};
 use message::OutsideMsg;
-use nalcell::{PortToLink, PortFromLink, PortToPe, PortFromPe, LinkToPortMsg, PortToPeMsg,
+use message_types::{PortToLink, PortFromLink, PortToPe, PortFromPe, LinkToPortMsg, PortToPeMsg,
 			  PortToOutside, PortFromOutside, PortToOutsideMsg};
 use name::{Name, PortID, CellID};
 use packet::{PacketAssembler, Packetizer};
@@ -154,8 +154,8 @@ impl fmt::Display for Port {
 error_chain! {
 	foreign_links {
 		Recv(::std::sync::mpsc::RecvError);
-		PortToLink(::nalcell::PortLinkError);
-		PortToPe(::nalcell::PortPeError);
+		PortToLink(::message_types::PortLinkError);
+		PortToPe(::message_types::PortPeError);
 	}
 	links {
 		Name(::name::Error, ::name::ErrorKind);

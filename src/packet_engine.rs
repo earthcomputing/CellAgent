@@ -3,7 +3,7 @@ use std::sync::{Arc, Mutex};
 use std::collections::HashSet;
 use crossbeam::Scope;
 use config::{PortNo, TableIndex};
-use nalcell::{PeFromCa, PeToCa, PeToPort, PeFromPort, CaToPeMsg, PortToPeMsg, PeToCaMsg};
+use message_types::{PeFromCa, PeToCa, PeToPort, PeFromPort, CaToPeMsg, PortToPeMsg, PeToCaMsg};
 use name::CellID;
 use packet::{Packet};
 use routing_table::{RoutingTable};
@@ -152,8 +152,8 @@ impl fmt::Display for PacketEngine {
 error_chain! {
 	foreign_links {
 		Recv(::std::sync::mpsc::RecvError);
-		PeToPort(::nalcell::PePortError);
-		PeToCa(::nalcell::PeCaError);
+		PeToPort(::message_types::PePortError);
+		PeToCa(::message_types::PeCaError);
 	}
 	links {
 		Port(::port::Error, ::port::ErrorKind);

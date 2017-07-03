@@ -5,9 +5,10 @@ use std::collections::HashMap;
 use crossbeam::Scope;
 
 use config::{PortNo, CellNo};
-use nalcell::{NalCell, LinkToPort, PortFromLink, PortToLink, LinkFromPort,
+use message_types::{LinkToPort, PortFromLink, PortToLink, LinkFromPort,
 	OutsideToPort, OutsideFromPort, PortToOutside, PortFromOutside};
 use link::{Link};
+use nalcell::{NalCell};
 use name::CellID;
 use noc::Noc;
 
