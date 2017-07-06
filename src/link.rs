@@ -12,9 +12,7 @@ pub struct Link {
 }
 impl Link {
 	pub fn new(left_id: &PortID, rite_id: &PortID) -> Result<Link> {
-		let rite_name = rite_id.get_name();
-		let temp_id = left_id.add_component(&rite_name).chain_err(|| ErrorKind::LinkError)?;
-		let id = LinkID::new(&temp_id.get_name()).chain_err(|| ErrorKind::LinkError)?;
+		let id = LinkID::new(left_id, rite_id).chain_err(|| ErrorKind::LinkError)?;
 		Ok(Link { id: id, is_broken: false, is_connected: true })
 	}
 	pub fn start_threads(&self, scope: &Scope,

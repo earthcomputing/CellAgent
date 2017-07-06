@@ -10,7 +10,7 @@ pub type PathLength = u32;
 pub type PortNo     = u8;
 pub type TableIndex = u32;
 pub type Uniquifier = u64;
-pub type VMNo       = usize;
+pub type VmNo       = usize;
 // Default inputs
 pub const NCELLS: CellNo = 10;
 pub const NPORTS: PortNo =  6;

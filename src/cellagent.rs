@@ -9,7 +9,7 @@ use container::Service;
 use gvm_equation::{GvmEquation, GvmVariables};
 use message::{DiscoverMsg, Message};
 use message_types::{CaToPe, CaFromPe, CaToVm, VmFromCa, VmToCa, CaFromVm, CaToPeMsg, PeToCaMsg};
-use name::{Name, CellID, TreeID, VMID};
+use name::{Name, CellID, TreeID, VmID};
 use packet::{Packet, Packetizer, PacketAssembler, PacketAssemblers};
 use port;
 use routing_table_entry::{RoutingTableEntry};
@@ -55,7 +55,7 @@ impl CellAgent {
 		}
 		free_indices.reverse();
 		let traphs = Arc::new(Mutex::new(HashMap::new()));
-		Ok(CellAgent { cell_id: cell_id.clone(), my_tree_id: my_tree_id.clone(), 
+		Ok(CellAgent { cell_id: cell_id.clone(), my_tree_id: my_tree_id, 
 			control_tree_id: control_tree_id, connected_tree_id: connected_tree_id,	
 			no_ports: no_ports, traphs: traphs,  
 			free_indices: Arc::new(Mutex::new(free_indices)),
@@ -136,11 +136,11 @@ impl CellAgent {
 	}
 	pub fn create_vms(&mut self, service_sets: Vec<Vec<Service>>) -> Result<()> {
 		let up_tree_id = TreeID::new(&format!("UpTree:{}+{}", self.cell_id, self.up_trees.len())).chain_err(|| ErrorKind::CellagentError)?;
-		let mut id_no = 0;
+		let id_no = 0;
 		let mut ca_to_vms = Vec::new();
 		for mut services in service_sets {
 			let id_no = id_no + 1;
-			let vm_id = VMID::new(&format!("VM:{}+{}", self.cell_id, id_no)).chain_err(|| ErrorKind::CellagentError)?;
+			let vm_id = VmID::new(&self.cell_id, id_no).chain_err(|| ErrorKind::CellagentError)?;
 			let (ca_to_vm, vm_from_ca): (CaToVm, VmFromCa) = channel();
 			let (vm_to_ca, ca_from_vm): (VmToCa, CaFromVm) = channel();
 			let mut vm = VirtualMachine::new(vm_id);

@@ -33,9 +33,8 @@ pub struct Port {
 impl Port {
 	pub fn new(cell_id: &CellID, port_number: PortNumber, is_border: bool, is_connected: bool,
 			   port_to_pe: PortToPe) -> Result<Port> {
-		let port_id = PortID::new(port_number.get_port_no())?;
-		let temp_id = port_id.add_component(&cell_id.get_name())?;
-		Ok(Port{ id: temp_id, port_number: port_number, is_border: is_border, 
+		let port_id = PortID::new(cell_id, port_number)?;
+		Ok(Port{ id: port_id, port_number: port_number, is_border: is_border, 
 			is_connected: Arc::new(AtomicBool::new(is_connected)), 
 			is_broken: Arc::new(AtomicBool::new(false)), packet_assemblers: HashMap::new(),
 			port_to_pe: port_to_pe})
