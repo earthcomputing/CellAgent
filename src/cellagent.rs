@@ -8,7 +8,7 @@ use config::{MAX_ENTRIES, PathLength, PortNo, TableIndex, Uniquifier};
 use container::Service;
 use gvm_equation::{GvmEquation, GvmVariables};
 use message::{DiscoverMsg, Message};
-use message_types::{CaToPe, CaFromPe, CaToVm, VmFromCa, VmToCa, CaFromVm, CaToPeMsg, PeToCaMsg};
+use message_types::{CaToPe, CaFromPe, CaToVm, VmFromCa, VmToCa, CaFromVm, CaToPePacket, PeToCaPacket};
 use name::{Name, CellID, TreeID, VmID};
 use packet::{Packet, Packetizer, PacketAssembler, PacketAssemblers};
 use port;
@@ -64,7 +64,7 @@ impl CellAgent {
 			tenant_masks: tenant_masks, trees: Arc::new(Mutex::new(trees)), up_trees: HashMap::new(),
 			ca_to_pe: ca_to_pe, packet_assemblers: HashMap::new()})
 		}
-	pub fn initialize(&mut self, scope: &Scope, ca_from_pe: CaFromPe) -> Result<ScopedJoinHandle<()>> {
+	pub fn initialize(&mut self, scope: &Scope, ca_from_pe: CaFromPe) -> Result<::std::thread::JoinHandle<()>> {
 		// Set up predefined trees - Must be first two in this order
 		let port_number_0 = PortNumber::new(0, self.no_ports).chain_err(|| ErrorKind::CellagentError)?;
 		let other_index = 0;
@@ -150,6 +150,17 @@ impl CellAgent {
 		self.up_trees.insert(up_tree_id, ca_to_vms);
 		Ok(())
 	}
+	fn listen_vms(&self, vm_id: VmID, ca_from_vm: CaFromVm) -> Result<()> {
+		let ca = self.clone();
+		let _ = crossbeam::scope(|scope| -> Result<()> {
+			scope.spawn( move || -> Result<()> {
+				let msg = ca_from_vm.recv().chain_err(|| ErrorKind::CellagentError)?;
+				Ok(())	
+			});
+			Ok(())
+		});
+		Ok(())
+	}
 	pub fn update_traph(&mut self, tree_id: &TreeID, port_number: PortNumber, port_status: traph::PortStatus,
 				gvm_equation: Option<GvmEquation>, 
 				children: &mut HashSet<PortNumber>, other_index: TableIndex, hops: PathLength, path: Option<Path>) 
@@ -186,7 +197,7 @@ impl CellAgent {
 		{
 			self.trees.lock().unwrap().insert(entry.get_index(), tree_id.stringify());
 		}
-		self.ca_to_pe.send(CaToPeMsg::Entry(entry)).chain_err(|| ErrorKind::CellagentError)?;
+		self.ca_to_pe.send(CaToPePacket::Entry(entry)).chain_err(|| ErrorKind::CellagentError)?;
 		Ok(entry)
 	}
 	fn write_err(&self, e: Error) -> Result<()> {
@@ -201,9 +212,9 @@ impl CellAgent {
 		}
 		Err(e)
 	}
-	fn listen(&mut self, scope: &Scope, ca_from_pe: CaFromPe) -> Result<ScopedJoinHandle<()>>{
+	fn listen(&mut self, scope: &Scope, ca_from_pe: CaFromPe) -> Result<::std::thread::JoinHandle<()>>{
 		let mut ca = self.clone();
-		let join_handle = scope.spawn( move || { 
+		let join_handle = ::std::thread::spawn( move || { 
 			let _ = ca.listen_loop(ca_from_pe).chain_err(|| ErrorKind::CellagentError).map_err(|e| ca.write_err(e));
 		});
 		Ok(join_handle)
@@ -212,11 +223,11 @@ impl CellAgent {
 		loop {
 			//println!("CellAgent {}: waiting for status or packet", ca.cell_id);
 			match ca_from_pe.recv().chain_err(|| ErrorKind::CellagentError)? {
-				PeToCaMsg::Status(port_no, status) => match status {
+				PeToCaPacket::Status(port_no, status) => match status {
 					port::PortStatus::Connected => self.port_connected(port_no).chain_err(|| ErrorKind::CellagentError)?,
 					port::PortStatus::Disconnected => self.port_disconnected(port_no).chain_err(|| ErrorKind::CellagentError)?
 				},
-				PeToCaMsg::Msg(port_no, index, packet) => {
+				PeToCaPacket::Packet(port_no, index, packet) => {
 					if let Some(packets) = Packetizer::process_packet(&mut self.packet_assemblers, packet) {
 						let mut msg = Packetizer::get_msg(packets).chain_err(|| ErrorKind::CellagentError)?;
 						msg.process(&mut self.clone(), port_no).chain_err(|| ErrorKind::CellagentError)?;
@@ -239,9 +250,9 @@ impl CellAgent {
 		//println!("CellAgent {}: sending packet {} on port {} {} ", self.cell_id, packets[0].get_count(), port_no, msg);
 		let index = (*self.connected_tree_entry.lock().unwrap()).get_index();
 		for packet in packets {
-			let entry = CaToPeMsg::Entry(*self.connected_tree_entry.lock().unwrap());
+			let entry = CaToPePacket::Entry(*self.connected_tree_entry.lock().unwrap());
 			self.ca_to_pe.send(entry).chain_err(|| ErrorKind::CellagentError)?;
-			let msg = CaToPeMsg::Msg((index, port_no_mask, *packet));
+			let msg = CaToPePacket::Packet((index, port_no_mask, *packet));
 			self.ca_to_pe.send(msg).chain_err(|| ErrorKind::CellagentError)?;
 //			self.ca_to_pe.send((Some(*self.connected_tree_entry.lock().unwrap()), 
 //			                    Some((index, port_no_mask, *packet)))).chain_err(|| ErrorKind::CellagentError)?;
@@ -255,7 +266,7 @@ impl CellAgent {
 		//println!("Cell Agent {} got disconnected on port {}", self.cell_id, port_no);
 		let port_no_mask = Mask::new(PortNumber::new(port_no, self.no_ports).chain_err(|| ErrorKind::CellagentError)?);
 		self.connected_tree_entry.lock().unwrap().and_with_mask(port_no_mask.not());
-		let entry = CaToPeMsg::Entry(*self.connected_tree_entry.lock().unwrap());
+		let entry = CaToPePacket::Entry(*self.connected_tree_entry.lock().unwrap());
 		self.ca_to_pe.send(entry).chain_err(|| ErrorKind::CellagentError)?;
 		//self.ca_to_pe.send((Some(*self.connected_tree_entry.lock().unwrap()),None)).chain_err(|| ErrorKind::CellagentError)?;	
 		Ok(())	
@@ -280,7 +291,7 @@ impl CellAgent {
 		};
 		for packet in packets.iter() {
 			//println!("CellAgent {}: Sending packet {}", self.cell_id, packets[0].get_packet_count());
-			let msg = CaToPeMsg::Msg((index, user_mask, **packet));
+			let msg = CaToPePacket::Packet((index, user_mask, **packet));
 			self.ca_to_pe.send(msg).chain_err(|| ErrorKind::CellagentError)?;
 			//println!("CellAgent {}: sent packet {} on tree {} to packet engine with index {}", self.cell_id, packet_count, tree_id, index);
 		}

@@ -5,10 +5,10 @@ use packet::{Packet};
 use port::{PortStatus};
 use utility::{Mask};
 // CellAgent to PacketEngine
-pub enum CaToPeMsg { Entry(RoutingTableEntry), Msg((TableIndex,Mask,Packet)) }
-pub type CaToPe = mpsc::Sender<CaToPeMsg>;
-pub type PeFromCa = mpsc::Receiver<CaToPeMsg>;
-pub type CaPeError = mpsc::SendError<CaToPeMsg>;
+pub enum CaToPePacket { Entry(RoutingTableEntry), Packet((TableIndex,Mask,Packet)) }
+pub type CaToPe = mpsc::Sender<CaToPePacket>;
+pub type PeFromCa = mpsc::Receiver<CaToPePacket>;
+pub type CaPeError = mpsc::SendError<CaToPePacket>;
 // PacketEngine to Port
 pub type PeToPort = mpsc::Sender<Packet>;
 pub type PortFromPe = mpsc::Receiver<Packet>;
@@ -18,20 +18,20 @@ pub type PortToLink = mpsc::Sender<Packet>;
 pub type LinkFromPort = mpsc::Receiver<Packet>;
 pub type PortLinkError = mpsc::SendError<Packet>;
 // Link to Port
-pub enum LinkToPortMsg { Status(PortStatus),Msg(Packet) }
-pub type LinkToPort = mpsc::Sender<LinkToPortMsg>;
-pub type PortFromLink = mpsc::Receiver<LinkToPortMsg>;
-pub type LinkPortError = mpsc::SendError<LinkToPortMsg>;
+pub enum LinkToPortPacket { Status(PortStatus),Packet(Packet) }
+pub type LinkToPort = mpsc::Sender<LinkToPortPacket>;
+pub type PortFromLink = mpsc::Receiver<LinkToPortPacket>;
+pub type LinkPortError = mpsc::SendError<LinkToPortPacket>;
 // Port to PacketEngine
-pub enum PortToPeMsg { Status((PortNo, PortStatus)), Msg((PortNo, Packet)) }
-pub type PortToPe = mpsc::Sender<PortToPeMsg>;
-pub type PeFromPort = mpsc::Receiver<PortToPeMsg>;
-pub type PortPeError = mpsc::SendError<PortToPeMsg>;
+pub enum PortToPePacket { Status((PortNo, PortStatus)), Packet((PortNo, Packet)) }
+pub type PortToPe = mpsc::Sender<PortToPePacket>;
+pub type PeFromPort = mpsc::Receiver<PortToPePacket>;
+pub type PortPeError = mpsc::SendError<PortToPePacket>;
 // PacketEngine to CellAgent
-pub enum PeToCaMsg { Status(PortNo, PortStatus), Msg(PortNo, TableIndex, Packet) }
-pub type PeToCa = mpsc::Sender<PeToCaMsg>;
-pub type CaFromPe = mpsc::Receiver<PeToCaMsg>;
-pub type PeCaError = mpsc::SendError<PeToCaMsg>;
+pub enum PeToCaPacket { Status(PortNo, PortStatus), Packet(PortNo, TableIndex, Packet) }
+pub type PeToCa = mpsc::Sender<PeToCaPacket>;
+pub type CaFromPe = mpsc::Receiver<PeToCaPacket>;
+pub type PeCaError = mpsc::SendError<PeToCaPacket>;
 // Port to Outside World
 pub type PortToOutsideMsg = Json;
 pub type PortToOutside = mpsc::Sender<PortToOutsideMsg>;

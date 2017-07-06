@@ -1,6 +1,6 @@
 use std::fmt;
 use crossbeam::{Scope, ScopedJoinHandle};
-use message_types::{LinkToPort, LinkFromPort, LinkToPortMsg};
+use message_types::{LinkToPort, LinkFromPort, LinkToPortPacket};
 use name::{Name, LinkID, PortID};
 use port::{PortStatus};
 
@@ -38,7 +38,7 @@ impl Link {
 				-> ScopedJoinHandle<()> {
 		let link = self.clone();
 		scope.spawn( move || {
-			let _ = status.send(LinkToPortMsg::Status(PortStatus::Connected)).chain_err(|| ErrorKind::LinkError).map_err(|e| link.write_err(e));
+			let _ = status.send(LinkToPortPacket::Status(PortStatus::Connected)).chain_err(|| ErrorKind::LinkError).map_err(|e| link.write_err(e));
 			let _ = link.listen_loop(link_from, link_to).chain_err(|| ErrorKind::LinkError).map_err(|e| link.write_err(e));
 		})
 	}			
@@ -46,7 +46,7 @@ impl Link {
 		loop {
 			//println!("Link {}: waiting to recv left", link_id);
 			let packet = link_from.recv().chain_err(|| ErrorKind::LinkError)?;
-			link_to.send(LinkToPortMsg::Msg(packet)).chain_err(|| ErrorKind::LinkError)?;
+			link_to.send(LinkToPortPacket::Packet(packet)).chain_err(|| ErrorKind::LinkError)?;
 			//println!("Link {}: sent packet {} right", link_id, packet.get_count());
 		}
 	}

@@ -3,7 +3,7 @@ use std::sync::{Arc, Mutex};
 use std::collections::HashSet;
 use crossbeam::Scope;
 use config::{PortNo, TableIndex};
-use message_types::{PeFromCa, PeToCa, PeToPort, PeFromPort, CaToPeMsg, PortToPeMsg, PeToCaMsg};
+use message_types::{PeFromCa, PeToCa, PeToPort, PeFromPort, CaToPePacket, PortToPePacket, PeToCaPacket};
 use name::CellID;
 use packet::{Packet};
 use routing_table::{RoutingTable};
@@ -28,11 +28,11 @@ impl PacketEngine {
 	}
 	pub fn start_threads(&self, scope: &Scope, pe_from_ca: PeFromCa, pe_from_ports: PeFromPort) -> Result<()> {			
 		let pe = self.clone();
-		scope.spawn( move ||  {
+		::std::thread::spawn( move ||  {
 			let _ = pe.listen_ca(pe_from_ca).map_err(|e| pe.write_err(e));
 		});
 		let pe = self.clone();
-		scope.spawn( move || {
+		::std::thread::spawn( move || {
 			let _ = pe.listen_port(pe_from_ports).map_err(|e| pe.write_err(e));
 		});
 		Ok(())
@@ -42,8 +42,8 @@ impl PacketEngine {
 	fn listen_ca(&self, entry_pe_from_ca: PeFromCa) -> Result<()> {
 		loop { 
 			match entry_pe_from_ca.recv().chain_err(|| ErrorKind::PacketEngineError)? {
-				CaToPeMsg::Entry(e) => self.routing_table.lock().unwrap().set_entry(e),
-				CaToPeMsg::Msg((index, user_mask, packet)) => {
+				CaToPePacket::Entry(e) => self.routing_table.lock().unwrap().set_entry(e),
+				CaToPePacket::Packet((index, user_mask, packet)) => {
 					let entry = self.routing_table.lock().unwrap().get_entry(index).chain_err(|| ErrorKind::PacketEngineError)?;
 					let port_no = 0 as PortNo;
 					self.forward(port_no, entry, user_mask, packet).chain_err(|| ErrorKind::PacketEngineError)?;
@@ -55,8 +55,8 @@ impl PacketEngine {
 		loop {
 			//println!("PacketEngine {}: waiting for status or packet", pe.cell_id);
 			match pe_from_ports.recv()? {
-				PortToPeMsg::Status((port_no,status)) => self.pe_to_ca.send(PeToCaMsg::Status(port_no,status)).chain_err(|| ErrorKind::PacketEngineError)?,
-				PortToPeMsg::Msg((port_no, packet)) => self.process_packet(port_no, packet).chain_err(|| ErrorKind::PacketEngineError)?
+				PortToPePacket::Status((port_no,status)) => self.pe_to_ca.send(PeToCaPacket::Status(port_no,status)).chain_err(|| ErrorKind::PacketEngineError)?,
+				PortToPePacket::Packet((port_no, packet)) => self.process_packet(port_no, packet).chain_err(|| ErrorKind::PacketEngineError)?
 			};
 		}		
 	}
@@ -93,7 +93,7 @@ impl PacketEngine {
 			if let Some(other_index) = other_indices.get(parent as usize) {
 				header.set_other_index(*other_index);
 				if parent == 0 {
-					self.pe_to_ca.send(PeToCaMsg::Msg(recv_port_no, *other_index, packet)).chain_err(|| ErrorKind::PacketEngineError)?;
+					self.pe_to_ca.send(PeToCaPacket::Packet(recv_port_no, *other_index, packet)).chain_err(|| ErrorKind::PacketEngineError)?;
 				} else {
 					if let Some(sender) = self.pe_to_ports.get(parent as usize) {
 						sender.send(packet).chain_err(|| ErrorKind::PacketEngineError)?;
@@ -101,7 +101,7 @@ impl PacketEngine {
 						let is_up = entry.get_mask().equal(Mask::new0());
 						if is_up { // Send to cell agent, too
 							let other_index: TableIndex = 0;
-							self.pe_to_ca.send(PeToCaMsg::Msg(recv_port_no, other_index, packet)).chain_err(|| ErrorKind::PacketEngineError)?;
+							self.pe_to_ca.send(PeToCaPacket::Packet(recv_port_no, other_index, packet)).chain_err(|| ErrorKind::PacketEngineError)?;
 						}
 					} else {
 						let max_ports = self.pe_to_ports.len() as u8;
@@ -117,7 +117,7 @@ impl PacketEngine {
 				let other_index = *other_indices.get(*port_no as usize).expect("PacketEngine: No such other index");
 				header.set_other_index(other_index as u32);
 				if *port_no as usize == 0 { 
-					self.pe_to_ca.send(PeToCaMsg::Msg(recv_port_no, other_index, packet)).chain_err(|| ErrorKind::PacketEngineError)?;
+					self.pe_to_ca.send(PeToCaPacket::Packet(recv_port_no, other_index, packet)).chain_err(|| ErrorKind::PacketEngineError)?;
 				} else {
 					match self.pe_to_ports.get(*port_no as usize) {
 						Some(s) => s.send(packet).chain_err(|| ErrorKind::PacketEngineError)?,
