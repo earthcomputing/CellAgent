@@ -8,7 +8,7 @@ use serde;
 use serde_json;
 use config::{PortNo, TableIndex, Uniquifier};
 use message::OutsideMsg;
-use message_types::{PortToLink, PortFromLink, PortToPe, PortFromPe, LinkToPortMsg, PortToPeMsg,
+use message_types::{PortToLink, PortFromLink, PortToPe, PortFromPe, LinkToPortPacket, PortToPePacket,
 			  PortToOutside, PortFromOutside, PortToOutsideMsg};
 use name::{Name, PortID, CellID};
 use packet::{PacketAssembler, Packetizer};
@@ -69,7 +69,7 @@ impl Port {
 			let packets = Packetizer::packetize(&msg, other_index)?;
 			println!("Port {}: msg from outside {}", port.id, msg);
 			for packet in packets {
-				self.port_to_pe.send(PortToPeMsg::Msg((port.port_number.get_port_no(), *packet))).chain_err(|| ErrorKind::PortError)?;
+				self.port_to_pe.send(PortToPePacket::Packet((port.port_number.get_port_no(), *packet))).chain_err(|| ErrorKind::PortError)?;
 			}
 		}
 	}
@@ -86,7 +86,7 @@ impl Port {
 	}
 	pub fn link_channel(&self, scope: &Scope, port_to_link: PortToLink, 
 			port_from_link: PortFromLink, port_from_pe: PortFromPe) 
-				-> Result<(ScopedJoinHandle<()>,ScopedJoinHandle<()>)> {
+				-> Result<()> {
 		let port = self.clone();
 		let link_handle = scope.spawn( move || {
 			let _ = port.listen_link(port_from_link).chain_err(|| ErrorKind::PortError).map_err(|e| port.write_err(e));
@@ -95,7 +95,7 @@ impl Port {
 		let pe_handle = scope.spawn( move || {
 			let _ = port.listen_pe(port_to_link, port_from_pe).chain_err(|| ErrorKind::PortError).map_err(|e| port.write_err(e));
 		});
-		Ok((link_handle, pe_handle))
+		Ok(())
 	}
 	fn listen_link(&self, port_from_link: PortFromLink) -> Result<()> {
 		let port_no = self.get_port_no();
@@ -103,15 +103,16 @@ impl Port {
 		loop {
 			//println!("Port {}: waiting for status or packet from link", port.id);
 			match port_from_link.recv().chain_err(|| ErrorKind::PortError)? {
-				LinkToPortMsg::Status(status) => {
+				LinkToPortPacket::Status(status) => {
 					match status {
 						PortStatus::Connected => self.set_connected(),
 						PortStatus::Disconnected => self.set_disconnected()
 					};
-					self.port_to_pe.send(PortToPeMsg::Status((port_no, status))).chain_err(|| ErrorKind::PortError)?;
+					self.port_to_pe.send(PortToPePacket::Status((port_no, status))).chain_err(|| ErrorKind::PortError)?;
 				}
-				LinkToPortMsg::Msg(msg) => {
-					self.port_to_pe.send(PortToPeMsg::Msg((port_no, msg))).chain_err(|| ErrorKind::PortError)?;
+				LinkToPortPacket::Packet(msg) => {
+					println!("Port {}: message {}", self.id, msg);
+					self.port_to_pe.send(PortToPePacket::Packet((port_no, msg))).chain_err(|| ErrorKind::PortError)?;
 				}
 			}
 		}
