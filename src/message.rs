@@ -1,8 +1,6 @@
 use std::fmt;
 use std::collections::HashSet;
 use std::sync::atomic::{ATOMIC_USIZE_INIT, AtomicUsize, Ordering};
-use serde;
-use serde_json;
 use cellagent::{CellAgent};
 use config::{MAX_PORTS, PathLength, PortNo, TableIndex};
 use container::Service;
@@ -252,7 +250,7 @@ impl Message for SetupVMsMsg {
 	fn get_header(&self) -> MsgHeader { self.header.clone() }
 	fn get_payload(&self) -> Box<MsgPayload> { Box::new(self.payload.clone()) }
 	fn process(&mut self, ca: &mut CellAgent, port_no: u8) -> Result<()> {
-		let mut service_sets = self.payload.get_service_sets().clone();
+		let service_sets = self.payload.get_service_sets().clone();
 		ca.create_vms(service_sets).chain_err(|| ErrorKind::MessageError)?;		
 		Ok(())
 	}

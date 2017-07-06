@@ -1,6 +1,7 @@
 use std::fmt;
 use std::marker::Sized;
-use config::{SEPARATOR, ContainerNo, VMNo};
+use config::{SEPARATOR, ContainerNo, VmNo};
+use utility::PortNumber;
 // Using String means names are not Copy
 type NAME = String;
 pub trait Name: Sized {
@@ -38,9 +39,9 @@ impl fmt::Display for CellID { fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Res
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct PortID { name: NAME, }
 impl PortID {
-	pub fn new(n: u8) -> Result<PortID> { 
-		let n = format!("P:{}",n);
-		Ok(PortID { name: n })
+	pub fn new(cell_id: &CellID, port_number: PortNumber) -> Result<PortID> { 
+		let name = [cell_id.get_name(), &format!("P:{}",port_number)].join(SEPARATOR); 
+		Ok(PortID { name: name })
 	}
 }
 impl Name for PortID {
@@ -83,12 +84,9 @@ impl fmt::Display for TenantID { fn fmt(&self, f: &mut fmt::Formatter) -> fmt::R
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct LinkID { name: NAME, }
 impl LinkID {
-	pub fn new(n: &str) -> Result<LinkID> { 
-		let str = n.to_string();
-		match n.find(' ') {
-			None => Ok(LinkID { name: str, }),
-			Some(_) => Err(ErrorKind::Format(str).into())
-		}
+	pub fn new(left_id: &PortID, rite_id: &PortID) -> Result<LinkID> { 
+		let name = [left_id.get_name(),rite_id.get_name()].join(SEPARATOR);
+		Ok(LinkID { name: name })
 	}
 }
 impl Name for LinkID {
@@ -97,21 +95,18 @@ impl Name for LinkID {
 }
 impl fmt::Display for LinkID { fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result { self.name.fmt(f) } }
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub struct VMID { name: NAME, }
-impl VMID {
-	pub fn new(n: &str) -> Result<VMID> { 
-		let str = n.to_string();
-		match n.find(' ') {
-			None => Ok(VMID { name: str}),
-			Some(_) => Err(ErrorKind::Format(str).into())
-		}
+pub struct VmID { name: NAME, }
+impl VmID {
+	pub fn new(cell_id: &CellID, id_no: usize) -> Result<VmID> { 
+		let name = format!("VM:{}+{}", cell_id, id_no);
+		Ok(VmID {name: name })
 	}
 }
-impl Name for VMID {
+impl Name for VmID {
 	fn get_name(&self) -> &str { &self.name }
-	fn create_from_string(&self, n: String) -> VMID { VMID { name: n } }
+	fn create_from_string(&self, n: String) -> VmID { VmID { name: n } }
 }
-impl fmt::Display for VMID { fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result { self.name.fmt(f) } }
+impl fmt::Display for VmID { fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result { self.name.fmt(f) } }
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct ContainerID { name: NAME, }
 impl ContainerID {

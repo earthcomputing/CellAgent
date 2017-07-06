@@ -38,9 +38,6 @@ use container::Service;
 use datacenter::{Datacenter};
 use ecargs::{ECArgs};
 use message::SetupVMsMsg;
-use message_types::{OutsideToPort, OutsideFromPort};
-use name::TreeID;
-use noc::Noc;
 use packet::Packetizer;
 
 fn main() {
@@ -80,7 +77,7 @@ fn run() -> Result<()> {
 	crossbeam::scope( |scope| -> Result<()> { 
 		match build_datacenter(scope, nports, ncells) {
 			Ok(dc) => control(scope, dc),
-			Err(e) =>  write_err(e)
+			Err(e) => write_err(e)
 		}
 	})?;
 	Ok(())
@@ -92,7 +89,8 @@ fn control(scope: &Scope, dc: Datacenter) -> Result<()> {
 }
 fn setup_vms(outside_to_port: message_types::OutsideToPort) -> Result<()> {
 	let msg = SetupVMsMsg::new("NocMaster", vec![vec![Service::NocMaster]])?;
-	let packets = Packetizer::packetize(&msg, 0)?;
+	let other_index = 0;
+	let packets = Packetizer::packetize(&msg, other_index)?;
 	for packet in packets.iter() {
 		//outside_to_port.send(**packet)?;
 	}
@@ -123,7 +121,7 @@ fn build_datacenter(scope: &crossbeam::Scope, nports: u8, ncells: usize) -> Resu
 error_chain! {
 	foreign_links {
 		Recv(::std::sync::mpsc::RecvError);
-		send(::message_types::OutsidePortError);
+		Send(::message_types::OutsidePortError);
 	}
 	links {
 		DatacenterError(datacenter::Error, datacenter::ErrorKind);

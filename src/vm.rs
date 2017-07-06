@@ -4,15 +4,15 @@ use std::sync::mpsc::channel;
 use container::{Container, Service};
 use message_types::{VmToCa, VmFromCa, VmToContainerMsg, VmToContainer, ContainerFromVm,
 	ContainerToVmMsg, ContainerToVm, VmFromContainer, ContainerVmError};
-use name::{ContainerID, VMID};
+use name::{ContainerID, VmID};
 
 #[derive(Debug, Clone)]
 pub struct VirtualMachine {
-	id: VMID,
+	id: VmID,
 	containers: HashMap<Service, VmToContainer>,
 }
 impl VirtualMachine {
-	pub fn new(id: VMID) -> VirtualMachine {
+	pub fn new(id: VmID) -> VirtualMachine {
 		VirtualMachine { id: id, containers: HashMap::new() }
 	}
 	pub fn initialize(&mut self, services: &mut Vec<Service>,

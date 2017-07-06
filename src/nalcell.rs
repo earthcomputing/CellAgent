@@ -58,7 +58,7 @@ impl NalCell {
 				ports: boxed_ports, cell_agent: cell_agent, vms: Vec::new(),
 				packet_engine: packet_engine, ports_from_pe: ports_from_pe, })
 	}
-	pub fn get_id(&self) -> CellID { self.id.clone() }
+	pub fn get_id(&self) -> &CellID { &self.id }
 //	pub fn get_no(&self) -> usize { self.cell_no }
 //	pub fn get_cell_agent(&self) -> &CellAgent { &self.cell_agent }
 	pub fn is_border(&self) -> bool { self.is_border }
