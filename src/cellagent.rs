@@ -152,12 +152,9 @@ impl CellAgent {
 	}
 	fn listen_vms(&self, vm_id: VmID, ca_from_vm: CaFromVm) -> Result<()> {
 		let ca = self.clone();
-		let _ = crossbeam::scope(|scope| -> Result<()> {
-			scope.spawn( move || -> Result<()> {
-				let msg = ca_from_vm.recv().chain_err(|| ErrorKind::CellagentError)?;
-				Ok(())	
-			});
-			Ok(())
+		::std::thread::spawn( move || -> Result<()> {
+			let msg = ca_from_vm.recv().chain_err(|| ErrorKind::CellagentError)?;
+			Ok(())	
 		});
 		Ok(())
 	}
@@ -246,7 +243,9 @@ impl CellAgent {
 		let my_table_index = self.my_entry.get_index();
 		let msg = DiscoverMsg::new(tree_id.clone(), my_table_index, self.cell_id.clone(), hops, path);
 		let other_index = 0;
-		let packets = Packetizer::packetize(&msg, other_index).chain_err(|| ErrorKind::CellagentError)?;
+		let direction = msg.get_header().get_direction();
+		let bytes = Packetizer::serialize(&msg).chain_err(|| ErrorKind::CellagentError)?;
+		let packets = Packetizer::packetize(bytes, direction, other_index).chain_err(|| ErrorKind::CellagentError)?;
 		//println!("CellAgent {}: sending packet {} on port {} {} ", self.cell_id, packets[0].get_count(), port_no, msg);
 		let index = (*self.connected_tree_entry.lock().unwrap()).get_index();
 		for packet in packets {
@@ -274,7 +273,9 @@ impl CellAgent {
 	pub fn forward_discover(&mut self, discover_msgs: &Vec<DiscoverMsg>, mask: Mask) -> Result<()> {
 		let my_table_index = self.my_entry.get_index();
 		for msg in discover_msgs.iter() {
-			let packets = Packetizer::packetize(msg, my_table_index).chain_err(|| ErrorKind::CellagentError)?;
+			let direction = msg.get_header().get_direction();
+			let bytes = Packetizer::serialize(msg).chain_err(|| ErrorKind::CellagentError)?;
+			let packets = Packetizer::packetize(bytes, direction, my_table_index).chain_err(|| ErrorKind::CellagentError)?;
 			self.send_msg(&self.connected_tree_id, packets, mask).chain_err(|| ErrorKind::CellagentError)?;
 			//println!("CellAgent {}: forward on ports {:?} {}", self.cell_id, mask.get_port_nos(), msg);
 		}

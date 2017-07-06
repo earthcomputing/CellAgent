@@ -7,7 +7,7 @@ use crossbeam::{Scope, ScopedJoinHandle};
 use serde;
 use serde_json;
 use config::{PortNo, TableIndex, Uniquifier};
-use message::OutsideMsg;
+use message::{Message, OutsideMsg};
 use message_types::{PortToLink, PortFromLink, PortToPe, PortFromPe, LinkToPortPacket, PortToPePacket,
 			  PortToOutside, PortFromOutside, PortToOutsideMsg};
 use name::{Name, PortID, CellID};
@@ -66,7 +66,9 @@ impl Port {
 		loop {
 			let json_msg = port_from_outside.recv().chain_err(|| "Receive from outside")?;
 			let msg = OutsideMsg::new(&json_msg);
-			let packets = Packetizer::packetize(&msg, other_index)?;
+			let direction = msg.get_header().get_direction();
+			let bytes = Packetizer::serialize(&msg).chain_err(|| ErrorKind::PortError)?;
+			let packets = Packetizer::packetize(bytes, direction, other_index).chain_err(|| ErrorKind::PortError)?;
 			println!("Port {}: msg from outside {}", port.id, msg);
 			for packet in packets {
 				self.port_to_pe.send(PortToPePacket::Packet((port.port_number.get_port_no(), *packet))).chain_err(|| ErrorKind::PortError)?;

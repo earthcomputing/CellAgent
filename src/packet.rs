@@ -152,19 +152,22 @@ impl Packetizer {
 			None
 		}
 	}
-	pub fn packetize<M>(msg: &M, other_index: TableIndex) -> Result<Vec<Box<Packet>>>
-			where M: Message + Hash + serde::Serialize {
+	pub fn serialize<M>(msg: &M) -> Result<Box<Vec<u8>>>
+			where M: Message + Hash + serde::Serialize {		
 		let msg_type = msg.get_header().get_msg_type();
 		let serialized_msg_type = serde_json::to_string(&msg_type).chain_err(|| ErrorKind::PacketError)?;
 		let serialized = serde_json::to_string(&msg).chain_err(|| ErrorKind::PacketError)?;
 		let mut msg_bytes = serialized_msg_type.clone().into_bytes();
 		msg_bytes.push(MSG_HEADER_DELIMITER as u8);
 		msg_bytes.append(&mut serialized.into_bytes());
+		Ok(Box::new(msg_bytes))
+	}
+	pub fn packetize(msg_bytes: Box<Vec<u8>>, direction: MsgDirection, other_index: TableIndex) 
+			-> Result<Vec<Box<Packet>>> {
 		let payload_size = Packetizer::packet_payload_size(msg_bytes.len());
 		let num_packets = (msg_bytes.len() + payload_size - 1)/ payload_size; // Poor man's ceiling
 		let last_packet_size = msg_bytes.len() - (num_packets-1)*payload_size;
 		let unique_id = rand::random(); // Can't use hash in case two cells send the same message
-		let direction = msg.get_header().get_direction();
 		let mut packets = Vec::new();
 		for i in 0..num_packets {
 			let (size, is_last_packet) = if i == (num_packets-1) {
