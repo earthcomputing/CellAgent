@@ -126,14 +126,18 @@ impl Message for DiscoverMsg {
 		// Send DiscoverD to sender
 		let discoverd_msg = DiscoverDMsg::new(new_tree_id.clone(), my_index);
 		let other_index = 0;
-		let packets = Packetizer::packetize(&discoverd_msg, other_index).chain_err(|| ErrorKind::MessageError)?;
+		let direction = discoverd_msg.get_header().get_direction();
+		let bytes = Packetizer::serialize(&discoverd_msg).chain_err(|| ErrorKind::MessageError)?;
+		let packets = Packetizer::packetize(bytes, direction, other_index).chain_err(|| ErrorKind::MessageError)?;
 		//println!("DiscoverMsg {}: sending discoverd for tree {} packet {} {}",ca.get_id(), new_tree_id, packets[0].get_count(), discoverd_msg);
 		let mask = Mask::new(port_number);
 		ca.send_msg(&ca.get_connected_ports_tree_id(), packets, mask).chain_err(|| ErrorKind::MessageError)?;
 		// Forward Discover on all except port_no with updated hops and path
 		self.update_discover_msg(ca.get_id(), my_index);
 		let control_tree_index = 0;
-		let packets = Packetizer::packetize(self, control_tree_index).chain_err(|| ErrorKind::MessageError)?;
+		let direction = self.get_header().get_direction();
+		let bytes = Packetizer::serialize(&self.clone()).chain_err(|| ErrorKind::MessageError)?;
+		let packets = Packetizer::packetize(bytes, direction, control_tree_index).chain_err(|| ErrorKind::MessageError)?;
 		let user_mask = DEFAULT_USER_MASK.all_but_port(PortNumber::new(port_no, ca.get_no_ports()).chain_err(|| ErrorKind::MessageError)?);
 		ca.add_discover_msg(self.clone());
 		//println!("DiscoverMsg {}: forwarding packet {} on connected ports {}", ca.get_id(), packets[0].get_count(), self);
