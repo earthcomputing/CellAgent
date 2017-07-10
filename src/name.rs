@@ -65,6 +65,22 @@ impl Name for TreeID {
 	fn create_from_string(&self, n: String) -> TreeID { TreeID { name: n } }
 }
 impl fmt::Display for TreeID { fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result { self.name.fmt(f) } }
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub struct UpTreeID { name: NAME, }
+impl<'a> UpTreeID {
+	pub fn new(n: &str) -> Result<UpTreeID> { 
+		let str = n.to_string();
+		match n.find(' ') {
+			None => Ok(UpTreeID { name: str}),
+			Some(_) => Err(ErrorKind::Format(str).into())
+		}
+	}
+}
+impl Name for UpTreeID {
+	fn get_name(&self) -> &str { &self.name }
+	fn create_from_string(&self, n: String) -> UpTreeID { UpTreeID { name: n } }
+}
+impl fmt::Display for UpTreeID { fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result { self.name.fmt(f) } }
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct TenantID { name: NAME, }
 impl TenantID {

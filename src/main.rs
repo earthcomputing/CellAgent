@@ -87,17 +87,6 @@ fn control(scope: &Scope, dc: Datacenter) -> Result<()> {
 	//noc.initialize();
 	Ok(())
 }
-fn setup_vms(outside_to_port: message_types::OutsideToPort) -> Result<()> {
-	let msg = SetupVMsMsg::new("NocMaster", vec![vec![Service::NocMaster]])?;
-	let other_index = 0;
-	let direction = msg.get_header().get_direction();
-	let bytes = Packetizer::serialize(&msg)?;
-	let packets = Packetizer::packetize(bytes, direction, other_index)?;
-	for packet in packets.iter() {
-		//outside_to_port.send(**packet)?;
-	}
-	Ok(())
-}
 fn write_err(e: Error) -> Result<()> {
 	use ::std::io::Write;
 	let stderr = &mut ::std::io::stderr();
