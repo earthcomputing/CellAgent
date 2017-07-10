@@ -113,7 +113,7 @@ impl Port {
 					self.port_to_pe.send(PortToPePacket::Status((port_no, status))).chain_err(|| ErrorKind::PortError)?;
 				}
 				LinkToPortPacket::Packet(msg) => {
-					println!("Port {}: message {}", self.id, msg);
+					//println!("Port {}: message {}", self.id, msg);
 					self.port_to_pe.send(PortToPePacket::Packet((port_no, msg))).chain_err(|| ErrorKind::PortError)?;
 				}
 			}
