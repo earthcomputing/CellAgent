@@ -9,7 +9,7 @@ use container::Service;
 use gvm_equation::{GvmEquation, GvmVariables};
 use message::{DiscoverMsg, Message};
 use message_types::{CaToPe, CaFromPe, CaToVm, VmFromCa, VmToCa, CaFromVm, CaToPePacket, PeToCaPacket};
-use name::{Name, CellID, TreeID, VmID};
+use name::{Name, CellID, TreeID, UpTreeID, VmID};
 use packet::{Packet, Packetizer, PacketAssembler, PacketAssemblers};
 use port;
 use routing_table_entry::{RoutingTableEntry};
@@ -38,7 +38,7 @@ pub struct CellAgent {
 	traphs: Traphs,
 	tenant_masks: Vec<Mask>,
 	ca_to_pe: CaToPe,
-	up_trees: HashMap<TreeID,Vec<CaToVm>>,
+	up_trees: HashMap<UpTreeID,(HashMap<UpTreeID,TreeID>,Vec<CaToVm>)>,
 	packet_assemblers: PacketAssemblers,
 }
 impl CellAgent {
@@ -135,22 +135,26 @@ impl CellAgent {
 		}
 	}
 	pub fn create_vms(&mut self, service_sets: Vec<Vec<Service>>) -> Result<()> {
-		let up_tree_id = TreeID::new(&format!("UpTree:{}+{}", self.cell_id, self.up_trees.len())).chain_err(|| ErrorKind::CellagentError)?;
+		let up_tree_id = UpTreeID::new(&format!("UpTree:{}+{}", self.cell_id, self.up_trees.len())).chain_err(|| ErrorKind::CellagentError)?;
 		let id_no = 0;
 		let mut ca_to_vms = Vec::new();
+		let (vm_to_ca, ca_from_vm): (VmToCa, CaFromVm) = channel();
 		for mut services in service_sets {
 			let id_no = id_no + 1;
 			let vm_id = VmID::new(&self.cell_id, id_no).chain_err(|| ErrorKind::CellagentError)?;
 			let (ca_to_vm, vm_from_ca): (CaToVm, VmFromCa) = channel();
-			let (vm_to_ca, ca_from_vm): (VmToCa, CaFromVm) = channel();
 			let mut vm = VirtualMachine::new(vm_id);
-			vm.initialize(&mut services, vm_to_ca, vm_from_ca).chain_err(|| ErrorKind::CellagentError)?;
+			vm.initialize(&mut services, vm_to_ca.clone(), vm_from_ca).chain_err(|| ErrorKind::CellagentError)?;
 			ca_to_vms.push(ca_to_vm);
 		}
-		self.up_trees.insert(up_tree_id, ca_to_vms);
+		let mut tree_map = HashMap::new();
+		tree_map.insert(UpTreeID::new("CellAgent")?, self.control_tree_id.clone());
+		tree_map.insert(UpTreeID::new("BaseTree")?, self.my_tree_id.clone());
+		self.up_trees.insert(up_tree_id.clone(), (tree_map, ca_to_vms));
+		self.listen_uptree(up_tree_id, ca_from_vm)?;
 		Ok(())
 	}
-	fn listen_vms(&self, vm_id: VmID, ca_from_vm: CaFromVm) -> Result<()> {
+	fn listen_uptree(&self, up_tree_id: UpTreeID, ca_from_vm: CaFromVm) -> Result<()> {
 		let ca = self.clone();
 		::std::thread::spawn( move || -> Result<()> {
 			let msg = ca_from_vm.recv().chain_err(|| ErrorKind::CellagentError)?;

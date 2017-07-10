@@ -1,7 +1,10 @@
 use std::fmt;
 use std::io::{stdin, stdout, Read, Write};
 use crossbeam::Scope;
-use message_types::{OutsideToPort, OutsideFromPort};
+use container::Service;
+use message::{Message, SetupVMsMsg};
+use message_types::{OutsideToPort, OutsideFromPort, OutsideToPortMsg};
+use packet::Packetizer;
 
 #[derive(Debug, Clone)]
 pub struct Noc {}
@@ -32,6 +35,17 @@ impl Noc {
 			let msg = recvr.recv()?;
 			println!("Noc received: {}", msg);
 		}
+	}
+	fn setup_vms(outside_to_port: OutsideToPort) -> Result<()> {
+		let msg = SetupVMsMsg::new("NocMaster", vec![vec![Service::NocMaster]])?;
+		let other_index = 0;
+		let direction = msg.get_header().get_direction();
+		let bytes = Packetizer::serialize(&msg)?;
+		let packets = Packetizer::packetize(bytes, direction, other_index)?;
+		for packet in packets.iter() {
+			//outside_to_port.send(**packet)?;
+		}
+		Ok(())
 	}
 	fn write_err(&self, e: Error) {
 		use ::std::io::Write;
@@ -69,7 +83,9 @@ error_chain! {
 		Send(::std::sync::mpsc::SendError<OutsideToPort>);
 	}
 	links {
+		Message(::message::Error, ::message::ErrorKind);
 		Name(::name::Error, ::name::ErrorKind);
+		Packet(::packet::Error, ::packet::ErrorKind);
 	}
 	errors { NocError
 	}

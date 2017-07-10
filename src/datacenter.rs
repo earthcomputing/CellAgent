@@ -104,7 +104,7 @@ impl fmt::Display for Datacenter {
 		}
 		s = s + "\nCells";
 		for i in 0..self.cells.len() {			
-			if i < 50 { s = s + &format!("\n{}", self.cells[i]); }
+			if i < 3 { s = s + &format!("\n{}", self.cells[i]); }
 		}
 		write!(f, "{}", s) 
 	}
