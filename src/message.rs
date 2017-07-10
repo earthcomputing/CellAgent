@@ -5,7 +5,7 @@ use cellagent::{CellAgent};
 use config::{MAX_PORTS, PathLength, PortNo, TableIndex};
 use container::Service;
 use gvm_equation::{GvmEquation, GvmVariables};
-use name::{CellID, TreeID};
+use name::{CellID, TreeID, UpTreeID};
 use packet::Packetizer;
 use traph;
 use utility::{DEFAULT_USER_MASK, Mask, Path, PortNumber};
@@ -60,11 +60,13 @@ pub struct MsgHeader {
 	msg_count: usize,
 	msg_type: MsgType,
 	direction: MsgDirection,
+	up_tree_id: Option<UpTreeID>, // Tells which VMs get the message
 }
 impl MsgHeader {
-	pub fn new(msg_type: MsgType, direction: MsgDirection) -> MsgHeader {
+	pub fn new(msg_type: MsgType, direction: MsgDirection, up_tree_id: Option<UpTreeID>) -> MsgHeader {
 		let msg_count = get_next_count();
-		MsgHeader { msg_type: msg_type, direction: direction, msg_count: msg_count }
+		MsgHeader { msg_type: msg_type, direction: direction, msg_count: msg_count,
+					up_tree_id: up_tree_id }
 	}
 	pub fn get_msg_type(&self) -> MsgType { self.msg_type }
 	pub fn get_count(&self) -> usize { self.msg_count }
@@ -85,7 +87,7 @@ pub struct DiscoverMsg {
 impl DiscoverMsg {
 	pub fn new(tree_id: TreeID, my_index: TableIndex, sending_cell_id: CellID, 
 			hops: PathLength, path: Path) -> DiscoverMsg {
-		let header = MsgHeader::new(MsgType::Discover, MsgDirection::Leafward);
+		let header = MsgHeader::new(MsgType::Discover, MsgDirection::Leafward, None);
 		//println!("DiscoverMsg: msg_count {}", header.get_count());
 		let payload = DiscoverPayload::new(tree_id, my_index, sending_cell_id, hops, path);
 		DiscoverMsg { header: header, payload: payload }
@@ -192,7 +194,7 @@ impl DiscoverDMsg {
 	pub fn new(tree_id: TreeID, index: TableIndex) -> DiscoverDMsg {
 		// Note that direction is leafward so we can use the connected ports tree
 		// If we send rootward, then the first recipient forwards the DiscoverD
-		let header = MsgHeader::new(MsgType::DiscoverD, MsgDirection::Leafward);
+		let header = MsgHeader::new(MsgType::DiscoverD, MsgDirection::Leafward, None);
 		let payload = DiscoverDPayload::new(tree_id, index);
 		DiscoverDMsg { header: header, payload: payload }
 	}
@@ -245,7 +247,7 @@ impl SetupVMsMsg {
 	pub fn new(id: &str, service_sets: Vec<Vec<Service>>) -> Result<SetupVMsMsg> {
 		// Note that direction is rootward so cell agent will get the message
 		let tree_id = TreeID::new(id).chain_err(|| ErrorKind::MessageError)?;
-		let header = MsgHeader::new(MsgType::SetupVM, MsgDirection::Rootward);
+		let header = MsgHeader::new(MsgType::SetupVM, MsgDirection::Rootward, None);
 		let payload = SetupVMsMsgPayload::new(tree_id, service_sets);
 		Ok(SetupVMsMsg { header: header, payload: payload })
 	}
@@ -297,7 +299,7 @@ pub struct OutsideMsg {
 impl OutsideMsg {
 	pub fn new(msg: &str) -> OutsideMsg {
 		// Note that direction is rootward so cell agent will get the message
-		let header = MsgHeader::new(MsgType::SetupVM, MsgDirection::Rootward);
+		let header = MsgHeader::new(MsgType::SetupVM, MsgDirection::Rootward, None);
 		let payload = OutsideMsgPayload::new(msg);
 		OutsideMsg { header: header, payload: payload }
 	}
