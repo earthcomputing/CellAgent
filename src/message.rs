@@ -291,46 +291,6 @@ impl fmt::Display for SetupVMsMsgPayload {
 		write!(f, "{}", s)
 	}
 }
-#[derive(Debug, Clone, Hash, Serialize, Deserialize)]
-pub struct OutsideMsg {
-	header: MsgHeader,
-	payload: OutsideMsgPayload
-}
-impl OutsideMsg {
-	pub fn new(msg: &str) -> OutsideMsg {
-		// Note that direction is rootward so cell agent will get the message
-		let header = MsgHeader::new(MsgType::SetupVM, MsgDirection::Rootward, None);
-		let payload = OutsideMsgPayload::new(msg);
-		OutsideMsg { header: header, payload: payload }
-	}
-}
-impl Message for OutsideMsg {
-	fn get_header(&self) -> MsgHeader { self.header.clone() }
-	fn get_payload(&self) -> Box<MsgPayload> { Box::new(self.payload.clone()) }
-	fn process(&mut self, ca: &mut CellAgent, port_no: u8) -> Result<()> {
-		Ok(())
-	}
-}
-impl fmt::Display for OutsideMsg {
-	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-		write!(f, "{} {}", self.header, self.payload)
-	}
-}
-#[derive(Debug, Clone, Hash, Serialize, Deserialize)]
-pub struct OutsideMsgPayload {
-	msg: String,
-}
-impl OutsideMsgPayload {
-	fn new(msg: &str) -> OutsideMsgPayload {
-		OutsideMsgPayload { msg: msg.to_string() }
-	}
-}
-impl MsgPayload for OutsideMsgPayload {}
-impl fmt::Display for OutsideMsgPayload {
-	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-		write!(f, "Message to the outside world {}", self.msg)
-	}
-}
 // Errors
 error_chain! {
 	links {

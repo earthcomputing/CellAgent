@@ -1,39 +1,51 @@
 use std::fmt;
-use std::io::{stdin, stdout, Read, Write};
+use std::io::{stdin, stdout, Write};
 use crossbeam::Scope;
 use container::Service;
 use message::{Message, SetupVMsMsg};
-use message_types::{OutsideToPort, OutsideFromPort, OutsideToPortMsg};
-use packet::Packetizer;
+use message_types::{OutsideToPort, OutsideFromPort};
+use packet::{PacketAssemblers, Packetizer};
 
 #[derive(Debug, Clone)]
-pub struct Noc {}
+pub struct Noc {
+	packet_assemblers: PacketAssemblers
+}
 impl Noc {
 	pub fn new() -> Noc {
-		Noc {  }
+		Noc { packet_assemblers: PacketAssemblers::new() }
 	}
 	pub fn initialize(&self, scope: &Scope,
 			outside_to_port: OutsideToPort, outside_from_port: OutsideFromPort) -> Result<()> {
 		let noc = self.clone();
 		let outside_to_port_clone = outside_to_port.clone();
 		scope.spawn( move || {
-			let _ = noc.listen_loop(outside_to_port_clone, outside_from_port).chain_err(|| ErrorKind::NocError).map_err(|e| noc.write_err(e));
+			let _ = noc.listen_outside(outside_to_port_clone).map_err(|e| noc.write_err(e));
 		});
-		scope.spawn( move || -> Result<()> {
-			loop {
-				stdout().write(b"Enter a command\n").chain_err(|| ErrorKind::NocError)?;
-				let mut input = String::new();
-				let _ = stdin().read_line(&mut input).chain_err(|| "Error reading from console")?;
-				stdout().write(b"Got command\n").chain_err(|| ErrorKind::NocError)?;
-				outside_to_port.send(input).chain_err(|| ErrorKind::NocError)?;
-			}
+		let mut noc = self.clone();
+		scope.spawn( move || {
+			let _ = noc.listen_pe(outside_from_port).map_err(|e| noc.write_err(e));	
 		});
 		Ok(())
 	}
-	fn listen_loop(&self, sendr: OutsideToPort, recvr: OutsideFromPort) -> Result<()> {
+	fn listen_pe(&mut self, outside_from_port: OutsideFromPort) -> Result<()> {
+		let noc = self.clone();
 		loop {
-			let msg = recvr.recv()?;
-			println!("Noc received: {}", msg);
+			let packet = outside_from_port.recv()?;
+			if let Some(packets) = Packetizer::process_packet(&mut self.packet_assemblers, packet) {
+				let msg = Packetizer::get_msg(packets).chain_err(|| ErrorKind::NocError)?;
+				println!("Noc received {}", msg);
+			}
+		}
+	}
+	fn listen_outside(&self, outside_to_port: OutsideToPort) -> Result<()> {
+		loop {
+			stdout().write(b"Enter a command\n").chain_err(|| ErrorKind::NocError)?;
+			let mut input = String::new();
+			let _ = stdin().read_line(&mut input).chain_err(|| "Error reading from console")?;
+			match input.as_str() {
+				"startvms\n" => Noc::setup_vms(outside_to_port.clone())?,
+				_ => println!("Got command: {}", input)
+			}
 		}
 	}
 	fn setup_vms(outside_to_port: OutsideToPort) -> Result<()> {
@@ -43,7 +55,7 @@ impl Noc {
 		let bytes = Packetizer::serialize(&msg)?;
 		let packets = Packetizer::packetize(bytes, direction, other_index)?;
 		for packet in packets.iter() {
-			//outside_to_port.send(**packet)?;
+			outside_to_port.send(**packet)?;
 		}
 		Ok(())
 	}
@@ -80,7 +92,7 @@ error_chain! {
 	foreign_links {
 		Io(::std::io::Error);
 		Recv(::std::sync::mpsc::RecvError);
-		Send(::std::sync::mpsc::SendError<OutsideToPort>);
+		Send(::message_types::OutsidePortError);
 	}
 	links {
 		Message(::message::Error, ::message::ErrorKind);

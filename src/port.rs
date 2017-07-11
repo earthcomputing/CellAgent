@@ -1,17 +1,12 @@
 use std::fmt;
-use std::collections::HashMap;
 use std::sync::atomic::AtomicBool;
-use std::sync::{mpsc, Arc};
+use std::sync::{Arc};
 use std::sync::atomic::Ordering::SeqCst;
 use crossbeam::{Scope, ScopedJoinHandle};
-use serde;
-use serde_json;
-use config::{PortNo, TableIndex, Uniquifier};
-use message::{Message, OutsideMsg};
+use config::{PortNo, TableIndex};
 use message_types::{PortToLink, PortFromLink, PortToPe, PortFromPe, LinkToPortPacket, PortToPePacket,
-			  PortToOutside, PortFromOutside, PortToOutsideMsg};
-use name::{Name, PortID, CellID};
-use packet::{PacketAssembler, Packetizer};
+			  PortToOutside, PortFromOutside};
+use name::{PortID, CellID};
 use utility::PortNumber;
 
 #[derive(Debug, Copy, Clone)]
@@ -28,7 +23,6 @@ pub struct Port {
 	is_connected: Arc<AtomicBool>,
 	is_broken: Arc<AtomicBool>,
 	port_to_pe: PortToPe,
-	packet_assemblers: HashMap<Uniquifier, PacketAssembler>,
 }
 impl Port {
 	pub fn new(cell_id: &CellID, port_number: PortNumber, is_border: bool, is_connected: bool,
@@ -36,12 +30,12 @@ impl Port {
 		let port_id = PortID::new(cell_id, port_number)?;
 		Ok(Port{ id: port_id, port_number: port_number, is_border: is_border, 
 			is_connected: Arc::new(AtomicBool::new(is_connected)), 
-			is_broken: Arc::new(AtomicBool::new(false)), packet_assemblers: HashMap::new(),
+			is_broken: Arc::new(AtomicBool::new(false)),
 			port_to_pe: port_to_pe})
 	}
 	pub fn get_id(&self) -> PortID { self.id.clone() }
 	pub fn get_port_no(&self) -> PortNo { self.port_number.get_port_no() }
-//	pub fn get_port_number(&self) -> PortNumber { self.port_number }
+	pub fn get_port_number(&self) -> PortNumber { self.port_number }
 	pub fn is_connected(&self) -> bool { self.is_connected.load(SeqCst) }
 	pub fn set_connected(&self) { self.is_connected.store(true, SeqCst); }
 	pub fn set_disconnected(&self) { self.is_connected.store(false, SeqCst); }
@@ -52,7 +46,7 @@ impl Port {
 			-> Result<(ScopedJoinHandle<()>)> {
 		let port = self.clone();
 		let outside_handle = scope.spawn( move || {
-			let _ = port.listen_outside(port_from_outside).chain_err(|| ErrorKind::PortError).map_err(|e| port.write_err(e));
+			let _ = port.listen_outside_for_pe(port_from_outside).chain_err(|| ErrorKind::PortError).map_err(|e| port.write_err(e));
 		});
 		let mut port = self.clone();
 		let pe_handle = scope.spawn( move || {
@@ -60,30 +54,19 @@ impl Port {
 		});
 		Ok((outside_handle))
 	}
-	fn listen_outside(&self, port_from_outside: PortFromOutside) -> Result<()> {
+	fn listen_outside_for_pe(&self, port_from_outside: PortFromOutside) -> Result<()> {
 		let port = self.clone();
 		let other_index = 0 as TableIndex;
 		loop {
-			let json_msg = port_from_outside.recv().chain_err(|| "Receive from outside")?;
-			let msg = OutsideMsg::new(&json_msg);
-			let direction = msg.get_header().get_direction();
-			let bytes = Packetizer::serialize(&msg).chain_err(|| ErrorKind::PortError)?;
-			let packets = Packetizer::packetize(bytes, direction, other_index).chain_err(|| ErrorKind::PortError)?;
-			println!("Port {}: msg from outside {}", port.id, msg);
-			for packet in packets {
-				self.port_to_pe.send(PortToPePacket::Packet((port.port_number.get_port_no(), *packet))).chain_err(|| ErrorKind::PortError)?;
-			}
+			let packet = port_from_outside.recv().chain_err(|| "Receive from outside")?;
+			self.port_to_pe.send(PortToPePacket::Packet((port.port_number.get_port_no(), packet))).chain_err(|| ErrorKind::PortError)?;
 		}
 	}
 	fn listen_pe_for_outside(&mut self, port_to_outside: PortToOutside, port_from_pe: PortFromPe) -> Result<()> {
 		loop {
 			//println!("Port {}: waiting for packet from pe", port.id);
 			let packet = port_from_pe.recv().chain_err(|| "Receive from pe for outside")?;
-			if let Some(packets) = Packetizer::process_packet(&mut self.packet_assemblers, packet) {
-				let msg = Packetizer::unpacketize(packets).chain_err(|| ErrorKind::PortError)?;
-				let json_msg = serde_json::to_string(&msg).chain_err(|| ErrorKind::PortError)?;
-				port_to_outside.send(json_msg).chain_err(|| ErrorKind::PortError)?;
-			}
+			port_to_outside.send(packet).chain_err(|| ErrorKind::PortError)?;
 		}		
 	}
 	pub fn link_channel(&self, scope: &Scope, port_to_link: PortToLink, 

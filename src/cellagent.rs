@@ -62,7 +62,7 @@ impl CellAgent {
 			discover_msgs: Arc::new(Mutex::new(Vec::new())), my_entry: RoutingTableEntry::default(0).chain_err(|| ErrorKind::CellagentError)?, 
 			connected_tree_entry: Arc::new(Mutex::new(RoutingTableEntry::default(0).chain_err(|| ErrorKind::CellagentError)?)),
 			tenant_masks: tenant_masks, trees: Arc::new(Mutex::new(trees)), up_trees: HashMap::new(),
-			ca_to_pe: ca_to_pe, packet_assemblers: HashMap::new()})
+			ca_to_pe: ca_to_pe, packet_assemblers: PacketAssemblers::new()})
 		}
 	pub fn initialize(&mut self, scope: &Scope, ca_from_pe: CaFromPe) -> Result<::std::thread::JoinHandle<()>> {
 		// Set up predefined trees - Must be first two in this order
@@ -84,10 +84,9 @@ impl CellAgent {
 		self.connected_tree_entry = Arc::new(Mutex::new(connected_tree_entry));
 		// Create my tree
 		let gvm_equation = GvmEquation::new("true", GvmVariables::empty());
-		let my_entry = self.update_traph(&my_tree_id, port_number_0, 
+		self.my_entry = self.update_traph(&my_tree_id, port_number_0, 
 				traph::PortStatus::Parent, Some(gvm_equation), 
 				&mut HashSet::new(), other_index, hops, path).chain_err(|| ErrorKind::CellagentError)?; 
-		self.my_entry = my_entry;
 		let listen_handle = self.listen(scope, ca_from_pe).chain_err(|| ErrorKind::CellagentError)?;
 		Ok(listen_handle)
 	}

@@ -33,12 +33,12 @@ pub type PeToCa = mpsc::Sender<PeToCaPacket>;
 pub type CaFromPe = mpsc::Receiver<PeToCaPacket>;
 pub type PeCaError = mpsc::SendError<PeToCaPacket>;
 // Port to Outside World
-pub type PortToOutsideMsg = Json;
+pub type PortToOutsideMsg = Packet;
 pub type PortToOutside = mpsc::Sender<PortToOutsideMsg>;
 pub type OutsideFromPort = mpsc::Receiver<PortToOutsideMsg>;
 pub type PortOutsideError = mpsc::SendError<PortToOutsideMsg>;
 // Outside World to Port
-pub type OutsideToPortMsg = Json;
+pub type OutsideToPortMsg = Packet;
 pub type OutsideToPort = mpsc::Sender<OutsideToPortMsg>;
 pub type PortFromOutside = mpsc::Receiver<OutsideToPortMsg>;
 pub type OutsidePortError = mpsc::SendError<OutsideToPortMsg>;
