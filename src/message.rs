@@ -14,6 +14,18 @@ use utility::{DEFAULT_USER_MASK, Mask, Path, PortNumber};
 
 static MESSAGE_COUNT: AtomicUsize = ATOMIC_USIZE_INIT;
 pub fn get_next_count() -> usize { MESSAGE_COUNT.fetch_add(1, Ordering::SeqCst) } 
+#[derive(Debug, Clone, Hash, Serialize, Deserialize)]
+pub struct TypePlusMsg {
+	msg_type: MsgType,
+	serialized_msg: String
+}
+impl TypePlusMsg {
+	pub fn new(msg_type: MsgType, serialized_msg: String) -> TypePlusMsg {
+		TypePlusMsg { msg_type: msg_type, serialized_msg: serialized_msg }
+	}
+	fn get_type(&self) -> MsgType { self.msg_type }
+	fn get_serialized_msg(&self) -> &str { &self.serialized_msg }
+}
 #[derive(Debug, Copy, Clone, Hash, Serialize, Deserialize)]
 pub enum MsgType {
 	Discover,
@@ -23,29 +35,22 @@ pub enum MsgType {
 impl MsgType {
 	pub fn get_msg(packets: Vec<Packet>) -> Result<Box<Message>> {
 		let serialized = Packetizer::unpacketize(packets).chain_err(|| ErrorKind::MessageError)?;
-		let mut split = serialized.splitn(2, PAYLOAD_DEFAULT_ELEMENT as char);
-		if let Some(serialized_msg_type) = split.next() {
-			let msg_type: MsgType = serde_json::from_str(serialized_msg_type).chain_err(|| ErrorKind::MessageError)?;
-			if let Some(serialized_msg) = split.next() {
-				match msg_type {
-					MsgType::Discover => {
-						let msg: DiscoverMsg = serde_json::from_str(&serialized_msg).chain_err(|| ErrorKind::MessageError)?;
-						Ok(Box::new(msg))
-					}
-					MsgType::DiscoverD => {
-						let msg: DiscoverDMsg = serde_json::from_str(&serialized_msg).chain_err(|| ErrorKind::MessageError)?;
-						Ok(Box::new(msg))
-					}
-					MsgType::SetupVM => {
-						let msg: SetupVMsMsg = serde_json::from_str(&serialized_msg).chain_err(|| ErrorKind::MessageError)?;
-						Ok(Box::new(msg))
-					}
-				}
-			} else {
-				panic!("boo");
+		let type_msg: TypePlusMsg = serde_json::from_str(&serialized).chain_err(|| ErrorKind::MessageError)?;
+		let msg_type = type_msg.get_type();
+		let serialized_msg = type_msg.get_serialized_msg();
+		match msg_type {
+			MsgType::Discover => {
+				let msg: DiscoverMsg = serde_json::from_str(&serialized_msg).chain_err(|| ErrorKind::MessageError)?;
+				Ok(Box::new(msg))
 			}
-		} else {
-			panic!("boo");
+			MsgType::DiscoverD => {
+				let msg: DiscoverDMsg = serde_json::from_str(&serialized_msg).chain_err(|| ErrorKind::MessageError)?;
+				Ok(Box::new(msg))
+			}
+			MsgType::SetupVM => {
+				let msg: SetupVMsMsg = serde_json::from_str(&serialized_msg).chain_err(|| ErrorKind::MessageError)?;
+				Ok(Box::new(msg))
+			}
 		}
 	}
 }
