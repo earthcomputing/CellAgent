@@ -1,12 +1,14 @@
 use std::fmt;
 use std::collections::HashSet;
 use std::sync::atomic::{ATOMIC_USIZE_INIT, AtomicUsize, Ordering};
+use serde;
+use serde_json;
 use cellagent::{CellAgent};
-use config::{MAX_PORTS, PathLength, PortNo, TableIndex};
+use config::{MAX_PORTS, PAYLOAD_DEFAULT_ELEMENT, PathLength, PortNo, TableIndex};
 use container::Service;
 use gvm_equation::{GvmEquation, GvmVariables};
 use name::{CellID, TreeID, UpTreeID};
-use packet::Packetizer;
+use packet::{Packet, Packetizer};
 use traph;
 use utility::{DEFAULT_USER_MASK, Mask, Path, PortNumber};
 
@@ -17,6 +19,35 @@ pub enum MsgType {
 	Discover,
 	DiscoverD,
 	SetupVM,
+}
+impl MsgType {
+	pub fn get_msg(packets: Vec<Packet>) -> Result<Box<Message>> {
+		let serialized = Packetizer::unpacketize(packets).chain_err(|| ErrorKind::MessageError)?;
+		let mut split = serialized.splitn(2, PAYLOAD_DEFAULT_ELEMENT as char);
+		if let Some(serialized_msg_type) = split.next() {
+			let msg_type: MsgType = serde_json::from_str(serialized_msg_type).chain_err(|| ErrorKind::MessageError)?;
+			if let Some(serialized_msg) = split.next() {
+				match msg_type {
+					MsgType::Discover => {
+						let msg: DiscoverMsg = serde_json::from_str(&serialized_msg).chain_err(|| ErrorKind::MessageError)?;
+						Ok(Box::new(msg))
+					}
+					MsgType::DiscoverD => {
+						let msg: DiscoverDMsg = serde_json::from_str(&serialized_msg).chain_err(|| ErrorKind::MessageError)?;
+						Ok(Box::new(msg))
+					}
+					MsgType::SetupVM => {
+						let msg: SetupVMsMsg = serde_json::from_str(&serialized_msg).chain_err(|| ErrorKind::MessageError)?;
+						Ok(Box::new(msg))
+					}
+				}
+			} else {
+				panic!("boo");
+			}
+		} else {
+			panic!("boo");
+		}
+	}
 }
 impl fmt::Display for MsgType {
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {

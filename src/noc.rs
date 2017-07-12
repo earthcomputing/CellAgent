@@ -2,7 +2,7 @@ use std::fmt;
 use std::io::{stdin, stdout, Write};
 use crossbeam::Scope;
 use container::Service;
-use message::{Message, SetupVMsMsg};
+use message::{Message, MsgType, SetupVMsMsg};
 use message_types::{OutsideToPort, OutsideFromPort};
 use packet::{PacketAssemblers, Packetizer};
 
@@ -32,7 +32,7 @@ impl Noc {
 		loop {
 			let packet = outside_from_port.recv()?;
 			if let Some(packets) = Packetizer::process_packet(&mut self.packet_assemblers, packet) {
-				let msg = Packetizer::get_msg(packets).chain_err(|| ErrorKind::NocError)?;
+				let msg = MsgType::get_msg(packets).chain_err(|| ErrorKind::NocError)?;
 				println!("Noc received {}", msg);
 			}
 		}
