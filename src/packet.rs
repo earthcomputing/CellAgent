@@ -189,10 +189,6 @@ impl Packetizer {
 		}
 		Ok(packets)
 	}
-	pub fn get_msg(packets: Vec<Packet>) -> Result<Box<Message>> {
-		let serialized = Packetizer::unpacketize(packets).chain_err(|| ErrorKind::PacketError)?;
-		Packetizer::deserialize(serialized)
-	}
 	pub fn unpacketize(packets: Vec<Packet>) -> Result<String> {
 		let mut all_bytes = Vec::new();
 		for packet in packets {
@@ -205,37 +201,6 @@ impl Packetizer {
 		}
 		Ok(str::from_utf8(&all_bytes).chain_err(|| ErrorKind::PacketError)?.to_string())
 	}
-	pub fn deserialize(serialized: String) -> Result<Box<Message>> {
-		let mut split = serialized.splitn(2, PAYLOAD_DEFAULT_ELEMENT as char);
-		let deserialized;
-		if let Some(serialized_msg_type) = split.next() {
-			let msg_type = serde_json::from_str(serialized_msg_type).chain_err(|| ErrorKind::PacketError)?;
-			if let Some(serialized_msg) = split.next() {
-				deserialized = match msg_type {
-					MsgType::Discover  => Packetizer::make_discover(serialized_msg).chain_err(|| ErrorKind::PacketError)?,
-					MsgType::DiscoverD => Packetizer::make_discoverd(serialized_msg).chain_err(|| ErrorKind::PacketError)?,
-					MsgType::SetupVM   => Packetizer::make_setup_vm(serialized_msg).chain_err(|| ErrorKind::PacketError)?,
-				};
-			} else {
-				return Err(ErrorKind::Unpacketize(serialized.to_string()).into())
-			}
-		} else {
-			return Err(ErrorKind::Unpacketize(serialized.to_string()).into())			
-		}
-		Ok(deserialized)
-	}
-	fn make_discover(serialized: &str) -> Result<Box<Message>> {
-		let msg: DiscoverMsg = serde_json::from_str(&serialized).chain_err(|| ErrorKind::PacketError)?;
-		Ok(Box::new(msg))
-	}
-	fn make_discoverd(serialized: &str) -> Result<Box<Message>> {
-		let msg: DiscoverDMsg = serde_json::from_str(&serialized).chain_err(|| ErrorKind::PacketError)?;
-		Ok(Box::new(msg))
-	}
-	fn make_setup_vm(serialized: &str) -> Result<Box<Message>> {
-		let msg: SetupVMsMsg = serde_json::from_str(&serialized).chain_err(|| ErrorKind::PacketError)?;
-		Ok(Box::new(msg))
-	} 
 	fn packet_payload_size(len: usize) -> usize {
 		match len-1 { 
 			0...PACKET_MIN           => PAYLOAD_MIN,

@@ -7,7 +7,7 @@ use crossbeam::{Scope, ScopedJoinHandle};
 use config::{MAX_ENTRIES, PathLength, PortNo, TableIndex, Uniquifier};
 use container::Service;
 use gvm_equation::{GvmEquation, GvmVariables};
-use message::{DiscoverMsg, Message};
+use message::{DiscoverMsg, Message, MsgType};
 use message_types::{CaToPe, CaFromPe, CaToVm, VmFromCa, VmToCa, CaFromVm, CaToPePacket, PeToCaPacket};
 use name::{Name, CellID, TreeID, UpTreeID, VmID};
 use packet::{Packet, Packetizer, PacketAssembler, PacketAssemblers};
@@ -234,7 +234,7 @@ impl CellAgent {
 				},
 				PeToCaPacket::Packet(port_no, index, packet) => {
 					if let Some(packets) = Packetizer::process_packet(&mut self.packet_assemblers, packet) {
-						let mut msg = Packetizer::get_msg(packets).chain_err(|| ErrorKind::CellagentError)?;
+						let mut msg = MsgType::get_msg(packets).chain_err(|| ErrorKind::CellagentError)?;
 						msg.process(&mut self.clone(), port_no).chain_err(|| ErrorKind::CellagentError)?;
 					}
 				}
