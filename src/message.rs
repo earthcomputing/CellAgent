@@ -39,18 +39,9 @@ impl MsgType {
 		let msg_type = type_msg.get_type();
 		let serialized_msg = type_msg.get_serialized_msg();
 		match msg_type {
-			MsgType::Discover => {
-				let msg: DiscoverMsg = serde_json::from_str(&serialized_msg).chain_err(|| ErrorKind::MessageError)?;
-				Ok(Box::new(msg))
-			}
-			MsgType::DiscoverD => {
-				let msg: DiscoverDMsg = serde_json::from_str(&serialized_msg).chain_err(|| ErrorKind::MessageError)?;
-				Ok(Box::new(msg))
-			}
-			MsgType::SetupVM => {
-				let msg: SetupVMsMsg = serde_json::from_str(&serialized_msg).chain_err(|| ErrorKind::MessageError)?;
-				Ok(Box::new(msg))
-			}
+			MsgType::Discover => Ok(Box::new(serde_json::from_str::<DiscoverMsg>(&serialized_msg).chain_err(|| ErrorKind::MessageError)?)),
+			MsgType::DiscoverD => Ok(Box::new(serde_json::from_str::<DiscoverDMsg>(&serialized_msg).chain_err(|| ErrorKind::MessageError)?)),
+			MsgType::SetupVM => Ok(Box::new(serde_json::from_str::<SetupVMsMsg>(&serialized_msg).chain_err(|| ErrorKind::MessageError)?)),
 		}
 	}
 }
