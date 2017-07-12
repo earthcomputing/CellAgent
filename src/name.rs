@@ -1,6 +1,6 @@
 use std::fmt;
 use std::marker::Sized;
-use config::{SEPARATOR, ContainerNo, VmNo};
+use config::{SEPARATOR};
 use utility::PortNumber;
 // Using String means names are not Copy
 type NAME = String;
@@ -25,7 +25,7 @@ pub trait Name: Sized {
 }
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct CellID { name: NAME, }
-impl<'a> CellID {
+impl CellID {
 	pub fn new(n: usize) -> Result<CellID> { 
 		let n = format!("C:{}",n);
 		Ok(CellID { name: n})

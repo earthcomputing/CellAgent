@@ -38,7 +38,8 @@ pub struct CellAgent {
 	traphs: Traphs,
 	tenant_masks: Vec<Mask>,
 	ca_to_pe: CaToPe,
-	up_trees: HashMap<UpTreeID,(HashMap<UpTreeID,TreeID>,Vec<CaToVm>)>,
+	vm_id_no: usize,
+	up_trees: HashMap<UpTreeID,(HashMap<TreeID,TreeID>,Vec<CaToVm>)>,
 	packet_assemblers: PacketAssemblers,
 }
 impl CellAgent {
@@ -57,7 +58,7 @@ impl CellAgent {
 		let traphs = Arc::new(Mutex::new(HashMap::new()));
 		Ok(CellAgent { cell_id: cell_id.clone(), my_tree_id: my_tree_id, 
 			control_tree_id: control_tree_id, connected_tree_id: connected_tree_id,	
-			no_ports: no_ports, traphs: traphs,  
+			no_ports: no_ports, traphs: traphs, vm_id_no: 0,
 			free_indices: Arc::new(Mutex::new(free_indices)),
 			discover_msgs: Arc::new(Mutex::new(Vec::new())), my_entry: RoutingTableEntry::default(0).chain_err(|| ErrorKind::CellagentError)?, 
 			connected_tree_entry: Arc::new(Mutex::new(RoutingTableEntry::default(0).chain_err(|| ErrorKind::CellagentError)?)),
@@ -135,20 +136,23 @@ impl CellAgent {
 	}
 	pub fn create_vms(&mut self, service_sets: Vec<Vec<Service>>) -> Result<()> {
 		let up_tree_id = UpTreeID::new(&format!("UpTree:{}+{}", self.cell_id, self.up_trees.len())).chain_err(|| ErrorKind::CellagentError)?;
-		let id_no = 0;
 		let mut ca_to_vms = Vec::new();
 		let (vm_to_ca, ca_from_vm): (VmToCa, CaFromVm) = channel();
+		let mut tree_map = HashMap::new();
+		let ca_id = TreeID::new("CellAgent")?;
+		let base_id = TreeID::new("BaseTree")?;
+		tree_map.insert(ca_id.clone(), self.control_tree_id.clone());
+		tree_map.insert(base_id.clone(), self.my_tree_id.clone());
+		let tree_ids = vec![ca_id, base_id];
 		for mut services in service_sets {
-			let id_no = id_no + 1;
-			let vm_id = VmID::new(&self.cell_id, id_no).chain_err(|| ErrorKind::CellagentError)?;
+			self.vm_id_no = self.vm_id_no + 1;
+			let vm_id = VmID::new(&self.cell_id, self.vm_id_no).chain_err(|| ErrorKind::CellagentError)?;
 			let (ca_to_vm, vm_from_ca): (CaToVm, VmFromCa) = channel();
 			let mut vm = VirtualMachine::new(vm_id);
-			vm.initialize(&mut services, vm_to_ca.clone(), vm_from_ca).chain_err(|| ErrorKind::CellagentError)?;
+			vm.initialize(&mut services, &up_tree_id, &tree_ids, 
+				vm_to_ca.clone(), vm_from_ca).chain_err(|| ErrorKind::CellagentError)?;
 			ca_to_vms.push(ca_to_vm);
 		}
-		let mut tree_map = HashMap::new();
-		tree_map.insert(UpTreeID::new("CellAgent")?, self.control_tree_id.clone());
-		tree_map.insert(UpTreeID::new("BaseTree")?, self.my_tree_id.clone());
 		self.up_trees.insert(up_tree_id.clone(), (tree_map, ca_to_vms));
 		self.listen_uptree(up_tree_id, ca_from_vm)?;
 		Ok(())
@@ -156,8 +160,9 @@ impl CellAgent {
 	fn listen_uptree(&self, up_tree_id: UpTreeID, ca_from_vm: CaFromVm) -> Result<()> {
 		let ca = self.clone();
 		::std::thread::spawn( move || -> Result<()> {
+		loop {
 			let msg = ca_from_vm.recv().chain_err(|| ErrorKind::CellagentError)?;
-			Ok(())	
+		}	
 		});
 		Ok(())
 	}

@@ -27,6 +27,7 @@ mod packet_engine;
 mod port;
 mod routing_table;
 mod routing_table_entry;
+mod service;
 mod tenant;
 mod traph;
 mod utility;
