@@ -4,13 +4,12 @@ use std::collections::HashMap;
 use std::sync::atomic::{ATOMIC_USIZE_INIT, AtomicUsize, Ordering};
 use rand;
 use std::str;
-use std::str::Utf8Error;
 use std::hash::{Hash};
 use serde;
 use serde_json;
-use config::{MSG_HEADER_DELIMITER, PACKET_MIN, PACKET_MAX, PAYLOAD_DEFAULT_ELEMENT, 
+use config::{PACKET_MIN, PACKET_MAX, PAYLOAD_DEFAULT_ELEMENT, 
 	PacketElement, PacketNo, TableIndex, Uniquifier};
-use message::{Message, MsgDirection, MsgType, DiscoverMsg, DiscoverDMsg, SetupVMsMsg};
+use message::{Message, MsgDirection, TypePlusMsg};
  
 //const LARGEST_MSG: usize = std::u32::MAX as usize;
 const PAYLOAD_MIN: usize = PACKET_MAX - PACKET_HEADER_SIZE;
@@ -155,11 +154,11 @@ impl Packetizer {
 	pub fn serialize<M>(msg: &M) -> Result<Box<Vec<u8>>>
 			where M: Message + Hash + serde::Serialize {		
 		let msg_type = msg.get_header().get_msg_type();
-		let serialized_msg_type = serde_json::to_string(&msg_type).chain_err(|| ErrorKind::PacketError)?;
-		let serialized = serde_json::to_string(&msg).chain_err(|| ErrorKind::PacketError)?;
-		let mut msg_bytes = serialized_msg_type.clone().into_bytes();
-		msg_bytes.push(MSG_HEADER_DELIMITER as u8);
-		msg_bytes.append(&mut serialized.into_bytes());
+		//let serialized_msg_type = serde_json::to_string(&msg_type).chain_err(|| ErrorKind::PacketError)?;
+		let serialized_msg = serde_json::to_string(&msg).chain_err(|| ErrorKind::PacketError)?;
+		let msg_obj = TypePlusMsg::new(msg_type, serialized_msg);
+		let serialized = serde_json::to_string(&msg_obj).chain_err(|| ErrorKind::PacketError)?;
+		let msg_bytes = serialized.clone().into_bytes();
 		Ok(Box::new(msg_bytes))
 	}
 	pub fn packetize(msg_bytes: Box<Vec<u8>>, direction: MsgDirection, other_index: TableIndex) 
