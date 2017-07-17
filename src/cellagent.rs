@@ -1,16 +1,16 @@
 use std::fmt;
-use std::sync::mpsc;
 use std::sync::mpsc::channel;
 use std::sync::{Arc, Mutex};
 use std::collections::{HashMap, HashSet};
-use crossbeam::{Scope, ScopedJoinHandle};
-use config::{MAX_ENTRIES, PathLength, PortNo, TableIndex, Uniquifier};
+use crossbeam::{Scope};
+use serde_json;
+use config::{MAX_ENTRIES, PathLength, PortNo, TableIndex};
 use container::Service;
 use gvm_equation::{GvmEquation, GvmVariables};
-use message::{DiscoverMsg, Message, MsgType};
+use message::{DiscoverMsg, DiscoverDMsg, StackTreeMsg, SetupVMsMsg, Message, MsgType};
 use message_types::{CaToPe, CaFromPe, CaToVm, VmFromCa, VmToCa, CaFromVm, CaToPePacket, PeToCaPacket};
 use name::{Name, CellID, TreeID, UpTreeID, VmID};
-use packet::{Packet, Packetizer, PacketAssembler, PacketAssemblers};
+use packet::{Packet, Packetizer, PacketAssemblers};
 use port;
 use routing_table_entry::{RoutingTableEntry};
 use traph;
@@ -39,7 +39,8 @@ pub struct CellAgent {
 	tenant_masks: Vec<Mask>,
 	ca_to_pe: CaToPe,
 	vm_id_no: usize,
-	up_trees: HashMap<UpTreeID,(HashMap<TreeID,TreeID>,Vec<CaToVm>)>,
+	up_trees_senders: HashMap<UpTreeID,Vec<CaToVm>>,
+	up_trees_clist: HashMap<TreeID, TreeID>,
 	packet_assemblers: PacketAssemblers,
 }
 impl CellAgent {
@@ -62,8 +63,8 @@ impl CellAgent {
 			free_indices: Arc::new(Mutex::new(free_indices)),
 			discover_msgs: Arc::new(Mutex::new(Vec::new())), my_entry: RoutingTableEntry::default(0).chain_err(|| ErrorKind::CellagentError)?, 
 			connected_tree_entry: Arc::new(Mutex::new(RoutingTableEntry::default(0).chain_err(|| ErrorKind::CellagentError)?)),
-			tenant_masks: tenant_masks, trees: Arc::new(Mutex::new(trees)), up_trees: HashMap::new(),
-			ca_to_pe: ca_to_pe, packet_assemblers: PacketAssemblers::new()})
+			tenant_masks: tenant_masks, trees: Arc::new(Mutex::new(trees)), up_trees_senders: HashMap::new(),
+			up_trees_clist: HashMap::new(), ca_to_pe: ca_to_pe, packet_assemblers: PacketAssemblers::new()})
 		}
 	pub fn initialize(&mut self, scope: &Scope, ca_from_pe: CaFromPe) -> Result<::std::thread::JoinHandle<()>> {
 		// Set up predefined trees - Must be first two in this order
@@ -135,14 +136,14 @@ impl CellAgent {
 		}
 	}
 	pub fn create_vms(&mut self, service_sets: Vec<Vec<Service>>) -> Result<()> {
-		let up_tree_id = UpTreeID::new(&format!("UpTree:{}+{}", self.cell_id, self.up_trees.len())).chain_err(|| ErrorKind::CellagentError)?;
+		let up_tree_id = UpTreeID::new(&format!("UpTree:{}+{}", self.cell_id, self.up_trees_clist.len())).chain_err(|| ErrorKind::CellagentError)?;
 		let mut ca_to_vms = Vec::new();
 		let (vm_to_ca, ca_from_vm): (VmToCa, CaFromVm) = channel();
-		let mut tree_map = HashMap::new();
+
 		let ca_id = TreeID::new("CellAgent")?;
 		let base_id = TreeID::new("BaseTree")?;
-		tree_map.insert(ca_id.clone(), self.control_tree_id.clone());
-		tree_map.insert(base_id.clone(), self.my_tree_id.clone());
+		self.up_trees_clist.insert(ca_id.clone(), self.control_tree_id.clone());
+		self.up_trees_clist.insert(base_id.clone(), self.my_tree_id.clone());
 		let tree_ids = vec![ca_id, base_id];
 		for mut services in service_sets {
 			self.vm_id_no = self.vm_id_no + 1;
@@ -153,7 +154,7 @@ impl CellAgent {
 				vm_to_ca.clone(), vm_from_ca).chain_err(|| ErrorKind::CellagentError)?;
 			ca_to_vms.push(ca_to_vm);
 		}
-		self.up_trees.insert(up_tree_id.clone(), (tree_map, ca_to_vms));
+		self.up_trees_senders.insert(up_tree_id.clone(), ca_to_vms);
 		self.listen_uptree(up_tree_id, ca_from_vm)?;
 		Ok(())
 	}
@@ -162,13 +163,14 @@ impl CellAgent {
 		::std::thread::spawn( move || -> Result<()> {
 		loop {
 			let msg = ca_from_vm.recv().chain_err(|| ErrorKind::CellagentError)?;
+			println!("CellAgent {}: got vm msg {}", ca.cell_id, msg);
 		}	
 		});
 		Ok(())
 	}
 	pub fn update_traph(&mut self, tree_id: &TreeID, port_number: PortNumber, port_status: traph::PortStatus,
-				gvm_equation: Option<GvmEquation>, 
-				children: &mut HashSet<PortNumber>, other_index: TableIndex, hops: PathLength, path: Option<Path>) 
+				gvm_equation: Option<GvmEquation>, children: &mut HashSet<PortNumber>, 
+				other_index: TableIndex, hops: PathLength, path: Option<Path>) 
 			-> Result<RoutingTableEntry> {
 // Note that traphs is updated transactionally; I remove an entry, update it, then put it back.
 		let mut traphs = self.traphs.lock().unwrap();
@@ -205,18 +207,6 @@ impl CellAgent {
 		self.ca_to_pe.send(CaToPePacket::Entry(entry)).chain_err(|| ErrorKind::CellagentError)?;
 		Ok(entry)
 	}
-	fn write_err(&self, e: Error) -> Result<()> {
-		use ::std::io::Write;
-		let stderr = &mut ::std::io::stderr();
-		let _ = writeln!(stderr, "CellAgent {}: {}", self.cell_id, e);
-		for e in e.iter().skip(1) {
-			let _ = writeln!(stderr, "Caused by: {}", e);
-		}
-		if let Some(backtrace) = e.backtrace() {
-			let _ = writeln!(stderr, "Backtrace: {:?}", backtrace);
-		}
-		Err(e)
-	}
 	fn listen(&mut self, scope: &Scope, ca_from_pe: CaFromPe) -> Result<::std::thread::JoinHandle<()>>{
 		let mut ca = self.clone();
 		let join_handle = ::std::thread::spawn( move || { 
@@ -234,12 +224,33 @@ impl CellAgent {
 				},
 				PeToCaPacket::Packet(port_no, index, packet) => {
 					if let Some(packets) = Packetizer::process_packet(&mut self.packet_assemblers, packet) {
-						let mut msg = MsgType::get_msg(packets).chain_err(|| ErrorKind::CellagentError)?;
-						msg.process(&mut self.clone(), port_no).chain_err(|| ErrorKind::CellagentError)?;
+						let (msg_type, serialized_msg) = MsgType::get_type_serialized(packets).chain_err(|| ErrorKind::CellagentError)?;
+						if let Some(mut msg) = self.get_msg(msg_type, serialized_msg)? {
+							msg.process(&mut self.clone(), port_no).chain_err(|| ErrorKind::CellagentError)?;
+						};
 					}
 				}
 			}
 		}
+	}
+	fn get_msg(&self, msg_type: MsgType, serialized_msg: String) -> Result<Option<Box<Message>>> {
+		Ok(match msg_type {
+			MsgType::Discover => Some(Box::new(serde_json::from_str::<DiscoverMsg>(&serialized_msg).chain_err(|| ErrorKind::CellagentError)?)),
+			MsgType::DiscoverD => Some(Box::new(serde_json::from_str::<DiscoverDMsg>(&serialized_msg).chain_err(|| ErrorKind::CellagentError)?)),
+			MsgType::StackTree => Some(Box::new(serde_json::from_str::<StackTreeMsg>(&serialized_msg).chain_err(|| ErrorKind::CellagentError)?)),
+			MsgType::SetupVM => Some(Box::new(serde_json::from_str::<SetupVMsMsg>(&serialized_msg).chain_err(|| ErrorKind::CellagentError)?)),
+			_ => { // Not for cell agent
+				let (up_tree_id, serialized) = serde_json::from_str::<(UpTreeID, String)>(&serialized_msg).chain_err(|| ErrorKind::CellagentError)?;
+				if let Some(senders) = self.up_trees_senders.get(&up_tree_id) {
+					for sender in senders.iter() { 
+						sender.send(serialized.clone()).chain_err(|| ErrorKind::CellagentError)?;
+					}
+				} else {
+					return Err(ErrorKind::UpTree(self.cell_id.clone(), up_tree_id.clone()).into());
+				}
+				None
+			}
+		})		
 	}
 	fn port_connected(&mut self, port_no: PortNo) -> Result<()> {
 		//println!("CellAgent {}: port {} connected", self.cell_id, port_no);
@@ -249,7 +260,7 @@ impl CellAgent {
 		self.connected_tree_entry.lock().unwrap().or_with_mask(port_no_mask);
 		let hops = 1;
 		let my_table_index = self.my_entry.get_index();
-		let msg = DiscoverMsg::new(tree_id.clone(), my_table_index, self.cell_id.clone(), hops, path);
+		let msg = DiscoverMsg::new(&tree_id, my_table_index, &self.cell_id, hops, path);
 		let other_index = 0;
 		let direction = msg.get_header().get_direction();
 		let bytes = Packetizer::serialize(&msg).chain_err(|| ErrorKind::CellagentError)?;
@@ -306,6 +317,18 @@ impl CellAgent {
 		}
 		Ok(())
 	}
+	fn write_err(&self, e: Error) -> Result<()> {
+		use ::std::io::Write;
+		let stderr = &mut ::std::io::stderr();
+		let _ = writeln!(stderr, "CellAgent {}: {}", self.cell_id, e);
+		for e in e.iter().skip(1) {
+			let _ = writeln!(stderr, "Caused by: {}", e);
+		}
+		if let Some(backtrace) = e.backtrace() {
+			let _ = writeln!(stderr, "Backtrace: {:?}", backtrace);
+		}
+		Err(e)
+	}
 }
 impl fmt::Display for CellAgent { 
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result { 
@@ -320,6 +343,7 @@ error_chain! {
 	foreign_links {
 		Recv(::std::sync::mpsc::RecvError);
 		CaToPe(::message_types::CaPeError);
+		CaToVm(::message_types::CaVmError);
 	}
 	links {
 		//Message(::message::Error, ::message::ErrorKind); // Recursive type error if left in
@@ -341,7 +365,7 @@ error_chain! {
 			description("Error processing message")
 			display("Error processing message {} on cell {}", msg_no, cell_id)
 		}		
-		MessageAssemblyError(cell_id: CellID) {
+		MessageAssembly(cell_id: CellID) {
 			description("Problem assembling message")
 			display("Problem assembling message on cell {}", cell_id)
 		}
@@ -369,5 +393,9 @@ error_chain! {
 			description("No tree for specified index")
 			display("No tree associated with index {} on cell {}", index, cell_id)
 		} 
+		UpTree(cell_id: CellID, up_tree_id: UpTreeID) {
+			description("UpTree not found")
+			display("Cell {} has no uptree named {}", cell_id, up_tree_id)
+		}
 	}
 }

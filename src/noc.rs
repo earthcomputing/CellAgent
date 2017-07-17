@@ -23,16 +23,22 @@ impl Noc {
 		});
 		let mut noc = self.clone();
 		scope.spawn( move || {
-			let _ = noc.listen_pe(outside_from_port).map_err(|e| noc.write_err(e));	
+			let _ = noc.listen_port(outside_from_port).map_err(|e| noc.write_err(e));	
 		});
 		Ok(())
 	}
-	fn listen_pe(&mut self, outside_from_port: OutsideFromPort) -> Result<()> {
+	fn get_msg(&self, msg_type: MsgType, serialized_msg:String) -> Result<Box<Message>> {
+		Ok(match msg_type {
+			_ => panic!("Noc doesn't recognize message type {}", msg_type)
+		})
+	}
+	fn listen_port(&mut self, outside_from_port: OutsideFromPort) -> Result<()> {
 		let noc = self.clone();
 		loop {
 			let packet = outside_from_port.recv()?;
 			if let Some(packets) = Packetizer::process_packet(&mut self.packet_assemblers, packet) {
-				let msg = MsgType::get_msg(packets).chain_err(|| ErrorKind::NocError)?;
+				let (msg_type, serialized_msg) = MsgType::get_type_serialized(packets).chain_err(|| ErrorKind::NocError)?;
+				let mut msg = self.get_msg(msg_type, serialized_msg)?;
 				println!("Noc received {}", msg);
 			}
 		}
