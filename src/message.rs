@@ -30,19 +30,17 @@ impl TypePlusMsg {
 pub enum MsgType {
 	Discover,
 	DiscoverD,
+	StackTree,
 	SetupVM,
+	Placeholder
 }
 impl MsgType {
-	pub fn get_msg(packets: Vec<Packet>) -> Result<Box<Message>> {
+	pub fn get_type_serialized(packets: Vec<Packet>) -> Result<(MsgType, String)> {
 		let serialized = Packetizer::unpacketize(packets).chain_err(|| ErrorKind::MessageError)?;
 		let type_msg: TypePlusMsg = serde_json::from_str(&serialized).chain_err(|| ErrorKind::MessageError)?;
 		let msg_type = type_msg.get_type();
 		let serialized_msg = type_msg.get_serialized_msg();
-		match msg_type {
-			MsgType::Discover => Ok(Box::new(serde_json::from_str::<DiscoverMsg>(&serialized_msg).chain_err(|| ErrorKind::MessageError)?)),
-			MsgType::DiscoverD => Ok(Box::new(serde_json::from_str::<DiscoverDMsg>(&serialized_msg).chain_err(|| ErrorKind::MessageError)?)),
-			MsgType::SetupVM => Ok(Box::new(serde_json::from_str::<SetupVMsMsg>(&serialized_msg).chain_err(|| ErrorKind::MessageError)?)),
-		}
+		Ok((msg_type, serialized_msg.to_string()))
 	}
 }
 impl fmt::Display for MsgType {
@@ -50,7 +48,9 @@ impl fmt::Display for MsgType {
 		match *self {
 			MsgType::Discover =>  write!(f, "Discover"),
 			MsgType::DiscoverD => write!(f, "DiscoverD"),
+			MsgType::StackTree => write!(f, "StackTree"),
 			MsgType::SetupVM =>   write!(f, "SetupVM"),
+			_ => write!(f, "{} is an undefined type", self)
 		}
 	}
 }
@@ -69,8 +69,8 @@ impl fmt::Display for MsgDirection {
 }
 
 pub trait Message: fmt::Display {
-	fn get_header(&self) -> MsgHeader;
-	fn get_payload(&self) -> Box<MsgPayload>;
+	fn get_header(&self) -> &MsgHeader;
+	fn get_payload(&self) -> &MsgPayload;
 	fn is_rootward(&self) -> bool {
 		match self.get_header().get_direction() {
 			MsgDirection::Rootward => true,
@@ -112,11 +112,11 @@ pub struct DiscoverMsg {
 	payload: DiscoverPayload
 }
 impl DiscoverMsg {
-	pub fn new(tree_id: TreeID, my_index: TableIndex, sending_cell_id: CellID, 
+	pub fn new(tree_id: &TreeID, my_index: TableIndex, sending_cell_id: &CellID, 
 			hops: PathLength, path: Path) -> DiscoverMsg {
 		let header = MsgHeader::new(MsgType::Discover, MsgDirection::Leafward, None);
 		//println!("DiscoverMsg: msg_count {}", header.get_count());
-		let payload = DiscoverPayload::new(tree_id, my_index, sending_cell_id, hops, path);
+		let payload = DiscoverPayload::new(&tree_id, my_index, &sending_cell_id, hops, path);
 		DiscoverMsg { header: header, payload: payload }
 	}
 	pub fn update_discover_msg(&mut self, cell_id: CellID, index: TableIndex) {
@@ -131,8 +131,8 @@ impl DiscoverMsg {
 	fn update_path(&self) -> Path { self.payload.get_path() } // No change per hop
 }
 impl Message for DiscoverMsg {
-	fn get_header(&self) -> MsgHeader { self.header.clone() }
-	fn get_payload(&self) -> Box<MsgPayload> { Box::new(self.payload.clone()) }
+	fn get_header(&self) -> &MsgHeader { &self.header }
+	fn get_payload(&self) -> &MsgPayload { &self.payload }
 	fn process(&mut self, ca: &mut CellAgent, port_no: u8) -> Result<()> {
 		let new_tree_id = self.payload.get_tree_id();
 		let port_number = PortNumber::new(port_no, ca.get_no_ports()).chain_err(|| ErrorKind::MessageError)?;
@@ -189,9 +189,9 @@ pub struct DiscoverPayload {
 	path: Path,
 }
 impl DiscoverPayload {
-	fn new(tree_id: TreeID, index: TableIndex, sending_cell_id: CellID, 
+	fn new(tree_id: &TreeID, index: TableIndex, sending_cell_id: &CellID, 
 			hops: PathLength, path: Path) -> DiscoverPayload {
-		DiscoverPayload { tree_id: tree_id, index: index, sending_cell_id: sending_cell_id, 
+		DiscoverPayload { tree_id: tree_id.clone(), index: index, sending_cell_id: sending_cell_id.clone(), 
 			hops: hops, path: path }
 	}
 	fn get_tree_id(&self) -> TreeID { self.tree_id.clone() }
@@ -227,10 +227,9 @@ impl DiscoverDMsg {
 	}
 }
 impl Message for DiscoverDMsg {
-	fn get_header(&self) -> MsgHeader { self.header.clone() }
-	fn get_payload(&self) -> Box<MsgPayload> { Box::new(self.payload.clone()) }
-	fn process(&mut self, ca: &mut CellAgent, port_no: u8) 
-			-> Result<()> {
+	fn get_header(&self) -> &MsgHeader { &self.header }
+	fn get_payload(&self) -> &MsgPayload { &self.payload }
+	fn process(&mut self, ca: &mut CellAgent, port_no: u8) -> Result<()> {
 		let tree_id = self.payload.get_tree_id();
 		let my_index = self.payload.get_table_index();
 		let mut children = HashSet::new();
@@ -266,6 +265,52 @@ impl fmt::Display for DiscoverDPayload {
 	}
 }
 #[derive(Debug, Clone, Hash, Serialize, Deserialize)]
+pub struct StackTreeMsg {
+	header: MsgHeader,
+	payload: StackTreeMsgPayload
+}
+impl StackTreeMsg{
+	pub fn new(id: &str, base_tree_id: TreeID) -> Result<StackTreeMsg> {
+		let tree_id = TreeID::new(id).chain_err(|| ErrorKind::MessageError)?;
+		let header = MsgHeader::new(MsgType::StackTree, MsgDirection::Rootward, None);
+		let payload = StackTreeMsgPayload::new(id, base_tree_id).chain_err(|| ErrorKind::MessageError)?;
+		Ok(StackTreeMsg { header: header, payload: payload})
+	}
+}
+impl Message for StackTreeMsg {
+	fn get_header(&self) -> &MsgHeader { &self.header }
+	fn get_payload(&self) -> &MsgPayload { &self.payload }
+	fn process(&mut self, ca: &mut CellAgent, port_no: PortNo) -> Result<()> {
+		Ok(())
+	}
+}
+impl fmt::Display for StackTreeMsg {
+	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+		write!(f, "{} {}", self.header, self.payload)
+	}	
+}
+#[derive(Debug, Clone, Hash, Serialize, Deserialize)]
+pub struct StackTreeMsgPayload {
+	tree_id: TreeID,
+	base_tree_id: TreeID,
+	gvm_equation: GvmEquation,
+}
+impl StackTreeMsgPayload {
+	fn new(id: &str, base_tree_id: TreeID) -> Result<StackTreeMsgPayload> {
+		let tree_id = TreeID::new(id).chain_err(|| ErrorKind::MessageError)?;
+		let gvm_equation = GvmEquation::new("true", GvmVariables::empty());
+		Ok(StackTreeMsgPayload { tree_id: tree_id, base_tree_id: base_tree_id, gvm_equation: gvm_equation })
+	}
+	pub fn get_base_tree_id(&self) -> &TreeID { &self.base_tree_id }
+	pub fn get_tree_id(&self) -> &TreeID { &self.tree_id}
+}
+impl MsgPayload for StackTreeMsgPayload {}
+impl fmt::Display for StackTreeMsgPayload {
+	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+		write!(f, "Tree {} stacked on {}", self.tree_id, self.base_tree_id)
+	}
+}
+#[derive(Debug, Clone, Hash, Serialize, Deserialize)]
 pub struct SetupVMsMsg {
 	header: MsgHeader,
 	payload: SetupVMsMsgPayload
@@ -273,15 +318,14 @@ pub struct SetupVMsMsg {
 impl SetupVMsMsg {
 	pub fn new(id: &str, service_sets: Vec<Vec<Service>>) -> Result<SetupVMsMsg> {
 		// Note that direction is rootward so cell agent will get the message
-		let tree_id = TreeID::new(id).chain_err(|| ErrorKind::MessageError)?;
 		let header = MsgHeader::new(MsgType::SetupVM, MsgDirection::Rootward, None);
-		let payload = SetupVMsMsgPayload::new(tree_id, service_sets);
+		let payload = SetupVMsMsgPayload::new(id, service_sets).chain_err(|| ErrorKind::MessageError)?;
 		Ok(SetupVMsMsg { header: header, payload: payload })
 	}
 }
 impl Message for SetupVMsMsg {
-	fn get_header(&self) -> MsgHeader { self.header.clone() }
-	fn get_payload(&self) -> Box<MsgPayload> { Box::new(self.payload.clone()) }
+	fn get_header(&self) -> &MsgHeader { &self.header }
+	fn get_payload(&self) -> &MsgPayload { &self.payload }
 	fn process(&mut self, ca: &mut CellAgent, port_no: u8) -> Result<()> {
 		let service_sets = self.payload.get_service_sets().clone();
 		ca.create_vms(service_sets).chain_err(|| ErrorKind::MessageError)?;		
@@ -295,14 +339,15 @@ impl fmt::Display for SetupVMsMsg {
 }
 #[derive(Debug, Clone, Hash, Serialize, Deserialize)]
 pub struct SetupVMsMsgPayload {
-	id: TreeID,
+	up_tree_id: UpTreeID,
 	// Each set of services runs on a single VM
 	// All the VMs setup in a single message are on an up-tree
 	service_sets: Vec<Vec<Service>>,
 }
 impl SetupVMsMsgPayload {
-	fn new(id: TreeID, service_sets: Vec<Vec<Service>>) -> SetupVMsMsgPayload {
-		SetupVMsMsgPayload { id: id, service_sets: service_sets }
+	fn new(id: &str, service_sets: Vec<Vec<Service>>) -> Result<SetupVMsMsgPayload> {
+		let up_tree_id = UpTreeID::new(id).chain_err(|| ErrorKind::MessageError)?;
+		Ok(SetupVMsMsgPayload { up_tree_id: up_tree_id, service_sets: service_sets })
 	}
 	pub fn get_service_sets(&self) -> &Vec<Vec<Service>> { &self.service_sets }
 }

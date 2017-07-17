@@ -23,17 +23,6 @@ impl Link {
 		let rite_handle = self.listen(scope, link_to_rite, link_from_rite, link_to_left);
 		Ok((left_handle, rite_handle))
 	}
-	fn write_err(&self, e: Error) {
-		use ::std::io::Write;
-		let stderr = &mut ::std::io::stderr();
-		let _ = writeln!(stderr, "Link {}: {}", self.id, e);
-		for e in e.iter().skip(1) {
-			let _ = writeln!(stderr, "Caused by: {}", e);
-		}
-		if let Some(backtrace) = e.backtrace() {
-			let _ = writeln!(stderr, "Backtrace: {:?}", backtrace);
-		}
-	}
 	fn listen(&self, scope: &Scope, status: LinkToPort, link_from: LinkFromPort, link_to: LinkToPort) 
 				-> ScopedJoinHandle<()> {
 		let link = self.clone();
@@ -48,6 +37,17 @@ impl Link {
 			let packet = link_from.recv().chain_err(|| ErrorKind::LinkError)?;
 			link_to.send(LinkToPortPacket::Packet(packet)).chain_err(|| ErrorKind::LinkError)?;
 			//println!("Link {}: sent packet {} right", link_id, packet.get_count());
+		}
+	}
+	fn write_err(&self, e: Error) {
+		use ::std::io::Write;
+		let stderr = &mut ::std::io::stderr();
+		let _ = writeln!(stderr, "Link {}: {}", self.id, e);
+		for e in e.iter().skip(1) {
+			let _ = writeln!(stderr, "Caused by: {}", e);
+		}
+		if let Some(backtrace) = e.backtrace() {
+			let _ = writeln!(stderr, "Backtrace: {:?}", backtrace);
 		}
 	}
 }

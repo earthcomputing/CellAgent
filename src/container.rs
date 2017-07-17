@@ -45,12 +45,18 @@ impl fmt::Display for Service {
 }
 #[derive(Debug, Clone, Hash, Serialize, Deserialize, PartialEq, Eq)]
 struct NocMaster {
-	container_id: ContainerID
+	container_id: ContainerID,
+	service: Service
 }
 impl NocMaster {
-	fn new(container_id: &ContainerID) -> NocMaster { NocMaster { container_id: container_id.clone() } }
+	fn new(container_id: &ContainerID) -> NocMaster { 
+		NocMaster { container_id: container_id.clone(), service: Service::NocMaster } 
+	}
+	fn get_container_id(&self) -> &ContainerID { &self.container_id }
+	fn get_service(&self) -> Service { self.service }
 	fn initialize(&self, up_tree_id: &UpTreeID, tree_ids: &Vec<TreeID>,
 			container_to_vm: ContainerToVm, container_from_vm: ContainerFromVm) -> Result<()> {
+		
 		self.listen_vm(container_from_vm).chain_err(|| ErrorKind::ContainerError)
 	}
 	fn listen_vm(&self, container_from_vm: ContainerFromVm) -> Result<()> {
