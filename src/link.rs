@@ -18,25 +18,25 @@ impl Link {
 	pub fn start_threads(&self, scope: &Scope,
 			link_to_left: LinkToPort, link_from_left: LinkFromPort,
 			link_to_rite: LinkToPort, link_from_rite: LinkFromPort ) 
-				-> Result<(ScopedJoinHandle<()>, ScopedJoinHandle<()>)> {
-		let left_handle = self.listen(scope, link_to_left.clone(), link_from_left, link_to_rite.clone());
-		let rite_handle = self.listen(scope, link_to_rite, link_from_rite, link_to_left);
-		Ok((left_handle, rite_handle))
+				-> Result<()> {
+		let left_handle = self.listen(scope, true,  link_to_left.clone(), link_from_left, link_to_rite.clone());
+		let rite_handle = self.listen(scope, false, link_to_rite, link_from_rite, link_to_left);
+		Ok(())
 	}
-	fn listen(&self, scope: &Scope, status: LinkToPort, link_from: LinkFromPort, link_to: LinkToPort) 
-				-> ScopedJoinHandle<()> {
+	fn listen(&self, scope: &Scope, dir: bool, status: LinkToPort, link_from: LinkFromPort, link_to: LinkToPort) {
 		let link = self.clone();
-		scope.spawn( move || {
+		::std::thread::spawn( move || {
 			let _ = status.send(LinkToPortPacket::Status(PortStatus::Connected)).chain_err(|| ErrorKind::LinkError).map_err(|e| link.write_err(e));
-			let _ = link.listen_loop(link_from, link_to).chain_err(|| ErrorKind::LinkError).map_err(|e| link.write_err(e));
-		})
+			let _ = link.listen_loop(dir, link_from, link_to).chain_err(|| ErrorKind::LinkError).map_err(|e| link.write_err(e));
+		});
 	}			
-	fn listen_loop(&self, link_from: LinkFromPort, link_to: LinkToPort) -> Result<()> {
+	fn listen_loop(&self, dir: bool, link_from: LinkFromPort, link_to: LinkToPort) -> Result<()> {
 		loop {
-			//println!("Link {}: waiting to recv left", link_id);
+			//println!("Link {}: waiting to recv", self.id);
 			let packet = link_from.recv().chain_err(|| ErrorKind::LinkError)?;
 			link_to.send(LinkToPortPacket::Packet(packet)).chain_err(|| ErrorKind::LinkError)?;
-			//println!("Link {}: sent packet {} right", link_id, packet.get_count());
+			//if dir { println!("Link {}: sent packet rite {}", self.id, packet.get_count()); }
+			//else   { println!("Link {}: sent packet left {}", self.id, packet.get_count()); }
 		}
 	}
 	fn write_err(&self, e: Error) {

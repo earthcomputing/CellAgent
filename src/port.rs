@@ -43,16 +43,16 @@ impl Port {
 	pub fn is_border(&self) -> bool { self.is_border }
 	pub fn outside_channel(&self, scope: &Scope, port_to_outside: PortToOutside, 
 			port_from_outside: PortFromOutside, port_from_pe: PortFromPe) 
-			-> Result<(ScopedJoinHandle<()>)> {
+			-> Result<()> {
 		let port = self.clone();
-		let outside_handle = scope.spawn( move || {
+		let outside_handle = ::std::thread::spawn( move || {
 			let _ = port.listen_outside_for_pe(port_from_outside).chain_err(|| ErrorKind::PortError).map_err(|e| port.write_err(e));
 		});
 		let mut port = self.clone();
-		let pe_handle = scope.spawn( move || {
+		let pe_handle = ::std::thread::spawn( move || {
 			let _ = port.listen_pe_for_outside(port_to_outside, port_from_pe).chain_err(|| ErrorKind::PortError).map_err(|e| port.write_err(e));
 		});
-		Ok((outside_handle))
+		Ok(())
 	}
 	fn listen_outside_for_pe(&self, port_from_outside: PortFromOutside) -> Result<()> {
 		let port = self.clone();
@@ -73,11 +73,11 @@ impl Port {
 			port_from_link: PortFromLink, port_from_pe: PortFromPe) 
 				-> Result<()> {
 		let port = self.clone();
-		let link_handle = scope.spawn( move || {
+		let link_handle = ::std::thread::spawn( move || {
 			let _ = port.listen_link(port_from_link).chain_err(|| ErrorKind::PortError).map_err(|e| port.write_err(e));
 		});
 		let port = self.clone();
-		let pe_handle = scope.spawn( move || {
+		let pe_handle = ::std::thread::spawn( move || {
 			let _ = port.listen_pe(port_to_link, port_from_pe).chain_err(|| ErrorKind::PortError).map_err(|e| port.write_err(e));
 		});
 		Ok(())
@@ -95,9 +95,10 @@ impl Port {
 					};
 					self.port_to_pe.send(PortToPePacket::Status((port_no, status))).chain_err(|| ErrorKind::PortError)?;
 				}
-				LinkToPortPacket::Packet(msg) => {
-					//println!("Port {}: message {}", self.id, msg);
-					self.port_to_pe.send(PortToPePacket::Packet((port_no, msg))).chain_err(|| ErrorKind::PortError)?;
+				LinkToPortPacket::Packet(packet) => {
+					//println!("Port {}: got from link {}", self.id, packet);
+					self.port_to_pe.send(PortToPePacket::Packet((port_no, packet))).chain_err(|| ErrorKind::PortError)?;
+					//println!("Port {}: sent from link to pe {}", self.id, packet);
 				}
 			}
 		}
@@ -106,7 +107,9 @@ impl Port {
 		loop {
 			//println!("Port {}: waiting for packet from pe", port.id);
 			let packet = port_from_pe.recv()?;
+			//println!("Port {}: got from pe {}", self.id, packet);
 			port_to_link.send(packet).chain_err(|| ErrorKind::PortError)?;
+			//println!("Port {}: sent from pe to link {}", self.id, packet);
 		}		
 	}
 	fn write_err(&self, e: Error) {

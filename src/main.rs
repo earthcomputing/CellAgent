@@ -105,7 +105,7 @@ fn build_datacenter(scope: &crossbeam::Scope, nports: u8, ncells: usize) -> Resu
 	//let edges = vec![(0,1),(1,2),(2,3),(3,4),(5,6),(6,7),(7,8),(8,9),(0,5),(1,6),(2,7),(3,8),(4,9)];
 	let edges = vec![(0,1),(1,2),(1,6),(3,4),(5,6),(6,7),(7,8),(8,9),(0,5),(2,3),(2,7),(3,8),(4,9)];
 	let dc = Datacenter::new(scope, ncells, nports, edges)?;
-	let nap = time::Duration::from_millis(1000);
+	let nap = time::Duration::from_millis(2000);
 	thread::sleep(nap);
 	println!("{}", dc);
 	Ok(dc)

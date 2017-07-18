@@ -133,7 +133,7 @@ impl DiscoverMsg {
 impl Message for DiscoverMsg {
 	fn get_header(&self) -> &MsgHeader { &self.header }
 	fn get_payload(&self) -> &MsgPayload { &self.payload }
-	fn process(&mut self, ca: &mut CellAgent, port_no: u8) -> Result<()> {
+	fn process(&mut self, ca: &mut CellAgent, port_no: PortNo) -> Result<()> {
 		let new_tree_id = self.payload.get_tree_id();
 		let port_number = PortNumber::new(port_no, ca.get_no_ports()).chain_err(|| ErrorKind::MessageError)?;
 		let hops = self.payload.get_hops();
@@ -146,15 +146,13 @@ impl Message for DiscoverMsg {
 		let gvm_equation = GvmEquation::new("true", GvmVariables::empty());
 		let entry = ca.update_traph(&new_tree_id, port_number, status, Some(gvm_equation),
 				children, senders_index, hops, Some(path)).chain_err(|| ErrorKind::MessageError)?;
-		//println!("DiscoverMsg {}: entry {}", ca.get_id(), entry);
 		if exists { 
-			//println!("DiscoverMsg {}: exists {}", ca.get_id(), self);
 			return Ok(()); // Don't forward if traph exists for this tree - Simple quenching
-		} 
+		}
 		let my_index = entry.get_index();
 		// Send DiscoverD to sender
-		let discoverd_msg = DiscoverDMsg::new(new_tree_id.clone(), my_index);
 		let other_index = 0;
+		let discoverd_msg = DiscoverDMsg::new(new_tree_id.clone(), my_index);
 		let direction = discoverd_msg.get_header().get_direction();
 		let bytes = Packetizer::serialize(&discoverd_msg).chain_err(|| ErrorKind::MessageError)?;
 		let packets = Packetizer::packetize(bytes, direction, other_index).chain_err(|| ErrorKind::MessageError)?;
@@ -166,7 +164,7 @@ impl Message for DiscoverMsg {
 		let control_tree_index = 0;
 		let direction = self.get_header().get_direction();
 		let bytes = Packetizer::serialize(&self.clone()).chain_err(|| ErrorKind::MessageError)?;
-		let packets = Packetizer::packetize(bytes, direction, control_tree_index).chain_err(|| ErrorKind::MessageError)?;
+		let packets = Packetizer::packetize(bytes, direction, other_index).chain_err(|| ErrorKind::MessageError)?;
 		let user_mask = DEFAULT_USER_MASK.all_but_port(PortNumber::new(port_no, ca.get_no_ports()).chain_err(|| ErrorKind::MessageError)?);
 		ca.add_discover_msg(self.clone());
 		//println!("DiscoverMsg {}: forwarding packet {} on connected ports {}", ca.get_id(), packets[0].get_count(), self);

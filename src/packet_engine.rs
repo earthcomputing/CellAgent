@@ -44,6 +44,7 @@ impl PacketEngine {
 			match entry_pe_from_ca.recv().chain_err(|| ErrorKind::PacketEngineError)? {
 				CaToPePacket::Entry(e) => self.routing_table.lock().unwrap().set_entry(e),
 				CaToPePacket::Packet((index, user_mask, packet)) => {
+					//println!("PacketEngine {}: received from ca packet {}", self.cell_id, packet);					
 					let entry = self.routing_table.lock().unwrap().get_entry(index).chain_err(|| ErrorKind::PacketEngineError)?;
 					let port_no = 0 as PortNo;
 					self.forward(port_no, entry, user_mask, packet).chain_err(|| ErrorKind::PacketEngineError)?;
@@ -61,7 +62,7 @@ impl PacketEngine {
 		}		
 	}
 	fn process_packet(&self, port_no: PortNo, packet: Packet) -> Result<()> {
-		//println!("PacketEngine {}: received packet {} on port {}", cell_id, packet_count, recv_port_no);
+		//println!("PacketEngine {}: received on port {} {}", self.cell_id, port_no, packet);
 		let header = packet.get_header();
 		let my_index = header.get_other_index();
 		// The cell agent processes all messages coming in on border ports.
@@ -97,7 +98,7 @@ impl PacketEngine {
 				} else {
 					if let Some(sender) = self.pe_to_ports.get(parent as usize) {
 						sender.send(packet).chain_err(|| ErrorKind::PacketEngineError)?;
-						//println!("PacketEngine {}: sent packet {} rootward on port {}", self.cell_id, packet.get_packet_count(), parent);
+						//println!("PacketEngine {}: sent rootward on port {} sent packet {}", self.cell_id, recv_port_no, packet);
 						let is_up = entry.get_mask().equal(Mask::new0());
 						if is_up { // Send to cell agent, too
 							let other_index: TableIndex = 0;
@@ -117,13 +118,14 @@ impl PacketEngine {
 				let other_index = *other_indices.get(*port_no as usize).expect("PacketEngine: No such other index");
 				header.set_other_index(other_index as u32);
 				if *port_no as usize == 0 { 
+					//println!("PacketEngine {}: sending to ca packet {}", self.cell_id, packet);
 					self.pe_to_ca.send(PeToCaPacket::Packet(recv_port_no, other_index, packet)).chain_err(|| ErrorKind::PacketEngineError)?;
 				} else {
 					match self.pe_to_ports.get(*port_no as usize) {
 						Some(s) => s.send(packet).chain_err(|| ErrorKind::PacketEngineError)?,
 						None => return Err(ErrorKind::Sender(self.cell_id.clone(), *port_no).into())
 					};
-					//println!("Packet Engine {} sent packet {} to port {}", cell_id, packet_count, port_no);
+					//println!("Packet Engine {} sent to port {} packet {}", self.cell_id, port_no, packet);
 				}
 			}
 		}
