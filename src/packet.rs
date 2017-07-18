@@ -38,7 +38,13 @@ impl Packet {
 }
 impl fmt::Display for Packet {
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result { 
-		let s = format!("Header: {}, Payload: {}", self.header, self.payload);
+		let bytes = self.get_payload().get_bytes();
+		let len = if self.get_header().is_last_packet() {
+			self.get_header().get_size() as usize
+		} else {
+			bytes.len()
+		};
+		let s = format!("Packet {}: Header: {}, Payload: {:?}", self.packet_count, self.header, str::from_utf8(&bytes[0..len]));
 		write!(f, "{}", s)
 	} 	
 }
