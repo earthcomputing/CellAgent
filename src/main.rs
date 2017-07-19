@@ -33,13 +33,10 @@ mod traph;
 mod utility;
 mod vm;
 use std::{thread, time};
-use crossbeam::Scope;
+
 use config::{NCELLS,NPORTS,NLINKS};
-use container::Service;
 use datacenter::{Datacenter};
 use ecargs::{ECArgs};
-use message::{Message, SetupVMsMsg};
-use packet::Packetizer;
 
 fn main() {
 	if let Err(ref e) = run() {
@@ -75,17 +72,15 @@ fn run() -> Result<()> {
 	//let cell_id = CellID::new("foo bar").chain_err(|| "testing bad name")?;
 	let (ncells,nports) = ecargs.get_args();
 	println!("Main: {} ports for each of {} cells", nports, ncells);
-	crossbeam::scope( |scope| -> Result<()> { 
-		match build_datacenter(scope, nports, ncells) {
-			Ok(dc) => control(scope, dc),
-			Err(e) => write_err(e)
-		}
-	})?;
-	Ok(())
+	match build_datacenter(nports, ncells) {
+		Ok(dc) => control(dc),
+		Err(e) => write_err(e)
+	}
 }
-fn control(scope: &Scope, dc: Datacenter) -> Result<()> {
-	//let noc = Noc::new(dc);
-	//noc.initialize();
+fn control(dc: Datacenter) -> Result<()> {
+	println!("Keeping main alive");
+	let nap = time::Duration::from_millis(100000000);
+	thread::sleep(nap);
 	Ok(())
 }
 fn write_err(e: Error) -> Result<()> {
@@ -101,10 +96,10 @@ fn write_err(e: Error) -> Result<()> {
 	//::std::process::exit(1);
 	Err(e)	
 }
-fn build_datacenter(scope: &crossbeam::Scope, nports: u8, ncells: usize) -> Result<Datacenter>{
+fn build_datacenter(nports: u8, ncells: usize) -> Result<Datacenter>{
 	//let edges = vec![(0,1),(1,2),(2,3),(3,4),(5,6),(6,7),(7,8),(8,9),(0,5),(1,6),(2,7),(3,8),(4,9)];
 	let edges = vec![(0,1),(1,2),(1,6),(3,4),(5,6),(6,7),(7,8),(8,9),(0,5),(2,3),(2,7),(3,8),(4,9)];
-	let dc = Datacenter::new(scope, ncells, nports, edges)?;
+	let dc = Datacenter::new(ncells, nports, edges)?;
 	let nap = time::Duration::from_millis(2000);
 	thread::sleep(nap);
 	println!("{}", dc);

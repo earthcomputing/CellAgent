@@ -2,7 +2,6 @@ use std::fmt;
 use std::sync::mpsc::channel;
 use std::sync::{Arc, Mutex};
 use std::collections::{HashMap, HashSet};
-use crossbeam::{Scope};
 use serde_json;
 use config::{MAX_ENTRIES, PathLength, PortNo, TableIndex};
 use container::Service;
@@ -66,7 +65,7 @@ impl CellAgent {
 			tenant_masks: tenant_masks, trees: Arc::new(Mutex::new(trees)), up_trees_senders: HashMap::new(),
 			up_trees_clist: HashMap::new(), ca_to_pe: ca_to_pe, packet_assemblers: PacketAssemblers::new()})
 		}
-	pub fn initialize(&mut self, scope: &Scope, ca_from_pe: CaFromPe) -> Result<()> {
+	pub fn initialize(&mut self, ca_from_pe: CaFromPe) -> Result<()> {
 		// Set up predefined trees - Must be first two in this order
 		let port_number_0 = PortNumber::new(0, self.no_ports).chain_err(|| ErrorKind::CellagentError)?;
 		let other_index = 0;
@@ -89,7 +88,7 @@ impl CellAgent {
 		self.my_entry = self.update_traph(&my_tree_id, port_number_0, 
 				traph::PortStatus::Parent, Some(gvm_equation), 
 				&mut HashSet::new(), other_index, hops, path).chain_err(|| ErrorKind::CellagentError)?; 
-		self.listen(scope, ca_from_pe).chain_err(|| ErrorKind::CellagentError)?;
+		self.listen(ca_from_pe).chain_err(|| ErrorKind::CellagentError)?;
 		Ok(())
 	}
 	pub fn get_no_ports(&self) -> PortNo { self.no_ports }	
@@ -207,7 +206,7 @@ impl CellAgent {
 		self.ca_to_pe.send(CaToPePacket::Entry(entry)).chain_err(|| ErrorKind::CellagentError)?;
 		Ok(entry)
 	}
-	fn listen(&mut self, scope: &Scope, ca_from_pe: CaFromPe) -> Result<()>{
+	fn listen(&mut self, ca_from_pe: CaFromPe) -> Result<()>{
 		let mut ca = self.clone();
 		::std::thread::spawn( move || { 
 			let _ = ca.listen_loop(ca_from_pe).chain_err(|| ErrorKind::CellagentError).map_err(|e| ca.write_err(e));

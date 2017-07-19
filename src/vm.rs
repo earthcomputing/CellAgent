@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 use std::sync::mpsc::channel;
+
 use container::{Container, Service};
 use message_types::{VmToCa, VmFromCa, VmToContainerMsg, VmToContainer, ContainerFromVm,
 	ContainerToVmMsg, ContainerToVm, VmFromContainer, ContainerVmError};

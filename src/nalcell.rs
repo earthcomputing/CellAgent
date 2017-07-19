@@ -2,7 +2,7 @@ use std::fmt;
 use std::collections::{HashMap, HashSet};
 use std::sync::mpsc;
 use std::sync::mpsc::channel;
-use crossbeam::Scope;
+
 use cellagent::{CellAgent};
 use config::{MAX_PORTS, CellNo, Json, PortNo, TableIndex};
 use message_types::{CaToPe, PeFromCa, PeToCa, CaFromPe, PortToPe, PeFromPort, PeToPort,PortFromPe};
@@ -27,7 +27,7 @@ pub struct NalCell {
 }
 
 impl NalCell {
-	pub fn new(scope: &Scope, cell_no: CellNo, nports: PortNo, is_border: bool) -> Result<NalCell> {
+	pub fn new(cell_no: CellNo, nports: PortNo, is_border: bool) -> Result<NalCell> {
 		if nports > MAX_PORTS { return Err(ErrorKind::NumberPorts(nports).into()) }
 		let cell_id = CellID::new(cell_no)?;
 		let (ca_to_pe, pe_from_ca): (CaToPe, PeFromCa) = channel();
@@ -51,9 +51,9 @@ impl NalCell {
 		}
 		let boxed_ports: Box<[Port]> = ports.into_boxed_slice();
 		let packet_engine = PacketEngine::new(&cell_id, pe_to_ca, pe_to_ports, tcp_port_nos).chain_err(|| ErrorKind::NalCellError)?;
-		packet_engine.start_threads(scope, pe_from_ca, pe_from_ports)?;
+		packet_engine.start_threads(pe_from_ca, pe_from_ports)?;
 		let mut cell_agent = CellAgent::new(&cell_id, boxed_ports.len() as u8, ca_to_pe).chain_err(|| ErrorKind::NalCellError)?;
-		cell_agent.initialize(scope, ca_from_pe)?;
+		cell_agent.initialize(ca_from_pe)?;
 		Ok(NalCell { id: cell_id, cell_no: cell_no, is_border: is_border, 
 				ports: boxed_ports, cell_agent: cell_agent, vms: Vec::new(),
 				packet_engine: packet_engine, ports_from_pe: ports_from_pe, })
