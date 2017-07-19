@@ -1,7 +1,7 @@
 use std::fmt;
 use std::sync::{Arc, Mutex};
 use std::collections::HashSet;
-use crossbeam::Scope;
+
 use config::{PortNo, TableIndex};
 use message_types::{PeFromCa, PeToCa, PeToPort, PeFromPort, CaToPePacket, PortToPePacket, PeToCaPacket};
 use name::CellID;
@@ -26,7 +26,7 @@ impl PacketEngine {
 		Ok(PacketEngine { cell_id: cell_id.clone(), routing_table: routing_table, 
 			tcp_port_nos: tcp_port_nos, pe_to_ca: packet_pe_to_ca, pe_to_ports: pe_to_ports })
 	}
-	pub fn start_threads(&self, scope: &Scope, pe_from_ca: PeFromCa, pe_from_ports: PeFromPort) -> Result<()> {			
+	pub fn start_threads(&self, pe_from_ca: PeFromCa, pe_from_ports: PeFromPort) -> Result<()> {			
 		let pe = self.clone();
 		::std::thread::spawn( move ||  {
 			let _ = pe.listen_ca(pe_from_ca).map_err(|e| pe.write_err(e));

@@ -7,6 +7,7 @@ use std::str;
 use std::hash::{Hash};
 use serde;
 use serde_json;
+
 use config::{PACKET_MIN, PACKET_MAX, PAYLOAD_DEFAULT_ELEMENT, 
 	PacketElement, PacketNo, TableIndex, Uniquifier};
 use message::{Message, MsgDirection, TypePlusMsg};

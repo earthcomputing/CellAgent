@@ -1,10 +1,9 @@
 use std::fmt;
 use std::collections::HashSet;
 use std::sync::atomic::{ATOMIC_USIZE_INIT, AtomicUsize, Ordering};
-use serde;
 use serde_json;
 use cellagent::{CellAgent};
-use config::{MAX_PORTS, PAYLOAD_DEFAULT_ELEMENT, PathLength, PortNo, TableIndex};
+use config::{MAX_PORTS, PathLength, PortNo, TableIndex};
 use container::Service;
 use gvm_equation::{GvmEquation, GvmVariables};
 use name::{CellID, TreeID, UpTreeID};

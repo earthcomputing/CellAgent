@@ -1,5 +1,6 @@
 use std::fmt;
 use std::collections::HashSet;
+
 use config::{MAX_PORTS, MAX_ENTRIES, PortNo, TableIndex};
 use utility::{Mask, PortNumber};
 

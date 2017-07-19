@@ -2,7 +2,7 @@ use std::fmt;
 use std::sync::atomic::AtomicBool;
 use std::sync::{Arc};
 use std::sync::atomic::Ordering::SeqCst;
-use crossbeam::{Scope, ScopedJoinHandle};
+
 use config::{PortNo, TableIndex};
 use message_types::{PortToLink, PortFromLink, PortToPe, PortFromPe, LinkToPortPacket, PortToPePacket,
 			  PortToOutside, PortFromOutside};
@@ -41,7 +41,7 @@ impl Port {
 	pub fn set_disconnected(&self) { self.is_connected.store(false, SeqCst); }
 	pub fn is_broken(&self) -> bool { self.is_broken.load(SeqCst) }
 	pub fn is_border(&self) -> bool { self.is_border }
-	pub fn outside_channel(&self, scope: &Scope, port_to_outside: PortToOutside, 
+	pub fn outside_channel(&self, port_to_outside: PortToOutside, 
 			port_from_outside: PortFromOutside, port_from_pe: PortFromPe) 
 			-> Result<()> {
 		let port = self.clone();
@@ -69,7 +69,7 @@ impl Port {
 			port_to_outside.send(packet).chain_err(|| ErrorKind::PortError)?;
 		}		
 	}
-	pub fn link_channel(&self, scope: &Scope, port_to_link: PortToLink, 
+	pub fn link_channel(&self, port_to_link: PortToLink, 
 			port_from_link: PortFromLink, port_from_pe: PortFromPe) 
 				-> Result<()> {
 		let port = self.clone();

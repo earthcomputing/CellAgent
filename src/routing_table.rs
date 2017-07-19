@@ -1,4 +1,5 @@
 use std::fmt;
+
 use config::{MAX_ENTRIES, MAX_PORTS, TableIndex};
 use name::CellID;
 use routing_table_entry::{RoutingTableEntry};

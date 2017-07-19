@@ -1,6 +1,6 @@
 use std::fmt;
 use std::io::{stdin, stdout, Write};
-use crossbeam::Scope;
+
 use container::Service;
 use message::{Message, MsgType, SetupVMsMsg};
 use message_types::{OutsideToPort, OutsideFromPort};
@@ -14,15 +14,15 @@ impl Noc {
 	pub fn new() -> Noc {
 		Noc { packet_assemblers: PacketAssemblers::new() }
 	}
-	pub fn initialize(&self, scope: &Scope,
+	pub fn initialize(&self, 
 			outside_to_port: OutsideToPort, outside_from_port: OutsideFromPort) -> Result<()> {
 		let noc = self.clone();
 		let outside_to_port_clone = outside_to_port.clone();
-		scope.spawn( move || {
+		::std::thread::spawn( move || {
 			let _ = noc.listen_outside(outside_to_port_clone).map_err(|e| noc.write_err(e));
 		});
 		let mut noc = self.clone();
-		scope.spawn( move || {
+		::std::thread::spawn( move || {
 			let _ = noc.listen_port(outside_from_port).map_err(|e| noc.write_err(e));	
 		});
 		Ok(())

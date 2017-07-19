@@ -1,5 +1,6 @@
 use std::fmt;
 use std::collections::HashSet;
+
 use config::{MAX_PORTS, PathLength, PortNo, TableIndex};
 use name::{CellID, TreeID};
 use routing_table_entry::{RoutingTableEntry};

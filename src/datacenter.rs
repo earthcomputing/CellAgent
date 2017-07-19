@@ -1,15 +1,12 @@
 use std::fmt;
 use std::cmp::max;
 use std::sync::mpsc::channel;
-use std::collections::HashMap;
-use crossbeam::Scope;
 
 use config::{PortNo, CellNo};
 use message_types::{LinkToPort, PortFromLink, PortToLink, LinkFromPort,
 	OutsideToPort, OutsideFromPort, PortToOutside, PortFromOutside};
 use link::{Link};
 use nalcell::{NalCell};
-use name::CellID;
 use noc::Noc;
 
 type Edge = (usize, usize);
@@ -21,7 +18,7 @@ pub struct Datacenter {
 	noc:   Noc
 }
 impl Datacenter {
-	pub fn new(scope: &Scope, ncells: CellNo, nports: PortNo, edge_list: Vec<(CellNo,CellNo)>) -> 
+	pub fn new(ncells: CellNo, nports: PortNo, edge_list: Vec<(CellNo,CellNo)>) -> 
 				Result<Datacenter> {
 		if ncells < 2  {
 			println!("ncells {}", ncells);
@@ -34,9 +31,9 @@ impl Datacenter {
 		let mut cells = Vec::new();
 		for i in 0..ncells {
 			let is_border = (i % 3) == 1;
-			let cell = NalCell::new(scope, i, nports, is_border).chain_err(|| ErrorKind::DatacenterError)?;
+			let cell = NalCell::new(i, nports, is_border).chain_err(|| ErrorKind::DatacenterError)?;
 			cells.push(cell);
-		}	
+		}
 		let mut links: Vec<Link> = Vec::new();
 		for edge in edge_list {
 			if edge.0 == edge.1 { return Err(ErrorKind::Wire(edge).into()); }
@@ -58,16 +55,16 @@ impl Datacenter {
 			let (link_to_rite, rite_from_link): (LinkToPort, PortFromLink) = channel();
 			let (left_to_link, link_from_left): (PortToLink, LinkFromPort) = channel();
 			let (rite_to_link, link_from_rite): (PortToLink, LinkFromPort) = channel();
-			left.link_channel(scope, left_to_link, left_from_link, left_from_pe).chain_err(|| ErrorKind::DatacenterError)?;
-			rite.link_channel(scope, rite_to_link, rite_from_link, rite_from_pe).chain_err(|| ErrorKind::DatacenterError)?;
+			left.link_channel(left_to_link, left_from_link, left_from_pe).chain_err(|| ErrorKind::DatacenterError)?;
+			rite.link_channel(rite_to_link, rite_from_link, rite_from_pe).chain_err(|| ErrorKind::DatacenterError)?;
 			let link = Link::new(&left.get_id(), &rite.get_id())?;
-			let link_handles = link.start_threads(scope, link_to_left, link_from_left, link_to_rite, link_from_rite)?;
+			let link_handles = link.start_threads(link_to_left, link_from_left, link_to_rite, link_from_rite)?;
 			links.push(link); 
 		} 
 		let (outside_to_primary, primary_from_outside): (OutsideToPort, OutsideFromPort) = channel();
 		let (primary_to_outside, outside_from_primary): (PortToOutside, PortFromOutside) = channel();
 		let noc = Noc::new();
-		noc.initialize(scope, outside_to_primary, outside_from_primary)?;
+		noc.initialize(outside_to_primary, outside_from_primary)?;
 		{
 			let mut boundary_cells = Datacenter::get_boundary_cells(&mut cells)?;
 			if boundary_cells.len() < 2 {
@@ -75,7 +72,7 @@ impl Datacenter {
 			} else {
 				let (mut primary, _) = boundary_cells.split_at_mut(1);
 				let (port, port_from_pe) = primary[0].get_free_tcp_port_mut()?;
-				port.outside_channel(scope, primary_to_outside, primary_from_outside, port_from_pe)?;
+				port.outside_channel(primary_to_outside, primary_from_outside, port_from_pe)?;
 			}
 		}
 		Ok(Datacenter { cells: cells, links: links, noc: noc })
