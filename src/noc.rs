@@ -9,7 +9,7 @@ use datacenter::Datacenter;
 use message::{Message, MsgType, SetupVMsMsg};
 use message_types::{NocToPort, NocFromPort, PortToNoc, PortFromNoc, NocFromOutside};
 use name::UpTreeID;
-use packet::{PacketAssemblers, Packetizer};
+use packet::{PacketAssemblers, Packetizer, Serializer};
 
 #[derive(Debug, Clone)]
 pub struct Noc {
@@ -60,25 +60,28 @@ impl Noc {
 			let packet = noc_from_port.recv()?;
 			if let Some(packets) = Packetizer::process_packet(&mut self.packet_assemblers, packet) {
 				let (msg_type, serialized_msg) = MsgType::get_type_serialized(packets).chain_err(|| ErrorKind::NocError)?;
-				let mut msg = self.get_msg(msg_type, serialized_msg)?;
+				let msg = self.get_msg(msg_type, serialized_msg)?;
 				println!("Noc received {}", msg);
 			}
 		}
 	}
 	fn listen_outside(&self, noc_from_outside: NocFromOutside, noc_to_port: NocToPort) -> Result<()> {
 		loop {
-			let input = noc_from_outside.recv()?;
-			match input.as_str() {
-				"startvms\n" => Noc::setup_vms(noc_to_port.clone())?,
-				_ => println!("Got command: {}", input)
+			let input = &noc_from_outside.recv()?;
+			let mut parsed = input.split_whitespace();
+			if let Some(cmd) = parsed.next() {
+				match cmd {
+					"new_uptree" => self.new_uptree(noc_to_port.clone())?,
+					_ => println!("Unknown command: {}", input)
+				};
 			}
 		}
 	}
-	fn setup_vms(noc_to_port: NocToPort) -> Result<()> {
+	fn new_uptree(&self, noc_to_port: NocToPort) -> Result<()> {
 		let msg = SetupVMsMsg::new("NocMaster", vec![vec![Service::NocMaster]])?;
 		let other_index = 0;
 		let direction = msg.get_header().get_direction();
-		let bytes = Packetizer::serialize(&msg)?;
+		let bytes = Serializer::serialize(&msg)?;
 		let packets = Packetizer::packetize(bytes, direction, other_index)?;
 		for packet in packets.iter() {
 			noc_to_port.send(**packet)?;
@@ -126,5 +129,9 @@ error_chain! {
 		Packet(::packet::Error, ::packet::ErrorKind);
 	}
 	errors { NocError
+		Input(input: String) {
+			description("Invalid input")
+			display("{} is not a valid command to the NOC", input)
+		}
 	}
 }
