@@ -10,7 +10,7 @@ use gvm_equation::{GvmEquation, GvmVariables};
 use message::{DiscoverMsg, DiscoverDMsg, StackTreeMsg, SetupVMsMsg, Message, MsgType};
 use message_types::{CaToPe, CaFromPe, CaToVm, VmFromCa, VmToCa, CaFromVm, CaToPePacket, PeToCaPacket};
 use name::{Name, CellID, TreeID, UpTreeID, VmID};
-use packet::{Packet, Packetizer, PacketAssemblers};
+use packet::{Packet, Packetizer, PacketAssemblers, Serializer};
 use port;
 use routing_table_entry::{RoutingTableEntry};
 use traph;
@@ -264,7 +264,7 @@ impl CellAgent {
 		let msg = DiscoverMsg::new(&tree_id, my_table_index, &self.cell_id, hops, path);
 		let other_index = 0;
 		let direction = msg.get_header().get_direction();
-		let bytes = Packetizer::serialize(&msg).chain_err(|| ErrorKind::CellagentError)?;
+		let bytes = Serializer::serialize(&msg).chain_err(|| ErrorKind::CellagentError)?;
 		let packets = Packetizer::packetize(bytes, direction, other_index).chain_err(|| ErrorKind::CellagentError)?;
 		//println!("CellAgent {}: sending packet {} on port {} {} ", self.cell_id, packets[0].get_count(), port_no, msg);
 		let connected_tree_index = (*self.connected_tree_entry.lock().unwrap()).get_index();
@@ -293,7 +293,7 @@ impl CellAgent {
 		let other_index = 0;
 		for msg in discover_msgs.iter() {
 			let direction = msg.get_header().get_direction();
-			let bytes = Packetizer::serialize(msg).chain_err(|| ErrorKind::CellagentError)?;
+			let bytes = Serializer::serialize(msg).chain_err(|| ErrorKind::CellagentError)?;
 			let packets = Packetizer::packetize(bytes, direction, other_index).chain_err(|| ErrorKind::CellagentError)?;
 			self.send_msg(&self.connected_tree_id, packets, mask).chain_err(|| ErrorKind::CellagentError)?;
 			//println!("CellAgent {}: forward on ports {:?} {}", self.cell_id, mask.get_port_nos(), msg);

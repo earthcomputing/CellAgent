@@ -7,7 +7,7 @@ use config::{MAX_PORTS, PathLength, PortNo, TableIndex};
 use container::Service;
 use gvm_equation::{GvmEquation, GvmVariables};
 use name::{CellID, TreeID, UpTreeID};
-use packet::{Packet, Packetizer};
+use packet::{Packet, Packetizer, Serializer};
 use traph;
 use utility::{DEFAULT_USER_MASK, Mask, Path, PortNumber};
 
@@ -153,7 +153,7 @@ impl Message for DiscoverMsg {
 		let other_index = 0;
 		let discoverd_msg = DiscoverDMsg::new(new_tree_id.clone(), my_index);
 		let direction = discoverd_msg.get_header().get_direction();
-		let bytes = Packetizer::serialize(&discoverd_msg).chain_err(|| ErrorKind::MessageError)?;
+		let bytes = Serializer::serialize(&discoverd_msg).chain_err(|| ErrorKind::MessageError)?;
 		let packets = Packetizer::packetize(bytes, direction, other_index).chain_err(|| ErrorKind::MessageError)?;
 		//println!("DiscoverMsg {}: sending discoverd for tree {} packet {} {}",ca.get_id(), new_tree_id, packets[0].get_count(), discoverd_msg);
 		let mask = Mask::new(port_number);
@@ -162,7 +162,7 @@ impl Message for DiscoverMsg {
 		self.update_discover_msg(ca.get_id(), my_index);
 		let control_tree_index = 0;
 		let direction = self.get_header().get_direction();
-		let bytes = Packetizer::serialize(&self.clone()).chain_err(|| ErrorKind::MessageError)?;
+		let bytes = Serializer::serialize(&self.clone()).chain_err(|| ErrorKind::MessageError)?;
 		let packets = Packetizer::packetize(bytes, direction, other_index).chain_err(|| ErrorKind::MessageError)?;
 		let user_mask = DEFAULT_USER_MASK.all_but_port(PortNumber::new(port_no, ca.get_no_ports()).chain_err(|| ErrorKind::MessageError)?);
 		ca.add_discover_msg(self.clone());

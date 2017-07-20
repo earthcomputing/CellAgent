@@ -9,14 +9,14 @@ use serde;
 use serde_json;
 
 use config::{PACKET_MIN, PACKET_MAX, PAYLOAD_DEFAULT_ELEMENT, 
-	PacketElement, PacketNo, TableIndex, Uniquifier};
+	PacketElement, PacketNo, TableIndex, Msg_id};
 use message::{Message, MsgDirection, TypePlusMsg};
  
 //const LARGEST_MSG: usize = std::u32::MAX as usize;
 const PAYLOAD_MIN: usize = PACKET_MAX - PACKET_HEADER_SIZE;
 const PAYLOAD_MAX: usize = PACKET_MAX - PACKET_HEADER_SIZE;
 
-pub type PacketAssemblers = HashMap<Uniquifier, PacketAssembler>;
+pub type PacketAssemblers = HashMap<Msg_id, PacketAssembler>;
 
 static PACKET_COUNT: AtomicUsize = ATOMIC_USIZE_INIT;
 #[derive(Debug, Copy)]
@@ -55,7 +55,7 @@ impl Clone for Packet {
 const PACKET_HEADER_SIZE: usize = 8 + 2 + 4 + 1 + 1; // Last value is padding
 #[derive(Debug, Copy, Clone)]
 pub struct PacketHeader {
-	uniquifier: u64,	// Unique identifier of this message
+	msg_id: u64,	// Unique identifier of this message
 	size: u16,			// Number of packets remaining in message if not last packet
 						// Number of bytes in last packet if last packet, 0 => Error
 	other_index: u32,	// Routing table index on receiving cell
@@ -69,18 +69,18 @@ pub struct PacketHeader {
 }
 #[deny(unused_must_use)]
 impl PacketHeader {
-	pub fn new(uniquifier: Uniquifier, size: PacketNo, other_index: TableIndex, direction: MsgDirection,
+	pub fn new(msg_id: Msg_id, size: PacketNo, other_index: TableIndex, direction: MsgDirection,
 			is_last_packet: bool) -> PacketHeader {
 		// Assertion fails if I forgot to change PACKET_HEADER_SIZE when I changed PacketHeader struct
 		assert_eq!(PACKET_HEADER_SIZE, mem::size_of::<PacketHeader>());
 		let flags = if is_last_packet { 2 } else { 0 };
-		let mut ph = PacketHeader { uniquifier: uniquifier, size: size, 
+		let mut ph = PacketHeader { msg_id: msg_id, size: size, 
 			other_index: other_index, flags: flags };
 		ph.set_direction(direction);
 		ph
 	}
-	pub fn get_uniquifier(&self) -> Uniquifier { self.uniquifier }
-//	fn set_uniquifier(&mut self, uniquifier: Uniquifier) { self.uniquifier = uniquifier; }
+	pub fn get_msg_id(&self) -> Msg_id { self.msg_id }
+//	fn set_msg_id(&mut self, msg_id: Msg_id) { self.msg_id = msg_id; }
 	pub fn get_size(&self) -> PacketNo { self.size }
 	pub fn is_leafcast(&self) -> bool { (self.flags & 1) == 1 }
 	pub fn is_rootcast(&self) -> bool { !self.is_leafcast() }
@@ -139,25 +139,8 @@ impl fmt::Debug for Payload {
 		write!(f, "{}", s)
 	}
 }
-pub struct Packetizer {}
-impl Packetizer {
-	pub fn process_packet(packet_assemblers: &mut PacketAssemblers, packet: Packet) -> Option<Vec<Packet>> {
-		let uniquifier = packet.get_header().get_uniquifier();
-		let mut packet_assembler = match packet_assemblers.remove(&uniquifier) {
-			Some(pa) => pa,
-			None => {
-				let packet_assembler = PacketAssembler::new(uniquifier);
-				packet_assemblers.insert(uniquifier, packet_assembler);
-				packet_assemblers.remove(&uniquifier).unwrap()
-			}
-		};
-		if let Some(packets) = packet_assembler.add(packet) {
-			Some(packets)
-		} else {
-			packet_assemblers.insert(uniquifier, packet_assembler);
-			None
-		}
-	}
+pub struct Serializer {}
+impl Serializer {
 	pub fn serialize<M>(msg: &M) -> Result<Box<Vec<u8>>>
 			where M: Message + Hash + serde::Serialize {		
 		let msg_type = msg.get_header().get_msg_type();
@@ -167,6 +150,26 @@ impl Packetizer {
 		let serialized = serde_json::to_string(&msg_obj).chain_err(|| ErrorKind::PacketError)?;
 		let msg_bytes = serialized.clone().into_bytes();
 		Ok(Box::new(msg_bytes))
+	}	
+}
+pub struct Packetizer {}
+impl Packetizer {
+	pub fn process_packet(packet_assemblers: &mut PacketAssemblers, packet: Packet) -> Option<Vec<Packet>> {
+		let msg_id = packet.get_header().get_msg_id();
+		let mut packet_assembler = match packet_assemblers.remove(&msg_id) {
+			Some(pa) => pa,
+			None => {
+				let packet_assembler = PacketAssembler::new(msg_id);
+				packet_assemblers.insert(msg_id, packet_assembler);
+				packet_assemblers.remove(&msg_id).unwrap()
+			}
+		};
+		if let Some(packets) = packet_assembler.add(packet) {
+			Some(packets)
+		} else {
+			packet_assemblers.insert(msg_id, packet_assembler);
+			None
+		}
 	}
 	pub fn packetize(msg_bytes: Box<Vec<u8>>, direction: MsgDirection, other_index: TableIndex) 
 			-> Result<Vec<Box<Packet>>> {
@@ -200,10 +203,13 @@ impl Packetizer {
 		for packet in packets {
 			let header = packet.get_header();
 			let is_last_packet = header.is_last_packet();
-			let last_packet_size = header.get_size();
-			let payload = packet.get_payload(); 
-			all_bytes.extend_from_slice(payload.get_bytes().as_slice());
-			if is_last_packet { all_bytes.truncate(last_packet_size as usize); }
+			let last_packet_size = header.get_size() as usize;
+			let payload = packet.get_payload();
+			let mut bytes = payload.get_bytes();
+			if is_last_packet {
+				bytes.truncate(last_packet_size)
+			};
+			all_bytes.extend_from_slice(&bytes);
 		}
 		Ok(str::from_utf8(&all_bytes).chain_err(|| ErrorKind::PacketError)?.to_string())
 	}
@@ -217,14 +223,14 @@ impl Packetizer {
 }
 #[derive(Debug, Clone)]
 pub struct PacketAssembler {
-	uniquifier: Uniquifier,
+	msg_id: Msg_id,
 	packets: Vec<Packet>,
 }
 impl PacketAssembler {
-	pub fn new(uniquifier: Uniquifier) -> PacketAssembler {
-		PacketAssembler { uniquifier: uniquifier, packets: Vec::new() }
+	pub fn new(msg_id: Msg_id) -> PacketAssembler {
+		PacketAssembler { msg_id: msg_id, packets: Vec::new() }
 	}
-	pub fn get_uniquifier(&self) -> Uniquifier { self.uniquifier }
+	pub fn get_msg_id(&self) -> Msg_id { self.msg_id }
 	pub fn add(&mut self, packet: Packet) -> Option<Vec<Packet>> { 
 		self.packets.push(packet); 
 		let header = packet.get_header();
