@@ -5,7 +5,7 @@ use std::thread::{JoinHandle, spawn};
 
 use config::{MIN_BOUNDARY_CELLS, PortNo, CellNo};
 use message_types::{LinkToPort, PortFromLink, PortToLink, LinkFromPort,
-	OutsideToPort, OutsideFromPort, PortToOutside, PortFromOutside};
+	NocToPort, NocFromPort, PortToNoc, PortFromNoc};
 use link::{Link};
 use nalcell::{NalCell};
 use name::UpTreeID;
@@ -20,9 +20,8 @@ pub struct Datacenter {
 	links: Vec<Link>,
 }
 impl Datacenter {
-	pub fn new(name: &str) -> Result<Datacenter> {
-		let id = UpTreeID::new(name).chain_err(|| ErrorKind::DatacenterError)?;
-		Ok(Datacenter { id: id, cells: Vec::new(), links: Vec::new() }) 
+	pub fn new(id: &UpTreeID) -> Datacenter {
+		Datacenter { id: id.clone(), cells: Vec::new(), links: Vec::new() }
 	}
 	pub fn initialize(&mut self, ncells: CellNo, nports: PortNo, edge_list: Vec<(CellNo,CellNo)>) 
 			-> Result<Vec<JoinHandle<()>>> {
@@ -71,7 +70,7 @@ impl Datacenter {
 		}
 		boundary_cells
 	}
-	pub fn connect_to_noc(&mut self, port_to_outside: PortToOutside, port_from_outside: PortFromOutside)  
+	pub fn connect_to_noc(&mut self, port_to_outside: PortToNoc, port_from_outside: PortFromNoc)  
 			-> Result<()> {
 		let mut boundary_cells = self.get_boundary_cells();
 		if boundary_cells.len() < MIN_BOUNDARY_CELLS {
@@ -102,7 +101,6 @@ error_chain! {
 	links {
 		Link(::link::Error, ::link::ErrorKind);
 		NalCell(::nalcell::Error, ::nalcell::ErrorKind);
-		Noc(::noc::Error, ::noc::ErrorKind);
 		Port(::port::Error, ::port::ErrorKind);
 	}
 	errors { DatacenterError

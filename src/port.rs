@@ -5,7 +5,7 @@ use std::sync::atomic::Ordering::SeqCst;
 
 use config::{PortNo, TableIndex};
 use message_types::{PortToLink, PortFromLink, PortToPe, PortFromPe, LinkToPortPacket, PortToPePacket,
-			  PortToOutside, PortFromOutside};
+			  PortToNoc, PortFromNoc};
 use name::{PortID, CellID};
 use utility::PortNumber;
 
@@ -41,8 +41,8 @@ impl Port {
 	pub fn set_disconnected(&self) { self.is_connected.store(false, SeqCst); }
 	pub fn is_broken(&self) -> bool { self.is_broken.load(SeqCst) }
 	pub fn is_border(&self) -> bool { self.is_border }
-	pub fn outside_channel(&self, port_to_outside: PortToOutside, 
-			port_from_outside: PortFromOutside, port_from_pe: PortFromPe) 
+	pub fn outside_channel(&self, port_to_outside: PortToNoc, 
+			port_from_outside: PortFromNoc, port_from_pe: PortFromPe) 
 			-> Result<()> {
 		let port = self.clone();
 		let outside_handle = ::std::thread::spawn( move || {
@@ -54,7 +54,7 @@ impl Port {
 		});
 		Ok(())
 	}
-	fn listen_outside_for_pe(&self, port_from_outside: PortFromOutside) -> Result<()> {
+	fn listen_outside_for_pe(&self, port_from_outside: PortFromNoc) -> Result<()> {
 		let port = self.clone();
 		let other_index = 0 as TableIndex;
 		loop {
@@ -62,7 +62,7 @@ impl Port {
 			self.port_to_pe.send(PortToPePacket::Packet((port.port_number.get_port_no(), packet))).chain_err(|| ErrorKind::PortError)?;
 		}
 	}
-	fn listen_pe_for_outside(&mut self, port_to_outside: PortToOutside, port_from_pe: PortFromPe) -> Result<()> {
+	fn listen_pe_for_outside(&mut self, port_to_outside: PortToNoc, port_from_pe: PortFromPe) -> Result<()> {
 		loop {
 			//println!("Port {}: waiting for packet from pe", port.id);
 			let packet = port_from_pe.recv().chain_err(|| "Receive from pe for outside")?;

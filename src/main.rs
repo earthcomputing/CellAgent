@@ -34,12 +34,13 @@ mod utility;
 mod vm;
 
 use std::{thread, time};
+use std::io::{stdin, stdout, Write};
 use std::sync::mpsc::channel;
 
 use config::{PHYSICAL_UP_TREE_NAME, NCELLS, NPORTS, NLINKS, CellNo};
 use datacenter::{Datacenter};
 use ecargs::{ECArgs};
-use message_types::{OutsideToPort, OutsideFromPort, PortToOutside, PortFromOutside};
+use message_types::{OutsideToNoc, NocFromOutside};
 use noc::Noc;
 
 fn main() {
@@ -74,33 +75,24 @@ fn run() -> Result<()> {
 		Err(err) => panic!("Argument Error: {}", err)
 	};
 	//let cell_id = CellID::new("foo bar").chain_err(|| "testing bad name")?;
-	let (ncells,nports) = ecargs.get_args();
+	let (ncells, nports) = ecargs.get_args();
 	println!("Main: {} ports for each of {} cells", nports, ncells);
 	//let edges = vec![(0,1),(1,2),(2,3),(3,4),(5,6),(6,7),(7,8),(8,9),(0,5),(1,6),(2,7),(3,8),(4,9)];
 	let edges = vec![(0,1),(1,2),(1,6),(3,4),(5,6),(6,7),(7,8),(8,9),(0,5),(2,3),(2,7),(3,8),(4,9)];
-	let (mut dc, join_handles) = build_datacenter(nports, ncells, edges)?;
-	let nap = time::Duration::from_millis(1000);
-	thread::sleep(nap);
-	println!("{}", dc);
-	control(&mut dc)?;
+	let (outside_to_noc, noc_from_outside): (OutsideToNoc, NocFromOutside) = channel();
+	let noc = Noc::new(PHYSICAL_UP_TREE_NAME)?;
+	let join_handles = noc.initialize(ncells, nports, edges, noc_from_outside)?;
+	loop {
+		stdout().write(b"Enter a command\n")?;
+		let mut input = String::new();
+		let _ = stdin().read_line(&mut input).chain_err(|| "Error reading from console")?;
+		outside_to_noc.send(input)?;
+	}
 	for handle in join_handles {
 		let _ = handle.join();
-	};
+	}
 	println!("All links broken");
 	Ok(())
-}
-fn control(dc: &mut Datacenter) -> Result<()> {
-	let (outside_to_port, port_from_outside): (OutsideToPort, OutsideFromPort) = channel();
-	let (port_to_outside, outside_from_port): (PortToOutside, PortFromOutside) = channel();
-	dc.connect_to_noc(port_to_outside, port_from_outside)?;
-	let noc = Noc::new();
-	noc.initialize(outside_to_port, outside_from_port)?;
-	Ok(())
-}
-fn build_datacenter(nports: u8, ncells: usize, edges: Vec<(CellNo,CellNo)>) -> Result<(Datacenter, Vec<thread::JoinHandle<()>>)> {
-	let mut dc = Datacenter::new(PHYSICAL_UP_TREE_NAME)?;
-	let join_handles = dc.initialize(ncells, nports, edges)?;
-	Ok((dc, join_handles))
 }
 fn write_err(e: Error) -> Result<()> { 
 	use ::std::io::Write;
@@ -117,8 +109,10 @@ fn write_err(e: Error) -> Result<()> {
 }
 error_chain! {
 	foreign_links {
+		Io(::std::io::Error);
 		Recv(::std::sync::mpsc::RecvError);
-		Send(::message_types::OutsidePortError);
+		SendPort(::message_types::NocPortError);
+		SendNoc(::message_types::OutsideNocError);
 	}
 	links {
 		DatacenterError(datacenter::Error, datacenter::ErrorKind);
