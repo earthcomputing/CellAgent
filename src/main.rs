@@ -36,7 +36,7 @@ mod vm;
 use std::{thread, time};
 use std::sync::mpsc::channel;
 
-use config::{NCELLS,NPORTS,NLINKS};
+use config::{PHYSICAL_UP_TREE_NAME, NCELLS, NPORTS, NLINKS, CellNo};
 use datacenter::{Datacenter};
 use ecargs::{ECArgs};
 use message_types::{OutsideToPort, OutsideFromPort, PortToOutside, PortFromOutside};
@@ -76,11 +76,17 @@ fn run() -> Result<()> {
 	//let cell_id = CellID::new("foo bar").chain_err(|| "testing bad name")?;
 	let (ncells,nports) = ecargs.get_args();
 	println!("Main: {} ports for each of {} cells", nports, ncells);
-	let (mut dc, join_handles) = build_datacenter(nports, ncells)?;
+	//let edges = vec![(0,1),(1,2),(2,3),(3,4),(5,6),(6,7),(7,8),(8,9),(0,5),(1,6),(2,7),(3,8),(4,9)];
+	let edges = vec![(0,1),(1,2),(1,6),(3,4),(5,6),(6,7),(7,8),(8,9),(0,5),(2,3),(2,7),(3,8),(4,9)];
+	let (mut dc, join_handles) = build_datacenter(nports, ncells, edges)?;
+	let nap = time::Duration::from_millis(1000);
+	thread::sleep(nap);
+	println!("{}", dc);
 	control(&mut dc)?;
 	for handle in join_handles {
 		let _ = handle.join();
 	};
+	println!("All links broken");
 	Ok(())
 }
 fn control(dc: &mut Datacenter) -> Result<()> {
@@ -91,15 +97,9 @@ fn control(dc: &mut Datacenter) -> Result<()> {
 	noc.initialize(outside_to_port, outside_from_port)?;
 	Ok(())
 }
-fn build_datacenter(nports: u8, ncells: usize) -> Result<(Datacenter, Vec<thread::JoinHandle<()>>)> {
-	//let edges = vec![(0,1),(1,2),(2,3),(3,4),(5,6),(6,7),(7,8),(8,9),(0,5),(1,6),(2,7),(3,8),(4,9)];
-	let edges = vec![(0,1),(1,2),(1,6),(3,4),(5,6),(6,7),(7,8),(8,9),(0,5),(2,3),(2,7),(3,8),(4,9)];
-	let mut dc = Datacenter::new();
+fn build_datacenter(nports: u8, ncells: usize, edges: Vec<(CellNo,CellNo)>) -> Result<(Datacenter, Vec<thread::JoinHandle<()>>)> {
+	let mut dc = Datacenter::new(PHYSICAL_UP_TREE_NAME)?;
 	let join_handles = dc.initialize(ncells, nports, edges)?;
-	let nap = time::Duration::from_millis(1000);
-	thread::sleep(nap);
-	println!("{}", dc);
-	println!("All links broken");
 	Ok((dc, join_handles))
 }
 fn write_err(e: Error) -> Result<()> { 
