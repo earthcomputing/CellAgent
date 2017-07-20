@@ -8,18 +8,21 @@ use message_types::{LinkToPort, PortFromLink, PortToLink, LinkFromPort,
 	OutsideToPort, OutsideFromPort, PortToOutside, PortFromOutside};
 use link::{Link};
 use nalcell::{NalCell};
+use name::UpTreeID;
 use noc::Noc;
 
 type Edge = (usize, usize);
 
 #[derive(Debug)]
 pub struct Datacenter {
+	id: UpTreeID,
 	cells: Vec<NalCell>,
 	links: Vec<Link>,
 }
 impl Datacenter {
-	pub fn new() -> Datacenter {
-		Datacenter { cells: Vec::new(), links: Vec::new() } 
+	pub fn new(name: &str) -> Result<Datacenter> {
+		let id = UpTreeID::new(name).chain_err(|| ErrorKind::DatacenterError)?;
+		Ok(Datacenter { id: id, cells: Vec::new(), links: Vec::new() }) 
 	}
 	pub fn initialize(&mut self, ncells: CellNo, nports: PortNo, edge_list: Vec<(CellNo,CellNo)>) 
 			-> Result<Vec<JoinHandle<()>>> {

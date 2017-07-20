@@ -29,3 +29,4 @@ pub const PACKET_MIN: usize = 64;
 pub const PACKET_MAX: usize = 9000;
 // Size of chunk identifier 
 //pub const CHUNK_ID_SIZE: u64 = 48;
+pub const PHYSICAL_UP_TREE_NAME: &str = "Physical";
