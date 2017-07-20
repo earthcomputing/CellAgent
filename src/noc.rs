@@ -14,8 +14,8 @@ impl Noc {
 	pub fn new() -> Noc {
 		Noc { packet_assemblers: PacketAssemblers::new() }
 	}
-	pub fn initialize(&self, 
-			outside_to_port: OutsideToPort, outside_from_port: OutsideFromPort) -> Result<()> {
+	pub fn initialize(&self, outside_to_port: OutsideToPort, outside_from_port: OutsideFromPort) 
+			-> Result<()> {
 		let noc = self.clone();
 		let outside_to_port_clone = outside_to_port.clone();
 		::std::thread::spawn( move || {
