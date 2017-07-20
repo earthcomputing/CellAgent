@@ -1,8 +1,9 @@
 use std::fmt;
 use std::cmp::max;
 use std::sync::mpsc::channel;
+use std::thread::{JoinHandle, spawn};
 
-use config::{PortNo, CellNo};
+use config::{MIN_BOUNDARY_CELLS, PortNo, CellNo};
 use message_types::{LinkToPort, PortFromLink, PortToLink, LinkFromPort,
 	OutsideToPort, OutsideFromPort, PortToOutside, PortFromOutside};
 use link::{Link};
@@ -15,30 +16,25 @@ type Edge = (usize, usize);
 pub struct Datacenter {
 	cells: Vec<NalCell>,
 	links: Vec<Link>,
-	noc:   Noc
 }
 impl Datacenter {
-	pub fn new(ncells: CellNo, nports: PortNo, edge_list: Vec<(CellNo,CellNo)>) -> 
-				Result<Datacenter> {
-		if ncells < 2  {
-			println!("ncells {}", ncells);
-			return Err(ErrorKind::CellsSize(ncells).into());
-		}
-		if edge_list.len() < ncells - 1 {
-			println!("nlinks {}", edge_list.len());
-			return Err(ErrorKind::LinksSize(edge_list.len()).into());			
-		}
-		let mut cells = Vec::new();
+	pub fn new() -> Datacenter {
+		Datacenter { cells: Vec::new(), links: Vec::new() } 
+	}
+	pub fn initialize(&mut self, ncells: CellNo, nports: PortNo, edge_list: Vec<(CellNo,CellNo)>) 
+			-> Result<Vec<JoinHandle<()>>> {
+		if ncells < 1  { return Err(ErrorKind::Cells(ncells).into()); }
+		if edge_list.len() < ncells - 1 { return Err(ErrorKind::Edges(edge_list.len()).into()); }
 		for i in 0..ncells {
 			let is_border = (i % 3) == 1;
 			let cell = NalCell::new(i, nports, is_border).chain_err(|| ErrorKind::DatacenterError)?;
-			cells.push(cell);
+			self.cells.push(cell);
 		}
-		let mut links: Vec<Link> = Vec::new();
+		let mut link_handles = Vec::new();
 		for edge in edge_list {
 			if edge.0 == edge.1 { return Err(ErrorKind::Wire(edge).into()); }
 			if (edge.0 > ncells) | (edge.1 >= ncells) { return Err(ErrorKind::Wire(edge).into()); }
-			let split = cells.split_at_mut(max(edge.0,edge.1));
+			let split = self.cells.split_at_mut(max(edge.0,edge.1));
 			let mut cell = match split.0.get_mut(edge.0) {
 				Some(c) => c,
 				None => return Err(ErrorKind::Wire(edge).into())
@@ -58,40 +54,32 @@ impl Datacenter {
 			left.link_channel(left_to_link, left_from_link, left_from_pe).chain_err(|| ErrorKind::DatacenterError)?;
 			rite.link_channel(rite_to_link, rite_from_link, rite_from_pe).chain_err(|| ErrorKind::DatacenterError)?;
 			let link = Link::new(&left.get_id(), &rite.get_id())?;
-			let link_handles = link.start_threads(link_to_left, link_from_left, link_to_rite, link_from_rite)?;
-			links.push(link); 
+			let mut handle_pair = link.start_threads(link_to_left, link_from_left, link_to_rite, link_from_rite)?;
+			link_handles.append(&mut handle_pair);
+			self.links.push(link); 
 		} 
-		let (outside_to_primary, primary_from_outside): (OutsideToPort, OutsideFromPort) = channel();
-		let (primary_to_outside, outside_from_primary): (PortToOutside, PortFromOutside) = channel();
-		let noc = Noc::new();
-		noc.initialize(outside_to_primary, outside_from_primary)?;
-		{
-			let mut boundary_cells = Datacenter::get_boundary_cells(&mut cells)?;
-			if boundary_cells.len() < 2 {
-				return Err(ErrorKind::Boundary.into());
-			} else {
-				let (mut primary, _) = boundary_cells.split_at_mut(1);
-				let (port, port_from_pe) = primary[0].get_free_tcp_port_mut()?;
-				port.outside_channel(primary_to_outside, primary_from_outside, port_from_pe)?;
-			}
-		}
-		Ok(Datacenter { cells: cells, links: links, noc: noc })
+		Ok(link_handles)
 	}
 	pub fn get_cells(&self) -> &Vec<NalCell> { &self.cells }
-	fn get_boundary_cells(cells: &mut Vec<NalCell>) -> Result<Vec<&mut NalCell>> {
+	fn get_boundary_cells(&mut self) -> Vec<&mut NalCell> {
 		let mut boundary_cells = Vec::new();
-		for cell in cells {
+		for cell in &mut self.cells {
 			if cell.is_border() { boundary_cells.push(cell); }
 		}
-		if boundary_cells.len() == 0 {
-			Err(ErrorKind::Boundary.into())
+		boundary_cells
+	}
+	pub fn connect_to_noc(&mut self, port_to_outside: PortToOutside, port_from_outside: PortFromOutside)  
+			-> Result<()> {
+		let mut boundary_cells = self.get_boundary_cells();
+		if boundary_cells.len() < MIN_BOUNDARY_CELLS {
+			return Err(ErrorKind::Boundary.into());
 		} else {
-			Ok(boundary_cells)
+			let (mut port, _) = boundary_cells.split_at_mut(1);
+			let (port, port_from_pe) = port[0].get_free_tcp_port_mut()?;
+			port.outside_channel(port_to_outside, port_from_outside, port_from_pe)?;
+			Ok(())
 		}
 	}
-				//	pub fn add_noc(&mut self, control: &'a NalCell, backup: &'a NalCell) {
-//		self.noc = Some(NOC::new(control, backup));
-//	}
 }
 impl fmt::Display for Datacenter { 
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result { 
@@ -117,14 +105,15 @@ error_chain! {
 	errors { DatacenterError
 		Boundary {
 			description("No boundary cells")
+			display("No boundary cells found")
 		}
-		CellsSize(n: usize) {
+		Cells(n: usize) {
 			description("Not enough cells")
-			display("The number of cells {} must be at least 2", n)
+			display("The number of cells {} must be at least 1", n)
 		}
-		LinksSize(nlinks: usize) {
+		Edges(nlinks: usize) {
 			description("Not enough cells")
-			display("{} is not enough links", nlinks)
+			display("{} is not enough links to connect all cells", nlinks)
 		}
 		Wire(edge: Edge) {
 			description("Invalid edge")
