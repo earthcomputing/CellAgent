@@ -9,7 +9,7 @@ use datacenter::Datacenter;
 use message::{Message, MsgType, SetupVMsMsg};
 use message_types::{NocToPort, NocFromPort, PortToNoc, PortFromNoc, NocFromOutside};
 use name::UpTreeID;
-use packet::{PacketAssemblers, Packetizer, Serializer};
+use packet::{PacketAssembler, PacketAssemblers, Packetizer, Serializer};
 
 #[derive(Debug, Clone)]
 pub struct Noc {
@@ -23,16 +23,17 @@ impl Noc {
 	}
 	pub fn initialize(&self, ncells: CellNo, nports: PortNo, edges: Vec<(CellNo, CellNo)>,
 			noc_from_outside: NocFromOutside) -> Result<Vec<JoinHandle<()>>> {
-		let (noc_to_port, port_from_outside): (NocToPort, NocFromPort) = channel();
-		let (port_to_outside, noc_from_port): (PortToNoc, PortFromNoc) = channel();
+		let (noc_to_port, port_from_noc): (NocToPort, NocFromPort) = channel();
+		let (port_to_noc, noc_from_port): (PortToNoc, PortFromNoc) = channel();
 		let (mut dc, join_handles) = self.build_datacenter(&self.id, nports, ncells, edges)?;
+		dc.connect_to_noc(port_to_noc, port_from_noc).chain_err(|| ErrorKind::NocError)?;
 		let noc = self.clone();
-		spawn( move || {
-			let _ = noc.listen_outside(noc_from_outside, noc_to_port).map_err(|e| noc.write_err(e));
+		spawn( move || { 
+			let _ = noc.listen_outside(noc_from_outside, noc_to_port).map_err(|e| noc.write_err("outside", e));
 		});
 		let mut noc = self.clone();
 		spawn( move || {
-			let _ = noc.listen_port(noc_from_port).map_err(|e| noc.write_err(e));	
+			let _ = noc.listen_port(noc_from_port).map_err(|e| noc.write_err("port", e));	
 		});
 		let nap = time::Duration::from_millis(1000);
 		sleep(nap);
@@ -58,10 +59,14 @@ impl Noc {
 		let noc = self.clone();
 		loop {
 			let packet = noc_from_port.recv()?;
-			if let Some(packets) = Packetizer::process_packet(&mut self.packet_assemblers, packet) {
+			let msg_id = packet.get_header().get_msg_id();
+			let mut packet_assembler = self.packet_assemblers.remove(&msg_id).unwrap_or(PacketAssembler::new(msg_id));
+			if let Some(packets) = packet_assembler.add(packet) {
 				let (msg_type, serialized_msg) = MsgType::get_type_serialized(packets).chain_err(|| ErrorKind::NocError)?;
 				let msg = self.get_msg(msg_type, serialized_msg)?;
 				println!("Noc received {}", msg);
+			} else {
+				self.packet_assemblers.insert(msg_id, packet_assembler);
 			}
 		}
 	}
@@ -88,10 +93,10 @@ impl Noc {
 		}
 		Ok(())
 	}
-	fn write_err(&self, e: Error) {
+	fn write_err(&self, s: &str, e: Error) {
 		use ::std::io::Write;
 		let stderr = &mut ::std::io::stderr();
-		let _ = writeln!(stderr, "Noc error: {}", e);
+		let _ = writeln!(stderr, "Noc {} error: {}", s, e);
 		for e in e.iter().skip(1) {
 			let _ = writeln!(stderr, "Caused by: {}", e);
 		}
