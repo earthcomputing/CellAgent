@@ -70,7 +70,7 @@ impl Datacenter {
 		}
 		boundary_cells
 	}
-	pub fn connect_to_noc(&mut self, port_to_outside: PortToNoc, port_from_outside: PortFromNoc)  
+	pub fn connect_to_noc(&mut self, port_to_noc: PortToNoc, port_from_noc: PortFromNoc)  
 			-> Result<()> {
 		let mut boundary_cells = self.get_boundary_cells();
 		if boundary_cells.len() < MIN_BOUNDARY_CELLS {
@@ -78,7 +78,7 @@ impl Datacenter {
 		} else {
 			let (mut port, _) = boundary_cells.split_at_mut(1);
 			let (port, port_from_pe) = port[0].get_free_tcp_port_mut()?;
-			port.outside_channel(port_to_outside, port_from_outside, port_from_pe)?;
+			port.outside_channel(port_to_noc, port_from_noc, port_from_pe)?;
 			Ok(())
 		}
 	}

@@ -9,7 +9,7 @@ pub type PacketElement = u8; // Packets are made up of bytes
 pub type PathLength = u32;
 pub type PortNo     = u8;
 pub type TableIndex = u32;
-pub type Msg_id = u64;
+pub type MsgID = u64;
 pub type VmNo       = usize;
 // Default inputs
 pub const NCELLS: CellNo = 10;

@@ -4,13 +4,13 @@ use std::sync::{Arc, Mutex};
 use std::collections::{HashMap, HashSet};
 use serde_json;
 
-use config::{MAX_ENTRIES, PathLength, PortNo, TableIndex};
+use config::{MAX_ENTRIES, MsgID, PathLength, PortNo, TableIndex};
 use container::Service;
 use gvm_equation::{GvmEquation, GvmVariables};
 use message::{DiscoverMsg, DiscoverDMsg, StackTreeMsg, SetupVMsMsg, Message, MsgType};
 use message_types::{CaToPe, CaFromPe, CaToVm, VmFromCa, VmToCa, CaFromVm, CaToPePacket, PeToCaPacket};
 use name::{Name, CellID, TreeID, UpTreeID, VmID};
-use packet::{Packet, Packetizer, PacketAssemblers, Serializer};
+use packet::{Packet, Packetizer, PacketAssembler, PacketAssemblers, Serializer};
 use port;
 use routing_table_entry::{RoutingTableEntry};
 use traph;
@@ -222,13 +222,17 @@ impl CellAgent {
 					port::PortStatus::Connected => self.port_connected(port_no).chain_err(|| ErrorKind::CellagentError)?,
 					port::PortStatus::Disconnected => self.port_disconnected(port_no).chain_err(|| ErrorKind::CellagentError)?
 				},
-				PeToCaPacket::Packet(port_no, index, packet) => {
-					if let Some(packets) = Packetizer::process_packet(&mut self.packet_assemblers, packet) {
+				PeToCaPacket::Packet(port_no, packet) => {
+					let msg_id = packet.get_header().get_msg_id();
+					let mut packet_assembler = self.packet_assemblers.remove(&msg_id).unwrap_or(PacketAssembler::new(msg_id));
+					if let Some(packets) = packet_assembler.add(packet) {
 						let (msg_type, serialized_msg) = MsgType::get_type_serialized(packets).chain_err(|| ErrorKind::CellagentError)?;
 						if let Some(mut msg) = self.get_msg(msg_type, serialized_msg)? {
 							//println!("CellAgent {}: got msg {}", self.cell_id, msg);
 							msg.process(&mut self.clone(), port_no).chain_err(|| ErrorKind::CellagentError)?;
 						};
+					} else {
+						self.packet_assemblers.insert(msg_id, packet_assembler);
 					}
 				}
 			}

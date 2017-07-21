@@ -1,9 +1,11 @@
 use std::sync::mpsc;
 use routing_table_entry::{RoutingTableEntry};
+
 use config::{Json, PortNo, TableIndex};
 use packet::{Packet};
 use port::{PortStatus};
 use utility::{Mask};
+
 // CellAgent to PacketEngine
 pub enum CaToPePacket { Entry(RoutingTableEntry), Packet((TableIndex,Mask,Packet)) }
 pub type CaToPe = mpsc::Sender<CaToPePacket>;
@@ -28,7 +30,7 @@ pub type PortToPe = mpsc::Sender<PortToPePacket>;
 pub type PeFromPort = mpsc::Receiver<PortToPePacket>;
 pub type PortPeError = mpsc::SendError<PortToPePacket>;
 // PacketEngine to CellAgent
-pub enum PeToCaPacket { Status(PortNo, PortStatus), Packet(PortNo, TableIndex, Packet) }
+pub enum PeToCaPacket { Status(PortNo, PortStatus), Packet(PortNo, Packet) }
 pub type PeToCa = mpsc::Sender<PeToCaPacket>;
 pub type CaFromPe = mpsc::Receiver<PeToCaPacket>;
 pub type PeCaError = mpsc::SendError<PeToCaPacket>;

@@ -94,7 +94,7 @@ impl PacketEngine {
 			if let Some(other_index) = other_indices.get(parent as usize) {
 				header.set_other_index(*other_index);
 				if parent == 0 {
-					self.pe_to_ca.send(PeToCaPacket::Packet(recv_port_no, *other_index, packet)).chain_err(|| ErrorKind::PacketEngineError)?;
+					self.pe_to_ca.send(PeToCaPacket::Packet(recv_port_no, packet)).chain_err(|| ErrorKind::PacketEngineError)?;
 				} else {
 					if let Some(sender) = self.pe_to_ports.get(parent as usize) {
 						sender.send(packet).chain_err(|| ErrorKind::PacketEngineError)?;
@@ -102,7 +102,7 @@ impl PacketEngine {
 						let is_up = entry.get_mask().equal(Mask::new0());
 						if is_up { // Send to cell agent, too
 							let other_index: TableIndex = 0;
-							self.pe_to_ca.send(PeToCaPacket::Packet(recv_port_no, other_index, packet)).chain_err(|| ErrorKind::PacketEngineError)?;
+							self.pe_to_ca.send(PeToCaPacket::Packet(recv_port_no, packet)).chain_err(|| ErrorKind::PacketEngineError)?;
 						}
 					} else {
 						let max_ports = self.pe_to_ports.len() as u8;
@@ -119,7 +119,7 @@ impl PacketEngine {
 				header.set_other_index(other_index as u32);
 				if *port_no as usize == 0 { 
 					//println!("PacketEngine {}: sending to ca packet {}", self.cell_id, packet);
-					self.pe_to_ca.send(PeToCaPacket::Packet(recv_port_no, other_index, packet)).chain_err(|| ErrorKind::PacketEngineError)?;
+					self.pe_to_ca.send(PeToCaPacket::Packet(recv_port_no, packet)).chain_err(|| ErrorKind::PacketEngineError)?;
 				} else {
 					match self.pe_to_ports.get(*port_no as usize) {
 						Some(s) => s.send(packet).chain_err(|| ErrorKind::PacketEngineError)?,
