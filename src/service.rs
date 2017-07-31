@@ -1,4 +1,4 @@
-use name::{ContainerID, TreeID, UpTreeID};
+use name::{ContainerID, TreeID, UpTraphID};
 use message::Message;
 use message_types::{ContainerToVm, ContainerFromVm, ContainerVmError};
 
@@ -16,12 +16,12 @@ pub trait Service {
 #[derive(Debug, Clone)]
 pub struct NocMaster {
 	container_id: ContainerID,
-	up_tree_id: UpTreeID,
+	up_traph_id: UpTraphID,
 	tree_ids: Vec<TreeID>
 }
 impl NocMaster {
-	pub fn new(container_id: ContainerID, up_tree_id: UpTreeID, tree_ids: Vec<TreeID>) -> NocMaster {
-		NocMaster { container_id: container_id, up_tree_id: up_tree_id, tree_ids: tree_ids }
+	pub fn new(container_id: ContainerID, up_traph_id: UpTraphID, tree_ids: Vec<TreeID>) -> NocMaster {
+		NocMaster { container_id: container_id, up_traph_id: up_traph_id, tree_ids: tree_ids }
 	}
 }
 impl Service for NocMaster {

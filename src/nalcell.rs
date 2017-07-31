@@ -14,6 +14,13 @@ use routing_table_entry::RoutingTableEntry;
 use utility::{Mask, PortNumber};
 use vm::VirtualMachine;
 
+#[derive(Debug, Copy, Clone)]
+pub enum CellType {
+	NalCell,
+	Vm,
+	Container
+}
+
 #[derive(Debug)]
 pub struct NalCell {
 	id: CellID,
@@ -21,13 +28,14 @@ pub struct NalCell {
 	is_border: bool,
 	ports: Box<[Port]>,
 	cell_agent: CellAgent,
+	cell_type: CellType,
 	packet_engine: PacketEngine,
 	vms: Vec<VirtualMachine>,
 	ports_from_pe: HashMap<PortNo, PortFromPe>,
 }
 
 impl NalCell {
-	pub fn new(cell_no: CellNo, nports: PortNo, is_border: bool) -> Result<NalCell> {
+	pub fn new(cell_no: CellNo, nports: PortNo, is_border: bool, cell_type: CellType) -> Result<NalCell> {
 		if nports > MAX_PORTS { return Err(ErrorKind::NumberPorts(nports).into()) }
 		let cell_id = CellID::new(cell_no)?;
 		let (ca_to_pe, pe_from_ca): (CaToPe, PeFromCa) = channel();
@@ -52,9 +60,9 @@ impl NalCell {
 		let boxed_ports: Box<[Port]> = ports.into_boxed_slice();
 		let packet_engine = PacketEngine::new(&cell_id, pe_to_ca, pe_to_ports, tcp_port_nos).chain_err(|| ErrorKind::NalCellError)?;
 		packet_engine.start_threads(pe_from_ca, pe_from_ports)?;
-		let mut cell_agent = CellAgent::new(&cell_id, boxed_ports.len() as u8, ca_to_pe).chain_err(|| ErrorKind::NalCellError)?;
-		cell_agent.initialize(ca_from_pe)?;
-		Ok(NalCell { id: cell_id, cell_no: cell_no, is_border: is_border, 
+		let mut cell_agent = CellAgent::new(&cell_id, cell_type, boxed_ports.len() as u8, ca_to_pe).chain_err(|| ErrorKind::NalCellError)?;
+		cell_agent.initialize(cell_type, ca_from_pe)?;
+		Ok(NalCell { id: cell_id, cell_no: cell_no, is_border: is_border, cell_type: cell_type, 
 				ports: boxed_ports, cell_agent: cell_agent, vms: Vec::new(),
 				packet_engine: packet_engine, ports_from_pe: ports_from_pe, })
 	}
