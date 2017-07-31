@@ -1,6 +1,8 @@
 // Size of various fields
 pub type CellNo     = usize;
 pub type ContainerNo = usize;
+pub type DatacenterNo = u16;
+pub type Edge = (usize, usize);
 pub type Json = String;
 pub type LinkNo     = usize;
 pub type MaskValue  = u16;

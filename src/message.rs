@@ -6,7 +6,7 @@ use cellagent::{CellAgent};
 use config::{MAX_PORTS, PathLength, PortNo, TableIndex};
 use container::Service;
 use gvm_equation::{GvmEquation, GvmVariables};
-use name::{CellID, TreeID, UpTreeID};
+use name::{CellID, TreeID, UpTraphID};
 use packet::{Packet, Packetizer, Serializer};
 use traph;
 use utility::{DEFAULT_USER_MASK, Mask, Path, PortNumber};
@@ -86,10 +86,10 @@ pub struct MsgHeader {
 	msg_count: usize,
 	msg_type: MsgType,
 	direction: MsgDirection,
-	up_tree_id: Option<UpTreeID>, // Tells which VMs get the message
+	up_tree_id: Option<UpTraphID>, // Tells which VMs get the message
 }
 impl MsgHeader {
-	pub fn new(msg_type: MsgType, direction: MsgDirection, up_tree_id: Option<UpTreeID>) -> MsgHeader {
+	pub fn new(msg_type: MsgType, direction: MsgDirection, up_tree_id: Option<UpTraphID>) -> MsgHeader {
 		let msg_count = get_next_count();
 		MsgHeader { msg_type: msg_type, direction: direction, msg_count: msg_count,
 					up_tree_id: up_tree_id }
@@ -336,14 +336,14 @@ impl fmt::Display for SetupVMsMsg {
 }
 #[derive(Debug, Clone, Hash, Serialize, Deserialize)]
 pub struct SetupVMsMsgPayload {
-	up_tree_id: UpTreeID,
+	up_tree_id: UpTraphID,
 	// Each set of services runs on a single VM
 	// All the VMs setup in a single message are on an up-tree
 	service_sets: Vec<Vec<Service>>,
 }
 impl SetupVMsMsgPayload {
 	fn new(id: &str, service_sets: Vec<Vec<Service>>) -> Result<SetupVMsMsgPayload> {
-		let up_tree_id = UpTreeID::new(id).chain_err(|| ErrorKind::MessageError)?;
+		let up_tree_id = UpTraphID::new(id).chain_err(|| ErrorKind::MessageError)?;
 		Ok(SetupVMsMsgPayload { up_tree_id: up_tree_id, service_sets: service_sets })
 	}
 	pub fn get_service_sets(&self) -> &Vec<Vec<Service>> { &self.service_sets }
@@ -361,6 +361,7 @@ impl fmt::Display for SetupVMsMsgPayload {
 	}
 }
 // Errors
+use errors::*;
 error_chain! {
 	links {
 		CellAgent(::cellagent::Error, ::cellagent::ErrorKind);

@@ -1,33 +1,40 @@
 use std::fmt;
+use std::collections::HashMap;
 use std::thread::{JoinHandle, sleep, spawn};
 use std::sync::mpsc::channel;
 use std::time;
 
-use config::{CellNo, PortNo};
+use serde_json;
+
+use config::{SEPARATOR, CellNo, DatacenterNo, Edge, PortNo};
 use container::Service;
-use datacenter::Datacenter;
+use datacenter::{Datacenter};
 use message::{Message, MsgType, SetupVMsMsg};
 use message_types::{NocToPort, NocFromPort, PortToNoc, PortFromNoc, NocFromOutside};
-use name::UpTreeID;
+use name::UpTraphID;
+use nalcell::CellType;
 use packet::{PacketAssembler, PacketAssemblers, Packetizer, Serializer};
 
 #[derive(Debug, Clone)]
 pub struct Noc {
-	id: UpTreeID,
+	id: UpTraphID,
+	cell_type: CellType,
+	no_datacenters: DatacenterNo,
 	packet_assemblers: PacketAssemblers
 }
 impl Noc {
-	pub fn new(id: &str) -> Result<Noc> {
-		let id = UpTreeID::new(id).chain_err(|| ErrorKind::NocError)?;
-		Ok(Noc { id: id, packet_assemblers: PacketAssemblers::new() })
+	pub fn new(id: &str, cell_type: CellType) -> Result<Noc> {
+		let id = UpTraphID::new(id).chain_err(|| ErrorKind::NocError)?;
+		Ok(Noc { id: id, cell_type: cell_type, packet_assemblers: PacketAssemblers::new(),
+				 no_datacenters: 0 })
 	}
 	pub fn initialize(&self, ncells: CellNo, nports: PortNo, edges: Vec<(CellNo, CellNo)>,
 			noc_from_outside: NocFromOutside) -> Result<Vec<JoinHandle<()>>> {
 		let (noc_to_port, port_from_noc): (NocToPort, NocFromPort) = channel();
 		let (port_to_noc, noc_from_port): (PortToNoc, PortFromNoc) = channel();
-		let (mut dc, join_handles) = self.build_datacenter(&self.id, nports, ncells, edges)?;
+		let (mut dc, join_handles) = self.build_datacenter(&self.id, self.cell_type, ncells, nports, edges)?;
 		dc.connect_to_noc(port_to_noc, port_from_noc).chain_err(|| ErrorKind::NocError)?;
-		let noc = self.clone();
+		let mut noc = self.clone();
 		spawn( move || { 
 			let _ = noc.listen_outside(noc_from_outside, noc_to_port).map_err(|e| noc.write_err("outside", e));
 		});
@@ -44,10 +51,10 @@ impl Noc {
 	fn control(&self, dc: &mut Datacenter) -> Result<()> {
 		Ok(())
 	}
-	fn build_datacenter(&self, id: &UpTreeID, nports: u8, ncells: usize, edges: Vec<(CellNo,CellNo)>) 
-			-> Result<(Datacenter, Vec<JoinHandle<()>>)> {
-		let mut dc = Datacenter::new(id);
-		let join_handles = dc.initialize(ncells, nports, edges)?;
+	fn build_datacenter(&self, id: &UpTraphID, cell_type: CellType, 
+			ncells: usize, nports: u8, edges: Vec<Edge>) -> Result<(Datacenter, Vec<JoinHandle<()>>)> {
+		let mut dc = Datacenter::new(id, cell_type);
+		let join_handles = dc.initialize(ncells, nports, edges, self.cell_type)?;
 		Ok((dc, join_handles))
 	}
 	fn get_msg(&self, msg_type: MsgType, serialized_msg:String) -> Result<Box<Message>> {
@@ -70,27 +77,31 @@ impl Noc {
 			}
 		}
 	}
-	fn listen_outside(&self, noc_from_outside: NocFromOutside, noc_to_port: NocToPort) -> Result<()> {
+	fn listen_outside(&mut self, noc_from_outside: NocFromOutside, noc_to_port: NocToPort) -> Result<()> {
 		loop {
 			let input = &noc_from_outside.recv()?;
-			let mut parsed = input.split_whitespace();
-			if let Some(cmd) = parsed.next() {
+			let mut split_input = input.splitn(2, "");
+			if let Some(cmd) = split_input.next() {
 				match cmd {
-					"new_uptree" => self.new_uptree(noc_to_port.clone())?,
+					"new_uptraph" => self.new_uptraph(split_input.next(), noc_to_port.clone())?,
 					_ => println!("Unknown command: {}", input)
 				};
 			}
 		}
 	}
-	fn new_uptree(&self, noc_to_port: NocToPort) -> Result<()> {
-		let msg = SetupVMsMsg::new("NocMaster", vec![vec![Service::NocMaster]])?;
-		let other_index = 0;
-		let direction = msg.get_header().get_direction();
-		let bytes = Serializer::serialize(&msg)?;
-		let packets = Packetizer::packetize(bytes, direction, other_index)?;
-		for packet in packets.iter() {
-			noc_to_port.send(**packet)?;
-		}
+	fn new_uptraph(&mut self, str_params: Option<&str>, noc_to_port: NocToPort) -> Result<()> {
+		let new_cell_type = match self.cell_type {
+			CellType::NalCell => CellType::Vm,
+			CellType::Vm => CellType::Container,
+			_ => panic!("Bad CellType")
+		};
+		let up_id = UpTraphID::new(&format!("{}{}{}", self.id, SEPARATOR, self.no_datacenters)).chain_err(|| ErrorKind::NocError)?;
+		type Params = (CellNo, PortNo, Vec<Edge>);
+		if let Some(str_params) = str_params {
+			let params: Params = serde_json::from_str(str_params).chain_err(|| ErrorKind::NocError)?;
+			let dc = self.build_datacenter(&up_id, new_cell_type, params.0, params.1, params.2).chain_err(|| ErrorKind::Input(str_params.to_string()))?;
+			self.no_datacenters = self.no_datacenters + 1;
+		} else { panic!("Parameter problem"); }
 		Ok(())
 	}
 	fn write_err(&self, s: &str, e: Error) {
@@ -137,6 +148,10 @@ error_chain! {
 		Input(input: String) {
 			description("Invalid input")
 			display("{} is not a valid command to the NOC", input)
+		}
+		Build(up_id: UpTraphID) {
+			description("Problem building datacenter")
+			display("Problem building datacenter at up_traph {}", up_id)
 		}
 	}
 }

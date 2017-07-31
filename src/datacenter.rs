@@ -3,33 +3,32 @@ use std::cmp::max;
 use std::sync::mpsc::channel;
 use std::thread::{JoinHandle, spawn};
 
-use config::{MIN_BOUNDARY_CELLS, PortNo, CellNo};
+use config::{MIN_BOUNDARY_CELLS, CellNo, Edge, PortNo};
 use message_types::{LinkToPort, PortFromLink, PortToLink, LinkFromPort,
 	NocToPort, NocFromPort, PortToNoc, PortFromNoc};
 use link::{Link};
-use nalcell::{NalCell};
-use name::UpTreeID;
+use nalcell::{CellType, NalCell};
+use name::UpTraphID;
 use noc::Noc;
-
-type Edge = (usize, usize);
 
 #[derive(Debug)]
 pub struct Datacenter {
-	id: UpTreeID,
+	id: UpTraphID,
+	cell_type: CellType,
 	cells: Vec<NalCell>,
 	links: Vec<Link>,
 }
 impl Datacenter {
-	pub fn new(id: &UpTreeID) -> Datacenter {
-		Datacenter { id: id.clone(), cells: Vec::new(), links: Vec::new() }
+	pub fn new(id: &UpTraphID, cell_type: CellType) -> Datacenter {
+		Datacenter { id: id.clone(), cell_type: cell_type, cells: Vec::new(), links: Vec::new() }
 	}
-	pub fn initialize(&mut self, ncells: CellNo, nports: PortNo, edge_list: Vec<(CellNo,CellNo)>) 
-			-> Result<Vec<JoinHandle<()>>> {
+	pub fn initialize(&mut self, ncells: CellNo, nports: PortNo, edge_list: Vec<(CellNo,CellNo)>,
+			cell_type: CellType) -> Result<Vec<JoinHandle<()>>> {
 		if ncells < 1  { return Err(ErrorKind::Cells(ncells).into()); }
 		if edge_list.len() < ncells - 1 { return Err(ErrorKind::Edges(edge_list.len()).into()); }
 		for i in 0..ncells {
 			let is_border = (i % 3) == 1;
-			let cell = NalCell::new(i, nports, is_border).chain_err(|| ErrorKind::DatacenterError)?;
+			let cell = NalCell::new(i, nports, is_border, cell_type).chain_err(|| ErrorKind::DatacenterError)?;
 			self.cells.push(cell);
 		}
 		let mut link_handles = Vec::new();

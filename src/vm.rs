@@ -4,20 +4,20 @@ use std::sync::mpsc::channel;
 use container::{Container, Service};
 use message_types::{VmToCa, VmFromCa, VmToContainerMsg, VmToContainer, ContainerFromVm,
 	ContainerToVmMsg, ContainerToVm, VmFromContainer, ContainerVmError};
-use name::{ContainerID, TreeID, UpTreeID, VmID};
+use name::{ContainerID, TreeID, UpTraphID, VmID};
 
 #[derive(Debug, Clone)]
 pub struct VirtualMachine {
 	id: VmID,
-	containers: HashMap<UpTreeID, Vec<VmToContainer>>,
+	containers: HashMap<UpTraphID, Vec<VmToContainer>>,
 }
 impl VirtualMachine {
 	pub fn new(id: VmID) -> VirtualMachine {
 		VirtualMachine { id: id, containers: HashMap::new() }
 	}
 	pub fn initialize(&mut self, services: &mut Vec<Service>,
-			up_tree_id: &UpTreeID, tree_ids: &Vec<TreeID>, 
-			vm_to_ca: VmToCa, vm_from_ca: VmFromCa) -> Result<()> {
+			up_tree_id: &UpTraphID, tree_ids: &HashMap<&str,TreeID>, 
+			vm_to_ca: &VmToCa, vm_from_ca: VmFromCa) -> Result<()> {
 		self.listen_ca(vm_from_ca).chain_err(|| ErrorKind::VmError)?;
 		while services.len() > 0 {
 			let (vm_to_container, container_from_vm): (VmToContainer, ContainerFromVm) = channel();
