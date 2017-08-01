@@ -142,7 +142,7 @@ impl fmt::Debug for Payload {
 pub struct Serializer {}
 impl Serializer {
 	pub fn serialize<M>(msg: &M) -> Result<Box<Vec<u8>>>
-			where M: Message + Hash + serde::Serialize {		
+			where M: Message + serde::Serialize {		
 		let msg_type = msg.get_header().get_msg_type();
 		//let serialized_msg_type = serde_json::to_string(&msg_type).chain_err(|| ErrorKind::PacketError)?;
 		let serialized_msg = serde_json::to_string(&msg).chain_err(|| ErrorKind::PacketError)?;

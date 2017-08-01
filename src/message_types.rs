@@ -25,12 +25,12 @@ pub type LinkToPort = mpsc::Sender<LinkToPortPacket>;
 pub type PortFromLink = mpsc::Receiver<LinkToPortPacket>;
 pub type LinkPortError = mpsc::SendError<LinkToPortPacket>;
 // Port to PacketEngine
-pub enum PortToPePacket { Status((PortNo, PortStatus)), Packet((PortNo, Packet)) }
+pub enum PortToPePacket { Status((PortNo, bool, PortStatus)), Packet((PortNo, Packet)) }
 pub type PortToPe = mpsc::Sender<PortToPePacket>;
 pub type PeFromPort = mpsc::Receiver<PortToPePacket>;
 pub type PortPeError = mpsc::SendError<PortToPePacket>;
 // PacketEngine to CellAgent
-pub enum PeToCaPacket { Status(PortNo, PortStatus), Packet(PortNo, Packet) }
+pub enum PeToCaPacket { Status(PortNo, bool, PortStatus), Packet(PortNo, Packet) }
 pub type PeToCa = mpsc::Sender<PeToCaPacket>;
 pub type CaFromPe = mpsc::Receiver<PeToCaPacket>;
 pub type PeCaError = mpsc::SendError<PeToCaPacket>;

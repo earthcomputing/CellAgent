@@ -13,7 +13,7 @@ use utility::{Mask, PortNumber};
 #[derive(Debug, Clone)]
 pub struct PacketEngine {
 	cell_id: CellID,
-	tcp_port_nos: HashSet<PortNo>,
+	boundary_port_nos: HashSet<PortNo>,
 	routing_table: Arc<Mutex<RoutingTable>>,
 	pe_to_ca: PeToCa,
 	pe_to_ports: Vec<PeToPort>,
@@ -21,10 +21,10 @@ pub struct PacketEngine {
 #[deny(unused_must_use)]
 impl PacketEngine {
 	pub fn new(cell_id: &CellID, packet_pe_to_ca: PeToCa, pe_to_ports: Vec<PeToPort>, 
-			tcp_port_nos: HashSet<PortNo>) -> Result<PacketEngine> {
+			boundary_port_nos: HashSet<PortNo>) -> Result<PacketEngine> {
 		let routing_table = Arc::new(Mutex::new(RoutingTable::new(cell_id.clone()).chain_err(|| ErrorKind::PacketEngineError)?)); 
 		Ok(PacketEngine { cell_id: cell_id.clone(), routing_table: routing_table, 
-			tcp_port_nos: tcp_port_nos, pe_to_ca: packet_pe_to_ca, pe_to_ports: pe_to_ports })
+			boundary_port_nos: boundary_port_nos, pe_to_ca: packet_pe_to_ca, pe_to_ports: pe_to_ports })
 	}
 	pub fn start_threads(&self, pe_from_ca: PeFromCa, pe_from_ports: PeFromPort) -> Result<()> {			
 		let pe = self.clone();
@@ -56,7 +56,7 @@ impl PacketEngine {
 		loop {
 			//println!("PacketEngine {}: waiting for status or packet", pe.cell_id);
 			match pe_from_ports.recv()? {
-				PortToPePacket::Status((port_no,status)) => self.pe_to_ca.send(PeToCaPacket::Status(port_no,status)).chain_err(|| ErrorKind::PacketEngineError)?,
+				PortToPePacket::Status((port_no, is_border, status)) => self.pe_to_ca.send(PeToCaPacket::Status(port_no, is_border, status)).chain_err(|| ErrorKind::PacketEngineError)?,
 				PortToPePacket::Packet((port_no, packet)) => self.process_packet(port_no, packet).chain_err(|| ErrorKind::PacketEngineError)?
 			};
 		}		
@@ -71,7 +71,7 @@ impl PacketEngine {
 		// code here in case I forget about the problem when I move packetization.
 		let entry;
 		{   
-			entry = match self.tcp_port_nos.get(&port_no) {
+			entry = match self.boundary_port_nos.get(&port_no) {
 				Some(_) => self.routing_table.lock().unwrap().get_entry(0).chain_err(|| ErrorKind::PacketEngineError)?,
 				None => self.routing_table.lock().unwrap().get_entry(my_index).chain_err(|| ErrorKind::PacketEngineError)?
 			}
