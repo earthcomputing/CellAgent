@@ -290,8 +290,9 @@ impl StackTreeMsg {
 		let tree_id = TreeID::new(id).chain_err(|| ErrorKind::MessageError)?;
 		let mut tree_map = HashMap::new();
 		tree_map.insert(tree_id.stringify(), tree_id);
+		tree_map.insert(base_tree_id.stringify(), base_tree_id.clone());
 		let header = MsgHeader::new(MsgType::StackTree, MsgDirection::Rootward, tree_map);
-		let payload = StackTreeMsgPayload::new(id, base_tree_id).chain_err(|| ErrorKind::MessageError)?;
+		let payload = StackTreeMsgPayload::new(id, base_tree_id.stringify()).chain_err(|| ErrorKind::MessageError)?;
 		Ok(StackTreeMsg { header: header, payload: payload})
 	}
 }
@@ -309,23 +310,24 @@ impl fmt::Display for StackTreeMsg {
 }
 #[derive(Debug, Clone, Hash, Serialize, Deserialize)]
 pub struct StackTreeMsgPayload {
-	tree_id: TreeID,
-	base_tree_id: TreeID,
+	tree_name: String,
+	base_tree_name: String,
 	gvm_equation: GvmEquation,
 }
 impl StackTreeMsgPayload {
-	fn new(id: &str, base_tree_id: TreeID) -> Result<StackTreeMsgPayload> {
+	fn new(id: &str, base_tree_name: String) -> Result<StackTreeMsgPayload> {
 		let tree_id = TreeID::new(id).chain_err(|| ErrorKind::MessageError)?;
 		let gvm_equation = GvmEquation::new("true", GvmVariables::empty());
-		Ok(StackTreeMsgPayload { tree_id: tree_id, base_tree_id: base_tree_id, gvm_equation: gvm_equation })
+		Ok(StackTreeMsgPayload { tree_name: tree_id.stringify(), base_tree_name: base_tree_name, 
+				gvm_equation: gvm_equation })
 	}
-	pub fn get_base_tree_id(&self) -> &TreeID { &self.base_tree_id }
-	pub fn get_tree_id(&self) -> &TreeID { &self.tree_id}
+	pub fn get_base_tree_name(&self) -> &str { &self.base_tree_name }
+	pub fn get_tree_name(&self) -> &str { &self.tree_name}
 }
 impl MsgPayload for StackTreeMsgPayload {}
 impl fmt::Display for StackTreeMsgPayload {
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-		write!(f, "Tree {} stacked on {}", self.tree_id, self.base_tree_id)
+		write!(f, "Tree {} stacked on {}", self.tree_name, self.base_tree_name)
 	}
 }
 #[derive(Debug, Clone, Serialize, Deserialize)]
