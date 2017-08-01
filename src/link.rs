@@ -27,8 +27,8 @@ impl Link {
 	fn listen(&self, status: LinkToPort, link_from: LinkFromPort, link_to: LinkToPort) 
 			-> Result<JoinHandle<()>> {
 		let link = self.clone();
+		let _ = status.send(LinkToPortPacket::Status(PortStatus::Connected)).chain_err(|| ErrorKind::LinkError).map_err(|e| link.write_err(e));
 		let join_handle = ::std::thread::spawn( move || {
-			let _ = status.send(LinkToPortPacket::Status(PortStatus::Connected)).chain_err(|| ErrorKind::LinkError).map_err(|e| link.write_err(e));
 			let _ = link.listen_loop(link_from, link_to).chain_err(|| ErrorKind::LinkError).map_err(|e| link.write_err(e));
 		});
 		Ok(join_handle)

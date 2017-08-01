@@ -44,10 +44,10 @@ impl NalCell {
 		let mut ports = Vec::new();
 		let mut pe_to_ports = Vec::new();
 		let mut ports_from_pe = HashMap::new(); // So I can remove the item
-		let mut tcp_port_nos = HashSet::new();
+		let mut boundary_port_nos = HashSet::new();
 		for i in 0..nports + 1 {
 			let is_border_port = is_border & (i == 2);
-			if is_border_port { tcp_port_nos.insert(i); }
+			if is_border_port { boundary_port_nos.insert(i); }
 			let (pe_to_port, port_from_pe): (PeToPort, PortFromPe) = channel();
 			pe_to_ports.push(pe_to_port);
 			ports_from_pe.insert(i, port_from_pe);
@@ -58,7 +58,7 @@ impl NalCell {
 			ports.push(port);
 		}
 		let boxed_ports: Box<[Port]> = ports.into_boxed_slice();
-		let packet_engine = PacketEngine::new(&cell_id, pe_to_ca, pe_to_ports, tcp_port_nos).chain_err(|| ErrorKind::NalCellError)?;
+		let packet_engine = PacketEngine::new(&cell_id, pe_to_ca, pe_to_ports, boundary_port_nos).chain_err(|| ErrorKind::NalCellError)?;
 		packet_engine.start_threads(pe_from_ca, pe_from_ports)?;
 		let mut cell_agent = CellAgent::new(&cell_id, cell_type, boxed_ports.len() as u8, ca_to_pe).chain_err(|| ErrorKind::NalCellError)?;
 		cell_agent.initialize(cell_type, ca_from_pe)?;
@@ -73,14 +73,14 @@ impl NalCell {
 	pub fn get_free_ec_port_mut(&mut self) -> Result<(&mut Port, PortFromPe)> {
 		self.get_free_port_mut(false)
 	}
-	pub fn get_free_tcp_port_mut(&mut self) -> Result<(&mut Port, PortFromPe)> {
+	pub fn get_free_boundary_port_mut(&mut self) -> Result<(&mut Port, PortFromPe)> {
 		self.get_free_port_mut(true)
 	}
-	pub fn get_free_port_mut(&mut self, want_tcp_port: bool) 
+	pub fn get_free_port_mut(&mut self, want_boundary_port: bool) 
 			-> Result<(&mut Port, PortFromPe)> {
 		for port in &mut self.ports.iter_mut() {
 			//println!("NalCell {}: port {} is connected {}", self.id, p.get_port_no(), p.is_connected());
-			if !port.is_connected() && !(want_tcp_port ^ port.is_border()) && (port.get_port_no() != 0 as u8) {
+			if !port.is_connected() && !(want_boundary_port ^ port.is_border()) && (port.get_port_no() != 0 as u8) {
 				let port_no = port.get_port_no();
 				match self.ports_from_pe.remove(&port_no) { // Remove avoids a borrowed context error
 					Some(recvr) => {
@@ -130,9 +130,9 @@ error_chain! {
 			description("You are asking for too many ports.")
 			display("You asked for {} ports, but only {} are allowed", nports, MAX_PORTS)
 		}
-		TcpPort(cell_id: CellID, port_no: PortNo) {
-			description("No outside receiver for TCP port")
-			display("Cell {} has no outside receiver for TCP port {}", cell_id, port_no)
+		BoundaryPort(cell_id: CellID, port_no: PortNo) {
+			description("No outside receiver for boundary port")
+			display("Cell {} has no outside receiver for boundary port {}", cell_id, port_no)
 		}
 	}
 }

@@ -42,9 +42,9 @@ impl Port {
 	pub fn is_broken(&self) -> bool { self.is_broken.load(SeqCst) }
 	pub fn is_border(&self) -> bool { self.is_border }
 	pub fn outside_channel(&self, port_to_outside: PortToNoc, 
-			port_from_outside: PortFromNoc, port_from_pe: PortFromPe) 
-			-> Result<()> {
+			port_from_outside: PortFromNoc, port_from_pe: PortFromPe) -> Result<()> {
 		let port = self.clone();
+		self.port_to_pe.send(PortToPePacket::Status((self.get_port_no(), self.is_border, PortStatus::Connected))).chain_err(|| ErrorKind::PortError)?;
 		let outside_handle = ::std::thread::spawn( move || {
 			let _ = port.listen_outside_for_pe(port_from_outside).chain_err(|| ErrorKind::PortError).map_err(|e| port.write_err(e));
 		});
@@ -93,7 +93,7 @@ impl Port {
 						PortStatus::Connected => self.set_connected(),
 						PortStatus::Disconnected => self.set_disconnected()
 					};
-					self.port_to_pe.send(PortToPePacket::Status((port_no, status))).chain_err(|| ErrorKind::PortError)?;
+					self.port_to_pe.send(PortToPePacket::Status((port_no, self.is_border, status))).chain_err(|| ErrorKind::PortError)?;
 				}
 				LinkToPortPacket::Packet(packet) => {
 					//println!("Port {}: got from link {}", self.id, packet);
@@ -129,7 +129,7 @@ impl fmt::Display for Port {
 		let is_connected = self.is_connected();
 		let is_broken = self.is_broken();
 		let mut s = format!("Port {} {}", self.port_number, self.id);
-		if self.is_border { s = s + " is TCP  port,"; }
+		if self.is_border { s = s + " is boundary  port,"; }
 		else              { s = s + " is ECLP port,"; }
 		if is_connected   { s = s + " is connected"; }
 		else              { s = s + " is not connected"; }

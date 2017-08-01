@@ -29,7 +29,8 @@ pub struct GvmVariables {
 	variables: Vec<String>
 }
 impl GvmVariables {
-	pub fn new(variables: Vec<String>) -> GvmVariables {
+	pub fn new(strs: Vec<&str>) -> GvmVariables {
+		let variables = strs.iter().map(|s| s.to_string()).collect();
 		GvmVariables { variables: variables }
 	}
 	pub fn empty() -> GvmVariables {
