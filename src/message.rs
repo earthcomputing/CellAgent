@@ -149,18 +149,18 @@ impl Message for DiscoverMsg {
 		let path = self.payload.get_path();
 		let my_index;
 		let other_index;
-		{
-		let new_tree_id = self.get_tree_id(self.payload.get_tree_name())?;
-		let senders_index = self.payload.get_index();
-		let children = &mut HashSet::new();
-		//println!("DiscoverMsg: tree_id {}, port_number {}", tree_id, port_number);
-		let exists = ca.exists(&new_tree_id);  // Have I seen this tree before?
-		let status = if exists { traph::PortStatus::Pruned } else { traph::PortStatus::Parent };
-		let gvm_equation = GvmEquation::new("true", GvmVariables::empty());
-		let entry = ca.update_traph(&new_tree_id, port_number, status, Some(gvm_equation),
-				children, senders_index, hops, Some(path)).chain_err(|| ErrorKind::MessageError)?;
-		if exists { 
-			return Ok(()); // Don't forward if traph exists for this tree - Simple quenching
+		{ // Limit scope of immutable borrow of self on the next line
+			let new_tree_id = self.get_tree_id(self.payload.get_tree_name())?;
+			let senders_index = self.payload.get_index();
+			let children = &mut HashSet::new();
+			//println!("DiscoverMsg: tree_id {}, port_number {}", tree_id, port_number);
+			let exists = ca.exists(&new_tree_id);  // Have I seen this tree before?
+			let status = if exists { traph::PortStatus::Pruned } else { traph::PortStatus::Parent };
+			let gvm_equation = GvmEquation::new("true", GvmVariables::empty());
+			let entry = ca.update_traph(&new_tree_id, port_number, status, Some(gvm_equation),
+					children, senders_index, hops, Some(path)).chain_err(|| ErrorKind::MessageError)?;
+			if exists { 
+				return Ok(()); // Don't forward if traph exists for this tree - Simple quenching
 		}
 		my_index = entry.get_index();
 		// Send DiscoverD to sender
@@ -317,9 +317,10 @@ pub struct StackTreeMsgPayload {
 impl StackTreeMsgPayload {
 	fn new(id: &str, base_tree_name: String) -> Result<StackTreeMsgPayload> {
 		let tree_id = TreeID::new(id).chain_err(|| ErrorKind::MessageError)?;
-		let gvm_equation = GvmEquation::new("true", GvmVariables::empty());
+		let gvm_vars = GvmVariables::new(vec!["hops"]);
+		let gvm_eqn = GvmEquation::new("hops == 0", gvm_vars);
 		Ok(StackTreeMsgPayload { tree_name: tree_id.stringify(), base_tree_name: base_tree_name, 
-				gvm_equation: gvm_equation })
+				gvm_equation: gvm_eqn })
 	}
 	pub fn get_base_tree_name(&self) -> &str { &self.base_tree_name }
 	pub fn get_tree_name(&self) -> &str { &self.tree_name}

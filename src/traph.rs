@@ -42,6 +42,18 @@ impl Traph {
 		}
 		Err(ErrorKind::Parent(self.tree_id.clone(), self.cell_id.clone()).into())
 	}
+	pub fn get_hops(&self) -> Result<PathLength> {
+		for element in self.elements.clone() {
+			if element.get_status() == PortStatus::Parent { return Ok(element.get_hops()); }
+		}
+		Err(ErrorKind::NoParent(self.tree_id.clone()).into())	
+	}
+	pub fn is_leaf(&self) -> bool {
+		for element in self.elements.clone() {
+			if element.get_status() == PortStatus::Child { return false; }
+		}
+		true
+	}
 	pub fn get_table_entry(&self) -> RoutingTableEntry { self.table_entry }
 	pub fn get_table_index(&self) -> TableIndex { self.table_entry.get_index() }
 	pub fn new_element(&mut self, port_number: PortNumber, port_status: PortStatus, 
@@ -107,7 +119,7 @@ impl fmt::Display for Traph {
 		write!(f, "{}", s) 
 	}
 }
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, PartialEq)]
 pub enum PortStatus {
 	Parent,
 	Child,
@@ -132,11 +144,12 @@ error_chain! {
 	}
 	errors { TraphError
 		Lookup(port_number: PortNumber) {
-			description("No traph for port number")
 			display("No traph entry for port {}", port_number)
 		}
+		NoParent(tree_id: TreeID) {
+			display("No parent for tree {}", tree_id)
+		}
 		Parent(tree_id: TreeID, cell_id: CellID) {
-			description("No parent")
 			display("No parent for tree {} on cell {}", tree_id, cell_id)
 		}
 	}

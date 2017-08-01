@@ -200,7 +200,10 @@ impl CellAgent {
 			_ => traph_status  // Don't replace if Parent or Child
 		};
 		let gvm_result = match gvm_equation {
-			Some(eqn) => eqn.evaluate(HashMap::new()).chain_err(|| ErrorKind::CellagentError)?,
+			Some(eqn) => {
+				let variables = self.get_vars(&traph, eqn.get_variables())?;
+				eqn.evaluate(variables).chain_err(|| ErrorKind::CellagentError)?
+			},
 			None => false,
 		};
 		if gvm_result { children.insert(PortNumber::new(0, self.no_ports)?); }
@@ -213,6 +216,17 @@ impl CellAgent {
 		}
 		self.ca_to_pe.send(CaToPePacket::Entry(entry)).chain_err(|| ErrorKind::CellagentError)?;
 		Ok(entry)
+	}
+	fn get_vars(&self, traph: &Traph, vars: &GvmVariables) -> Result<HashMap<String,String>> {
+		let mut var_map = HashMap::new();
+		for var in vars.iter() {
+			if var == "hops" {
+				var_map.insert(var.clone(), traph.get_hops()?.to_string());
+			} else {
+				return Err(ErrorKind::UnknownVariable(self.cell_id.clone(), var.to_string()).into());
+			}
+		}
+		Ok(var_map)
 	}
 	fn listen(&mut self, ca_from_pe: CaFromPe) -> Result<()>{
 		let mut ca = self.clone();
@@ -262,8 +276,6 @@ impl CellAgent {
 		//println!("CellAgent {}: port {} is border {} connected", self.cell_id, port_no, is_border);
 		if is_border {
 			println!("CellAgent {}: port {} is a border port", self.cell_id, port_no);
-			let gvm_vars = GvmVariables::new(vec!["hops"]);
-			let gvm_eqn = GvmEquation::new("hops == 0", gvm_vars);
 		} else {
 			let tree_id = self.my_tree_id.clone();
 			let port_no_mask = Mask::new(PortNumber::new(port_no, self.no_ports).chain_err(|| ErrorKind::CellagentError)?);
@@ -368,44 +380,37 @@ error_chain! {
 	}
 	errors { CellagentError
 		InvalidMsgType(cell_id: CellID, msg_type: MsgType) {
-			description("Invalid message type")
 			display("Invalid message type {} from packet assembler on cell {}", msg_type, cell_id)
 		}
 		// Recursive type error if put in message.rs
 		Message(cell_id: CellID, msg_no: usize) {
-			description("Error processing message")
 			display("Error processing message {} on cell {}", msg_no, cell_id)
 		}		
 		MessageAssembly(cell_id: CellID) {
-			description("Problem assembling message")
 			display("Problem assembling message on cell {}", cell_id)
 		}
 		PortTaken(cell_id: CellID, port_no: PortNo) {
-			description("Port already assigned")
 			display("Receiver for port {} has been previously assigned on cell {}", port_no, cell_id)
 		}
 		Recvr(cell_id: CellID, port_no: PortNo) {
-			description("No channel receiver")
 			display("No receiver for port {} on cell {}", port_no, cell_id)
 		}
 		Size(cell_id: CellID) {
-			description("Routing table is full")
 			display("No more room in routing table for cell {}", cell_id)
 		}
 		TenantMask(cell_id: CellID) {
-			description("Tenant mask missing")
 			display("Cell {} has no tenant mask", cell_id)
 		}
 		Tree(cell_id: CellID, tree_id: TreeID ) {
-			description("Unknown tree")
 			display("TreeID {} does not exist on cell {}", tree_id, cell_id)
 		}
 		TreeIndex(cell_id: CellID, index: TableIndex) {
-			description("No tree for specified index")
 			display("No tree associated with index {} on cell {}", index, cell_id)
 		} 
+		UnknownVariable(cell_id: CellID, var: String) {
+			display("Cell {}: Unknown gvm variable {}", cell_id, var)
+		}
 		UpTraph(cell_id: CellID, up_tree_id: UpTraphID) {
-			description("UpTraph not found")
 			display("Cell {} has no UpTraph named {}", cell_id, up_tree_id)
 		}
 	}
