@@ -77,17 +77,17 @@ impl CellAgent {
 		let control_tree_id = self.control_tree_id.clone();
 		let connected_tree_id = self.connected_tree_id.clone();
 		let my_tree_id = self.my_tree_id.clone();
-		let gvm_equation = GvmEquation::new("true", GvmVariables::empty());
+		let gvm_equation = GvmEquation::new("true", "true", GvmVariables::empty());
 		self.update_traph(&control_tree_id, port_number_0, 
 				traph::PortStatus::Parent, Some(gvm_equation), 
 				&mut HashSet::new(), other_index, hops, path).chain_err(|| ErrorKind::CellagentError)?;
-		let gvm_equation = GvmEquation::new("false", GvmVariables::empty());
+		let gvm_equation = GvmEquation::new("false", "true", GvmVariables::empty());
 		let connected_tree_entry = self.update_traph(&connected_tree_id, port_number_0, 
 			traph::PortStatus::Parent, Some(gvm_equation),
 			&mut HashSet::new(), other_index, hops, path).chain_err(|| ErrorKind::CellagentError)?;
 		self.connected_tree_entry = Arc::new(Mutex::new(connected_tree_entry));
 		// Create my tree
-		let gvm_equation = GvmEquation::new("true", GvmVariables::empty());
+		let gvm_equation = GvmEquation::new("true", "true", GvmVariables::empty());
 		self.my_entry = self.update_traph(&my_tree_id, port_number_0, 
 				traph::PortStatus::Parent, Some(gvm_equation), 
 				&mut HashSet::new(), other_index, hops, path).chain_err(|| ErrorKind::CellagentError)?; 
@@ -199,14 +199,16 @@ impl CellAgent {
 			traph::PortStatus::Pruned => port_status,
 			_ => traph_status  // Don't replace if Parent or Child
 		};
-		let gvm_result = match gvm_equation {
+		let gvm_recv = match gvm_equation {
 			Some(eqn) => {
 				let variables = self.get_vars(&traph, eqn.get_variables())?;
-				eqn.evaluate(variables).chain_err(|| ErrorKind::CellagentError)?
+				let recv_eqn = eqn.get_recv_eqn();
+				let send_eqn = eqn.get_send_eqn();
+				eqn.eval_recv(variables).chain_err(|| ErrorKind::CellagentError)?
 			},
 			None => false,
 		};
-		if gvm_result { children.insert(PortNumber::new(0, self.no_ports)?); }
+		if gvm_recv { children.insert(PortNumber::new(0, self.no_ports)?); }
 		let entry = traph.new_element(port_number, port_status, other_index, children, hops, path).chain_err(|| ErrorKind::CellagentError)?; 
 // Here's the end of the transaction
 		//println!("CellAgent {}: entry {}\n{}", self.cell_id, entry, traph); 

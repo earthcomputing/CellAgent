@@ -2,18 +2,28 @@ use std::collections::HashMap;
 use serde_json;
 use eval::{eval, Expr, to_value};
 
+type GvmEqn = String;
 #[derive(Debug, Clone, Hash, Serialize, Deserialize)]
 pub struct GvmEquation {
-	equation: String,
-	variables: GvmVariables
+	recv_eqn: GvmEqn,        // If true, then send to cell agent
+	send_eqn: GvmEqn,        // If true, then add to traph
+	variables: GvmVariables  // Local variables used in the two equations
 }
 // Sample GvmEquation: "hops < 7 || n_childen == 0", ["hops", "n_children"]
 impl GvmEquation {
-	pub fn new(s: &str, variables: GvmVariables) -> GvmEquation { 
-		GvmEquation { equation: s.to_string(), variables: variables }
+	pub fn new(recv: &str, send: &str, variables: GvmVariables) -> GvmEquation { 
+		GvmEquation { recv_eqn: recv.to_string(), send_eqn: send.to_string(), variables: variables }
 	}
-	pub fn evaluate(&self, params: HashMap<String,String>) -> Result<bool> {
-		let mut expr = Expr::new(self.equation.clone());
+	pub fn get_recv_eqn(&self) -> &GvmEqn { &self.recv_eqn }
+	pub fn get_send_eqn(&self) -> &GvmEqn { &self.send_eqn }
+	pub fn eval_recv(&self, params: HashMap<String, String>) -> Result<bool> {
+		self.evaluate(&self.recv_eqn, params)
+	}
+	pub fn eval_send(&self, params: HashMap<String, String>) -> Result<bool> {
+		self.evaluate(&self.send_eqn, params)
+	}
+	fn evaluate(&self, eqn: &GvmEqn, params: HashMap<String,String>) -> Result<bool> {
+		let mut expr = Expr::new(eqn.clone());
 		for (variable, value) in params {
 			let test: bool = serde_json::from_str(&value).chain_err(|| ErrorKind::GvmEquationError)?;
 			expr = expr.clone().value(variable,test);
