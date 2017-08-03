@@ -59,14 +59,14 @@ impl Port {
 		let other_index = 0 as TableIndex;
 		loop {
 			let packet = port_from_outside.recv().chain_err(|| "Receive from outside")?;
-			self.port_to_pe.send(PortToPePacket::Packet((port.port_number.get_port_no(), packet))).chain_err(|| ErrorKind::PortError)?;
+			self.port_to_pe.send(PortToPePacket::Packet((port.port_number.get_port_no(), other_index, packet))).chain_err(|| ErrorKind::PortError)?;
 		}
 	}
-	fn listen_pe_for_outside(&mut self, port_to_outside: PortToNoc, port_from_pe: PortFromPe) -> Result<()> {
+	fn listen_pe_for_outside(&mut self, port_to_noc: PortToNoc, port_from_pe: PortFromPe) -> Result<()> {
 		loop {
 			//println!("Port {}: waiting for packet from pe", port.id);
-			let packet = port_from_pe.recv().chain_err(|| "Receive from pe for outside")?;
-			port_to_outside.send(packet).chain_err(|| ErrorKind::PortError)?;
+			let (_, packet) = port_from_pe.recv().chain_err(|| "Receive from pe for outside")?;
+			port_to_noc.send(packet).chain_err(|| ErrorKind::PortError)?;
 		}		
 	}
 	pub fn link_channel(&self, port_to_link: PortToLink, 
@@ -95,9 +95,9 @@ impl Port {
 					};
 					self.port_to_pe.send(PortToPePacket::Status((port_no, self.is_border, status))).chain_err(|| ErrorKind::PortError)?;
 				}
-				LinkToPortPacket::Packet(packet) => {
+				LinkToPortPacket::Packet((my_index, packet)) => {
 					//println!("Port {}: got from link {}", self.id, packet);
-					self.port_to_pe.send(PortToPePacket::Packet((port_no, packet))).chain_err(|| ErrorKind::PortError)?;
+					self.port_to_pe.send(PortToPePacket::Packet((port_no, my_index, packet))).chain_err(|| ErrorKind::PortError)?;
 					//println!("Port {}: sent from link to pe {}", self.id, packet);
 				}
 			}
