@@ -155,7 +155,7 @@ impl Message for DiscoverMsg {
 			//println!("DiscoverMsg: tree_id {}, port_number {}", tree_id, port_number);
 			let exists = ca.exists(&new_tree_id);  // Have I seen this tree before?
 			let status = if exists { traph::PortStatus::Pruned } else { traph::PortStatus::Parent };
-			let gvm_equation = GvmEquation::new("true", GvmVariables::empty());
+			let gvm_equation = GvmEquation::new("true", "true", GvmVariables::empty());
 			let entry = ca.update_traph(&new_tree_id, port_number, status, Some(gvm_equation),
 					children, senders_index, hops, Some(path)).chain_err(|| ErrorKind::MessageError)?;
 			if exists { 
@@ -314,7 +314,7 @@ pub struct StackTreeMsgPayload {
 impl StackTreeMsgPayload {
 	fn new(tree_id: &TreeID, base_tree_name: String) -> Result<StackTreeMsgPayload> {
 		let gvm_vars = GvmVariables::new(vec!["hops"]);
-		let gvm_eqn = GvmEquation::new("hops == 0", gvm_vars);
+		let gvm_eqn = GvmEquation::new("hops == 0", "true", gvm_vars);
 		Ok(StackTreeMsgPayload { tree_name: tree_id.stringify(), base_tree_name: base_tree_name, 
 				gvm_equation: gvm_eqn })
 	}
