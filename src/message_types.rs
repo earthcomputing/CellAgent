@@ -1,7 +1,7 @@
 use std::sync::mpsc;
 use routing_table_entry::{RoutingTableEntry};
 
-use config::{Json, PortNo, TableIndex};
+use config::{PortNo, TableIndex};
 use packet::{Packet};
 use port::{PortStatus};
 use utility::{Mask};
@@ -12,20 +12,22 @@ pub type CaToPe = mpsc::Sender<CaToPePacket>;
 pub type PeFromCa = mpsc::Receiver<CaToPePacket>;
 pub type CaPeError = mpsc::SendError<CaToPePacket>;
 // PacketEngine to Port
-pub type PeToPort = mpsc::Sender<Packet>;
-pub type PortFromPe = mpsc::Receiver<Packet>;
-pub type PePortError = mpsc::SendError<Packet>;
+pub type PeToPortPacket = ((TableIndex, Packet));
+pub type PeToPort = mpsc::Sender<PeToPortPacket>;
+pub type PortFromPe = mpsc::Receiver<PeToPortPacket>;
+pub type PePortError = mpsc::SendError<PeToPortPacket>;
 // PacketEngine to Port, Port to Link
-pub type PortToLink = mpsc::Sender<Packet>;
-pub type LinkFromPort = mpsc::Receiver<Packet>;
-pub type PortLinkError = mpsc::SendError<Packet>;
+pub type PortToLinkPacket = ((TableIndex, Packet));
+pub type PortToLink = mpsc::Sender<PortToLinkPacket>;
+pub type LinkFromPort = mpsc::Receiver<PortToLinkPacket>;
+pub type PortLinkError = mpsc::SendError<PortToLinkPacket>;
 // Link to Port
-pub enum LinkToPortPacket { Status(PortStatus),Packet(Packet) }
+pub enum LinkToPortPacket { Status(PortStatus),Packet((TableIndex, Packet)) }
 pub type LinkToPort = mpsc::Sender<LinkToPortPacket>;
 pub type PortFromLink = mpsc::Receiver<LinkToPortPacket>;
 pub type LinkPortError = mpsc::SendError<LinkToPortPacket>;
 // Port to PacketEngine
-pub enum PortToPePacket { Status((PortNo, bool, PortStatus)), Packet((PortNo, Packet)) }
+pub enum PortToPePacket { Status((PortNo, bool, PortStatus)), Packet((PortNo, TableIndex, Packet)) }
 pub type PortToPe = mpsc::Sender<PortToPePacket>;
 pub type PeFromPort = mpsc::Receiver<PortToPePacket>;
 pub type PortPeError = mpsc::SendError<PortToPePacket>;
