@@ -276,6 +276,16 @@ impl CellAgent {
 		//println!("CellAgent {}: port {} is border {} connected", self.cell_id, port_no, is_border);
 		if is_border {
 			println!("CellAgent {}: port {} is a border port", self.cell_id, port_no);
+			let tree_id = self.my_tree_id.add_component("Outside").chain_err(|| ErrorKind::CellagentError)?;
+			let msg = StackTreeMsg::new(&tree_id, &self.my_tree_id).chain_err(|| ErrorKind::CellagentError)?;
+			let direction = msg.get_header().get_direction();
+			let bytes = Serializer::serialize(&msg).chain_err(|| ErrorKind::CellagentError).chain_err(|| ErrorKind::CellagentError)?;
+			let port_no_mask = Mask::all_but_zero();
+			let my_index = self.my_entry.get_index();
+			let packets = Packetizer::packetize(bytes, direction).chain_err(|| ErrorKind::CellagentError)?;
+			for packet in packets {
+				self.ca_to_pe.send(CaToPePacket::Packet((my_index, port_no_mask, *packet))).chain_err(|| ErrorKind::CellagentError)?;			
+			}
 		} else {
 			let tree_id = self.my_tree_id.clone();
 			let port_no_mask = Mask::new(PortNumber::new(port_no, self.no_ports).chain_err(|| ErrorKind::CellagentError)?);
@@ -284,10 +294,9 @@ impl CellAgent {
 			let hops = 1;
 			let my_table_index = self.my_entry.get_index();
 			let msg = DiscoverMsg::new(&tree_id, my_table_index, &self.cell_id, hops, path);
-			let other_index = 0;
 			let direction = msg.get_header().get_direction();
 			let bytes = Serializer::serialize(&msg).chain_err(|| ErrorKind::CellagentError)?;
-			let packets = Packetizer::packetize(bytes, direction, other_index).chain_err(|| ErrorKind::CellagentError)?;
+			let packets = Packetizer::packetize(bytes, direction,).chain_err(|| ErrorKind::CellagentError)?;
 			//println!("CellAgent {}: sending packet {} on port {} {} ", self.cell_id, packets[0].get_count(), port_no, msg);
 			let connected_tree_index = (*self.connected_tree_entry.lock().unwrap()).get_index();
 			for packet in packets {
@@ -317,7 +326,7 @@ impl CellAgent {
 		for msg in discover_msgs.iter() {
 			let direction = msg.get_header().get_direction();
 			let bytes = Serializer::serialize(msg).chain_err(|| ErrorKind::CellagentError)?;
-			let packets = Packetizer::packetize(bytes, direction, other_index).chain_err(|| ErrorKind::CellagentError)?;
+			let packets = Packetizer::packetize(bytes, direction).chain_err(|| ErrorKind::CellagentError)?;
 			self.send_msg(&self.connected_tree_id, packets, mask).chain_err(|| ErrorKind::CellagentError)?;
 			//println!("CellAgent {}: forward on ports {:?} {}", self.cell_id, mask.get_port_nos(), msg);
 		}

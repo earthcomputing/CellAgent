@@ -52,30 +52,28 @@ impl fmt::Display for Packet {
 impl Clone for Packet {
 	fn clone(&self) -> Packet { *self }
 }
-const PACKET_HEADER_SIZE: usize = 8 + 2 + 4 + 1 + 1; // Last value is padding
+const PACKET_HEADER_SIZE: usize = 8 + 2 + 1 + 5; // Last value is padding
 #[derive(Debug, Copy, Clone)]
 pub struct PacketHeader {
 	msg_id: u64,	// Unique identifier of this message
-	size: u16,			// Number of packets remaining in message if not last packet
-						// Number of bytes in last packet if last packet, 0 => Error
-	other_index: u32,	// Routing table index on receiving cell
-	flags: u8,    		// Various flags
-						// xxxx xxx0 => rootcast
-						// xxxx xxx1 => leafcast
-						// xxxx xx0x => Not last packet
-						// xxxx xx1x => Last packet
-						// xx00 xxxx => EC Protocol to VirtualMachine
-						// xx01 xxxx => Legacy Protocol to VirtualMachine
+	size: u16,		// Number of packets remaining in message if not last packet
+					// Number of bytes in last packet if last packet, 0 => Error
+	flags: u8,    	// Various flags
+					// xxxx xxx0 => rootcast
+					// xxxx xxx1 => leafcast
+					// xxxx xx0x => Not last packet
+					// xxxx xx1x => Last packet
+					// xx00 xxxx => EC Protocol to VirtualMachine
+					// xx01 xxxx => Legacy Protocol to VirtualMachine
 }
 #[deny(unused_must_use)]
 impl PacketHeader {
-	pub fn new(msg_id: MsgID, size: PacketNo, other_index: TableIndex, direction: MsgDirection,
-			is_last_packet: bool) -> PacketHeader {
+	pub fn new(msg_id: MsgID, size: PacketNo, direction: MsgDirection, is_last_packet: bool) 
+			-> PacketHeader {
 		// Assertion fails if I forgot to change PACKET_HEADER_SIZE when I changed PacketHeader struct
 		assert_eq!(PACKET_HEADER_SIZE, mem::size_of::<PacketHeader>());
 		let flags = if is_last_packet { 2 } else { 0 };
-		let mut ph = PacketHeader { msg_id: msg_id, size: size, 
-			other_index: other_index, flags: flags };
+		let mut ph = PacketHeader { msg_id: msg_id, size: size, flags: flags };
 		ph.set_direction(direction);
 		ph
 	}
@@ -91,12 +89,10 @@ impl PacketHeader {
 			MsgDirection::Rootward => self.flags = self.flags & 254
 		}
 	}
-	pub fn get_other_index(&self) -> u32 { self.other_index }
-	pub fn set_other_index(&mut self, other_index: TableIndex) { self.other_index = other_index; }
 }
 impl fmt::Display for PacketHeader { 
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result { 
-		let mut s = format!("Table Index {} ", self.other_index);
+		let mut s = format!("Table Index");
 		if self.is_rootcast() { s = s + "Rootward"; }
 		else                  { s = s + "Leafward"; }
 		if self.is_last_packet() { s = s + ", Last packet"; }
@@ -154,7 +150,7 @@ impl Serializer {
 }
 pub struct Packetizer {}
 impl Packetizer {
-	pub fn packetize(msg_bytes: Box<Vec<u8>>, direction: MsgDirection, other_index: TableIndex) 
+	pub fn packetize(msg_bytes: Box<Vec<u8>>, direction: MsgDirection) 
 			-> Result<Vec<Box<Packet>>> {
 		let payload_size = Packetizer::packet_payload_size(msg_bytes.len());
 		let num_packets = (msg_bytes.len() + payload_size - 1)/ payload_size; // Poor man's ceiling
@@ -167,7 +163,7 @@ impl Packetizer {
 			} else {
 				(num_packets - i, false)
 			};
-			let packet_header = PacketHeader::new(unique_id, size as u16, other_index, direction, is_last_packet);
+			let packet_header = PacketHeader::new(unique_id, size as u16, direction, is_last_packet);
 			// Not a very Rusty way to put bytes into payload
 			let mut packet_bytes = vec![PAYLOAD_DEFAULT_ELEMENT; payload_size];
 			for j in 0..payload_size {
