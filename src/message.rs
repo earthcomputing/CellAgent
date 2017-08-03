@@ -148,7 +148,6 @@ impl Message for DiscoverMsg {
 		let hops = self.payload.get_hops();
 		let path = self.payload.get_path();
 		let my_index;
-		let other_index;
 		{ // Limit scope of immutable borrow of self on the next line
 			let new_tree_id = self.get_tree_id(self.payload.get_tree_name())?;
 			let senders_index = self.payload.get_index();
@@ -164,11 +163,10 @@ impl Message for DiscoverMsg {
 		}
 		my_index = entry.get_index();
 		// Send DiscoverD to sender
-		other_index = 0;
 		let discoverd_msg = DiscoverDMsg::new(new_tree_id.clone(), my_index);
 		let direction = discoverd_msg.get_header().get_direction();
 		let bytes = Serializer::serialize(&discoverd_msg).chain_err(|| ErrorKind::MessageError)?;
-		let packets = Packetizer::packetize(bytes, direction, other_index).chain_err(|| ErrorKind::MessageError)?;
+		let packets = Packetizer::packetize(bytes, direction).chain_err(|| ErrorKind::MessageError)?;
 		//println!("DiscoverMsg {}: sending discoverd for tree {} packet {} {}",ca.get_id(), new_tree_id, packets[0].get_count(), discoverd_msg);
 		let mask = Mask::new(port_number);
 		ca.send_msg(&ca.get_connected_ports_tree_id(), packets, mask).chain_err(|| ErrorKind::MessageError)?;
@@ -178,7 +176,7 @@ impl Message for DiscoverMsg {
 		let control_tree_index = 0;
 		let direction = self.get_header().get_direction();
 		let bytes = Serializer::serialize(&self.clone()).chain_err(|| ErrorKind::MessageError)?;
-		let packets = Packetizer::packetize(bytes, direction, other_index).chain_err(|| ErrorKind::MessageError)?;
+		let packets = Packetizer::packetize(bytes, direction).chain_err(|| ErrorKind::MessageError)?;
 		let user_mask = DEFAULT_USER_MASK.all_but_port(PortNumber::new(port_no, ca.get_no_ports()).chain_err(|| ErrorKind::MessageError)?);
 		ca.add_discover_msg(self.clone());
 		//println!("DiscoverMsg {}: forwarding packet {} on connected ports {}", ca.get_id(), packets[0].get_count(), self);
@@ -286,13 +284,12 @@ pub struct StackTreeMsg {
 	payload: StackTreeMsgPayload
 }
 impl StackTreeMsg {
-	pub fn new(id: &str, base_tree_id: TreeID) -> Result<StackTreeMsg> {
-		let tree_id = TreeID::new(id).chain_err(|| ErrorKind::MessageError)?;
+	pub fn new(tree_id: &TreeID, base_tree_id: &TreeID) -> Result<StackTreeMsg> {
 		let mut tree_map = HashMap::new();
-		tree_map.insert(tree_id.stringify(), tree_id);
-		tree_map.insert(base_tree_id.stringify(), base_tree_id.clone());
-		let header = MsgHeader::new(MsgType::StackTree, MsgDirection::Rootward, tree_map);
-		let payload = StackTreeMsgPayload::new(id, base_tree_id.stringify()).chain_err(|| ErrorKind::MessageError)?;
+		tree_map.insert(tree_id.stringify(), tree_id.clone());
+		tree_map.insert(base_tree_id.stringify(), base_tree_id.clone()); 
+		let header = MsgHeader::new(MsgType::StackTree, MsgDirection::Leafward, tree_map);
+		let payload = StackTreeMsgPayload::new(tree_id, base_tree_id.stringify()).chain_err(|| ErrorKind::MessageError)?;
 		Ok(StackTreeMsg { header: header, payload: payload})
 	}
 }
@@ -315,8 +312,7 @@ pub struct StackTreeMsgPayload {
 	gvm_equation: GvmEquation,
 }
 impl StackTreeMsgPayload {
-	fn new(id: &str, base_tree_name: String) -> Result<StackTreeMsgPayload> {
-		let tree_id = TreeID::new(id).chain_err(|| ErrorKind::MessageError)?;
+	fn new(tree_id: &TreeID, base_tree_name: String) -> Result<StackTreeMsgPayload> {
 		let gvm_vars = GvmVariables::new(vec!["hops"]);
 		let gvm_eqn = GvmEquation::new("hops == 0", gvm_vars);
 		Ok(StackTreeMsgPayload { tree_name: tree_id.stringify(), base_tree_name: base_tree_name, 

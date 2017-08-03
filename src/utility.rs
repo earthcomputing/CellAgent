@@ -34,6 +34,9 @@ impl Mask {
 	}
 	pub fn new0() -> Mask { Mask { mask: 1 } }
 	pub fn empty() -> Mask { Mask { mask: 0 } }
+	pub fn all_but_zero() -> Mask {
+		Mask::empty().not().all_but_port(PortNumber::new0())
+	}
 	pub fn equal(&self, other: Mask) -> bool { self.mask == other.mask }
 	pub fn get_as_value(&self) -> MaskValue { self.mask }
 	pub fn or(&self, mask: Mask) -> Mask {
