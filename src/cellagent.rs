@@ -6,7 +6,7 @@ use serde_json;
 
 use config::{MAX_ENTRIES, MsgID, PathLength, PortNo, TableIndex};
 use container::Service;
-use gvm_equation::{GvmEquation, GvmVariables};
+use gvm_equation::{GvmEquation, GvmVariable, GvmVariables};
 use message::{DiscoverMsg, DiscoverDMsg, StackTreeMsg, SetupVMsMsg, Message, MsgType};
 use message_types::{CaToPe, CaFromPe, CaToVm, VmFromCa, VmToCa, CaFromVm, CaToPePacket, PeToCaPacket};
 use name::{Name, CellID, TreeID, UpTraphID, VmID};
@@ -77,17 +77,17 @@ impl CellAgent {
 		let control_tree_id = self.control_tree_id.clone();
 		let connected_tree_id = self.connected_tree_id.clone();
 		let my_tree_id = self.my_tree_id.clone();
-		let gvm_equation = GvmEquation::new("true", "true", GvmVariables::empty());
+		let gvm_equation = GvmEquation::new("true", "true", GvmVariables::new());
 		self.update_traph(&control_tree_id, port_number_0, 
 				traph::PortStatus::Parent, Some(gvm_equation), 
 				&mut HashSet::new(), other_index, hops, path).chain_err(|| ErrorKind::CellagentError)?;
-		let gvm_equation = GvmEquation::new("false", "true", GvmVariables::empty());
+		let gvm_equation = GvmEquation::new("false", "true", GvmVariables::new());
 		let connected_tree_entry = self.update_traph(&connected_tree_id, port_number_0, 
 			traph::PortStatus::Parent, Some(gvm_equation),
 			&mut HashSet::new(), other_index, hops, path).chain_err(|| ErrorKind::CellagentError)?;
 		self.connected_tree_entry = Arc::new(Mutex::new(connected_tree_entry));
 		// Create my tree
-		let gvm_equation = GvmEquation::new("true", "true", GvmVariables::empty());
+		let gvm_equation = GvmEquation::new("true", "true", GvmVariables::new());
 		self.my_entry = self.update_traph(&my_tree_id, port_number_0, 
 				traph::PortStatus::Parent, Some(gvm_equation), 
 				&mut HashSet::new(), other_index, hops, path).chain_err(|| ErrorKind::CellagentError)?; 
@@ -199,33 +199,35 @@ impl CellAgent {
 			traph::PortStatus::Pruned => port_status,
 			_ => traph_status  // Don't replace if Parent or Child
 		};
-		let gvm_recv = match gvm_equation {
+		let (gvm_recv, gvm_send) = match gvm_equation {
 			Some(eqn) => {
 				let variables = self.get_vars(&traph, eqn.get_variables())?;
-				let recv_eqn = eqn.get_recv_eqn();
-				let send_eqn = eqn.get_send_eqn();
-				eqn.eval_recv(variables).chain_err(|| ErrorKind::CellagentError)?
+				let recv = eqn.eval_recv(&variables).chain_err(|| ErrorKind::CellagentError)?;
+				let send = eqn.eval_send(&variables).chain_err(|| ErrorKind::CellagentError)?;
+				(recv, send)
 			},
-			None => false,
+			None => (false, false),
 		};
 		if gvm_recv { children.insert(PortNumber::new(0, self.no_ports)?); }
 		let entry = traph.new_element(port_number, port_status, other_index, children, hops, path).chain_err(|| ErrorKind::CellagentError)?; 
 // Here's the end of the transaction
 		//println!("CellAgent {}: entry {}\n{}", self.cell_id, entry, traph); 
-		traphs.insert(tree_id.stringify(), traph);
-		{
-			self.trees.lock().unwrap().insert(entry.get_index(), tree_id.stringify());
+		if gvm_send {
+			traphs.insert(tree_id.stringify(), traph);
+			{
+				self.trees.lock().unwrap().insert(entry.get_index(), tree_id.stringify());
+			}
+			self.ca_to_pe.send(CaToPePacket::Entry(entry)).chain_err(|| ErrorKind::CellagentError)?;
 		}
-		self.ca_to_pe.send(CaToPePacket::Entry(entry)).chain_err(|| ErrorKind::CellagentError)?;
 		Ok(entry)
 	}
-	fn get_vars(&self, traph: &Traph, vars: &GvmVariables) -> Result<HashMap<String,String>> {
+	fn get_vars(&self, traph: &Traph, vars: &GvmVariables) -> Result<HashMap<GvmVariable,String>> {
 		let mut var_map = HashMap::new();
-		for var in vars.iter() {
-			if var == "hops" {
-				var_map.insert(var.clone(), traph.get_hops()?.to_string());
+		for var in vars.get_variables().clone() {
+			if var.get_value() == "hops" {
+				var_map.insert(var, traph.get_hops()?.to_string());
 			} else {
-				return Err(ErrorKind::UnknownVariable(self.cell_id.clone(), var.to_string()).into());
+				return Err(ErrorKind::UnknownVariable(self.cell_id.clone(), var).into());
 			}
 		}
 		Ok(var_map)
@@ -418,7 +420,7 @@ error_chain! {
 		TreeIndex(cell_id: CellID, index: TableIndex) {
 			display("No tree associated with index {} on cell {}", index, cell_id)
 		} 
-		UnknownVariable(cell_id: CellID, var: String) {
+		UnknownVariable(cell_id: CellID, var: GvmVariable) {
 			display("Cell {}: Unknown gvm variable {}", cell_id, var)
 		}
 		UpTraph(cell_id: CellID, up_tree_id: UpTraphID) {
