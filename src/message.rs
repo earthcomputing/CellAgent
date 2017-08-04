@@ -298,7 +298,16 @@ impl Message for StackTreeMsg {
 	fn get_header(&self) -> &MsgHeader { &self.header }
 	fn get_payload(&self) -> &MsgPayload { &self.payload }
 	fn process(&mut self, ca: &mut CellAgent, port_no: PortNo) -> Result<()> {
-		ca.stack_tree(self).chain_err(|| ErrorKind::MessageError)
+		println!("Stack tree msg {}", self);
+		let tree_map = self.header.get_tree_map();
+		let tree_name = self.payload.get_tree_name();
+		if let Some(tree_id) = tree_map.get(tree_name) {
+			let gvm_eqn = self.payload.get_gvm_equation();
+		//ca.update_traph(&tree_id, port_number, traph::PortStatus::Child, Some(gvm_eqn), 
+		//	&mut children, my_index, 0, None).chain_err(|| ErrorKind::MessageError)?;
+			
+		}
+		Ok(())
 	}
 }
 impl fmt::Display for StackTreeMsg {
@@ -322,6 +331,7 @@ impl StackTreeMsgPayload {
 	}
 	pub fn get_base_tree_name(&self) -> &str { &self.base_tree_name }
 	pub fn get_tree_name(&self) -> &str { &self.tree_name}
+	pub fn get_gvm_equation(&self) -> &GvmEquation { &self.gvm_eqn }
 }
 impl MsgPayload for StackTreeMsgPayload {}
 impl fmt::Display for StackTreeMsgPayload {
