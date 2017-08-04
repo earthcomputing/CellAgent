@@ -171,10 +171,6 @@ impl CellAgent {
 		});
 		Ok(())
 	}
-	pub fn stack_tree(&self, msg: &StackTreeMsg) -> Result<()> {
-		println!("CellAgent {}: stack tree msg {}", self.cell_id, msg);
-		Ok(())
-	}
 	pub fn update_traph(&mut self, tree_id: &TreeID, port_number: PortNumber, port_status: traph::PortStatus,
 				gvm_equation: Option<GvmEquation>, children: &mut HashSet<PortNumber>, 
 				other_index: TableIndex, hops: PathLength, path: Option<Path>) 
