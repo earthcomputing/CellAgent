@@ -70,11 +70,13 @@ impl PacketEngine {
 				None => self.routing_table.lock().unwrap().get_entry(my_index).chain_err(|| ErrorKind::PacketEngineError)?
 			}
 		}
-		//println!("PacketEngine {}: packet {} entry {}", self.cell_id, packet.get_count(), entry);
-		let mask = entry.get_mask();
-		let other_indices = entry.get_other_indices();
-		PortNumber::new(port_no, other_indices.len() as u8).chain_err(|| ErrorKind::PacketEngineError)?; // Verify that port_no is valid
-		self.forward(port_no, entry, mask, packet).chain_err(|| ErrorKind::PacketEngineError)?;	
+		if entry.is_in_use() {
+			//println!("PacketEngine {}: packet {} entry {}", self.cell_id, packet.get_count(), entry);
+			let mask = entry.get_mask();
+			let other_indices = entry.get_other_indices();
+			PortNumber::new(port_no, other_indices.len() as u8).chain_err(|| ErrorKind::PacketEngineError)?; // Verify that port_no is valid
+			self.forward(port_no, entry, mask, packet).chain_err(|| ErrorKind::PacketEngineError)?;	
+		}
 		Ok(())	
 	}
 	fn forward(&self, recv_port_no: PortNo, entry: RoutingTableEntry, user_mask: Mask, packet: Packet) 
