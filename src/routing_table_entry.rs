@@ -23,7 +23,7 @@ impl RoutingTableEntry {
 		let port_number = PortNumber::new(0, MAX_PORTS).chain_err(|| ErrorKind::RoutingTableEntryError)?;
 		Ok(RoutingTableEntry::new(index, false, port_number, Mask::empty(), [0; MAX_PORTS as usize]))
 	}
-	pub fn is_inuse(&self) -> bool { self.inuse }
+	pub fn is_in_use(&self) -> bool { self.inuse }
 	pub fn get_index(&self) -> TableIndex { self.index }
 	pub fn or_with_mask(&mut self, mask: Mask) { self.mask = self.mask.or(mask); }
 	pub fn and_with_mask(&mut self, mask: Mask) { self.mask = self.mask.and(mask); }

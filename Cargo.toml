@@ -5,9 +5,10 @@ authors = ["alanhkarp <alanhkarp@gmail.com>"]
 
 [dependencies]
 crossbeam = "0.2"
+error-chain = "*"
+eval = "^0.4"
+rand = "*" # Or a specific version
 serde = "0.9"
 serde_derive = "0.9"
 serde_json = "0.9.9"
-rand = "*" # Or a specific version
-error-chain = "*"
-eval = "^0.4"
+uuid = "0.4"
