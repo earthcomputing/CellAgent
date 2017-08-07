@@ -127,7 +127,8 @@ impl CellAgent {
 	//	}
 	//}
 	//pub fn get_control_tree_id(&self) -> &TreeID { &self.control_tree_id }
-	pub fn get_connected_ports_tree_id(&self) -> TreeID { self.connected_tree_id.clone() }
+	pub fn get_connected_ports_tree_id(&self) -> &TreeID { &self.connected_tree_id }
+	pub fn get_control_tree_id(&self) -> &TreeID { &self.control_tree_id }
 	pub fn exists(&self, tree_id: &TreeID) -> bool { 
 		(*self.traphs.lock().unwrap()).contains_key(tree_id.get_name())
 	}
@@ -205,7 +206,7 @@ impl CellAgent {
 			None => (false, false),
 		};
 		if gvm_recv { children.insert(PortNumber::new(0, self.no_ports)?); }
-		let entry = traph.new_element(port_number, port_status, other_index, children, hops, path).chain_err(|| ErrorKind::CellagentError)?; 
+		let entry = traph.new_element(tree_id, port_number, port_status, other_index, children, hops, path).chain_err(|| ErrorKind::CellagentError)?; 
 // Here's the end of the transaction
 		//println!("CellAgent {}: entry {}\n{}", self.cell_id, entry, traph); 
 		if gvm_send {
@@ -282,21 +283,20 @@ impl CellAgent {
 			let bytes = Serializer::serialize(&msg).chain_err(|| ErrorKind::CellagentError).chain_err(|| ErrorKind::CellagentError)?;
 			let port_no_mask = Mask::all_but_zero();
 			let my_index = self.my_entry.get_index();
-			let packets = Packetizer::packetize(bytes, direction).chain_err(|| ErrorKind::CellagentError)?;
+			let packets = Packetizer::packetize(&self.my_tree_id, bytes, direction).chain_err(|| ErrorKind::CellagentError)?;
 			for packet in packets {
 				self.ca_to_pe.send(CaToPePacket::Packet((my_index, port_no_mask, *packet))).chain_err(|| ErrorKind::CellagentError)?;			
 			}
 		} else {
-			let tree_id = self.my_tree_id.clone();
 			let port_no_mask = Mask::new(PortNumber::new(port_no, self.no_ports).chain_err(|| ErrorKind::CellagentError)?);
 			let path = Path::new(port_no, self.no_ports).chain_err(|| ErrorKind::CellagentError)?;
 			self.connected_tree_entry.lock().unwrap().or_with_mask(port_no_mask);
 			let hops = 1;
 			let my_table_index = self.my_entry.get_index();
-			let msg = DiscoverMsg::new(&tree_id, my_table_index, &self.cell_id, hops, path);
+			let msg = DiscoverMsg::new(&self.my_tree_id, my_table_index, &self.cell_id, hops, path);
 			let direction = msg.get_header().get_direction();
 			let bytes = Serializer::serialize(&msg).chain_err(|| ErrorKind::CellagentError)?;
-			let packets = Packetizer::packetize(bytes, direction,).chain_err(|| ErrorKind::CellagentError)?;
+			let packets = Packetizer::packetize(&self.control_tree_id, bytes, direction,).chain_err(|| ErrorKind::CellagentError)?;
 			//println!("CellAgent {}: sending packet {} on port {} {} ", self.cell_id, packets[0].get_count(), port_no, msg);
 			let connected_tree_index = (*self.connected_tree_entry.lock().unwrap()).get_index();
 			for packet in packets {
@@ -326,7 +326,7 @@ impl CellAgent {
 		for msg in discover_msgs.iter() {
 			let direction = msg.get_header().get_direction();
 			let bytes = Serializer::serialize(msg).chain_err(|| ErrorKind::CellagentError)?;
-			let packets = Packetizer::packetize(bytes, direction).chain_err(|| ErrorKind::CellagentError)?;
+			let packets = Packetizer::packetize(&self.my_tree_id, bytes, direction).chain_err(|| ErrorKind::CellagentError)?;
 			self.send_msg(&self.connected_tree_id, packets, mask).chain_err(|| ErrorKind::CellagentError)?;
 			//println!("CellAgent {}: forward on ports {:?} {}", self.cell_id, mask.get_port_nos(), msg);
 		}

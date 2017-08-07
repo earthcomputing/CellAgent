@@ -15,7 +15,6 @@ impl RoutingTable {
 	pub fn new(id: CellID) -> Result<RoutingTable> {
 		let mut entries = Vec::new();
 		for i in 1..MAX_ENTRIES {
-			let port_number = PortNumber::new0();
 			let entry = RoutingTableEntry::default(i as TableIndex).chain_err(|| ErrorKind::RoutingTableError)?;
 			entries.push(entry);
 		}
@@ -35,7 +34,7 @@ impl RoutingTable {
 impl fmt::Display for RoutingTable {
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result { 
 		let mut s = format!("\nRouting Table with {} Entries", MAX_ENTRIES);
-		s = s + &format!("\n Index TreeID Hash In Use Parent Mask             Indices");
+		s = s + &format!("\n Index Tree UUID  In Use Parent Mask             Indices");
 		for entry in self.entries.iter() {
 			if entry.is_in_use() { s = s + &format!("\n{}", entry); }
 		}

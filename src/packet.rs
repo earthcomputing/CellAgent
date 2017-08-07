@@ -2,15 +2,18 @@ use std::fmt;
 use std::mem;
 use std::collections::HashMap;
 use std::sync::atomic::{ATOMIC_USIZE_INIT, AtomicUsize, Ordering};
-use rand;
 use std::str;
 use std::hash::{Hash};
+
+use rand;
 use serde;
 use serde_json;
+use uuid::Uuid;
 
 use config::{PACKET_MIN, PACKET_MAX, PAYLOAD_DEFAULT_ELEMENT, 
 	MsgID, PacketElement, PacketNo, TableIndex};
 use message::{Message, MsgDirection, TypePlusMsg};
+use name::{Name, TreeID};
  
 //const LARGEST_MSG: usize = std::u32::MAX as usize;
 const PAYLOAD_MIN: usize = PACKET_MAX - PACKET_HEADER_SIZE;
@@ -34,6 +37,7 @@ impl Packet {
 	pub fn get_count(&self) -> usize { self.packet_count }
 	pub fn get_header(&self) -> PacketHeader { self.header }
 	pub fn get_payload(&self) -> Payload { self.payload }
+	pub fn get_uuid(&self) -> Uuid { self.header.get_uuid() }
 //	pub fn get_payload_bytes(&self) -> Vec<u8> { self.get_payload().get_bytes() }
 //	pub fn get_payload_size(&self) -> usize { self.payload.get_no_bytes() }
 }
@@ -52,10 +56,11 @@ impl fmt::Display for Packet {
 impl Clone for Packet {
 	fn clone(&self) -> Packet { *self }
 }
-const PACKET_HEADER_SIZE: usize = 8 + 2 + 1 + 5; // Last value is padding
+const PACKET_HEADER_SIZE: usize = 8 + 16 + 2 + 1 + 5; // Last value is padding
 #[derive(Debug, Copy, Clone)]
 pub struct PacketHeader {
 	msg_id: u64,	// Unique identifier of this message
+	uuid: Uuid,     // Tree identifier 16 bytes
 	size: u16,		// Number of packets remaining in message if not last packet
 					// Number of bytes in last packet if last packet, 0 => Error
 	flags: u8,    	// Various flags
@@ -68,17 +73,17 @@ pub struct PacketHeader {
 }
 #[deny(unused_must_use)]
 impl PacketHeader {
-	pub fn new(msg_id: MsgID, size: PacketNo, direction: MsgDirection, is_last_packet: bool) 
+	pub fn new(msg_id: MsgID, tree_id: &TreeID, size: PacketNo, direction: MsgDirection, is_last_packet: bool) 
 			-> PacketHeader {
 		// Assertion fails if I forgot to change PACKET_HEADER_SIZE when I changed PacketHeader struct
 		assert_eq!(PACKET_HEADER_SIZE, mem::size_of::<PacketHeader>());
 		let flags = if is_last_packet { 2 } else { 0 };
-		let mut ph = PacketHeader { msg_id: msg_id, size: size, flags: flags };
+		let mut ph = PacketHeader { msg_id: msg_id, uuid: tree_id.get_uuid(), size: size, flags: flags };
 		ph.set_direction(direction);
 		ph
 	}
 	pub fn get_msg_id(&self) -> MsgID { self.msg_id }
-//	fn set_msg_id(&mut self, msg_id: MsgID) { self.msg_id = msg_id; }
+	pub fn get_uuid(&self) -> Uuid { self.uuid }
 	pub fn get_size(&self) -> PacketNo { self.size }
 	pub fn is_leafcast(&self) -> bool { (self.flags & 1) == 1 }
 	pub fn is_rootcast(&self) -> bool { !self.is_leafcast() }
@@ -92,9 +97,12 @@ impl PacketHeader {
 }
 impl fmt::Display for PacketHeader { 
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result { 
-		let mut s = format!("Table Index");
-		if self.is_rootcast() { s = s + "Rootward"; }
-		else                  { s = s + "Leafward"; }
+		let mut uuid = self.uuid.to_string();
+		uuid.truncate(8);
+		let mut s = format!("Message ID {}", self.msg_id);
+		s = s + &format!(", UUID {}", self.uuid );
+		if self.is_rootcast() { s = s + " Rootward"; }
+		else                  { s = s + " Leafward"; }
 		if self.is_last_packet() { s = s + ", Last packet"; }
 		else                     { s = s + ", Not last packet"; }
 		s = s + &format!(", Size {}", self.size);
@@ -150,12 +158,12 @@ impl Serializer {
 }
 pub struct Packetizer {}
 impl Packetizer {
-	pub fn packetize(msg_bytes: Box<Vec<u8>>, direction: MsgDirection) 
+	pub fn packetize(tree_id: &TreeID, msg_bytes: Box<Vec<u8>>, direction: MsgDirection) 
 			-> Result<Vec<Box<Packet>>> {
 		let payload_size = Packetizer::packet_payload_size(msg_bytes.len());
 		let num_packets = (msg_bytes.len() + payload_size - 1)/ payload_size; // Poor man's ceiling
 		let last_packet_size = msg_bytes.len() - (num_packets-1)*payload_size;
-		let unique_id = rand::random(); // Can't use hash in case two cells send the same message
+		let msg_id = rand::random(); // Can't use hash in case two cells send the same message
 		let mut packets = Vec::new();
 		for i in 0..num_packets {
 			let (size, is_last_packet) = if i == (num_packets-1) {
@@ -163,7 +171,7 @@ impl Packetizer {
 			} else {
 				(num_packets - i, false)
 			};
-			let packet_header = PacketHeader::new(unique_id, size as u16, direction, is_last_packet);
+			let packet_header = PacketHeader::new(msg_id, tree_id, size as u16, direction, is_last_packet);
 			// Not a very Rusty way to put bytes into payload
 			let mut packet_bytes = vec![PAYLOAD_DEFAULT_ELEMENT; payload_size];
 			for j in 0..payload_size {

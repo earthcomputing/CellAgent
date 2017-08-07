@@ -1,6 +1,7 @@
 use std::fmt;
 use std::sync::{Arc, Mutex};
 use std::collections::HashSet;
+use uuid::Uuid;
 
 use config::{PortNo, TableIndex};
 use message_types::{PeFromCa, PeToCa, PeToPort, PeFromPort, CaToPePacket, PortToPePacket, PeToCaPacket};
@@ -72,16 +73,24 @@ impl PacketEngine {
 		}
 		if entry.is_in_use() {
 			//println!("PacketEngine {}: packet {} entry {}", self.cell_id, packet.get_count(), entry);
-			let mask = entry.get_mask();
-			let other_indices = entry.get_other_indices();
-			PortNumber::new(port_no, other_indices.len() as u8).chain_err(|| ErrorKind::PacketEngineError)?; // Verify that port_no is valid
-			self.forward(port_no, entry, mask, packet).chain_err(|| ErrorKind::PacketEngineError)?;	
+			// The control tree is special since each cell has a different uuid
+			if (entry.get_index() == 0) || (entry.get_uuid() == packet.get_header().get_uuid()) {
+				let mask = entry.get_mask();
+				let other_indices = entry.get_other_indices();
+				PortNumber::new(port_no, other_indices.len() as u8).chain_err(|| ErrorKind::PacketEngineError)?; // Verify that port_no is valid
+				self.forward(port_no, entry, mask, packet).chain_err(|| ErrorKind::PacketEngineError)?;	
+			} else {
+				println!("CellID {}: entry index {}, entry uuid {}, packet uuid {}",
+					self.cell_id, entry.get_index(), entry.get_uuid(), packet.get_header().get_uuid());
+				return Err(ErrorKind::Uuid(self.cell_id.clone(), entry.get_index(), entry.get_uuid(),
+						packet.get_uuid()).into());
+			}
 		}
 		Ok(())	
 	}
 	fn forward(&self, recv_port_no: PortNo, entry: RoutingTableEntry, user_mask: Mask, packet: Packet) 
 			-> Result<()>{
-		let mut header = packet.get_header();
+		let header = packet.get_header();
 		//println!("PacketEngine {}: forward packet {}, mask {}, entry {}", self.cell_id, packet.get_count(), mask, entry);
 		let other_indices = entry.get_other_indices();
 		PortNumber::new(recv_port_no, other_indices.len() as u8).chain_err(|| ErrorKind::PacketEngineError)?; // Make sure recv_port_no is valid
@@ -160,8 +169,11 @@ error_chain! {
 		Utility(::utility::Error, ::utility::ErrorKind);
 	}
 	errors { PacketEngineError
+		Uuid(cell_id: CellID, index: TableIndex, table_uuid: Uuid, packet_uuid: Uuid) {
+			display("CellID {}: index {}, entry uuid {}, packet uuid {}", cell_id, index, 
+				table_uuid, packet_uuid)
+		}
 		Sender(cell_id: CellID, port_no: PortNo) {
-			description("No sender for port")
 			display("No sender for port {} on cell {}", port_no, cell_id)
 		}
 	}
