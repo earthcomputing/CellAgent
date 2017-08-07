@@ -2,7 +2,7 @@ use std::fmt;
 use std::collections::HashSet;
 
 use config::{MAX_PORTS, PathLength, PortNo, TableIndex};
-use name::{CellID, TreeID};
+use name::{Name, CellID, TreeID};
 use routing_table_entry::{RoutingTableEntry};
 use utility::{Path, PortNumber};
 
@@ -25,7 +25,7 @@ impl Traph {
 		Ok(Traph { cell_id: cell_id, tree_id: tree_id, my_index: index, 
 				table_entry: entry, elements: elements })
 	}
-//	pub fn get_tree_id(&self) -> TreeID { self.tree_id.clone() }
+	pub fn get_tree_id(&self) -> TreeID { self.tree_id.clone() }
 	pub fn get_port_status(&self, port_number: PortNumber) -> PortStatus { 
 		let port_no = port_number.get_port_no();
 		match self.elements.get(port_no as usize) {
@@ -56,7 +56,7 @@ impl Traph {
 	}
 	pub fn get_table_entry(&self) -> RoutingTableEntry { self.table_entry }
 	pub fn get_table_index(&self) -> TableIndex { self.table_entry.get_index() }
-	pub fn new_element(&mut self, port_number: PortNumber, port_status: PortStatus, 
+	pub fn new_element(&mut self, tree_id: &TreeID, port_number: PortNumber, port_status: PortStatus, 
 			other_index: TableIndex, children: &HashSet<PortNumber>, hops: PathLength, path: Option<Path>) 
 			-> Result<RoutingTableEntry> {
 		let port_no = port_number.get_port_no();
@@ -72,6 +72,7 @@ impl Traph {
 		self.table_entry.add_other_index(port_number, other_index);
 		self.table_entry.add_children(children);
 		self.table_entry.set_inuse();
+		self.table_entry.set_tree_id(tree_id);
 		let element = TraphElement::new(true, port_no, other_index, port_status, hops, path);
 		self.elements[port_no as usize] = element;
 		Ok(self.table_entry)
@@ -109,8 +110,8 @@ impl Traph {
 }
 impl fmt::Display for Traph {
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result { 
-		let mut s = format!("Cell {}: Traph for TreeID {}\nTable Entry Index {}", 
-			self.cell_id, self.tree_id, self.table_entry.get_index());
+		let mut s = format!("Cell {}: Traph for TreeID {} {}\nTable Entry Index {}", 
+			self.cell_id, self.tree_id, self.tree_id.get_uuid(), self.table_entry.get_index());
 		s = s + &format!("\nPort Other Connected Broken Status Hops Path");
 		// Can't replace with map() because s gets moved into closure 
 		for element in self.elements.iter() { 
