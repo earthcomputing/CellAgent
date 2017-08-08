@@ -24,6 +24,7 @@ const CONTROL_TREE_NAME: &'static str = "Control";
 const CONNECTED_PORTS_TREE_NAME: &'static str = "Connected";
 
 pub type Traphs = Arc<Mutex<HashMap<Uuid,Traph>>>;
+pub type SavedMsg = Vec<Packet>;
 
 #[derive(Debug, Clone)]
 pub struct CellAgent {
@@ -35,7 +36,7 @@ pub struct CellAgent {
 	connected_tree_id: TreeID,
 	my_entry: RoutingTableEntry,
 	connected_tree_entry: Arc<Mutex<RoutingTableEntry>>,
-	discover_msgs: Arc<Mutex<Vec<DiscoverMsg>>>,
+	saved_msgs: Arc<Mutex<Vec<SavedMsg>>>,
 	free_indices: Arc<Mutex<Vec<TableIndex>>>,
 	trees: Arc<Mutex<HashMap<TableIndex,String>>>,
 	traphs: Traphs,
@@ -64,7 +65,7 @@ impl CellAgent {
 			control_tree_id: control_tree_id, connected_tree_id: connected_tree_id,	
 			no_ports: no_ports, traphs: traphs, vm_id_no: 0,
 			free_indices: Arc::new(Mutex::new(free_indices)),
-			discover_msgs: Arc::new(Mutex::new(Vec::new())), my_entry: RoutingTableEntry::default(0).chain_err(|| ErrorKind::CellagentError)?, 
+			saved_msgs: Arc::new(Mutex::new(Vec::new())), my_entry: RoutingTableEntry::default(0).chain_err(|| ErrorKind::CellagentError)?, 
 			connected_tree_entry: Arc::new(Mutex::new(RoutingTableEntry::default(0).chain_err(|| ErrorKind::CellagentError)?)),
 			tenant_masks: tenant_masks, trees: Arc::new(Mutex::new(trees)), up_traphs_senders: HashMap::new(),
 			up_traphs_clist: HashMap::new(), ca_to_pe: ca_to_pe, packet_assemblers: PacketAssemblers::new()})
@@ -109,16 +110,16 @@ impl CellAgent {
 		};
 		Ok(tree_id)
 	}
-	pub fn get_discover_msgs(&self) -> Vec<DiscoverMsg> {
-		self.discover_msgs.lock().unwrap().to_vec()
+	pub fn get_saved_msgs(&self) -> Vec<SavedMsg> {
+		self.saved_msgs.lock().unwrap().to_vec()
 	}
-	pub fn add_discover_msg(&mut self, msg: DiscoverMsg) -> Vec<DiscoverMsg> {
+	pub fn add_saved_msg(&mut self, msg: SavedMsg) -> Vec<SavedMsg> {
 		{ 
-			let mut discover_msgs = self.discover_msgs.lock().unwrap();
+			let mut saved_msgs = self.saved_msgs.lock().unwrap();
 			//println!("CellAgent {}: added msg {} as entry {} for tree {}", self.cell_id, msg.get_header().get_count(), discover_msgs.len()+1, msg); 
-			discover_msgs.push(msg);
+			saved_msgs.push(msg);
 		}
-		self.get_discover_msgs()
+		self.get_saved_msgs()
 	}
 	//pub fn get_tenant_mask(&self) -> Result<&Mask, CellAgentError> {
 	//	if let Some(tenant_mask) = self.tenant_masks.last() {
@@ -306,9 +307,9 @@ impl CellAgent {
 				let packet_msg = CaToPePacket::Packet((connected_tree_index, port_no_mask, packet));
 				self.ca_to_pe.send(packet_msg).chain_err(|| ErrorKind::CellagentError)?;
 			}
-			let discover_msgs  = self.get_discover_msgs();
+			let saved_msgs  = self.get_saved_msgs();
 			//println!("CellAgent {}: {} discover msgs", ca.cell_id, discover_msgs.len());
-			self.forward_discover(&discover_msgs, port_no_mask).chain_err(|| ErrorKind::CellagentError)?;		
+			self.forward_saved(&saved_msgs, port_no_mask).chain_err(|| ErrorKind::CellagentError)?;		
 		}
 		Ok(())		
 	}
@@ -321,25 +322,27 @@ impl CellAgent {
 		//self.ca_to_pe.send((Some(*self.connected_tree_entry.lock().unwrap()),None)).chain_err(|| ErrorKind::CellagentError)?;	
 		Ok(())	
 	}		
-	pub fn forward_discover(&mut self, discover_msgs: &Vec<DiscoverMsg>, mask: Mask) -> Result<()> {
-		let my_table_index = self.my_entry.get_index();
-		let other_index = 0;
-		for msg in discover_msgs.iter() {
-			let direction = msg.get_header().get_direction();
-			let bytes = Serializer::serialize(msg).chain_err(|| ErrorKind::CellagentError)?;
-			let packets = Packetizer::packetize(&self.my_tree_id, bytes, direction).chain_err(|| ErrorKind::CellagentError)?;
-			self.send_msg(&self.connected_tree_id, packets, mask).chain_err(|| ErrorKind::CellagentError)?;
+	pub fn forward_saved(&mut self, saved_msgs: &Vec<SavedMsg>, mask: Mask) -> Result<()> {
+		for packets in saved_msgs.iter() {
+			let packet_uuid = packets[0].get_uuid();
+			// If packet is to this cell's control tree, send out on all connected ports
+			let uuid = if packet_uuid == self.control_tree_id.get_uuid() {
+				self.connected_tree_id.get_uuid()
+			} else {  // Otherwise, send it on the tree it came in on
+				packet_uuid
+			};
+			self.send_msg(uuid, packets, mask).chain_err(|| ErrorKind::CellagentError)?;
 			//println!("CellAgent {}: forward on ports {:?} {}", self.cell_id, mask.get_port_nos(), msg);
 		}
 		Ok(())	
 	}
-	pub fn send_msg(&self, tree_id: &TreeID, packets: Vec<Packet>, user_mask: Mask) 
+	pub fn send_msg(&self, tree_uuid: Uuid, packets: &Vec<Packet>, user_mask: Mask) 
 			-> Result<()> {
 		let index = {
-			if let Some(traph) = self.traphs.lock().unwrap().get(&tree_id.get_uuid()) {
+			if let Some(traph) = self.traphs.lock().unwrap().get(&tree_uuid) {
 				traph.get_table_index()			
 			} else {
-				return Err(ErrorKind::Tree(self.cell_id.clone(), tree_id.clone()).into());
+				return Err(ErrorKind::Tree(self.cell_id.clone(), tree_uuid).into());
 			}
 		};
 		for packet in packets.iter() {
@@ -411,8 +414,8 @@ error_chain! {
 		TenantMask(cell_id: CellID) {
 			display("Cell {} has no tenant mask", cell_id)
 		}
-		Tree(cell_id: CellID, tree_id: TreeID ) {
-			display("TreeID {} does not exist on cell {}", tree_id, cell_id)
+		Tree(cell_id: CellID, tree_uuid: Uuid ) {
+			display("TreeID {} does not exist on cell {}", tree_uuid, cell_id)
 		}
 		TreeIndex(cell_id: CellID, index: TableIndex) {
 			display("No tree associated with index {} on cell {}", index, cell_id)

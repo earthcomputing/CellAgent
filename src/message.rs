@@ -169,7 +169,7 @@ impl Message for DiscoverMsg {
 		let packets = Packetizer::packetize(&ca.get_connected_ports_tree_id(), bytes, direction).chain_err(|| ErrorKind::MessageError)?;
 		//println!("DiscoverMsg {}: sending discoverd for tree {} packet {} {}",ca.get_id(), new_tree_id, packets[0].get_count(), discoverd_msg);
 		let mask = Mask::new(port_number);
-		ca.send_msg(&ca.get_connected_ports_tree_id(), packets, mask).chain_err(|| ErrorKind::MessageError)?;
+		ca.send_msg(ca.get_connected_ports_tree_id().get_uuid(), &packets, mask).chain_err(|| ErrorKind::MessageError)?;
 		// Forward Discover on all except port_no with updated hops and path
 		}
 		self.update_discover_msg(ca.get_id(), my_index);
@@ -178,9 +178,9 @@ impl Message for DiscoverMsg {
 		let bytes = Serializer::serialize(&self.clone()).chain_err(|| ErrorKind::MessageError)?;
 		let packets = Packetizer::packetize(&ca.get_control_tree_id(), bytes, direction).chain_err(|| ErrorKind::MessageError)?;
 		let user_mask = DEFAULT_USER_MASK.all_but_port(PortNumber::new(port_no, ca.get_no_ports()).chain_err(|| ErrorKind::MessageError)?);
-		ca.add_discover_msg(self.clone());
+		ca.add_saved_msg(packets.clone());
 		//println!("DiscoverMsg {}: forwarding packet {} on connected ports {}", ca.get_id(), packets[0].get_count(), self);
-		ca.send_msg(&ca.get_connected_ports_tree_id(), packets, user_mask).chain_err(|| ErrorKind::MessageError)?;
+		ca.send_msg(ca.get_connected_ports_tree_id().get_uuid(), &packets, user_mask).chain_err(|| ErrorKind::MessageError)?;
 		Ok(())
 	}
 }
