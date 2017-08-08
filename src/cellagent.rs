@@ -3,6 +3,7 @@ use std::sync::mpsc::channel;
 use std::sync::{Arc, Mutex};
 use std::collections::{HashMap, HashSet};
 use serde_json;
+use uuid::Uuid;
 
 use config::{MAX_ENTRIES, MsgID, PathLength, PortNo, TableIndex};
 use container::Service;
@@ -22,7 +23,7 @@ use vm::VirtualMachine;
 const CONTROL_TREE_NAME: &'static str = "Control";
 const CONNECTED_PORTS_TREE_NAME: &'static str = "Connected";
 
-pub type Traphs = Arc<Mutex<HashMap<String,Traph>>>;
+pub type Traphs = Arc<Mutex<HashMap<Uuid,Traph>>>;
 
 #[derive(Debug, Clone)]
 pub struct CellAgent {
@@ -130,7 +131,7 @@ impl CellAgent {
 	pub fn get_connected_ports_tree_id(&self) -> &TreeID { &self.connected_tree_id }
 	pub fn get_control_tree_id(&self) -> &TreeID { &self.control_tree_id }
 	pub fn exists(&self, tree_id: &TreeID) -> bool { 
-		(*self.traphs.lock().unwrap()).contains_key(tree_id.get_name())
+		(*self.traphs.lock().unwrap()).contains_key(&tree_id.get_uuid())
 	}
 	fn use_index(&mut self) -> Result<TableIndex> {
 		match self.free_indices.lock().unwrap().pop() {
@@ -178,7 +179,7 @@ impl CellAgent {
 			-> Result<RoutingTableEntry> {
 // Note that traphs is updated transactionally; I remove an entry, update it, then put it back.
 		let mut traphs = self.traphs.lock().unwrap();
-		let mut traph = match traphs.remove(tree_id.get_name()) { // Avoids lifetime problem
+		let mut traph = match traphs.remove(&tree_id.get_uuid()) { // Avoids lifetime problem
 			Some(t) => t,
 			None => Traph::new(self.cell_id.clone(), tree_id.clone(), 
 				self.clone().use_index().chain_err(|| ErrorKind::CellagentError)?).chain_err(|| ErrorKind::CellagentError)?
@@ -210,7 +211,7 @@ impl CellAgent {
 // Here's the end of the transaction
 		//println!("CellAgent {}: entry {}\n{}", self.cell_id, entry, traph); 
 		if gvm_send {
-			traphs.insert(tree_id.stringify(), traph);
+			traphs.insert(tree_id.get_uuid(), traph);
 			{
 				self.trees.lock().unwrap().insert(entry.get_index(), tree_id.stringify());
 			}
@@ -335,7 +336,7 @@ impl CellAgent {
 	pub fn send_msg(&self, tree_id: &TreeID, packets: Vec<Packet>, user_mask: Mask) 
 			-> Result<()> {
 		let index = {
-			if let Some(traph) = self.traphs.lock().unwrap().get(tree_id.get_name()) {
+			if let Some(traph) = self.traphs.lock().unwrap().get(&tree_id.get_uuid()) {
 				traph.get_table_index()			
 			} else {
 				return Err(ErrorKind::Tree(self.cell_id.clone(), tree_id.clone()).into());
