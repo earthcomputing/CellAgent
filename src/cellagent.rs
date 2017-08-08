@@ -285,7 +285,7 @@ impl CellAgent {
 			let my_index = self.my_entry.get_index();
 			let packets = Packetizer::packetize(&self.my_tree_id, bytes, direction).chain_err(|| ErrorKind::CellagentError)?;
 			for packet in packets {
-				self.ca_to_pe.send(CaToPePacket::Packet((my_index, port_no_mask, *packet))).chain_err(|| ErrorKind::CellagentError)?;			
+				self.ca_to_pe.send(CaToPePacket::Packet((my_index, port_no_mask, packet))).chain_err(|| ErrorKind::CellagentError)?;			
 			}
 		} else {
 			let port_no_mask = Mask::new(PortNumber::new(port_no, self.no_ports).chain_err(|| ErrorKind::CellagentError)?);
@@ -302,7 +302,7 @@ impl CellAgent {
 			for packet in packets {
 				let entry = CaToPePacket::Entry(*self.connected_tree_entry.lock().unwrap());
 				self.ca_to_pe.send(entry).chain_err(|| ErrorKind::CellagentError)?;
-				let packet_msg = CaToPePacket::Packet((connected_tree_index, port_no_mask, *packet));
+				let packet_msg = CaToPePacket::Packet((connected_tree_index, port_no_mask, packet));
 				self.ca_to_pe.send(packet_msg).chain_err(|| ErrorKind::CellagentError)?;
 			}
 			let discover_msgs  = self.get_discover_msgs();
@@ -332,7 +332,7 @@ impl CellAgent {
 		}
 		Ok(())	
 	}
-	pub fn send_msg(&self, tree_id: &TreeID, packets: Vec<Box<Packet>>, user_mask: Mask) 
+	pub fn send_msg(&self, tree_id: &TreeID, packets: Vec<Packet>, user_mask: Mask) 
 			-> Result<()> {
 		let index = {
 			if let Some(traph) = self.traphs.lock().unwrap().get(tree_id.get_name()) {
@@ -343,7 +343,7 @@ impl CellAgent {
 		};
 		for packet in packets.iter() {
 			//println!("CellAgent {}: Sending packet {}", self.cell_id, packet);
-			let msg = CaToPePacket::Packet((index, user_mask, **packet));
+			let msg = CaToPePacket::Packet((index, user_mask, *packet));
 			self.ca_to_pe.send(msg).chain_err(|| ErrorKind::CellagentError)?;
 			//println!("CellAgent {}: sent packet {} on tree {} to packet engine with index {}", self.cell_id, packet_count, tree_id, index);
 		}

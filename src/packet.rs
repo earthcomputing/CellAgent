@@ -159,7 +159,7 @@ impl Serializer {
 pub struct Packetizer {}
 impl Packetizer {
 	pub fn packetize(tree_id: &TreeID, msg_bytes: Box<Vec<u8>>, direction: MsgDirection) 
-			-> Result<Vec<Box<Packet>>> {
+			-> Result<Vec<Packet>> {
 		let payload_size = Packetizer::packet_payload_size(msg_bytes.len());
 		let num_packets = (msg_bytes.len() + payload_size - 1)/ payload_size; // Poor man's ceiling
 		let last_packet_size = msg_bytes.len() - (num_packets-1)*payload_size;
@@ -179,7 +179,7 @@ impl Packetizer {
 				packet_bytes[j] = msg_bytes[i*payload_size + j];
 			}
 			let payload = Payload::new(packet_bytes);
-			let packet = Box::new(Packet::new(packet_header, payload));
+			let packet = Packet::new(packet_header, payload);
 			//println!("Packet: packet {} for msg {}", packet.get_packet_count(), msg.get_count());
 			packets.push(packet);
 		}
