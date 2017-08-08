@@ -10,20 +10,26 @@ type GvmEqn = String;
 pub struct GvmEquation {
 	recv_eqn: GvmEqn,        // If true, then send to cell agent
 	send_eqn: GvmEqn,        // If true, then add to traph
+	save_eqn: GvmEqn,		 // If true, save the message for future ports being connected
 	variables: GvmVariables  // Local variables used in the two equations
 }
 // Sample GvmEquation: "hops < 7 || n_childen == 0", ["hops", "n_children"]
 impl GvmEquation {
-	pub fn new(recv: &str, send: &str, variables: GvmVariables) -> GvmEquation { 
-		GvmEquation { recv_eqn: recv.to_string(), send_eqn: send.to_string(), variables: variables }
+	pub fn new(recv: &str, send: &str, save: &str, variables: GvmVariables) -> GvmEquation { 
+		GvmEquation { recv_eqn: recv.to_string(), send_eqn: send.to_string(), 
+			save_eqn: save.to_string(), variables: variables }
 	}
 	pub fn get_recv_eqn(&self) -> &GvmEqn { &self.recv_eqn }
 	pub fn get_send_eqn(&self) -> &GvmEqn { &self.send_eqn }
+	pub fn get_save_eqn(&self) -> &GvmEqn { &self.save_eqn }
 	pub fn eval_recv(&self, params: &HashMap<GvmVariable, String>) -> Result<bool> {
 		self.evaluate(&self.recv_eqn, params)
 	}
 	pub fn eval_send(&self, params: &HashMap<GvmVariable, String>) -> Result<bool> {
 		self.evaluate(&self.send_eqn, params)
+	}
+	pub fn eval_save(&self, params: &HashMap<GvmVariable, String>) -> Result<bool> {
+		self.evaluate(&self.save_eqn, params)
 	}
 	fn evaluate(&self, eqn: &GvmEqn, params: &HashMap<GvmVariable,String>) -> Result<bool> {
 		let mut expr = Expr::new(eqn.clone());
