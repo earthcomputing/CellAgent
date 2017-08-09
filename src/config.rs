@@ -2,13 +2,13 @@
 pub type CellNo     = usize;
 pub type ContainerNo = usize;
 pub type DatacenterNo = u16;
-pub type Edge = (usize, usize);
+pub type Edge = (CellNo, CellNo);
 pub type Json = String;
-pub type LinkNo     = usize;
+pub type LinkNo     = CellNo;
 pub type MaskValue  = u16;
 pub type PacketNo   = u16;
 pub type PacketElement = u8; // Packets are made up of bytes
-pub type PathLength = u32;
+pub type PathLength = CellNo;
 pub type PortNo     = u8;
 pub type TableIndex = u32;
 pub type MsgID = u64;
