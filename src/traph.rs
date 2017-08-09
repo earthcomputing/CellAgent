@@ -2,27 +2,27 @@ use std::fmt;
 use std::collections::HashSet;
 
 use config::{MAX_PORTS, PathLength, PortNo, TableIndex};
-use name::{Name, CellID, TreeID};
+use name::{Name, TreeID};
 use routing_table_entry::{RoutingTableEntry};
 use utility::{Path, PortNumber};
 
 #[derive(Debug, Clone)]
 pub struct Traph {
-	cell_id: CellID,
 	tree_id: TreeID,
+	stack: Vec<TreeID>,
 	my_index: TableIndex,
 	table_entry: RoutingTableEntry,
 	elements: Vec<TraphElement>,
 }
 
 impl Traph {
-	pub fn new(cell_id: CellID, tree_id: TreeID, index: TableIndex) -> Result<Traph> {
+	pub fn new(tree_id: &TreeID, index: TableIndex) -> Result<Traph> {
 		let mut elements = Vec::new();
 		for i in 1..MAX_PORTS { 
 			elements.push(TraphElement::default(PortNumber::new(i, MAX_PORTS).chain_err(|| ErrorKind::TraphError)?)); 
 		}
 		let entry = RoutingTableEntry::default(index).chain_err(|| ErrorKind::TraphError)?;
-		Ok(Traph { cell_id: cell_id, tree_id: tree_id, my_index: index, 
+		Ok(Traph { tree_id: tree_id.clone(), stack: Vec::new(), my_index: index, 
 				table_entry: entry, elements: elements })
 	}
 	pub fn get_tree_id(&self) -> TreeID { self.tree_id.clone() }
@@ -40,7 +40,7 @@ impl Traph {
 				_ => ()
 			}
 		}
-		Err(ErrorKind::Parent(self.tree_id.clone(), self.cell_id.clone()).into())
+		Err(ErrorKind::Parent(self.tree_id.clone()).into())
 	}
 	pub fn get_hops(&self) -> Result<PathLength> {
 		for element in self.elements.clone() {
@@ -110,8 +110,8 @@ impl Traph {
 }
 impl fmt::Display for Traph {
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result { 
-		let mut s = format!("Cell {}: Traph for TreeID {} {}\nTable Entry Index {}", 
-			self.cell_id, self.tree_id, self.tree_id.get_uuid(), self.table_entry.get_index());
+		let mut s = format!("Traph for TreeID {} {}\nTable Entry Index {}", 
+			self.tree_id, self.tree_id.get_uuid(), self.table_entry.get_index());
 		s = s + &format!("\nPort Other Connected Broken Status Hops Path");
 		// Can't replace with map() because s gets moved into closure 
 		for element in self.elements.iter() { 
@@ -150,8 +150,8 @@ error_chain! {
 		NoParent(tree_id: TreeID) {
 			display("No parent for tree {}", tree_id)
 		}
-		Parent(tree_id: TreeID, cell_id: CellID) {
-			display("No parent for tree {} on cell {}", tree_id, cell_id)
+		Parent(tree_id: TreeID) {
+			display("No parent for tree {}", tree_id)
 		}
 	}
 }

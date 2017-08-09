@@ -80,17 +80,17 @@ impl CellAgent {
 		let connected_tree_id = self.connected_tree_id.clone();
 		let my_tree_id = self.my_tree_id.clone();
 		let gvm_equation = GvmEquation::new("true", "true", "true", GvmVariables::new());
-		self.update_traph(&control_tree_id, port_number_0, 
+		self.update_black_trees(&control_tree_id, port_number_0, 
 				traph::PortStatus::Parent, Some(gvm_equation), 
 				&mut HashSet::new(), other_index, hops, path).chain_err(|| ErrorKind::CellagentError)?;
 		let gvm_equation = GvmEquation::new("false", "true", "true", GvmVariables::new());
-		let connected_tree_entry = self.update_traph(&connected_tree_id, port_number_0, 
+		let connected_tree_entry = self.update_black_trees(&connected_tree_id, port_number_0, 
 			traph::PortStatus::Parent, Some(gvm_equation),
 			&mut HashSet::new(), other_index, hops, path).chain_err(|| ErrorKind::CellagentError)?;
 		self.connected_tree_entry = Arc::new(Mutex::new(connected_tree_entry));
 		// Create my tree
 		let gvm_equation = GvmEquation::new("true", "true", "true", GvmVariables::new());
-		self.my_entry = self.update_traph(&my_tree_id, port_number_0, 
+		self.my_entry = self.update_black_trees(&my_tree_id, port_number_0, 
 				traph::PortStatus::Parent, Some(gvm_equation), 
 				&mut HashSet::new(), other_index, hops, path).chain_err(|| ErrorKind::CellagentError)?; 
 		self.listen(ca_from_pe).chain_err(|| ErrorKind::CellagentError)?;
@@ -174,7 +174,7 @@ impl CellAgent {
 		});
 		Ok(())
 	}
-	pub fn update_traph(&mut self, tree_id: &TreeID, port_number: PortNumber, port_status: traph::PortStatus,
+	pub fn update_black_trees(&mut self, tree_id: &TreeID, port_number: PortNumber, port_status: traph::PortStatus,
 				gvm_equation: Option<GvmEquation>, children: &mut HashSet<PortNumber>, 
 				other_index: TableIndex, hops: PathLength, path: Option<Path>) 
 			-> Result<RoutingTableEntry> {
@@ -182,8 +182,7 @@ impl CellAgent {
 		let mut traphs = self.traphs.lock().unwrap();
 		let mut traph = match traphs.remove(&tree_id.get_uuid()) { // Avoids lifetime problem
 			Some(t) => t,
-			None => Traph::new(self.cell_id.clone(), tree_id.clone(), 
-				self.clone().use_index().chain_err(|| ErrorKind::CellagentError)?).chain_err(|| ErrorKind::CellagentError)?
+			None => Traph::new(&tree_id, self.clone().use_index().chain_err(|| ErrorKind::CellagentError)?).chain_err(|| ErrorKind::CellagentError)?
 		};
 		let (hops, path) = match port_status{
 			traph::PortStatus::Child => {

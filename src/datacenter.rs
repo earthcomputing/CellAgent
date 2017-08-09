@@ -3,7 +3,7 @@ use std::cmp::max;
 use std::sync::mpsc::channel;
 use std::thread::{JoinHandle, spawn};
 
-use config::{MIN_BOUNDARY_CELLS, CellNo, Edge, PortNo};
+use config::{MIN_BOUNDARY_CELLS, CellNo, Edge, LinkNo, PortNo};
 use message_types::{LinkToPort, PortFromLink, PortToLink, LinkFromPort,
 	NocToPort, NocFromPort, PortToNoc, PortFromNoc};
 use link::{Link};
@@ -107,11 +107,11 @@ error_chain! {
 			description("No boundary cells")
 			display("No boundary cells found")
 		}
-		Cells(n: usize) {
+		Cells(n: CellNo) {
 			description("Not enough cells")
 			display("The number of cells {} must be at least 1", n)
 		}
-		Edges(nlinks: usize) {
+		Edges(nlinks: LinkNo) {
 			description("Not enough cells")
 			display("{} is not enough links to connect all cells", nlinks)
 		}
