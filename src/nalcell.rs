@@ -24,7 +24,7 @@ pub enum CellType {
 #[derive(Debug)]
 pub struct NalCell {
 	id: CellID,
-	cell_no: usize,
+	cell_no: CellNo,
 	is_border: bool,
 	ports: Box<[Port]>,
 	cell_agent: CellAgent,
@@ -36,8 +36,8 @@ pub struct NalCell {
 
 impl NalCell {
 	pub fn new(cell_no: CellNo, nports: PortNo, is_border: bool, cell_type: CellType) -> Result<NalCell> {
-		if nports > MAX_PORTS { return Err(ErrorKind::NumberPorts(nports).into()) }
-		let cell_id = CellID::new(cell_no)?;
+		if nports.v > MAX_PORTS.v { return Err(ErrorKind::NumberPorts(nports).into()) }
+		let cell_id = CellID::new(cell_no.v)?;
 		let (ca_to_pe, pe_from_ca): (CaToPe, PeFromCa) = channel();
 		let (pe_to_ca, ca_from_pe): (PeToCa, CaFromPe) = channel();
 		let (port_to_pe, pe_from_ports): (PortToPe, PeFromPort) = channel();
@@ -45,14 +45,14 @@ impl NalCell {
 		let mut pe_to_ports = Vec::new();
 		let mut ports_from_pe = HashMap::new(); // So I can remove the item
 		let mut boundary_port_nos = HashSet::new();
-		for i in 0..nports + 1 {
+		for i in 0..nports.v + 1 {
 			let is_border_port = is_border & (i == 2);
-			if is_border_port { boundary_port_nos.insert(i); }
+			if is_border_port { boundary_port_nos.insert(PortNo{v:i}); }
 			let (pe_to_port, port_from_pe): (PeToPort, PortFromPe) = channel();
 			pe_to_ports.push(pe_to_port);
-			ports_from_pe.insert(i, port_from_pe);
+			ports_from_pe.insert(PortNo{v:i}, port_from_pe);
 			let is_connected = if i == 0 { true } else { false };
-			let port_number = PortNumber::new(i, nports).chain_err(|| ErrorKind::NalCellError)?;
+			let port_number = PortNumber::new(PortNo{v:i}, nports).chain_err(|| ErrorKind::NalCellError)?;
 			let port = Port::new(&cell_id, port_number, is_border_port, is_connected, 
 				port_to_pe.clone()).chain_err(|| ErrorKind::NalCellError)?;
 			ports.push(port);
@@ -60,7 +60,7 @@ impl NalCell {
 		let boxed_ports: Box<[Port]> = ports.into_boxed_slice();
 		let packet_engine = PacketEngine::new(&cell_id, pe_to_ca, pe_to_ports, boundary_port_nos).chain_err(|| ErrorKind::NalCellError)?;
 		packet_engine.start_threads(pe_from_ca, pe_from_ports)?;
-		let mut cell_agent = CellAgent::new(&cell_id, cell_type, boxed_ports.len() as u8, ca_to_pe).chain_err(|| ErrorKind::NalCellError)?;
+		let mut cell_agent = CellAgent::new(&cell_id, cell_type, PortNo{v:boxed_ports.len() as u8}, ca_to_pe).chain_err(|| ErrorKind::NalCellError)?;
 		cell_agent.initialize(cell_type, ca_from_pe)?;
 		Ok(NalCell { id: cell_id, cell_no: cell_no, is_border: is_border, cell_type: cell_type, 
 				ports: boxed_ports, cell_agent: cell_agent, vms: Vec::new(),
@@ -80,7 +80,7 @@ impl NalCell {
 			-> Result<(&mut Port, PortFromPe)> {
 		for port in &mut self.ports.iter_mut() {
 			//println!("NalCell {}: port {} is connected {}", self.id, p.get_port_no(), p.is_connected());
-			if !port.is_connected() && !(want_boundary_port ^ port.is_border()) && (port.get_port_no() != 0 as u8) {
+			if !port.is_connected() && !(want_boundary_port ^ port.is_border()) && (port.get_port_no().v != 0 as u8) {
 				let port_no = port.get_port_no();
 				match self.ports_from_pe.remove(&port_no) { // Remove avoids a borrowed context error
 					Some(recvr) => {
@@ -120,7 +120,7 @@ error_chain! {
 		}
 		Channel(port_no: PortNo) {
 			description("No receiver for port")
-			display("No receiver for port {}", port_no)
+			display("No receiver for port {}", port_no.v)
 		}
 		NoFreePorts(cell_id: CellID) {
 			description("All ports have been assigned")
@@ -128,11 +128,11 @@ error_chain! {
 		}
 		NumberPorts(nports: PortNo) {
 			description("You are asking for too many ports.")
-			display("You asked for {} ports, but only {} are allowed", nports, MAX_PORTS)
+			display("You asked for {} ports, but only {} are allowed", nports.v, MAX_PORTS.v)
 		}
 		BoundaryPort(cell_id: CellID, port_no: PortNo) {
 			description("No outside receiver for boundary port")
-			display("Cell {} has no outside receiver for boundary port {}", cell_id, port_no)
+			display("Cell {} has no outside receiver for boundary port {}", cell_id, port_no.v)
 		}
 	}
 }
