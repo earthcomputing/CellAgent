@@ -22,21 +22,21 @@ impl Datacenter {
 	pub fn new(id: &UpTraphID, cell_type: CellType) -> Datacenter {
 		Datacenter { id: id.clone(), cell_type: cell_type, cells: Vec::new(), links: Vec::new() }
 	}
-	pub fn initialize(&mut self, ncells: CellNo, nports: PortNo, edge_list: Vec<(CellNo,CellNo)>,
+	pub fn initialize(&mut self, ncells: CellNo, nports: PortNo, edge_list: Vec<Edge>,
 			cell_type: CellType) -> Result<Vec<JoinHandle<()>>> {
-		if ncells < 1  { return Err(ErrorKind::Cells(ncells).into()); }
-		if edge_list.len() < ncells - 1 { return Err(ErrorKind::Edges(edge_list.len()).into()); }
-		for i in 0..ncells {
+		if ncells.v < 1  { return Err(ErrorKind::Cells(ncells).into()); }
+		if edge_list.len() < ncells.v - 1 { return Err(ErrorKind::Edges(LinkNo{v:CellNo{v:edge_list.len()}}).into()); }
+		for i in 0..ncells.v {
 			let is_border = (i % 3) == 1;
-			let cell = NalCell::new(i, nports, is_border, cell_type).chain_err(|| ErrorKind::DatacenterError)?;
+			let cell = NalCell::new(CellNo{v:i}, nports, is_border, cell_type).chain_err(|| ErrorKind::DatacenterError)?;
 			self.cells.push(cell);
 		}
 		let mut link_handles = Vec::new();
 		for edge in edge_list {
-			if edge.0 == edge.1 { return Err(ErrorKind::Wire(edge).into()); }
-			if (edge.0 > ncells) | (edge.1 >= ncells) { return Err(ErrorKind::Wire(edge).into()); }
-			let split = self.cells.split_at_mut(max(edge.0,edge.1));
-			let mut cell = match split.0.get_mut(edge.0) {
+			if edge.v.0.v == edge.v.1.v { return Err(ErrorKind::Wire(edge).into()); }
+			if (edge.v.0.v > ncells.v) | (edge.v.1.v >= ncells.v) { return Err(ErrorKind::Wire(edge).into()); }
+			let split = self.cells.split_at_mut(max(edge.v.0.v,edge.v.1.v));
+			let mut cell = match split.0.get_mut(edge.v.0.v) {
 				Some(c) => c,
 				None => return Err(ErrorKind::Wire(edge).into())
 
@@ -72,7 +72,7 @@ impl Datacenter {
 	pub fn connect_to_noc(&mut self, port_to_noc: PortToNoc, port_from_noc: PortFromNoc)  
 			-> Result<()> {
 		let mut boundary_cells = self.get_boundary_cells();
-		if boundary_cells.len() < MIN_BOUNDARY_CELLS {
+		if boundary_cells.len() < MIN_BOUNDARY_CELLS.v {
 			return Err(ErrorKind::Boundary.into());
 		} else {
 			let (mut boundary_cell, _) = boundary_cells.split_at_mut(1);
@@ -109,11 +109,11 @@ error_chain! {
 		}
 		Cells(n: CellNo) {
 			description("Not enough cells")
-			display("The number of cells {} must be at least 1", n)
+			display("The number of cells {} must be at least 1", n.v)
 		}
 		Edges(nlinks: LinkNo) {
 			description("Not enough cells")
-			display("{} is not enough links to connect all cells", nlinks)
+			display("{} is not enough links to connect all cells", nlinks.v.v)
 		}
 		Wire(edge: Edge) {
 			description("Invalid edge")

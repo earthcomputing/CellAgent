@@ -45,7 +45,7 @@ impl fmt::Display for Packet {
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result { 
 		let bytes = self.get_payload().get_bytes();
 		let len = if self.get_header().is_last_packet() {
-			self.get_header().get_size() as usize
+			self.get_header().get_size().v as usize
 		} else {
 			bytes.len()
 		};
@@ -59,9 +59,9 @@ impl Clone for Packet {
 const PACKET_HEADER_SIZE: usize = 8 + 16 + 2 + 1 + 5; // Last value is padding
 #[derive(Debug, Copy, Clone)]
 pub struct PacketHeader {
-	msg_id: u64,	// Unique identifier of this message
+	msg_id: MsgID,	// Unique identifier of this message
 	uuid: Uuid,     // Tree identifier 16 bytes
-	size: u16,		// Number of packets remaining in message if not last packet
+	size: PacketNo,	// Number of packets remaining in message if not last packet
 					// Number of bytes in last packet if last packet, 0 => Error
 	flags: u8,    	// Various flags
 					// xxxx xxx0 => rootcast
@@ -99,13 +99,13 @@ impl fmt::Display for PacketHeader {
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result { 
 		let mut uuid = self.uuid.to_string();
 		uuid.truncate(8);
-		let mut s = format!("Message ID {}", self.msg_id);
+		let mut s = format!("Message ID {}", self.msg_id.v);
 		s = s + &format!(", UUID {}", self.uuid );
 		if self.is_rootcast() { s = s + " Rootward"; }
 		else                  { s = s + " Leafward"; }
 		if self.is_last_packet() { s = s + ", Last packet"; }
 		else                     { s = s + ", Not last packet"; }
-		s = s + &format!(", Size {}", self.size);
+		s = s + &format!(", Size {}", self.size.v);
 		write!(f, "{}", s) 
 	}
 }
@@ -163,7 +163,7 @@ impl Packetizer {
 		let payload_size = Packetizer::packet_payload_size(msg_bytes.len());
 		let num_packets = (msg_bytes.len() + payload_size - 1)/ payload_size; // Poor man's ceiling
 		let last_packet_size = msg_bytes.len() - (num_packets-1)*payload_size;
-		let msg_id = rand::random(); // Can't use hash in case two cells send the same message
+		let msg_id = MsgID {v:rand::random()}; // Can't use hash in case two cells send the same message
 		let mut packets = Vec::new();
 		for i in 0..num_packets {
 			let (size, is_last_packet) = if i == (num_packets-1) {
@@ -171,7 +171,7 @@ impl Packetizer {
 			} else {
 				(num_packets - i, false)
 			};
-			let packet_header = PacketHeader::new(msg_id, tree_id, size as u16, direction, is_last_packet);
+			let packet_header = PacketHeader::new(msg_id, tree_id, PacketNo{v:size as u16}, direction, is_last_packet);
 			// Not a very Rusty way to put bytes into payload
 			let mut packet_bytes = vec![PAYLOAD_DEFAULT_ELEMENT; payload_size];
 			for j in 0..payload_size {
@@ -181,7 +181,7 @@ impl Packetizer {
 			let payload = Payload::new(packet_bytes);
 			let packet = Packet::new(packet_header, payload);
 			//println!("Packet: packet {} for msg {}", packet.get_packet_count(), msg.get_count());
-			packets.push(packet);
+			packets.push(packet); 
 		}
 		Ok(packets)
 	}
@@ -190,7 +190,7 @@ impl Packetizer {
 		for packet in packets {
 			let header = packet.get_header();
 			let is_last_packet = header.is_last_packet();
-			let last_packet_size = header.get_size() as usize;
+			let last_packet_size = header.get_size().v as usize;
 			let payload = packet.get_payload();
 			let mut bytes = payload.get_bytes();
 			if is_last_packet {

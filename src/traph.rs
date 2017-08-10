@@ -1,7 +1,7 @@
 use std::fmt;
 use std::collections::HashSet;
 
-use config::{MAX_PORTS, PathLength, PortNo, TableIndex};
+use config::{MAX_PORTS, CellNo, PathLength, PortNo, TableIndex};
 use name::{Name, TreeID};
 use routing_table_entry::{RoutingTableEntry};
 use utility::{Path, PortNumber};
@@ -18,8 +18,8 @@ pub struct Traph {
 impl Traph {
 	pub fn new(tree_id: &TreeID, index: TableIndex) -> Result<Traph> {
 		let mut elements = Vec::new();
-		for i in 1..MAX_PORTS { 
-			elements.push(TraphElement::default(PortNumber::new(i, MAX_PORTS).chain_err(|| ErrorKind::TraphError)?)); 
+		for i in 1..MAX_PORTS.v { 
+			elements.push(TraphElement::default(PortNumber::new(PortNo{v:i as u8}, MAX_PORTS).chain_err(|| ErrorKind::TraphError)?)); 
 		}
 		let entry = RoutingTableEntry::default(index).chain_err(|| ErrorKind::TraphError)?;
 		Ok(Traph { tree_id: tree_id.clone(), stack: Vec::new(), my_index: index, 
@@ -28,7 +28,7 @@ impl Traph {
 	pub fn get_tree_id(&self) -> TreeID { self.tree_id.clone() }
 	pub fn get_port_status(&self, port_number: PortNumber) -> PortStatus { 
 		let port_no = port_number.get_port_no();
-		match self.elements.get(port_no as usize) {
+		match self.elements.get(port_no.v as usize) {
 			Some(e) => e.get_status(),
 			None => PortStatus::Pruned
 		}
@@ -74,7 +74,7 @@ impl Traph {
 		self.table_entry.set_inuse();
 		self.table_entry.set_tree_id(tree_id);
 		let element = TraphElement::new(true, port_no, other_index, port_status, hops, path);
-		self.elements[port_no as usize] = element;
+		self.elements[port_no.v as usize] = element;
 		Ok(self.table_entry)
 	}
 //	fn get_all_hops(&self) -> BTreeSet<PathLength> {
@@ -85,12 +85,12 @@ impl Traph {
 //		}
 //		set
 //	}
-	pub  fn get_other_indices(&self) -> [TableIndex; MAX_PORTS as usize] {
-		let mut indices = [0; MAX_PORTS as usize];
+	pub  fn get_other_indices(&self) -> [TableIndex; MAX_PORTS.v as usize] {
+		let mut indices = [TableIndex{v:0}; MAX_PORTS.v as usize];
 		// Not sure why map gives warning about unused result
 		//self.elements.iter().map(|e| indices[e.get_port_no() as usize] = e.get_other_index());
 		for e in self.elements.iter() {
-			indices[e.get_port_no() as usize] = e.get_other_index();
+			indices[e.get_port_no().v as usize] = e.get_other_index();
 		}
 		indices
 	}
@@ -111,7 +111,7 @@ impl Traph {
 impl fmt::Display for Traph {
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result { 
 		let mut s = format!("Traph for TreeID {} {}\nTable Entry Index {}", 
-			self.tree_id, self.tree_id.get_uuid(), self.table_entry.get_index());
+			self.tree_id, self.tree_id.get_uuid(), self.table_entry.get_index().v);
 		s = s + &format!("\nPort Other Connected Broken Status Hops Path");
 		// Can't replace with map() because s gets moved into closure 
 		for element in self.elements.iter() { 
@@ -174,8 +174,8 @@ impl TraphElement {
 	}
 	fn default(port_number: PortNumber) -> TraphElement {
 		let port_no = port_number.get_port_no();
-		TraphElement::new(false, port_no, 0 as TableIndex, PortStatus::Pruned, 
-					0 as PathLength, None)
+		TraphElement::new(false, port_no, TableIndex{v:0}, PortStatus::Pruned, 
+					PathLength{v:CellNo{v:0}}, None)
 	}
 	fn get_port_no(&self) -> PortNo { self.port_no }
 	pub fn get_hops(&self) -> PathLength { self.hops }
@@ -190,9 +190,9 @@ impl TraphElement {
 impl fmt::Display for TraphElement {
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
 		let mut s = format!("{:4} {:5} {:9} {:6} {:6} {:4}", 
-			self.port_no, self.other_index, self.is_connected, self.is_broken, self.status, self.hops);
+			self.port_no.v, self.other_index.v, self.is_connected, self.is_broken, self.status, self.hops.v.v);
 		match self.path {
-			Some(p) => s = s + &format!(" {:4}", p.get_port_no()),
+			Some(p) => s = s + &format!(" {:4}", p.get_port_no().v),
 			None    => s = s + &format!(" None")
 		}
 		write!(f, "{}", s)

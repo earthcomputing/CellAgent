@@ -56,7 +56,7 @@ impl Port {
 	}
 	fn listen_outside_for_pe(&self, port_from_outside: PortFromNoc) -> Result<()> {
 		let port = self.clone();
-		let other_index = 0 as TableIndex;
+		let other_index = TableIndex{v:0};
 		loop {
 			let packet = port_from_outside.recv().chain_err(|| "Receive from outside")?;
 			self.port_to_pe.send(PortToPePacket::Packet((port.port_number.get_port_no(), other_index, packet))).chain_err(|| ErrorKind::PortError)?;

@@ -3,7 +3,7 @@ use std::collections::{HashMap, HashSet};
 use std::sync::atomic::{ATOMIC_USIZE_INIT, AtomicUsize, Ordering};
 use serde_json;
 use cellagent::{CellAgent};
-use config::{MAX_PORTS, PathLength, PortNo, TableIndex};
+use config::{MAX_PORTS, CellNo, PathLength, PortNo, TableIndex};
 use container::Service;
 use gvm_equation::{GvmEquation, GvmVariable, GvmVariables, GvmVariableType};
 use name::{Name, CellID, TreeID, UpTraphID};
@@ -137,7 +137,7 @@ impl DiscoverMsg {
 		self.payload.set_index(index);
 		self.payload.set_sending_cell(cell_id);
 	}
-	fn update_hops(&self) -> PathLength { self.payload.get_hops() + 1 }
+	fn update_hops(&self) -> PathLength { PathLength{v:CellNo{v:self.payload.get_hops().v.v + 1}} }
 	fn update_path(&self) -> Path { self.payload.get_path() } // No change per hop
 }
 impl Message for DiscoverMsg {
@@ -218,7 +218,7 @@ impl MsgPayload for DiscoverPayload {}
 impl fmt::Display for DiscoverPayload { 
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result { 
 		let s = format!("Tree {}, sending cell {}, index {}, hops {}, path {}", self.tree_name, 
-			self.sending_cell_id, self.index, self.hops, self.path);
+			self.sending_cell_id, self.index.v, self.hops.v.v, self.path);
 		write!(f, "{}", s) 
 	}
 }
@@ -242,7 +242,7 @@ impl DiscoverDMsg {
 impl Message for DiscoverDMsg {
 	fn get_header(&self) -> &MsgHeader { &self.header }
 	fn get_payload(&self) -> &MsgPayload { &self.payload }
-	fn process(&mut self, ca: &mut CellAgent, port_no: u8) -> Result<()> {
+	fn process(&mut self, ca: &mut CellAgent, port_no: PortNo) -> Result<()> {
 		let tree_name = self.payload.get_tree_name();
 		let tree_id = self.get_tree_id(tree_name)?;
 		let my_index = self.payload.get_table_index();
@@ -252,7 +252,7 @@ impl Message for DiscoverDMsg {
 		//println!("DiscoverDMsg {}: process msg {} processing {} {} {}", ca.get_id(), self.get_header().get_count(), port_no, my_index, tree_id);
 		let gvm_eqn = GvmEquation::new("false", "true", "true", GvmVariables::new());
 		ca.update_black_trees(&tree_id, port_number, traph::PortStatus::Child, Some(gvm_eqn), 
-			&mut children, my_index, 0, None).chain_err(|| ErrorKind::MessageError)?;
+			&mut children, my_index, PathLength{v:CellNo{v:0}}, None).chain_err(|| ErrorKind::MessageError)?;
 		Ok(())
 	}
 }
@@ -276,7 +276,7 @@ impl DiscoverDPayload {
 impl MsgPayload for DiscoverDPayload {}
 impl fmt::Display for DiscoverDPayload {
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-		write!(f, "My table index {}", self.my_index)
+		write!(f, "My table index {}", self.my_index.v)
 	}
 }
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -355,7 +355,7 @@ impl SetupVMsMsg {
 impl Message for SetupVMsMsg {
 	fn get_header(&self) -> &MsgHeader { &self.header }
 	fn get_payload(&self) -> &MsgPayload { &self.payload }
-	fn process(&mut self, ca: &mut CellAgent, port_no: u8) -> Result<()> {
+	fn process(&mut self, ca: &mut CellAgent, port_no: PortNo) -> Result<()> {
 		let service_sets = self.payload.get_service_sets().clone();
 		ca.create_vms(service_sets).chain_err(|| ErrorKind::MessageError)?;		
 		Ok(())
