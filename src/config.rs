@@ -21,10 +21,8 @@ pub struct PortNo { pub v: u8 }
 pub struct TableIndex(pub u32);
 #[derive(Debug, Copy, Clone, Hash, Eq, PartialEq)]
 pub struct MsgID(pub u64);
+#[derive(Debug, Copy, Clone)]
 pub struct VmNo(pub usize);
-
-pub type Json = String;
-pub type PacketElement = u8; // Packets are made up of bytes
 // Default inputs
 pub const NCELLS: CellNo = CellNo(10);
 pub const NPORTS: PortNo =  PortNo { v: 6 };
@@ -38,7 +36,7 @@ pub const MIN_BOUNDARY_CELLS: CellNo = CellNo(1);   // Minimum acceptable number
 // Things used in constructing names
 pub const SEPARATOR: &'static str = "+"; // Separator for compound names
 // Packet sizes in bytes including header
-pub const PAYLOAD_DEFAULT_ELEMENT: PacketElement = 0;
+pub const PAYLOAD_DEFAULT_ELEMENT: u8 = 0;
 pub const PACKET_MIN: usize = 64;
 pub const PACKET_MAX: usize = 9000;
 // Size of chunk identifier 

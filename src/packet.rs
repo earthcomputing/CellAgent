@@ -11,7 +11,7 @@ use serde_json;
 use uuid::Uuid;
 
 use config::{PACKET_MIN, PACKET_MAX, PAYLOAD_DEFAULT_ELEMENT, 
-	MsgID, PacketElement, PacketNo, TableIndex};
+	MsgID, PacketNo, TableIndex};
 use message::{Message, MsgDirection, TypePlusMsg};
 use name::{Name, TreeID};
  
@@ -111,22 +111,16 @@ impl fmt::Display for PacketHeader {
 }
 #[derive(Copy)]
 pub struct Payload {
-	bytes: [PacketElement; PAYLOAD_MAX],
+	bytes: [u8; PAYLOAD_MAX],
 }
-#[deny(unused_must_use)]
 impl Payload {
-	pub fn new(data_bytes: Vec<PacketElement>) -> Payload {
+	pub fn new(data_bytes: Vec<u8>) -> Payload {
 		let no_data_bytes = data_bytes.len();
 		let mut bytes = [0; PAYLOAD_MAX];
 		for i in 0..no_data_bytes { bytes[i] = data_bytes[i]; }
 		Payload { bytes: bytes }
 	}
-	fn get_bytes(&self) -> Vec<PacketElement> { self.bytes.iter().cloned().collect() }
-//	fn get_no_bytes(&self) -> usize { self.get_bytes().len() }
-//	fn get_msg_bytes(&self) -> Vec<PacketElement> {
-//		let total_bytes = self.get_bytes();
-//		total_bytes[0..self.no_data_bytes as usize].iter().cloned().collect()
-//	}
+	fn get_bytes(&self) -> Vec<u8> { self.bytes.iter().cloned().collect() }
 }
 impl fmt::Display for Payload {
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result { 
@@ -185,7 +179,7 @@ impl Packetizer {
 		}
 		Ok(packets)
 	}
-	pub fn unpacketize(packets: Vec<Packet>) -> Result<String> {
+	pub fn unpacketize(packets: &Vec<Packet>) -> Result<String> {
 		let mut all_bytes = Vec::new();
 		for packet in packets {
 			let header = packet.get_header();
@@ -218,11 +212,11 @@ impl PacketAssembler {
 		PacketAssembler { msg_id: msg_id, packets: Vec::new() }
 	}
 	pub fn get_msg_id(&self) -> MsgID { self.msg_id }
-	pub fn add(&mut self, packet: Packet) -> Option<Vec<Packet>> { 
+	pub fn add(&mut self, packet: Packet) -> Option<&Vec<Packet>> { 
 		self.packets.push(packet); 
 		let header = packet.get_header();
 		if header.is_last_packet() {
-			Some(self.packets.clone())
+			Some(&self.packets)
 		} else {
 			None
 		}

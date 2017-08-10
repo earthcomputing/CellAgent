@@ -119,7 +119,7 @@ impl PacketEngine {
 				Some(_) => true,
 				None => false
 			};
-			if is_stack_msg { println!("PacketEngine {}: forwarding packet {} on ports {:?}, {}", self.cell_id, packet.get_count(), port_nos, entry); }
+			//if is_stack_msg { println!("PacketEngine {}: forwarding packet {} on ports {:?}, {}", self.cell_id, packet.get_count(), port_nos, entry); }
 			for port_no in port_nos.iter() {
 				if let Some(other_index) = other_indices.get(port_no.v as usize) {
 					if port_no.v as usize == 0 { 
