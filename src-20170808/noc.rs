@@ -26,9 +26,9 @@ impl Noc {
 	pub fn new(id: &str, cell_type: CellType) -> Result<Noc> {
 		let id = UpTraphID::new(id).chain_err(|| ErrorKind::NocError)?;
 		Ok(Noc { id: id, cell_type: cell_type, packet_assemblers: PacketAssemblers::new(),
-				 no_datacenters: DatacenterNo(0) })
+				 no_datacenters: 0 })
 	}
-	pub fn initialize(&self, ncells: CellNo, nports: PortNo, edges: Vec<Edge>,
+	pub fn initialize(&self, ncells: CellNo, nports: PortNo, edges: Vec<(CellNo, CellNo)>,
 			noc_from_outside: NocFromOutside) -> Result<Vec<JoinHandle<()>>> {
 		let (noc_to_port, port_from_noc): (NocToPort, NocFromPort) = channel();
 		let (port_to_noc, noc_from_port): (PortToNoc, PortFromNoc) = channel();
@@ -52,7 +52,7 @@ impl Noc {
 		Ok(())
 	}
 	fn build_datacenter(&self, id: &UpTraphID, cell_type: CellType, 
-			ncells: CellNo, nports: PortNo, edges: Vec<Edge>) -> Result<(Datacenter, Vec<JoinHandle<()>>)> {
+			ncells: usize, nports: u8, edges: Vec<Edge>) -> Result<(Datacenter, Vec<JoinHandle<()>>)> {
 		let mut dc = Datacenter::new(id, cell_type);
 		let join_handles = dc.initialize(ncells, nports, edges, self.cell_type)?;
 		Ok((dc, join_handles))
@@ -95,12 +95,12 @@ impl Noc {
 			CellType::Vm => CellType::Container,
 			_ => panic!("Bad CellType")
 		};
-		let up_id = UpTraphID::new(&format!("{}{}{}", self.id, SEPARATOR, self.no_datacenters.0)).chain_err(|| ErrorKind::NocError)?;
+		let up_id = UpTraphID::new(&format!("{}{}{}", self.id, SEPARATOR, self.no_datacenters)).chain_err(|| ErrorKind::NocError)?;
 		type Params = (CellNo, PortNo, Vec<Edge>);
 		if let Some(str_params) = str_params {
 			let params: Params = serde_json::from_str(str_params).chain_err(|| ErrorKind::NocError)?;
 			let dc = self.build_datacenter(&up_id, new_cell_type, params.0, params.1, params.2).chain_err(|| ErrorKind::Input(str_params.to_string()))?;
-			self.no_datacenters = DatacenterNo(self.no_datacenters.0 + 1);
+			self.no_datacenters = self.no_datacenters + 1;
 		} else { panic!("Parameter problem"); }
 		Ok(())
 	}

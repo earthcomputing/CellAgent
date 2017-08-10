@@ -6,12 +6,12 @@ use name::{Name,TenantID};
 #[derive(Clone)]
 pub struct Tenant { 
 	id: TenantID, 
-	ncells: CellNo, 
+	ncells: usize, 
 	children: HashMap<TenantID,Box<Tenant>>,
 }
 #[deny(unused_must_use)]
 impl Tenant {
-	pub fn new(id: &'static str, n: CellNo, parent_id: Option<TenantID>) -> Result<Tenant> {
+	pub fn new(id: &'static str, n: usize, parent_id: Option<TenantID>) -> Result<Tenant> {
 		let name = match parent_id {
 			Some(p) => Ok(p.add_component(id).chain_err(|| ErrorKind::TenantError)?),
 			None => TenantID::new(id)
@@ -31,8 +31,8 @@ impl Tenant {
 //	pub fn get_mut_subtenant(&mut self, id: TenantID) -> Option<&mut Box<Tenant>> {
 //		self.children.get_mut(&id)
 //	}
-	pub fn create_subtenant(&mut self, id: &'static str, n: CellNo) -> Result<Tenant> {
-		if self.ncells.0 < n.0 {
+	pub fn create_subtenant(&mut self, id: &'static str, n:usize) -> Result<Tenant> {
+		if self.ncells < n {
 			Err(ErrorKind::Quota(n, self.ncells).into())
 		} else {
 			let tenant = Tenant::new(id, n, Some(self.get_id()));
@@ -54,7 +54,7 @@ impl Tenant {
 impl fmt::Debug for Tenant { 
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result { 
 		let mut s = "Tenant: ".to_string();
-		s = s + &format!("{:?} {} cells", self.id, self.ncells.0);
+		s = s + &format!("{:?} {} cells", self.id, self.ncells);
 		write!(f, "{}", s) 
 	} 
 }
@@ -71,7 +71,7 @@ error_chain! {
 		}
 		Quota(request: CellNo, available: CellNo) {
 			description("Quota violation")
-			display("You asked for {} cells, but only {} are available", request.0, available.0)
+			display("You asked for {} cells, but only {} are available", request, available)
 		}
 	}
 }

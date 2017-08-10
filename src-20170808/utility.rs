@@ -22,31 +22,31 @@ pub fn chars_to_string(chars: &[char]) -> String {
 	s
 }
 */
-pub const BASE_TENANT_MASK: Mask = Mask { mask: MaskValue(255) };   // All ports
-pub const DEFAULT_USER_MASK: Mask = Mask { mask: MaskValue(254) };  // All ports except port 0
+pub const BASE_TENANT_MASK: Mask = Mask { mask: 255 };   // All ports
+pub const DEFAULT_USER_MASK: Mask = Mask { mask: 254 };  // All ports except port 0
 #[derive(Debug, Copy, Clone, Serialize, Deserialize)]
 pub struct Mask { mask: MaskValue }
 #[deny(unused_must_use)]
 impl Mask {
 	pub fn new(i: PortNumber) -> Mask {
-	    let mask = MaskValue((1 as u16).rotate_left(i.get_port_no().v as u32));
+	    let mask = (1 as u16).rotate_left(i.get_port_no() as u32);
         Mask { mask: mask } 
 	}
-	pub fn new0() -> Mask { Mask { mask: MaskValue(1) } }
-	pub fn empty() -> Mask { Mask { mask: MaskValue(0) } }
+	pub fn new0() -> Mask { Mask { mask: 1 } }
+	pub fn empty() -> Mask { Mask { mask: 0 } }
 	pub fn all_but_zero() -> Mask {
 		Mask::empty().not().all_but_port(PortNumber::new0())
 	}
-	pub fn equal(&self, other: Mask) -> bool { self.mask.0 == other.mask.0 }
+	pub fn equal(&self, other: Mask) -> bool { self.mask == other.mask }
 	pub fn get_as_value(&self) -> MaskValue { self.mask }
 	pub fn or(&self, mask: Mask) -> Mask {
-		Mask { mask: MaskValue(self.mask.0 | mask.mask.0) }
+		Mask { mask: self.mask | mask.mask }
 	}
 	pub fn and(&self, mask: Mask) -> Mask {
-		Mask { mask: MaskValue(self.mask.0 & mask.mask.0) }
+		Mask { mask: self.mask & mask.mask }
 	}
 	pub fn not(&self) -> Mask {
-		Mask { mask: MaskValue(!self.mask.0) }
+		Mask { mask: !self.mask }
 	}
 	pub fn all_but_port(&self, port_number: PortNumber) -> Mask {
 		let port_mask = Mask::new(port_number);
@@ -63,37 +63,38 @@ impl Mask {
 	}
 	pub fn get_port_nos(&self) -> Vec<PortNo> {
 		let mut port_nos = Vec::new();
-		for i in 0..MAX_PORTS.v {
-			let port_number = match PortNumber::new(PortNo{v:i}, MAX_PORTS) {
+		for i in 0..MAX_PORTS {
+			let port_number = match PortNumber::new(i, MAX_PORTS) {
 				Ok(n) => n,
 				Err(_) => panic!("Mask port_nos_from_mask cannont generate an error")
 			};
 			let test = Mask::new(port_number);
-			if test.mask.0 & self.mask.0 != 0 { port_nos.push(PortNo{v:i}) }
+			if test.mask & self.mask != 0 { port_nos.push(i as PortNo) }
 		}
 		port_nos
 	}
 }
 impl fmt::Display for Mask {
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result { 
-		write!(f, " {:016.b}", self.mask.0) 
+		write!(f, " {:016.b}", self.mask) 
 	}
 }
 #[derive(Debug, Copy, Clone, Hash, PartialEq, Eq, Serialize, Deserialize)]
 pub struct PortNumber { pub port_no: PortNo }
+#[deny(unused_must_use)]
 impl PortNumber {
 	pub fn new(no: PortNo, no_ports: PortNo) -> Result<PortNumber> {
-		if no.v > no_ports.v {
+		if no > no_ports {
 			Err(ErrorKind::PortNumber(no, no_ports).into())
 		} else {
 			Ok(PortNumber { port_no: (no as PortNo) })
 		}
 	}
-	pub fn new0() -> PortNumber { PortNumber { port_no: (PortNo{v:0}) } }
+	pub fn new0() -> PortNumber { PortNumber { port_no: (0 as PortNo) } }
 	pub fn get_port_no(&self) -> PortNo { self.port_no }
 }
 impl fmt::Display for PortNumber {
-	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result { write!(f, "{}", self.port_no.v) }
+	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result { write!(f, "{}", self.port_no) }
 }
 #[derive(Debug, Copy, Clone, Hash, Serialize, Deserialize)]
 pub struct Path { port_number: PortNumber }
@@ -118,7 +119,7 @@ error_chain! {
 		}
 		PortNumber(port_no: PortNo, max: PortNo) {
 			description("Invalid port number")
-			display("Port number {} is larger than the maximum of {}", port_no.v, max.v)
+			display("Port number {} is larger than the maximum of {}", port_no, max)
 		}
 		Unimplemented(feature: String) {
 			description("Feature is not implemented")
