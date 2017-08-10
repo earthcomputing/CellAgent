@@ -10,7 +10,7 @@ pub struct ECArgs {
 impl ECArgs {
 	pub fn new(ncells: CellNo, nports: PortNo, nlinks: CellNo) -> Result<ECArgs> {
 		if nports.v < (MAX_PORTS.v - 1) {
-			Ok(ECArgs { nports: nports as PortNo, ncells: ncells, nlinks: LinkNo{v:nlinks} })
+			Ok(ECArgs { nports: nports as PortNo, ncells: ncells, nlinks: LinkNo(nlinks) })
 		} else {
 			Err(ErrorKind::NumberPorts(nports).into())
 		}	
@@ -50,7 +50,7 @@ impl ECArgs {
 */
 	pub fn to_string(&self) -> String {
 		let s = format!("{} cells, {} ports per cell, {} links", 
-			self.ncells.v, self.nports.v, self.nlinks.v.v);
+			self.ncells.0, self.nports.v, (self.nlinks.0).0);
 		s
 	}
 }

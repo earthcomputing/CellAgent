@@ -3,7 +3,7 @@ use std::cmp::max;
 use std::sync::mpsc::channel;
 use std::thread::{JoinHandle, spawn};
 
-use config::{MIN_BOUNDARY_CELLS, CellNo, Edge, LinkNo, PortNo};
+use config::{MIN_BOUNDARY_CELLS, CellNo, Edge, PortNo};
 use message_types::{LinkToPort, PortFromLink, PortToLink, LinkFromPort,
 	NocToPort, NocFromPort, PortToNoc, PortFromNoc};
 use link::{Link};
@@ -22,21 +22,21 @@ impl Datacenter {
 	pub fn new(id: &UpTraphID, cell_type: CellType) -> Datacenter {
 		Datacenter { id: id.clone(), cell_type: cell_type, cells: Vec::new(), links: Vec::new() }
 	}
-	pub fn initialize(&mut self, ncells: CellNo, nports: PortNo, edge_list: Vec<Edge>,
+	pub fn initialize(&mut self, ncells: CellNo, nports: PortNo, edge_list: Vec<(CellNo,CellNo)>,
 			cell_type: CellType) -> Result<Vec<JoinHandle<()>>> {
-		if ncells.0 < 1  { return Err(ErrorKind::Cells(ncells).into()); }
-		if edge_list.len() < ncells.0 - 1 { return Err(ErrorKind::Edges(LinkNo(CellNo(edge_list.len()))).into()); }
-		for i in 0..ncells.0 {
+		if ncells < 1  { return Err(ErrorKind::Cells(ncells).into()); }
+		if edge_list.len() < ncells - 1 { return Err(ErrorKind::Edges(edge_list.len()).into()); }
+		for i in 0..ncells {
 			let is_border = (i % 3) == 1;
-			let cell = NalCell::new(CellNo(i), nports, is_border, cell_type).chain_err(|| ErrorKind::DatacenterError)?;
+			let cell = NalCell::new(i, nports, is_border, cell_type).chain_err(|| ErrorKind::DatacenterError)?;
 			self.cells.push(cell);
 		}
 		let mut link_handles = Vec::new();
 		for edge in edge_list {
-			if (edge.v.0).0 == (edge.v.1).0 { return Err(ErrorKind::Wire(edge).into()); }
-			if ((edge.v.0).0 > ncells.0) | ((edge.v.1).0 >= ncells.0) { return Err(ErrorKind::Wire(edge).into()); }
-			let split = self.cells.split_at_mut(max((edge.v.0).0,(edge.v.1).0));
-			let mut cell = match split.0.get_mut((edge.v.0).0) {
+			if edge.0 == edge.1 { return Err(ErrorKind::Wire(edge).into()); }
+			if (edge.0 > ncells) | (edge.1 >= ncells) { return Err(ErrorKind::Wire(edge).into()); }
+			let split = self.cells.split_at_mut(max(edge.0,edge.1));
+			let mut cell = match split.0.get_mut(edge.0) {
 				Some(c) => c,
 				None => return Err(ErrorKind::Wire(edge).into())
 
@@ -72,7 +72,7 @@ impl Datacenter {
 	pub fn connect_to_noc(&mut self, port_to_noc: PortToNoc, port_from_noc: PortFromNoc)  
 			-> Result<()> {
 		let mut boundary_cells = self.get_boundary_cells();
-		if boundary_cells.len() < MIN_BOUNDARY_CELLS.0 {
+		if boundary_cells.len() < MIN_BOUNDARY_CELLS {
 			return Err(ErrorKind::Boundary.into());
 		} else {
 			let (mut boundary_cell, _) = boundary_cells.split_at_mut(1);
@@ -107,13 +107,13 @@ error_chain! {
 			description("No boundary cells")
 			display("No boundary cells found")
 		}
-		Cells(n: CellNo) {
+		Cells(n: usize) {
 			description("Not enough cells")
-			display("The number of cells {} must be at least 1", n.0)
+			display("The number of cells {} must be at least 1", n)
 		}
-		Edges(nlinks: LinkNo) {
+		Edges(nlinks: usize) {
 			description("Not enough cells")
-			display("{} is not enough links to connect all cells", (nlinks.0).0)
+			display("{} is not enough links to connect all cells", nlinks)
 		}
 		Wire(edge: Edge) {
 			description("Invalid edge")

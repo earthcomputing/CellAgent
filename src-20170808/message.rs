@@ -3,7 +3,7 @@ use std::collections::{HashMap, HashSet};
 use std::sync::atomic::{ATOMIC_USIZE_INIT, AtomicUsize, Ordering};
 use serde_json;
 use cellagent::{CellAgent};
-use config::{MAX_PORTS, CellNo, PathLength, PortNo, TableIndex};
+use config::{MAX_PORTS, PathLength, PortNo, TableIndex};
 use container::Service;
 use gvm_equation::{GvmEquation, GvmVariable, GvmVariables, GvmVariableType};
 use name::{Name, CellID, TreeID, UpTraphID};
@@ -137,7 +137,7 @@ impl DiscoverMsg {
 		self.payload.set_index(index);
 		self.payload.set_sending_cell(cell_id);
 	}
-	fn update_hops(&self) -> PathLength { PathLength(CellNo((self.payload.get_hops().0).0 + 1)) }
+	fn update_hops(&self) -> PathLength { self.payload.get_hops() + 1 }
 	fn update_path(&self) -> Path { self.payload.get_path() } // No change per hop
 }
 impl Message for DiscoverMsg {
@@ -148,6 +148,7 @@ impl Message for DiscoverMsg {
 		let hops = self.payload.get_hops();
 		let path = self.payload.get_path();
 		let my_index;
+		let connected_tree_uuid = ca.get_connected_ports_tree_id().get_uuid();
 		{ // Limit scope of immutable borrow of self on the next line
 			let new_tree_id = self.get_tree_id(self.payload.get_tree_name())?;
 			let senders_index = self.payload.get_index();
@@ -155,8 +156,8 @@ impl Message for DiscoverMsg {
 			//println!("DiscoverMsg: tree_id {}, port_number {}", tree_id, port_number);
 			let exists = ca.exists(&new_tree_id);  // Have I seen this tree before?
 			let status = if exists { traph::PortStatus::Pruned } else { traph::PortStatus::Parent };
-			let gvm_equation = GvmEquation::new("true", "true", "true", GvmVariables::new());
-			let entry = ca.update_black_trees(&new_tree_id, port_number, status, Some(gvm_equation),
+			let gvm_equation = GvmEquation::new("true", "true", GvmVariables::new());
+			let entry = ca.update_traph(&new_tree_id, port_number, status, Some(gvm_equation),
 					children, senders_index, hops, Some(path)).chain_err(|| ErrorKind::MessageError)?;
 			if exists { 
 				return Ok(()); // Don't forward if traph exists for this tree - Simple quenching
@@ -169,7 +170,7 @@ impl Message for DiscoverMsg {
 		let packets = Packetizer::packetize(&ca.get_connected_ports_tree_id(), bytes, direction).chain_err(|| ErrorKind::MessageError)?;
 		//println!("DiscoverMsg {}: sending discoverd for tree {} packet {} {}",ca.get_id(), new_tree_id, packets[0].get_count(), discoverd_msg);
 		let mask = Mask::new(port_number);
-		ca.send_msg(ca.get_connected_ports_tree_id().get_uuid(), &packets, mask).chain_err(|| ErrorKind::MessageError)?;
+		ca.send_msg(connected_tree_uuid, &packets, mask).chain_err(|| ErrorKind::MessageError)?;
 		// Forward Discover on all except port_no with updated hops and path
 		}
 		self.update_discover_msg(ca.get_id(), my_index);
@@ -178,9 +179,9 @@ impl Message for DiscoverMsg {
 		let bytes = Serializer::serialize(&self.clone()).chain_err(|| ErrorKind::MessageError)?;
 		let packets = Packetizer::packetize(&ca.get_control_tree_id(), bytes, direction).chain_err(|| ErrorKind::MessageError)?;
 		let user_mask = DEFAULT_USER_MASK.all_but_port(PortNumber::new(port_no, ca.get_no_ports()).chain_err(|| ErrorKind::MessageError)?);
-		ca.add_saved_msg(packets.clone());
+		ca.add_saved_msg(&packets);
 		//println!("DiscoverMsg {}: forwarding packet {} on connected ports {}", ca.get_id(), packets[0].get_count(), self);
-		ca.send_msg(ca.get_connected_ports_tree_id().get_uuid(), &packets, user_mask).chain_err(|| ErrorKind::MessageError)?;
+		ca.send_msg(connected_tree_uuid, &packets, user_mask).chain_err(|| ErrorKind::MessageError)?;
 		Ok(())
 	}
 }
@@ -218,7 +219,7 @@ impl MsgPayload for DiscoverPayload {}
 impl fmt::Display for DiscoverPayload { 
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result { 
 		let s = format!("Tree {}, sending cell {}, index {}, hops {}, path {}", self.tree_name, 
-			self.sending_cell_id, self.index.0, (self.hops.0).0, self.path);
+			self.sending_cell_id, self.index, self.hops, self.path);
 		write!(f, "{}", s) 
 	}
 }
@@ -242,7 +243,7 @@ impl DiscoverDMsg {
 impl Message for DiscoverDMsg {
 	fn get_header(&self) -> &MsgHeader { &self.header }
 	fn get_payload(&self) -> &MsgPayload { &self.payload }
-	fn process(&mut self, ca: &mut CellAgent, port_no: PortNo) -> Result<()> {
+	fn process(&mut self, ca: &mut CellAgent, port_no: u8) -> Result<()> {
 		let tree_name = self.payload.get_tree_name();
 		let tree_id = self.get_tree_id(tree_name)?;
 		let my_index = self.payload.get_table_index();
@@ -250,9 +251,9 @@ impl Message for DiscoverDMsg {
 		let port_number = PortNumber::new(port_no, MAX_PORTS).chain_err(|| ErrorKind::MessageError)?;
 		children.insert(port_number);
 		//println!("DiscoverDMsg {}: process msg {} processing {} {} {}", ca.get_id(), self.get_header().get_count(), port_no, my_index, tree_id);
-		let gvm_eqn = GvmEquation::new("false", "true", "true", GvmVariables::new());
-		ca.update_black_trees(&tree_id, port_number, traph::PortStatus::Child, Some(gvm_eqn), 
-			&mut children, my_index, PathLength(CellNo(0)), None).chain_err(|| ErrorKind::MessageError)?;
+		let gvm_eqn = GvmEquation::new("false", "true", GvmVariables::new());
+		ca.update_traph(&tree_id, port_number, traph::PortStatus::Child, Some(gvm_eqn), 
+			&mut children, my_index, 0, None).chain_err(|| ErrorKind::MessageError)?;
 		Ok(())
 	}
 }
@@ -276,7 +277,7 @@ impl DiscoverDPayload {
 impl MsgPayload for DiscoverDPayload {}
 impl fmt::Display for DiscoverDPayload {
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-		write!(f, "My table index {}", self.my_index.0)
+		write!(f, "My table index {}", self.my_index)
 	}
 }
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -325,7 +326,7 @@ impl StackTreeMsgPayload {
 	fn new(tree_id: &TreeID, base_tree_name: String) -> Result<StackTreeMsgPayload> {
 		let mut gvm_vars = GvmVariables::new();
 		gvm_vars.add(GvmVariable::new(GvmVariableType::CellNo, "hops"));
-		let gvm_eqn = GvmEquation::new("hops == 0", "true", "true", gvm_vars);
+		let gvm_eqn = GvmEquation::new("hops == 0", "true", gvm_vars);
 		Ok(StackTreeMsgPayload { tree_name: tree_id.stringify(), base_tree_name: base_tree_name, 
 				gvm_eqn: gvm_eqn })
 	}
@@ -355,7 +356,7 @@ impl SetupVMsMsg {
 impl Message for SetupVMsMsg {
 	fn get_header(&self) -> &MsgHeader { &self.header }
 	fn get_payload(&self) -> &MsgPayload { &self.payload }
-	fn process(&mut self, ca: &mut CellAgent, port_no: PortNo) -> Result<()> {
+	fn process(&mut self, ca: &mut CellAgent, port_no: u8) -> Result<()> {
 		let service_sets = self.payload.get_service_sets().clone();
 		ca.create_vms(service_sets).chain_err(|| ErrorKind::MessageError)?;		
 		Ok(())
