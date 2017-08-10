@@ -7,7 +7,7 @@ use uuid::Uuid;
 
 use config::{MAX_ENTRIES, MsgID, CellNo, PathLength, PortNo, TableIndex};
 use container::Service;
-use gvm_equation::{GvmEquation, GvmVariable, GvmVariables};
+use gvm_equation::{GvmEquation, GvmVariable, GvmVariableType};
 use message::{DiscoverMsg, DiscoverDMsg, StackTreeMsg, SetupVMsMsg, Message, MsgType};
 use message_types::{CaToPe, CaFromPe, CaToVm, VmFromCa, VmToCa, CaFromVm, CaToPePacket, PeToCaPacket};
 use name::{Name, CellID, TreeID, UpTraphID, VmID};
@@ -79,17 +79,17 @@ impl CellAgent {
 		let control_tree_id = self.control_tree_id.clone();
 		let connected_tree_id = self.connected_tree_id.clone();
 		let my_tree_id = self.my_tree_id.clone();
-		let gvm_equation = GvmEquation::new("true", "true", "true", GvmVariables::new());
+		let gvm_equation = GvmEquation::new("true", "true", "true", Vec::new());
 		self.update_black_trees(&control_tree_id, port_number_0, 
 				traph::PortStatus::Parent, Some(gvm_equation), 
 				&mut HashSet::new(), other_index, hops, path).chain_err(|| ErrorKind::CellagentError)?;
-		let gvm_equation = GvmEquation::new("false", "true", "true", GvmVariables::new());
+		let gvm_equation = GvmEquation::new("false", "true", "true", Vec::new());
 		let connected_tree_entry = self.update_black_trees(&connected_tree_id, port_number_0, 
 			traph::PortStatus::Parent, Some(gvm_equation),
 			&mut HashSet::new(), other_index, hops, path).chain_err(|| ErrorKind::CellagentError)?;
 		self.connected_tree_entry = Arc::new(Mutex::new(connected_tree_entry));
 		// Create my tree
-		let gvm_equation = GvmEquation::new("true", "true", "true", GvmVariables::new());
+		let gvm_equation = GvmEquation::new("true", "true", "true", Vec::new());
 		self.my_entry = self.update_black_trees(&my_tree_id, port_number_0, 
 				traph::PortStatus::Parent, Some(gvm_equation), 
 				&mut HashSet::new(), other_index, hops, path).chain_err(|| ErrorKind::CellagentError)?; 
@@ -109,6 +109,19 @@ impl CellAgent {
 			
 		};
 		Ok(tree_id)
+	}
+	pub fn get_hops(&self, tree_id: &TreeID) -> Result<PathLength> {
+		let traph = self.get_traph(tree_id)?;
+		let hops = traph.get_hops().chain_err(|| ErrorKind::CellagentError)?;
+		Ok(hops)
+	}
+	pub fn get_traph(&self, tree_id: &TreeID) -> Result<Traph> { 
+		if let Some(traph) = (*self.traphs.lock().unwrap()).remove(&tree_id.get_uuid()) {
+			self.traphs.lock().unwrap().insert(tree_id.get_uuid(), traph.clone());
+			Ok(traph)
+		} else {
+			Err(ErrorKind::Tree(self.cell_id.clone(), tree_id.get_uuid()).into())
+		}
 	}
 	pub fn get_saved_msgs(&self) -> Vec<SavedMsg> {
 		self.saved_msgs.lock().unwrap().to_vec()
@@ -219,16 +232,18 @@ impl CellAgent {
 		}
 		Ok(entry)
 	}
-	fn get_vars(&self, traph: &Traph, vars: &GvmVariables) -> Result<HashMap<GvmVariable,String>> {
-		let mut var_map = HashMap::new();
-		for var in vars.get_variables().clone() {
-			if var.get_value() == "hops" {
-				var_map.insert(var, (traph.get_hops()?.0).0.to_string());
-			} else {
-				return Err(ErrorKind::UnknownVariable(self.cell_id.clone(), var).into());
+	fn get_vars(&self, traph: &Traph, vars: &Vec<GvmVariable>) -> Result<Vec<GvmVariable>> {
+		let mut variables = Vec::new();
+		for var in vars {
+			match var.get_value().as_ref() {
+				"hops" => {
+					let hops = (traph.get_hops()?.0).0;
+					variables.push(GvmVariable::new(GvmVariableType::CellNo, hops));
+				},
+				_ => ()
 			}
 		}
-		Ok(var_map)
+		Ok(variables)
 	}
 	fn listen(&mut self, ca_from_pe: CaFromPe) -> Result<()>{
 		let mut ca = self.clone();
@@ -248,7 +263,7 @@ impl CellAgent {
 				PeToCaPacket::Packet(port_no, packet) => {
 					let msg_id = packet.get_header().get_msg_id();
 					let mut packet_assembler = self.packet_assemblers.remove(&msg_id).unwrap_or(PacketAssembler::new(msg_id));
-					if let Some(packets) = packet_assembler.add(packet) {
+					if let Some(packets) = packet_assembler.clone().add(packet) {
 						let (msg_type, serialized_msg) = MsgType::get_type_serialized(packets).chain_err(|| ErrorKind::CellagentError)?;
 						if let Some(mut msg) = self.get_msg(msg_type, serialized_msg)? {
 							//println!("CellAgent {}: got msg {}", self.cell_id, msg);

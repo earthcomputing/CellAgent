@@ -68,7 +68,7 @@ impl Noc {
 			let packet = noc_from_port.recv()?;
 			let msg_id = packet.get_header().get_msg_id();
 			let mut packet_assembler = self.packet_assemblers.remove(&msg_id).unwrap_or(PacketAssembler::new(msg_id));
-			if let Some(packets) = packet_assembler.add(packet) {
+			if let Some(packets) = packet_assembler.clone().add(packet) {
 				let (msg_type, serialized_msg) = MsgType::get_type_serialized(packets).chain_err(|| ErrorKind::NocError)?;
 				let msg = self.get_msg(msg_type, serialized_msg)?;
 				println!("Noc received {}", msg);

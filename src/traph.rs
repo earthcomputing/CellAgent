@@ -1,20 +1,19 @@
 use std::fmt;
 use std::collections::HashSet;
 
-use config::{MAX_PORTS, CellNo, PathLength, PortNo, TableIndex};
+use config::{MAX_PORTS, PathLength, PortNo, TableIndex};
 use name::{Name, TreeID};
 use routing_table_entry::{RoutingTableEntry};
+use traph_element::TraphElement;
 use utility::{Path, PortNumber};
 
 #[derive(Debug, Clone)]
 pub struct Traph {
 	tree_id: TreeID,
-	stack: Vec<TreeID>,
 	my_index: TableIndex,
 	table_entry: RoutingTableEntry,
 	elements: Vec<TraphElement>,
 }
-
 impl Traph {
 	pub fn new(tree_id: &TreeID, index: TableIndex) -> Result<Traph> {
 		let mut elements = Vec::new();
@@ -22,10 +21,10 @@ impl Traph {
 			elements.push(TraphElement::default(PortNumber::new(PortNo{v:i as u8}, MAX_PORTS).chain_err(|| ErrorKind::TraphError)?)); 
 		}
 		let entry = RoutingTableEntry::default(index).chain_err(|| ErrorKind::TraphError)?;
-		Ok(Traph { tree_id: tree_id.clone(), stack: Vec::new(), my_index: index, 
+		Ok(Traph { tree_id: tree_id.clone(), my_index: index, 
 				table_entry: entry, elements: elements })
 	}
-	pub fn get_tree_id(&self) -> TreeID { self.tree_id.clone() }
+	pub fn get_tree_id(&self) -> &TreeID { &self.tree_id }
 	pub fn get_port_status(&self, port_number: PortNumber) -> PortStatus { 
 		let port_no = port_number.get_port_no();
 		match self.elements.get(port_no.v as usize) {
@@ -77,36 +76,6 @@ impl Traph {
 		self.elements[port_no.v as usize] = element;
 		Ok(self.table_entry)
 	}
-//	fn get_all_hops(&self) -> BTreeSet<PathLength> {
-//		let mut set = BTreeSet::new();
-//		//self.elements.iter().map(|e| set.insert(e.get_hops()));
-//		for e in self.elements.iter() {
-//			set.insert(e.get_hops());
-//		}
-//		set
-//	}
-	pub  fn get_other_indices(&self) -> [TableIndex; MAX_PORTS.v as usize] {
-		let mut indices = [TableIndex(0); MAX_PORTS.v as usize];
-		// Not sure why map gives warning about unused result
-		//self.elements.iter().map(|e| indices[e.get_port_no() as usize] = e.get_other_index());
-		for e in self.elements.iter() {
-			indices[e.get_port_no().v as usize] = e.get_other_index();
-		}
-		indices
-	}
-//	pub fn set_connected(&mut self, port_no: PortNumber) -> Result<(), TraphError> { 
-//		self.set_connected_state(port_no, true); 
-//		Ok(())
-//	}
-//	pub fn set_disconnected(&mut self, port_no: PortNumber) -> Result<(), TraphError> { 
-//		self.set_connected_state(port_no, false); 
-//		Ok(())
-//	}
-//	fn set_connected_state(&mut self, port_no: PortNumber, state: bool) -> Result<(),TraphError> {
-//		if state { self.elements[port_no.get_port_no() as usize].set_connected(); }
-//		else     { self.elements[port_no.get_port_no() as usize].set_disconnected(); }
-//		Ok(())
-//	}
 }
 impl fmt::Display for Traph {
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result { 
@@ -153,48 +122,5 @@ error_chain! {
 		Parent(tree_id: TreeID) {
 			display("No parent for tree {}", tree_id)
 		}
-	}
-}
-#[derive(Debug, Copy, Clone)]
-pub struct TraphElement {
-	port_no: PortNo,
-	other_index: TableIndex,
-	is_connected: bool,
-	is_broken: bool,
-	status: PortStatus,
-	hops: PathLength,
-	path: Option<Path> 
-}
-impl TraphElement {
-	fn new(is_connected: bool, port_no: PortNo, other_index: TableIndex, 
-			status: PortStatus, hops: PathLength, path: Option<Path>) -> TraphElement {
-		TraphElement { port_no: port_no,  other_index: other_index, 
-			is_connected: is_connected, is_broken: false, status: status, 
-			hops: hops, path: path } 
-	}
-	fn default(port_number: PortNumber) -> TraphElement {
-		let port_no = port_number.get_port_no();
-		TraphElement::new(false, port_no, TableIndex(0), PortStatus::Pruned, 
-					PathLength(CellNo(0)), None)
-	}
-	fn get_port_no(&self) -> PortNo { self.port_no }
-	pub fn get_hops(&self) -> PathLength { self.hops }
-	pub fn get_path(&self) -> Option<Path> { self.path }
-	fn get_status(&self) -> PortStatus { self.status }
-	fn get_other_index(&self) -> TableIndex { self.other_index }
-	fn is_connected(&self) -> bool { self.is_connected }
-	fn set_connected(&mut self) { self.is_connected = true; }
-//	fn set_disconnected(&mut self) { self.is_connected = false; }
-	fn set_status(&mut self, status: PortStatus) { self.status = status; }	
-}
-impl fmt::Display for TraphElement {
-	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-		let mut s = format!("{:4} {:5} {:9} {:6} {:6} {:4}", 
-			self.port_no.v, self.other_index.0, self.is_connected, self.is_broken, self.status, (self.hops.0).0);
-		match self.path {
-			Some(p) => s = s + &format!(" {:4}", p.get_port_no().v),
-			None    => s = s + &format!(" None")
-		}
-		write!(f, "{}", s)
 	}
 }

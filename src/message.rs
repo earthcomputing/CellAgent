@@ -5,7 +5,7 @@ use serde_json;
 use cellagent::{CellAgent};
 use config::{MAX_PORTS, CellNo, PathLength, PortNo, TableIndex};
 use container::Service;
-use gvm_equation::{GvmEquation, GvmVariable, GvmVariables, GvmVariableType};
+use gvm_equation::{GvmEquation, GvmVariable, GvmVariableType};
 use name::{Name, CellID, TreeID, UpTraphID};
 use packet::{Packet, Packetizer, Serializer};
 use traph;
@@ -34,7 +34,7 @@ pub enum MsgType {
 	Placeholder
 }
 impl MsgType {
-	pub fn get_type_serialized(packets: Vec<Packet>) -> Result<(MsgType, String)> {
+	pub fn get_type_serialized(packets: &Vec<Packet>) -> Result<(MsgType, String)> {
 		let serialized = Packetizer::unpacketize(packets).chain_err(|| ErrorKind::MessageError)?;
 		let type_msg: TypePlusMsg = serde_json::from_str(&serialized).chain_err(|| ErrorKind::MessageError)?;
 		let msg_type = type_msg.get_type();
@@ -155,7 +155,7 @@ impl Message for DiscoverMsg {
 			//println!("DiscoverMsg: tree_id {}, port_number {}", tree_id, port_number);
 			let exists = ca.exists(&new_tree_id);  // Have I seen this tree before?
 			let status = if exists { traph::PortStatus::Pruned } else { traph::PortStatus::Parent };
-			let gvm_equation = GvmEquation::new("true", "true", "true", GvmVariables::new());
+			let gvm_equation = GvmEquation::new("true", "true", "true", Vec::new());
 			let entry = ca.update_black_trees(&new_tree_id, port_number, status, Some(gvm_equation),
 					children, senders_index, hops, Some(path)).chain_err(|| ErrorKind::MessageError)?;
 			if exists { 
@@ -250,7 +250,7 @@ impl Message for DiscoverDMsg {
 		let port_number = PortNumber::new(port_no, MAX_PORTS).chain_err(|| ErrorKind::MessageError)?;
 		children.insert(port_number);
 		//println!("DiscoverDMsg {}: process msg {} processing {} {} {}", ca.get_id(), self.get_header().get_count(), port_no, my_index, tree_id);
-		let gvm_eqn = GvmEquation::new("false", "true", "true", GvmVariables::new());
+		let gvm_eqn = GvmEquation::new("false", "true", "true", Vec::new());
 		ca.update_black_trees(&tree_id, port_number, traph::PortStatus::Child, Some(gvm_eqn), 
 			&mut children, my_index, PathLength(CellNo(0)), None).chain_err(|| ErrorKind::MessageError)?;
 		Ok(())
@@ -285,13 +285,28 @@ pub struct StackTreeMsg {
 	payload: StackTreeMsgPayload
 }
 impl StackTreeMsg {
-	pub fn new(tree_id: &TreeID, base_tree_id: &TreeID) -> Result<StackTreeMsg> {
+	pub fn new(tree_id: &TreeID, black_tree_id: &TreeID) -> Result<StackTreeMsg> {
 		let mut tree_map = HashMap::new();
 		tree_map.insert(tree_id.stringify(), tree_id.clone());
-		tree_map.insert(base_tree_id.stringify(), base_tree_id.clone()); 
+		tree_map.insert(black_tree_id.stringify(), black_tree_id.clone()); 
 		let header = MsgHeader::new(MsgType::StackTree, MsgDirection::Leafward, tree_map);
-		let payload = StackTreeMsgPayload::new(tree_id, base_tree_id.stringify()).chain_err(|| ErrorKind::MessageError)?;
+		let payload = StackTreeMsgPayload::new(tree_id, black_tree_id.stringify()).chain_err(|| ErrorKind::MessageError)?;
 		Ok(StackTreeMsg { header: header, payload: payload})
+	}
+	fn build_gvm_params(&self, ca: &CellAgent, tree_id: &TreeID, gvm_eqn: GvmEquation) 
+			-> Result<HashMap<GvmVariable,String>> {
+		let params = HashMap::new();
+		let variables = gvm_eqn.get_variables();
+		for variable in variables.iter() {
+			match variable.get_value().as_ref() {
+				"hops" => {
+					let hops = (ca.get_hops(&tree_id)?.0).0;
+					let gvm_var = GvmVariable::new(GvmVariableType::CellNo, hops);
+				},
+				_ => ()
+			}
+		}
+		Ok(params)
 	}
 }
 impl Message for StackTreeMsg {
@@ -303,6 +318,9 @@ impl Message for StackTreeMsg {
 		let tree_name = self.payload.get_tree_name();
 		if let Some(tree_id) = tree_map.get(tree_name) {
 			let gvm_eqn = self.payload.get_gvm_equation();
+			let variables = gvm_eqn.get_variables();
+			
+			let hops = ca.get_hops(&tree_id);
 		//ca.update_traph(&tree_id, port_number, traph::PortStatus::Child, Some(gvm_eqn), 
 		//	&mut children, my_index, 0, None).chain_err(|| ErrorKind::MessageError)?;
 			
@@ -318,25 +336,25 @@ impl fmt::Display for StackTreeMsg {
 #[derive(Debug, Clone, Hash, Serialize, Deserialize)]
 pub struct StackTreeMsgPayload {
 	tree_name: String,
-	base_tree_name: String,
+	black_tree_name: String,
 	gvm_eqn: GvmEquation,
 }
 impl StackTreeMsgPayload {
 	fn new(tree_id: &TreeID, base_tree_name: String) -> Result<StackTreeMsgPayload> {
-		let mut gvm_vars = GvmVariables::new();
-		gvm_vars.add(GvmVariable::new(GvmVariableType::CellNo, "hops"));
+		let mut gvm_vars = Vec::new();
+		gvm_vars.push(GvmVariable::new(GvmVariableType::CellNo, "hops"));
 		let gvm_eqn = GvmEquation::new("hops == 0", "true", "true", gvm_vars);
-		Ok(StackTreeMsgPayload { tree_name: tree_id.stringify(), base_tree_name: base_tree_name, 
+		Ok(StackTreeMsgPayload { tree_name: tree_id.stringify(), black_tree_name: base_tree_name, 
 				gvm_eqn: gvm_eqn })
 	}
-	pub fn get_base_tree_name(&self) -> &str { &self.base_tree_name }
+	pub fn get_black_tree_name(&self) -> &str { &self.black_tree_name }
 	pub fn get_tree_name(&self) -> &str { &self.tree_name}
 	pub fn get_gvm_equation(&self) -> &GvmEquation { &self.gvm_eqn }
 }
 impl MsgPayload for StackTreeMsgPayload {}
 impl fmt::Display for StackTreeMsgPayload {
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-		write!(f, "Tree {} stacked on {}", self.tree_name, self.base_tree_name)
+		write!(f, "Tree {} stacked on black tree {}", self.tree_name, self.black_tree_name)
 	}
 }
 #[derive(Debug, Clone, Serialize, Deserialize)]

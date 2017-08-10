@@ -31,6 +31,7 @@ mod routing_table_entry;
 mod service;
 mod tenant;
 mod traph;
+mod traph_element;
 mod utility;
 mod vm;
 

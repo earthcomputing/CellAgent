@@ -4,7 +4,7 @@ use std::sync::mpsc;
 use std::sync::mpsc::channel;
 
 use cellagent::{CellAgent};
-use config::{MAX_PORTS, CellNo, Json, PortNo, TableIndex};
+use config::{MAX_PORTS, CellNo, PortNo, TableIndex};
 use message_types::{CaToPe, PeFromCa, PeToCa, CaFromPe, PortToPe, PeFromPort, PeToPort,PortFromPe};
 use name::{CellID};
 use packet::Packet;
