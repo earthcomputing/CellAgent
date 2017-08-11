@@ -130,7 +130,7 @@ impl PacketEngine {
 							Some(s) => s.send((*other_index, packet)).chain_err(|| ErrorKind::PacketEngineError)?,
 							None => return Err(ErrorKind::Sender(self.cell_id.clone(), *port_no).into())
 						};
-						if is_stack_msg { println!("Packet Engine {} sent to port {} packet {}", self.cell_id, port_no.v, packet); }
+						//if is_stack_msg { println!("Packet Engine {} sent to port {} packet {}", self.cell_id, port_no.v, packet); }
 					}
 				}
 			}

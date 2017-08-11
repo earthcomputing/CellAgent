@@ -315,12 +315,13 @@ impl Message for StackTreeMsg {
 	fn process(&mut self, ca: &mut CellAgent, port_no: PortNo) -> Result<()> {
 		println!("Stack tree msg {}", self);
 		let tree_map = self.header.get_tree_map();
-		let tree_name = self.payload.get_tree_name();
-		if let Some(tree_id) = tree_map.get(tree_name) {
+		let black_tree_name = self.payload.get_black_tree_name();
+		if let Some(black_tree_id) = tree_map.get(black_tree_name) {
 			let gvm_eqn = self.payload.get_gvm_equation();
-			let variables = gvm_eqn.get_variables();
-			
-			let hops = ca.get_hops(&tree_id);
+			let params = ca.get_params(black_tree_id, gvm_eqn.get_variables())?;
+			//let recv = gvm_eqn.eval_recv(&params);
+			//let send = gvm_eqn.eval_send(&params);
+			//let save = gvm_eqn.eval_save(&params);
 		//ca.update_traph(&tree_id, port_number, traph::PortStatus::Child, Some(gvm_eqn), 
 		//	&mut children, my_index, 0, None).chain_err(|| ErrorKind::MessageError)?;
 			

@@ -110,18 +110,19 @@ impl CellAgent {
 		};
 		Ok(tree_id)
 	}
-	pub fn get_hops(&self, tree_id: &TreeID) -> Result<PathLength> {
-		let traph = self.get_traph(tree_id)?;
-		let hops = traph.get_hops().chain_err(|| ErrorKind::CellagentError)?;
-		Ok(hops)
-	}
-	pub fn get_traph(&self, tree_id: &TreeID) -> Result<Traph> { 
-		if let Some(traph) = (*self.traphs.lock().unwrap()).remove(&tree_id.get_uuid()) {
-			self.traphs.lock().unwrap().insert(tree_id.get_uuid(), traph.clone());
+	pub fn get_traph(&self, tree_id: &TreeID) -> Result<Traph> {
+		let mut traphs = self.traphs.lock().unwrap();
+		if let Some(traph) = traphs.remove(&tree_id.get_uuid()) {
+			traphs.insert(tree_id.get_uuid(), traph.clone());
 			Ok(traph)
 		} else {
 			Err(ErrorKind::Tree(self.cell_id.clone(), tree_id.get_uuid()).into())
 		}
+	}
+	pub fn get_hops(&self, tree_id: &TreeID) -> Result<PathLength> {
+		let traph = self.get_traph(tree_id)?;
+		let hops = traph.get_hops().chain_err(|| ErrorKind::CellagentError)?;
+		Ok(hops)
 	}
 	pub fn get_saved_msgs(&self) -> Vec<SavedMsg> {
 		self.saved_msgs.lock().unwrap().to_vec()
@@ -212,7 +213,7 @@ impl CellAgent {
 		};
 		let (gvm_recv, gvm_send) = match gvm_equation {
 			Some(eqn) => {
-				let variables = self.get_vars(&traph, eqn.get_variables())?;
+				let variables = self.get_params(tree_id, eqn.get_variables())?;
 				let recv = eqn.eval_recv(&variables).chain_err(|| ErrorKind::CellagentError)?;
 				let send = eqn.eval_send(&variables).chain_err(|| ErrorKind::CellagentError)?;
 				(recv, send)
@@ -232,12 +233,12 @@ impl CellAgent {
 		}
 		Ok(entry)
 	}
-	fn get_vars(&self, traph: &Traph, vars: &Vec<GvmVariable>) -> Result<Vec<GvmVariable>> {
+	pub fn get_params(&self, tree_id: &TreeID, vars: &Vec<GvmVariable>) -> Result<Vec<GvmVariable>> {
 		let mut variables = Vec::new();
 		for var in vars {
 			match var.get_value().as_ref() {
 				"hops" => {
-					let hops = (traph.get_hops()?.0).0;
+					let hops = (self.get_hops(tree_id)?.0).0;
 					variables.push(GvmVariable::new(GvmVariableType::CellNo, hops));
 				},
 				_ => ()
