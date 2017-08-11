@@ -110,19 +110,12 @@ impl CellAgent {
 		};
 		Ok(tree_id)
 	}
-	pub fn get_traph(&self, tree_id: &TreeID) -> Result<Traph> {
-		let mut traphs = self.traphs.lock().unwrap();
-		if let Some(traph) = traphs.remove(&tree_id.get_uuid()) {
-			traphs.insert(tree_id.get_uuid(), traph.clone());
-			Ok(traph)
+	pub fn get_hops(&self, tree_id: &TreeID) -> Result<PathLength> {
+		if let Some(traph) = self.traphs.lock().unwrap().get(&tree_id.get_uuid()) {
+			Ok(traph.get_hops().chain_err(|| ErrorKind::CellagentError)?)
 		} else {
 			Err(ErrorKind::Tree(self.cell_id.clone(), tree_id.get_uuid()).into())
 		}
-	}
-	pub fn get_hops(&self, tree_id: &TreeID) -> Result<PathLength> {
-		let traph = self.get_traph(tree_id)?;
-		let hops = traph.get_hops().chain_err(|| ErrorKind::CellagentError)?;
-		Ok(hops)
 	}
 	pub fn get_saved_msgs(&self) -> Vec<SavedMsg> {
 		self.saved_msgs.lock().unwrap().to_vec()
