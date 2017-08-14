@@ -28,6 +28,7 @@ impl TraphElement {
 	}
 	pub fn get_port_no(&self) -> PortNo { self.port_no }
 	pub fn get_hops(&self) -> PathLength { self.hops }
+	pub fn hops_plus_one(&self) -> PathLength { PathLength(CellNo((self.hops.0).0 + 1)) }
 	pub fn get_path(&self) -> Option<Path> { self.path }
 	pub fn get_status(&self) -> PortStatus { self.status }
 	pub fn get_other_index(&self) -> TableIndex { self.other_index }

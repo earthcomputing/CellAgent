@@ -37,7 +37,7 @@ pub struct NalCell {
 impl NalCell {
 	pub fn new(cell_no: CellNo, nports: PortNo, is_border: bool, cell_type: CellType) -> Result<NalCell> {
 		if nports.v > MAX_PORTS.v { return Err(ErrorKind::NumberPorts(nports).into()) }
-		let cell_id = CellID::new(cell_no.0)?;
+		let cell_id = CellID::new(cell_no)?;
 		let (ca_to_pe, pe_from_ca): (CaToPe, PeFromCa) = channel();
 		let (pe_to_ca, ca_from_pe): (PeToCa, CaFromPe) = channel();
 		let (port_to_pe, pe_from_ports): (PortToPe, PeFromPort) = channel();

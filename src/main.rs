@@ -29,6 +29,7 @@ mod port;
 mod routing_table;
 mod routing_table_entry;
 mod service;
+mod stacked_tree;
 mod tenant;
 mod traph;
 mod traph_element;
