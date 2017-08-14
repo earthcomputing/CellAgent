@@ -137,7 +137,7 @@ impl DiscoverMsg {
 		self.payload.set_index(index);
 		self.payload.set_sending_cell(cell_id);
 	}
-	fn update_hops(&self) -> PathLength { PathLength(CellNo((self.payload.get_hops().0).0 + 1)) }
+	fn update_hops(&self) -> PathLength { self.payload.hops_plus_one() }
 	fn update_path(&self) -> Path { self.payload.get_path() } // No change per hop
 }
 impl Message for DiscoverMsg {
@@ -207,6 +207,7 @@ impl DiscoverPayload {
 	fn get_tree_name(&self) -> String { self.tree_name.clone() }
 	//fn get_sending_cell(&self) -> CellID { self.sending_cell_id.clone() }
 	fn get_hops(&self) -> PathLength { self.hops }
+	fn hops_plus_one(&self) -> PathLength { PathLength(CellNo((self.hops.0).0 + 1)) }
 	fn get_path(&self) -> Path { self.path }
 	fn get_index(&self) -> TableIndex { self.index }
 	fn set_hops(&mut self, hops: PathLength) { self.hops = hops; }
@@ -300,8 +301,8 @@ impl StackTreeMsg {
 		for variable in variables.iter() {
 			match variable.get_value().as_ref() {
 				"hops" => {
-					let hops = (ca.get_hops(&tree_id)?.0).0;
-					let gvm_var = GvmVariable::new(GvmVariableType::CellNo, hops);
+					let hops = ca.get_hops(&tree_id)?;
+					let gvm_var = GvmVariable::new(GvmVariableType::CellNo, (hops.0).0);
 				},
 				_ => ()
 			}

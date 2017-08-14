@@ -21,7 +21,7 @@ impl Traph {
 			elements.push(TraphElement::default(PortNumber::new(PortNo{v:i as u8}, MAX_PORTS).chain_err(|| ErrorKind::TraphError)?)); 
 		}
 		let entry = RoutingTableEntry::default(index).chain_err(|| ErrorKind::TraphError)?;
-		Ok(Traph { tree_id: tree_id.clone(), my_index: index, 
+		Ok(Traph { tree_id: tree_id.clone(), my_index: index,
 				table_entry: entry, elements: elements })
 	}
 	pub fn get_tree_id(&self) -> &TreeID { &self.tree_id }

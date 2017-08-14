@@ -2,7 +2,7 @@ use std::fmt;
 use std::marker::Sized;
 use uuid::Uuid;
 
-use config::{SEPARATOR};
+use config::{SEPARATOR, CellNo};
 use utility::PortNumber;
 // Using String means names are not Copy
 type NameType = String;
@@ -29,9 +29,9 @@ pub trait Name: Sized {
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct CellID { name: NameType, uuid: Uuid }
 impl CellID {
-	pub fn new(n: usize) -> Result<CellID> { 
-		let n = format!("C:{}",n);
-		Ok(CellID { name: n, uuid: Uuid::new_v4() })
+	pub fn new(CellNo(n): CellNo) -> Result<CellID> { 
+		let name = format!("C:{}",n);
+		Ok(CellID { name: name, uuid: Uuid::new_v4() })
 	}
 }
 impl Name for CellID {

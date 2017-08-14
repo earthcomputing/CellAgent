@@ -20,10 +20,10 @@ impl RoutingTable {
 		}
 		Ok(RoutingTable { id: id, entries: entries, connected_ports: Vec::new() })
 	}
-	pub fn get_entry(&self, index: TableIndex) -> Result<RoutingTableEntry> { 
-		match self.entries.get(index.0 as usize) {
+	pub fn get_entry(&self, TableIndex(index): TableIndex) -> Result<RoutingTableEntry> { 
+		match self.entries.get(index as usize) {
 			Some(e) => Ok(*e),
-			None => Err(ErrorKind::Index(index).into())
+			None => Err(ErrorKind::Index(TableIndex(index)).into())
 		}
 	}
 	pub fn set_entry(&mut self, entry: RoutingTableEntry) { 
