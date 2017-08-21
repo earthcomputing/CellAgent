@@ -15,7 +15,6 @@ use nalcell::CellType;
 use packet::{Packet, Packetizer, PacketAssembler, PacketAssemblers, Serializer};
 use port;
 use routing_table_entry::{RoutingTableEntry};
-use stacked_tree::StackedTree;
 use traph;
 use traph::{Traph};
 use utility::{BASE_TENANT_MASK, Mask, Path, PortNumber};
@@ -36,11 +35,10 @@ pub struct CellAgent {
 	control_tree_id: TreeID,
 	connected_tree_id: TreeID,
 	my_entry: RoutingTableEntry,
-	stacked_trees: HashMap<Uuid, StackedTree>,
 	connected_tree_entry: Arc<Mutex<RoutingTableEntry>>,
 	saved_msgs: Arc<Mutex<Vec<SavedMsg>>>,
 	free_indices: Arc<Mutex<Vec<TableIndex>>>,
-	trees: Arc<Mutex<HashMap<TableIndex,String>>>,
+	trees: Arc<Mutex<HashMap<TableIndex,TreeID>>>,
 	traphs: Traphs,
 	tenant_masks: Vec<Mask>,
 	ca_to_pe: CaToPe,
@@ -66,7 +64,7 @@ impl CellAgent {
 		Ok(CellAgent { cell_id: cell_id.clone(), my_tree_id: my_tree_id, cell_type: cell_type,
 			control_tree_id: control_tree_id, connected_tree_id: connected_tree_id,	
 			no_ports: no_ports, traphs: traphs, vm_id_no: 0,
-			free_indices: Arc::new(Mutex::new(free_indices)), stacked_trees: HashMap::new(),
+			free_indices: Arc::new(Mutex::new(free_indices)), 
 			saved_msgs: Arc::new(Mutex::new(Vec::new())), my_entry: RoutingTableEntry::default(TableIndex(0)).chain_err(|| ErrorKind::CellagentError)?, 
 			connected_tree_entry: Arc::new(Mutex::new(RoutingTableEntry::default(TableIndex(0)).chain_err(|| ErrorKind::CellagentError)?)),
 			tenant_masks: tenant_masks, trees: Arc::new(Mutex::new(trees)), up_traphs_senders: HashMap::new(),
@@ -101,16 +99,15 @@ impl CellAgent {
 	pub fn get_no_ports(&self) -> PortNo { self.no_ports }	
 	pub fn get_id(&self) -> CellID { self.cell_id.clone() }
 	pub fn get_traphs(&self) -> &Traphs { &self.traphs }
-	pub fn get_tree_id(&self, TableIndex(index): TableIndex) -> Result<String> {
+	pub fn get_tree_id(&self, TableIndex(index): TableIndex) -> Result<TreeID> {
 		let trees = self.trees.lock().unwrap();
 		let tree_id = match trees.get(&TableIndex(index)) {
-			Some(t) => t.clone(),
+			Some(t) => t,
 			None => {
-				println!("--- CellAgent {}: index {} in trees table {:?}", self.cell_id, index, *trees);
 				return Err(ErrorKind::TreeIndex(self.cell_id.clone(), TableIndex(index)).into())}
 			
 		};
-		Ok(tree_id)
+		Ok(tree_id.clone())
 	}
 	pub fn get_hops(&self, tree_id: &TreeID) -> Result<PathLength> {
 		if let Some(traph) = self.traphs.lock().unwrap().get(&tree_id.get_uuid()) {
@@ -226,7 +223,7 @@ impl CellAgent {
 		// Need traph even if cell only forwards on this tree
 		traphs.insert(tree_id.get_uuid(), traph);
 		{
-			self.trees.lock().unwrap().insert(entry.get_index(), tree_id.stringify());
+			self.trees.lock().unwrap().insert(entry.get_index(), tree_id.clone());
 		}
 		self.ca_to_pe.send(CaToPePacket::Entry(entry)).chain_err(|| ErrorKind::CellagentError)?;
 		Ok(entry)
@@ -261,7 +258,7 @@ impl CellAgent {
 				},
 				PeToCaPacket::Packet(port_no, packet) => {
 					let msg_id = packet.get_header().get_msg_id();
-					let mut packet_assembler = self.packet_assemblers.remove(&msg_id).unwrap_or(PacketAssembler::new(msg_id));
+					let packet_assembler = self.packet_assemblers.remove(&msg_id).unwrap_or(PacketAssembler::new(msg_id));
 					if let Some(packets) = packet_assembler.clone().add(packet) {
 						let (msg_type, serialized_msg) = MsgType::get_type_serialized(packets).chain_err(|| ErrorKind::CellagentError)?;
 						if let Some(mut msg) = self.get_msg(msg_type, serialized_msg)? {
@@ -296,7 +293,7 @@ impl CellAgent {
 			let msg = StackTreeMsg::new(&tree_id, &self.my_tree_id).chain_err(|| ErrorKind::CellagentError)?;
 			let direction = msg.get_header().get_direction();
 			let bytes = Serializer::serialize(&msg).chain_err(|| ErrorKind::CellagentError).chain_err(|| ErrorKind::CellagentError)?;
-			let port_no_mask = Mask::all_but_zero();
+			let port_no_mask = Mask::all_but_zero(self.no_ports);
 			let my_index = self.my_entry.get_index();
 			let packets = Packetizer::packetize(&self.my_tree_id, bytes, direction).chain_err(|| ErrorKind::CellagentError)?;
 			for packet in packets {
@@ -384,9 +381,6 @@ impl fmt::Display for CellAgent {
 		let mut s = format!(" Cell Agent");
 		for (_, traph) in self.traphs.lock().unwrap().iter() {
 			s = s + &format!("\n{}", traph);
-		}
-		for (_, stacked) in self.stacked_trees.iter() {
-			s = s + &format!("\n{}", stacked);
 		}
 		write!(f, "{}", s) }
 }

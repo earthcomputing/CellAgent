@@ -146,12 +146,10 @@ error_chain! {
 	}
 	errors { NocError
 		Input(input: String) {
-			description("Invalid input")
-			display("{} is not a valid command to the NOC", input)
+			display("Noc: {} is not a valid command to the NOC", input)
 		}
 		Build(up_id: UpTraphID) {
-			description("Problem building datacenter")
-			display("Problem building datacenter at up_traph {}", up_id)
+			display("Noc: Problem building datacenter at up_traph {}", up_id)
 		}
 	}
 }

@@ -230,12 +230,10 @@ error_chain! {
 	}
 	errors { PacketError 
 		Size(size: usize) {
-			description("Invalid packet size")
-			display("{} is not a valid packet size", size)
+			display("Packet: {} is not a valid packet size", size)
 		}
 		Unpacketize(serialized: String) {
-			description("Malformed packet")
-			display("Cannot deserialize {}", serialized)
+			display("Packet: Cannot deserialize {}", serialized)
 		}
 	}
 }

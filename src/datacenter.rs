@@ -104,20 +104,16 @@ error_chain! {
 	}
 	errors { DatacenterError
 		Boundary {
-			description("No boundary cells")
-			display("No boundary cells found")
+			display("Datacenter: No boundary cells found")
 		}
 		Cells(n: CellNo) {
-			description("Not enough cells")
-			display("The number of cells {} must be at least 1", n.0)
+			display("Datacenter: The number of cells {} must be at least 1", n.0)
 		}
 		Edges(nlinks: LinkNo) {
-			description("Not enough cells")
-			display("{} is not enough links to connect all cells", (nlinks.0).0)
+			display("Datacenter: {} is not enough links to connect all cells", (nlinks.0).0)
 		}
 		Wire(edge: Edge) {
-			description("Invalid edge")
-			display("{:?} is not a valid edge", edge)
+			display("Datacenter: {:?} is not a valid edge", edge)
 		}
 	}
 }

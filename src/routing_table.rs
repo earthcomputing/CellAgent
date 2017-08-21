@@ -14,7 +14,7 @@ pub struct RoutingTable {
 impl RoutingTable {
 	pub fn new(id: CellID) -> Result<RoutingTable> {
 		let mut entries = Vec::new();
-		for i in 1..MAX_ENTRIES.0 {
+		for i in 0..MAX_ENTRIES.0 {
 			let entry = RoutingTableEntry::default(TableIndex(i)).chain_err(|| ErrorKind::RoutingTableError)?;
 			entries.push(entry);
 		}
@@ -50,8 +50,7 @@ error_chain! {
 	}
 	errors { RoutingTableError
 		Index(index: TableIndex) {
-			description("Invalid table index")
-			display("{} is not a valid routing table index", index.0)
+			display("RoutingTable: {} is not a valid routing table index", index.0)
 		}
 	}
 }
