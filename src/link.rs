@@ -26,24 +26,21 @@ impl Link {
 	}
 	fn listen(&self, status: LinkToPort, link_from: LinkFromPort, link_to: LinkToPort) 
 			-> Result<JoinHandle<()>> {
-		let link = self.clone();
-		let _ = status.send(LinkToPortPacket::Status(PortStatus::Connected)).chain_err(|| ErrorKind::LinkError).map_err(|e| link.write_err(e));
+		let id = self.id.clone();
+		let _ = status.send(LinkToPortPacket::Status(PortStatus::Connected)).chain_err(|| ErrorKind::LinkError).map_err(|e| Link::write_err(&id, e));
 		let join_handle = ::std::thread::spawn( move || {
-			let _ = link.listen_loop(link_from, link_to).chain_err(|| ErrorKind::LinkError).map_err(|e| link.write_err(e));
+		loop {
+			//println!("Link {}: waiting to recv", self.id);
+			let packet = link_from.recv().chain_err(|| ErrorKind::LinkError).map_err(|e| Link::write_err(&id, e)).unwrap();
+			let _ = link_to.send(LinkToPortPacket::Packet(packet)).chain_err(|| ErrorKind::LinkError).map_err(|e| Link::write_err(&id, e));
+		}
 		});
 		Ok(join_handle)
 	}			
-	fn listen_loop(&self, link_from: LinkFromPort, link_to: LinkToPort) -> Result<()> {
-		loop {
-			//println!("Link {}: waiting to recv", self.id);
-			let packet = link_from.recv().chain_err(|| ErrorKind::LinkError)?;
-			link_to.send(LinkToPortPacket::Packet(packet)).chain_err(|| ErrorKind::LinkError)?;
-		}
-	}
-	fn write_err(&self, e: Error) {
+	fn write_err(id: &LinkID, e: Error) {
 		use ::std::io::Write;
 		let stderr = &mut ::std::io::stderr();
-		let _ = writeln!(stderr, "Link {}: {}", self.id, e);
+		let _ = writeln!(stderr, "Link {}: {}", id, e);
 		for e in e.iter().skip(1) {
 			let _ = writeln!(stderr, "Caused by: {}", e);
 		}

@@ -58,10 +58,10 @@ impl NalCell {
 			ports.push(port);
 		}
 		let boxed_ports: Box<[Port]> = ports.into_boxed_slice();
+		let mut cell_agent = CellAgent::new(&cell_id, cell_type, nports, ca_to_pe).chain_err(|| ErrorKind::NalCellError)?;
+		cell_agent.initialize(cell_type, ca_from_pe).chain_err(|| ErrorKind::NalCellError)?;
 		let packet_engine = PacketEngine::new(&cell_id, pe_to_ca, pe_to_ports, boundary_port_nos).chain_err(|| ErrorKind::NalCellError)?;
 		packet_engine.start_threads(pe_from_ca, pe_from_ports)?;
-		let mut cell_agent = CellAgent::new(&cell_id, cell_type, PortNo{v:boxed_ports.len() as u8}, ca_to_pe).chain_err(|| ErrorKind::NalCellError)?;
-		cell_agent.initialize(cell_type, ca_from_pe)?;
 		Ok(NalCell { id: cell_id, cell_no: cell_no, is_border: is_border, cell_type: cell_type, 
 				ports: boxed_ports, cell_agent: cell_agent, vms: Vec::new(),
 				packet_engine: packet_engine, ports_from_pe: ports_from_pe, })
@@ -84,7 +84,7 @@ impl NalCell {
 				let port_no = port.get_port_no();
 				match self.ports_from_pe.remove(&port_no) { // Remove avoids a borrowed context error
 					Some(recvr) => {
-						port.set_connected();
+						Port::set_connected(port.get_is_connected());
 						return Ok((port, recvr))
 					},
 					None => return Err(ErrorKind::Channel(port_no).into())
@@ -115,24 +115,19 @@ error_chain! {
 	}
 	errors { NalCellError
 		Border(cell_id: CellID) {
-			description("Not a border cell")
-			display("{} is not a border cell", cell_id)
+			display("NalCell: {} is not a border cell", cell_id)
 		}
 		Channel(port_no: PortNo) {
-			description("No receiver for port")
-			display("No receiver for port {}", port_no.v)
+			display("NalCell: No receiver for port {}", port_no.v)
 		}
 		NoFreePorts(cell_id: CellID) {
-			description("All ports have been assigned")
-			display("All ports have been assigned for cell {}", cell_id)
+			display("NalCell: All ports have been assigned for cell {}", cell_id)
 		}
 		NumberPorts(nports: PortNo) {
-			description("You are asking for too many ports.")
-			display("You asked for {} ports, but only {} are allowed", nports.v, MAX_PORTS.v)
+			display("NalCell: You asked for {} ports, but only {} are allowed", nports.v, MAX_PORTS.v)
 		}
 		BoundaryPort(cell_id: CellID, port_no: PortNo) {
-			description("No outside receiver for boundary port")
-			display("Cell {} has no outside receiver for boundary port {}", cell_id, port_no.v)
+			display("NalCell: Cell {} has no outside receiver for boundary port {}", cell_id, port_no.v)
 		}
 	}
 }

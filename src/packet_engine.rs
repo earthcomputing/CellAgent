@@ -45,8 +45,9 @@ impl PacketEngine {
 			match entry_pe_from_ca.recv().chain_err(|| ErrorKind::PacketEngineError)? {
 				CaToPePacket::Entry(e) => self.routing_table.lock().unwrap().set_entry(e),
 				CaToPePacket::Packet((index, user_mask, packet)) => {
-					//println!("PacketEngine {}: received from ca packet {}", self.cell_id, packet);					
-					let entry = self.routing_table.lock().unwrap().get_entry(index).chain_err(|| ErrorKind::PacketEngineError)?;
+					//println!("PacketEngine {}: received from ca packet {}", self.cell_id, packet);
+					let locked = self.routing_table.lock().unwrap();	// Hold lock until forwarding is done			
+					let entry = locked.get_entry(index).chain_err(|| ErrorKind::PacketEngineError)?;
 					let port_no = PortNo{v:0};
 					self.forward(port_no, entry, user_mask, packet).chain_err(|| ErrorKind::PacketEngineError)?;
 				}
@@ -170,11 +171,11 @@ error_chain! {
 	}
 	errors { PacketEngineError
 		Uuid(cell_id: CellID, index: TableIndex, table_uuid: Uuid, packet_uuid: Uuid) {
-			display("CellID {}: index {}, entry uuid {}, packet uuid {}", cell_id, index.0, 
+			display("PacketEngine: CellID {}: index {}, entry uuid {}, packet uuid {}", cell_id, index.0, 
 				table_uuid, packet_uuid)
 		}
 		Sender(cell_id: CellID, port_no: PortNo) {
-			display("No sender for port {} on cell {}", port_no.v, cell_id)
+			display("PacketEngine: No sender for port {} on cell {}", port_no.v, cell_id)
 		}
 	}
 }

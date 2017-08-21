@@ -29,10 +29,10 @@ mod port;
 mod routing_table;
 mod routing_table_entry;
 mod service;
-mod stacked_tree;
 mod tenant;
 mod traph;
 mod traph_element;
+mod tree;
 mod utility;
 mod vm;
 
@@ -99,19 +99,6 @@ fn run() -> Result<()> {
 	Ok(())
 }
 fn is2e(i: usize, j: usize) -> Edge { Edge { v: (CellNo(i),CellNo(j)) } }
-fn write_err(e: Error) -> Result<()> { 
-	use ::std::io::Write;
-	let stderr = &mut ::std::io::stderr();
-	let _ = writeln!(stderr, "Main: {}", e);
-	for e in e.iter().skip(1) {
-		let _ = writeln!(stderr, "Caused by: {}", e);
-	}
-	if let Some(backtrace) = e.backtrace() {
-		let _ = writeln!(stderr, "Backtrace: {:?}", backtrace);
-	}
-	//::std::process::exit(1);
-	Err(e)	
-}
 // Errors
 error_chain! {
 	foreign_links {

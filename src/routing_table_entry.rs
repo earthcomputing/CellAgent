@@ -16,14 +16,14 @@ pub struct RoutingTableEntry {
 	other_indices: [TableIndex; MAX_PORTS.v as usize]
 }
 impl RoutingTableEntry {
-	pub fn new(index: TableIndex, tree_id: TreeID, inuse: bool, parent: PortNumber, mask: Mask, 
+	pub fn new(index: TableIndex, tree_id: &TreeID, inuse: bool, parent: PortNumber, mask: Mask, 
 			other_indices: [TableIndex; MAX_PORTS.v as usize]) -> RoutingTableEntry {
 		RoutingTableEntry { index: index, uuid: tree_id.get_uuid(), parent: parent.get_port_no(),
 			inuse: inuse, mask: mask, other_indices: other_indices }
 	}
 	pub fn default(index: TableIndex) -> Result<RoutingTableEntry> {
 		let port_number = PortNumber::new(PortNo{v:0}, MAX_PORTS).chain_err(|| ErrorKind::RoutingTableEntryError)?;
-		Ok(RoutingTableEntry::new(index, TreeID::new("Default")?, false, port_number, Mask::empty(), [TableIndex(0); MAX_PORTS.v as usize]))
+		Ok(RoutingTableEntry::new(index, &TreeID::new("Default")?, false, port_number, Mask::empty(), [TableIndex(0); MAX_PORTS.v as usize]))
 	}
 	pub fn is_in_use(&self) -> bool { self.inuse }
 	pub fn get_index(&self) -> TableIndex { self.index }
@@ -81,7 +81,7 @@ error_chain! {
 	}
 	errors { RoutingTableEntryError
 		Index(index: TableIndex) {
-			display("Index number {} is greater than the maximum of {}", index.0, MAX_ENTRIES.0)
+			display("RoutingTableEntry: Index number {} is greater than the maximum of {}", index.0, MAX_ENTRIES.0)
 		}
 	}
 }

@@ -47,8 +47,8 @@ impl GvmEquation {
 }
 impl fmt::Display for GvmEquation {
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-		write!(f, "GvmEquation: receive {}, send {}, variables {:?}", 
-			self.recv_eqn, self.send_eqn, self.variables)
+		write!(f, "GvmEquation: receive {}, send {}, save {}, variables {:?}", 
+			self.recv_eqn, self.send_eqn, self.save_eqn, self.variables)
 	}
 }
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize)]

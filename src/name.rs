@@ -154,12 +154,10 @@ impl fmt::Display for ContainerID { fn fmt(&self, f: &mut fmt::Formatter) -> fmt
 error_chain! {
 	errors {
 		Format(name: String) {
-			description("Name cannot contain blanks")
-			display("NameError: '{}' contains blanks.", name)
+			display("Name: '{}' contains blanks.", name)
 		}
 		Size(name: String) {
-			description("Name is too long")
-			display("NameError: '{}' is longer than {} characters", name, ::config::MAX_CHARS)
+			display("Name: '{}' is longer than {} characters", name, ::config::MAX_CHARS)
 		}
 	}
 }

@@ -34,8 +34,8 @@ impl Mask {
 	}
 	pub fn new0() -> Mask { Mask { mask: MaskValue(1) } }
 	pub fn empty() -> Mask { Mask { mask: MaskValue(0) } }
-	pub fn all_but_zero() -> Mask {
-		Mask::empty().not().all_but_port(PortNumber::new0())
+	pub fn all_but_zero(no_ports: PortNo) -> Mask { 
+		Mask { mask: MaskValue((2 as u16).pow(no_ports.v as u32)-1) }
 	}
 	pub fn equal(&self, other: Mask) -> bool { self.mask.0 == other.mask.0 }
 	pub fn get_as_value(&self) -> MaskValue { self.mask }
@@ -113,16 +113,13 @@ use name::CellID;
 error_chain! {
 	errors { UtilityError
 		Mask(cell_id: CellID) {
-			description("Mask error")
-			display("Cell {} has no tenant mask", cell_id)
+			display("Utility: Cell {} has no tenant mask", cell_id)
 		}
 		PortNumber(port_no: PortNo, max: PortNo) {
-			description("Invalid port number")
-			display("Port number {} is larger than the maximum of {}", port_no.v, max.v)
+			display("Utility: Port number {} is larger than the maximum of {}", port_no.v, max.v)
 		}
 		Unimplemented(feature: String) {
-			description("Feature is not implemented")
-			display("{} is not implemented", feature)
+			display("Utility: {} is not implemented", feature)
 		}
 	}
 }

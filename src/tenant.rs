@@ -66,12 +66,10 @@ error_chain! {
 	}
 	errors { TenantError
 		DuplicateName(tenant_id: String) {
-			description("Tenant name already exists")
-			display("A tenant named '{}' already exists.", tenant_id)
+			display("Tenant: A tenant named '{}' already exists.", tenant_id)
 		}
 		Quota(request: CellNo, available: CellNo) {
-			description("Quota violation")
-			display("You asked for {} cells, but only {} are available", request.0, available.0)
+			display("Tenant: You asked for {} cells, but only {} are available", request.0, available.0)
 		}
 	}
 }

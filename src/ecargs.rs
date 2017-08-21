@@ -61,8 +61,7 @@ impl fmt::Display for ECArgs {
 error_chain! {
 	errors { 
 		NumberPorts(n: PortNo) {
-			display("You asked for {} ports, but only {} are allowed", n.v, MAX_PORTS.v)
-			
+			display("ECArgs: You asked for {} ports, but only {} are allowed", n.v, MAX_PORTS.v)			
 		}
 	}
 }

@@ -7,9 +7,9 @@ use utility::{Path, PortNumber};
 #[derive(Debug, Copy, Clone)]
 pub struct TraphElement {
 	port_no: PortNo,
-	other_index: TableIndex,
 	is_connected: bool,
 	is_broken: bool,
+	other_index: TableIndex,
 	status: PortStatus,
 	hops: PathLength,
 	path: Option<Path> 
