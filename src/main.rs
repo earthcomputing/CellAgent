@@ -74,13 +74,13 @@ fn run() -> Result<()> {
 		Err(err) => panic!("Argument Error: {}",err)
 	}; 
 */
-	let ecargs = match ECArgs::new(NCELLS,NPORTS,NLINKS.0) {
+	let ecargs = match ECArgs::new(NCELLS, NPORTS, *NLINKS) {
 		Ok(a) => a,
 		Err(err) => panic!("Argument Error: {}", err)
 	};
 	//let cell_id = CellID::new("foo bar").chain_err(|| "testing bad name")?;
 	let (ncells, nports) = ecargs.get_args();
-	println!("Main: {} ports for each of {} cells", nports.v, ncells.0);
+	println!("Main: {} ports for each of {} cells", *nports, *ncells);
 	//let edges = vec![(0,1),(1,2),(2,3),(3,4),(5,6),(6,7),(7,8),(8,9),(0,5),(1,6),(2,7),(3,8),(4,9)];
 	let edges = vec![is2e(0,1),is2e(1,2),is2e(1,6),is2e(3,4),is2e(5,6),is2e(6,7),is2e(7,8),is2e(8,9),is2e(0,5),is2e(2,3),is2e(2,7),is2e(3,8),is2e(4,9)];
 	let (outside_to_noc, noc_from_outside): (OutsideToNoc, NocFromOutside) = channel();

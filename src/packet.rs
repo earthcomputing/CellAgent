@@ -45,7 +45,7 @@ impl fmt::Display for Packet {
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result { 
 		let bytes = self.get_payload().get_bytes();
 		let len = if self.get_header().is_last_packet() {
-			self.get_header().get_size().0 as usize
+			*self.get_header().get_size() as usize
 		} else {
 			bytes.len()
 		};
@@ -99,13 +99,13 @@ impl fmt::Display for PacketHeader {
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result { 
 		let mut uuid = self.uuid.to_string();
 		uuid.truncate(8);
-		let mut s = format!("Message ID {}", self.msg_id.0);
+		let mut s = format!("Message ID {}", *self.msg_id);
 		s = s + &format!(", UUID {}", self.uuid );
 		if self.is_rootcast() { s = s + " Rootward"; }
 		else                  { s = s + " Leafward"; }
 		if self.is_last_packet() { s = s + ", Last packet"; }
 		else                     { s = s + ", Not last packet"; }
-		s = s + &format!(", Size {}", self.size.0);
+		s = s + &format!(", Size {}", *self.size);
 		write!(f, "{}", s) 
 	}
 }
@@ -184,7 +184,7 @@ impl Packetizer {
 		for packet in packets {
 			let header = packet.get_header();
 			let is_last_packet = header.is_last_packet();
-			let last_packet_size = header.get_size().0 as usize;
+			let last_packet_size = *header.get_size() as usize;
 			let payload = packet.get_payload();
 			let mut bytes = payload.get_bytes();
 			if is_last_packet {

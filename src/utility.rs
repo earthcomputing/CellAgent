@@ -37,16 +37,16 @@ impl Mask {
 	pub fn all_but_zero(no_ports: PortNo) -> Mask { 
 		Mask { mask: MaskValue((2 as u16).pow(no_ports.v as u32)-1) }
 	}
-	pub fn equal(&self, other: Mask) -> bool { self.mask.0 == other.mask.0 }
+	pub fn equal(&self, other: Mask) -> bool { *self.mask == *other.mask }
 	pub fn get_as_value(&self) -> MaskValue { self.mask }
 	pub fn or(&self, mask: Mask) -> Mask {
-		Mask { mask: MaskValue(self.mask.0 | mask.mask.0) }
+		Mask { mask: MaskValue(*self.mask | *mask.mask) }
 	}
 	pub fn and(&self, mask: Mask) -> Mask {
-		Mask { mask: MaskValue(self.mask.0 & mask.mask.0) }
+		Mask { mask: MaskValue(*self.mask & *mask.mask) }
 	}
 	pub fn not(&self) -> Mask {
-		Mask { mask: MaskValue(!self.mask.0) }
+		Mask { mask: MaskValue(!*self.mask) }
 	}
 	pub fn all_but_port(&self, port_number: PortNumber) -> Mask {
 		let port_mask = Mask::new(port_number);
@@ -69,14 +69,14 @@ impl Mask {
 				Err(_) => panic!("Mask port_nos_from_mask cannont generate an error")
 			};
 			let test = Mask::new(port_number);
-			if test.mask.0 & self.mask.0 != 0 { port_nos.push(PortNo{v:i}) }
+			if *test.mask & *self.mask != 0 { port_nos.push(PortNo{v:i}) }
 		}
 		port_nos
 	}
 }
 impl fmt::Display for Mask {
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result { 
-		write!(f, " {:016.b}", self.mask.0) 
+		write!(f, " {:016.b}", *self.mask) 
 	}
 }
 #[derive(Debug, Copy, Clone, Hash, PartialEq, Eq, Serialize, Deserialize)]

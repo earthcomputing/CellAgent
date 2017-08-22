@@ -95,12 +95,12 @@ impl Noc {
 			CellType::Vm => CellType::Container,
 			_ => panic!("Bad CellType")
 		};
-		let up_id = UpTraphID::new(&format!("{}{}{}", self.id, SEPARATOR, self.no_datacenters.0)).chain_err(|| ErrorKind::NocError)?;
+		let up_id = UpTraphID::new(&format!("{}{}{}", self.id, SEPARATOR, *self.no_datacenters)).chain_err(|| ErrorKind::NocError)?;
 		type Params = (CellNo, PortNo, Vec<Edge>);
 		if let Some(str_params) = str_params {
 			let params: Params = serde_json::from_str(str_params).chain_err(|| ErrorKind::NocError)?;
 			let dc = self.build_datacenter(&up_id, new_cell_type, params.0, params.1, params.2).chain_err(|| ErrorKind::Input(str_params.to_string()))?;
-			self.no_datacenters = DatacenterNo(self.no_datacenters.0 + 1);
+			self.no_datacenters = DatacenterNo(*self.no_datacenters + 1);
 		} else { panic!("Parameter problem"); }
 		Ok(())
 	}

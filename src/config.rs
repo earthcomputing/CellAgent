@@ -1,26 +1,37 @@
+use std::ops::{Deref, DerefMut};
 // Size of various fields
 #[derive(Debug, Copy, Clone, Hash, Serialize, Deserialize)]
 pub struct CellNo(pub usize);
+impl Deref for CellNo { type Target = usize; fn deref(&self) -> &Self::Target { &self.0 } }
 #[derive(Debug, Copy, Clone)]
 pub struct ContainerNo(pub usize);
+impl Deref for ContainerNo { type Target = usize; fn deref(&self) -> &Self::Target { &self.0 } }
 #[derive(Debug, Copy, Clone)]
 pub struct DatacenterNo(pub u16);
+impl Deref for DatacenterNo { type Target = u16; fn deref(&self) -> &Self::Target { &self.0 } }
 #[derive(Debug, Copy, Clone, Serialize, Deserialize)]
 pub struct Edge { pub v: (CellNo, CellNo) }
 #[derive(Debug, Copy, Clone)]
 pub struct LinkNo(pub CellNo);
+impl Deref for LinkNo { type Target = CellNo; fn deref(&self) -> &Self::Target { &self.0 } }
 #[derive(Debug, Copy, Clone, Serialize, Deserialize)]
 pub struct MaskValue(pub u16);
+impl Deref for MaskValue { type Target = u16; fn deref(&self) -> &Self::Target { &self.0 } }
 #[derive(Debug, Copy, Clone)]
 pub struct PacketNo(pub u16);
+impl Deref for PacketNo { type Target = u16; fn deref(&self) -> &Self::Target { &self.0 } }
 #[derive(Debug, Copy, Clone, Hash, Serialize, Deserialize)]
 pub struct PathLength(pub CellNo);
+impl Deref for PathLength { type Target = CellNo; fn deref(&self) -> &Self::Target { &self.0 } }
 #[derive(Debug, Copy, Clone, Hash, Eq, PartialEq, Serialize, Deserialize)]
 pub struct PortNo { pub v: u8 }
+impl Deref for PortNo { type Target = u8; fn deref(&self) -> &Self::Target { &self.v } }
 #[derive(Debug, Copy, Clone, Hash, Eq, PartialEq, Serialize, Deserialize)]
 pub struct TableIndex(pub u32);
+impl Deref for TableIndex { type Target = u32; fn deref(&self) -> &Self::Target { &self.0 } }
 #[derive(Debug, Copy, Clone, Hash, Eq, PartialEq)]
 pub struct MsgID(pub u64);
+impl Deref for MsgID { type Target = u64; fn deref(&self) -> &Self::Target { &self.0 } }
 #[derive(Debug, Copy, Clone)]
 pub struct VmNo(pub usize);
 // Default inputs

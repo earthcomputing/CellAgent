@@ -12,21 +12,22 @@ use utility::{Mask, PortNumber};
 #[derive(Debug, Clone)]
 pub struct Tree {
 	tree_id: TreeID,
-	traph_id: TreeID,
+	black_tree_id: TreeID,
 	stacked_tree_ids: Vec<TreeID>,
 	table_entry: RoutingTableEntry,
 	gvm_eqn: Option<GvmEquation>,
 }
 impl Tree {
-	pub fn new(traph_id: &TreeID, tree_id: &TreeID, gvm_eqn: Option<GvmEquation>, 
+	pub fn new(tree_id: &TreeID, black_tree_id: &TreeID, gvm_eqn: Option<GvmEquation>, 
 			table_entry: RoutingTableEntry) -> Tree {
-		Tree { traph_id: traph_id.clone(), tree_id: tree_id.clone(), gvm_eqn: gvm_eqn,
+		Tree { black_tree_id: black_tree_id.clone(), tree_id: tree_id.clone(), gvm_eqn: gvm_eqn,
 				table_entry: table_entry, stacked_tree_ids: Vec::new() }
 	}
 	pub fn get_id(&self) -> &TreeID { &self.tree_id }
-	pub fn get_traph_id(&self) -> &TreeID { &self.traph_id }
+	pub fn get_black_tree_id(&self) -> &TreeID { &self.black_tree_id }
 	pub fn get_uuid(&self) -> Uuid { self.tree_id.get_uuid() }
 	pub fn get_table_entry(&self) -> RoutingTableEntry { self.table_entry }
+	pub fn set_table_entry(&mut self, entry: RoutingTableEntry) { self.table_entry = entry; }
 	pub fn get_table_index(&self) -> TableIndex { self.table_entry.get_index() }
 	pub fn get_gvm_eqn(&self) -> Option<GvmEquation> { self.gvm_eqn.clone() }
 	pub fn set_gvm_eqn(&mut self, gvm_eqn: GvmEquation) { self.gvm_eqn = Some(gvm_eqn) }

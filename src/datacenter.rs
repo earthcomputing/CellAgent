@@ -33,10 +33,10 @@ impl Datacenter {
 		}
 		let mut link_handles = Vec::new();
 		for edge in edge_list {
-			if (edge.v.0).0 == (edge.v.1).0 { return Err(ErrorKind::Wire(edge).into()); }
-			if ((edge.v.0).0 > ncells.0) | ((edge.v.1).0 >= ncells.0) { return Err(ErrorKind::Wire(edge).into()); }
-			let split = self.cells.split_at_mut(max((edge.v.0).0,(edge.v.1).0));
-			let mut cell = match split.0.get_mut((edge.v.0).0) {
+			if *(edge.v.0) == *(edge.v.1) { return Err(ErrorKind::Wire(edge).into()); }
+			if (*(edge.v.0) > ncells.0) | (*(edge.v.1) >= ncells.0) { return Err(ErrorKind::Wire(edge).into()); }
+			let split = self.cells.split_at_mut(max(*(edge.v.0),*(edge.v.1)));
+			let mut cell = match split.0.get_mut(*(edge.v.0)) {
 				Some(c) => c,
 				None => return Err(ErrorKind::Wire(edge).into())
 
@@ -72,7 +72,7 @@ impl Datacenter {
 	pub fn connect_to_noc(&mut self, port_to_noc: PortToNoc, port_from_noc: PortFromNoc)  
 			-> Result<()> {
 		let mut boundary_cells = self.get_boundary_cells();
-		if boundary_cells.len() < MIN_BOUNDARY_CELLS.0 {
+		if boundary_cells.len() < *MIN_BOUNDARY_CELLS {
 			return Err(ErrorKind::Boundary.into());
 		} else {
 			let (mut boundary_cell, _) = boundary_cells.split_at_mut(1);
