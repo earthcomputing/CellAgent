@@ -156,7 +156,7 @@ impl Message for DiscoverMsg {
 			let exists = ca.exists(&new_tree_id);  // Have I seen this tree before?
 			let status = if exists { traph::PortStatus::Pruned } else { traph::PortStatus::Parent };
 			let gvm_equation = GvmEquation::new("true", "true", "true", Vec::new());
-			let entry = ca.update_black_trees(&new_tree_id, port_number, status, Some(gvm_equation),
+			let entry = ca.update_traph(&new_tree_id, port_number, status, Some(gvm_equation),
 					children, senders_index, hops, Some(path)).chain_err(|| ErrorKind::MessageError)?;
 			if exists { 
 				return Ok(()); // Don't forward if traph exists for this tree - Simple quenching
@@ -207,7 +207,7 @@ impl DiscoverPayload {
 	fn get_tree_name(&self) -> String { self.tree_name.clone() }
 	//fn get_sending_cell(&self) -> CellID { self.sending_cell_id.clone() }
 	fn get_hops(&self) -> PathLength { self.hops }
-	fn hops_plus_one(&self) -> PathLength { PathLength(CellNo((self.hops.0).0 + 1)) }
+	fn hops_plus_one(&self) -> PathLength { PathLength(CellNo(**self.hops + 1)) }
 	fn get_path(&self) -> Path { self.path }
 	fn get_index(&self) -> TableIndex { self.index }
 	fn set_hops(&mut self, hops: PathLength) { self.hops = hops; }
@@ -219,7 +219,7 @@ impl MsgPayload for DiscoverPayload {}
 impl fmt::Display for DiscoverPayload { 
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result { 
 		let s = format!("Tree {}, sending cell {}, index {}, hops {}, path {}", self.tree_name, 
-			self.sending_cell_id, self.index.0, (self.hops.0).0, self.path);
+			self.sending_cell_id, *self.index, **self.hops, self.path);
 		write!(f, "{}", s) 
 	}
 }
@@ -252,7 +252,7 @@ impl Message for DiscoverDMsg {
 		children.insert(port_number);
 		//println!("DiscoverDMsg {}: process msg {} processing {} {} {}", ca.get_id(), self.get_header().get_count(), port_no, my_index, tree_id);
 		let gvm_eqn = GvmEquation::new("false", "true", "true", Vec::new());
-		ca.update_black_trees(&tree_id, port_number, traph::PortStatus::Child, Some(gvm_eqn), 
+		ca.update_traph(&tree_id, port_number, traph::PortStatus::Child, Some(gvm_eqn), 
 			&mut children, my_index, PathLength(CellNo(0)), None).chain_err(|| ErrorKind::MessageError)?;
 		Ok(())
 	}
@@ -277,7 +277,7 @@ impl DiscoverDPayload {
 impl MsgPayload for DiscoverDPayload {}
 impl fmt::Display for DiscoverDPayload {
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-		write!(f, "My table index {}", self.my_index.0)
+		write!(f, "My table index {}", *self.my_index)
 	}
 }
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -302,7 +302,7 @@ impl StackTreeMsg {
 			match variable.get_value().as_ref() {
 				"hops" => {
 					let hops = ca.get_hops(&tree_id)?;
-					let gvm_var = GvmVariable::new(GvmVariableType::CellNo, (hops.0).0);
+					let gvm_var = GvmVariable::new(GvmVariableType::CellNo, **hops);
 				},
 				_ => ()
 			}
@@ -316,16 +316,13 @@ impl Message for StackTreeMsg {
 	fn process(&mut self, ca: &mut CellAgent, port_no: PortNo) -> Result<()> {
 		println!("Stack tree msg {}", self);
 		let tree_map = self.header.get_tree_map();
+		let tree_name = self.payload.get_tree_name();
+		let gvm_eqn = self.payload.get_gvm_eqn();
 		let black_tree_name = self.payload.get_black_tree_name();
 		if let Some(black_tree_id) = tree_map.get(black_tree_name) {
-			let gvm_eqn = self.payload.get_gvm_equation();
-			let params = ca.get_params(black_tree_id, gvm_eqn.get_variables())?;
-			//let recv = gvm_eqn.eval_recv(&params);
-			//let send = gvm_eqn.eval_send(&params);
-			//let save = gvm_eqn.eval_save(&params);
-		//ca.update_traph(&tree_id, port_number, traph::PortStatus::Child, Some(gvm_eqn), 
-		//	&mut children, my_index, 0, None).chain_err(|| ErrorKind::MessageError)?;
-			
+			ca.stack_tree(tree_name, black_tree_id, gvm_eqn).chain_err(|| ErrorKind::MessageError)?;			
+		} else {
+			return Err(ErrorKind::TreeMapEntry(black_tree_name.to_string()).into());
 		}
 		Ok(())
 	}
@@ -349,9 +346,9 @@ impl StackTreeMsgPayload {
 		Ok(StackTreeMsgPayload { tree_name: tree_id.stringify(), black_tree_name: base_tree_name, 
 				gvm_eqn: gvm_eqn })
 	}
-	pub fn get_black_tree_name(&self) -> &str { &self.black_tree_name }
-	pub fn get_tree_name(&self) -> &str { &self.tree_name}
-	pub fn get_gvm_equation(&self) -> &GvmEquation { &self.gvm_eqn }
+	pub fn get_black_tree_name(&self) -> &String { &self.black_tree_name }
+	pub fn get_tree_name(&self) -> &String { &self.tree_name}
+	pub fn get_gvm_eqn(&self) -> &GvmEquation { &self.gvm_eqn }
 }
 impl MsgPayload for StackTreeMsgPayload {}
 impl fmt::Display for StackTreeMsgPayload {

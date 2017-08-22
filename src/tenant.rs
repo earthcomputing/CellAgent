@@ -32,7 +32,7 @@ impl Tenant {
 //		self.children.get_mut(&id)
 //	}
 	pub fn create_subtenant(&mut self, id: &'static str, n: CellNo) -> Result<Tenant> {
-		if self.ncells.0 < n.0 {
+		if *self.ncells < *n {
 			Err(ErrorKind::Quota(n, self.ncells).into())
 		} else {
 			let tenant = Tenant::new(id, n, Some(self.get_id()));
@@ -54,7 +54,7 @@ impl Tenant {
 impl fmt::Debug for Tenant { 
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result { 
 		let mut s = "Tenant: ".to_string();
-		s = s + &format!("{:?} {} cells", self.id, self.ncells.0);
+		s = s + &format!("{:?} {} cells", self.id, *self.ncells);
 		write!(f, "{}", s) 
 	} 
 }

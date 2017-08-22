@@ -75,14 +75,14 @@ impl PacketEngine {
 		if entry.is_in_use() {
 			//println!("PacketEngine {}: packet {} entry {}", self.cell_id, packet.get_count(), entry);
 			// The control tree is special since each cell has a different uuid
-			if (entry.get_index().0 == 0) || (entry.get_uuid() == packet.get_header().get_uuid()) {
+			if (*entry.get_index() == 0) || (entry.get_uuid() == packet.get_header().get_uuid()) {
 				let mask = entry.get_mask();
 				let other_indices = entry.get_other_indices();
 				PortNumber::new(port_no, PortNo{v:other_indices.len() as u8}).chain_err(|| ErrorKind::PacketEngineError)?; // Verify that port_no is valid
 				self.forward(port_no, entry, mask, packet).chain_err(|| ErrorKind::PacketEngineError)?;	
 			} else {
 				println!("CellID {}: entry index {}, entry uuid {}, packet uuid {}",
-					self.cell_id, entry.get_index().0, entry.get_uuid(), packet.get_header().get_uuid());
+					self.cell_id, *entry.get_index(), entry.get_uuid(), packet.get_header().get_uuid());
 				return Err(ErrorKind::Uuid(self.cell_id.clone(), entry.get_index(), entry.get_uuid(),
 						packet.get_uuid()).into());
 			}
