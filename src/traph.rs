@@ -27,7 +27,7 @@ impl Traph {
 		for i in 1..MAX_PORTS.v { 
 			elements.push(TraphElement::default(PortNumber::new(PortNo{v:i as u8}, MAX_PORTS).chain_err(|| ErrorKind::TraphError)?)); 
 		}
-		let gvm_eqn = GvmEquation::new("true", "true", "true", Vec::new());
+		let gvm_eqn = GvmEquation::new("true", "true", "true", "true", Vec::new());
 		let entry = RoutingTableEntry::default(index).chain_err(|| ErrorKind::TraphError)?;
 		let black_tree = Tree::new(black_tree_id, black_tree_id, Some(gvm_eqn), entry);
 		let stacked_trees = Arc::new(Mutex::new(HashMap::new()));
@@ -39,6 +39,16 @@ impl Traph {
 				stacked_trees: stacked_trees, elements: elements })
 	}
 	pub fn get_black_tree_id(&self) -> &TreeID { &self.black_tree_id }
+	pub fn get_tree_entry(&self, tree_uuid: &Uuid) -> Result<RoutingTableEntry> {
+		let locked = self.stacked_trees.lock().unwrap();
+		if let Some(tree) = locked.get(tree_uuid) {
+			Ok(tree.get_table_entry())
+		} else {
+			Err(ErrorKind::Tree(self.cell_id.clone(), tree_uuid.clone()).into())
+		}
+	}
+	pub fn get_black_tree_entry(&self) -> Result<RoutingTableEntry> { self.get_tree_entry(&self.black_tree_id.get_uuid()) }
+	pub fn get_stacked_trees(&self) -> &Arc<Mutex<StackedTrees>> { &self.stacked_trees }
 	pub fn get_port_status(&self, port_number: PortNumber) -> PortStatus { 
 		let port_no = port_number.get_port_no();
 		match self.elements.get(port_no.v as usize) {
@@ -53,13 +63,13 @@ impl Traph {
 				_ => ()
 			}
 		}
-		Err(ErrorKind::Parent(self.black_tree_id.clone()).into())
+		Err(ErrorKind::Parent(self.cell_id.clone(), self.black_tree_id.clone()).into())
 	}
 	pub fn get_hops(&self) -> Result<PathLength> {
 		for element in self.elements.clone() {
 			if element.get_status() == PortStatus::Parent { return Ok(element.get_hops()); }
 		}
-		Err(ErrorKind::NoParent(self.black_tree_id.clone()).into())	
+		Err(ErrorKind::NoParent(self.cell_id.clone(), self.black_tree_id.clone()).into())	
 	}
 	pub fn is_leaf(&self) -> bool {
 		for element in self.elements.clone() {
@@ -70,7 +80,7 @@ impl Traph {
 	pub fn get_table_entry(&self, stacked_trees_locked: &MutexGuard<StackedTrees>, tree_uuid: &Uuid) -> Result<RoutingTableEntry> { 
 		match stacked_trees_locked.get(tree_uuid) {
 			Some(tree) => Ok(tree.get_table_entry()),
-			None => Err(ErrorKind::Tree(tree_uuid.clone()).into())
+			None => Err(ErrorKind::Tree(self.cell_id.clone(), tree_uuid.clone()).into())
 		}
 	}
 	pub fn get_table_index(&self, tree_uuid: &Uuid) -> Result<TableIndex> {
@@ -83,9 +93,10 @@ impl Traph {
 			-> Result<RoutingTableEntry> {
 		let port_no = port_number.get_port_no();
 		let mut locked = self.stacked_trees.lock().unwrap();
+		// I get lifetime errors if I put this block in a function
 		let mut tree = match locked.get(&tree_id.get_uuid()) {
 			Some(tree) => tree.clone(),
-			None => return Err(ErrorKind::Tree(tree_id.get_uuid()).into())
+			None => return Err(ErrorKind::Tree(self.cell_id.clone(), tree_id.get_uuid()).into())
 		};
 		let mut table_entry = tree.get_table_entry();
 		match port_status {
@@ -106,6 +117,19 @@ impl Traph {
 		let element = TraphElement::new(true, port_no, other_index, port_status, hops, path);
 		self.elements[*port_no as usize] = element;
 		Ok(table_entry)
+	}
+	pub fn update_entry(&self, tree_id: &TreeID, entry: RoutingTableEntry) -> Result<()> {
+		// I get lifetime errors if I put this block in a function
+		let mut locked = self.stacked_trees.lock().unwrap();
+		let mut tree = match locked.get(&tree_id.get_uuid()) {
+			Some(tree) => tree.clone(),
+			None => return Err(ErrorKind::Tree(self.cell_id.clone(), tree_id.get_uuid()).into())
+		};
+		tree.set_table_entry(entry);
+		Ok(())		
+	}
+	pub fn stack_tree(&self, tree: &Tree) {
+		
 	}
 }
 impl fmt::Display for Traph {
@@ -144,17 +168,17 @@ error_chain! {
 		Utility(::utility::Error, ::utility::ErrorKind);
 	}
 	errors { TraphError
-		Lookup(port_number: PortNumber) {
-			display("Traph: No traph entry for port {}", port_number)
+		Lookup(cell_id: CellID, port_number: PortNumber) {
+			display("Traph on cell {}: No traph entry for port {}", cell_id, port_number)
 		}
-		NoParent(tree_id: TreeID) {
-			display("Traph: No parent for tree {}", tree_id)
+		NoParent(cell_id: CellID, tree_id: TreeID) {
+			display("Traph on cell {}: No parent for tree {}", cell_id, tree_id)
 		}
-		Parent(tree_id: TreeID) {
-			display("Traph: No parent for tree {}", tree_id)
+		Parent(cell_id: CellID, tree_id: TreeID) {
+			display("Traph on cell {}: No parent for tree {}", cell_id, tree_id)
 		}
-		Tree(tree_uuid: Uuid) {
-			display("Traph: No tree with UUID {}", tree_uuid)
+		Tree(cell_id: CellID, tree_uuid: Uuid) {
+			display("Traph on cell {}: No tree with UUID {}", cell_id, tree_uuid)
 		}
 	}
 }

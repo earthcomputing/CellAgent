@@ -1,6 +1,5 @@
 target
 Cargo.lock
-.#.gitignore
 src-20170129
 src-20170130
 src-20170131

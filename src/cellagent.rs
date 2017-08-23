@@ -17,6 +17,7 @@ use port;
 use routing_table_entry::{RoutingTableEntry};
 use traph;
 use traph::{Traph};
+use tree::Tree;
 use utility::{BASE_TENANT_MASK, Mask, Path, PortNumber};
 use vm::VirtualMachine;
 
@@ -80,17 +81,17 @@ impl CellAgent {
 		let control_tree_id = self.control_tree_id.clone();
 		let connected_tree_id = self.connected_tree_id.clone();
 		let my_tree_id = self.my_tree_id.clone();
-		let gvm_equation = GvmEquation::new("true", "true", "true", Vec::new());
+		let gvm_equation = GvmEquation::new("true", "true", "true", "false", Vec::new());
 		self.update_traph(&control_tree_id, port_number_0, 
 				traph::PortStatus::Parent, Some(gvm_equation), 
 				&mut HashSet::new(), other_index, hops, path).chain_err(|| ErrorKind::CellagentError)?;
-		let gvm_equation = GvmEquation::new("false", "true", "true", Vec::new());
+		let gvm_equation = GvmEquation::new("false", "true", "true", "false", Vec::new());
 		let connected_tree_entry = self.update_traph(&connected_tree_id, port_number_0, 
 			traph::PortStatus::Parent, Some(gvm_equation),
 			&mut HashSet::new(), other_index, hops, path).chain_err(|| ErrorKind::CellagentError)?;
 		self.connected_tree_entry = Arc::new(Mutex::new(connected_tree_entry));
 		// Create my tree
-		let gvm_equation = GvmEquation::new("true", "true", "true", Vec::new());
+		let gvm_equation = GvmEquation::new("true", "true", "true", "false", Vec::new());
 		self.my_entry = self.update_traph(&my_tree_id, port_number_0, 
 				traph::PortStatus::Parent, Some(gvm_equation), 
 				&mut HashSet::new(), other_index, hops, path).chain_err(|| ErrorKind::CellagentError)?; 
@@ -185,16 +186,6 @@ impl CellAgent {
 				gvm_equation: Option<GvmEquation>, children: &mut HashSet<PortNumber>, 
 				other_index: TableIndex, hops: PathLength, path: Option<Path>) 
 			-> Result<RoutingTableEntry> {
-		let (gvm_recv, gvm_send, gvm_save) = match gvm_equation {
-			Some(eqn) => {
-				let variables = self.get_params(tree_id, eqn.get_variables())?;
-				let recv = eqn.eval_recv(&variables).chain_err(|| ErrorKind::CellagentError)?;
-				let send = eqn.eval_send(&variables).chain_err(|| ErrorKind::CellagentError)?;
-				let save = eqn.eval_save(&variables).chain_err(|| ErrorKind::CellagentError)?; 
-				(recv, send, save)
-			},
-			None => (false, false, false),
-		};
 // Note that traphs is updated transactionally; I remove an entry, update it, then put it back.
 		let mut traphs = self.traphs.lock().unwrap();
 		let mut traph = match traphs.remove(&tree_id.get_uuid()) { // Avoids lifetime problem
@@ -203,6 +194,16 @@ impl CellAgent {
 				let index = self.clone().use_index().chain_err(|| ErrorKind::CellagentError)?;
 				Traph::new(&self.cell_id, &tree_id, index).chain_err(|| ErrorKind::CellagentError)?
 			}
+		};
+		let (gvm_recv, gvm_send, gvm_save) = match gvm_equation {
+			Some(eqn) => {
+				let variables = self.get_params(&traph, eqn.get_variables())?;
+				let recv = eqn.eval_recv(&variables).chain_err(|| ErrorKind::CellagentError)?;
+				let send = eqn.eval_send(&variables).chain_err(|| ErrorKind::CellagentError)?;
+				let save = eqn.eval_save(&variables).chain_err(|| ErrorKind::CellagentError)?; 
+				(recv, send, save)
+			},
+			None => (false, false, false),
 		};
 		let (hops, path) = match port_status{
 			traph::PortStatus::Child => {
@@ -219,7 +220,7 @@ impl CellAgent {
 		};
 		if gvm_recv { children.insert(PortNumber::new0()); }
 		let entry = traph.new_element(tree_id, port_number, port_status, other_index, children, hops, path).chain_err(|| ErrorKind::CellagentError)?; 
-// Here's the end of the transaction
+		// Here's the end of the transaction
 		//println!("CellAgent {}: entry {}", self.cell_id, entry); 
 		// Need traph even if cell only forwards on this tree
 		traphs.insert(tree_id.get_uuid(), traph);
@@ -229,23 +230,38 @@ impl CellAgent {
 		self.ca_to_pe.send(CaToPePacket::Entry(entry)).chain_err(|| ErrorKind::CellagentError)?;
 		Ok(entry)
 	}
-	pub fn stack_tree(&self, tree_name: &String, black_tree_id: &TreeID, gvm_eqn: &GvmEquation) -> Result<()> {
+	pub fn stack_tree(&mut self, tree_name: &String, parent_tree_uuid: &Uuid, 
+			black_tree_id: &TreeID, gvm_eqn: &GvmEquation) -> Result<()> {
+		let index = self.use_index()?;
 		let locked = self.traphs.lock().unwrap();
 		let uuid = black_tree_id.get_uuid();
 		if let Some(traph) = locked.get(&uuid) {
+			let parent_entry = traph.get_tree_entry(&parent_tree_uuid).chain_err(|| ErrorKind::CellagentError)?;
+			let mut entry = parent_entry.clone();
+			entry.set_table_index(index);
+			let params = self.get_params(&traph, gvm_eqn.get_variables())?;
+			if !gvm_eqn.eval_recv(&params)? { 
+				let mask = entry.get_mask().and(Mask::all_but_zero(self.no_ports));
+				entry.set_mask(mask);
+			}
+			if !gvm_eqn.eval_xtnd(&params)? {
+				entry.clear_children();
+			}	
 			let tree_id = TreeID::new(tree_name).chain_err(|| ErrorKind::CellagentError)?;
-			
+			let tree = Tree::new(&tree_id, black_tree_id, Some(gvm_eqn.clone()), entry);
+			traph.stack_tree(&tree);
+			self.ca_to_pe.send(CaToPePacket::Entry(entry)).chain_err(|| ErrorKind::CellagentError)?;
 		} else {
-			return Err(ErrorKind::Tree(self.cell_id.clone(), uuid).into());
+			return Err(ErrorKind::NoTraph(self.cell_id.clone(), uuid).into());
 		}
 		Ok(())
 	}
-	pub fn get_params(&self, tree_id: &TreeID, vars: &Vec<GvmVariable>) -> Result<Vec<GvmVariable>> {
+	pub fn get_params(&self, traph: &Traph, vars: &Vec<GvmVariable>) -> Result<Vec<GvmVariable>> {
 		let mut variables = Vec::new();
 		for var in vars {
 			match var.get_value().as_ref() {
 				"hops" => {
-					let hops = *(*self.get_hops(tree_id)?);
+					let hops = *(*traph.get_hops()?);
 					variables.push(GvmVariable::new(GvmVariableType::CellNo, hops));
 				},
 				_ => ()
@@ -270,15 +286,18 @@ impl CellAgent {
 				},
 				PeToCaPacket::Packet(port_no, packet) => {
 					let msg_id = packet.get_header().get_msg_id();
-					let packet_assembler = self.packet_assemblers.remove(&msg_id).unwrap_or(PacketAssembler::new(msg_id));
-					if let Some(packets) = packet_assembler.clone().add(packet) {
+					let mut packet_assembler = self.packet_assemblers.remove(&msg_id).unwrap_or(PacketAssembler::new(msg_id));
+					let tree_uuid = packet.get_tree_uuid();
+					let (last_packet, packets) = packet_assembler.add(packet);
+					if last_packet {
 						let (msg_type, serialized_msg) = MsgType::get_type_serialized(packets).chain_err(|| ErrorKind::CellagentError)?;
 						if let Some(mut msg) = self.get_msg(msg_type, serialized_msg)? {
 							//println!("CellAgent {}: got msg {}", self.cell_id, msg);
-							msg.process(&mut self.clone(), port_no).chain_err(|| ErrorKind::CellagentError)?;
+							msg.process(self, tree_uuid, port_no).chain_err(|| ErrorKind::CellagentError)?;
 						};
 					} else {
-						self.packet_assemblers.insert(msg_id, packet_assembler);
+						let assembler = PacketAssembler::create(msg_id, packets);
+						self.packet_assemblers.insert(msg_id, assembler);
 					}
 				}
 			}
@@ -346,7 +365,7 @@ impl CellAgent {
 	}		
 	pub fn forward_saved(&mut self, saved_msgs: &Vec<SavedMsg>, mask: Mask) -> Result<()> {
 		for packets in saved_msgs.iter() {
-			let packet_uuid = packets[0].get_uuid();
+			let packet_uuid = packets[0].get_tree_uuid();
 			// If packet is to this cell's control tree, send out on all connected ports
 			let uuid = if packet_uuid == self.control_tree_id.get_uuid() {
 				self.connected_tree_id.get_uuid()
@@ -423,6 +442,9 @@ error_chain! {
 		}		
 		MessageAssembly(cell_id: CellID) {
 			display("Problem assembling message on cell {}", cell_id)
+		}
+		NoTraph(cell_id: CellID, tree_uuid: Uuid ) {
+			display("A Traph with TreeID {} does not exist on cell {}", tree_uuid, cell_id)
 		}
 		PortTaken(cell_id: CellID, port_no: PortNo) {
 			display("Receiver for port {} has been previously assigned on cell {}", port_no.v, cell_id)

@@ -37,7 +37,7 @@ impl Packet {
 	pub fn get_count(&self) -> usize { self.packet_count }
 	pub fn get_header(&self) -> PacketHeader { self.header }
 	pub fn get_payload(&self) -> Payload { self.payload }
-	pub fn get_uuid(&self) -> Uuid { self.header.get_uuid() }
+	pub fn get_tree_uuid(&self) -> Uuid { self.header.get_tree_uuid() }
 //	pub fn get_payload_bytes(&self) -> Vec<u8> { self.get_payload().get_bytes() }
 //	pub fn get_payload_size(&self) -> usize { self.payload.get_no_bytes() }
 }
@@ -83,7 +83,7 @@ impl PacketHeader {
 		ph
 	}
 	pub fn get_msg_id(&self) -> MsgID { self.msg_id }
-	pub fn get_uuid(&self) -> Uuid { self.uuid }
+	pub fn get_tree_uuid(&self) -> Uuid { self.uuid }
 	pub fn get_size(&self) -> PacketNo { self.size }
 	pub fn is_leafcast(&self) -> bool { (self.flags & 1) == 1 }
 	pub fn is_rootcast(&self) -> bool { !self.is_leafcast() }
@@ -211,15 +211,22 @@ impl PacketAssembler {
 	pub fn new(msg_id: MsgID) -> PacketAssembler {
 		PacketAssembler { msg_id: msg_id, packets: Vec::new() }
 	}
+	pub fn create(msg_id: MsgID, packets: &Vec<Packet>) -> PacketAssembler {
+		PacketAssembler { msg_id: msg_id, packets: packets.clone() }
+	}
 	pub fn get_msg_id(&self) -> MsgID { self.msg_id }
-	pub fn add(&mut self, packet: Packet) -> Option<&Vec<Packet>> { 
+	pub fn get_packets(&self) -> &Vec<Packet> { &self.packets }
+	pub fn get_tree_uuid(&self) -> Option<Uuid> { 
+		if let Some(packet) = self.packets.get(0) {
+			Some(packet.get_header().get_tree_uuid())
+		} else {
+			None 
+		}
+	}
+	pub fn add(&mut self, packet: Packet) -> (bool, &Vec<Packet>) { 
 		self.packets.push(packet); 
 		let header = packet.get_header();
-		if header.is_last_packet() {
-			Some(&self.packets)
-		} else {
-			None
-		}
+		(header.is_last_packet(), &self.packets)
 	}
 }
 // Errors
