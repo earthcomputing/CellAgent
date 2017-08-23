@@ -11,13 +11,14 @@ pub struct GvmEquation {
 	recv_eqn: GvmEqn,        // If true, add to traph and set "up" bit
 	send_eqn: GvmEqn,        // If true, add to traph
 	save_eqn: GvmEqn,		 // If true, save the message for future ports being connected
+	xtnd_eqn: GvmEqn,		 // If true, propagate message
 	variables: Vec<GvmVariable>  // Local variables used in the two equations
 }
 // Sample GvmEquation: "hops < 7 || n_childen == 0", ["hops", "n_children"]
 impl GvmEquation {
-	pub fn new(recv: &str, send: &str, save: &str, variables: Vec<GvmVariable>) -> GvmEquation { 
+	pub fn new(recv: &str, send: &str, save: &str, xtnd: &str, variables: Vec<GvmVariable>) -> GvmEquation { 
 		GvmEquation { recv_eqn: recv.to_string(), send_eqn: send.to_string(), 
-			save_eqn: save.to_string(), variables: variables }
+			save_eqn: save.to_string(), xtnd_eqn: xtnd.to_string(), variables: variables }
 	}
 	pub fn get_variables(&self) -> &Vec<GvmVariable> { &self.variables }
 	pub fn eval_recv(&self, params: &Vec<GvmVariable>) -> Result<bool> {
@@ -28,6 +29,9 @@ impl GvmEquation {
 	}
 	pub fn eval_save(&self, params: &Vec<GvmVariable>) -> Result<bool> {
 		self.evaluate(&self.save_eqn, params)
+	}
+	pub fn eval_xtnd(&self, params: &Vec<GvmVariable>) -> Result<bool> {
+		self.evaluate(&self.xtnd_eqn, params)
 	}
 	fn evaluate(&self, eqn: &GvmEqn, params: &Vec<GvmVariable>) -> Result<bool> {
 		let mut expr = Expr::new(eqn.clone());

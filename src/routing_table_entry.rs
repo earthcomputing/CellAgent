@@ -51,8 +51,14 @@ impl RoutingTableEntry {
 		let mask = Mask::make(children);
 		self.or_with_mask(mask);
 	}
+	pub fn clear_children(&mut self) {
+		self.and_with_mask(Mask::new0())
+	}
 	pub fn set_parent(&mut self, port_number: PortNumber) {
 		self.parent = port_number.get_port_no();
+	}
+	pub fn set_table_index(&mut self, index: TableIndex) {
+		self.index = index;
 	}
 }
 impl fmt::Display for RoutingTableEntry {
