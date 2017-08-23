@@ -305,7 +305,6 @@ impl StackTreeMsg {
 			match variable.get_value().as_ref() {
 				"hops" => {
 					let hops = ca.get_hops(&tree_id)?;
-					let gvm_var = GvmVariable::new(GvmVariableType::CellNo, **hops);
 				},
 				_ => ()
 			}
@@ -317,13 +316,17 @@ impl Message for StackTreeMsg {
 	fn get_header(&self) -> &MsgHeader { &self.header }
 	fn get_payload(&self) -> &MsgPayload { &self.payload }
 	fn process(&mut self, ca: &mut CellAgent, tree_uuid: Uuid, port_no: PortNo) -> Result<()> {
-		println!("Stack tree msg {}", self);
+		//println!("Stack tree msg {}", self);
 		let tree_map = self.header.get_tree_map();
 		let tree_name = self.payload.get_tree_name();
 		let gvm_eqn = self.payload.get_gvm_eqn();
 		let black_tree_name = self.payload.get_black_tree_name();
 		if let Some(black_tree_id) = tree_map.get(black_tree_name) {
-			ca.stack_tree(tree_name, &tree_uuid, black_tree_id, gvm_eqn).chain_err(|| ErrorKind::MessageError)?;			
+			if let Some(tree_id) = tree_map.get(tree_name) {
+				ca.stack_tree(&tree_id, &tree_uuid, black_tree_id, gvm_eqn).chain_err(|| ErrorKind::MessageError)?;
+			} else {
+				return Err(ErrorKind::TreeMapEntry(tree_name.to_string()).into());
+			}			
 		} else {
 			return Err(ErrorKind::TreeMapEntry(black_tree_name.to_string()).into());
 		}
@@ -344,7 +347,7 @@ pub struct StackTreeMsgPayload {
 impl StackTreeMsgPayload {
 	fn new(tree_id: &TreeID, base_tree_name: String) -> Result<StackTreeMsgPayload> {
 		let mut gvm_vars = Vec::new();
-		gvm_vars.push(GvmVariable::new(GvmVariableType::CellNo, "hops"));
+		gvm_vars.push(GvmVariable::new(GvmVariableType::PathLength, "hops"));
 		let gvm_eqn = GvmEquation::new("hops == 0", "true", "true", "true", gvm_vars);
 		Ok(StackTreeMsgPayload { tree_name: tree_id.stringify(), black_tree_name: base_tree_name, 
 				gvm_eqn: gvm_eqn })

@@ -35,7 +35,7 @@ impl Mask {
 	pub fn new0() -> Mask { Mask { mask: MaskValue(1) } }
 	pub fn empty() -> Mask { Mask { mask: MaskValue(0) } }
 	pub fn all_but_zero(no_ports: PortNo) -> Mask { 
-		Mask { mask: MaskValue((2 as u16).pow(no_ports.v as u32)-1) }
+		Mask { mask: MaskValue((2 as u16).pow(no_ports.v as u32)-2) }
 	}
 	pub fn equal(&self, other: Mask) -> bool { *self.mask == *other.mask }
 	pub fn get_as_value(&self) -> MaskValue { self.mask }
