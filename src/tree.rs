@@ -43,9 +43,9 @@ impl Tree {
 }
 impl fmt::Display for Tree {
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-		let mut s = format!("Stacked TreeID {}\n", self.tree_id);
+		let mut s = format!("TreeID {}, ", self.tree_id);
 		match self.gvm_eqn {
-			Some(ref eqn) => s = s + &format!("GVM Equations: {}", eqn),
+			Some(ref eqn) => s = s + &format!("{}", eqn),
 			None => s = s + &format!("No GVM equation")
 		};
 		for stacked in &self.stacked_tree_ids {

@@ -128,14 +128,19 @@ impl Traph {
 		tree.set_table_entry(entry);
 		Ok(())		
 	}
-	pub fn stack_tree(&self, tree: &Tree) {
-		
+	pub fn stack_tree(&mut self, tree: &Tree) {
+		self.stacked_trees.lock().unwrap().insert(tree.get_uuid(), tree.clone());
 	}
 }
 impl fmt::Display for Traph {
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result { 
-		let mut s = format!("Traph for Black TreeID {}", 
+		let mut s = format!("Traph {}", 
 			self.black_tree_id);
+		s = s + &format!("\nStacked Trees");
+		let locked = self.stacked_trees.lock().unwrap();
+		for tree in locked.values() {
+			s = s + &format!("\n{}", tree);
+		}
 		s = s + &format!("\nPort Other Connected Broken Status Hops Path");
 		// Can't replace with map() because s gets moved into closure 
 		for element in self.elements.iter() { 

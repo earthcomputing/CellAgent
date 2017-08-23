@@ -3,7 +3,7 @@ use std::fmt;
 use serde_json;
 use eval::{eval, Expr, to_value};
 
-use config::CellNo;
+use config::{CellNo, PathLength};
 
 type GvmEqn = String;
 #[derive(Debug, Clone, Hash, Serialize, Deserialize)]
@@ -38,12 +38,16 @@ impl GvmEquation {
 		for variable in params.iter() {
 			let var_type = variable.get_type();
 			let str_value = variable.get_value();
-			let value = match *var_type {
+			match *var_type {
 				GvmVariableType::CellNo => {
-					let val: CellNo = serde_json::from_str(&str_value).chain_err(|| ErrorKind::GvmEquationError)?;
-				}
+					let value = serde_json::from_str::<CellNo>(&str_value).chain_err(|| ErrorKind::GvmEquationError)?;
+					expr = expr.clone().value(variable.get_value(), value);					
+				},
+				GvmVariableType::PathLength => {
+					let value = serde_json::from_str::<PathLength>(&str_value).chain_err(|| ErrorKind::GvmEquationError)?;
+					expr = expr.clone().value(variable.get_value(), value);
+				},
 			};
-			expr = expr.clone().value(variable.get_value(), value);
 		}
 		let result = expr.exec().chain_err(|| ErrorKind::GvmEquationError)?;
 		Ok(result == to_value(true))
@@ -51,20 +55,26 @@ impl GvmEquation {
 }
 impl fmt::Display for GvmEquation {
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-		write!(f, "GvmEquation: receive {}, send {}, save {}, variables {:?}", 
-			self.recv_eqn, self.send_eqn, self.save_eqn, self.variables)
+		let mut s = format!("Gvm: receive {}, send {}, extend {}, save {}, Variables:", 
+			self.recv_eqn, self.send_eqn, self.save_eqn, self.xtnd_eqn);
+		for variable in self.variables.iter() {
+			s = s + &format!(" {} ", variable);
+		}
+		write!(f, "{}", s)
 	}
 }
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize)]
 pub enum GvmVariableType {
-	CellNo
+	CellNo,
+	PathLength
 }
 impl fmt::Display for GvmVariableType {
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
 		let s = match *self {
-			GvmVariableType::CellNo => "CellNo"
+			GvmVariableType::CellNo => "CellNo",
+			GvmVariableType::PathLength => "PathLength",
 		};
-		write!(f, "Type {}", s)
+		write!(f, "{}", s)
 	}
 }
 #[derive(Debug, Clone, Eq, PartialEq,Hash, Serialize, Deserialize)]
@@ -81,7 +91,7 @@ impl GvmVariable {
 }
 impl fmt::Display for GvmVariable { 
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result { 
-		write!(f, "{}, value {}", self.var_type, self.value) }
+		write!(f, "{}::{}", self.value, self.var_type) }
 }
 error_chain! {
 	foreign_links {

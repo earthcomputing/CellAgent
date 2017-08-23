@@ -230,15 +230,16 @@ impl CellAgent {
 		self.ca_to_pe.send(CaToPePacket::Entry(entry)).chain_err(|| ErrorKind::CellagentError)?;
 		Ok(entry)
 	}
-	pub fn stack_tree(&mut self, tree_name: &String, parent_tree_uuid: &Uuid, 
+	pub fn stack_tree(&mut self, tree_id: &TreeID, parent_tree_uuid: &Uuid, 
 			black_tree_id: &TreeID, gvm_eqn: &GvmEquation) -> Result<()> {
 		let index = self.use_index()?;
-		let locked = self.traphs.lock().unwrap();
+		let mut locked = self.traphs.lock().unwrap();
 		let uuid = black_tree_id.get_uuid();
-		if let Some(traph) = locked.get(&uuid) {
+		if let Some(mut traph) = locked.remove(&uuid) {
 			let parent_entry = traph.get_tree_entry(&parent_tree_uuid).chain_err(|| ErrorKind::CellagentError)?;
 			let mut entry = parent_entry.clone();
 			entry.set_table_index(index);
+			entry.set_uuid(&tree_id.get_uuid());
 			let params = self.get_params(&traph, gvm_eqn.get_variables())?;
 			if !gvm_eqn.eval_recv(&params)? { 
 				let mask = entry.get_mask().and(Mask::all_but_zero(self.no_ports));
@@ -247,9 +248,9 @@ impl CellAgent {
 			if !gvm_eqn.eval_xtnd(&params)? {
 				entry.clear_children();
 			}	
-			let tree_id = TreeID::new(tree_name).chain_err(|| ErrorKind::CellagentError)?;
 			let tree = Tree::new(&tree_id, black_tree_id, Some(gvm_eqn.clone()), entry);
 			traph.stack_tree(&tree);
+			locked.insert(tree_id.get_uuid(), traph);
 			self.ca_to_pe.send(CaToPePacket::Entry(entry)).chain_err(|| ErrorKind::CellagentError)?;
 		} else {
 			return Err(ErrorKind::NoTraph(self.cell_id.clone(), uuid).into());
@@ -321,6 +322,7 @@ impl CellAgent {
 		if is_border {
 			println!("CellAgent {}: port {} is a border port", self.cell_id, *port_no);
 			let tree_id = self.my_tree_id.add_component("Outside").chain_err(|| ErrorKind::CellagentError)?;
+			let ref my_tree_id = self.my_tree_id.clone();
 			let msg = StackTreeMsg::new(&tree_id, &self.my_tree_id).chain_err(|| ErrorKind::CellagentError)?;
 			let direction = msg.get_header().get_direction();
 			let bytes = Serializer::serialize(&msg).chain_err(|| ErrorKind::CellagentError).chain_err(|| ErrorKind::CellagentError)?;
@@ -330,6 +332,8 @@ impl CellAgent {
 			for packet in packets {
 				self.ca_to_pe.send(CaToPePacket::Packet((my_index, port_no_mask, packet))).chain_err(|| ErrorKind::CellagentError)?;			
 			}
+			let gvm_eqn = GvmEquation::new("true", "true", "true", "true", Vec::new());
+			self.stack_tree(&tree_id, &my_tree_id.get_uuid(), my_tree_id, &gvm_eqn)?;
 		} else {
 			let port_no_mask = Mask::new(PortNumber::new(port_no, self.no_ports).chain_err(|| ErrorKind::CellagentError)?);
 			let path = Path::new(port_no, self.no_ports).chain_err(|| ErrorKind::CellagentError)?;

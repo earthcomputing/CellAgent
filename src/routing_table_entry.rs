@@ -28,6 +28,7 @@ impl RoutingTableEntry {
 	pub fn is_in_use(&self) -> bool { self.inuse }
 	pub fn get_index(&self) -> TableIndex { self.index }
 	pub fn get_uuid(&self) -> Uuid { self.uuid }
+	pub fn set_uuid(&mut self, uuid: &Uuid) { self.uuid = *uuid; }
 	pub fn or_with_mask(&mut self, mask: Mask) { self.mask = self.mask.or(mask); }
 	pub fn and_with_mask(&mut self, mask: Mask) { self.mask = self.mask.and(mask); }
 	pub fn set_inuse(&mut self) { self.inuse = true; }
