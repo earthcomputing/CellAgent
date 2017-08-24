@@ -10,6 +10,7 @@ use utility::{Mask, PortNumber};
 pub struct RoutingTableEntry {
 	index: TableIndex,
 	uuid: Uuid,
+	may_send: bool, 
 	inuse: bool,
 	parent: PortNo,
 	mask: Mask,
@@ -17,15 +18,18 @@ pub struct RoutingTableEntry {
 }
 impl RoutingTableEntry {
 	pub fn new(index: TableIndex, tree_id: &TreeID, inuse: bool, parent: PortNumber, mask: Mask, 
-			other_indices: [TableIndex; MAX_PORTS.v as usize]) -> RoutingTableEntry {
+			may_send: bool, other_indices: [TableIndex; MAX_PORTS.v as usize]) -> RoutingTableEntry {
 		RoutingTableEntry { index: index, uuid: tree_id.get_uuid(), parent: parent.get_port_no(),
-			inuse: inuse, mask: mask, other_indices: other_indices }
+			may_send: may_send, inuse: inuse, mask: mask, other_indices: other_indices }
 	}
 	pub fn default(index: TableIndex) -> Result<RoutingTableEntry> {
 		let port_number = PortNumber::new(PortNo{v:0}, MAX_PORTS).chain_err(|| ErrorKind::RoutingTableEntryError)?;
-		Ok(RoutingTableEntry::new(index, &TreeID::new("Default")?, false, port_number, Mask::empty(), [TableIndex(0); MAX_PORTS.v as usize]))
+		Ok(RoutingTableEntry::new(index, &TreeID::new("Default")?, false, port_number, Mask::empty(), false, [TableIndex(0); MAX_PORTS.v as usize]))
 	}
 	pub fn is_in_use(&self) -> bool { self.inuse }
+	pub fn may_send(&self) -> bool { self.may_send }
+	pub fn enable_send(&mut self) { self.may_send = true; }
+	pub fn disable_send(&mut self) { self.may_send = false; }
 	pub fn get_index(&self) -> TableIndex { self.index }
 	pub fn get_uuid(&self) -> Uuid { self.uuid }
 	pub fn set_uuid(&mut self, uuid: &Uuid) { self.uuid = *uuid; }
@@ -70,6 +74,8 @@ impl fmt::Display for RoutingTableEntry {
 		s = s + &format!(" {:8?}", uuid);
 		if self.inuse { s = s + &format!("  Yes  ") }
 		else          { s = s + &format!("  No   ") }
+		if self.may_send { s = s + &format!("  Yes ") }
+		else             { s = s + &format!("  No  ") }
 		s = s + &format!("{:7}", self.parent.v);
 		s = s + &format!("{}", self.mask);
 		let mut other_indices = Vec::new();
