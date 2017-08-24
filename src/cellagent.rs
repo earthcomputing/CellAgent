@@ -219,7 +219,8 @@ impl CellAgent {
 			_ => traph_status  // Don't replace if Parent or Child
 		};
 		if gvm_recv { children.insert(PortNumber::new0()); }
-		let entry = traph.new_element(tree_id, port_number, port_status, other_index, children, hops, path).chain_err(|| ErrorKind::CellagentError)?; 
+		let mut entry = traph.new_element(tree_id, port_number, port_status, other_index, children, hops, path).chain_err(|| ErrorKind::CellagentError)?; 
+		if gvm_send { entry.enable_send() } else { entry.disable_send() }
 		// Here's the end of the transaction
 		//println!("CellAgent {}: entry {}", self.cell_id, entry); 
 		// Need traph even if cell only forwards on this tree
@@ -245,9 +246,8 @@ impl CellAgent {
 				let mask = entry.get_mask().and(Mask::all_but_zero(self.no_ports));
 				entry.set_mask(mask);
 			}
-			if !gvm_eqn.eval_xtnd(&params)? {
-				entry.clear_children();
-			}	
+			if !gvm_eqn.eval_xtnd(&params)? { entry.clear_children(); }
+			if gvm_eqn.eval_send(&params)? { entry.enable_send(); } else { entry.disable_send(); }
 			let tree = Tree::new(&tree_id, black_tree_id, Some(gvm_eqn.clone()), entry);
 			traph.stack_tree(&tree);
 			locked.insert(tree_id.get_uuid(), traph);
@@ -332,7 +332,7 @@ impl CellAgent {
 			for packet in packets {
 				self.ca_to_pe.send(CaToPePacket::Packet((my_index, port_no_mask, packet))).chain_err(|| ErrorKind::CellagentError)?;			
 			}
-			let gvm_eqn = GvmEquation::new("true", "true", "true", "true", Vec::new());
+			let gvm_eqn = GvmEquation::new("true", "false", "true", "true", Vec::new());
 			self.stack_tree(&tree_id, &my_tree_id.get_uuid(), my_tree_id, &gvm_eqn)?;
 		} else {
 			let port_no_mask = Mask::new(PortNumber::new(port_no, self.no_ports).chain_err(|| ErrorKind::CellagentError)?);
