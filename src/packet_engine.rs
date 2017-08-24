@@ -49,7 +49,7 @@ impl PacketEngine {
 					let locked = self.routing_table.lock().unwrap();	// Hold lock until forwarding is done			
 					let entry = locked.get_entry(index).chain_err(|| ErrorKind::PacketEngineError)?;
 					let port_no = PortNo{v:0};
-					self.forward(port_no, entry, user_mask, packet).chain_err(|| ErrorKind::PacketEngineError)?;
+					if entry.may_send() { self.forward(port_no, entry, user_mask, packet).chain_err(|| ErrorKind::PacketEngineError)?; }
 				}
 			}; 
 		}
