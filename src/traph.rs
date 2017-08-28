@@ -63,13 +63,12 @@ impl Traph {
 				_ => ()
 			}
 		}
-		Err(ErrorKind::Parent(self.cell_id.clone(), self.black_tree_id.clone()).into())
+		println!("+++ Cell {}: {}", self.cell_id, self);
+		Ok(&self.elements[0])//Err(ErrorKind::ParentElement(self.cell_id.clone(), self.black_tree_id.clone()).into())
 	}
 	pub fn get_hops(&self) -> Result<PathLength> {
-		for element in self.elements.clone() {
-			if element.get_status() == PortStatus::Parent { return Ok(element.get_hops()); }
-		}
-		Err(ErrorKind::NoParent(self.cell_id.clone(), self.black_tree_id.clone()).into())	
+		let element = self.get_parent_element()?;
+		return Ok(element.get_hops()); 
 	}
 	pub fn is_leaf(&self) -> bool {
 		for element in self.elements.clone() {
@@ -123,7 +122,10 @@ impl Traph {
 		let mut locked = self.stacked_trees.lock().unwrap();
 		let mut tree = match locked.get(&tree_id.get_uuid()) {
 			Some(tree) => tree.clone(),
-			None => return Err(ErrorKind::Tree(self.cell_id.clone(), tree_id.get_uuid()).into())
+			None => {
+				println!("--- Cell {}: Traph {}: tree_id {}", self.cell_id, self.black_tree_id, tree_id);
+				return Err(ErrorKind::Tree(self.cell_id.clone(), tree_id.get_uuid()).into());
+			}
 		};
 		tree.set_table_entry(entry);
 		Ok(())		
@@ -136,10 +138,10 @@ impl fmt::Display for Traph {
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result { 
 		let mut s = format!("Traph {}", 
 			self.black_tree_id);
-		s = s + &format!("\nStacked Trees");
+		s = s + &format!("\n  Stacked Trees");
 		let locked = self.stacked_trees.lock().unwrap();
 		for tree in locked.values() {
-			s = s + &format!("\n{}", tree);
+			s = s + &format!("\n  {}", tree);
 		}
 		s = s + &format!("\nPort Other Connected Broken Status Hops Path");
 		// Can't replace with map() because s gets moved into closure 
@@ -176,11 +178,8 @@ error_chain! {
 		Lookup(cell_id: CellID, port_number: PortNumber) {
 			display("Traph on cell {}: No traph entry for port {}", cell_id, port_number)
 		}
-		NoParent(cell_id: CellID, tree_id: TreeID) {
-			display("Traph on cell {}: No parent for tree {}", cell_id, tree_id)
-		}
-		Parent(cell_id: CellID, tree_id: TreeID) {
-			display("Traph on cell {}: No parent for tree {}", cell_id, tree_id)
+		ParentElement(cell_id: CellID, tree_id: TreeID) {
+			display("Traph on cell {}: No parent element for tree {}", cell_id, tree_id)
 		}
 		Tree(cell_id: CellID, tree_uuid: Uuid) {
 			display("Traph on cell {}: No tree with UUID {}", cell_id, tree_uuid)
