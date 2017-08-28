@@ -1,7 +1,6 @@
-use std::collections::HashMap;
 use std::fmt;
 use serde_json;
-use eval::{eval, Expr, to_value};
+use eval::{Expr, to_value};
 
 use config::{CellNo, PathLength};
 

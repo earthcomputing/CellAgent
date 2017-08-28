@@ -29,7 +29,7 @@ impl Deref for PortNo { type Target = u8; fn deref(&self) -> &Self::Target { &se
 #[derive(Debug, Copy, Clone, Hash, Eq, PartialEq, Serialize, Deserialize)]
 pub struct TableIndex(pub u32);
 impl Deref for TableIndex { type Target = u32; fn deref(&self) -> &Self::Target { &self.0 } }
-#[derive(Debug, Copy, Clone, Hash, Eq, PartialEq)]
+#[derive(Debug, Copy, Clone, Hash, Eq, PartialEq, Serialize, Deserialize)]
 pub struct MsgID(pub u64);
 impl Deref for MsgID { type Target = u64; fn deref(&self) -> &Self::Target { &self.0 } }
 #[derive(Debug, Copy, Clone)]

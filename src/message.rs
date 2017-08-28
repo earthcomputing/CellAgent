@@ -6,7 +6,7 @@ use serde_json;
 use uuid::Uuid;
 
 use cellagent::{CellAgent};
-use config::{MAX_PORTS, CellNo, PathLength, PortNo, TableIndex};
+use config::{MAX_PORTS, CellNo, MsgID, PathLength, PortNo, TableIndex};
 use container::Service;
 use gvm_equation::{GvmEquation, GvmVariable, GvmVariableType};
 use name::{Name, CellID, TreeID, UpTraphID};
@@ -15,7 +15,7 @@ use traph;
 use utility::{DEFAULT_USER_MASK, Mask, Path, PortNumber};
 
 static MESSAGE_COUNT: AtomicUsize = ATOMIC_USIZE_INIT;
-pub fn get_next_count() -> usize { MESSAGE_COUNT.fetch_add(1, Ordering::SeqCst) } 
+pub fn get_next_count() -> MsgID { MsgID(MESSAGE_COUNT.fetch_add(1, Ordering::SeqCst) as u64) } 
 #[derive(Debug, Clone, Hash, Serialize, Deserialize)]
 pub struct TypePlusMsg {
 	msg_type: MsgType,
@@ -80,6 +80,7 @@ pub trait Message: fmt::Display {
 		}
 	}
 	fn is_leafward(&self) -> bool { !self.is_rootward() }
+	fn get_count(&self) -> MsgID { self.get_header().get_count() }
 	fn get_tree_id(&self, tree_name: String) -> Result<&TreeID> {
 		let tree_map = self.get_header().get_tree_map();
 		Ok(match tree_map.get(&tree_name) {
@@ -94,7 +95,7 @@ type TreeMap = HashMap<String, TreeID>;
 #[derive(Debug, Clone, Serialize, Deserialize)]
 // Header may not contain '{' or '}' or a separate object, such as TreeID
 pub struct MsgHeader {
-	msg_count: usize,
+	msg_count: MsgID,
 	msg_type: MsgType,
 	direction: MsgDirection,
 	tree_map: TreeMap
@@ -105,14 +106,14 @@ impl MsgHeader {
 		MsgHeader { msg_type: msg_type, direction: direction, msg_count: msg_count, tree_map: tree_map }
 	}
 	pub fn get_msg_type(&self) -> MsgType { self.msg_type }
-	pub fn get_count(&self) -> usize { self.msg_count }
+	pub fn get_count(&self) -> MsgID { self.msg_count }
 	pub fn get_direction(&self) -> MsgDirection { self.direction }
 	pub fn get_tree_map(&self) -> &TreeMap { &self.tree_map }
 	//pub fn set_direction(&mut self, direction: MsgDirection) { self.direction = direction; }
 }
 impl fmt::Display for MsgHeader { 
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result { 
-		let s = format!("Message {} {} '{}'", self.msg_count, self.msg_type, self.direction);
+		let s = format!("Message {} {} '{}'", *self.msg_count, self.msg_type, self.direction);
 		write!(f, "{}", s) 
 	}
 }
@@ -163,17 +164,17 @@ impl Message for DiscoverMsg {
 					children, senders_index, hops, Some(path)).chain_err(|| ErrorKind::MessageError)?;
 			if exists { 
 				return Ok(()); // Don't forward if traph exists for this tree - Simple quenching
-		}
-		my_index = entry.get_index();
-		// Send DiscoverD to sender
-		let discoverd_msg = DiscoverDMsg::new(new_tree_id.clone(), my_index);
-		let direction = discoverd_msg.get_header().get_direction();
-		let bytes = Serializer::serialize(&discoverd_msg).chain_err(|| ErrorKind::MessageError)?;
-		let packets = Packetizer::packetize(&ca.get_connected_ports_tree_id(), bytes, direction).chain_err(|| ErrorKind::MessageError)?;
-		//println!("DiscoverMsg {}: sending discoverd for tree {} packet {} {}",ca.get_id(), new_tree_id, packets[0].get_count(), discoverd_msg);
-		let mask = Mask::new(port_number);
-		ca.send_msg(ca.get_connected_ports_tree_id().get_uuid(), &packets, mask).chain_err(|| ErrorKind::MessageError)?;
-		// Forward Discover on all except port_no with updated hops and path
+			}
+			my_index = entry.get_index();
+			// Send DiscoverD to sender
+			let discoverd_msg = DiscoverDMsg::new(new_tree_id.clone(), my_index);
+			let direction = discoverd_msg.get_header().get_direction();
+			let bytes = Serializer::serialize(&discoverd_msg).chain_err(|| ErrorKind::MessageError)?;
+			let packets = Packetizer::packetize(&ca.get_connected_ports_tree_id(), bytes, direction).chain_err(|| ErrorKind::MessageError)?;
+			//println!("DiscoverMsg {}: sending discoverd for tree {} packet {} {}",ca.get_id(), new_tree_id, packets[0].get_count(), discoverd_msg);
+			let mask = Mask::new(port_number);
+			ca.send_msg(ca.get_connected_ports_tree_id().get_uuid(), &packets, mask).chain_err(|| ErrorKind::MessageError)?;
+			// Forward Discover on all except port_no with updated hops and path
 		}
 		self.update_discover_msg(ca.get_id(), my_index);
 		let control_tree_index = 0;
@@ -280,7 +281,7 @@ impl DiscoverDPayload {
 impl MsgPayload for DiscoverDPayload {}
 impl fmt::Display for DiscoverDPayload {
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-		write!(f, "My table index {}", *self.my_index)
+		write!(f, "My table index {} for tree {}", *self.my_index, self.tree_name)
 	}
 }
 #[derive(Debug, Clone, Serialize, Deserialize)]
