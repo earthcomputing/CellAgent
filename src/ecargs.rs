@@ -12,7 +12,7 @@ impl ECArgs {
 		if *nports < (*MAX_PORTS - 1) {
 			Ok(ECArgs { nports: nports as PortNo, ncells: ncells, nlinks: LinkNo(CellNo(*nlinks)) })
 		} else {
-			Err(ErrorKind::NumberPorts(nports).into())
+			Err(ErrorKind::NumberPorts(nports, "new".to_string()).into())
 		}	
 	}
 //	pub fn get_nports(&self) -> u8 { return self.nports }
@@ -60,8 +60,8 @@ impl fmt::Display for ECArgs {
 // Errors
 error_chain! {
 	errors { 
-		NumberPorts(n: PortNo) {
-			display("ECArgs: You asked for {} ports, but only {} are allowed", n.v, MAX_PORTS.v)			
+		NumberPorts(n: PortNo, func_name: String) {
+			display("{}: ECArgs: You asked for {} ports, but only {} are allowed", func_name, n.v, *MAX_PORTS)			
 		}
 	}
 }

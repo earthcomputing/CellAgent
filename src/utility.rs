@@ -84,7 +84,7 @@ pub struct PortNumber { pub port_no: PortNo }
 impl PortNumber {
 	pub fn new(no: PortNo, no_ports: PortNo) -> Result<PortNumber> {
 		if no.v > no_ports.v {
-			Err(ErrorKind::PortNumber(no, no_ports).into())
+			Err(ErrorKind::PortNumber(no, "PortNumber::new".to_string(), no_ports).into())
 		} else {
 			Ok(PortNumber { port_no: (no as PortNo) })
 		}
@@ -112,14 +112,14 @@ impl fmt::Display for Path {
 use name::CellID;
 error_chain! {
 	errors { UtilityError
-		Mask(cell_id: CellID) {
-			display("Utility: Cell {} has no tenant mask", cell_id)
+		Mask(cell_id: CellID, func_name: String) {
+			display("{}: Utility: Cell {} has no tenant mask", func_name, cell_id)
 		}
-		PortNumber(port_no: PortNo, max: PortNo) {
-			display("Utility: Port number {} is larger than the maximum of {}", port_no.v, max.v)
+		PortNumber(port_no: PortNo, func_name: String, max: PortNo) {
+			display("{}: Utility: Port number {} is larger than the maximum of {}", func_name, port_no.v, max.v)
 		}
-		Unimplemented(feature: String) {
-			display("Utility: {} is not implemented", feature)
+		Unimplemented(feature: String, func_name: String) {
+			display("{}: Utility: {} is not implemented", func_name, feature)
 		}
 	}
 }

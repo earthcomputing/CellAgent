@@ -236,11 +236,11 @@ error_chain! {
 		Utf8(::std::str::Utf8Error);
 	}
 	errors { PacketError 
-		Size(size: usize) {
-			display("Packet: {} is not a valid packet size", size)
+		Size(size: usize, func_name: String) {
+			display("{}: Packet: {} is not a valid packet size", func_name, size)
 		}
-		Unpacketize(serialized: String) {
-			display("Packet: Cannot deserialize {}", serialized)
+		Unpacketize(serialized: String, func_name: String) {
+			display("{}: Packet: Cannot deserialize {}", func_name, serialized)
 		}
 	}
 }

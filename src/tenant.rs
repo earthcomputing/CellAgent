@@ -33,7 +33,7 @@ impl Tenant {
 //	}
 	pub fn create_subtenant(&mut self, id: &'static str, n: CellNo) -> Result<Tenant> {
 		if *self.ncells < *n {
-			Err(ErrorKind::Quota(n, self.ncells).into())
+			Err(ErrorKind::Quota(n, "create_subtenant".to_string(), self.ncells).into())
 		} else {
 			let tenant = Tenant::new(id, n, Some(self.get_id()));
 			match tenant {	
@@ -42,7 +42,7 @@ impl Tenant {
 						self.children.insert(t.get_id(),Box::new(t.clone()));
 						Ok(t)	
 					} else { 
-						Err(ErrorKind::DuplicateName(id.to_string()).into()) 
+						Err(ErrorKind::DuplicateName(id.to_string(), "create_subtenant".to_string()).into()) 
 					}
 				},
 				Err(_) => tenant
@@ -65,11 +65,11 @@ error_chain! {
 		Name(::name::Error, ::name::ErrorKind);
 	}
 	errors { TenantError
-		DuplicateName(tenant_id: String) {
-			display("Tenant: A tenant named '{}' already exists.", tenant_id)
+		DuplicateName(tenant_id: String, func_name: String) {
+			display("{}: Tenant: A tenant named '{}' already exists.", func_name, tenant_id)
 		}
-		Quota(request: CellNo, available: CellNo) {
-			display("Tenant: You asked for {} cells, but only {} are available", request.0, available.0)
+		Quota(request: CellNo, func_name: String, available: CellNo) {
+			display("{}: Tenant: You asked for {} cells, but only {} are available", func_name, request.0, available.0)
 		}
 	}
 }
