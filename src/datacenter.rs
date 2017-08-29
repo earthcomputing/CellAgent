@@ -24,8 +24,8 @@ impl Datacenter {
 	}
 	pub fn initialize(&mut self, ncells: CellNo, nports: PortNo, edge_list: Vec<Edge>,
 			cell_type: CellType) -> Result<Vec<JoinHandle<()>>> {
-		if ncells.0 < 1  { return Err(ErrorKind::Cells(ncells).into()); }
-		if edge_list.len() < ncells.0 - 1 { return Err(ErrorKind::Edges(LinkNo(CellNo(edge_list.len()))).into()); }
+		if ncells.0 < 1  { return Err(ErrorKind::Cells(ncells, "initialize".to_string()).into()); }
+		if edge_list.len() < ncells.0 - 1 { return Err(ErrorKind::Edges(LinkNo(CellNo(edge_list.len())), "initialize".to_string()).into()); }
 		for i in 0..ncells.0 {
 			let is_border = (i % 3) == 1;
 			let cell = NalCell::new(CellNo(i), nports, is_border, cell_type).chain_err(|| ErrorKind::DatacenterError)?;
@@ -33,18 +33,18 @@ impl Datacenter {
 		}
 		let mut link_handles = Vec::new();
 		for edge in edge_list {
-			if *(edge.v.0) == *(edge.v.1) { return Err(ErrorKind::Wire(edge).into()); }
-			if (*(edge.v.0) > ncells.0) | (*(edge.v.1) >= ncells.0) { return Err(ErrorKind::Wire(edge).into()); }
+			if *(edge.v.0) == *(edge.v.1) { return Err(ErrorKind::Wire(edge, "initialize".to_string()).into()); }
+			if (*(edge.v.0) > ncells.0) | (*(edge.v.1) >= ncells.0) { return Err(ErrorKind::Wire(edge, "initialize".to_string()).into()); }
 			let split = self.cells.split_at_mut(max(*(edge.v.0),*(edge.v.1)));
 			let mut cell = match split.0.get_mut(*(edge.v.0)) {
 				Some(c) => c,
-				None => return Err(ErrorKind::Wire(edge).into())
+				None => return Err(ErrorKind::Wire(edge, "initialize".to_string()).into())
 
 			};
 			let (left,left_from_pe) = cell.get_free_ec_port_mut().chain_err(|| ErrorKind::DatacenterError)?;
 			let mut cell = match split.1.first_mut() {
 				Some(c) => c,
-				None => return Err(ErrorKind::Wire(edge).into())
+				None => return Err(ErrorKind::Wire(edge, "initialize".to_string()).into())
 			};
 			let (rite, rite_from_pe) = cell.get_free_ec_port_mut().chain_err(|| ErrorKind::DatacenterError)?;
 			//println!("Datacenter: edge {:?}", edge);
@@ -73,7 +73,7 @@ impl Datacenter {
 			-> Result<()> {
 		let mut boundary_cells = self.get_boundary_cells();
 		if boundary_cells.len() < *MIN_BOUNDARY_CELLS {
-			return Err(ErrorKind::Boundary.into());
+			return Err(ErrorKind::Boundary("connect_to_noc".to_string()).into());
 		} else {
 			let (mut boundary_cell, _) = boundary_cells.split_at_mut(1);
 			let (port, port_from_pe) = boundary_cell[0].get_free_boundary_port_mut()?;
@@ -103,17 +103,17 @@ error_chain! {
 		Port(::port::Error, ::port::ErrorKind);
 	}
 	errors { DatacenterError
-		Boundary {
-			display("Datacenter: No boundary cells found")
+		Boundary(fn_name: String) {
+			display("{}: Datacenter: No boundary cells found", fn_name)
 		}
-		Cells(n: CellNo) {
-			display("Datacenter: The number of cells {} must be at least 1", n.0)
+		Cells(n: CellNo, fn_name: String) {
+			display("{}: Datacenter: The number of cells {} must be at least 1", fn_name, n.0)
 		}
-		Edges(nlinks: LinkNo) {
-			display("Datacenter: {} is not enough links to connect all cells", (nlinks.0).0)
+		Edges(nlinks: LinkNo, fn_name: String) {
+			display("{}: Datacenter: {} is not enough links to connect all cells", fn_name, (nlinks.0).0)
 		}
-		Wire(edge: Edge) {
-			display("Datacenter: {:?} is not a valid edge", edge)
+		Wire(edge: Edge, fn_name: String) {
+			display("{}: Datacenter: {:?} is not a valid edge", fn_name, edge)
 		}
 	}
 }

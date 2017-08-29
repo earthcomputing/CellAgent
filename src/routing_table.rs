@@ -23,7 +23,7 @@ impl RoutingTable {
 	pub fn get_entry(&self, TableIndex(index): TableIndex) -> Result<RoutingTableEntry> { 
 		match self.entries.get(index as usize) {
 			Some(e) => Ok(*e),
-			None => Err(ErrorKind::Index(TableIndex(index)).into())
+			None => Err(ErrorKind::Index(TableIndex(index), "get_entry".to_string()).into())
 		}
 	}
 	pub fn set_entry(&mut self, entry: RoutingTableEntry) { 
@@ -49,8 +49,8 @@ error_chain! {
 		Utility(::utility::Error, ::utility::ErrorKind);
 	}
 	errors { RoutingTableError
-		Index(index: TableIndex) {
-			display("RoutingTable: {} is not a valid routing table index", index.0)
+		Index(index: TableIndex, func_name: String) {
+			display("{}: RoutingTable: {} is not a valid routing table index", func_name, **index)
 		}
 	}
 }

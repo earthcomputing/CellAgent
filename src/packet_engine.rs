@@ -83,7 +83,7 @@ impl PacketEngine {
 			} else {
 				println!("CellID {}: entry index {}, entry uuid {}, packet uuid {}",
 					self.cell_id, *entry.get_index(), entry.get_uuid(), packet.get_header().get_tree_uuid());
-				return Err(ErrorKind::Uuid(self.cell_id.clone(), entry.get_index(), entry.get_uuid(),
+				return Err(ErrorKind::Uuid(self.cell_id.clone(), "process_packet".to_string(), entry.get_index(), entry.get_uuid(),
 						packet.get_tree_uuid()).into());
 			}
 		}
@@ -109,7 +109,7 @@ impl PacketEngine {
 							self.pe_to_ca.send(PeToCaPacket::Packet(recv_port_no, packet)).chain_err(|| ErrorKind::PacketEngineError)?;
 						}
 					} else {
-						return Err(ErrorKind::Sender(self.cell_id.clone(), parent).into());
+						return Err(ErrorKind::Sender(self.cell_id.clone(), "forward root".to_string(), parent).into());
 					}
 				}
 			} 
@@ -129,7 +129,7 @@ impl PacketEngine {
 					} else {
 						match self.pe_to_ports.get(port_no.v as usize) {
 							Some(s) => s.send((*other_index, packet)).chain_err(|| ErrorKind::PacketEngineError)?,
-							None => return Err(ErrorKind::Sender(self.cell_id.clone(), *port_no).into())
+							None => return Err(ErrorKind::Sender(self.cell_id.clone(), "forward leaf".to_string(), *port_no).into())
 						};
 						//if is_stack_msg { println!("Packet Engine {} sent to port {} packet {}", self.cell_id, port_no.v, packet); }
 					}
@@ -170,12 +170,12 @@ error_chain! {
 		Utility(::utility::Error, ::utility::ErrorKind);
 	}
 	errors { PacketEngineError
-		Uuid(cell_id: CellID, index: TableIndex, table_uuid: Uuid, packet_uuid: Uuid) {
-			display("PacketEngine: CellID {}: index {}, entry uuid {}, packet uuid {}", cell_id, index.0, 
+		Uuid(cell_id: CellID, func_name: String, index: TableIndex, table_uuid: Uuid, packet_uuid: Uuid) {
+			display("{}: PacketEngine: CellID {}: index {}, entry uuid {}, packet uuid {}", func_name, cell_id, index.0, 
 				table_uuid, packet_uuid)
 		}
-		Sender(cell_id: CellID, port_no: PortNo) {
-			display("PacketEngine: No sender for port {} on cell {}", port_no.v, cell_id)
+		Sender(cell_id: CellID, func_name: String, port_no: PortNo) {
+			display("{}: PacketEngine: No sender for port {} on cell {}", func_name, port_no.v, cell_id)
 		}
 	}
 }

@@ -106,7 +106,7 @@ impl CellAgent {
 		let tree_id = match trees.get(&TableIndex(index)) {
 			Some(t) => t,
 			None => {
-				return Err(ErrorKind::TreeIndex(self.cell_id.clone(), TableIndex(index)).into())}
+				return Err(ErrorKind::TreeIndex(self.cell_id.clone(), "get_tree_id".to_string(), TableIndex(index)).into())}
 			
 		};
 		Ok(tree_id.clone())
@@ -115,17 +115,17 @@ impl CellAgent {
 		if let Some(traph) = self.traphs.lock().unwrap().get(&tree_id.get_uuid()) {
 			Ok(traph.get_hops().chain_err(|| ErrorKind::CellagentError)?)
 		} else {
-			Err(ErrorKind::Tree(self.cell_id.clone(), tree_id.get_uuid()).into())
+			Err(ErrorKind::Tree(self.cell_id.clone(), "get_hops".to_string(), tree_id.get_uuid()).into())
 		}
 	}
 	pub fn get_saved_msgs(&self) -> Vec<SavedMsg> {
 		self.saved_msgs.lock().unwrap().to_vec()
 	}
-	pub fn add_saved_msg(&mut self, msg: SavedMsg) -> Vec<SavedMsg> {
+	pub fn add_saved_msg(&mut self, msg: &SavedMsg) -> Vec<SavedMsg> {
 		{ 
 			let mut saved_msgs = self.saved_msgs.lock().unwrap();
-			//println!("CellAgent {}: added msg {} as entry {} for tree {}", self.cell_id, msg.get_header().get_count(), discover_msgs.len()+1, msg); 
-			saved_msgs.push(msg);
+			//println!("CellAgent {}: added msg {} as entry {} for tree {}", self.cell_id, msg.get_header().get_count(), saved_msgs.len()+1, msg); 
+			saved_msgs.push(msg.clone());
 		}
 		self.get_saved_msgs()
 	}
@@ -145,7 +145,7 @@ impl CellAgent {
 	fn use_index(&mut self) -> Result<TableIndex> {
 		match self.free_indices.lock().unwrap().pop() {
 			Some(i) => Ok(i),
-			None => Err(ErrorKind::Size(self.cell_id.clone()).into())
+			None => Err(ErrorKind::Size(self.cell_id.clone(), "use_index".to_string()).into())
 		}
 	}
 	pub fn create_vms(&mut self, service_sets: Vec<Vec<Service>>) -> Result<()> {
@@ -221,13 +221,11 @@ impl CellAgent {
 		if gvm_recv { children.insert(PortNumber::new0()); }
 		let mut entry = traph.new_element(tree_id, port_number, port_status, other_index, children, hops, path).chain_err(|| ErrorKind::CellagentError)?; 
 		if gvm_send { entry.enable_send() } else { entry.disable_send() }
-		// Here's the end of the transaction
+		
 		//println!("CellAgent {}: entry {}", self.cell_id, entry); 
 		// Need traph even if cell only forwards on this tree
-		traphs.insert(tree_id.get_uuid(), traph);
-		{
-			self.trees.lock().unwrap().insert(entry.get_index(), tree_id.clone());
-		}
+		traphs.insert(tree_id.get_uuid(), traph); // Here's the end of the transaction
+		self.trees.lock().unwrap().insert(entry.get_index(), tree_id.clone());
 		self.ca_to_pe.send(CaToPePacket::Entry(entry)).chain_err(|| ErrorKind::CellagentError)?;
 		Ok(entry)
 	}
@@ -250,10 +248,10 @@ impl CellAgent {
 			if gvm_eqn.eval_send(&params)? { entry.enable_send(); } else { entry.disable_send(); }
 			let tree = Tree::new(&tree_id, black_tree_id, Some(gvm_eqn.clone()), entry);
 			traph.stack_tree(&tree);
-			locked.insert(black_tree_id.get_uuid(), traph);
+			locked.insert(black_tree_id.get_uuid(), traph); // Putting it back
 			self.ca_to_pe.send(CaToPePacket::Entry(entry)).chain_err(|| ErrorKind::CellagentError)?;
 		} else {
-			return Err(ErrorKind::NoTraph(self.cell_id.clone(), uuid).into());
+			return Err(ErrorKind::NoTraph(self.cell_id.clone(), "stack_tree".to_string(), uuid).into());
 		}
 		Ok(())
 	}
@@ -310,7 +308,7 @@ impl CellAgent {
 			MsgType::DiscoverD => Some(Box::new(serde_json::from_str::<DiscoverDMsg>(&serialized_msg).chain_err(|| ErrorKind::CellagentError)?)),
 			MsgType::StackTree => Some(Box::new(serde_json::from_str::<StackTreeMsg>(&serialized_msg).chain_err(|| ErrorKind::CellagentError)?)),
 			_ => match self.cell_type {
-				CellType::NalCell => return Err(ErrorKind::InvalidMsgType(self.cell_id.clone(), msg_type).into()),
+				CellType::NalCell => return Err(ErrorKind::InvalidMsgType(self.cell_id.clone(), "get_msg".to_string(), msg_type).into()),
 				CellType::Vm => panic!("Message for VM"),
 				CellType::Container => panic!("Message for Container"),
 				_ => panic!("Message for service")
@@ -354,7 +352,7 @@ impl CellAgent {
 			}
 			let saved_msgs  = self.get_saved_msgs();
 			//println!("CellAgent {}: {} discover msgs", ca.cell_id, saved_msgs.len());
-			self.forward_saved(&saved_msgs, port_no_mask).chain_err(|| ErrorKind::CellagentError)?;		
+			self.forward_saved(&saved_msgs, port_no_mask).chain_err(|| "port_connected")?;		
 		}
 		Ok(())		
 	}
@@ -376,7 +374,7 @@ impl CellAgent {
 			} else {  // Otherwise, send it on the tree it came in on
 				packet_uuid
 			};
-			self.send_msg(uuid, packets, mask).chain_err(|| ErrorKind::CellagentError)?;
+			self.send_msg(uuid, packets, mask).chain_err(|| "forward_saved")?;
 			//println!("CellAgent {}: forward on ports {:?} {}", self.cell_id, mask.get_port_nos(), msg);
 		}
 		Ok(())	
@@ -387,7 +385,7 @@ impl CellAgent {
 			if let Some(traph) = self.traphs.lock().unwrap().get(&tree_uuid) {
 				traph.get_table_index(&tree_uuid).chain_err(|| ErrorKind::CellagentError)?			
 			} else {
-				return Err(ErrorKind::Tree(self.cell_id.clone(), tree_uuid).into());
+				return Err(ErrorKind::Tree(self.cell_id.clone(), "send_msg".to_string(), tree_uuid).into());
 			}
 		};
 		for packet in packets.iter() {
@@ -437,45 +435,48 @@ error_chain! {
 		Utility(::utility::Error, ::utility::ErrorKind);
 	}
 	errors { CellagentError
-		InvalidMsgType(cell_id: CellID, msg_type: MsgType) {
-			display("Invalid message type {} from packet assembler on cell {}", msg_type, cell_id)
+		InvalidMsgType(cell_id: CellID, func_name: String, msg_type: MsgType) {
+			display("{}: Invalid message type {} from packet assembler on cell {}", func_name, msg_type, cell_id)
 		}
 		// Recursive type error if put in message.rs
-		Message(cell_id: CellID, msg_no: usize) {
-			display("Error processing message {} on cell {}", msg_no, cell_id)
+		Message(cell_id: CellID, func_name: String, msg_no: usize) {
+			display("{}: Error processing message {} on cell {}", func_name, msg_no, cell_id)
 		}		
-		MessageAssembly(cell_id: CellID) {
-			display("Problem assembling message on cell {}", cell_id)
+		MessageAssembly(cell_id: CellID, func_name: String) {
+			display("{}: Problem assembling message on cell {}", func_name, cell_id)
 		}
-		NoTraph(cell_id: CellID, tree_uuid: Uuid ) {
-			display("A Traph with TreeID {} does not exist on cell {}", tree_uuid, cell_id)
+		NoTraph(cell_id: CellID, func_name: String, tree_uuid: Uuid ) {
+			display("{}: A Traph with TreeID {} does not exist on cell {}", func_name, tree_uuid, cell_id)
 		}
-		PortTaken(cell_id: CellID, port_no: PortNo) {
-			display("Receiver for port {} has been previously assigned on cell {}", port_no.v, cell_id)
+		PortTaken(cell_id: CellID, func_name: String, port_no: PortNo) {
+			display("{}: Receiver for port {} has been previously assigned on cell {}", func_name, port_no.v, cell_id)
 		}
 		Recvr(cell_id: CellID, port_no: PortNo) {
 			display("No receiver for port {} on cell {}", port_no.v, cell_id)
 		}
-		Send(cell_id: CellID, tree_id: TreeID) {
-			display("CellID {} may not send on TreeID {}", cell_id, tree_id)
+		Send(cell_id: CellID, func_name: String, tree_id: TreeID) {
+			display("{}: CellID {} may not send on TreeID {}", func_name, cell_id, tree_id)
 		}
-		Size(cell_id: CellID) {
-			display("No more room in routing table for cell {}", cell_id)
+		Size(cell_id: CellID, func_name: String) {
+			display("{}: No more room in routing table for cell {}", func_name, cell_id)
 		}
-		TenantMask(cell_id: CellID) {
-			display("Cell {} has no tenant mask", cell_id)
+		StackedTree(cell_id: CellID, func_name: String, tree_id: TreeID) {
+			display("{}: Cell {} has no black tree for stacked tree {}", func_name, cell_id, tree_id)
 		}
-		Tree(cell_id: CellID, tree_uuid: Uuid ) {
-			display("TreeID {} does not exist on cell {}", tree_uuid, cell_id)
+		TenantMask(cell_id: CellID, func_name: String) {
+			display("{}: Cell {} has no tenant mask", func_name, cell_id)
 		}
-		TreeIndex(cell_id: CellID, index: TableIndex) {
-			display("No tree associated with index {} on cell {}", index.0, cell_id)
+		Tree(cell_id: CellID, func_name: String, tree_uuid: Uuid ) {
+			display("{}: TreeID {} does not exist on cell {}", func_name, tree_uuid, cell_id)
+		}
+		TreeIndex(cell_id: CellID, func_name: String, index: TableIndex) {
+			display("{}: No tree associated with index {} on cell {}", func_name, index.0, cell_id)
 		} 
-		UnknownVariable(cell_id: CellID, var: GvmVariable) {
-			display("Cell {}: Unknown gvm variable {}", cell_id, var)
+		UnknownVariable(cell_id: CellID, func_name: String, var: GvmVariable) {
+			display("{}: Cell {}: Unknown gvm variable {}", func_name, cell_id, var)
 		}
-		UpTraph(cell_id: CellID, up_tree_id: UpTraphID) {
-			display("Cell {} has no UpTraph named {}", cell_id, up_tree_id)
+		UpTraph(cell_id: CellID, func_name: String, up_tree_id: UpTraphID) {
+			display("{}: Cell {} has no UpTraph named {}", cell_id, func_name, up_tree_id)
 		}
 	}
 }

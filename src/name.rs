@@ -15,13 +15,13 @@ pub trait Name: Sized {
 	fn from_str(&self, s: &str) -> Result<Self> {
 		// Names may not contain blanks
 		match s.find(' ') {
-			Some(_) => Err(ErrorKind::Format(s.to_string()).into()), 
+			Some(_) => Err(ErrorKind::Format(s.to_string(), "from_str".to_string()).into()), 
 			None => Ok(self.create_from_string(s.to_string()))
 		}
 	}
 	fn add_component(&self, s: &str) -> Result<Self> {	
 		match s.find(' ') {
-			Some(_) => Err(ErrorKind::Format(s.to_string()).into()),
+			Some(_) => Err(ErrorKind::Format(s.to_string(), "add_component".to_string()).into()),
 			None => self.from_str(&([self.get_name(),s].join(SEPARATOR)))
 		}
 	}		
@@ -61,7 +61,7 @@ impl<'a> TreeID {
 		let str = n.to_string();
 		match n.find(' ') {
 			None => Ok(TreeID { name: str, uuid: Uuid::new_v4() }),
-			Some(_) => Err(ErrorKind::Format(str).into())
+			Some(_) => Err(ErrorKind::Format(str, "TreeID::new".to_string()).into())
 		}
 	}
 }
@@ -78,7 +78,7 @@ impl<'a> UpTraphID {
 		let str = n.to_string();
 		match n.find(' ') {
 			None => Ok(UpTraphID { name: str, uuid: Uuid::new_v4() }),
-			Some(_) => Err(ErrorKind::Format(str).into())
+			Some(_) => Err(ErrorKind::Format(str, "UpTraphID::new".to_string()).into())
 		}
 	}
 }
@@ -95,7 +95,7 @@ impl TenantID {
 		let str = n.to_string();
 		match n.find(' ') {
 			None => Ok(TenantID { name: str, uuid: Uuid::new_v4() }),
-			Some(_) => Err(ErrorKind::Format(str).into())
+			Some(_) => Err(ErrorKind::Format(str, "TenantID::new".to_string()).into())
 		}
 	}
 }
@@ -140,7 +140,7 @@ impl ContainerID {
 		let str = n.to_string();
 		match n.find(' ') {
 			None => Ok(ContainerID { name: str, uuid: Uuid::new_v4() }),
-			Some(_) => Err(ErrorKind::Format(str).into())
+			Some(_) => Err(ErrorKind::Format(str, "ContainerID::new".to_string()).into())
 		}
 	}
 }
@@ -153,11 +153,11 @@ impl fmt::Display for ContainerID { fn fmt(&self, f: &mut fmt::Formatter) -> fmt
 // Errors
 error_chain! {
 	errors {
-		Format(name: String) {
-			display("Name: '{}' contains blanks.", name)
+		Format(name: String, func_name: String) {
+			display("{}: Name: '{}' contains blanks.", func_name, name)
 		}
-		Size(name: String) {
-			display("Name: '{}' is longer than {} characters", name, ::config::MAX_CHARS)
+		Size(name: String, func_name: String) {
+			display("{}: Name: '{}' is longer than {} characters", func_name, name, ::config::MAX_CHARS)
 		}
 	}
 }

@@ -101,7 +101,7 @@ impl Noc {
 		type Params = (CellNo, PortNo, Vec<Edge>);
 		if let Some(str_params) = str_params {
 			let params: Params = serde_json::from_str(str_params).chain_err(|| ErrorKind::NocError)?;
-			let dc = self.build_datacenter(&up_id, new_cell_type, params.0, params.1, params.2).chain_err(|| ErrorKind::Input(str_params.to_string()))?;
+			let dc = self.build_datacenter(&up_id, new_cell_type, params.0, params.1, params.2).chain_err(|| ErrorKind::Input(str_params.to_string(), "new_uptraph".to_string()))?;
 			self.no_datacenters = DatacenterNo(*self.no_datacenters + 1);
 		} else { panic!("Parameter problem"); }
 		Ok(())
@@ -147,11 +147,11 @@ error_chain! {
 		Packet(::packet::Error, ::packet::ErrorKind);
 	}
 	errors { NocError
-		Input(input: String) {
-			display("Noc: {} is not a valid command to the NOC", input)
+		Input(input: String, func_name: String) {
+			display("{}: Noc: {} is not a valid command to the NOC", func_name, input)
 		}
-		Build(up_id: UpTraphID) {
-			display("Noc: Problem building datacenter at up_traph {}", up_id)
+		Build(up_id: UpTraphID, func_name: String) {
+			display("{}: Noc: Problem building datacenter at up_traph {}", func_name, up_id)
 		}
 	}
 }

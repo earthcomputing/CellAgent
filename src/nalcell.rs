@@ -36,7 +36,7 @@ pub struct NalCell {
 
 impl NalCell {
 	pub fn new(cell_no: CellNo, nports: PortNo, is_border: bool, cell_type: CellType) -> Result<NalCell> {
-		if nports.v > MAX_PORTS.v { return Err(ErrorKind::NumberPorts(nports).into()) }
+		if nports.v > MAX_PORTS.v { return Err(ErrorKind::NumberPorts(nports, "new".to_string()).into()) }
 		let cell_id = CellID::new(cell_no)?;
 		let (ca_to_pe, pe_from_ca): (CaToPe, PeFromCa) = channel();
 		let (pe_to_ca, ca_from_pe): (PeToCa, CaFromPe) = channel();
@@ -87,11 +87,11 @@ impl NalCell {
 						Port::set_connected(port.get_is_connected());
 						return Ok((port, recvr))
 					},
-					None => return Err(ErrorKind::Channel(port_no).into())
+					None => return Err(ErrorKind::Channel(port_no, "get_free_port_mut".to_string()).into())
 				} 
 			}
 		}
-		Err(ErrorKind::NoFreePorts(self.id.clone()).into())
+		Err(ErrorKind::NoFreePorts(self.id.clone(), "get_free_port_mut".to_string()).into())
 	}
 }
 impl fmt::Display for NalCell { 
@@ -114,20 +114,20 @@ error_chain! {
 		Utility(::utility::Error, ::utility::ErrorKind);
 	}
 	errors { NalCellError
-		Border(cell_id: CellID) {
-			display("NalCell: {} is not a border cell", cell_id)
+		Border(cell_id: CellID, func_name: String) {
+			display("{}: NalCell: {} is not a border cell", func_name, cell_id)
 		}
-		Channel(port_no: PortNo) {
-			display("NalCell: No receiver for port {}", port_no.v)
+		Channel(port_no: PortNo, func_name: String) {
+			display("{}: NalCell: No receiver for port {}", func_name, port_no.v)
 		}
-		NoFreePorts(cell_id: CellID) {
-			display("NalCell: All ports have been assigned for cell {}", cell_id)
+		NoFreePorts(cell_id: CellID, func_name: String) {
+			display("{}: NalCell: All ports have been assigned for cell {}", func_name, cell_id)
 		}
-		NumberPorts(nports: PortNo) {
-			display("NalCell: You asked for {} ports, but only {} are allowed", nports.v, MAX_PORTS.v)
+		NumberPorts(nports: PortNo, func_name: String) {
+			display("{}: NalCell: You asked for {} ports, but only {} are allowed", func_name, nports.v, MAX_PORTS.v)
 		}
-		BoundaryPort(cell_id: CellID, port_no: PortNo) {
-			display("NalCell: Cell {} has no outside receiver for boundary port {}", cell_id, port_no.v)
+		BoundaryPort(cell_id: CellID, func_name: String, port_no: PortNo) {
+			display("{}: NalCell: Cell {} has no outside receiver for boundary port {}", func_name, cell_id, port_no.v)
 		}
 	}
 }

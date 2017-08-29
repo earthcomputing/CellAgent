@@ -93,8 +93,8 @@ error_chain! {
 		Utility(::utility::Error, ::utility::ErrorKind);
 	}
 	errors { RoutingTableEntryError
-		Index(index: TableIndex) {
-			display("RoutingTableEntry: Index number {} is greater than the maximum of {}", index.0, MAX_ENTRIES.0)
+		Index(index: TableIndex, func_name: String) {
+			display("{}: RoutingTableEntry: Index number {} is greater than the maximum of {}", func_name, index.0, MAX_ENTRIES.0)
 		}
 	}
 }
