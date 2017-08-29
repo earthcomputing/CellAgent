@@ -90,7 +90,9 @@ pub trait Message: fmt::Display {
 	}
 	fn process(&mut self, cell_agent: &mut CellAgent, tree_uuid: Uuid, port_no: PortNo) -> Result<()>;
 }
-pub trait MsgPayload {}
+pub trait MsgPayload {
+	fn get_gvm_eqn(&self) -> Option<GvmEquation>;
+}
 type TreeMap = HashMap<String, TreeID>;
 #[derive(Debug, Clone, Serialize, Deserialize)]
 // Header may not contain '{' or '}' or a separate object, such as TreeID
@@ -201,12 +203,14 @@ pub struct DiscoverPayload {
 	sending_cell_id: CellID,
 	hops: PathLength,
 	path: Path,
+	gvm_eqn: GvmEquation,
 }
 impl DiscoverPayload {
 	fn new(tree_name: String, index: TableIndex, sending_cell_id: &CellID, 
 			hops: PathLength, path: Path) -> DiscoverPayload {
+		let gvm_eqn = GvmEquation::new("true", "true", "true", "true", Vec::new());
 		DiscoverPayload { tree_name: tree_name, index: index, sending_cell_id: sending_cell_id.clone(), 
-			hops: hops, path: path }
+			hops: hops, path: path, gvm_eqn: gvm_eqn }
 	}
 	fn get_tree_name(&self) -> String { self.tree_name.clone() }
 	//fn get_sending_cell(&self) -> CellID { self.sending_cell_id.clone() }
@@ -219,7 +223,9 @@ impl DiscoverPayload {
 	fn set_index(&mut self, index: TableIndex) { self.index = index; }
 	fn set_sending_cell(&mut self, sending_cell_id: CellID) { self.sending_cell_id = sending_cell_id; }
 }
-impl MsgPayload for DiscoverPayload {}
+impl MsgPayload for DiscoverPayload {
+	fn get_gvm_eqn(&self) -> Option<GvmEquation> { self.get_gvm_eqn() }
+}
 impl fmt::Display for DiscoverPayload { 
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result { 
 		let s = format!("Tree {}, sending cell {}, index {}, hops {}, path {}", self.tree_name, 
@@ -278,7 +284,9 @@ impl DiscoverDPayload {
 	pub fn get_tree_name(&self) -> String { self.tree_name.clone() }
 	pub fn get_table_index(&self) -> TableIndex { self.my_index }
 }
-impl MsgPayload for DiscoverDPayload {}
+impl MsgPayload for DiscoverDPayload {
+	fn get_gvm_eqn(&self) -> Option<GvmEquation> { None }
+}
 impl fmt::Display for DiscoverDPayload {
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
 		write!(f, "My table index {} for tree {}", *self.my_index, self.tree_name)
@@ -357,7 +365,9 @@ impl StackTreeMsgPayload {
 	pub fn get_tree_name(&self) -> &String { &self.tree_name}
 	pub fn get_gvm_eqn(&self) -> &GvmEquation { &self.gvm_eqn }
 }
-impl MsgPayload for StackTreeMsgPayload {}
+impl MsgPayload for StackTreeMsgPayload {
+	fn get_gvm_eqn(&self) -> Option<GvmEquation> { Some(self.gvm_eqn.clone()) }
+}
 impl fmt::Display for StackTreeMsgPayload {
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
 		write!(f, "Tree {} stacked on black tree {}", self.tree_name, self.black_tree_name)
@@ -404,7 +414,9 @@ impl SetupVMsMsgPayload {
 	}
 	pub fn get_service_sets(&self) -> &Vec<Vec<Service>> { &self.service_sets }
 }
-impl MsgPayload for SetupVMsMsgPayload {}
+impl MsgPayload for SetupVMsMsgPayload {
+	fn get_gvm_eqn(&self) -> Option<GvmEquation> { self.get_gvm_eqn() }
+}
 impl fmt::Display for SetupVMsMsgPayload {
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
 		let mut s = format!("Setup virtual machine with containers");

@@ -250,7 +250,7 @@ impl CellAgent {
 			if gvm_eqn.eval_send(&params)? { entry.enable_send(); } else { entry.disable_send(); }
 			let tree = Tree::new(&tree_id, black_tree_id, Some(gvm_eqn.clone()), entry);
 			traph.stack_tree(&tree);
-			locked.insert(tree_id.get_uuid(), traph);
+			locked.insert(black_tree_id.get_uuid(), traph);
 			self.ca_to_pe.send(CaToPePacket::Entry(entry)).chain_err(|| ErrorKind::CellagentError)?;
 		} else {
 			return Err(ErrorKind::NoTraph(self.cell_id.clone(), uuid).into());
@@ -353,7 +353,7 @@ impl CellAgent {
 				self.ca_to_pe.send(packet_msg).chain_err(|| ErrorKind::CellagentError)?;
 			}
 			let saved_msgs  = self.get_saved_msgs();
-			//println!("CellAgent {}: {} discover msgs", ca.cell_id, discover_msgs.len());
+			//println!("CellAgent {}: {} discover msgs", ca.cell_id, saved_msgs.len());
 			self.forward_saved(&saved_msgs, port_no_mask).chain_err(|| ErrorKind::CellagentError)?;		
 		}
 		Ok(())		

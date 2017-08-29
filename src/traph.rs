@@ -76,6 +76,13 @@ impl Traph {
 		}
 		true
 	}
+	pub fn count_connected(&self) -> usize {
+		let mut i = 0;
+		for element in &self.elements {
+			if element.is_connected() { i += 1; }
+		}
+		i
+	}
 	pub fn get_table_entry(&self, stacked_trees_locked: &MutexGuard<StackedTrees>, tree_uuid: &Uuid) -> Result<RoutingTableEntry> { 
 		match stacked_trees_locked.get(tree_uuid) {
 			Some(tree) => Ok(tree.get_table_entry()),
