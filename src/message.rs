@@ -162,7 +162,8 @@ impl Message for DiscoverMsg {
 			//println!("DiscoverMsg: tree_id {}, port_number {}", tree_id, port_number);
 			let exists = ca.exists(&new_tree_id);  // Have I seen this tree before?
 			let status = if exists { traph::PortStatus::Pruned } else { traph::PortStatus::Parent };
-			let gvm_equation = GvmEquation::new("true", "true", "true", "true", Vec::new());
+			// DiscoverMsg not saved for late port connects, because it needs to be updated with my table index for this tree
+			let gvm_equation = GvmEquation::new("true", "true", "true", "false", Vec::new());
 			let entry = ca.update_traph(&new_tree_id, port_number, status, Some(gvm_equation),
 					children, senders_index, hops, Some(path)).chain_err(|| ErrorKind::MessageError)?;
 			if exists { 
@@ -209,7 +210,7 @@ pub struct DiscoverPayload {
 impl DiscoverPayload {
 	fn new(tree_name: String, index: TableIndex, sending_cell_id: &CellID, 
 			hops: PathLength, path: Path) -> DiscoverPayload {
-		let gvm_eqn = GvmEquation::new("true", "true", "true", "true", Vec::new());
+		let gvm_eqn = GvmEquation::new("true", "true", "true", "false", Vec::new());
 		DiscoverPayload { tree_name: tree_name, index: index, sending_cell_id: sending_cell_id.clone(), 
 			hops: hops, path: path, gvm_eqn: gvm_eqn }
 	}

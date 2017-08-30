@@ -2,6 +2,7 @@ use std::fmt;
 use std::sync::mpsc::channel;
 use std::sync::{Arc, Mutex};
 use std::collections::{HashMap, HashSet};
+use std::collections::hash_map::Entry;
 use serde_json;
 use uuid::Uuid;
 
@@ -186,13 +187,13 @@ impl CellAgent {
 				gvm_equation: Option<GvmEquation>, children: &mut HashSet<PortNumber>, 
 				other_index: TableIndex, hops: PathLength, path: Option<Path>) 
 			-> Result<RoutingTableEntry> {
-// Note that traphs is updated transactionally; I remove an entry, update it, then put it back.
 		let mut traphs = self.traphs.lock().unwrap();
-		let mut traph = match traphs.remove(&tree_id.get_uuid()) { // Avoids lifetime problem
-			Some(t) => t,
-			None => {
+		let mut traph = match traphs.entry(tree_id.get_uuid()) { // Avoids lifetime problem
+			Entry::Occupied(t) => t.into_mut(),
+			Entry::Vacant(v) => {
 				let index = self.clone().use_index().chain_err(|| ErrorKind::CellagentError)?;
-				Traph::new(&self.cell_id, &tree_id, index).chain_err(|| ErrorKind::CellagentError)?
+				let t = Traph::new(&self.cell_id, &tree_id, index).chain_err(|| ErrorKind::CellagentError)?;
+				v.insert(t)
 			}
 		};
 		let (gvm_recv, gvm_send, gvm_save) = match gvm_equation {
@@ -224,7 +225,6 @@ impl CellAgent {
 		
 		//println!("CellAgent {}: entry {}", self.cell_id, entry); 
 		// Need traph even if cell only forwards on this tree
-		traphs.insert(tree_id.get_uuid(), traph); // Here's the end of the transaction
 		self.trees.lock().unwrap().insert(entry.get_index(), tree_id.clone());
 		self.ca_to_pe.send(CaToPePacket::Entry(entry)).chain_err(|| ErrorKind::CellagentError)?;
 		Ok(entry)
@@ -234,25 +234,24 @@ impl CellAgent {
 		let index = self.use_index()?;
 		let mut locked = self.traphs.lock().unwrap();
 		let uuid = black_tree_id.get_uuid();
-		if let Some(mut traph) = locked.remove(&uuid) {
-			let parent_entry = traph.get_tree_entry(&parent_tree_uuid).chain_err(|| ErrorKind::CellagentError)?;
-			let mut entry = parent_entry.clone();
-			entry.set_table_index(index);
-			entry.set_uuid(&tree_id.get_uuid());
-			let params = self.get_params(&traph, gvm_eqn.get_variables())?;
-			if !gvm_eqn.eval_recv(&params)? { 
-				let mask = entry.get_mask().and(Mask::all_but_zero(self.no_ports));
-				entry.set_mask(mask);
-			}
-			if !gvm_eqn.eval_xtnd(&params)? { entry.clear_children(); }
-			if gvm_eqn.eval_send(&params)? { entry.enable_send(); } else { entry.disable_send(); }
-			let tree = Tree::new(&tree_id, black_tree_id, Some(gvm_eqn.clone()), entry);
-			traph.stack_tree(&tree);
-			locked.insert(black_tree_id.get_uuid(), traph); // Putting it back
-			self.ca_to_pe.send(CaToPePacket::Entry(entry)).chain_err(|| ErrorKind::CellagentError)?;
-		} else {
-			return Err(ErrorKind::NoTraph(self.cell_id.clone(), "stack_tree".to_string(), uuid).into());
+		let traph = match locked.entry(uuid) {
+			Entry::Occupied(o) => o.into_mut(),
+			Entry::Vacant(v) => return Err(ErrorKind::NoTraph(self.cell_id.clone(), "stack_tree".to_string(), uuid).into())
+		};
+		let parent_entry = traph.get_tree_entry(&parent_tree_uuid).chain_err(|| ErrorKind::CellagentError)?;
+		let mut entry = parent_entry.clone();
+		entry.set_table_index(index);
+		entry.set_uuid(&tree_id.get_uuid());
+		let params = self.get_params(&traph, gvm_eqn.get_variables())?;
+		if !gvm_eqn.eval_recv(&params)? { 
+			let mask = entry.get_mask().and(Mask::all_but_zero(self.no_ports));
+			entry.set_mask(mask);
 		}
+		if !gvm_eqn.eval_xtnd(&params)? { entry.clear_children(); }
+		if gvm_eqn.eval_send(&params)? { entry.enable_send(); } else { entry.disable_send(); }
+		let tree = Tree::new(&tree_id, black_tree_id, Some(gvm_eqn.clone()), entry);
+		traph.stack_tree(&tree);
+		self.ca_to_pe.send(CaToPePacket::Entry(entry)).chain_err(|| ErrorKind::CellagentError)?;
 		Ok(())
 	}
 	pub fn get_params(&self, traph: &Traph, vars: &Vec<GvmVariable>) -> Result<Vec<GvmVariable>> {
