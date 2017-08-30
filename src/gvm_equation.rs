@@ -1,8 +1,17 @@
 use std::fmt;
 use serde_json;
+use std::collections::{HashMap, HashSet};
 use eval::{Expr, to_value};
 
 use config::{CellNo, PathLength};
+
+#[derive(Debug, Clone, Hash, Eq, PartialEq)]
+pub enum GvmEqn<'a> {
+	Recv(&'a str),
+	Send(&'a str),
+	Xtnd(&'a str),
+	Save(&'a str),
+}
 
 type GvmEqnType = String;
 #[derive(Debug, Clone, Hash, Serialize, Deserialize)]
@@ -15,9 +24,18 @@ pub struct GvmEquation {
 }
 // Sample GvmEquation: "hops < 7 || n_childen == 0",  associated variables vec!["hops", "n_children"]
 impl GvmEquation {
-	pub fn new(recv: &str, send: &str, save: &str, xtnd: &str, variables: Vec<GvmVariable>) -> GvmEquation { 
-		GvmEquation { recv_eqn: recv.to_string(), send_eqn: send.to_string(), 
-			save_eqn: save.to_string(), xtnd_eqn: xtnd.to_string(), variables: variables }
+	pub fn new(equations: HashSet<GvmEqn>, variables: Vec<GvmVariable>) -> GvmEquation { 
+		let (mut recv, mut send, mut xtnd, mut save) = ("false".to_string(), "false".to_string(), "false".to_string(), "false".to_string()); 
+		for eqn in equations.iter() {
+			match *eqn {
+				GvmEqn::Recv(s) => recv = s.to_string(),
+				GvmEqn::Send(s) => send = s.to_string(),
+				GvmEqn::Xtnd(s) => xtnd = s.to_string(),
+				GvmEqn::Save(s) => save = s.to_string(),
+			}
+		}
+		GvmEquation { recv_eqn: recv, send_eqn: send, 
+			save_eqn: save, xtnd_eqn: xtnd, variables: variables }
 	}
 	pub fn get_variables(&self) -> &Vec<GvmVariable> { &self.variables }
 	pub fn eval_recv(&self, params: &Vec<GvmVariable>) -> Result<bool> {

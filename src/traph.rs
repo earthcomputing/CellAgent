@@ -5,7 +5,7 @@ use std::sync::{Arc, Mutex, MutexGuard};
 use uuid::Uuid;
 
 use config::{MAX_PORTS, PathLength, PortNo, TableIndex};
-use gvm_equation::GvmEquation;
+use gvm_equation::{GvmEquation, GvmEqn};
 use name::{Name, CellID, TreeID};
 use routing_table_entry::{RoutingTableEntry};
 use traph_element::TraphElement;
@@ -27,7 +27,12 @@ impl Traph {
 		for i in 1..MAX_PORTS.v { 
 			elements.push(TraphElement::default(PortNumber::new(PortNo{v:i as u8}, MAX_PORTS).chain_err(|| ErrorKind::TraphError)?)); 
 		}
-		let gvm_eqn = GvmEquation::new("true", "true", "true", "true", Vec::new());
+		let mut eqns = HashSet::new();
+		eqns.insert(GvmEqn::Recv("true"));
+		eqns.insert(GvmEqn::Send("true"));
+		eqns.insert(GvmEqn::Xtnd("true"));
+		eqns.insert(GvmEqn::Save("true"));
+		let gvm_eqn = GvmEquation::new(eqns, Vec::new());
 		let entry = RoutingTableEntry::default(index).chain_err(|| ErrorKind::TraphError)?;
 		let black_tree = Tree::new(black_tree_id, black_tree_id, Some(gvm_eqn), entry);
 		let stacked_trees = Arc::new(Mutex::new(HashMap::new()));
