@@ -8,7 +8,7 @@ use uuid::Uuid;
 
 use config::{MAX_ENTRIES, MsgID, CellNo, PathLength, PortNo, TableIndex};
 use container::Service;
-use gvm_equation::{GvmEquation, GvmVariable, GvmVariableType};
+use gvm_equation::{GvmEquation, GvmEqn, GvmVariable, GvmVariableType};
 use message::{DiscoverMsg, DiscoverDMsg, StackTreeMsg, SetupVMsMsg, Message, MsgType};
 use message_types::{CaToPe, CaFromPe, CaToVm, VmFromCa, VmToCa, CaFromVm, CaToPePacket, PeToCaPacket};
 use name::{Name, CellID, TreeID, UpTraphID, VmID};
@@ -82,17 +82,32 @@ impl CellAgent {
 		let control_tree_id = self.control_tree_id.clone();
 		let connected_tree_id = self.connected_tree_id.clone();
 		let my_tree_id = self.my_tree_id.clone();
-		let gvm_equation = GvmEquation::new("true", "true", "true", "false", Vec::new());
+		let mut eqns = HashSet::new();
+		eqns.insert(GvmEqn::Recv("true"));
+		eqns.insert(GvmEqn::Send("true"));
+		eqns.insert(GvmEqn::Xtnd("true"));
+		eqns.insert(GvmEqn::Save("false"));
+		let gvm_equation = GvmEquation::new(eqns, Vec::new());
 		self.update_traph(&control_tree_id, port_number_0, 
 				traph::PortStatus::Parent, Some(gvm_equation), 
 				&mut HashSet::new(), other_index, hops, path).chain_err(|| ErrorKind::CellagentError)?;
-		let gvm_equation = GvmEquation::new("false", "true", "true", "false", Vec::new());
+		let mut eqns = HashSet::new();
+		eqns.insert(GvmEqn::Recv("false"));
+		eqns.insert(GvmEqn::Send("true"));
+		eqns.insert(GvmEqn::Xtnd("true"));
+		eqns.insert(GvmEqn::Save("false"));
+		let gvm_equation = GvmEquation::new(eqns, Vec::new());
 		let connected_tree_entry = self.update_traph(&connected_tree_id, port_number_0, 
 			traph::PortStatus::Parent, Some(gvm_equation),
 			&mut HashSet::new(), other_index, hops, path).chain_err(|| ErrorKind::CellagentError)?;
 		self.connected_tree_entry = Arc::new(Mutex::new(connected_tree_entry));
 		// Create my tree
-		let gvm_equation = GvmEquation::new("true", "true", "true", "false", Vec::new());
+		let mut eqns = HashSet::new();
+		eqns.insert(GvmEqn::Recv("false"));
+		eqns.insert(GvmEqn::Send("true"));
+		eqns.insert(GvmEqn::Xtnd("true"));
+		eqns.insert(GvmEqn::Save("false"));
+		let gvm_equation = GvmEquation::new(eqns, Vec::new());
 		self.my_entry = self.update_traph(&my_tree_id, port_number_0, 
 				traph::PortStatus::Parent, Some(gvm_equation), 
 				&mut HashSet::new(), other_index, hops, path).chain_err(|| ErrorKind::CellagentError)?; 
@@ -329,7 +344,12 @@ impl CellAgent {
 			for packet in packets {
 				self.ca_to_pe.send(CaToPePacket::Packet((my_index, port_no_mask, packet))).chain_err(|| ErrorKind::CellagentError)?;			
 			}
-			let gvm_eqn = GvmEquation::new("true", "false", "true", "true", Vec::new());
+			let mut eqns = HashSet::new();
+			eqns.insert(GvmEqn::Recv("true"));
+			eqns.insert(GvmEqn::Send("false"));
+			eqns.insert(GvmEqn::Xtnd("true"));
+			eqns.insert(GvmEqn::Save("true"));
+			let gvm_eqn = GvmEquation::new(eqns, Vec::new());
 			self.stack_tree(&tree_id, &my_tree_id.get_uuid(), my_tree_id, &gvm_eqn)?;
 		} else {
 			let port_no_mask = Mask::new(PortNumber::new(port_no, self.no_ports).chain_err(|| ErrorKind::CellagentError)?);

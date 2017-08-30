@@ -8,7 +8,7 @@ use uuid::Uuid;
 use cellagent::{CellAgent};
 use config::{MAX_PORTS, CellNo, MsgID, PathLength, PortNo, TableIndex};
 use container::Service;
-use gvm_equation::{GvmEquation, GvmVariable, GvmVariableType};
+use gvm_equation::{GvmEquation, GvmEqn, GvmVariable, GvmVariableType};
 use name::{Name, CellID, TreeID, UpTraphID};
 use packet::{Packet, Packetizer, Serializer};
 use traph;
@@ -163,7 +163,12 @@ impl Message for DiscoverMsg {
 			let exists = ca.exists(&new_tree_id);  // Have I seen this tree before?
 			let status = if exists { traph::PortStatus::Pruned } else { traph::PortStatus::Parent };
 			// DiscoverMsg not saved for late port connects, because it needs to be updated with my table index for this tree
-			let gvm_equation = GvmEquation::new("true", "true", "true", "false", Vec::new());
+			let mut eqns = HashSet::new();
+			eqns.insert(GvmEqn::Recv("true"));
+			eqns.insert(GvmEqn::Send("true"));
+			eqns.insert(GvmEqn::Xtnd("true"));
+			eqns.insert(GvmEqn::Save("false"));
+			let gvm_equation = GvmEquation::new(eqns, Vec::new());
 			let entry = ca.update_traph(&new_tree_id, port_number, status, Some(gvm_equation),
 					children, senders_index, hops, Some(path)).chain_err(|| ErrorKind::MessageError)?;
 			if exists { 
@@ -210,7 +215,12 @@ pub struct DiscoverPayload {
 impl DiscoverPayload {
 	fn new(tree_name: String, index: TableIndex, sending_cell_id: &CellID, 
 			hops: PathLength, path: Path) -> DiscoverPayload {
-		let gvm_eqn = GvmEquation::new("true", "true", "true", "false", Vec::new());
+		let mut eqns = HashSet::new();
+		eqns.insert(GvmEqn::Recv("true"));
+		eqns.insert(GvmEqn::Send("true"));
+		eqns.insert(GvmEqn::Xtnd("true"));
+		eqns.insert(GvmEqn::Save("false"));
+		let gvm_eqn = GvmEquation::new(eqns, Vec::new());
 		DiscoverPayload { tree_name: tree_name, index: index, sending_cell_id: sending_cell_id.clone(), 
 			hops: hops, path: path, gvm_eqn: gvm_eqn }
 	}
@@ -263,7 +273,12 @@ impl Message for DiscoverDMsg {
 		let port_number = PortNumber::new(port_no, MAX_PORTS).chain_err(|| ErrorKind::MessageError)?;
 		children.insert(port_number);
 		//println!("DiscoverDMsg {}: process msg {} processing {} {} {}", ca.get_id(), self.get_header().get_count(), port_no, my_index, tree_id);
-		let gvm_eqn = GvmEquation::new("true", "true", "false", "false", Vec::new());
+		let mut eqns = HashSet::new();
+		eqns.insert(GvmEqn::Recv("true"));
+		eqns.insert(GvmEqn::Send("true"));
+		eqns.insert(GvmEqn::Xtnd("false"));
+		eqns.insert(GvmEqn::Save("false"));
+		let gvm_eqn = GvmEquation::new(eqns, Vec::new());
 		ca.update_traph(&tree_id, port_number, traph::PortStatus::Child, Some(gvm_eqn), 
 			&mut children, my_index, PathLength(CellNo(0)), None).chain_err(|| ErrorKind::MessageError)?;
 		Ok(())
@@ -359,7 +374,12 @@ impl StackTreeMsgPayload {
 	fn new(tree_id: &TreeID, base_tree_name: String) -> Result<StackTreeMsgPayload> {
 		let mut gvm_vars = Vec::new();
 		gvm_vars.push(GvmVariable::new(GvmVariableType::PathLength, "hops"));
-		let gvm_eqn = GvmEquation::new("hops == 0", "true", "true", "true", gvm_vars);
+		let mut eqns = HashSet::new();
+		eqns.insert(GvmEqn::Recv("hops == 0"));
+		eqns.insert(GvmEqn::Send("true"));
+		eqns.insert(GvmEqn::Xtnd("true"));
+		eqns.insert(GvmEqn::Save("true"));
+		let gvm_eqn = GvmEquation::new(eqns, gvm_vars);
 		Ok(StackTreeMsgPayload { tree_name: tree_id.stringify(), black_tree_name: base_tree_name, 
 				gvm_eqn: gvm_eqn })
 	}
