@@ -64,14 +64,15 @@ impl PacketEngine {
 		}		
 	}
 	fn process_packet(&self, port_no: PortNo, my_index: TableIndex, packet: Packet) -> Result<()> {
-		//println!("PacketEngine {}: received on port {} {}", self.cell_id, port_no, packet);
-		let entry;
+		//println!("PacketEngine {}: received on port {} my index {} {}", self.cell_id, port_no.v, *my_index, packet);
+		let entry =
 		{   
-			entry = match self.boundary_port_nos.get(&port_no) {
-				Some(_) => self.routing_table.lock().unwrap().get_entry(TableIndex(0)).chain_err(|| ErrorKind::PacketEngineError)?,
-				None => self.routing_table.lock().unwrap().get_entry(my_index).chain_err(|| ErrorKind::PacketEngineError)?
+			let locked = self.routing_table.lock().unwrap();
+			match self.boundary_port_nos.get(&port_no) {
+				Some(_) => locked.get_entry(TableIndex(0)).chain_err(|| ErrorKind::PacketEngineError)?,
+				None => locked.get_entry(my_index).chain_err(|| ErrorKind::PacketEngineError)?
 			}
-		}
+		};
 		if entry.is_in_use() {
 			//println!("PacketEngine {}: packet {} entry {}", self.cell_id, packet.get_count(), entry);
 			// The control tree is special since each cell has a different uuid
@@ -81,8 +82,6 @@ impl PacketEngine {
 				PortNumber::new(port_no, PortNo{v:other_indices.len() as u8}).chain_err(|| ErrorKind::PacketEngineError)?; // Verify that port_no is valid
 				self.forward(port_no, entry, mask, packet).chain_err(|| ErrorKind::PacketEngineError)?;	
 			} else {
-				println!("CellID {}: entry index {}, entry uuid {}, packet uuid {}",
-					self.cell_id, *entry.get_index(), entry.get_uuid(), packet.get_header().get_tree_uuid());
 				return Err(ErrorKind::Uuid(self.cell_id.clone(), "process_packet".to_string(), entry.get_index(), entry.get_uuid(),
 						packet.get_tree_uuid()).into());
 			}
@@ -120,7 +119,8 @@ impl PacketEngine {
 				Some(_) => true,
 				None => false
 			};
-			//if is_stack_msg { println!("PacketEngine {}: forwarding packet {} on ports {:?}, {}", self.cell_id, packet.get_count(), port_nos, entry); }
+			if is_stack_msg { 
+				println!("PacketEngine {}: forwarding packet {} on ports {:?}, {}", self.cell_id, packet.get_count(), port_nos, entry); }
 			for port_no in port_nos.iter() {
 				if let Some(other_index) = other_indices.get(port_no.v as usize) {
 					if port_no.v as usize == 0 { 

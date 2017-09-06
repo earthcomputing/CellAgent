@@ -1,16 +1,17 @@
 use std::fmt;
 use std::collections::{HashMap, HashSet};
 use std::sync::{Arc, Mutex, MutexGuard};
+use std::collections::hash_map::Entry;
 
 use uuid::Uuid;
 
 use config::{MAX_PORTS, PathLength, PortNo, TableIndex};
-use gvm_equation::{GvmEquation, GvmEqn};
+use gvm_equation::{GvmEquation, GvmEqn, GvmVariable, GvmVariableType};
 use name::{Name, CellID, TreeID};
 use routing_table_entry::{RoutingTableEntry};
 use traph_element::TraphElement;
 use tree::Tree;
-use utility::{Path, PortNumber};
+use utility::{Mask, Path, PortNumber};
 
 type StackedTrees = HashMap<Uuid, Tree>;
 
@@ -69,7 +70,7 @@ impl Traph {
 			}
 		}
 		println!("+++ Cell {}: {}", self.cell_id, self);
-		Ok(&self.elements[0])//Err(ErrorKind::ParentElement(self.cell_id.clone(), self.black_tree_id.clone()).into())
+		Err(ErrorKind::ParentElement(self.cell_id.clone(), "get_parent_element".to_string(), self.black_tree_id.clone()).into())
 	}
 	pub fn get_hops(&self) -> Result<PathLength> {
 		let element = self.get_parent_element()?;
@@ -129,21 +130,43 @@ impl Traph {
 		self.elements[*port_no as usize] = element;
 		Ok(table_entry)
 	}
-	pub fn update_entry(&self, tree_id: &TreeID, entry: RoutingTableEntry) -> Result<()> {
-		// I get lifetime errors if I put this block in a function
-		let mut locked = self.stacked_trees.lock().unwrap();
-		let mut tree = match locked.get(&tree_id.get_uuid()) {
-			Some(tree) => tree.clone(),
-			None => {
-				println!("--- Cell {}: Traph {}: tree_id {}", self.cell_id, self.black_tree_id, tree_id);
-				return Err(ErrorKind::Tree(self.cell_id.clone(), "update_entry".to_string(), tree_id.get_uuid()).into());
+	pub fn update_stacked_entries(&self, base_tree_entry: RoutingTableEntry) -> Result<Vec<RoutingTableEntry>> {		
+		let locked = self.stacked_trees.lock().unwrap();
+		let mut updated_entries = Vec::new();
+		for stacked_tree in locked.values() {
+			if stacked_tree.get_id() != stacked_tree.get_black_tree_id() {
+				let mut stacked_entry = stacked_tree.get_table_entry();
+				let port_number = PortNumber::new(base_tree_entry.get_parent(), PortNo{v: base_tree_entry.get_other_indices().len() as u8})?;
+				stacked_entry.set_parent(port_number);
+				stacked_entry.set_mask(base_tree_entry.get_mask());
+				if let Some(gvm_eqn) = stacked_tree.get_gvm_eqn() {
+					let params = self.get_params(gvm_eqn.get_variables())?;
+					if !gvm_eqn.eval_recv(&params)? { 
+						let mask = stacked_entry.get_mask().and(Mask::all_but_zero(PortNo{v:stacked_entry.get_other_indices().len() as u8}));
+						stacked_entry.set_mask(mask);
+					}
+				}
+				stacked_entry.set_other_indices(base_tree_entry.get_other_indices());	
+				updated_entries.push(stacked_entry);
 			}
-		};
-		tree.set_table_entry(entry);
-		Ok(())		
+		}
+		Ok(updated_entries)		
 	}
 	pub fn stack_tree(&mut self, tree: &Tree) {
 		self.stacked_trees.lock().unwrap().insert(tree.get_uuid(), tree.clone());
+	}
+	pub fn get_params(&self, vars: &Vec<GvmVariable>) -> Result<Vec<GvmVariable>> {
+		let mut variables = Vec::new();
+		for var in vars {
+			match var.get_value().as_ref() {
+				"hops" => {
+					let hops = *(self.get_hops()?);
+					variables.push(GvmVariable::new(GvmVariableType::CellNo, *hops));
+				},
+				_ => ()
+			}
+		}
+		Ok(variables)
 	}
 }
 impl fmt::Display for Traph {
@@ -181,6 +204,7 @@ impl fmt::Display for PortStatus {
 // Errors
 error_chain! {
 	links {
+		Gvm(::gvm_equation::Error, ::gvm_equation::ErrorKind);
 		Name(::name::Error, ::name::ErrorKind);
 		RoutingTable(::routing_table::Error, ::routing_table::ErrorKind);
 		RoutingtableEntry(::routing_table_entry::Error, ::routing_table_entry::ErrorKind);

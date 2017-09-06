@@ -41,6 +41,7 @@ impl RoutingTableEntry {
 	pub fn get_mask(&self) -> Mask { self.mask }
 	pub fn set_mask(&mut self, mask: Mask) { self.mask = mask; }
 	pub fn get_other_indices(&self) -> [TableIndex; MAX_PORTS.v as usize] { self.other_indices }
+	pub fn set_other_indices(&mut self, other_indices: [TableIndex;8]) { self.other_indices = other_indices }
 	pub fn set_tree_id(&mut self, tree_id: &TreeID) {
 		self.uuid = tree_id.get_uuid();
 	}
