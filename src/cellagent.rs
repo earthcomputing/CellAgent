@@ -3,7 +3,6 @@ use std::sync::mpsc::channel;
 use std::sync::{Arc, Mutex};
 use std::collections::{HashMap, HashSet};
 use std::collections::hash_map::Entry;
-use serde_json;
 use uuid::Uuid;
 
 use config::{MAX_ENTRIES, MsgID, CellNo, PathLength, PortNo, TableIndex};
@@ -13,7 +12,7 @@ use message::{DiscoverMsg, DiscoverDMsg, StackTreeMsg, SetupVMsMsg, Message, Msg
 use message_types::{CaToPe, CaFromPe, CaToVm, VmFromCa, VmToCa, CaFromVm, CaToPePacket, PeToCaPacket};
 use name::{Name, CellID, TreeID, UpTraphID, VmID};
 use nalcell::CellType;
-use packet::{Packet, Packetizer, PacketAssembler, PacketAssemblers, Serializer};
+use packet::{Packet, PacketAssembler, PacketAssemblers};
 use port;
 use routing_table_entry::{RoutingTableEntry};
 use traph;
@@ -141,12 +140,12 @@ impl CellAgent {
 	pub fn get_saved_msgs(&self) -> Vec<SavedMsg> {
 		self.saved_msgs.lock().unwrap().to_vec()
 	}
-	pub fn add_saved_msg(&mut self, msg: &SavedMsg) -> Vec<SavedMsg> {
+	pub fn add_saved_msg(&mut self, packets: &SavedMsg) -> Vec<SavedMsg> {
 		{ 
 			let mut saved_msgs = self.saved_msgs.lock().unwrap();
-			let (msg_type, serialized_msg) = MsgType::get_type_serialized(msg).chain_err(|| ErrorKind::CellagentError).unwrap();
-			//println!("Cell {}: save {} {}", self.cell_id, msg_type, serialized_msg);
-			saved_msgs.push(msg.clone());
+			let msg = MsgType::get_msg(&packets).chain_err(|| ErrorKind::CellagentError).unwrap();
+			println!("Cell {}: save {}", self.cell_id, msg);
+			saved_msgs.push(packets.clone());
 		}
 		self.get_saved_msgs()
 	}
@@ -253,8 +252,8 @@ impl CellAgent {
 		// Update entries for stacked trees
 		let entries = traph.update_stacked_entries(entry).chain_err(|| ErrorKind::CellagentError)?;
 		for entry in entries {
-				println!("Cell {}: sending entry {}", self.cell_id, entry);
-				self.ca_to_pe.send(CaToPePacket::Entry(entry)).chain_err(|| ErrorKind::CellagentError)?;			
+			//println!("Cell {}: sending entry {}", self.cell_id, entry);
+			self.ca_to_pe.send(CaToPePacket::Entry(entry)).chain_err(|| ErrorKind::CellagentError)?;			
 		}
 		Ok(entry)
 	}
@@ -307,14 +306,12 @@ impl CellAgent {
 					let tree_uuid = packet.get_tree_uuid();
 					let (last_packet, packets) = packet_assembler.add(packet);
 					if last_packet {
-						let (msg_type, serialized_msg) = MsgType::get_type_serialized(packets).chain_err(|| ErrorKind::CellagentError)?;
-						if let Some(mut msg) = self.get_msg(msg_type, serialized_msg)? {
-							msg.process(self, tree_uuid, port_no).chain_err(|| ErrorKind::CellagentError)?;
-							let save = self.gvm_eval_save(tree_uuid, msg)?;
-							if save { 
-								self.add_saved_msg(packets); 
-							}
-						};
+						let mut msg = MsgType::get_msg(&packets).chain_err(|| ErrorKind::CellagentError)?;
+						msg.process(self, tree_uuid, port_no).chain_err(|| ErrorKind::CellagentError)?;
+						let save = self.gvm_eval_save(tree_uuid, msg)?;
+						if save { 
+							self.add_saved_msg(packets); 
+						}
 					} else {
 						let assembler = PacketAssembler::create(msg_id, packets);
 						self.packet_assemblers.insert(msg_id, assembler);
@@ -344,31 +341,16 @@ impl CellAgent {
 			Ok(false)
 		}
 	}
-	fn get_msg(&self, msg_type: MsgType, serialized_msg: String) -> Result<Option<Box<Message>>> {
-		Ok(match msg_type {
-			MsgType::Discover => Some(Box::new(serde_json::from_str::<DiscoverMsg>(&serialized_msg).chain_err(|| ErrorKind::CellagentError)?)),
-			MsgType::DiscoverD => Some(Box::new(serde_json::from_str::<DiscoverDMsg>(&serialized_msg).chain_err(|| ErrorKind::CellagentError)?)),
-			MsgType::StackTree => Some(Box::new(serde_json::from_str::<StackTreeMsg>(&serialized_msg).chain_err(|| ErrorKind::CellagentError)?)),
-			_ => match self.cell_type {
-				CellType::NalCell => return Err(ErrorKind::InvalidMsgType(self.cell_id.clone(), "get_msg".to_string(), msg_type).into()),
-				CellType::Vm => panic!("Message for VM"),
-				CellType::Container => panic!("Message for Container"),
-				_ => panic!("Message for service")
-			}
-		})		
-	}
 	fn port_connected(&mut self, port_no: PortNo, is_border: bool) -> Result<()> {
 		//println!("CellAgent {}: port {} is border {} connected", self.cell_id, port_no, is_border);
 		if is_border {
 			println!("CellAgent {}: port {} is a border port", self.cell_id, *port_no);
 			let tree_id = self.my_tree_id.add_component("Outside").chain_err(|| ErrorKind::CellagentError)?;
-			let ref my_tree_id = self.my_tree_id.clone();
+			let ref my_tree_id = self.my_tree_id.clone(); // Need because self borrowed mut
 			let msg = StackTreeMsg::new(&tree_id, &self.my_tree_id).chain_err(|| ErrorKind::CellagentError)?;
-			let direction = msg.get_header().get_direction();
-			let bytes = Serializer::serialize(&msg).chain_err(|| ErrorKind::CellagentError).chain_err(|| ErrorKind::CellagentError)?;
+			let packets = msg.to_packets(&self.my_tree_id).chain_err(|| ErrorKind::CellagentError)?;
 			let port_no_mask = Mask::all_but_zero(self.no_ports);
 			let my_index = self.my_entry.get_index();
-			let packets = Packetizer::packetize(&self.my_tree_id, bytes, direction).chain_err(|| ErrorKind::CellagentError)?;
 			for packet in packets {
 				self.ca_to_pe.send(CaToPePacket::Packet((my_index, port_no_mask, packet))).chain_err(|| ErrorKind::CellagentError)?;			
 			}
@@ -380,15 +362,14 @@ impl CellAgent {
 			let gvm_eqn = GvmEquation::new(eqns, Vec::new());
 			self.stack_tree(&tree_id, &my_tree_id.get_uuid(), my_tree_id, &gvm_eqn)?;
 		} else {
+			println!("Cell {}: port {} connected", self.cell_id, *port_no);
 			let port_no_mask = Mask::new(PortNumber::new(port_no, self.no_ports).chain_err(|| ErrorKind::CellagentError)?);
 			let path = Path::new(port_no, self.no_ports).chain_err(|| ErrorKind::CellagentError)?;
 			self.connected_tree_entry.lock().unwrap().or_with_mask(port_no_mask);
 			let hops = PathLength(CellNo(1));
 			let my_table_index = self.my_entry.get_index();
 			let msg = DiscoverMsg::new(&self.my_tree_id, my_table_index, &self.cell_id, hops, path);
-			let direction = msg.get_header().get_direction();
-			let bytes = Serializer::serialize(&msg).chain_err(|| ErrorKind::CellagentError)?;
-			let packets = Packetizer::packetize(&self.control_tree_id, bytes, direction,).chain_err(|| ErrorKind::CellagentError)?;
+			let packets = msg.to_packets(&self.control_tree_id).chain_err(|| ErrorKind::CellagentError)?;
 			//println!("CellAgent {}: sending packet {} on port {} {} ", self.cell_id, packets[0].get_count(), port_no, msg);
 			let connected_tree_index = (*self.connected_tree_entry.lock().unwrap()).get_index();
 			for packet in packets {
@@ -413,10 +394,10 @@ impl CellAgent {
 		Ok(())	
 	}		
 	pub fn forward_saved(&mut self, saved_msgs: &Vec<SavedMsg>, mask: Mask) -> Result<()> {
-		//println!("Cell {}: forwarding {} messages", self.cell_id, saved_msgs.len());
+		println!("Cell {}: forwarding {} messages", self.cell_id, saved_msgs.len());
 		for packets in saved_msgs.iter() {
-			let (msg_type, serialized_msg) = MsgType::get_type_serialized(packets).chain_err(|| ErrorKind::CellagentError)?;
-			//println!("Cell {}: {} {}", self.cell_id, msg_type, serialized_msg);
+			let msg = MsgType::get_msg(&packets).chain_err(|| ErrorKind::CellagentError)?;
+			//println!("Cell {}: forward {}", self.cell_id, msg);
 			let packet_uuid = packets[0].get_tree_uuid();
 			// If packet is to this cell's control tree, send out on all connected ports
 			let uuid = if packet_uuid == self.control_tree_id.get_uuid() {
@@ -485,9 +466,6 @@ error_chain! {
 		Utility(::utility::Error, ::utility::ErrorKind);
 	}
 	errors { CellagentError
-		InvalidMsgType(cell_id: CellID, func_name: String, msg_type: MsgType) {
-			display("{}: Invalid message type {} from packet assembler on cell {}", func_name, msg_type, cell_id)
-		}
 		// Recursive type error if put in message.rs
 		Message(cell_id: CellID, func_name: String, msg_no: usize) {
 			display("{}: Error processing message {} on cell {}", func_name, msg_no, cell_id)

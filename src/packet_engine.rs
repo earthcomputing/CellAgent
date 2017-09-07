@@ -43,7 +43,10 @@ impl PacketEngine {
 	fn listen_ca(&self, entry_pe_from_ca: PeFromCa) -> Result<()> {
 		loop { 
 			match entry_pe_from_ca.recv().chain_err(|| ErrorKind::PacketEngineError)? {
-				CaToPePacket::Entry(e) => self.routing_table.lock().unwrap().set_entry(e),
+				CaToPePacket::Entry(e) => {
+					println!("PacketEngine {}: entry {}", self.cell_id, e);
+					self.routing_table.lock().unwrap().set_entry(e)
+				},
 				CaToPePacket::Packet((index, user_mask, packet)) => {
 					//println!("PacketEngine {}: received from ca packet {}", self.cell_id, packet);
 					let locked = self.routing_table.lock().unwrap();	// Hold lock until forwarding is done			
