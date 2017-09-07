@@ -1,7 +1,9 @@
+use std;
 use std::fmt;
 use std::collections::{HashMap, HashSet};
 use std::sync::atomic::{ATOMIC_USIZE_INIT, AtomicUsize, Ordering};
 
+use serde;
 use serde_json;
 use uuid::Uuid;
 
@@ -37,12 +39,17 @@ pub enum MsgType {
 	Placeholder
 }
 impl MsgType {
-	pub fn get_type_serialized(packets: &Vec<Packet>) -> Result<(MsgType, String)> {
+	pub fn get_msg(packets: &Vec<Packet>) -> Result<Box<Message>> {
 		let serialized = Packetizer::unpacketize(packets).chain_err(|| ErrorKind::MessageError)?;
-		let type_msg: TypePlusMsg = serde_json::from_str(&serialized).chain_err(|| ErrorKind::MessageError)?;
+		let type_msg = serde_json::from_str::<TypePlusMsg>(&serialized).chain_err(|| ErrorKind::MessageError)?;
 		let msg_type = type_msg.get_type();
-		let serialized_msg = type_msg.get_serialized_msg();
-		Ok((msg_type, serialized_msg.to_string()))
+		let serialized_msg = type_msg.get_serialized_msg();		
+		Ok(match msg_type {
+			MsgType::Discover  => Box::new(serde_json::from_str::<DiscoverMsg>(&serialized_msg).chain_err(|| ErrorKind::MessageError)?),
+			MsgType::DiscoverD => Box::new(serde_json::from_str::<DiscoverDMsg>(&serialized_msg).chain_err(|| ErrorKind::MessageError)?),
+			MsgType::StackTree => Box::new(serde_json::from_str::<StackTreeMsg>(&serialized_msg).chain_err(|| ErrorKind::MessageError)?),
+			_ => return Err(ErrorKind::InvalidMsgType("get_msg".to_string(), msg_type).into())
+		})		
 	}
 }
 impl fmt::Display for MsgType {
@@ -50,8 +57,8 @@ impl fmt::Display for MsgType {
 		match *self {
 			MsgType::Discover  => write!(f, "Discover"),
 			MsgType::DiscoverD => write!(f, "DiscoverD"),
-			MsgType::StackTree => write!(f, "StackTree"),
 			MsgType::SetupVM   => write!(f, "SetupVM"),
+			MsgType::StackTree => write!(f, "StackTree"),
 			_ => write!(f, "{} is an undefined type", self)
 		}
 	}
@@ -87,6 +94,13 @@ pub trait Message: fmt::Display {
 			Some(id) => id,
 			None => return Err(ErrorKind::TreeMapEntry(tree_name.clone(), "get_tree_id".to_string()).into())
 		})
+	}
+	fn to_packets(&self, tree_id: &TreeID) -> Result<Vec<Packet>> 
+			where Self:std::marker::Sized + serde::Serialize {
+		let bytes = Serializer::serialize(self).chain_err(|| ErrorKind::MessageError)?;
+		let direction = self.get_header().get_direction();
+		let packets = Packetizer::packetize(tree_id, bytes, direction,).chain_err(|| ErrorKind::MessageError)?;		
+		Ok(packets)
 	}
 	fn process(&mut self, cell_agent: &mut CellAgent, tree_uuid: Uuid, port_no: PortNo) -> Result<()>;
 }
@@ -136,13 +150,13 @@ impl DiscoverMsg {
 		let payload = DiscoverPayload::new(tree_name, my_index, &sending_cell_id, hops, path);
 		DiscoverMsg { header: header, payload: payload }
 	}
-	pub fn update_discover_msg(&mut self, cell_id: CellID, index: TableIndex) {
+	pub fn update_discover_msg(&mut self, cell_id: &CellID, index: TableIndex) {
 		let hops = self.update_hops();
 		let path = self.update_path();
 		self.payload.set_hops(hops);
 		self.payload.set_path(path);
 		self.payload.set_index(index);
-		self.payload.set_sending_cell(cell_id);
+		self.payload.set_sending_cell(cell_id.clone());
 	}
 	fn update_hops(&self) -> PathLength { self.payload.hops_plus_one() }
 	fn update_path(&self) -> Path { self.payload.get_path() } // No change per hop
@@ -177,19 +191,15 @@ impl Message for DiscoverMsg {
 			my_index = entry.get_index();
 			// Send DiscoverD to sender
 			let discoverd_msg = DiscoverDMsg::new(new_tree_id.clone(), my_index);
-			let direction = discoverd_msg.get_header().get_direction();
-			let bytes = Serializer::serialize(&discoverd_msg).chain_err(|| ErrorKind::MessageError)?;
-			let packets = Packetizer::packetize(&ca.get_connected_ports_tree_id(), bytes, direction).chain_err(|| ErrorKind::MessageError)?;
+			let packets = discoverd_msg.to_packets(new_tree_id)?;
 			//println!("DiscoverMsg {}: sending discoverd for tree {} packet {} {}",ca.get_id(), new_tree_id, packets[0].get_count(), discoverd_msg);
 			let mask = Mask::new(port_number);
 			ca.send_msg(ca.get_connected_ports_tree_id().get_uuid(), &packets, mask).chain_err(|| ErrorKind::MessageError)?;
 			// Forward Discover on all except port_no with updated hops and path
 		}
-		self.update_discover_msg(ca.get_id(), my_index);
+		self.update_discover_msg(&ca.get_id(), my_index);
 		let control_tree_index = 0;
-		let direction = self.get_header().get_direction();
-		let bytes = Serializer::serialize(&self.clone()).chain_err(|| ErrorKind::MessageError)?;
-		let packets = Packetizer::packetize(&ca.get_control_tree_id(), bytes, direction).chain_err(|| ErrorKind::MessageError)?;
+		let packets = self.to_packets(&ca.get_control_tree_id())?;
 		let user_mask = DEFAULT_USER_MASK.all_but_port(PortNumber::new(port_no, ca.get_no_ports()).chain_err(|| ErrorKind::MessageError)?);
 		//println!("DiscoverMsg {}: forwarding packet {} on connected ports {}", ca.get_id(), packets[0].get_count(), self);
 		ca.add_saved_msg(&packets); // Discover message are always saved for late port connect
@@ -462,6 +472,9 @@ error_chain! {
 		Utility(::utility::Error, ::utility::ErrorKind);
 	}
 	errors { MessageError
+		InvalidMsgType(func_name: String, msg_type: MsgType) {
+			display("{}: Invalid message type {} from packet assembler", func_name, msg_type)
+		}
 		// Recursive type error if left in
 //		Message(cell_id: CellID, msg_no: usize) {
 //			description("Error processing message")

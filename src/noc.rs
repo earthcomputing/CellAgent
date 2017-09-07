@@ -70,8 +70,7 @@ impl Noc {
 			let mut packet_assembler = self.packet_assemblers.remove(&msg_id).unwrap_or(PacketAssembler::new(msg_id));
 			let (last_packet, packets) = packet_assembler.add(packet);
 			if last_packet {
-				let (msg_type, serialized_msg) = MsgType::get_type_serialized(packets).chain_err(|| ErrorKind::NocError)?;
-				let msg = self.get_msg(msg_type, serialized_msg)?;
+				let msg = MsgType::get_msg(&packets).chain_err(|| ErrorKind::NocError)?;
 				println!("Noc received {}", msg);
 			} else {
 				let assembler = PacketAssembler::create(msg_id, packets);
