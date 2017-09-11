@@ -55,6 +55,10 @@ impl Traph {
 	}
 	pub fn get_black_tree_entry(&self) -> Result<RoutingTableEntry> { self.get_tree_entry(&self.black_tree_id.get_uuid()) }
 	pub fn get_stacked_trees(&self) -> &Arc<Mutex<StackedTrees>> { &self.stacked_trees }
+	pub fn has_tree(&self, tree_id: &TreeID) -> bool {
+		let stacked_trees = self.stacked_trees.lock().unwrap();
+		stacked_trees.contains_key(&tree_id.get_uuid())
+	}
 	pub fn get_port_status(&self, port_number: PortNumber) -> PortStatus { 
 		let port_no = port_number.get_port_no();
 		match self.elements.get(port_no.v as usize) {

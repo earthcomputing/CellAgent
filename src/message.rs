@@ -51,6 +51,13 @@ impl MsgType {
 			_ => return Err(ErrorKind::InvalidMsgType("get_msg".to_string(), msg_type).into())
 		})		
 	}
+	// A hack for printing debug output only for a specific message type
+	pub fn is_type(packet: Packet, type_of_msg: &str) -> bool {
+		match format!("{}", packet).find(type_of_msg) {
+			Some(_) => true,
+			None => false
+		}		
+	}
 }
 impl fmt::Display for MsgType {
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
@@ -176,7 +183,6 @@ impl Message for DiscoverMsg {
 			//println!("DiscoverMsg: tree_id {}, port_number {}", tree_id, port_number);
 			let exists = ca.exists(&new_tree_id);  // Have I seen this tree before?
 			let status = if exists { traph::PortStatus::Pruned } else { traph::PortStatus::Parent };
-			// DiscoverMsg not saved for late port connects, because it needs to be updated with my table index for this tree
 			let mut eqns = HashSet::new();
 			eqns.insert(GvmEqn::Recv("true"));
 			eqns.insert(GvmEqn::Send("true"));
@@ -202,7 +208,7 @@ impl Message for DiscoverMsg {
 		let packets = self.to_packets(&ca.get_control_tree_id())?;
 		let user_mask = DEFAULT_USER_MASK.all_but_port(PortNumber::new(port_no, ca.get_no_ports()).chain_err(|| ErrorKind::MessageError)?);
 		//println!("DiscoverMsg {}: forwarding packet {} on connected ports {}", ca.get_id(), packets[0].get_count(), self);
-		ca.add_saved_msg(&packets); // Discover message are always saved for late port connect
+		ca.add_saved_discover(&packets); // Discover message are always saved for late port connect
 		ca.send_msg(ca.get_connected_ports_tree_id().get_uuid(), &packets, user_mask).chain_err(|| ErrorKind::MessageError)?;
 		Ok(())
 	}

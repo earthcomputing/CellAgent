@@ -4,6 +4,7 @@ use std::collections::HashSet;
 use uuid::Uuid;
 
 use config::{PortNo, TableIndex};
+use message::MsgType;
 use message_types::{PeFromCa, PeToCa, PeToPort, PeFromPort, CaToPePacket, PortToPePacket, PeToCaPacket};
 use name::CellID;
 use packet::{Packet};
@@ -44,7 +45,7 @@ impl PacketEngine {
 		loop { 
 			match entry_pe_from_ca.recv().chain_err(|| ErrorKind::PacketEngineError)? {
 				CaToPePacket::Entry(e) => {
-					println!("PacketEngine {}: entry {}", self.cell_id, e);
+					//println!("PacketEngine {}: entry {}", self.cell_id, e);
 					self.routing_table.lock().unwrap().set_entry(e)
 				},
 				CaToPePacket::Packet((index, user_mask, packet)) => {
@@ -122,8 +123,7 @@ impl PacketEngine {
 				Some(_) => true,
 				None => false
 			};
-			if is_stack_msg { 
-				println!("PacketEngine {}: forwarding packet {} on ports {:?}, {}", self.cell_id, packet.get_count(), port_nos, entry); }
+			//if MsgType::is_type(packet, "StackTree") { println!("PacketEngine {}: forwarding packet {} on ports {:?}, {}", self.cell_id, packet.get_count(), port_nos, entry); }
 			for port_no in port_nos.iter() {
 				if let Some(other_index) = other_indices.get(port_no.v as usize) {
 					if port_no.v as usize == 0 { 
