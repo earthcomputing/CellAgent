@@ -1,4 +1,7 @@
 use std::fmt;
+use std::io::Write;
+use std::fs::{File, OpenOptions};
+use std::path::Path;
 use std::sync::{Arc, Mutex};
 use std::collections::HashSet;
 use uuid::Uuid;
@@ -6,7 +9,7 @@ use uuid::Uuid;
 use config::{PortNo, TableIndex};
 use message::MsgType;
 use message_types::{PeFromCa, PeToCa, PeToPort, PeFromPort, CaToPePacket, PortToPePacket, PeToCaPacket};
-use name::CellID;
+use name::{Name, CellID};
 use packet::{Packet};
 use routing_table::{RoutingTable};
 use routing_table_entry::{RoutingTableEntry};
@@ -20,7 +23,7 @@ pub struct PacketEngine {
 	pe_to_ca: PeToCa,
 	pe_to_ports: Vec<PeToPort>,
 }
-#[deny(unused_must_use)]
+
 impl PacketEngine {
 	pub fn new(cell_id: &CellID, packet_pe_to_ca: PeToCa, pe_to_ports: Vec<PeToPort>, 
 			boundary_port_nos: HashSet<PortNo>) -> Result<PacketEngine> {
@@ -40,12 +43,17 @@ impl PacketEngine {
 		Ok(())
 	}
 	//pub fn get_table(&self) -> &Arc<Mutex<RoutingTable>> { &self.routing_table }
-	
 	fn listen_ca(&self, entry_pe_from_ca: PeFromCa) -> Result<()> {
 		loop { 
 			match entry_pe_from_ca.recv().chain_err(|| ErrorKind::PacketEngineError)? {
 				CaToPePacket::Entry(e) => {
-					//println!("PacketEngine {}: entry {}", self.cell_id, e);
+					if *e.get_index() > 0 {
+						let children = e.get_mask().get_port_nos();
+						let json = ::serde_json::to_string(&e).chain_err(|| ErrorKind::PacketEngineError)?;
+						let json2 = ::serde_json::to_string(&e.get_mask().get_port_nos()).chain_err(|| ErrorKind::PacketEngineError)?;
+						let string = format!("Entry {}: {} {}", self.cell_id, json, json2);
+						::utility::append2file(string).chain_err(|| ErrorKind::PacketEngineError)?;
+					}
 					self.routing_table.lock().unwrap().set_entry(e)
 				},
 				CaToPePacket::Packet((index, user_mask, packet)) => {
@@ -163,6 +171,7 @@ impl fmt::Display for PacketEngine {
 // Errors
 error_chain! {
 	foreign_links {
+		File(::std::io::Error);
 		Recv(::std::sync::mpsc::RecvError);
 		PeToPort(::message_types::PePortError);
 		PeToCa(::message_types::PeCaError);

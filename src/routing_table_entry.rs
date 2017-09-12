@@ -6,7 +6,8 @@ use config::{MAX_PORTS, MAX_ENTRIES, PortNo, TableIndex};
 use name::{Name, TreeID};
 use utility::{Mask, PortNumber};
 
-#[derive(Debug, Copy, Clone)]
+type OtherIndices = [TableIndex; MAX_PORTS.v as usize];
+#[derive(Debug, Copy, Clone, Serialize, Deserialize)]
 pub struct RoutingTableEntry {
 	index: TableIndex,
 	uuid: Uuid,
@@ -14,7 +15,7 @@ pub struct RoutingTableEntry {
 	inuse: bool,
 	parent: PortNo,
 	mask: Mask,
-	other_indices: [TableIndex; MAX_PORTS.v as usize]
+	other_indices: OtherIndices
 }
 impl RoutingTableEntry {
 	pub fn new(index: TableIndex, tree_id: &TreeID, inuse: bool, parent: PortNumber, mask: Mask, 
