@@ -66,7 +66,7 @@ impl Mask {
 		for i in 0..MAX_PORTS.v {
 			let port_number = match PortNumber::new(PortNo{v:i}, MAX_PORTS) {
 				Ok(n) => n,
-				Err(_) => panic!("Mask port_nos_from_mask cannont generate an error")
+				Err(_) => panic!("Mask get_port_no cannont generate an error")
 			};
 			let test = Mask::new(port_number);
 			if *test.mask & *self.mask != 0 { port_nos.push(PortNo{v:i}) }
@@ -97,7 +97,6 @@ impl fmt::Display for PortNumber {
 }
 #[derive(Debug, Copy, Clone, Hash, Serialize, Deserialize)]
 pub struct Path { port_number: PortNumber }
-#[deny(unused_must_use)]
 impl Path {
 	pub fn new(port_no: PortNo, no_ports: PortNo) -> Result<Path> {
 		let port_number = try!(PortNumber::new(port_no, no_ports));
@@ -107,6 +106,17 @@ impl Path {
 }
 impl fmt::Display for Path {
 	fn fmt(&self, f:&mut fmt::Formatter) -> fmt::Result { write!(f, "{}", self.port_number) }
+}
+use std::fs::{File, OpenOptions};
+use std::io::Write;
+pub fn append2file(line: String) -> Result<()> {
+	let file_name = "routing_table.json";
+	let mut file_handle = match OpenOptions::new().append(true).open(file_name).chain_err(|| ErrorKind::UtilityError) {
+		Ok(f) => Ok(f),
+		Err(_) => File::create(file_name)
+	}.chain_err(|| ErrorKind::UtilityError)?;
+	file_handle.write(&(line + "\n").into_bytes()).chain_err(|| ErrorKind::UtilityError)?;
+	Ok(())
 }
 // Errors
 use name::CellID;

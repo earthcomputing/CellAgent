@@ -59,8 +59,10 @@ impl CellAgent {
 				-> Result<CellAgent> {
 		let tenant_masks = vec![BASE_TENANT_MASK];
 		let my_tree_id = TreeID::new(cell_id.get_name()).chain_err(|| ErrorKind::CellagentError)?;
-		let control_tree_id = TreeID::new(CONTROL_TREE_NAME).chain_err(|| ErrorKind::CellagentError)?;
-		let connected_tree_id = TreeID::new(CONNECTED_PORTS_TREE_NAME).chain_err(|| ErrorKind::CellagentError)?;
+		my_tree_id.append2file().chain_err(|| ErrorKind::CellagentError)?;		
+		let control_tree_id = TreeID::new(&(cell_id.get_name().to_string() + ":" + CONTROL_TREE_NAME)).chain_err(|| ErrorKind::CellagentError)?;
+		let connected_tree_id = TreeID::new(&(cell_id.get_name().to_string() + ":" + CONNECTED_PORTS_TREE_NAME)).chain_err(|| ErrorKind::CellagentError)?;
+		connected_tree_id.append2file().chain_err(|| ErrorKind::CellagentError)?;
 		let mut free_indices = Vec::new();
 		let trees = HashMap::new(); // For getting TreeID from table index
 		for i in 0..(*MAX_ENTRIES) { 
@@ -290,7 +292,7 @@ impl CellAgent {
 	pub fn stack_tree(&mut self, tree_id: &TreeID, parent_tree_uuid: &Uuid, 
 			black_tree_id: &TreeID, gvm_eqn: &GvmEquation) -> Result<()> {
 		let mut traph = self.get_traph(black_tree_id)?;
-		if traph.has_tree(tree_id) { return Ok(()); } 
+		if traph.has_tree(tree_id) { return Ok(()); } // Check for redundant StackTreeMsg
 		let parent_entry = traph.get_tree_entry(&parent_tree_uuid).chain_err(|| ErrorKind::CellagentError)?;
 		let mut entry = parent_entry.clone();
 		let index = self.use_index()?; 
@@ -370,6 +372,8 @@ impl CellAgent {
 		if is_border {
 			println!("CellAgent {}: port {} is a border port", self.cell_id, *port_no);
 			let tree_id = self.my_tree_id.add_component("Outside").chain_err(|| ErrorKind::CellagentError)?;
+			let tree_id = TreeID::new(tree_id.get_name())?;
+			tree_id.append2file()?;
 			let ref my_tree_id = self.my_tree_id.clone(); // Need because self borrowed mut
 			let msg = StackTreeMsg::new(&tree_id, &self.my_tree_id).chain_err(|| ErrorKind::CellagentError)?;
 			let packets = msg.to_packets(&self.my_tree_id).chain_err(|| ErrorKind::CellagentError)?;

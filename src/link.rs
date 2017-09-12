@@ -14,6 +14,7 @@ pub struct Link {
 impl Link {
 	pub fn new(left_id: &PortID, rite_id: &PortID) -> Result<Link> {
 		let id = LinkID::new(left_id, rite_id).chain_err(|| ErrorKind::LinkError)?;
+		::utility::append2file("LinkID: ".to_string() + &id.get_name().to_string()).chain_err(|| ErrorKind::LinkError)?;
 		Ok(Link { id: id, is_broken: false, is_connected: true })
 	}
 	pub fn start_threads(&self, 

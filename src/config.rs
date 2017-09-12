@@ -17,6 +17,9 @@ impl Deref for LinkNo { type Target = CellNo; fn deref(&self) -> &Self::Target {
 #[derive(Debug, Copy, Clone, Serialize, Deserialize)]
 pub struct MaskValue(pub u16);
 impl Deref for MaskValue { type Target = u16; fn deref(&self) -> &Self::Target { &self.0 } }
+#[derive(Debug, Copy, Clone, Hash, Eq, PartialEq, Serialize, Deserialize)]
+pub struct MsgID(pub u64);
+impl Deref for MsgID { type Target = u64; fn deref(&self) -> &Self::Target { &self.0 } }
 #[derive(Debug, Copy, Clone)]
 pub struct PacketNo(pub u16);
 impl Deref for PacketNo { type Target = u16; fn deref(&self) -> &Self::Target { &self.0 } }
@@ -29,9 +32,6 @@ impl Deref for PortNo { type Target = u8; fn deref(&self) -> &Self::Target { &se
 #[derive(Debug, Copy, Clone, Hash, Eq, PartialEq, Serialize, Deserialize)]
 pub struct TableIndex(pub u32);
 impl Deref for TableIndex { type Target = u32; fn deref(&self) -> &Self::Target { &self.0 } }
-#[derive(Debug, Copy, Clone, Hash, Eq, PartialEq, Serialize, Deserialize)]
-pub struct MsgID(pub u64);
-impl Deref for MsgID { type Target = u64; fn deref(&self) -> &Self::Target { &self.0 } }
 #[derive(Debug, Copy, Clone)]
 pub struct VmNo(pub usize);
 // Default inputs

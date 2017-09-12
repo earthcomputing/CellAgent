@@ -59,10 +59,15 @@ pub struct TreeID { name: NameType, uuid: Uuid}
 impl<'a> TreeID {
 	pub fn new(n: &str) -> Result<TreeID> { 
 		let str = n.to_string();
+		let tree_uuid = Uuid::new_v4();
 		match n.find(' ') {
-			None => Ok(TreeID { name: str, uuid: Uuid::new_v4() }),
+			None => Ok(TreeID { name: str, uuid: tree_uuid }),
 			Some(_) => Err(ErrorKind::Format(str, "TreeID::new".to_string()).into())
 		}
+	}
+	pub fn append2file(&self) -> Result<()> {
+		let json = ::serde_json::to_string(&self).chain_err(|| ErrorKind::NameError)?;
+		::utility::append2file("Tree: ".to_string() + &json).chain_err(|| ErrorKind::NameError)
 	}
 }
 impl Name for TreeID {
@@ -153,6 +158,7 @@ impl fmt::Display for ContainerID { fn fmt(&self, f: &mut fmt::Formatter) -> fmt
 // Errors
 error_chain! {
 	errors {
+		NameError
 		Format(name: String, func_name: String) {
 			display("{}: Name: '{}' contains blanks.", func_name, name)
 		}
