@@ -5,6 +5,7 @@ use container::{Container, Service};
 use message_types::{VmToCa, VmFromCa, VmToContainerMsg, VmToContainer, ContainerFromVm,
 	ContainerToVmMsg, ContainerToVm, VmFromContainer, ContainerVmError};
 use name::{ContainerID, TreeID, UpTraphID, VmID};
+use utility::S;
 
 #[derive(Debug, Clone)]
 pub struct VirtualMachine {
@@ -18,14 +19,16 @@ impl VirtualMachine {
 	pub fn initialize(&mut self, services: &mut Vec<Service>,
 			up_tree_id: &UpTraphID, tree_ids: &HashMap<&str,TreeID>, 
 			vm_to_ca: &VmToCa, vm_from_ca: VmFromCa) -> Result<()> {
-		self.listen_ca(vm_from_ca).chain_err(|| ErrorKind::VmError)?;
+		let f = "initialize";
+		self.listen_ca(vm_from_ca).chain_err(|| ErrorKind::ListenCa(self.id.clone(), S(f)))?;
 		while services.len() > 0 {
 			let (vm_to_container, container_from_vm): (VmToContainer, ContainerFromVm) = channel();
 			let (container_to_vm, vm_from_container): (ContainerToVm, VmFromContainer) = channel();
 			let service = services.pop().unwrap();
-			let container_id = ContainerID::new(&format!("Container:{}+{}", self.id, self.containers.len() + 1)).chain_err(|| ErrorKind::VmError)?;
+			let name = format!("Container:{}+{}", self.id, self.containers.len() + 1);
+			let container_id = ContainerID::new(&name).chain_err(|| ErrorKind::Name(self.id.clone(), S(f), name))?;
 			let container = Container::new(container_id.clone(), service);
-			container.initialize(up_tree_id, tree_ids, container_to_vm, container_from_vm)?;
+			container.initialize(up_tree_id, tree_ids, container_to_vm, container_from_vm).chain_err(|| ErrorKind::Container(self.id.clone(), S(f), up_tree_id.clone()))?;
 			self.containers.insert(up_tree_id.clone(), vec![vm_to_container]);
 			self.listen_container(container_id, vm_from_container, vm_to_ca.clone())?;
 		}
@@ -35,7 +38,7 @@ impl VirtualMachine {
 		println!("VM {}: listening to Ca", self.id);
 		let vm = self.clone();
 		::std::thread::spawn( move || -> Result<()> {
-			let _ = vm.listen_ca_loop(vm_from_ca).chain_err(|| ErrorKind::VmError).map_err(|e| vm.write_err(e));
+			let _ = vm.listen_ca_loop(vm_from_ca).map_err(|e| vm.write_err(e));
 			Ok(())
 		});
 		Ok(())
@@ -45,21 +48,23 @@ impl VirtualMachine {
 		println!("VM {}: listening to container {}", self.id, container_id);
 		let vm = self.clone();
 		::std::thread::spawn( move || -> Result<()> {
-			let msg = vm.listen_container_loop(vm_from_container, vm_to_ca).chain_err(|| ErrorKind::VmError).map_err(|e| vm.write_err(e));
+			let msg = vm.listen_container_loop(vm_from_container, vm_to_ca).map_err(|e| vm.write_err(e));
 			Ok(())
 		});		
 		Ok(())	
 	}	
 	fn listen_ca_loop(&self, vm_from_ca: VmFromCa) -> Result<()> {
+		let f = "listen_ca_loop";
 		loop {
-			let msg = vm_from_ca.recv().chain_err(|| ErrorKind::VmError)?;
+			let msg = vm_from_ca.recv().chain_err(|| ErrorKind::RecvCa(self.id.clone(), S(f)))?;
 			
 		}
 	}
 	fn listen_container_loop(&self, vm_from_container: VmFromContainer, vm_to_ca: VmToCa) -> Result<()> {
+		let f = "listen_container_loop";
 		loop {
-			let msg = vm_from_container.recv().chain_err(|| ErrorKind::VmError)?;
-			vm_to_ca.send(msg).chain_err(|| ErrorKind::VmError)?;
+			let msg = vm_from_container.recv().chain_err(|| ErrorKind::RecvContainer(self.id.clone(), S(f)))?;
+			vm_to_ca.send(msg).chain_err(|| ErrorKind::SendCa(self.id.clone(), S(f)))?;
 		}
 	}
 	fn write_err(&self, e: Error) {
@@ -75,13 +80,25 @@ impl VirtualMachine {
 	}
 }
 error_chain! {
-	foreign_links {
-		Receive(::std::sync::mpsc::RecvError);
-	}
-	links {
-		Container(::container::Error, ::container::ErrorKind);
-	}
-	errors { VmError
+	errors { 
+		Container(vm_id: VmID, func_name: String, up_traph_id: UpTraphID) {
+			display("VM {}: Container problem on up tree {} on VM {}", func_name, up_traph_id, vm_id)
+		}
+		ListenCa(vm_id: VmID, func_name: String) {
+			display("VM {}: Error talking to the CallAgent from VM {}", func_name, vm_id)
+		}
+		Name(vm_id: VmID, func_name: String, name: String) {
+			display("VM {}: Error making name from {} on VM {}", func_name, name, vm_id)
+		}
+		RecvCa(vm_id: VmID, func_name: String) {
+			display("VM {}: Error receiving from CellAgent on VM {}", func_name, vm_id)
+		}
+		RecvContainer(vm_id: VmID, func_name: String) {
+			display("VM {}: Error receiving from Container on VM {}", func_name, vm_id)
+		}
+		SendCa(vm_id: VmID, func_name: String) {
+			display("VM {}: Error sending to CallAgent from VM {}", func_name, vm_id)
+		}
 		
 	}
 }

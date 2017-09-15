@@ -3,7 +3,8 @@ use std::marker::Sized;
 use uuid::Uuid;
 
 use config::{SEPARATOR, CellNo};
-use utility::PortNumber;
+use utility::{PortNumber, S};
+
 // Using String means names are not Copy
 type NameType = String;
 pub trait Name: Sized {
@@ -66,8 +67,9 @@ impl<'a> TreeID {
 		}
 	}
 	pub fn append2file(&self) -> Result<()> {
-		let json = ::serde_json::to_string(&self).chain_err(|| ErrorKind::NameError)?;
-		::utility::append2file("Tree: ".to_string() + &json).chain_err(|| ErrorKind::NameError)
+		let f = "append2file";
+		let json = ::serde_json::to_string(&self).chain_err(|| ErrorKind::Serialize(S(f), S(self)))?;
+		::utility::append2file("Tree: ".to_string() + &json).chain_err(|| ErrorKind::Trace(S(f)))
 	}
 }
 impl Name for TreeID {
@@ -158,12 +160,17 @@ impl fmt::Display for ContainerID { fn fmt(&self, f: &mut fmt::Formatter) -> fmt
 // Errors
 error_chain! {
 	errors {
-		NameError
 		Format(name: String, func_name: String) {
-			display("{}: Name: '{}' contains blanks.", func_name, name)
+			display("Name {}: '{}' contains blanks.", func_name, name)
+		}
+		Serialize(func_name: String, message: String) {
+			display("Name {}: Can't serialize {}", func_name, message)
 		}
 		Size(name: String, func_name: String) {
-			display("{}: Name: '{}' is longer than {} characters", func_name, name, ::config::MAX_CHARS)
+			display("Name {}: '{}' is longer than {} characters", func_name, name, ::config::MAX_CHARS)
+		}
+		Trace(func_name: String) {
+			display("Name {}: Error writing status output", func_name)
 		}
 	}
 }

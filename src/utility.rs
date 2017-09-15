@@ -1,7 +1,7 @@
 use std::fmt;
 use std::collections::HashSet;
 
-use config::{MAX_PORTS, MaskValue, PortNo};
+use config::{MAX_PORTS, OUTPUT_FILE_NAME, MaskValue, PortNo};
 /*
 pub fn get_first_arg(a: Vec<String>) -> Option<i32> {
 	if a.len() != 2 {
@@ -110,18 +110,27 @@ impl fmt::Display for Path {
 use std::fs::{File, OpenOptions};
 use std::io::Write;
 pub fn append2file(line: String) -> Result<()> {
-	let file_name = "routing_table.json";
-	let mut file_handle = match OpenOptions::new().append(true).open(file_name).chain_err(|| ErrorKind::UtilityError) {
+	let f = "append2file";
+	let mut file_handle = match OpenOptions::new().append(true).open(OUTPUT_FILE_NAME).chain_err(|| ErrorKind::IO(S(OUTPUT_FILE_NAME), S(f))) {
 		Ok(f) => Ok(f),
-		Err(_) => File::create(file_name)
-	}.chain_err(|| ErrorKind::UtilityError)?;
-	file_handle.write(&(line + "\n").into_bytes()).chain_err(|| ErrorKind::UtilityError)?;
+		Err(_) => {
+			println!("Writing output to {}", OUTPUT_FILE_NAME);
+			File::create(OUTPUT_FILE_NAME)
+		}
+	}.chain_err(|| ErrorKind::IO(S(OUTPUT_FILE_NAME), S(f)))?;
+	file_handle.write(&(line + "\n").into_bytes()).chain_err(|| ErrorKind::IO(S(OUTPUT_FILE_NAME), S(f)))?;
 	Ok(())
 }
+// There are so many places in my code where it's more convenient 
+// to provide &str but I need String that I made the following
+pub fn S<T: fmt::Display>(s: T) -> String { s.to_string() }
 // Errors
 use name::CellID;
 error_chain! {
-	errors { UtilityError
+	errors { 
+		IO(file_name: String, func_name: String) {
+			display("Utility {}: Problem with file {}", func_name, file_name)
+		}
 		Mask(cell_id: CellID, func_name: String) {
 			display("{}: Utility: Cell {} has no tenant mask", func_name, cell_id)
 		}

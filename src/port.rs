@@ -7,7 +7,7 @@ use config::{PortNo, TableIndex};
 use message_types::{PortToLink, PortFromLink, PortToPe, PortFromPe, LinkToPortPacket, PortToPePacket,
 			  PortToNoc, PortFromNoc};
 use name::{PortID, CellID};
-use utility::PortNumber;
+use utility::{PortNumber, S};
 
 #[derive(Debug, Copy, Clone)]
 pub enum PortStatus {
@@ -27,13 +27,14 @@ pub struct Port {
 impl Port {
 	pub fn new(cell_id: &CellID, port_number: PortNumber, is_border: bool, is_connected: bool,
 			   port_to_pe: PortToPe) -> Result<Port> {
-		let port_id = PortID::new(cell_id, port_number)?;
+		let f = "new";
+		let port_id = PortID::new(cell_id, port_number).chain_err(|| ErrorKind::Name(cell_id.clone(), S(f), port_number))?;
 		Ok(Port{ id: port_id, port_number: port_number, is_border: is_border, 
 			is_connected: Arc::new(AtomicBool::new(is_connected)), 
 			is_broken: Arc::new(AtomicBool::new(false)),
 			port_to_pe: port_to_pe})
 	}
-	pub fn get_id(&self) -> PortID { self.id.clone() }
+	pub fn get_id(&self) -> &PortID { &self.id }
 	pub fn get_port_no(&self) -> PortNo { self.port_number.get_port_no() }
 	pub fn get_port_number(&self) -> PortNumber { self.port_number }
 	pub fn get_is_connected(&self) -> Arc<AtomicBool> { self.is_connected.clone() }
@@ -44,76 +45,78 @@ impl Port {
 	pub fn is_border(&self) -> bool { self.is_border }
 	pub fn outside_channel(&self, port_to_outside: PortToNoc, 
 			port_from_outside: PortFromNoc, port_from_pe: PortFromPe) -> Result<()> {
-		self.port_to_pe.send(PortToPePacket::Status((self.get_port_no(), self.is_border, PortStatus::Connected))).chain_err(|| ErrorKind::PortError)?;
+		let f = "outside_channel";
+		self.port_to_pe.send(PortToPePacket::Status((self.get_port_no(), self.is_border, PortStatus::Connected))).chain_err(|| ErrorKind::SendPe(self.id.clone(), S(f)))?;
 		let port_to_pe = self.port_to_pe.clone();
 		let id = self.id.clone();
 		let port_number = self.port_number;
 		let outside_handle = ::std::thread::spawn( move || {
-			let _ = Port::listen_outside_for_pe(&id.clone(), port_number, port_to_pe, port_from_outside).chain_err(|| ErrorKind::PortError).map_err(|e| Port::write_err(&id, e));
+			let _ = Port::listen_outside_for_pe(&id.clone(), port_number, port_to_pe, port_from_outside).map_err(|e| Port::write_err(&id, e));
 		});
 		let id = self.id.clone();
 		let pe_handle = ::std::thread::spawn( move || {
-			let _ = Port::listen_pe_for_outside(port_to_outside, port_from_pe).chain_err(|| ErrorKind::PortError).map_err(|e| Port::write_err(&id.clone(), e));
+			let _ = Port::listen_pe_for_outside(&id.clone(), port_to_outside, port_from_pe).map_err(|e| Port::write_err(&id.clone(), e));
 		});
 		Ok(())
 	}
 	fn listen_outside_for_pe(id: &PortID, port_number: PortNumber, port_to_pe: PortToPe, port_from_outside: PortFromNoc) -> Result<()> {
+		let f = "listen_outside_for_pe";
 		let other_index = TableIndex(0);
 		loop {
-			let packet = port_from_outside.recv().chain_err(|| "Receive from outside")?;
-			port_to_pe.send(PortToPePacket::Packet((port_number.get_port_no(), other_index, packet))).chain_err(|| ErrorKind::PortError)?;
+			let packet = port_from_outside.recv().chain_err(|| ErrorKind::RecvOutside(id.clone(), S(f)))?;
+			port_to_pe.send(PortToPePacket::Packet((port_number.get_port_no(), other_index, packet))).chain_err(|| ErrorKind::SendPe(id.clone(), S(f)))?;
 		}
 	}
-	fn listen_pe_for_outside(port_to_noc: PortToNoc, port_from_pe: PortFromPe) -> Result<()> {
+	fn listen_pe_for_outside(id: &PortID, port_to_noc: PortToNoc, port_from_pe: PortFromPe) -> Result<()> {
+		let f = "listen_pe_for_outside";
 		loop {
 			//println!("Port {}: waiting for packet from pe", port.id);
 			let (_, packet) = port_from_pe.recv().chain_err(|| "Receive from pe for outside")?;
-			port_to_noc.send(packet).chain_err(|| ErrorKind::PortError)?;
+			port_to_noc.send(packet).chain_err(|| ErrorKind::SendOutside(id.clone(),S(f)))?;
 		}		
 	}
-	pub fn link_channel(&self, port_to_link: PortToLink, 
-			port_from_link: PortFromLink, port_from_pe: PortFromPe) 
-				-> Result<()> {
+	pub fn link_channel(&self, port_to_link: PortToLink, port_from_link: PortFromLink, port_from_pe: PortFromPe) {
 		let id = self.id.clone();
 		let port_no = self.get_port_no();
 		let is_connected = self.is_connected.clone();
 		let is_border = self.is_border;
 		let port_to_pe = self.port_to_pe.clone();
 		let link_handle = ::std::thread::spawn( move || {
-			let _ = Port::listen_link(port_no, is_connected, is_border, port_to_pe, port_from_link).chain_err(|| ErrorKind::PortError).map_err(|e| Port::write_err(&id, e));
+			let _ = Port::listen_link(&id.clone(), port_no, is_connected, is_border, port_to_pe, port_from_link).map_err(|e| Port::write_err(&id, e));
 		});
 		let id = self.id.clone();
 		let pe_handle = ::std::thread::spawn( move || {
-			let _ = Port::listen_pe(port_to_link, port_from_pe).chain_err(|| ErrorKind::PortError).map_err(|e| Port::write_err(&id, e));
+			let _ = Port::listen_pe(&id, port_to_link, port_from_pe).map_err(|e| Port::write_err(&id, e));
 		});
-		Ok(())
 	}
-	fn listen_link(port_no: PortNo, is_connected: Arc<AtomicBool>, is_border: bool, port_to_pe: PortToPe, port_from_link: PortFromLink) -> Result<()> {
+	fn listen_link(id: &PortID, port_no: PortNo, is_connected: Arc<AtomicBool>, is_border: bool, port_to_pe: PortToPe, port_from_link: PortFromLink) -> Result<()> {
 		//println!("PortID {}: port_no {}", self.id, port_no);
+		let f = "listen_link";
 		loop {
 			//println!("Port {}: waiting for status or packet from link", port.id);
-			match port_from_link.recv().chain_err(|| ErrorKind::PortError)? {
+			match port_from_link.recv().chain_err(|| ErrorKind::RecvLink(id.clone(), S(f)))? {
 				LinkToPortPacket::Status(status) => {
 					match status {
 						PortStatus::Connected => Port::set_connected(is_connected.clone()),
 						PortStatus::Disconnected => Port::set_disconnected(is_connected.clone())
 					};
-					port_to_pe.send(PortToPePacket::Status((port_no, is_border, status))).chain_err(|| ErrorKind::PortError)?;
+					port_to_pe.send(PortToPePacket::Status((port_no, is_border, status))).chain_err(|| ErrorKind::SendPe(id.clone(), S(f)))?;
 				}
 				LinkToPortPacket::Packet((my_index, packet)) => {
 					//println!("Port {}: got from link {}", self.id, packet);
-					port_to_pe.send(PortToPePacket::Packet((port_no, my_index, packet))).chain_err(|| ErrorKind::PortError)?;
+					port_to_pe.send(PortToPePacket::Packet((port_no, my_index, packet))).chain_err(|| ErrorKind::SendPe(id.clone(), S(f)))?;
 					//println!("Port {}: sent from link to pe {}", self.id, packet);
 				}
 			}
 		}
 	}
-	fn listen_pe(port_to_link: PortToLink, port_from_pe: PortFromPe) -> Result<()> {
+	fn listen_pe(id: &PortID, port_to_link: PortToLink, port_from_pe: PortFromPe) -> Result<()> {
+		let f = "listen_pe";
 		loop {
 			//println!("Port {}: waiting for packet from pe", id);
-			let packet = port_from_pe.recv()?;
+			let packet = port_from_pe.recv().chain_err(|| ErrorKind::RecvPe(id.clone(), S(f)))?;
 			//println!("Port {}: got from pe {}", id, packet);
-			port_to_link.send(packet).chain_err(|| ErrorKind::PortError)?;
+			port_to_link.send(packet).chain_err(|| ErrorKind::SendLink(id.clone(), S(f)))?;
 			//println!("Port {}: sent from pe to link {}", id, packet);
 		}		
 	}
@@ -145,15 +148,27 @@ impl fmt::Display for Port {
 }
 // Errors
 error_chain! {
-	foreign_links {
-		Recv(::std::sync::mpsc::RecvError);
-		PortToLink(::message_types::PortLinkError);
-		PortToPe(::message_types::PortPeError);
-	}
-	links {
-		Name(::name::Error, ::name::ErrorKind);
-		Packet(::packet::Error, ::packet::ErrorKind);
-	}
-	errors { PortError
+	errors { 
+		Name(cell_id: CellID, func_name: String, port_number: PortNumber) {
+			display("Port {}: Error making name from {} and {}", func_name, cell_id, port_number)
+		}
+		RecvLink(port_id: PortID, func_name: String) {
+			display("Port {}: Port {} error receiving from link", func_name, port_id)
+		}
+		RecvOutside(port_id: PortID, func_name: String) {
+			display("Port {}: Port {} error receiving from outside", func_name, port_id)
+		}
+		RecvPe(port_id: PortID, func_name: String) {
+			display("Port {}: Port {} error receiving from PacketEngine", func_name, port_id)
+		}
+		SendLink(port_id: PortID, func_name: String) {
+			display("Port {}: Port {} can't send to link", func_name, port_id)
+		}
+		SendOutside(port_id: PortID, func_name: String) {
+			display("Port {}: Port {} can't send to outside", func_name, port_id)
+		}
+		SendPe(port_id: PortID, func_name: String) {
+			display("Port {}: Port {} can't send to PacketEngine", func_name, port_id)
+		}
 	}
 }

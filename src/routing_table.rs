@@ -3,7 +3,7 @@ use std::fmt;
 use config::{MAX_ENTRIES, MAX_PORTS, TableIndex};
 use name::CellID;
 use routing_table_entry::{RoutingTableEntry};
-use utility::{Mask, PortNumber};
+use utility::{Mask, PortNumber, S};
 
 #[derive(Debug)]
 pub struct RoutingTable {
@@ -21,9 +21,10 @@ impl RoutingTable {
 		Ok(RoutingTable { id: id, entries: entries, connected_ports: Vec::new() })
 	}
 	pub fn get_entry(&self, TableIndex(index): TableIndex) -> Result<RoutingTableEntry> { 
+		let f = "get_entry";
 		match self.entries.get(index as usize) {
 			Some(e) => Ok(*e),
-			None => Err(ErrorKind::Index(TableIndex(index), "get_entry".to_string()).into())
+			None => Err(ErrorKind::Index(self.id.clone(), TableIndex(index), S(f)).into())
 		}
 	}
 	pub fn set_entry(&mut self, entry: RoutingTableEntry) { 
@@ -43,14 +44,12 @@ impl fmt::Display for RoutingTable {
 }
 // Errors
 error_chain! {
-	links {
-		Name(::name::Error, ::name::ErrorKind);
-		RoutingTabeEntry(::routing_table_entry::Error, ::routing_table_entry::ErrorKind);
-		Utility(::utility::Error, ::utility::ErrorKind);
-	}
 	errors { RoutingTableError
-		Index(index: TableIndex, func_name: String) {
-			display("{}: RoutingTable: {} is not a valid routing table index", func_name, **index)
+		Index(cell_id: CellID, index: TableIndex, func_name: String) {
+			display("RoutingTable {}: {} is not a valid routing table index on cell {}", func_name, **index, cell_id)
+		}
+		Name(cell_id: CellID, func_name: String, name: String) {
+			display("RoutingTable {}: Error making name from {} on cell {}", func_name, name, cell_id)
 		}
 	}
 }

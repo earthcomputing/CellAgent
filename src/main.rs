@@ -40,12 +40,13 @@ use std::{thread, time};
 use std::io::{stdin, stdout, Write};
 use std::sync::mpsc::channel;
 
-use config::{PHYSICAL_UP_TREE_NAME, NCELLS, NPORTS, NLINKS, CellNo, Edge};
+use config::{NCELLS, NPORTS, NLINKS, OUTPUT_FILE_NAME, PHYSICAL_UP_TREE_NAME, CellNo, Edge};
 use datacenter::{Datacenter};
 use ecargs::{ECArgs};
 use message_types::{OutsideToNoc, NocFromOutside};
 use nalcell::CellType;
 use noc::Noc;
+use utility::S;
 
 fn main() {
 	if let Err(ref e) = run() {
@@ -65,7 +66,8 @@ fn main() {
 }
 
 fn run() -> Result<()> {
-	println!("Multicell Routing");
+	let f = "run";
+	println!("Multicell Routing: Output to file {} set in config.rs", OUTPUT_FILE_NAME);
 /* Doesn't work when debugging in Eclipse
 	let args: Vec<String> = env::args().collect();
 	println!("Main: args {:?}",args);
@@ -83,15 +85,15 @@ fn run() -> Result<()> {
 	println!("Main: {} ports for each of {} cells", *nports, *ncells);
 	//let edges = vec![(0,1),(1,2),(2,3),(3,4),(5,6),(6,7),(7,8),(8,9),(0,5),(1,6),(2,7),(3,8),(4,9)];
 	let edges = vec![is2e(0,1),is2e(1,2),is2e(1,6),is2e(3,4),is2e(5,6),is2e(6,7),is2e(7,8),is2e(8,9),is2e(0,5),is2e(2,3),is2e(2,7),is2e(3,8),is2e(4,9)];
-	let json = serde_json::to_string(&edges).chain_err(|| ErrorKind::MainError)?;
+	let json = serde_json::to_string(&edges).chain_err(|| ErrorKind::Serialize(S(f), edges.clone()))?;
 	let (outside_to_noc, noc_from_outside): (OutsideToNoc, NocFromOutside) = channel();
-	let noc = Noc::new(PHYSICAL_UP_TREE_NAME, CellType::NalCell)?;
-	let join_handles = noc.initialize(ncells, nports, edges, noc_from_outside)?;
+	let noc = Noc::new(PHYSICAL_UP_TREE_NAME, CellType::NalCell).chain_err(|| ErrorKind::Noc(S(f), S("Can't create NOC")))?;
+	let join_handles = noc.initialize(ncells, nports, edges, noc_from_outside).chain_err(|| ErrorKind::Noc(S(f), S("NOC initialization problem")))?;
 	loop {
-		stdout().write(b"Enter a command\n")?;
+		stdout().write(b"Enter a command\n").chain_err(|| ErrorKind::Output(S(f), S("Error writing to stdout")))?;
 		let mut input = String::new();
-		let _ = stdin().read_line(&mut input).chain_err(|| "Error reading from console")?;
-		outside_to_noc.send(input)?;
+		let _ = stdin().read_line(&mut input).chain_err(|| ErrorKind::Input(S(f), S("Error reading from console")))?;
+		outside_to_noc.send(input).chain_err(|| ErrorKind::Send(S(f), S("Error sending to NOC")))?;
 	}
 	for handle in join_handles {
 		let _ = handle.join();
@@ -102,20 +104,11 @@ fn run() -> Result<()> {
 fn is2e(i: usize, j: usize) -> Edge { Edge { v: (CellNo(i),CellNo(j)) } }
 // Errors
 error_chain! {
-	foreign_links {
-		Io(::std::io::Error);
-		Recv(::std::sync::mpsc::RecvError);
-		SendPort(::message_types::NocPortError);
-		SendNoc(::message_types::OutsideNocError);
-	}
-	links {
-		DatacenterError(::datacenter::Error, ::datacenter::ErrorKind);
-		Message(::message::Error, ::message::ErrorKind);
-		Name(::name::Error, ::name::ErrorKind);
-		Noc(::noc::Error, ::noc::ErrorKind);
-		Packet(::packet::Error, ::packet::ErrorKind);
-	}
 	errors {
-		MainError
+		Input(func_name: String, explanation: String) { display("Main {}: {}", func_name, explanation) }
+		Noc(func_name: String, explanation: String) { display("Main {}: {}", func_name, explanation) }
+		Output(func_name: String, explanation: String) {display("Main {}: {}", func_name, explanation) }
+		Send(func_name: String, explanation: String)  { display("Main {}:  {}", func_name, explanation) }
+		Serialize(func_name: String, s: Vec<Edge>) { display("Main {}: Cannot serialize {:?}", func_name, s) }
 	}
 }

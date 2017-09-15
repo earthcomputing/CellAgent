@@ -1,7 +1,9 @@
 use std::fmt;
 use std::collections::HashMap;
+
 use message_types::{ContainerToVm, ContainerFromVm};
 use name::{ContainerID, TreeID, UpTraphID};
+use utility::S;
 
 #[derive(Debug, Clone, Hash, Serialize, Deserialize)]
 pub struct Container {
@@ -57,13 +59,14 @@ impl NocMaster {
 	fn get_service(&self) -> Service { self.service }
 	fn initialize(&self, up_tree_id: &UpTraphID, tree_ids: &HashMap<&str, TreeID>,
 			container_to_vm: ContainerToVm, container_from_vm: ContainerFromVm) -> Result<()> {
-		
-		self.listen_vm(container_from_vm).chain_err(|| ErrorKind::ContainerError)
+		let f = "initialize";
+		self.listen_vm(container_from_vm).chain_err(|| ErrorKind::ListenVm(self.container_id.clone(), S(f)))
 	}
 	fn listen_vm(&self, container_from_vm: ContainerFromVm) -> Result<()> {
+		let f = "listen_vm";
 		let master = self.clone();
 		loop {
-			let msg = container_from_vm.recv().chain_err(|| ErrorKind::ContainerError)?;
+			let msg = container_from_vm.recv().chain_err(|| ErrorKind::ListenVm(self.container_id.clone(), S(f)))?;
 			println!("Container {}: got msg {}", master.container_id, msg);
 		}
 	}
@@ -92,12 +95,9 @@ impl NocAgent {
 }
 // Errors
 error_chain! {
-	foreign_links {
-		Recv(::std::sync::mpsc::RecvError);
-		SendVm(::message_types::VmContainerError);
-	}
-	links {
-	}
-	errors { ContainerError
+	errors { 
+		ListenVm(container_id: ContainerID, func_name: String) {
+			display("{}: Container {} has a problem receiving from VM", func_name, container_id)
+		}
 	}
 }

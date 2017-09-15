@@ -1,9 +1,10 @@
 use std::fmt;
 use serde_json;
-use std::collections::{HashMap, HashSet};
+use std::collections::{HashSet};
 use eval::{Expr, to_value};
 
 use config::{CellNo, PathLength};
+use utility::S;
 
 #[derive(Debug, Clone, Hash, Eq, PartialEq)]
 pub enum GvmEqn<'a> {
@@ -25,13 +26,13 @@ pub struct GvmEquation {
 // Sample GvmEquation: "hops < 7 || n_childen == 0",  associated variables vec!["hops", "n_children"]
 impl GvmEquation {
 	pub fn new(equations: HashSet<GvmEqn>, variables: Vec<GvmVariable>) -> GvmEquation { 
-		let (mut recv, mut send, mut xtnd, mut save) = ("false".to_string(), "false".to_string(), "false".to_string(), "false".to_string()); 
+		let (mut recv, mut send, mut xtnd, mut save) = (S("false"), S("false"), S("false"), S("false")); 
 		for eqn in equations.iter() {
 			match *eqn {
-				GvmEqn::Recv(s) => recv = s.to_string(),
-				GvmEqn::Send(s) => send = s.to_string(),
-				GvmEqn::Xtnd(s) => xtnd = s.to_string(),
-				GvmEqn::Save(s) => save = s.to_string(),
+				GvmEqn::Recv(s) => recv = S(s),
+				GvmEqn::Send(s) => send = S(s),
+				GvmEqn::Xtnd(s) => xtnd = S(s),
+				GvmEqn::Save(s) => save = S(s),
 			}
 		}
 		GvmEquation { recv_eqn: recv, send_eqn: send, 
@@ -51,22 +52,23 @@ impl GvmEquation {
 		self.evaluate(&self.xtnd_eqn, params)
 	}
 	fn evaluate(&self, eqn: &GvmEqnType, params: &Vec<GvmVariable>) -> Result<bool> {
+		let f = "evaluate";
 		let mut expr = Expr::new(eqn.clone());
 		for variable in params.iter() {
 			let var_type = variable.get_type();
 			let str_value = variable.get_value();
 			match *var_type {
 				GvmVariableType::CellNo => {
-					let value = serde_json::from_str::<CellNo>(&str_value).chain_err(|| ErrorKind::GvmEquationError)?;
+					let value = serde_json::from_str::<CellNo>(&str_value).chain_err(|| ErrorKind::Serialize(S(f), str_value))?;
 					expr = expr.clone().value(variable.get_value(), value);					
 				},
 				GvmVariableType::PathLength => {
-					let value = serde_json::from_str::<PathLength>(&str_value).chain_err(|| ErrorKind::GvmEquationError)?;
+					let value = serde_json::from_str::<PathLength>(&str_value).chain_err(|| ErrorKind::Serialize(S(f), str_value))?;
 					expr = expr.clone().value(variable.get_value(), value);
 				},
 			};
 		}
-		let result = expr.exec().chain_err(|| ErrorKind::GvmEquationError)?;
+		let result = expr.exec().chain_err(|| ErrorKind::Eval(S(f), S(eqn)))?;
 		Ok(result == to_value(true))
 	}
 }
@@ -111,11 +113,13 @@ impl fmt::Display for GvmVariable {
 		write!(f, "{}::{}", self.value, self.var_type) }
 }
 error_chain! {
-	foreign_links {
-		Eval(::eval::Error);
-		Convert(serde_json::Error);
-	}
 	errors {
-		GvmEquationError
+		Serialize(func_name: String, s: String) {
+			display("GvmEquation {}: Problem serializing {}", func_name, s)
+		}
+		Eval(func_name: String, eqn: String) {
+			display("GvmEquation {}: Can't evaluate {}",func_name, eqn)
+		}
+		
 	}
 }
