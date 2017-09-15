@@ -14,7 +14,7 @@ use gvm_equation::{GvmEquation, GvmEqn, GvmVariable, GvmVariableType};
 use name::{Name, CellID, TreeID, UpTraphID};
 use packet::{Packet, Packetizer, Serializer};
 use traph;
-use utility::{DEFAULT_USER_MASK, Mask, Path, PortNumber};
+use utility::{DEFAULT_USER_MASK, Mask, Path, PortNumber, S};
 
 static MESSAGE_COUNT: AtomicUsize = ATOMIC_USIZE_INIT;
 pub fn get_next_count() -> MsgID { MsgID(MESSAGE_COUNT.fetch_add(1, Ordering::SeqCst) as u64) } 
@@ -30,6 +30,11 @@ impl TypePlusMsg {
 	fn get_type(&self) -> MsgType { self.msg_type }
 	fn get_serialized_msg(&self) -> &str { &self.serialized_msg }
 }
+impl fmt::Display for TypePlusMsg {
+	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+		write!(f, "{}: {}", self.msg_type, self.serialized_msg)
+	}
+}
 #[derive(Debug, Copy, Clone, Hash, Serialize, Deserialize)]
 pub enum MsgType {
 	Discover,
@@ -40,15 +45,16 @@ pub enum MsgType {
 }
 impl MsgType {
 	pub fn get_msg(packets: &Vec<Packet>) -> Result<Box<Message>> {
-		let serialized = Packetizer::unpacketize(packets).chain_err(|| ErrorKind::MessageError)?;
-		let type_msg = serde_json::from_str::<TypePlusMsg>(&serialized).chain_err(|| ErrorKind::MessageError)?;
+		let f = "get_msg";
+		let serialized = Packetizer::unpacketize(packets).chain_err(|| ErrorKind::Unpacketize(S(f), packets.clone()))?;
+		let type_msg = serde_json::from_str::<TypePlusMsg>(&serialized).chain_err(|| ErrorKind::Deserialize(S(f), serialized))?;
 		let msg_type = type_msg.get_type();
 		let serialized_msg = type_msg.get_serialized_msg();		
 		Ok(match msg_type {
-			MsgType::Discover  => Box::new(serde_json::from_str::<DiscoverMsg>(&serialized_msg).chain_err(|| ErrorKind::MessageError)?),
-			MsgType::DiscoverD => Box::new(serde_json::from_str::<DiscoverDMsg>(&serialized_msg).chain_err(|| ErrorKind::MessageError)?),
-			MsgType::StackTree => Box::new(serde_json::from_str::<StackTreeMsg>(&serialized_msg).chain_err(|| ErrorKind::MessageError)?),
-			_ => return Err(ErrorKind::InvalidMsgType("get_msg".to_string(), msg_type).into())
+			MsgType::Discover  => Box::new(serde_json::from_str::<DiscoverMsg>(&serialized_msg).chain_err(|| ErrorKind::Deserialize(S(f), S(serialized_msg)))?),
+			MsgType::DiscoverD => Box::new(serde_json::from_str::<DiscoverDMsg>(&serialized_msg).chain_err(|| ErrorKind::Deserialize(S(f), S(serialized_msg)))?),
+			MsgType::StackTree => Box::new(serde_json::from_str::<StackTreeMsg>(&serialized_msg).chain_err(|| ErrorKind::Deserialize(S(f), S(serialized_msg)))?),
+			_ => return Err(ErrorKind::InvalidMsgType(S(f), msg_type).into())
 		})		
 	}
 	// A hack for printing debug output only for a specific message type
@@ -104,9 +110,10 @@ pub trait Message: fmt::Display {
 	}
 	fn to_packets(&self, tree_id: &TreeID) -> Result<Vec<Packet>> 
 			where Self:std::marker::Sized + serde::Serialize {
-		let bytes = Serializer::serialize(self).chain_err(|| ErrorKind::MessageError)?;
+		let f = "to_packets";
+		let bytes = Serializer::serialize(self).chain_err(|| ErrorKind::Serialize(S(f), S(self)))?;
 		let direction = self.get_header().get_direction();
-		let packets = Packetizer::packetize(tree_id, bytes, direction,).chain_err(|| ErrorKind::MessageError)?;		
+		let packets = Packetizer::packetize(tree_id, &bytes, direction,).chain_err(|| ErrorKind::Packetize(S(f), bytes))?;		
 		Ok(packets)
 	}
 	fn process(&mut self, cell_agent: &mut CellAgent, tree_uuid: Uuid, port_no: PortNo) -> Result<()>;
@@ -172,7 +179,8 @@ impl Message for DiscoverMsg {
 	fn get_header(&self) -> &MsgHeader { &self.header }
 	fn get_payload(&self) -> &MsgPayload { &self.payload }
 	fn process(&mut self, ca: &mut CellAgent, tree_uuid: Uuid, port_no: PortNo) -> Result<()> {
-		let port_number = PortNumber::new(port_no, ca.get_no_ports()).chain_err(|| ErrorKind::MessageError)?;
+		let f = "process Discover"; 
+		let port_number = PortNumber::new(port_no, ca.get_no_ports()).chain_err(|| ErrorKind::PortNumber(S(f), ca.get_id(), port_no))?;
 		let hops = self.payload.get_hops();
 		let path = self.payload.get_path();
 		let my_index;
@@ -189,8 +197,8 @@ impl Message for DiscoverMsg {
 			eqns.insert(GvmEqn::Xtnd("true"));
 			eqns.insert(GvmEqn::Save("false"));
 			let gvm_equation = GvmEquation::new(eqns, Vec::new());
-			let entry = ca.update_traph(&new_tree_id, port_number, status, Some(gvm_equation),
-					children, senders_index, hops, Some(path)).chain_err(|| ErrorKind::MessageError)?;
+			let entry = ca.update_traph(new_tree_id, port_number, status, Some(gvm_equation),
+					children, senders_index, hops, Some(path)).chain_err(|| ErrorKind::Cellagent(S(f), ca.get_id(), new_tree_id.clone()))?;
 			if exists { 
 				return Ok(()); // Don't forward if traph exists for this tree - Simple quenching
 			}
@@ -200,16 +208,16 @@ impl Message for DiscoverMsg {
 			let packets = discoverd_msg.to_packets(new_tree_id)?;
 			//println!("DiscoverMsg {}: sending discoverd for tree {} packet {} {}",ca.get_id(), new_tree_id, packets[0].get_count(), discoverd_msg);
 			let mask = Mask::new(port_number);
-			ca.send_msg(ca.get_connected_ports_tree_id().get_uuid(), &packets, mask).chain_err(|| ErrorKind::MessageError)?;
+			ca.send_msg(ca.get_connected_ports_tree_id().get_uuid(), &packets, mask).chain_err(|| ErrorKind::Cellagent(S(f), ca.get_id(), ca.get_connected_ports_tree_id().clone()))?;
 			// Forward Discover on all except port_no with updated hops and path
 		}
 		self.update_discover_msg(&ca.get_id(), my_index);
 		let control_tree_index = 0;
 		let packets = self.to_packets(&ca.get_control_tree_id())?;
-		let user_mask = DEFAULT_USER_MASK.all_but_port(PortNumber::new(port_no, ca.get_no_ports()).chain_err(|| ErrorKind::MessageError)?);
+		let user_mask = DEFAULT_USER_MASK.all_but_port(PortNumber::new(port_no, ca.get_no_ports()).chain_err(|| ErrorKind::PortNumber(S(f), ca.get_id(), port_no))?);
 		//println!("DiscoverMsg {}: forwarding packet {} on connected ports {}", ca.get_id(), packets[0].get_count(), self);
 		ca.add_saved_discover(&packets); // Discover message are always saved for late port connect
-		ca.send_msg(ca.get_connected_ports_tree_id().get_uuid(), &packets, user_mask).chain_err(|| ErrorKind::MessageError)?;
+		ca.send_msg(ca.get_connected_ports_tree_id().get_uuid(), &packets, user_mask).chain_err(|| ErrorKind::Cellagent(S(f), ca.get_id(), ca.get_connected_ports_tree_id().clone()))?;
 		Ok(())
 	}
 }
@@ -282,11 +290,12 @@ impl Message for DiscoverDMsg {
 	fn get_header(&self) -> &MsgHeader { &self.header }
 	fn get_payload(&self) -> &MsgPayload { &self.payload }
 	fn process(&mut self, ca: &mut CellAgent, tree_uuid: Uuid, port_no: PortNo) -> Result<()> {
+		let f = "process DiscoverD";
 		let tree_name = self.payload.get_tree_name();
 		let tree_id = self.get_tree_id(tree_name)?;
 		let my_index = self.payload.get_table_index();
 		let mut children = HashSet::new();
-		let port_number = PortNumber::new(port_no, MAX_PORTS).chain_err(|| ErrorKind::MessageError)?;
+		let port_number = PortNumber::new(port_no, MAX_PORTS).chain_err(|| ErrorKind::PortNumber(S(f), ca.get_id(), port_no))?;
 		children.insert(port_number);
 		//println!("DiscoverDMsg {}: process msg {} processing {} {} {}", ca.get_id(), self.get_header().get_count(), port_no, my_index, tree_id);
 		let mut eqns = HashSet::new();
@@ -295,8 +304,8 @@ impl Message for DiscoverDMsg {
 		eqns.insert(GvmEqn::Xtnd("false"));
 		eqns.insert(GvmEqn::Save("false"));
 		let gvm_eqn = GvmEquation::new(eqns, Vec::new());
-		ca.update_traph(&tree_id, port_number, traph::PortStatus::Child, Some(gvm_eqn), 
-			&mut children, my_index, PathLength(CellNo(0)), None).chain_err(|| ErrorKind::MessageError)?;
+		ca.update_traph(tree_id, port_number, traph::PortStatus::Child, Some(gvm_eqn), 
+			&mut children, my_index, PathLength(CellNo(0)), None).chain_err(|| ErrorKind::Cellagent(S(f), ca.get_id(), tree_id.clone()))?;
 		Ok(())
 	}
 }
@@ -332,21 +341,23 @@ pub struct StackTreeMsg {
 }
 impl StackTreeMsg {
 	pub fn new(tree_id: &TreeID, black_tree_id: &TreeID) -> Result<StackTreeMsg> {
+		let f = "new StackTree";
 		let mut tree_map = HashMap::new();
 		tree_map.insert(tree_id.stringify(), tree_id.clone());
 		tree_map.insert(black_tree_id.stringify(), black_tree_id.clone()); 
 		let header = MsgHeader::new(MsgType::StackTree, MsgDirection::Leafward, tree_map);
-		let payload = StackTreeMsgPayload::new(tree_id, black_tree_id.stringify()).chain_err(|| ErrorKind::MessageError)?;
+		let payload = StackTreeMsgPayload::new(tree_id, black_tree_id.stringify()).chain_err(|| ErrorKind::Payload(S(f)))?;
 		Ok(StackTreeMsg { header: header, payload: payload})
 	}
 	fn build_gvm_params(&self, ca: &CellAgent, tree_id: &TreeID, gvm_eqn: GvmEquation) 
 			-> Result<HashMap<GvmVariable,String>> {
+		let f = "build_gvm_params";
 		let params = HashMap::new();
 		let variables = gvm_eqn.get_variables();
 		for variable in variables.iter() {
 			match variable.get_value().as_ref() {
 				"hops" => {
-					let hops = ca.get_hops(&tree_id)?;
+					let hops = ca.get_hops(&tree_id).chain_err(|| ErrorKind::Cellagent(S(f), ca.get_id(), tree_id.clone()))?;
 				},
 				_ => ()
 			}
@@ -358,6 +369,7 @@ impl Message for StackTreeMsg {
 	fn get_header(&self) -> &MsgHeader { &self.header }
 	fn get_payload(&self) -> &MsgPayload { &self.payload }
 	fn process(&mut self, ca: &mut CellAgent, tree_uuid: Uuid, port_no: PortNo) -> Result<()> {
+		let f = "process StackTree";
 		//println!("Stack tree msg {}", self);
 		let tree_map = self.header.get_tree_map();
 		let tree_name = self.payload.get_tree_name();
@@ -365,7 +377,7 @@ impl Message for StackTreeMsg {
 		let black_tree_name = self.payload.get_black_tree_name();
 		if let Some(black_tree_id) = tree_map.get(black_tree_name) {
 			if let Some(tree_id) = tree_map.get(tree_name) {
-				ca.stack_tree(&tree_id, &tree_uuid, black_tree_id, gvm_eqn).chain_err(|| ErrorKind::MessageError)?;
+				ca.stack_tree(&tree_id, &tree_uuid, black_tree_id, gvm_eqn).chain_err(|| ErrorKind::Cellagent(S(f), ca.get_id(), tree_id.clone()))?;
 			} else {
 				return Err(ErrorKind::TreeMapEntry(tree_name.to_string(), "process stack tree (black)".to_string()).into());
 			}			
@@ -419,9 +431,10 @@ pub struct SetupVMsMsg {
 }
 impl SetupVMsMsg {
 	pub fn new(id: &str, service_sets: Vec<Vec<Service>>) -> Result<SetupVMsMsg> {
+		let f = "new";
 		// Note that direction is rootward so cell agent will get the message
 		let header = MsgHeader::new(MsgType::SetupVM, MsgDirection::Rootward, HashMap::new());
-		let payload = SetupVMsMsgPayload::new(id, service_sets).chain_err(|| ErrorKind::MessageError)?;
+		let payload = SetupVMsMsgPayload::new(id, service_sets).chain_err(|| ErrorKind::Payload(S(f)))?;
 		Ok(SetupVMsMsg { header: header, payload: payload })
 	}
 }
@@ -429,8 +442,10 @@ impl Message for SetupVMsMsg {
 	fn get_header(&self) -> &MsgHeader { &self.header }
 	fn get_payload(&self) -> &MsgPayload { &self.payload }
 	fn process(&mut self, ca: &mut CellAgent, tree_uuid: Uuid, port_no: PortNo) -> Result<()> {
+		let f = "process SetupVMs";
 		let service_sets = self.payload.get_service_sets().clone();
-		ca.create_vms(service_sets).chain_err(|| ErrorKind::MessageError)?;		
+		let dummy_tree_id = TreeID::new("foo").chain_err(|| ErrorKind::Name(S(f), S("foo")))?; // Figure out what this name should be
+		ca.create_vms(service_sets).chain_err(|| ErrorKind::Cellagent(S(f), ca.get_id(), dummy_tree_id))?;		
 		Ok(())
 	}
 }
@@ -449,7 +464,8 @@ pub struct SetupVMsMsgPayload {
 }
 impl SetupVMsMsgPayload {
 	fn new(id: &str, service_sets: Vec<Vec<Service>>) -> Result<SetupVMsMsgPayload> {
-		let up_tree_id = UpTraphID::new(id).chain_err(|| ErrorKind::MessageError)?;
+		let f = "new SetupVms";
+		let up_tree_id = UpTraphID::new(id).chain_err(|| ErrorKind::Name(S(f), S(id)))?;
 		Ok(SetupVMsMsgPayload { tree_name: id.to_string(), up_tree_id: up_tree_id, service_sets: service_sets })
 	}
 	pub fn get_service_sets(&self) -> &Vec<Vec<Service>> { &self.service_sets }
@@ -472,25 +488,44 @@ impl fmt::Display for SetupVMsMsgPayload {
 // Errors
 use errors::*;
 error_chain! {
-	links {
-		CellAgent(::cellagent::Error, ::cellagent::ErrorKind);
-		Packetizer(::packet::Error, ::packet::ErrorKind);
-		Utility(::utility::Error, ::utility::ErrorKind);
-	}
-	errors { MessageError
+	errors { 
+		Cellagent(func_name: String, cell_id: CellID, tree_id: TreeID) {
+			display("Message {}: Can't get hops for tree {} on cell {}", func_name, tree_id, cell_id)
+		}
+		Deserialize(func_name: String, serialized: String) {
+			display("Message {}: Can't deserialize {}", func_name, serialized)
+		}
 		InvalidMsgType(func_name: String, msg_type: MsgType) {
-			display("{}: Invalid message type {} from packet assembler", func_name, msg_type)
+			display("Message {}: Invalid message type {} from packet assembler", func_name, msg_type)
 		}
 		// Recursive type error if left in
 //		Message(cell_id: CellID, msg_no: usize) {
 //			description("Error processing message")
 //			display("Error processing message {} on cell {}", msg_no, cell_id)
 //		}
+		Name(func_name: String, name: String) {
+			display("Message {}: {} is not a valid name", func_name, name)
+		}
+		Packetize(func_name: String, packets: Box<Vec<u8>>) {
+			display("Messasge {}: Can't unpacketize {:?}", func_name, packets)
+		}
+		Payload(func_name: String) {
+			display("Message: {}: Can't create payload", func_name)
+		}
+		PortNumber(func_name: String, cell_id: CellID, port_no: PortNo) {
+			display("Message {}: {} is not a valid port number on cell {}", func_name, port_no.v, cell_id)
+		}
+		Serialize(func_name: String, message: String) {
+			display("Message {}: Can't serialize {}", func_name, message)
+		}
 		TreeMapMissing(func_name: String) {
-			display("{}: No tree map", func_name)
+			display("Message {}: No tree map", func_name)
 		}
 		TreeMapEntry(tree_name: String, func_name: String) {
-			display("{}: No tree named {} in map", func_name, tree_name)
+			display("Message {}: No tree named {} in map", func_name, tree_name)
 		}		
+		Unpacketize(func_name: String, packets: Vec<Packet>) {
+			display("Messasge {}: Can't unpacketize {:?}", func_name, packets)
+		}
 	}
 }

@@ -14,6 +14,7 @@ use config::{PACKET_MIN, PACKET_MAX, PAYLOAD_DEFAULT_ELEMENT,
 	MsgID, PacketNo, TableIndex};
 use message::{Message, MsgDirection, TypePlusMsg};
 use name::{Name, TreeID};
+use utility::S;
  
 //const LARGEST_MSG: usize = std::u32::MAX as usize;
 const PAYLOAD_MIN: usize = PACKET_MAX - PACKET_HEADER_SIZE;
@@ -141,18 +142,19 @@ pub struct Serializer {}
 impl Serializer {
 	pub fn serialize<M>(msg: &M) -> Result<Box<Vec<u8>>>
 			where M: Message + serde::Serialize {		
+		let f = "serialize";
 		let msg_type = msg.get_header().get_msg_type();
 		//let serialized_msg_type = serde_json::to_string(&msg_type).chain_err(|| ErrorKind::PacketError)?;
-		let serialized_msg = serde_json::to_string(&msg).chain_err(|| ErrorKind::PacketError)?;
+		let serialized_msg = serde_json::to_string(&msg).chain_err(|| ErrorKind::Serialize(S(f), S(msg)))?;
 		let msg_obj = TypePlusMsg::new(msg_type, serialized_msg);
-		let serialized = serde_json::to_string(&msg_obj).chain_err(|| ErrorKind::PacketError)?;
+		let serialized = serde_json::to_string(&msg_obj).chain_err(|| ErrorKind::Serialize(S(f), S(msg_obj)))?;
 		let msg_bytes = serialized.clone().into_bytes();
 		Ok(Box::new(msg_bytes))
 	}	
 }
 pub struct Packetizer {}
 impl Packetizer {
-	pub fn packetize(tree_id: &TreeID, msg_bytes: Box<Vec<u8>>, direction: MsgDirection) 
+	pub fn packetize(tree_id: &TreeID, msg_bytes: &Box<Vec<u8>>, direction: MsgDirection) 
 			-> Result<Vec<Packet>> {
 		let payload_size = Packetizer::packet_payload_size(msg_bytes.len());
 		let num_packets = (msg_bytes.len() + payload_size - 1)/ payload_size; // Poor man's ceiling
@@ -180,6 +182,7 @@ impl Packetizer {
 		Ok(packets)
 	}
 	pub fn unpacketize(packets: &Vec<Packet>) -> Result<String> {
+		let f = "unpacketize";
 		let mut all_bytes = Vec::new();
 		for packet in packets {
 			let header = packet.get_header();
@@ -192,7 +195,7 @@ impl Packetizer {
 			};
 			all_bytes.extend_from_slice(&bytes);
 		}
-		Ok(str::from_utf8(&all_bytes).chain_err(|| ErrorKind::PacketError)?.to_string())
+		Ok(str::from_utf8(&all_bytes).chain_err(|| ErrorKind::Utf(S(f), all_bytes.clone()))?.to_string())
 	}
 	fn packet_payload_size(len: usize) -> usize {
 		match len-1 { 
@@ -231,16 +234,18 @@ impl PacketAssembler {
 }
 // Errors
 error_chain! {
-	foreign_links {
-		Serde(serde_json::Error);
-		Utf8(::std::str::Utf8Error);
-	}
-	errors { PacketError 
+	errors { 
+		Serialize(func_name: String, msg: String) {
+			display("Packet {}: Can't serialize {}", func_name, msg)
+		}
 		Size(size: usize, func_name: String) {
-			display("{}: Packet: {} is not a valid packet size", func_name, size)
+			display("Packet {}: {} is not a valid packet size", func_name, size)
 		}
 		Unpacketize(serialized: String, func_name: String) {
-			display("{}: Packet: Cannot deserialize {}", func_name, serialized)
+			display("Packet {}: Cannot deserialize {}", func_name, serialized)
+		}
+		Utf(func_name: String, bytes: Vec<u8>) {
+			display("Packet {}: Can't convert {:?} to String", func_name, bytes)
 		}
 	}
 }

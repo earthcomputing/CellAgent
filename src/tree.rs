@@ -55,11 +55,6 @@ impl fmt::Display for Tree {
 	}	
 }
 error_chain! {
-	links {
-		RoutingTableEntry(::routing_table_entry::Error, ::routing_table_entry::ErrorKind);
-		Traph(::traph::Error, ::traph::ErrorKind);
-	}
 	errors {
-		TreeError
 	}
 }

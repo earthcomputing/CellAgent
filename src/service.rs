@@ -1,15 +1,18 @@
 use name::{ContainerID, TreeID, UpTraphID};
 use message::Message;
 use message_types::{ContainerToVm, ContainerFromVm, ContainerVmError};
+use utility::S;
 
 pub trait Service {
 	fn initialize(&self, container_to_vm: ContainerToVm, container_from_vm: ContainerFromVm) -> Result<()>;
+	fn get_container_id(&self) -> &ContainerID;
 	fn run_service(&self) -> Result<()>; 
 	fn process_msg(&self, Box<Message>) -> Result<()>;
 	fn write_err(&self, e: Error);
 	fn listen_loop(&self, container_to_vm: ContainerToVm, container_from_vm: ContainerFromVm) -> Result<()> {
+		let f = "listen_loop";
 		loop {
-			let msg = container_from_vm.recv()?;
+			let msg = container_from_vm.recv().chain_err(|| ErrorKind::Recv(self.get_container_id().clone(), S(f)))?;
 		}
 	}
 }
@@ -28,10 +31,11 @@ impl Service for NocMaster {
 	fn initialize(&self, container_to_vm: ContainerToVm, container_from_vm: ContainerFromVm) -> Result<()> {
 		let service = self.clone();
 		::std::thread::spawn( move || {
-			let _ = service.listen_loop(container_to_vm, container_from_vm).chain_err(|| ErrorKind::ServiceError).map_err(|e| service.write_err(e));
+			let _ = service.listen_loop(container_to_vm, container_from_vm).map_err(|e| service.write_err(e));
 		});
 		self.run_service()
 	}
+	fn get_container_id(&self) -> &ContainerID { &self.container_id }
 	fn run_service(&self) -> Result<()> {
 		println!("Container {} running NocMaster", self.container_id);
 		Ok(())
@@ -54,9 +58,9 @@ impl Service for NocMaster {
 }
 // Errors
 error_chain!{
-	foreign_links {
-		Recv(::std::sync::mpsc::RecvError);
-		Send(ContainerVmError);
+	errors {  
+		Recv(container_id: ContainerID, func_name: String) {
+			display("Service {}: Container {} error receiving from VM", func_name, container_id)
+		}
 	}
-	errors { ServiceError }
 }
