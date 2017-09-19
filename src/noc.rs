@@ -26,7 +26,7 @@ pub struct Noc {
 impl Noc {
 	pub fn new(id: &str, cell_type: CellType) -> Result<Noc> {
 		let f = "new";
-		let id = UpTraphID::new(id).chain_err(|| ErrorKind::Name(S(f), S(id)))?;
+		let id = UpTraphID::new(id)?;
 		Ok(Noc { id: id, cell_type: cell_type, packet_assemblers: PacketAssemblers::new(),
 				 no_datacenters: DatacenterNo(0) })
 	}
@@ -36,7 +36,7 @@ impl Noc {
 		let (noc_to_port, port_from_noc): (NocToPort, NocFromPort) = channel();
 		let (port_to_noc, noc_from_port): (PortToNoc, PortFromNoc) = channel();
 		let (mut dc, join_handles) = self.build_datacenter(&self.id, self.cell_type, ncells, nports, edges)?;
-		dc.connect_to_noc(port_to_noc, port_from_noc).chain_err(|| ErrorKind::Datacenter(S(f)))?;
+		dc.connect_to_noc(port_to_noc, port_from_noc)?;
 		let mut noc = self.clone();
 		spawn( move || { 
 			let _ = noc.listen_outside(noc_from_outside, noc_to_port).map_err(|e| noc.write_err("outside", e));
@@ -58,7 +58,7 @@ impl Noc {
 			ncells: CellNo, nports: PortNo, edges: Vec<Edge>) -> Result<(Datacenter, Vec<JoinHandle<()>>)> {
 		let f = "build_datacenter";
 		let mut dc = Datacenter::new(id, cell_type);
-		let join_handles = dc.initialize(ncells, nports, edges, self.cell_type).chain_err(|| ErrorKind::Datacenter(S(f)))?;
+		let join_handles = dc.initialize(ncells, nports, edges, self.cell_type)?;
 		Ok((dc, join_handles))
 	}
 	fn get_msg(&self, msg_type: MsgType, serialized_msg:String) -> Result<Box<Message>> {
@@ -70,12 +70,12 @@ impl Noc {
 		let f = "listen_port";
 		let noc = self.clone();
 		loop {
-			let packet = noc_from_port.recv().chain_err(|| ErrorKind::Recv(S(f), S("Port")))?;
+			let packet = noc_from_port.recv()?;
 			let msg_id = packet.get_header().get_msg_id();
 			let mut packet_assembler = self.packet_assemblers.remove(&msg_id).unwrap_or(PacketAssembler::new(msg_id));
 			let (last_packet, packets) = packet_assembler.add(packet);
 			if last_packet {
-				let msg = MsgType::get_msg(&packets).chain_err(|| ErrorKind::Message(S(f)))?;
+				let msg = MsgType::get_msg(&packets)?;
 				println!("Noc received {}", msg);
 			} else {
 				let assembler = PacketAssembler::create(msg_id, packets);
@@ -86,7 +86,7 @@ impl Noc {
 	fn listen_outside(&mut self, noc_from_outside: NocFromOutside, noc_to_port: NocToPort) -> Result<()> {
 		let f = "listen_outside";
 		loop {
-			let input = &noc_from_outside.recv().chain_err(|| ErrorKind::Recv(S(f), S("Outside")))?;
+			let input = &noc_from_outside.recv()?;
 			let mut split_input = input.splitn(2, "");
 			if let Some(cmd) = split_input.next() {
 				match cmd {
@@ -104,11 +104,11 @@ impl Noc {
 			_ => panic!("Bad CellType")
 		};
 		let name = format!("{}{}{}", self.id, SEPARATOR, *self.no_datacenters);
-		let up_id = UpTraphID::new(&name).chain_err(|| ErrorKind::Name(S(f), S(name)))?;
+		let up_id = UpTraphID::new(&name)?;
 		type Params = (CellNo, PortNo, Vec<Edge>);
 		if let Some(str_params) = str_params {
-			let params: Params = serde_json::from_str(str_params).chain_err(|| ErrorKind::Deserialize(S(f), S(str_params)))?;
-			let dc = self.build_datacenter(&up_id, new_cell_type, params.0, params.1, params.2).chain_err(|| ErrorKind::Input(str_params.to_string(), "new_uptraph".to_string()))?;
+			let params: Params = serde_json::from_str(str_params)?;
+			let dc = self.build_datacenter(&up_id, new_cell_type, params.0, params.1, params.2)?;
 			self.no_datacenters = DatacenterNo(*self.no_datacenters + 1);
 		} else { panic!("Parameter problem"); }
 		Ok(())
@@ -143,25 +143,15 @@ impl fmt::Display for ControlChannel {
 }
 // Errors
 error_chain! {
+	foreign_links {
+		Recv(::std::sync::mpsc::RecvError);
+		Serialize(::serde_json::Error);
+	}
+	links {
+		Datacenter(::datacenter::Error, ::datacenter::ErrorKind);
+		Message(::message::Error, ::message::ErrorKind);
+		Name(::name::Error, ::name::ErrorKind);
+	}
 	errors { 
-		Build(up_id: UpTraphID, func_name: String) {
-			display("Noc {}: Problem building datacenter at up_traph {}", func_name, up_id)
-		}
-		Datacenter(func_name: String) { 
-			display("Noc {}: Cannot connect to datacenter", func_name) 
-		}
-		Deserialize(func_name: String, serialized: String) {
-			display("Message {}: Can't deserialize {}", func_name, serialized)
-		}
-		Input(input: String, func_name: String) {
-			display("Noc {}: {} is not a valid command to the NOC", func_name, input)
-		}
-		Message(func_name: String) { 
-			display("Noc {}: Problem reading message", func_name) 
-		}
-		Name(func_name: String, name: String) {
-			display("Noc {}: {} is not a valid name", func_name, name)
-		}
-		Recv(func_name: String, source: String) { display("Noc {}: Problem receiving from {}", func_name, source) }
 	}
 }

@@ -38,7 +38,7 @@ impl NalCell {
 	pub fn new(cell_no: CellNo, nports: PortNo, is_border: bool, cell_type: CellType) -> Result<NalCell> {
 		let f = "new";
 		if nports.v > MAX_PORTS.v { return Err(ErrorKind::NumberPorts(nports, "new".to_string()).into()) }
-		let cell_id = CellID::new(cell_no).chain_err(|| ErrorKind::Name(cell_no, S(f)))?;
+		let cell_id = CellID::new(cell_no)?;
 		let (ca_to_pe, pe_from_ca): (CaToPe, PeFromCa) = channel();
 		let (pe_to_ca, ca_from_pe): (PeToCa, CaFromPe) = channel();
 		let (port_to_pe, pe_from_ports): (PortToPe, PeFromPort) = channel();
@@ -53,15 +53,15 @@ impl NalCell {
 			pe_to_ports.push(pe_to_port);
 			ports_from_pe.insert(PortNo{v:i}, port_from_pe);
 			let is_connected = if i == 0 { true } else { false };
-			let port_number = PortNumber::new(PortNo{v:i}, nports).chain_err(|| ErrorKind::PortNumber(i, S(f)))?;
+			let port_number = PortNumber::new(PortNo{v:i}, nports)?;
 			let port = Port::new(&cell_id, port_number, is_border_port, is_connected, 
-				port_to_pe.clone()).chain_err(|| ErrorKind::Port(cell_id.clone(), port_number, S(f)))?;
+				port_to_pe.clone())?;
 			ports.push(port);
 		}
 		let boxed_ports: Box<[Port]> = ports.into_boxed_slice();
-		let mut cell_agent = CellAgent::new(&cell_id, cell_type, nports, ca_to_pe).chain_err(|| ErrorKind::Initialize(S(f), S("CellAgent")))?;
-		cell_agent.initialize(cell_type, ca_from_pe).chain_err(|| ErrorKind::Initialize(S(f), S("CellAgent")))?;
-		let packet_engine = PacketEngine::new(&cell_id, pe_to_ca, pe_to_ports, boundary_port_nos).chain_err(|| ErrorKind::Initialize(S(f), S("PacketEngine")))?;
+		let mut cell_agent = CellAgent::new(&cell_id, cell_type, nports, ca_to_pe)?;
+		cell_agent.initialize(cell_type, ca_from_pe)?;
+		let packet_engine = PacketEngine::new(&cell_id, pe_to_ca, pe_to_ports, boundary_port_nos)?;
 		packet_engine.start_threads(pe_from_ca, pe_from_ports);
 		Ok(NalCell { id: cell_id, cell_no: cell_no, is_border: is_border, cell_type: cell_type, 
 				ports: boxed_ports, cell_agent: cell_agent, vms: Vec::new(),
@@ -107,33 +107,22 @@ impl fmt::Display for NalCell {
 }
 // Errors
 error_chain! {
+	links {
+		CellAgent(::cellagent::Error, ::cellagent::ErrorKind);
+		Name(::name::Error, ::name::ErrorKind);
+		PacketEngine(::packet_engine::Error, ::packet_engine::ErrorKind);
+		Port(::port::Error, ::port::ErrorKind);
+		Utility(::utility::Error, ::utility::ErrorKind);
+	}
 	errors { 
-		Border(cell_id: CellID, func_name: String) {
-			display("NalCell {}: {} is not a border cell", func_name, cell_id)
-		}
-		BoundaryPort(cell_id: CellID, func_name: String, port_no: PortNo) {
-			display("NalCell {}: Cell {} has no outside receiver for boundary port {}", func_name, cell_id, port_no.v)
-		}
 		Channel(port_no: PortNo, func_name: String) {
 			display("NalCell {}: No receiver for port {}", func_name, port_no.v)
-		}
-		Initialize(what: String, func_name: String) {
-			display("NalCell {}: Problem initializing {}", func_name, what)
-		}
-		Name(cell_no: CellNo, func_name: String) {
-			display("NalCell {}: Can't create cell ID for cell number {}", func_name, **cell_no)
 		}
 		NoFreePorts(cell_id: CellID, func_name: String) {
 			display("NalCell {}: All ports have been assigned for cell {}", func_name, cell_id)
 		}
 		NumberPorts(nports: PortNo, func_name: String) {
 			display("NalCell {}: You asked for {} ports, but only {} are allowed", func_name, nports.v, MAX_PORTS.v)
-		}
-		Port(cell_id: CellID, port_no: PortNumber, func_name: String) {
-			display("NalCell {}: Problem with port {} on cell {}:", func_name, port_no, cell_id)
-		}
-		PortNumber(port_no: u8, func_name: String) {
-			display("NalCell {}: {} is not a valid port number", func_name, port_no)
 		}
 	}
 }

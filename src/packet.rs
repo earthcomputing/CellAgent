@@ -144,10 +144,9 @@ impl Serializer {
 			where M: Message + serde::Serialize {		
 		let f = "serialize";
 		let msg_type = msg.get_header().get_msg_type();
-		//let serialized_msg_type = serde_json::to_string(&msg_type).chain_err(|| ErrorKind::PacketError)?;
-		let serialized_msg = serde_json::to_string(&msg).chain_err(|| ErrorKind::Serialize(S(f), S(msg)))?;
+		let serialized_msg = serde_json::to_string(&msg)?;
 		let msg_obj = TypePlusMsg::new(msg_type, serialized_msg);
-		let serialized = serde_json::to_string(&msg_obj).chain_err(|| ErrorKind::Serialize(S(f), S(msg_obj)))?;
+		let serialized = serde_json::to_string(&msg_obj)?;
 		let msg_bytes = serialized.clone().into_bytes();
 		Ok(Box::new(msg_bytes))
 	}	
@@ -195,7 +194,7 @@ impl Packetizer {
 			};
 			all_bytes.extend_from_slice(&bytes);
 		}
-		Ok(str::from_utf8(&all_bytes).chain_err(|| ErrorKind::Utf(S(f), all_bytes.clone()))?.to_string())
+		Ok(str::from_utf8(&all_bytes)?.to_string())
 	}
 	fn packet_payload_size(len: usize) -> usize {
 		match len-1 { 
@@ -234,18 +233,10 @@ impl PacketAssembler {
 }
 // Errors
 error_chain! {
+	foreign_links {
+		Deserialize(::serde_json::Error);
+		Utf8(::std::str::Utf8Error);
+	}
 	errors { 
-		Serialize(func_name: String, msg: String) {
-			display("Packet {}: Can't serialize {}", func_name, msg)
-		}
-		Size(size: usize, func_name: String) {
-			display("Packet {}: {} is not a valid packet size", func_name, size)
-		}
-		Unpacketize(serialized: String, func_name: String) {
-			display("Packet {}: Cannot deserialize {}", func_name, serialized)
-		}
-		Utf(func_name: String, bytes: Vec<u8>) {
-			display("Packet {}: Can't convert {:?} to String", func_name, bytes)
-		}
 	}
 }

@@ -99,7 +99,7 @@ impl fmt::Display for PortNumber {
 pub struct Path { port_number: PortNumber }
 impl Path {
 	pub fn new(port_no: PortNo, no_ports: PortNo) -> Result<Path> {
-		let port_number = try!(PortNumber::new(port_no, no_ports));
+		let port_number = PortNumber::new(port_no, no_ports)?;
 		Ok(Path { port_number: port_number })
 	}
 	pub fn get_port_no(&self) -> PortNo { self.port_number.get_port_no() }
@@ -111,14 +111,14 @@ use std::fs::{File, OpenOptions};
 use std::io::Write;
 pub fn append2file(line: String) -> Result<()> {
 	let f = "append2file";
-	let mut file_handle = match OpenOptions::new().append(true).open(OUTPUT_FILE_NAME).chain_err(|| ErrorKind::IO(S(OUTPUT_FILE_NAME), S(f))) {
+	let mut file_handle = match OpenOptions::new().append(true).open(OUTPUT_FILE_NAME) {
 		Ok(f) => Ok(f),
 		Err(_) => {
 			println!("Writing output to {}", OUTPUT_FILE_NAME);
 			File::create(OUTPUT_FILE_NAME)
 		}
-	}.chain_err(|| ErrorKind::IO(S(OUTPUT_FILE_NAME), S(f)))?;
-	file_handle.write(&(line + "\n").into_bytes()).chain_err(|| ErrorKind::IO(S(OUTPUT_FILE_NAME), S(f)))?;
+	}?;
+	file_handle.write(&(line + "\n").into_bytes())?;
 	Ok(())
 }
 // There are so many places in my code where it's more convenient 
@@ -127,10 +127,10 @@ pub fn S<T: fmt::Display>(s: T) -> String { s.to_string() }
 // Errors
 use name::CellID;
 error_chain! {
+	foreign_links {
+		Io(::std::io::Error);
+	}
 	errors { 
-		IO(file_name: String, func_name: String) {
-			display("Utility {}: Problem with file {}", func_name, file_name)
-		}
 		Mask(cell_id: CellID, func_name: String) {
 			display("{}: Utility: Cell {} has no tenant mask", func_name, cell_id)
 		}

@@ -60,13 +60,13 @@ impl NocMaster {
 	fn initialize(&self, up_tree_id: &UpTraphID, tree_ids: &HashMap<&str, TreeID>,
 			container_to_vm: ContainerToVm, container_from_vm: ContainerFromVm) -> Result<()> {
 		let f = "initialize";
-		self.listen_vm(container_from_vm).chain_err(|| ErrorKind::ListenVm(self.container_id.clone(), S(f)))
+		self.listen_vm(container_from_vm)
 	}
 	fn listen_vm(&self, container_from_vm: ContainerFromVm) -> Result<()> {
 		let f = "listen_vm";
 		let master = self.clone();
 		loop {
-			let msg = container_from_vm.recv().chain_err(|| ErrorKind::ListenVm(self.container_id.clone(), S(f)))?;
+			let msg = container_from_vm.recv()?;
 			println!("Container {}: got msg {}", master.container_id, msg);
 		}
 	}
@@ -95,9 +95,9 @@ impl NocAgent {
 }
 // Errors
 error_chain! {
+	foreign_links {
+		Recv(::std::sync::mpsc::RecvError);
+	}
 	errors { 
-		ListenVm(container_id: ContainerID, func_name: String) {
-			display("{}: Container {} has a problem receiving from VM", func_name, container_id)
-		}
 	}
 }

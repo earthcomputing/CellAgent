@@ -68,8 +68,9 @@ impl<'a> TreeID {
 	}
 	pub fn append2file(&self) -> Result<()> {
 		let f = "append2file";
-		let json = ::serde_json::to_string(&self).chain_err(|| ErrorKind::Serialize(S(f), S(self)))?;
-		::utility::append2file("Tree: ".to_string() + &json).chain_err(|| ErrorKind::Trace(S(f)))
+		let json = ::serde_json::to_string(&self)?;
+		::utility::append2file("Tree: ".to_string() + &json)?;
+		Ok(())
 	}
 }
 impl Name for TreeID {
@@ -159,18 +160,15 @@ impl Name for ContainerID {
 impl fmt::Display for ContainerID { fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result { self.name.fmt(f) } }
 // Errors
 error_chain! {
+	foreign_links {
+		Serialize(::serde_json::Error);
+	}
+	links {
+		Utility(::utility::Error, ::utility::ErrorKind);
+	}
 	errors {
 		Format(name: String, func_name: String) {
 			display("Name {}: '{}' contains blanks.", func_name, name)
-		}
-		Serialize(func_name: String, message: String) {
-			display("Name {}: Can't serialize {}", func_name, message)
-		}
-		Size(name: String, func_name: String) {
-			display("Name {}: '{}' is longer than {} characters", func_name, name, ::config::MAX_CHARS)
-		}
-		Trace(func_name: String) {
-			display("Name {}: Error writing status output", func_name)
 		}
 	}
 }
