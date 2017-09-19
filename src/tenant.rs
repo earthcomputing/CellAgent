@@ -15,13 +15,10 @@ impl Tenant {
 	pub fn new(id: &'static str, n: CellNo, parent_id: Option<TenantID>) -> Result<Tenant> {
 		let f = "new";
 		let name = match parent_id {
-			Some(p) => Ok(p.add_component(id).chain_err(|| ErrorKind::Name(S(id), S(f)))?),
-			None => TenantID::new(id).chain_err(|| ErrorKind::Name(S(id), S(f)))
-		}; 
-		match name {
-			Ok(name) => Ok(Tenant { id: name, ncells: n, children: HashMap::new(), }),
-			Err(err) => Err(err.into())
-		}
+			Some(p) => Ok(p.add_component(id)?),
+			None => TenantID::new(id)
+		}?; 
+		Ok(Tenant { id: name, ncells: n, children: HashMap::new() })
 	}
 	pub fn get_id(&self) -> TenantID { self.id.clone() }
 //	pub fn get_ncells(&self) -> usize { self.ncells }
@@ -63,12 +60,12 @@ impl fmt::Debug for Tenant {
 // Errors
 use config::CellNo;
 error_chain! {
+	links {
+		Name(::name::Error, ::name::ErrorKind);
+	}
 	errors { 
 		DuplicateName(tenant_id: String, func_name: String) {
 			display("Tenant {}: A tenant named '{}' already exists.", func_name, tenant_id)
-		}
-		Name(func_name: String, name: String) {
-			display("Tenant {}: Error making tenant name from {}", func_name, name)
 		}
 		Quota(request: CellNo, func_name: String, available: CellNo) {
 			display("Tenant {}: You asked for {} cells, but only {} are available", func_name, request.0, available.0)

@@ -27,7 +27,7 @@ impl Traph {
 		let f = "new";
 		let mut elements = Vec::new();
 		for i in 1..MAX_PORTS.v { 
-			elements.push(TraphElement::default(PortNumber::new(PortNo{v:i as u8}, MAX_PORTS).chain_err(|| ErrorKind::PortNumber(cell_id.clone(), S(f), PortNo{v:i as u8}))?)); 
+			elements.push(TraphElement::default(PortNumber::new(PortNo{v:i as u8}, MAX_PORTS)?)); 
 		}
 		let mut eqns = HashSet::new();
 		eqns.insert(GvmEqn::Recv("true"));
@@ -35,7 +35,7 @@ impl Traph {
 		eqns.insert(GvmEqn::Xtnd("true"));
 		eqns.insert(GvmEqn::Save("true"));
 		let gvm_eqn = GvmEquation::new(eqns, Vec::new());
-		let entry = RoutingTableEntry::default(index).chain_err(|| ErrorKind::RoutingTable(cell_id.clone(), S(f), index))?;
+		let entry = RoutingTableEntry::default(index)?;
 		let black_tree = Tree::new(black_tree_id, black_tree_id, Some(gvm_eqn), entry);
 		let stacked_trees = Arc::new(Mutex::new(HashMap::new()));
 		{
@@ -142,12 +142,12 @@ impl Traph {
 			if stacked_tree.get_id() != stacked_tree.get_black_tree_id() {
 				let mut stacked_entry = stacked_tree.get_table_entry();
 				let port_no = PortNo{v: base_tree_entry.get_other_indices().len() as u8};
-				let port_number = PortNumber::new(base_tree_entry.get_parent(), port_no).chain_err(|| ErrorKind::PortNumber(self.cell_id.clone(), S(f), port_no))?;
+				let port_number = PortNumber::new(base_tree_entry.get_parent(), port_no)?;
 				stacked_entry.set_parent(port_number);
 				stacked_entry.set_mask(base_tree_entry.get_mask());
 				if let Some(gvm_eqn) = stacked_tree.get_gvm_eqn() {
 					let params = self.get_params(gvm_eqn.get_variables())?;
-					if !gvm_eqn.eval_recv(&params).chain_err(|| ErrorKind::Gvm(self.cell_id.clone(), S(f), gvm_eqn))? { 
+					if !gvm_eqn.eval_recv(&params)? { 
 						let mask = stacked_entry.get_mask().and(Mask::all_but_zero(PortNo{v:stacked_entry.get_other_indices().len() as u8}));
 						stacked_entry.set_mask(mask);
 					}
@@ -209,22 +209,18 @@ impl fmt::Display for PortStatus {
 }
 // Errors
 error_chain! {
+	foreign_links {
+		Recv(::std::sync::mpsc::RecvError);
+	}
+	links {
+		Gvm(::gvm_equation::Error, ::gvm_equation::ErrorKind);
+		RoutingTableEntry(::routing_table_entry::Error, ::routing_table_entry::ErrorKind);
+		Utility(::utility::Error, ::utility::ErrorKind);
+	}
 	errors { 
-		Gvm(cell_id: CellID, func_name: String, gvm_eqn: GvmEquation) {
-			display("Traph {}: Cell {} can't evaluate GVM equation {}", func_name, cell_id, gvm_eqn)
-		}
-		Lookup(cell_id: CellID, func_name: String, port_number: PortNumber) {
-			display("Traph {}: No traph entry for port {} on cell {}", func_name, port_number, cell_id)
-		}
 		ParentElement(cell_id: CellID, func_name: String, tree_id: TreeID) {
 			display("Traph {}: No parent element for tree {} on cell {}", func_name, tree_id, cell_id)
 		} 
-		PortNumber(cell_id: CellID, func_name: String, port_no: PortNo) {
-			display("Traph {}: {} is not a valid port number on cell {}", func_name, port_no.v, cell_id)
-		}
-		RoutingTable(cell_id: CellID, func_name: String, index: TableIndex) {
-			display("Traph {}: No routing table entry at index {} on cell {}", func_name, **index, cell_id)
-		}
 		Tree(cell_id: CellID, func_name: String, tree_uuid: Uuid) {
 			display("Traph {}: No tree with UUID {} on cell {}", func_name, tree_uuid, cell_id)
 		}

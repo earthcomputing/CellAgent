@@ -59,16 +59,16 @@ impl GvmEquation {
 			let str_value = variable.get_value();
 			match *var_type {
 				GvmVariableType::CellNo => {
-					let value = serde_json::from_str::<CellNo>(&str_value).chain_err(|| ErrorKind::Serialize(S(f), str_value))?;
+					let value = serde_json::from_str::<CellNo>(&str_value)?;
 					expr = expr.clone().value(variable.get_value(), value);					
 				},
 				GvmVariableType::PathLength => {
-					let value = serde_json::from_str::<PathLength>(&str_value).chain_err(|| ErrorKind::Serialize(S(f), str_value))?;
+					let value = serde_json::from_str::<PathLength>(&str_value)?;
 					expr = expr.clone().value(variable.get_value(), value);
 				},
 			};
 		}
-		let result = expr.exec().chain_err(|| ErrorKind::Eval(S(f), S(eqn)))?;
+		let result = expr.exec()?;
 		Ok(result == to_value(true))
 	}
 }
@@ -113,13 +113,10 @@ impl fmt::Display for GvmVariable {
 		write!(f, "{}::{}", self.value, self.var_type) }
 }
 error_chain! {
+	foreign_links {
+		Eval(::eval::Error);
+		Serialize(::serde_json::Error);
+	}
 	errors {
-		Serialize(func_name: String, s: String) {
-			display("GvmEquation {}: Problem serializing {}", func_name, s)
-		}
-		Eval(func_name: String, eqn: String) {
-			display("GvmEquation {}: Can't evaluate {}",func_name, eqn)
-		}
-		
 	}
 }

@@ -25,8 +25,8 @@ impl RoutingTableEntry {
 	}
 	pub fn default(index: TableIndex) -> Result<RoutingTableEntry> {
 		let f = "default";
-		let port_number = PortNumber::new(PortNo{v:0}, MAX_PORTS).chain_err(|| ErrorKind::PortNumber(S(f), PortNo{v:0}))?;
-		let tree_id = TreeID::new("default").chain_err(|| ErrorKind::Name(S(f), S("default")))?;
+		let port_number = PortNumber::new(PortNo{v:0}, MAX_PORTS)?;
+		let tree_id = TreeID::new("default")?;
 		Ok(RoutingTableEntry::new(index, &tree_id, false, port_number, Mask::empty(), false, [TableIndex(0); MAX_PORTS.v as usize]))
 	}
 	pub fn is_in_use(&self) -> bool { self.inuse }
@@ -92,15 +92,10 @@ impl fmt::Display for RoutingTableEntry {
 }
 // Errors
 error_chain! {
+	links { 
+		Name(::name::Error, ::name::ErrorKind);
+		Utilty(::utility::Error, ::utility::ErrorKind);
+	}
 	errors { 
-		Index(index: TableIndex, func_name: String) {
-			display("RoutingTableEntry {}: Index number {} is greater than the maximum of {}", func_name, index.0, MAX_ENTRIES.0)
-		}
-		Name(func_name: String, name: String) {
-			display("RoutingTableEntry {}: Error making name from {}", func_name, name)
-		}
-		PortNumber(func_name: String, port_no: PortNo) {
-			display("RoutingTableEntry {}: {} is not a valid port number", func_name, port_no.v)
-		}
 	}
 }

@@ -80,20 +80,19 @@ fn run() -> Result<()> {
 		Ok(a) => a,
 		Err(err) => panic!("Argument Error: {}", err)
 	};
-	//let cell_id = CellID::new("foo bar").chain_err(|| "testing bad name")?;
 	let (ncells, nports) = ecargs.get_args();
 	println!("Main: {} ports for each of {} cells", *nports, *ncells);
 	//let edges = vec![(0,1),(1,2),(2,3),(3,4),(5,6),(6,7),(7,8),(8,9),(0,5),(1,6),(2,7),(3,8),(4,9)];
 	let edges = vec![is2e(0,1),is2e(1,2),is2e(1,6),is2e(3,4),is2e(5,6),is2e(6,7),is2e(7,8),is2e(8,9),is2e(0,5),is2e(2,3),is2e(2,7),is2e(3,8),is2e(4,9)];
-	let json = serde_json::to_string(&edges).chain_err(|| ErrorKind::Serialize(S(f), edges.clone()))?;
+	let json = serde_json::to_string(&edges)?;
 	let (outside_to_noc, noc_from_outside): (OutsideToNoc, NocFromOutside) = channel();
-	let noc = Noc::new(PHYSICAL_UP_TREE_NAME, CellType::NalCell).chain_err(|| ErrorKind::Noc(S(f), S("Can't create NOC")))?;
-	let join_handles = noc.initialize(ncells, nports, edges, noc_from_outside).chain_err(|| ErrorKind::Noc(S(f), S("NOC initialization problem")))?;
+	let noc = Noc::new(PHYSICAL_UP_TREE_NAME, CellType::NalCell)?;
+	let join_handles = noc.initialize(ncells, nports, edges, noc_from_outside)?;
 	loop {
-		stdout().write(b"Enter a command\n").chain_err(|| ErrorKind::Output(S(f), S("Error writing to stdout")))?;
+		stdout().write(b"Enter a command\n")?;
 		let mut input = String::new();
-		let _ = stdin().read_line(&mut input).chain_err(|| ErrorKind::Input(S(f), S("Error reading from console")))?;
-		outside_to_noc.send(input).chain_err(|| ErrorKind::Send(S(f), S("Error sending to NOC")))?;
+		let _ = stdin().read_line(&mut input)?;
+		outside_to_noc.send(input)?;
 	}
 	for handle in join_handles {
 		let _ = handle.join();
@@ -104,11 +103,12 @@ fn run() -> Result<()> {
 fn is2e(i: usize, j: usize) -> Edge { Edge { v: (CellNo(i),CellNo(j)) } }
 // Errors
 error_chain! {
-	errors {
-		Input(func_name: String, explanation: String) { display("Main {}: {}", func_name, explanation) }
-		Noc(func_name: String, explanation: String) { display("Main {}: {}", func_name, explanation) }
-		Output(func_name: String, explanation: String) {display("Main {}: {}", func_name, explanation) }
-		Send(func_name: String, explanation: String)  { display("Main {}:  {}", func_name, explanation) }
-		Serialize(func_name: String, s: Vec<Edge>) { display("Main {}: Cannot serialize {:?}", func_name, s) }
+	foreign_links {
+		Io(::std::io::Error);
+		SendNoc(::message_types::OutsideNocError);
+		Serialize(::serde_json::Error);
+	}
+	links {
+		Noc(::noc::Error, ::noc::ErrorKind);
 	}
 }

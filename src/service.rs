@@ -12,7 +12,7 @@ pub trait Service {
 	fn listen_loop(&self, container_to_vm: ContainerToVm, container_from_vm: ContainerFromVm) -> Result<()> {
 		let f = "listen_loop";
 		loop {
-			let msg = container_from_vm.recv().chain_err(|| ErrorKind::Recv(self.get_container_id().clone(), S(f)))?;
+			let msg = container_from_vm.recv()?;
 		}
 	}
 }
@@ -58,9 +58,9 @@ impl Service for NocMaster {
 }
 // Errors
 error_chain!{
+	foreign_links {
+		Recv(::std::sync::mpsc::RecvError);
+	}
 	errors {  
-		Recv(container_id: ContainerID, func_name: String) {
-			display("Service {}: Container {} error receiving from VM", func_name, container_id)
-		}
 	}
 }

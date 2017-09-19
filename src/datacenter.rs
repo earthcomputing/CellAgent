@@ -30,7 +30,7 @@ impl Datacenter {
 		if edge_list.len() < ncells.0 - 1 { return Err(ErrorKind::Edges(LinkNo(CellNo(edge_list.len())), S(f)).into()); }
 		for i in 0..ncells.0 {
 			let is_border = (i % 3) == 1;
-			let cell = NalCell::new(CellNo(i), nports, is_border, cell_type).chain_err(|| ErrorKind::NalCell(i, S(f)))?;
+			let cell = NalCell::new(CellNo(i), nports, is_border, cell_type)?;
 			self.cells.push(cell);
 		}
 		let mut link_handles = Vec::new();
@@ -44,12 +44,12 @@ impl Datacenter {
 
 			};
 			let cell_id = cell.get_id().clone();
-			let (left,left_from_pe) = cell.get_free_ec_port_mut().chain_err(|| ErrorKind::FreeECPort(cell_id.clone(), S(f)))?;
+			let (left,left_from_pe) = cell.get_free_ec_port_mut()?;
 			let mut cell = match split.1.first_mut() {
 				Some(c) => c,
 				None => return Err(ErrorKind::Wire(edge, S(f)).into())
 			};
-			let (rite, rite_from_pe) = cell.get_free_ec_port_mut().chain_err(|| ErrorKind::FreeECPort(cell_id, S(f)))?;
+			let (rite, rite_from_pe) = cell.get_free_ec_port_mut()?;
 			//println!("Datacenter: edge {:?}", edge);
 			let (link_to_left, left_from_link): (LinkToPort, PortFromLink) = channel();
 			let (link_to_rite, rite_from_link): (LinkToPort, PortFromLink) = channel();
@@ -57,8 +57,8 @@ impl Datacenter {
 			let (rite_to_link, link_from_rite): (PortToLink, LinkFromPort) = channel();
 			left.link_channel(left_to_link, left_from_link, left_from_pe);
 			rite.link_channel(rite_to_link, rite_from_link, rite_from_pe);
-			let link = Link::new(&left.get_id(), &rite.get_id()).chain_err(|| ErrorKind::LinkCreate(left.get_id().clone(), rite.get_id().clone(), S(f)))?;
-			let mut handle_pair = link.start_threads(link_to_left, link_from_left, link_to_rite, link_from_rite).chain_err(|| ErrorKind::Link(link.get_id().clone(), S(f)))?;
+			let link = Link::new(&left.get_id(), &rite.get_id())?;
+			let mut handle_pair = link.start_threads(link_to_left, link_from_left, link_to_rite, link_from_rite)?;
 			link_handles.append(&mut handle_pair);
 			self.links.push(link); 
 		} 
@@ -81,8 +81,8 @@ impl Datacenter {
 		} else {
 			let (mut boundary_cell, _) = boundary_cells.split_at_mut(1);
 			let cell_id = boundary_cell[0].get_id().clone();
-			let (port, port_from_pe) = boundary_cell[0].get_free_boundary_port_mut().chain_err(|| ErrorKind::FreeBorderPort(cell_id, S(f)))?;
-			port.outside_channel(port_to_noc, port_from_noc, port_from_pe).chain_err(|| ErrorKind::Port(port.get_id().clone(), S(f)))?;
+			let (port, port_from_pe) = boundary_cell[0].get_free_boundary_port_mut()?;
+			port.outside_channel(port_to_noc, port_from_noc, port_from_pe)?;
 			Ok(())
 		}
 	}
@@ -102,6 +102,11 @@ impl fmt::Display for Datacenter {
 }
 // Errors
 error_chain! {
+	links { 
+		Link(::link::Error, ::link::ErrorKind);
+		NalCell(::nalcell::Error, ::nalcell::ErrorKind);
+		Port(::port::Error, ::port::ErrorKind);
+	}
 	errors { 
 		Boundary(func_name: String) {
 			display("Datacenter {}: No boundary cells found", func_name)
@@ -112,26 +117,9 @@ error_chain! {
 		Edges(nlinks: LinkNo, func_name: String) {
 			display("Datacenter {}: {} is not enough links to connect all cells", func_name, (nlinks.0).0)
 		}
-		FreeECPort(cell_id: CellID, func_name: String) {
-			display("Datacenter {}: No free EC port on cell {}", func_name, cell_id)
-		}
-		FreeBorderPort(cell_id: CellID, func_name: String) {
-			display("Datacenter {}: No free EC port on cell {}", func_name, cell_id)
-		}
-		LinkCreate(left_id: PortID, rite_id: PortID, func_name: String) {
-			display("Datacenter {}: Problem connecting port {} to port {}", func_name, left_id, rite_id)
-		}
-		Link(link_id: LinkID, func_name: String) {
-			display("Datacenter {}: Problem connecting link {}", func_name, link_id)
-		}
-		NalCell(i: usize, func_name: String) {
-			display("Datacenter {}: Can't create cell {}", func_name, i)
-		}
-		Port(port_id: PortID, func_name: String) {
-			display("Datacenter {}: Problem on port {}", func_name, port_id)
-		}
 		Wire(edge: Edge, func_name: String) {
 			display("Datacenter {}: {:?} is not a valid edge", func_name, edge)
 		}
 	}
+
 }

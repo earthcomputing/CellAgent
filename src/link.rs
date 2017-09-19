@@ -15,8 +15,8 @@ pub struct Link {
 impl Link {
 	pub fn new(left_id: &PortID, rite_id: &PortID) -> Result<Link> {
 		let f = "new";
-		let id = LinkID::new(left_id, rite_id).chain_err(|| ErrorKind::Name(S(left_id), S(rite_id), S(f)))?;
-		::utility::append2file("LinkID: ".to_string() + &id.get_name().to_string()).chain_err(|| ErrorKind::Trace(id.clone(), S(f)))?;
+		let id = LinkID::new(left_id, rite_id)?;
+		::utility::append2file("LinkID: ".to_string() + &id.get_name().to_string())?;
 		Ok(Link { id: id, is_broken: false, is_connected: true })
 	}
 	pub fn get_id(&self) -> &LinkID { &self.id }
@@ -32,12 +32,12 @@ impl Link {
 			-> Result<JoinHandle<()>> {
 		let f = "listen";
 		let id = self.id.clone();
-		status.send(LinkToPortPacket::Status(PortStatus::Connected)).chain_err(|| ErrorKind::Send(S(f), S("Status")))?;
+		status.send(LinkToPortPacket::Status(PortStatus::Connected))?;
 		let join_handle = ::std::thread::spawn( move || {
 		loop {
 			//println!("Link {}: waiting to recv", self.id);
-			let packet = link_from.recv().chain_err(|| ErrorKind::Recv(S(f))).map_err(|e| Link::write_err(&id, e)).unwrap();
-			let _ = link_to.send(LinkToPortPacket::Packet(packet)).chain_err(|| ErrorKind::Send(S(f),S("Packet"))).map_err(|e| Link::write_err(&id, e));
+			let packet = link_from.recv().unwrap(); // TODO: Should be ? but I get a compiler error
+			let _ = link_to.send(LinkToPortPacket::Packet(packet));
 		}
 		});
 		Ok(join_handle)
@@ -64,18 +64,14 @@ impl fmt::Display for Link {
 }
 // Errors
 error_chain! {
+	foreign_links {
+		//Recv(::std::sync::mpsc::RecvError);
+		Send(::message_types::LinkPortError);
+	}
+	links {
+		Name(::name::Error, ::name::ErrorKind);
+		Utility(::utility::Error, ::utility::ErrorKind);
+	}
 	errors {
-		Name(left: String, rite: String, func_name: String) {
-			display("Link {}: {} and {} cannot be used to create a LinkID", func_name, left, rite) 
-		}
-		Recv(func_name: String) {
-			display("Link {}: Problem receiving from port", func_name)
-		}
-		Send(func_name: String, kind: String) {
-			display("Link {}: Problem sending {} Port", func_name, kind)
-		}
-		Trace(link_id: LinkID, func_name: String) {
-			display("Link {}: Error writing status output on cell {}", func_name, link_id)
-		}
 	}
 }
