@@ -3,7 +3,6 @@ use std::mem;
 use std::collections::HashMap;
 use std::sync::atomic::{ATOMIC_USIZE_INIT, AtomicUsize, Ordering};
 use std::str;
-use std::hash::{Hash};
 
 use rand;
 use serde;
@@ -11,10 +10,9 @@ use serde_json;
 use uuid::Uuid;
 
 use config::{PACKET_MIN, PACKET_MAX, PAYLOAD_DEFAULT_ELEMENT, 
-	MsgID, PacketNo, TableIndex};
+	MsgID, PacketNo};
 use message::{Message, MsgDirection, TypePlusMsg};
 use name::{Name, TreeID};
-use utility::S;
  
 //const LARGEST_MSG: usize = std::u32::MAX as usize;
 const PAYLOAD_MIN: usize = PACKET_MAX - PACKET_HEADER_SIZE;
@@ -142,7 +140,6 @@ pub struct Serializer {}
 impl Serializer {
 	pub fn serialize<M>(msg: &M) -> Result<Box<Vec<u8>>>
 			where M: Message + serde::Serialize {		
-		let f = "serialize";
 		let msg_type = msg.get_header().get_msg_type();
 		let serialized_msg = serde_json::to_string(&msg)?;
 		let msg_obj = TypePlusMsg::new(msg_type, serialized_msg);
@@ -181,7 +178,6 @@ impl Packetizer {
 		Ok(packets)
 	}
 	pub fn unpacketize(packets: &Vec<Packet>) -> Result<String> {
-		let f = "unpacketize";
 		let mut all_bytes = Vec::new();
 		for packet in packets {
 			let header = packet.get_header();
@@ -216,6 +212,7 @@ impl PacketAssembler {
 	pub fn create(msg_id: MsgID, packets: &Vec<Packet>) -> PacketAssembler {
 		PacketAssembler { msg_id: msg_id, packets: packets.clone() }
 	}
+/*
 	pub fn get_msg_id(&self) -> MsgID { self.msg_id }
 	pub fn get_packets(&self) -> &Vec<Packet> { &self.packets }
 	pub fn get_tree_uuid(&self) -> Option<Uuid> { 
@@ -225,6 +222,7 @@ impl PacketAssembler {
 			None 
 		}
 	}
+*/
 	pub fn add(&mut self, packet: Packet) -> (bool, &Vec<Packet>) { 
 		self.packets.push(packet); 
 		let header = packet.get_header();

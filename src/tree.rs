@@ -2,12 +2,11 @@ use std::fmt;
 use std::collections::HashSet;
 use uuid::Uuid;
 
-use cellagent::CellAgent;
-use config::{MAX_PORTS, PortNo, TableIndex};
+use config::{PortNo, TableIndex};
 use gvm_equation::GvmEquation;
 use name::{Name, TreeID};
 use routing_table_entry::RoutingTableEntry;
-use utility::{Mask, PortNumber};
+use utility::{PortNumber};
 
 #[derive(Debug, Clone)]
 pub struct Tree {

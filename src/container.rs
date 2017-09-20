@@ -3,7 +3,6 @@ use std::collections::HashMap;
 
 use message_types::{ContainerToVm, ContainerFromVm};
 use name::{ContainerID, TreeID, UpTraphID};
-use utility::S;
 
 #[derive(Debug, Clone, Hash, Serialize, Deserialize)]
 pub struct Container {
@@ -55,8 +54,8 @@ impl NocMaster {
 	fn new(container_id: &ContainerID) -> NocMaster { 
 		NocMaster { container_id: container_id.clone(), service: Service::NocMaster } 
 	}
-	fn get_container_id(&self) -> &ContainerID { &self.container_id }
-	fn get_service(&self) -> Service { self.service }
+//	fn get_container_id(&self) -> &ContainerID { &self.container_id }
+//	fn get_service(&self) -> Service { self.service }
 	fn initialize(&self, up_tree_id: &UpTraphID, tree_ids: &HashMap<&str, TreeID>,
 			container_to_vm: ContainerToVm, container_from_vm: ContainerFromVm) -> Result<()> {
 		let f = "initialize";
@@ -70,17 +69,17 @@ impl NocMaster {
 			println!("Container {}: got msg {}", master.container_id, msg);
 		}
 	}
-	fn write_err(&self, e: Error) {
-		use ::std::io::Write;
-		let stderr = &mut ::std::io::stderr();
-		let _ = writeln!(stderr, "Container {} error: {}", self.container_id, e);
-		for e in e.iter().skip(1) {
-			let _ = writeln!(stderr, "Caused by: {}", e);
-		}
-		if let Some(backtrace) = e.backtrace() {
-			let _ = writeln!(stderr, "Backtrace: {:?}", backtrace);
-		}
-	}
+//	fn write_err(&self, e: Error) {
+//		use ::std::io::Write;
+//		let stderr = &mut ::std::io::stderr();
+//		let _ = writeln!(stderr, "Container {} error: {}", self.container_id, e);
+//		for e in e.iter().skip(1) {
+//			let _ = writeln!(stderr, "Caused by: {}", e);
+//		}
+//		if let Some(backtrace) = e.backtrace() {
+//			let _ = writeln!(stderr, "Backtrace: {:?}", backtrace);
+//		}
+//	}
 }
 #[derive(Debug, Clone, Hash, Serialize, Deserialize, PartialEq, Eq)]
 struct NocAgent {

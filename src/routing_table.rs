@@ -1,9 +1,9 @@
 use std::fmt;
 
-use config::{MAX_ENTRIES, MAX_PORTS, TableIndex};
+use config::{MAX_ENTRIES, TableIndex};
 use name::CellID;
 use routing_table_entry::{RoutingTableEntry};
-use utility::{Mask, PortNumber, S};
+use utility::{S};
 
 #[derive(Debug)]
 pub struct RoutingTable {

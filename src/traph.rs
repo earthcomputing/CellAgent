@@ -1,7 +1,6 @@
 use std::fmt;
 use std::collections::{HashMap, HashSet};
 use std::sync::{Arc, Mutex, MutexGuard};
-use std::collections::hash_map::Entry;
 
 use uuid::Uuid;
 
@@ -11,7 +10,7 @@ use name::{Name, CellID, TreeID};
 use routing_table_entry::{RoutingTableEntry};
 use traph_element::TraphElement;
 use tree::Tree;
-use utility::{Mask, Path, PortNumber, S};
+use utility::{Mask, Path, PortNumber};
 
 type StackedTrees = HashMap<Uuid, Tree>;
 
@@ -24,7 +23,6 @@ pub struct Traph {
 }
 impl Traph {
 	pub fn new(cell_id: &CellID, black_tree_id: &TreeID, index: TableIndex) -> Result<Traph> {
-		let f = "new";
 		let mut elements = Vec::new();
 		for i in 1..MAX_PORTS.v { 
 			elements.push(TraphElement::default(PortNumber::new(PortNo{v:i as u8}, MAX_PORTS)?)); 
@@ -135,7 +133,6 @@ impl Traph {
 		Ok(table_entry)
 	}
 	pub fn update_stacked_entries(&self, base_tree_entry: RoutingTableEntry) -> Result<Vec<RoutingTableEntry>> {	
-		let f = "update_stacked_entries";
 		let locked = self.stacked_trees.lock().unwrap();
 		let mut updated_entries = Vec::new();
 		for stacked_tree in locked.values() {

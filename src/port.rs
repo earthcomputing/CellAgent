@@ -7,7 +7,7 @@ use config::{PortNo, TableIndex};
 use message_types::{PortToLink, PortFromLink, PortToPe, PortFromPe, LinkToPortPacket, PortToPePacket,
 			  PortToNoc, PortFromNoc};
 use name::{PortID, CellID};
-use utility::{PortNumber, S};
+use utility::{PortNumber};
 
 #[derive(Debug, Copy, Clone)]
 pub enum PortStatus {
@@ -27,7 +27,6 @@ pub struct Port {
 impl Port {
 	pub fn new(cell_id: &CellID, port_number: PortNumber, is_border: bool, is_connected: bool,
 			   port_to_pe: PortToPe) -> Result<Port> {
-		let f = "new";
 		let port_id = PortID::new(cell_id, port_number)?;
 		Ok(Port{ id: port_id, port_number: port_number, is_border: is_border, 
 			is_connected: Arc::new(AtomicBool::new(is_connected)), 
@@ -36,7 +35,7 @@ impl Port {
 	}
 	pub fn get_id(&self) -> &PortID { &self.id }
 	pub fn get_port_no(&self) -> PortNo { self.port_number.get_port_no() }
-	pub fn get_port_number(&self) -> PortNumber { self.port_number }
+//	pub fn get_port_number(&self) -> PortNumber { self.port_number }
 	pub fn get_is_connected(&self) -> Arc<AtomicBool> { self.is_connected.clone() }
 	pub fn is_connected(&self) -> bool { self.is_connected.load(SeqCst) }
 	pub fn set_connected(is_connected: Arc<AtomicBool>) { is_connected.store(true, SeqCst); }
@@ -45,30 +44,27 @@ impl Port {
 	pub fn is_border(&self) -> bool { self.is_border }
 	pub fn outside_channel(&self, port_to_outside: PortToNoc, 
 			port_from_outside: PortFromNoc, port_from_pe: PortFromPe) -> Result<()> {
-		let f = "outside_channel";
 		self.port_to_pe.send(PortToPePacket::Status((self.get_port_no(), self.is_border, PortStatus::Connected)))?;
 		let port_to_pe = self.port_to_pe.clone();
-		let id = self.id.clone();
 		let port_number = self.port_number;
-		let outside_handle = ::std::thread::spawn( move || {
-			let _ = Port::listen_outside_for_pe(&id.clone(), port_number, port_to_pe, port_from_outside).map_err(|e| Port::write_err(&id, e));
+		let id = self.id.clone();
+		::std::thread::spawn( move || {
+			let _ = Port::listen_outside_for_pe(port_number, port_to_pe, port_from_outside).map_err(|e| Port::write_err(&id, e));
 		});
 		let id = self.id.clone();
-		let pe_handle = ::std::thread::spawn( move || {
-			let _ = Port::listen_pe_for_outside(&id.clone(), port_to_outside, port_from_pe).map_err(|e| Port::write_err(&id.clone(), e));
+		::std::thread::spawn( move || {
+			let _ = Port::listen_pe_for_outside(port_to_outside, port_from_pe).map_err(|e| Port::write_err(&id.clone(), e));
 		});
 		Ok(())
 	}
-	fn listen_outside_for_pe(id: &PortID, port_number: PortNumber, port_to_pe: PortToPe, port_from_outside: PortFromNoc) -> Result<()> {
-		let f = "listen_outside_for_pe";
+	fn listen_outside_for_pe(port_number: PortNumber, port_to_pe: PortToPe, port_from_outside: PortFromNoc) -> Result<()> {
 		let other_index = TableIndex(0);
 		loop {
 			let packet = port_from_outside.recv()?;
 			port_to_pe.send(PortToPePacket::Packet((port_number.get_port_no(), other_index, packet)))?;
 		}
 	}
-	fn listen_pe_for_outside(id: &PortID, port_to_noc: PortToNoc, port_from_pe: PortFromPe) -> Result<()> {
-		let f = "listen_pe_for_outside";
+	fn listen_pe_for_outside(port_to_noc: PortToNoc, port_from_pe: PortFromPe) -> Result<()> {
 		loop {
 			//println!("Port {}: waiting for packet from pe", port.id);
 			let (_, packet) = port_from_pe.recv()?;
@@ -81,17 +77,16 @@ impl Port {
 		let is_connected = self.is_connected.clone();
 		let is_border = self.is_border;
 		let port_to_pe = self.port_to_pe.clone();
-		let link_handle = ::std::thread::spawn( move || {
-			let _ = Port::listen_link(&id.clone(), port_no, is_connected, is_border, port_to_pe, port_from_link).map_err(|e| Port::write_err(&id, e));
+		::std::thread::spawn( move || {
+			let _ = Port::listen_link(port_no, is_connected, is_border, port_to_pe, port_from_link).map_err(|e| Port::write_err(&id, e));
 		});
 		let id = self.id.clone();
-		let pe_handle = ::std::thread::spawn( move || {
-			let _ = Port::listen_pe(&id, port_to_link, port_from_pe).map_err(|e| Port::write_err(&id, e));
+		::std::thread::spawn( move || {
+			let _ = Port::listen_pe(port_to_link, port_from_pe).map_err(|e| Port::write_err(&id, e));
 		});
 	}
-	fn listen_link(id: &PortID, port_no: PortNo, is_connected: Arc<AtomicBool>, is_border: bool, port_to_pe: PortToPe, port_from_link: PortFromLink) -> Result<()> {
+	fn listen_link(port_no: PortNo, is_connected: Arc<AtomicBool>, is_border: bool, port_to_pe: PortToPe, port_from_link: PortFromLink) -> Result<()> {
 		//println!("PortID {}: port_no {}", self.id, port_no);
-		let f = "listen_link";
 		loop {
 			//println!("Port {}: waiting for status or packet from link", port.id);
 			match port_from_link.recv()? {
@@ -110,8 +105,7 @@ impl Port {
 			}
 		}
 	}
-	fn listen_pe(id: &PortID, port_to_link: PortToLink, port_from_pe: PortFromPe) -> Result<()> {
-		let f = "listen_pe";
+	fn listen_pe(port_to_link: PortToLink, port_from_pe: PortFromPe) -> Result<()> {
 		loop {
 			//println!("Port {}: waiting for packet from pe", id);
 			let packet = port_from_pe.recv()?;

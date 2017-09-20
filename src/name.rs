@@ -3,7 +3,7 @@ use std::marker::Sized;
 use uuid::Uuid;
 
 use config::{SEPARATOR, CellNo};
-use utility::{PortNumber, S};
+use utility::{PortNumber};
 
 // Using String means names are not Copy
 type NameType = String;
@@ -67,7 +67,6 @@ impl<'a> TreeID {
 		}
 	}
 	pub fn append2file(&self) -> Result<()> {
-		let f = "append2file";
 		let json = ::serde_json::to_string(&self)?;
 		::utility::append2file("Tree: ".to_string() + &json)?;
 		Ok(())

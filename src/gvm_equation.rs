@@ -52,7 +52,6 @@ impl GvmEquation {
 		self.evaluate(&self.xtnd_eqn, params)
 	}
 	fn evaluate(&self, eqn: &GvmEqnType, params: &Vec<GvmVariable>) -> Result<bool> {
-		let f = "evaluate";
 		let mut expr = Expr::new(eqn.clone());
 		for variable in params.iter() {
 			let var_type = variable.get_type();

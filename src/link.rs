@@ -4,7 +4,6 @@ use std::thread::JoinHandle;
 use message_types::{LinkToPort, LinkFromPort, LinkToPortPacket};
 use name::{Name, LinkID, PortID};
 use port::{PortStatus};
-use utility::S;
 
 #[derive(Debug, Clone)]
 pub struct Link {
@@ -14,12 +13,11 @@ pub struct Link {
 }
 impl Link {
 	pub fn new(left_id: &PortID, rite_id: &PortID) -> Result<Link> {
-		let f = "new";
 		let id = LinkID::new(left_id, rite_id)?;
 		::utility::append2file("LinkID: ".to_string() + &id.get_name().to_string())?;
 		Ok(Link { id: id, is_broken: false, is_connected: true })
 	}
-	pub fn get_id(&self) -> &LinkID { &self.id }
+//	pub fn get_id(&self) -> &LinkID { &self.id }
 	pub fn start_threads(&self, 
 			link_to_left: LinkToPort, link_from_left: LinkFromPort,
 			link_to_rite: LinkToPort, link_from_rite: LinkFromPort ) 
@@ -30,8 +28,6 @@ impl Link {
 	}
 	fn listen(&self, status: LinkToPort, link_from: LinkFromPort, link_to: LinkToPort) 
 			-> Result<JoinHandle<()>> {
-		let f = "listen";
-		let id = self.id.clone();
 		status.send(LinkToPortPacket::Status(PortStatus::Connected))?;
 		let join_handle = ::std::thread::spawn( move || {
 		loop {
@@ -42,17 +38,17 @@ impl Link {
 		});
 		Ok(join_handle)
 	}			
-	fn write_err(id: &LinkID, e: Error) {
-		use ::std::io::Write;
-		let stderr = &mut ::std::io::stderr();
-		let _ = writeln!(stderr, "Link {}: {}", id, e);
-		for e in e.iter().skip(1) {
-			let _ = writeln!(stderr, "Caused by: {}", e);
-		}
-		if let Some(backtrace) = e.backtrace() {
-			let _ = writeln!(stderr, "Backtrace: {:?}", backtrace);
-		}
-	}
+//	fn write_err(id: &LinkID, e: Error) {
+//		use ::std::io::Write;
+//		let stderr = &mut ::std::io::stderr();
+//		let _ = writeln!(stderr, "Link {}: {}", id, e);
+//		for e in e.iter().skip(1) {
+//			let _ = writeln!(stderr, "Caused by: {}", e);
+//		}
+//		if let Some(backtrace) = e.backtrace() {
+//			let _ = writeln!(stderr, "Backtrace: {:?}", backtrace);
+//		}
+//	}
 }
 impl fmt::Display for Link { 
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result { 

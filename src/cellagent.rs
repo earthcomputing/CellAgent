@@ -5,13 +5,12 @@ use std::collections::{HashMap, HashSet};
 use std::collections::hash_map::Entry;
 use uuid::Uuid;
 
-use config::{MAX_ENTRIES, MsgID, CellNo, PathLength, PortNo, TableIndex};
+use config::{MAX_ENTRIES, CellNo, CellType, PathLength, PortNo, TableIndex};
 use container::Service;
-use gvm_equation::{GvmEquation, GvmEqn, GvmVariable, GvmVariableType};
-use message::{DiscoverMsg, DiscoverDMsg, StackTreeMsg, SetupVMsMsg, Message, MsgType};
+use gvm_equation::{GvmEquation, GvmEqn};
+use message::{DiscoverMsg, StackTreeMsg, Message, MsgType};
 use message_types::{CaToPe, CaFromPe, CaToVm, VmFromCa, VmToCa, CaFromVm, CaToPePacket, PeToCaPacket};
 use name::{Name, CellID, TreeID, UpTraphID, VmID};
-use nalcell::CellType;
 use packet::{Packet, PacketAssembler, PacketAssemblers};
 use port;
 use routing_table_entry::{RoutingTableEntry};
@@ -57,7 +56,6 @@ pub struct CellAgent {
 impl CellAgent {
 	pub fn new(cell_id: &CellID, cell_type: CellType, no_ports: PortNo, ca_to_pe: CaToPe ) 
 				-> Result<CellAgent> {
-		let f = "new";
 		let tenant_masks = vec![BASE_TENANT_MASK];
 		let my_tree_id = TreeID::new(cell_id.get_name())?;
 		my_tree_id.append2file()?;		
@@ -83,7 +81,6 @@ impl CellAgent {
 		}
 	pub fn initialize(&mut self, cell_type: CellType, ca_from_pe: CaFromPe) -> Result<()> {
 		// Set up predefined trees - Must be first two in this order
-		let f = "initialize";
 		let port_number_0 = PortNumber::new(PortNo{v:0}, self.no_ports).unwrap(); // No error possible for port 0
 		let other_index = TableIndex(0);
 		let hops = PathLength(CellNo(0));
@@ -149,20 +146,18 @@ impl CellAgent {
 		self.saved_msgs.lock().unwrap().to_vec()
 	}
 	pub fn add_saved_msg(&mut self, packets: &SavedMsg) -> Vec<SavedMsg> {
-		let f = "add_saved_msg";
 		{ 
 			let mut saved_msgs = self.saved_msgs.lock().unwrap();
-			let msg = MsgType::get_msg(&packets).unwrap();
+			//let msg = MsgType::get_msg(&packets).unwrap();
 			//println!("Cell {}: save generic {}", self.cell_id, msg);
 			saved_msgs.push(packets.clone());
 		}
 		self.get_saved_msgs()
 	}
 	pub fn add_saved_discover(&mut self, packets: &SavedMsg) -> Vec<SavedMsg> {
-		let f = "add_saved_discover";
 		{
 			let mut saved_discover = self.saved_msgs.lock().unwrap();
-			let msg = MsgType::get_msg(&packets).unwrap();
+			//let msg = MsgType::get_msg(&packets).unwrap();
 			//println!("Cell {}: save discover {}", self.cell_id, msg);
 			saved_discover.push(packets.clone());
 		}
@@ -189,11 +184,10 @@ impl CellAgent {
 			None => Err(ErrorKind::Size(self.cell_id.clone(), S(f)).into())
 		}
 	}
-	fn free_index(&mut self, index: TableIndex) {
-		self.free_indices.lock().unwrap().push(index);
-	}
+//	fn free_index(&mut self, index: TableIndex) {
+//		self.free_indices.lock().unwrap().push(index);
+//	}
 	pub fn create_vms(&mut self, service_sets: Vec<Vec<Service>>) -> Result<()> {
-		let f = "create_vms";
 		let name = format!("Up:{}+{}", self.cell_id, self.up_traphs_clist.len());
 		let up_traph_id = UpTraphID::new(&name)?;
 		let mut ca_to_vms = Vec::new();
@@ -219,7 +213,6 @@ impl CellAgent {
 		Ok(())
 	}
 	fn listen_uptraph(&self, up_traph_id: UpTraphID, ca_from_vm: CaFromVm) -> Result<()> {
-		let f = "listen_uptraph";
 		let ca = self.clone();
 		::std::thread::spawn( move || -> Result<()> {
 		loop {
@@ -233,7 +226,6 @@ impl CellAgent {
 				gvm_equation: Option<GvmEquation>, children: &mut HashSet<PortNumber>, 
 				other_index: TableIndex, hops: PathLength, path: Option<Path>) 
 			-> Result<RoutingTableEntry> {
-		let f = "update_traph";
 		let entry = {
 			let mut traphs = self.traphs.lock().unwrap();
 			let mut traph = match traphs.entry(black_tree_id.get_uuid()) { // Avoids lifetime problem
@@ -300,7 +292,6 @@ impl CellAgent {
 	}
 	pub fn stack_tree(&mut self, tree_id: &TreeID, parent_tree_uuid: &Uuid, 
 			black_tree_id: &TreeID, gvm_eqn: &GvmEquation) -> Result<()> {
-		let f = "stack_tree";
 		let mut traph = self.get_traph(black_tree_id)?;
 		if traph.has_tree(tree_id) { return Ok(()); } // Check for redundant StackTreeMsg
 		let parent_entry = traph.get_tree_entry(&parent_tree_uuid)?;
@@ -324,7 +315,6 @@ impl CellAgent {
 		Ok(())
 	}
 	fn listen(&mut self, ca_from_pe: CaFromPe) -> Result<()>{
-		let f = "listen";
 		let mut ca = self.clone();
 		::std::thread::spawn( move || { 
 			let _ = ca.listen_loop(ca_from_pe).map_err(|e| ca.write_err(e));
@@ -332,7 +322,6 @@ impl CellAgent {
 		Ok(())
 	}
 	fn listen_loop(&mut self, ca_from_pe: CaFromPe) -> Result<()> {
-		let f = "listen_loop";
 		loop {
 			//println!("CellAgent {}: waiting for status or packet", ca.cell_id);
 			match ca_from_pe.recv()? {
@@ -387,10 +376,9 @@ impl CellAgent {
 		}
 	}
 	fn port_connected(&mut self, port_no: PortNo, is_border: bool) -> Result<()> {
-		let f = "port_connected";
 		//println!("CellAgent {}: port {} is border {} connected", self.cell_id, port_no, is_border);
 		if is_border {
-			println!("CellAgent {}: port {} is a border port", self.cell_id, *port_no);
+			//println!("CellAgent {}: port {} is a border port", self.cell_id, *port_no);
 			let tree_id = self.my_tree_id.add_component("Outside")?;
 			let tree_id = TreeID::new(tree_id.get_name())?;
 			tree_id.append2file()?;
@@ -441,7 +429,6 @@ impl CellAgent {
 		Ok(())		
 	}
 	fn port_disconnected(&self, port_no: PortNo) -> Result<()> {
-		let f = "port_disconnected";
 		//println!("Cell Agent {} got disconnected on port {}", self.cell_id, port_no);
 		let port_no_mask = Mask::new(PortNumber::new(port_no, self.no_ports)?);
 		self.connected_tree_entry.lock().unwrap().and_with_mask(port_no_mask.not());
@@ -450,7 +437,6 @@ impl CellAgent {
 		Ok(())	
 	}		
 	pub fn forward_discover(&mut self, saved_msgs: &Vec<SavedMsg>, mask: Mask) -> Result<()> {
-		let f = "forward_discover";
 		//println!("Cell {}: forwarding {} discover msgs", self.cell_id, saved_msgs.len());
 		for packets in saved_msgs.iter() {
 			self.send_msg(self.connected_tree_id.get_uuid(), packets, mask)?;
@@ -459,7 +445,6 @@ impl CellAgent {
 		Ok(())	
 	}
 	pub fn forward_saved(&mut self, saved_msgs: &Vec<SavedMsg>, mask: Mask) -> Result<()> {
-		let f = "forward_saved";
 		//println!("Cell {}: forwarding {} messages", self.cell_id, saved_msgs.len());
 		for packets in saved_msgs.iter() {
 			//let msg = MsgType::get_msg(&packets)?;
