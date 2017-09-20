@@ -1,19 +1,15 @@
 use std::fmt;
-use std::io::Write;
-use std::fs::{File, OpenOptions};
-use std::path::Path;
 use std::sync::{Arc, Mutex};
 use std::collections::HashSet;
 use uuid::Uuid;
 
 use config::{PortNo, TableIndex};
-use message::MsgType;
 use message_types::{PeFromCa, PeToCa, PeToPort, PeFromPort, CaToPePacket, PortToPePacket, PeToCaPacket};
-use name::{Name, CellID};
+use name::{CellID};
 use packet::{Packet};
 use routing_table::{RoutingTable};
 use routing_table_entry::{RoutingTableEntry};
-use utility::{Mask, PortNumber, S};
+use utility::{Mask, PortNumber};
 
 #[derive(Debug, Clone)]
 pub struct PacketEngine {
@@ -27,7 +23,6 @@ pub struct PacketEngine {
 impl PacketEngine {
 	pub fn new(cell_id: &CellID, packet_pe_to_ca: PeToCa, pe_to_ports: Vec<PeToPort>, 
 			boundary_port_nos: HashSet<PortNo>) -> Result<PacketEngine> {
-		let f = "new";
 		let routing_table = Arc::new(Mutex::new(RoutingTable::new(cell_id.clone())?)); 
 		Ok(PacketEngine { cell_id: cell_id.clone(), routing_table: routing_table, 
 			boundary_port_nos: boundary_port_nos, pe_to_ca: packet_pe_to_ca, pe_to_ports: pe_to_ports })
@@ -44,12 +39,10 @@ impl PacketEngine {
 	}
 	//pub fn get_table(&self) -> &Arc<Mutex<RoutingTable>> { &self.routing_table }
 	fn listen_ca(&self, entry_pe_from_ca: PeFromCa) -> Result<()> {
-		let f = "listen_ca";
 		loop { 
 			match entry_pe_from_ca.recv()? {
 				CaToPePacket::Entry(e) => {
 					if *e.get_index() > 0 {
-						let children = e.get_mask().get_port_nos();
 						let json = ::serde_json::to_string(&e)?;
 						let json2 = ::serde_json::to_string(&e.get_mask().get_port_nos())?;
 						let string = format!("Entry {}: {} {}", self.cell_id, json, json2);
@@ -68,7 +61,6 @@ impl PacketEngine {
 		}
 	}
 	fn listen_port(&self, pe_from_ports: PeFromPort) -> Result<()> {
-		let f = "listen_port";
 		loop {
 			//println!("PacketEngine {}: waiting for status or packet", pe.cell_id);
 			match pe_from_ports.recv()? {
@@ -78,7 +70,6 @@ impl PacketEngine {
 		}		
 	}
 	fn process_packet(&self, port_no: PortNo, my_index: TableIndex, packet: Packet) -> Result<()> {
-		let f = "process_packet";
 		//println!("PacketEngine {}: received on port {} my index {} {}", self.cell_id, port_no.v, *my_index, packet);
 		let entry =
 		{   
@@ -105,7 +96,6 @@ impl PacketEngine {
 	}
 	fn forward(&self, recv_port_no: PortNo, entry: RoutingTableEntry, user_mask: Mask, packet: Packet) 
 			-> Result<()>{
-		let f = "forward";
 		let header = packet.get_header();
 		//println!("PacketEngine {}: forward packet {}, mask {}, entry {}", self.cell_id, packet.get_count(), mask, entry);
 		let other_indices = entry.get_other_indices();
@@ -131,10 +121,7 @@ impl PacketEngine {
 		} else {
 			let mask = user_mask.and(entry.get_mask());
 			let port_nos = mask.get_port_nos();
-			let is_stack_msg = match format!("{}", packet).find("StackTree") {
-				Some(_) => true,
-				None => false
-			};
+			//let is_stack_msg = match format!("{}", packet).find("StackTree") { Some(_) => true, None => false };
 			//if MsgType::is_type(packet, "StackTree") { println!("PacketEngine {}: forwarding packet {} on ports {:?}, {}", self.cell_id, packet.get_count(), port_nos, entry); }
 			for port_no in port_nos.iter() {
 				if let Some(other_index) = other_indices.get(port_no.v as usize) {

@@ -5,7 +5,6 @@ use container::{Container, Service};
 use message_types::{VmToCa, VmFromCa, VmToContainerMsg, VmToContainer, ContainerFromVm,
 	ContainerToVmMsg, ContainerToVm, VmFromContainer, ContainerVmError};
 use name::{ContainerID, TreeID, UpTraphID, VmID};
-use utility::S;
 
 #[derive(Debug, Clone)]
 pub struct VirtualMachine {
@@ -19,7 +18,6 @@ impl VirtualMachine {
 	pub fn initialize(&mut self, services: &mut Vec<Service>,
 			up_tree_id: &UpTraphID, tree_ids: &HashMap<&str,TreeID>, 
 			vm_to_ca: &VmToCa, vm_from_ca: VmFromCa) -> Result<()> {
-		let f = "initialize";
 		self.listen_ca(vm_from_ca)?;
 		while services.len() > 0 {
 			let (vm_to_container, container_from_vm): (VmToContainer, ContainerFromVm) = channel();
@@ -54,14 +52,12 @@ impl VirtualMachine {
 		Ok(())	
 	}	
 	fn listen_ca_loop(&self, vm_from_ca: VmFromCa) -> Result<()> {
-		let f = "listen_ca_loop";
 		loop {
 			let msg = vm_from_ca.recv()?;
 			
 		}
 	}
 	fn listen_container_loop(&self, vm_from_container: VmFromContainer, vm_to_ca: VmToCa) -> Result<()> {
-		let f = "listen_container_loop";
 		loop {
 			let msg = vm_from_container.recv()?;
 			vm_to_ca.send(msg)?;

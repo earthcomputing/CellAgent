@@ -1,7 +1,6 @@
 use name::{ContainerID, TreeID, UpTraphID};
 use message::Message;
-use message_types::{ContainerToVm, ContainerFromVm, ContainerVmError};
-use utility::S;
+use message_types::{ContainerToVm, ContainerFromVm};
 
 pub trait Service {
 	fn initialize(&self, container_to_vm: ContainerToVm, container_from_vm: ContainerFromVm) -> Result<()>;

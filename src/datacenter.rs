@@ -1,15 +1,15 @@
 use std::fmt;
 use std::cmp::max;
 use std::sync::mpsc::channel;
-use std::thread::{JoinHandle, spawn};
+use std::thread::{JoinHandle};
 
-use config::{MIN_BOUNDARY_CELLS, CellNo, Edge, LinkNo, PortNo};
+use blueprint::{Blueprint};
+use config::{MIN_BOUNDARY_CELLS, CellNo, CellType, Edge, LinkNo, PortNo};
 use message_types::{LinkToPort, PortFromLink, PortToLink, LinkFromPort,
-	NocToPort, NocFromPort, PortToNoc, PortFromNoc};
+	PortToNoc, PortFromNoc};
 use link::{Link};
-use nalcell::{CellType, NalCell};
-use name::{CellID, LinkID, PortID, UpTraphID};
-use noc::Noc;
+use nalcell::{NalCell};
+use name::{UpTraphID};
 use utility::S;
 
 #[derive(Debug)]
@@ -23,31 +23,36 @@ impl Datacenter {
 	pub fn new(id: &UpTraphID, cell_type: CellType) -> Datacenter {
 		Datacenter { id: id.clone(), cell_type: cell_type, cells: Vec::new(), links: Vec::new() }
 	}
-	pub fn initialize(&mut self, ncells: CellNo, nports: PortNo, edge_list: Vec<Edge>,
-			cell_type: CellType) -> Result<Vec<JoinHandle<()>>> {
+	pub fn initialize(&mut self, cell_type: CellType, blueprint: Blueprint) -> Result<Vec<JoinHandle<()>>> {
 		let f = "initialize";
-		if ncells.0 < 1  { return Err(ErrorKind::Cells(ncells, S(f)).into()); }
-		if edge_list.len() < ncells.0 - 1 { return Err(ErrorKind::Edges(LinkNo(CellNo(edge_list.len())), S(f)).into()); }
-		for i in 0..ncells.0 {
-			let is_border = (i % 3) == 1;
-			let cell = NalCell::new(CellNo(i), nports, is_border, cell_type)?;
+		let ncells = blueprint.get_ncells();
+		let edge_list = blueprint.get_edge_list();
+		if *ncells < 1  { return Err(ErrorKind::Cells(ncells, S(f)).into()); }
+		if edge_list.len() < *ncells - 1 { return Err(ErrorKind::Edges(LinkNo(CellNo(edge_list.len())), S(f)).into()); }
+		let border_cells = blueprint.get_border_cells();
+		for cell in border_cells {
+			let cell = NalCell::new(cell.get_cell_no(), cell.get_nports(), true, cell_type)?;
+			self.cells.push(cell);
+		}
+		let interior_cells = blueprint.get_interior_cells();
+		for cell in interior_cells {
+			let cell = NalCell::new(cell.get_cell_no(), cell.get_nports(), false, cell_type)?;
 			self.cells.push(cell);
 		}
 		let mut link_handles = Vec::new();
 		for edge in edge_list {
-			if *(edge.v.0) == *(edge.v.1) { return Err(ErrorKind::Wire(edge, S(f)).into()); }
-			if (*(edge.v.0) > ncells.0) | (*(edge.v.1) >= ncells.0) { return Err(ErrorKind::Wire(edge, S(f)).into()); }
+			if *(edge.v.0) == *(edge.v.1) { return Err(ErrorKind::Wire(edge.clone(), S(f)).into()); }
+			if (*(edge.v.0) > ncells.0) | (*(edge.v.1) >= ncells.0) { return Err(ErrorKind::Wire(edge.clone(), S(f)).into()); }
 			let split = self.cells.split_at_mut(max(*(edge.v.0),*(edge.v.1)));
 			let mut cell = match split.0.get_mut(*(edge.v.0)) {
 				Some(c) => c,
-				None => return Err(ErrorKind::Wire(edge, S(f)).into())
+				None => return Err(ErrorKind::Wire(edge.clone(), S(f)).into())
 
 			};
-			let cell_id = cell.get_id().clone();
 			let (left,left_from_pe) = cell.get_free_ec_port_mut()?;
 			let mut cell = match split.1.first_mut() {
 				Some(c) => c,
-				None => return Err(ErrorKind::Wire(edge, S(f)).into())
+				None => return Err(ErrorKind::Wire(edge.clone(), S(f)).into())
 			};
 			let (rite, rite_from_pe) = cell.get_free_ec_port_mut()?;
 			//println!("Datacenter: edge {:?}", edge);
@@ -64,7 +69,7 @@ impl Datacenter {
 		} 
 		Ok(link_handles)
 	}
-	pub fn get_cells(&self) -> &Vec<NalCell> { &self.cells }
+//	pub fn get_cells(&self) -> &Vec<NalCell> { &self.cells }
 	fn get_boundary_cells(&mut self) -> Vec<&mut NalCell> {
 		let mut boundary_cells = Vec::new();
 		for cell in &mut self.cells {
@@ -74,13 +79,11 @@ impl Datacenter {
 	}
 	pub fn connect_to_noc(&mut self, port_to_noc: PortToNoc, port_from_noc: PortFromNoc)  
 			-> Result<()> {
-		let f = "connect_to_noc";
 		let mut boundary_cells = self.get_boundary_cells();
 		if boundary_cells.len() < *MIN_BOUNDARY_CELLS {
 			return Err(ErrorKind::Boundary("connect_to_noc".to_string()).into());
 		} else {
 			let (mut boundary_cell, _) = boundary_cells.split_at_mut(1);
-			let cell_id = boundary_cell[0].get_id().clone();
 			let (port, port_from_pe) = boundary_cell[0].get_free_boundary_port_mut()?;
 			port.outside_channel(port_to_noc, port_from_noc, port_from_pe)?;
 			Ok(())

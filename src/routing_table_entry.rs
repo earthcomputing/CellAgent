@@ -2,9 +2,9 @@ use std::fmt;
 use std::collections::HashSet;
 use uuid::Uuid;
 
-use config::{MAX_PORTS, MAX_ENTRIES, PortNo, TableIndex};
+use config::{MAX_PORTS, PortNo, TableIndex};
 use name::{Name, TreeID};
-use utility::{Mask, PortNumber, S};
+use utility::{Mask, PortNumber};
 
 type OtherIndices = [TableIndex; MAX_PORTS.v as usize];
 #[derive(Debug, Copy, Clone, Serialize, Deserialize)]
@@ -24,7 +24,6 @@ impl RoutingTableEntry {
 			may_send: may_send, inuse: inuse, mask: mask, other_indices: other_indices }
 	}
 	pub fn default(index: TableIndex) -> Result<RoutingTableEntry> {
-		let f = "default";
 		let port_number = PortNumber::new(PortNo{v:0}, MAX_PORTS)?;
 		let tree_id = TreeID::new("default")?;
 		Ok(RoutingTableEntry::new(index, &tree_id, false, port_number, Mask::empty(), false, [TableIndex(0); MAX_PORTS.v as usize]))

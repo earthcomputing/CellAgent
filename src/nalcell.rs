@@ -1,34 +1,24 @@
 use std::fmt;
 use std::collections::{HashMap, HashSet};
-use std::sync::mpsc;
 use std::sync::mpsc::channel;
 
 use cellagent::{CellAgent};
-use config::{MAX_PORTS, CellNo, PortNo, TableIndex};
+use config::{MAX_PORTS, CellNo, CellType, PortNo};
 use message_types::{CaToPe, PeFromCa, PeToCa, CaFromPe, PortToPe, PeFromPort, PeToPort,PortFromPe};
 use name::{CellID};
-use packet::Packet;
 use packet_engine::{PacketEngine};
-use port::{Port, PortStatus};
-use routing_table_entry::RoutingTableEntry;
-use utility::{Mask, PortNumber, S};
+use port::{Port};
+use utility::{PortNumber};
 use vm::VirtualMachine;
-
-#[derive(Debug, Copy, Clone)]
-pub enum CellType {
-	NalCell,
-	Vm,
-	Container
-}
 
 #[derive(Debug)]
 pub struct NalCell {
 	id: CellID,
+	cell_type: CellType,
 	cell_no: CellNo,
 	is_border: bool,
 	ports: Box<[Port]>,
 	cell_agent: CellAgent,
-	cell_type: CellType,
 	packet_engine: PacketEngine,
 	vms: Vec<VirtualMachine>,
 	ports_from_pe: HashMap<PortNo, PortFromPe>,
@@ -36,7 +26,6 @@ pub struct NalCell {
 
 impl NalCell {
 	pub fn new(cell_no: CellNo, nports: PortNo, is_border: bool, cell_type: CellType) -> Result<NalCell> {
-		let f = "new";
 		if nports.v > MAX_PORTS.v { return Err(ErrorKind::NumberPorts(nports, "new".to_string()).into()) }
 		let cell_id = CellID::new(cell_no)?;
 		let (ca_to_pe, pe_from_ca): (CaToPe, PeFromCa) = channel();
@@ -67,7 +56,7 @@ impl NalCell {
 				ports: boxed_ports, cell_agent: cell_agent, vms: Vec::new(),
 				packet_engine: packet_engine, ports_from_pe: ports_from_pe, })
 	}
-	pub fn get_id(&self) -> &CellID { &self.id }
+//	pub fn get_id(&self) -> &CellID { &self.id }
 //	pub fn get_no(&self) -> usize { self.cell_no }
 //	pub fn get_cell_agent(&self) -> &CellAgent { &self.cell_agent }
 	pub fn is_border(&self) -> bool { self.is_border }

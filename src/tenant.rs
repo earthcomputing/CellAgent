@@ -2,7 +2,6 @@ use std::fmt;
 use std::collections::HashMap;
 
 use name::{Name,TenantID};
-use utility::S;
 
 #[derive(Clone)]
 pub struct Tenant { 
@@ -13,7 +12,6 @@ pub struct Tenant {
 #[deny(unused_must_use)]
 impl Tenant {
 	pub fn new(id: &'static str, n: CellNo, parent_id: Option<TenantID>) -> Result<Tenant> {
-		let f = "new";
 		let name = match parent_id {
 			Some(p) => Ok(p.add_component(id)?),
 			None => TenantID::new(id)
@@ -23,7 +21,7 @@ impl Tenant {
 	pub fn get_id(&self) -> TenantID { self.id.clone() }
 //	pub fn get_ncells(&self) -> usize { self.ncells }
 	//pub fn get_size(&self) -> usize { self.ncells }
-	pub fn get_children(&self) -> &HashMap<TenantID,Box<Tenant>> { &self.children }
+//	pub fn get_children(&self) -> &HashMap<TenantID,Box<Tenant>> { &self.children }
 //	pub fn get_subtenant(&self, id: TenantID) -> Option<&Box<Tenant>> {
 //		self.children.get(&id)
 //	}

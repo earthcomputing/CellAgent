@@ -110,7 +110,6 @@ impl fmt::Display for Path {
 use std::fs::{File, OpenOptions};
 use std::io::Write;
 pub fn append2file(line: String) -> Result<()> {
-	let f = "append2file";
 	let mut file_handle = match OpenOptions::new().append(true).open(OUTPUT_FILE_NAME) {
 		Ok(f) => Ok(f),
 		Err(_) => {

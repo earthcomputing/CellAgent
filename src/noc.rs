@@ -1,20 +1,16 @@
-use std::fmt;
-use std::collections::HashMap;
 use std::thread::{JoinHandle, sleep, spawn};
 use std::sync::mpsc::channel;
 use std::time;
 
 use serde_json;
 
-use config::{SEPARATOR, CellNo, DatacenterNo, Edge, PortNo};
-use container::Service;
+use blueprint::{Blueprint};
+use config::{SEPARATOR, CellNo, CellType, DatacenterNo, Edge, PortNo};
 use datacenter::{Datacenter};
-use message::{Message, MsgType, SetupVMsMsg};
+use message::{MsgType};
 use message_types::{NocToPort, NocFromPort, PortToNoc, PortFromNoc, NocFromOutside};
 use name::UpTraphID;
-use nalcell::CellType;
-use packet::{PacketAssembler, PacketAssemblers, Packetizer, Serializer};
-use utility::S;
+use packet::{PacketAssembler, PacketAssemblers};
 
 #[derive(Debug, Clone)]
 pub struct Noc {
@@ -25,17 +21,14 @@ pub struct Noc {
 }
 impl Noc {
 	pub fn new(id: &str, cell_type: CellType) -> Result<Noc> {
-		let f = "new";
 		let id = UpTraphID::new(id)?;
 		Ok(Noc { id: id, cell_type: cell_type, packet_assemblers: PacketAssemblers::new(),
 				 no_datacenters: DatacenterNo(0) })
 	}
-	pub fn initialize(&self, ncells: CellNo, nports: PortNo, edges: Vec<Edge>,
-			noc_from_outside: NocFromOutside) -> Result<Vec<JoinHandle<()>>> {
-		let f = "initialize";
+	pub fn initialize(&self, blueprint: Blueprint, noc_from_outside: NocFromOutside) -> Result<Vec<JoinHandle<()>>> {
 		let (noc_to_port, port_from_noc): (NocToPort, NocFromPort) = channel();
 		let (port_to_noc, noc_from_port): (PortToNoc, PortFromNoc) = channel();
-		let (mut dc, join_handles) = self.build_datacenter(&self.id, self.cell_type, ncells, nports, edges)?;
+		let (mut dc, join_handles) = self.build_datacenter(&self.id, self.cell_type, blueprint)?;
 		dc.connect_to_noc(port_to_noc, port_from_noc)?;
 		let mut noc = self.clone();
 		spawn( move || { 
@@ -54,21 +47,18 @@ impl Noc {
 	fn control(&self, dc: &mut Datacenter) -> Result<()> {
 		Ok(())
 	}
-	fn build_datacenter(&self, id: &UpTraphID, cell_type: CellType, 
-			ncells: CellNo, nports: PortNo, edges: Vec<Edge>) -> Result<(Datacenter, Vec<JoinHandle<()>>)> {
-		let f = "build_datacenter";
+	fn build_datacenter(&self, id: &UpTraphID, cell_type: CellType, blueprint: Blueprint) 
+			-> Result<(Datacenter, Vec<JoinHandle<()>>)> {
 		let mut dc = Datacenter::new(id, cell_type);
-		let join_handles = dc.initialize(ncells, nports, edges, self.cell_type)?;
+		let join_handles = dc.initialize(self.cell_type, blueprint)?;
 		Ok((dc, join_handles))
 	}
-	fn get_msg(&self, msg_type: MsgType, serialized_msg:String) -> Result<Box<Message>> {
-		Ok(match msg_type {
-			_ => panic!("Noc doesn't recognize message type {}", msg_type)
-		})
-	}
+//	fn get_msg(&self, msg_type: MsgType, serialized_msg:String) -> Result<Box<Message>> {
+//		Ok(match msg_type {
+//			_ => panic!("Noc doesn't recognize message type {}", msg_type)
+//		})
+//	}
 	fn listen_port(&mut self, noc_from_port: NocFromPort) -> Result<()> {
-		let f = "listen_port";
-		let noc = self.clone();
 		loop {
 			let packet = noc_from_port.recv()?;
 			let msg_id = packet.get_header().get_msg_id();
@@ -84,20 +74,19 @@ impl Noc {
 		}
 	}
 	fn listen_outside(&mut self, noc_from_outside: NocFromOutside, noc_to_port: NocToPort) -> Result<()> {
-		let f = "listen_outside";
 		loop {
 			let input = &noc_from_outside.recv()?;
 			let mut split_input = input.splitn(2, "");
 			if let Some(cmd) = split_input.next() {
 				match cmd {
-					"new_uptraph" => self.new_uptraph(split_input.next(), noc_to_port.clone())?,
+					//"new_uptraph" => self.new_uptraph(split_input.next(), noc_to_port.clone())?,
 					_ => println!("Unknown command: {}", input)
 				};
 			}
 		}
 	}
+	/*
 	fn new_uptraph(&mut self, str_params: Option<&str>, noc_to_port: NocToPort) -> Result<()> {
-		let f = "new_uptraph";
 		let new_cell_type = match self.cell_type {
 			CellType::NalCell => CellType::Vm,
 			CellType::Vm => CellType::Container,
@@ -108,11 +97,12 @@ impl Noc {
 		type Params = (CellNo, PortNo, Vec<Edge>);
 		if let Some(str_params) = str_params {
 			let params: Params = serde_json::from_str(str_params)?;
-			let dc = self.build_datacenter(&up_id, new_cell_type, params.0, params.1, params.2)?;
+			let _ = self.build_datacenter(&up_id, new_cell_type, params.0, params.1, params.2)?;
 			self.no_datacenters = DatacenterNo(*self.no_datacenters + 1);
 		} else { panic!("Parameter problem"); }
 		Ok(())
 	}
+	*/
 	fn write_err(&self, s: &str, e: Error) {
 		use ::std::io::Write;
 		let stderr = &mut ::std::io::stderr();
@@ -125,6 +115,7 @@ impl Noc {
 		}
 	}
 }
+/*
 #[derive(Debug)]
 struct ControlChannel {
 	channel: (NocToPort, NocFromPort)
@@ -141,6 +132,7 @@ impl fmt::Display for ControlChannel {
 		write!(f, "Control Channel")	
 	}
 }
+*/
 // Errors
 error_chain! {
 	foreign_links {

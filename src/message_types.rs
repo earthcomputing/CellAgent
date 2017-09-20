@@ -45,7 +45,7 @@ pub type PortNocError = mpsc::SendError<PortToNocMsg>;
 pub type NocToPortMsg = Packet;
 pub type NocToPort = mpsc::Sender<NocToPortMsg>;
 pub type PortFromNoc = mpsc::Receiver<NocToPortMsg>;
-pub type NocPortError = mpsc::SendError<NocToPortMsg>;
+//pub type NocPortError = mpsc::SendError<NocToPortMsg>;
 // Outside to Noc
 pub type OutsideNocMsg = String;
 pub type OutsideToNoc = mpsc::Sender<OutsideNocMsg>;
@@ -55,12 +55,12 @@ pub type OutsideNocError = mpsc::SendError<OutsideNocMsg>;
 pub type CaToVmMsg = String;
 pub type CaToVm = mpsc::Sender<CaToVmMsg>;
 pub type VmFromCa = mpsc::Receiver<CaToVmMsg>;
-pub type CaVmError = mpsc::SendError<CaToVmMsg>;
+//pub type CaVmError = mpsc::SendError<CaToVmMsg>;
 // VM to Cell agent
 pub type VmToCaMsg = String;
 pub type VmToCa = mpsc::Sender<VmToCaMsg>;
 pub type CaFromVm = mpsc::Receiver<VmToCaMsg>;
-pub type VmCaError = mpsc::SendError<VmToCaMsg>;
+//pub type VmCaError = mpsc::SendError<VmToCaMsg>;
 // Vm to Container
 pub type VmToContainerMsg = String;
 pub type VmToContainer = mpsc::Sender<VmToContainerMsg>;
