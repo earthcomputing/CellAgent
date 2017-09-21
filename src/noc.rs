@@ -26,6 +26,13 @@ impl Noc {
 				 no_datacenters: DatacenterNo(0) })
 	}
 	pub fn initialize(&self, blueprint: Blueprint, noc_from_outside: NocFromOutside) -> Result<Vec<JoinHandle<()>>> {
+		match self.cell_type {
+			CellType::Physical  => self.initialize_physical(blueprint, noc_from_outside),
+			CellType::Vm        => self.initialize_vm(blueprint, noc_from_outside),
+			CellType::Container => self.initialize_container(blueprint, noc_from_outside)
+		}
+	}
+	fn initialize_physical(&self, blueprint: Blueprint, noc_from_outside: NocFromOutside) -> Result<Vec<JoinHandle<()>>> {
 		let (noc_to_port, port_from_noc): (NocToPort, NocFromPort) = channel();
 		let (port_to_noc, noc_from_port): (PortToNoc, PortFromNoc) = channel();
 		let (mut dc, join_handles) = self.build_datacenter(&self.id, self.cell_type, blueprint)?;
@@ -44,6 +51,15 @@ impl Noc {
 		self.control(&mut dc)?;
 		Ok(join_handles)
 	}
+	fn initialize_vm(&self, blueprint: Blueprint, noc_from_outside: NocFromOutside) -> Result<Vec<JoinHandle<()>>> {
+		let (mut dc, join_handles) = self.build_datacenter(&self.id, self.cell_type, blueprint)?;
+		Ok(join_handles)
+	}
+	fn initialize_container(&self, blueprint: Blueprint, noc_from_outside: NocFromOutside) -> Result<Vec<JoinHandle<()>>> {
+		let (mut dc, join_handles) = self.build_datacenter(&self.id, self.cell_type, blueprint)?;
+		Ok(join_handles)
+	}
+
 	fn control(&self, dc: &mut Datacenter) -> Result<()> {
 		Ok(())
 	}

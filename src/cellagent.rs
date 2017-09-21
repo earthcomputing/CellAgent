@@ -375,13 +375,10 @@ impl CellAgent {
 			Ok(false)
 		}
 	}
-	fn port_connected(&mut self, port_no: PortNo, is_border: bool) -> Result<()> {
-		//println!("CellAgent {}: port {} is border {} connected", self.cell_id, port_no, is_border);
-		if is_border {
-			//println!("CellAgent {}: port {} is a border port", self.cell_id, *port_no);
-			let tree_id = self.my_tree_id.add_component("Outside")?;
-			let tree_id = TreeID::new(tree_id.get_name())?;
-			tree_id.append2file()?;
+	fn create_tree(&mut self, id: &str, target_tree_id: &TreeID, port_no_mask: Mask, gvm_eqn: GvmEquation) -> Result<()> {
+			let new_tree_id = self.my_tree_id.add_component(id)?;
+			let tree_id = TreeID::new(new_tree_id.get_name())?;
+			new_tree_id.append2file()?;
 			let ref my_tree_id = self.my_tree_id.clone(); // Need because self borrowed mut
 			let msg = match StackTreeMsg::new(&tree_id, &self.my_tree_id) {
 				Ok(m) => m,
@@ -391,18 +388,33 @@ impl CellAgent {
 				Ok(p) => p,
 				Err(err) => return Err(map_message_errors(err))
 			};
+			self.send_msg(target_tree_id.get_uuid(), &packets, port_no_mask)?;
+			self.stack_tree(&new_tree_id, &my_tree_id.get_uuid(), my_tree_id, &gvm_eqn)		
+	}
+	fn port_connected(&mut self, port_no: PortNo, is_border: bool) -> Result<()> {
+		//println!("CellAgent {}: port {} is border {} connected", self.cell_id, port_no, is_border);
+		if is_border {
+			//println!("CellAgent {}: port {} is a border port", self.cell_id, *port_no);
+			// Create tree to talk to outside
+			let port_no_mask = Mask::new(PortNumber::new(port_no, self.get_no_ports())?);
+			let mut eqns = HashSet::new();
+			eqns.insert(GvmEqn::Recv("true"));
+			eqns.insert(GvmEqn::Send("true"));
+			eqns.insert(GvmEqn::Xtnd("false"));
+			eqns.insert(GvmEqn::Save("false"));
+			let gvm_eqn = GvmEquation::new(eqns, Vec::new());
+			let ref target_tree_id = self.control_tree_id.clone();
+			self.create_tree("Outside", target_tree_id, port_no_mask, gvm_eqn)?;
+			// For NocMaster tree, eventually move into a container
 			let port_no_mask = Mask::all_but_zero(self.no_ports);
-			let my_index = self.my_entry.get_index();
-			for packet in packets {
-				self.ca_to_pe.send(CaToPePacket::Packet((my_index, port_no_mask, packet)))?;			
-			}
 			let mut eqns = HashSet::new();
 			eqns.insert(GvmEqn::Recv("true"));
 			eqns.insert(GvmEqn::Send("false"));
 			eqns.insert(GvmEqn::Xtnd("true"));
 			eqns.insert(GvmEqn::Save("true"));
 			let gvm_eqn = GvmEquation::new(eqns, Vec::new());
-			self.stack_tree(&tree_id, &my_tree_id.get_uuid(), my_tree_id, &gvm_eqn)?;
+			let ref target_tree_id = self.my_tree_id.clone();
+			self.create_tree("NocMaster", target_tree_id, port_no_mask, gvm_eqn)?;
 		} else {
 			//println!("Cell {}: port {} connected", self.cell_id, *port_no);
 			let port_no_mask = Mask::new(PortNumber::new(port_no, self.no_ports)?);
@@ -416,13 +428,9 @@ impl CellAgent {
 				Err(err) => return Err(map_message_errors(err))
 			};
 			//println!("CellAgent {}: sending packet {} on port {} {} ", self.cell_id, packets[0].get_count(), port_no, msg);
-			let connected_tree_index = (*self.connected_tree_entry.lock().unwrap()).get_index();
-			for packet in packets {
-				let entry = CaToPePacket::Entry(*self.connected_tree_entry.lock().unwrap());
-				self.ca_to_pe.send(entry)?;
-				let packet_msg = CaToPePacket::Packet((connected_tree_index, port_no_mask, packet));
-				self.ca_to_pe.send(packet_msg)?;
-			}
+			let entry = CaToPePacket::Entry(*self.connected_tree_entry.lock().unwrap());
+			self.ca_to_pe.send(entry)?;
+			self.send_msg(self.connected_tree_id.get_uuid(), &packets, port_no_mask)?;
 			let saved_msgs  = self.get_saved_msgs();
 			self.forward_discover(&saved_msgs, port_no_mask)?;		
 		}
