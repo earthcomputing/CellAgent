@@ -17,8 +17,12 @@ pub struct Tree {
 	gvm_eqn: Option<GvmEquation>,
 }
 impl Tree {
-	pub fn new(tree_id: &TreeID, black_tree_id: &TreeID, gvm_eqn: Option<GvmEquation>, 
+	pub fn new(tree_id: &TreeID, black_tree_id: &TreeID, opt_gvm_eqn: Option<&GvmEquation>, 
 			table_entry: RoutingTableEntry) -> Tree {
+		let gvm_eqn = match opt_gvm_eqn {
+			Some(g) => Some(g.clone()),
+			None => None
+		};
 		Tree { black_tree_id: black_tree_id.clone(), tree_id: tree_id.clone(), gvm_eqn: gvm_eqn,
 				table_entry: table_entry, stacked_tree_ids: Vec::new() }
 	}

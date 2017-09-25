@@ -195,7 +195,7 @@ impl Message for DiscoverMsg {
 			eqns.insert(GvmEqn::Xtnd("true"));
 			eqns.insert(GvmEqn::Save("false"));
 			let gvm_equation = GvmEquation::new(eqns, Vec::new());
-			let entry = match ca.update_traph(new_tree_id, port_number, status, Some(gvm_equation),
+			let entry = match ca.update_traph(new_tree_id, port_number, status, Some(&gvm_equation),
 					children, senders_index, hops, Some(path)) {
 				Ok(e) => e,
 				Err(err) => return Err(map_cellagent_errors(err))
@@ -309,7 +309,7 @@ impl Message for DiscoverDMsg {
 		eqns.insert(GvmEqn::Xtnd("false"));
 		eqns.insert(GvmEqn::Save("false"));
 		let gvm_eqn = GvmEquation::new(eqns, Vec::new());
-		match ca.update_traph(tree_id, port_number, traph::PortStatus::Child, Some(gvm_eqn), 
+		match ca.update_traph(tree_id, port_number, traph::PortStatus::Child, Some(&gvm_eqn), 
 			&mut children, my_index, PathLength(CellNo(0)), None) {
 			Ok(_) => (),				
 			Err(err) => return Err(map_cellagent_errors(err))
@@ -381,7 +381,7 @@ impl Message for StackTreeMsg {
 	fn get_header(&self) -> &MsgHeader { &self.header }
 	fn get_payload(&self) -> &MsgPayload { &self.payload }
 	fn process(&mut self, ca: &mut CellAgent, tree_uuid: Uuid, port_no: PortNo) -> Result<()> {
-		//println!("Stack tree msg {}", self);
+		//println!("Cell {}: Stack tree msg {}", ca.get_id(), self);
 		let tree_map = self.header.get_tree_map();
 		let tree_name = self.payload.get_tree_name();
 		let gvm_eqn = self.payload.get_gvm_eqn();
