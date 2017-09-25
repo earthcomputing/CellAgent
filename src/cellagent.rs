@@ -58,7 +58,7 @@ impl CellAgent {
 				-> Result<CellAgent> {
 		let tenant_masks = vec![BASE_TENANT_MASK];
 		let my_tree_id = TreeID::new(cell_id.get_name())?;
-		my_tree_id.append2file()?;		
+		my_tree_id.append2file()?;	
 		let control_tree_id = TreeID::new(&(cell_id.get_name().to_string() + ":" + CONTROL_TREE_NAME))?;
 		let connected_tree_id = TreeID::new(&(cell_id.get_name().to_string() + ":" + CONNECTED_PORTS_TREE_NAME))?;
 		connected_tree_id.append2file()?;
@@ -95,7 +95,7 @@ impl CellAgent {
 		eqns.insert(GvmEqn::Save("false"));
 		let gvm_equation = GvmEquation::new(eqns, Vec::new());
 		self.update_traph(&control_tree_id, port_number_0, 
-				traph::PortStatus::Parent, Some(gvm_equation), 
+				traph::PortStatus::Parent, Some(&gvm_equation),
 				&mut HashSet::new(), other_index, hops, path)?;
 		let mut eqns = HashSet::new();
 		eqns.insert(GvmEqn::Recv("false"));
@@ -104,18 +104,18 @@ impl CellAgent {
 		eqns.insert(GvmEqn::Save("false"));
 		let gvm_equation = GvmEquation::new(eqns, Vec::new());
 		let connected_tree_entry = self.update_traph(&connected_tree_id, port_number_0, 
-			traph::PortStatus::Parent, Some(gvm_equation),
+			traph::PortStatus::Parent, Some(&gvm_equation),
 			&mut HashSet::new(), other_index, hops, path)?;
 		self.connected_tree_entry = Arc::new(Mutex::new(connected_tree_entry));
 		// Create my tree
 		let mut eqns = HashSet::new();
-		eqns.insert(GvmEqn::Recv("false"));
+		eqns.insert(GvmEqn::Recv("true"));
 		eqns.insert(GvmEqn::Send("true"));
 		eqns.insert(GvmEqn::Xtnd("true"));
 		eqns.insert(GvmEqn::Save("false"));
 		let gvm_equation = GvmEquation::new(eqns, Vec::new());
 		self.my_entry = self.update_traph(&my_tree_id, port_number_0, 
-				traph::PortStatus::Parent, Some(gvm_equation), 
+				traph::PortStatus::Parent, Some(&gvm_equation), 
 				&mut HashSet::new(), other_index, hops, path)?; 
 		self.listen(ca_from_pe)?;
 		Ok(())
@@ -223,7 +223,7 @@ impl CellAgent {
 		Ok(())
 	}
 	pub fn update_traph(&mut self, black_tree_id: &TreeID, port_number: PortNumber, port_status: traph::PortStatus,
-				gvm_equation: Option<GvmEquation>, children: &mut HashSet<PortNumber>, 
+				gvm_eqn: Option<&GvmEquation>, children: &mut HashSet<PortNumber>, 
 				other_index: TableIndex, hops: PathLength, path: Option<Path>) 
 			-> Result<RoutingTableEntry> {
 		let entry = {
@@ -235,11 +235,11 @@ impl CellAgent {
 					self.tree_map.lock().unwrap().insert(black_tree_id.get_uuid(), black_tree_id.get_uuid());
 					self.tree_id_map.lock().unwrap().insert(black_tree_id.get_uuid(), black_tree_id.clone());
 					let index = self.clone().use_index()?;
-					let t = Traph::new(&self.cell_id, &black_tree_id, index)?;
+					let t = Traph::new(&self.cell_id, &black_tree_id, index, gvm_eqn)?;
 					v.insert(t)
 				}
 			};
-			let (gvm_recv, gvm_send, gvm_xtnd, gvm_save) = match gvm_equation {
+			let (gvm_recv, gvm_send, gvm_xtnd, gvm_save) = match gvm_eqn {
 				Some(eqn) => {
 					let variables = traph.get_params(eqn.get_variables())?;
 					let recv = eqn.eval_recv(&variables)?;
@@ -306,7 +306,7 @@ impl CellAgent {
 		}
 		if !gvm_eqn.eval_xtnd(&params)? { entry.clear_children(); }
 		if gvm_eqn.eval_send(&params)? { entry.enable_send(); } else { entry.disable_send(); }
-		let tree = Tree::new(&tree_id, black_tree_id, Some(gvm_eqn.clone()), entry);
+		let tree = Tree::new(&tree_id, black_tree_id, Some(&gvm_eqn), entry);
 		//println!("Cell {}: stack tree {} {}", self.cell_id, tree_id, tree_id.get_uuid());
 		traph.stack_tree(&tree);
 		self.tree_map.lock().unwrap().insert(tree_id.get_uuid(), black_tree_id.get_uuid());
@@ -376,11 +376,11 @@ impl CellAgent {
 		}
 	}
 	fn create_tree(&mut self, id: &str, target_tree_id: &TreeID, port_no_mask: Mask, gvm_eqn: GvmEquation) -> Result<()> {
-			let new_tree_id = self.my_tree_id.add_component(id)?;
-			let tree_id = TreeID::new(new_tree_id.get_name())?;
+			let new_id = self.my_tree_id.add_component(id)?;
+			let new_tree_id = TreeID::new(new_id.get_name())?;
 			new_tree_id.append2file()?;
-			let ref my_tree_id = self.my_tree_id.clone(); // Need because self borrowed mut
-			let msg = match StackTreeMsg::new(&tree_id, &self.my_tree_id) {
+			let ref my_tree_id = self.my_tree_id.clone(); // Need because self is borrowed mut
+			let msg = match StackTreeMsg::new(&new_tree_id, &self.my_tree_id) {
 				Ok(m) => m,
 				Err(err) => return Err(map_message_errors(err))
 			};
@@ -396,15 +396,16 @@ impl CellAgent {
 		if is_border {
 			//println!("CellAgent {}: port {} is a border port", self.cell_id, *port_no);
 			// Create tree to talk to outside
-			let port_no_mask = Mask::new(PortNumber::new(port_no, self.get_no_ports())?);
 			let mut eqns = HashSet::new();
 			eqns.insert(GvmEqn::Recv("true"));
 			eqns.insert(GvmEqn::Send("true"));
 			eqns.insert(GvmEqn::Xtnd("false"));
 			eqns.insert(GvmEqn::Save("false"));
 			let gvm_eqn = GvmEquation::new(eqns, Vec::new());
-			let ref target_tree_id = self.control_tree_id.clone();
-			self.create_tree("Outside", target_tree_id, port_no_mask, gvm_eqn)?;
+			let new_tree_id = self.my_tree_id.add_component("Outside")?;
+			let port_number = PortNumber::new(port_no, self.no_ports)?;
+			self.update_traph(&new_tree_id, port_number, traph::PortStatus::Parent, 
+				Some(&gvm_eqn), &mut HashSet::new(), TableIndex(0), PathLength(CellNo(1)), None)?;
 			// For NocMaster tree, eventually move into a container
 			let port_no_mask = Mask::all_but_zero(self.no_ports);
 			let mut eqns = HashSet::new();
@@ -503,6 +504,7 @@ impl fmt::Display for CellAgent {
 		write!(f, "{}", s) }
 }
 // Errors
+// This method is used to get around an infinite recurrsion in error_chain between cellagent.rs and message.rs
 fn map_message_errors(err: ::message::Error) -> ::cellagent::Error {
 	::cellagent::ErrorKind::Message(Box::new(err)).into()
 }
