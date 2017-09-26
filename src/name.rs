@@ -126,7 +126,7 @@ impl Name for LinkID {
 	fn create_from_string(&self, n: String) -> LinkID { LinkID { name: n, uuid: Uuid::new_v4() } }
 }
 impl fmt::Display for LinkID { fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result { self.name.fmt(f) } }
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Deserialize)]
 pub struct VmID { name: NameType, uuid: Uuid}
 impl VmID {
 	pub fn new(cell_id: &CellID, id_no: usize) -> Result<VmID> { 

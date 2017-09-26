@@ -34,10 +34,12 @@ mod tenant;
 mod traph;
 mod traph_element;
 mod tree;
+mod uptree_spec;
 mod utility;
 mod vm;
 
-use std::io::{stdin, stdout, Write};
+use std::io::{stdin, stdout, Read, Write};
+use std::fs::File;
 use std::sync::mpsc::channel;
 use std::collections::HashMap;
 
@@ -46,6 +48,7 @@ use config::{NCELLS, NPORTS, NLINKS, OUTPUT_FILE_NAME, PHYSICAL_UP_TREE_NAME, Ce
 use ecargs::{ECArgs};
 use message_types::{OutsideToNoc, NocFromOutside};
 use noc::Noc;
+use uptree_spec::{DeploymentSpec, UpTreeSpec, VmSpec};
 
 fn main() {
 	if let Err(ref e) = run() {
@@ -88,14 +91,26 @@ fn run() -> Result<()> {
 	border.insert(CellNo(7), vec![PortNo{v:2}]);
 	let blueprint = Blueprint::new(CellType::Physical, ncells, nports, edges, exceptions, border)?;
 	println!("{}", blueprint);
+	let up_tree1 = UpTreeSpec::new("test1", vec![0, 0, 0, 2, 2])?;
+	let up_tree2 = UpTreeSpec::new("test2", vec![1, 1, 0, 1])?;
+	let vm_spec1 = VmSpec::new("vm1", vec!["foo", "bar"], vec!["c1", "c2", "c3", "c2", "c4"], vec![up_tree1, up_tree2])?;
+	let up_tree3 = UpTreeSpec::new("test3", vec![0, 0])?;
+	let up_tree4 = UpTreeSpec::new("test4", vec![1, 1, 0])?;
+	let vm_spec2 = VmSpec::new("vm2", vec!["foo"], vec!["c5", "c3", "c6"], vec![up_tree3.clone(), up_tree4])?;
+	let up_tree_def = DeploymentSpec::new("tree1", vec!["foo", "bar"], vec![vm_spec1, vm_spec2], vec![up_tree3])?;
+	println!("{}", up_tree_def);
+	return Ok(());
 	let (outside_to_noc, noc_from_outside): (OutsideToNoc, NocFromOutside) = channel();
 	let noc = Noc::new(PHYSICAL_UP_TREE_NAME, CellType::Physical)?;
 	let _ = noc.initialize(blueprint, noc_from_outside)?;
 	loop {
-		stdout().write(b"Enter a command\n")?;
-		let mut input = String::new();
-		let _ = stdin().read_line(&mut input)?;
-		outside_to_noc.send(input)?;
+		stdout().write(b"Enter filename specifying an up tree\n")?;
+		let mut filename = String::new();
+		let _ = stdin().read_line(&mut filename)?;
+		let mut f = File::open(filename.trim())?;
+		let mut uptree_spec = String::new();
+		let _ = f.read_to_string(&mut uptree_spec)?;
+		outside_to_noc.send(uptree_spec)?;
 	}
 }
 fn is2e(i: usize, j: usize) -> Edge { Edge { v: (CellNo(i),CellNo(j)) } }
@@ -109,5 +124,6 @@ error_chain! {
 	links {
 		Blueprint(::blueprint::Error, ::blueprint::ErrorKind);
 		Noc(::noc::Error, ::noc::ErrorKind);
+		UpTree(::uptree_spec::Error, ::uptree_spec::ErrorKind);
 	}
 }
