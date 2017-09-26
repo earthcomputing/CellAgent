@@ -11,6 +11,7 @@ use message::{MsgType};
 use message_types::{NocToPort, NocFromPort, PortToNoc, PortFromNoc, NocFromOutside};
 use name::UpTraphID;
 use packet::{PacketAssembler, PacketAssemblers};
+use uptree_spec::DeploymentSpec;
 
 #[derive(Debug, Clone)]
 pub struct Noc {
@@ -92,13 +93,9 @@ impl Noc {
 	fn listen_outside(&mut self, noc_from_outside: NocFromOutside, noc_to_port: NocToPort) -> Result<()> {
 		loop {
 			let input = &noc_from_outside.recv()?;
-			let mut split_input = input.splitn(2, "");
-			if let Some(cmd) = split_input.next() {
-				match cmd {
-					//"new_uptraph" => self.new_uptraph(split_input.next(), noc_to_port.clone())?,
-					_ => println!("Unknown command: {}", input)
-				};
-			}
+			println!("{}", input);
+			let uptree_spec = serde_json::from_str::<DeploymentSpec>(input);
+			println!("{:?}", uptree_spec);
 		}
 	}
 	/*

@@ -6,14 +6,14 @@ use message_types::{VmToCa, VmFromCa, VmToContainerMsg, VmToContainer, Container
 	ContainerToVmMsg, ContainerToVm, VmFromContainer, ContainerVmError};
 use name::{ContainerID, TreeID, UpTraphID, VmID};
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Deserialize)]
 pub struct VirtualMachine {
 	id: VmID,
-	containers: HashMap<UpTraphID, Vec<VmToContainer>>,
+	containers: Vec<Container>,
 }
 impl VirtualMachine {
 	pub fn new(id: VmID) -> VirtualMachine {
-		VirtualMachine { id: id, containers: HashMap::new() }
+		VirtualMachine { id: id, containers: Vec::new() }
 	}
 	pub fn initialize(&mut self, services: &mut Vec<Service>,
 			up_tree_id: &UpTraphID, tree_ids: &HashMap<&str,TreeID>, 
@@ -27,7 +27,7 @@ impl VirtualMachine {
 			let container_id = ContainerID::new(&name)?;
 			let container = Container::new(container_id.clone(), service);
 			container.initialize(up_tree_id, tree_ids, container_to_vm, container_from_vm)?;
-			self.containers.insert(up_tree_id.clone(), vec![vm_to_container]);
+			//self.containers.insert(up_tree_id.clone(), vec![vm_to_container]);
 			self.listen_container(container_id, vm_from_container, vm_to_ca.clone())?;
 		}
 		Ok(())

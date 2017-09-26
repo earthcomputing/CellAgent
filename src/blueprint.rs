@@ -4,46 +4,6 @@ use std::iter::FromIterator;
 
 use config::{CellNo, CellType, Edge, PortNo};
 
-#[derive(Debug, Clone)]
-pub struct BorderCell {
-	cell_no: CellNo, 
-	interior_ports: Vec<PortNo>,
-	border_ports: Vec<PortNo>,
-}
-impl BorderCell {
-	pub fn get_cell_no(&self) -> CellNo { self.cell_no }
-	pub fn get_nports(&self) -> PortNo { PortNo{ v: (self.border_ports.len() + self.interior_ports.len()) as u8} }
-	pub fn get_interior_ports(&self) -> &Vec<PortNo> { &self.interior_ports }
-	pub fn get_border_ports(&self) -> &Vec<PortNo> { &self.border_ports }
-}
-impl fmt::Display for BorderCell {
-	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result { 
-		let mut s = format!("\n  Border Cell {}: ", *self.cell_no);
-		s = s + &format!("Border Ports:");
-		for p in self.border_ports.iter() { s = s + &format!(" {}", p.v); }
-		s = s + &format!(", Interior Ports:");
-		for p in self.interior_ports.iter() { s = s + &format!(" {}", p.v); }
-		write!(f, "{}", s)
-	}	
-}
-#[derive(Debug, Clone)]
-pub struct InteriorCell {
-	cell_no: CellNo,
-	interior_ports: Vec<PortNo>
-}
-impl InteriorCell {
-	pub fn get_cell_no(&self) -> CellNo { self.cell_no }
-	pub fn get_nports(&self) -> PortNo { PortNo { v: self.interior_ports.len() as u8} }
-	pub fn get_interior_ports(&self) -> &Vec<PortNo> { &self.interior_ports }
-}
-impl fmt::Display for InteriorCell {
-	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result { 
-		let mut s = format!("\n  Interior Cell {}: ", *self.cell_no);
-		s = s + &format!("Interior Ports:");
-		for p in self.interior_ports.iter() { s = s + &format!(" {}", p.v); }
-		write!(f, "{}", s)
-	}	
-}
 #[derive(Debug)]
 pub struct Blueprint {
 	cell_type: CellType,
@@ -92,6 +52,46 @@ impl fmt::Display for Blueprint {
 		s = s + &format!("\n  Edges: ");
 		for edge in self.edges.iter() { s = s + &format!("({},{})", *edge.v.0, *edge.v.1); }
 		write!(f, "{}", s) }
+}
+#[derive(Debug, Clone)]
+pub struct BorderCell {
+	cell_no: CellNo, 
+	interior_ports: Vec<PortNo>,
+	border_ports: Vec<PortNo>,
+}
+impl BorderCell {
+	pub fn get_cell_no(&self) -> CellNo { self.cell_no }
+	pub fn get_nports(&self) -> PortNo { PortNo{ v: (self.border_ports.len() + self.interior_ports.len()) as u8} }
+	pub fn get_interior_ports(&self) -> &Vec<PortNo> { &self.interior_ports }
+	pub fn get_border_ports(&self) -> &Vec<PortNo> { &self.border_ports }
+}
+impl fmt::Display for BorderCell {
+	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result { 
+		let mut s = format!("\n  Border Cell {}: ", *self.cell_no);
+		s = s + &format!("Border Ports:");
+		for p in self.border_ports.iter() { s = s + &format!(" {}", p.v); }
+		s = s + &format!(", Interior Ports:");
+		for p in self.interior_ports.iter() { s = s + &format!(" {}", p.v); }
+		write!(f, "{}", s)
+	}	
+}
+#[derive(Debug, Clone)]
+pub struct InteriorCell {
+	cell_no: CellNo,
+	interior_ports: Vec<PortNo>
+}
+impl InteriorCell {
+	pub fn get_cell_no(&self) -> CellNo { self.cell_no }
+	pub fn get_nports(&self) -> PortNo { PortNo { v: self.interior_ports.len() as u8} }
+	pub fn get_interior_ports(&self) -> &Vec<PortNo> { &self.interior_ports }
+}
+impl fmt::Display for InteriorCell {
+	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result { 
+		let mut s = format!("\n  Interior Cell {}: ", *self.cell_no);
+		s = s + &format!("Interior Ports:");
+		for p in self.interior_ports.iter() { s = s + &format!(" {}", p.v); }
+		write!(f, "{}", s)
+	}	
 }
 error_chain! {
 	errors {

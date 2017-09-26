@@ -1,0 +1,8 @@
+{"id": "noc_master_tree_id",
+ "vms": [
+     VmSpec { "vm": "vm", "containers": ["noc_master"],
+              ["trees": ["UpTree": { "noc_master": "noc_master", "parent_list": [0] }]
+              ]
+            }
+     ]
+}
