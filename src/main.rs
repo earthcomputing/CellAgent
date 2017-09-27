@@ -39,6 +39,7 @@ mod utility;
 mod vm;
 
 use std::io::{stdin, stdout, Read, Write};
+use std::collections::HashSet;
 use std::fs::File;
 use std::sync::mpsc::channel;
 use std::collections::HashMap;
@@ -46,9 +47,10 @@ use std::collections::HashMap;
 use blueprint::Blueprint;
 use config::{NCELLS, NPORTS, NLINKS, OUTPUT_FILE_NAME, PHYSICAL_UP_TREE_NAME, CellNo, CellType, Edge, PortNo};
 use ecargs::{ECArgs};
+use gvm_equation::{GvmEquation, GvmEqn, GvmVariable, GvmVariableType};
 use message_types::{OutsideToNoc, NocFromOutside};
 use noc::Noc;
-use uptree_spec::{DeploymentSpec, UpTreeSpec, VmSpec};
+use uptree_spec::{ContainerSpec, DeploymentSpec, UpTreeSpec, VmSpec};
 
 fn main() {
 	if let Err(ref e) = run() {
@@ -64,11 +66,11 @@ fn main() {
 		}
 		::std::process::exit(1);
 	}
-	println!("Main exit");
+	println!("\nMain exit");
 }
 
 fn run() -> Result<()> {
-	println!("Multicell Routing: Output to file {} set in config.rs", OUTPUT_FILE_NAME);
+	println!("Multicell Routing: Output to file {} (set in config.rs)", OUTPUT_FILE_NAME);
 /* Doesn't work when debugging in Eclipse
 	let args: Vec<String> = env::args().collect();
 	println!("Main: args {:?}",args);
@@ -82,10 +84,12 @@ fn run() -> Result<()> {
 		Err(err) => panic!("Argument Error: {}", err)
 	};
 	let (ncells, nports) = ecargs.get_args();
-	println!("Main: {} ports for each of {} cells", *nports, *ncells);
+	println!("\nMain: {} ports for each of {} cells", *nports, *ncells);
 	//let edges = vec![(0,1),(1,2),(2,3),(3,4),(5,6),(6,7),(7,8),(8,9),(0,5),(1,6),(2,7),(3,8),(4,9)];
 	let edges = vec![is2e(0,1),is2e(1,2),is2e(1,6),is2e(3,4),is2e(5,6),is2e(6,7),is2e(7,8),is2e(8,9),is2e(0,5),is2e(2,3),is2e(2,7),is2e(3,8),is2e(4,9)];
-	let exceptions = HashMap::new();
+	let mut exceptions = HashMap::new();
+	exceptions.insert(CellNo(5), PortNo{v:4});
+	exceptions.insert(CellNo(2), PortNo{v:8});
 	let mut border = HashMap::new();
 	border.insert(CellNo(2), vec![PortNo{v:2}]);
 	border.insert(CellNo(7), vec![PortNo{v:2}]);
@@ -93,11 +97,24 @@ fn run() -> Result<()> {
 	println!("{}", blueprint);
 	let up_tree1 = UpTreeSpec::new("test1", vec![0, 0, 0, 2, 2])?;
 	let up_tree2 = UpTreeSpec::new("test2", vec![1, 1, 0, 1])?;
-	let vm_spec1 = VmSpec::new("vm1", vec!["foo", "bar"], vec!["c1", "c2", "c3", "c2", "c4"], vec![up_tree1, up_tree2])?;
+	let c1 = ContainerSpec::new("c1", "D1", vec!["foo", "bar"])?;
+	let c2 = ContainerSpec::new("c2", "D1", vec!["foo"])?;
+	let c3 = ContainerSpec::new("c3", "D3", vec!["foo"])?;
+	let c4 = ContainerSpec::new("c4", "D2", vec!["foo", "bar"])?;
+	let c5 = ContainerSpec::new("c5", "D2", vec!["foo"])?;
+	let c6 = ContainerSpec::new("c6", "D3", vec!["foo"])?;
+	let vm_spec1 = VmSpec::new("vm1", "Ubuntu", vec!["foo", "bar"], vec![&c1, &c2, &c4, &c5, &c5], vec![&up_tree1, &up_tree2])?;
 	let up_tree3 = UpTreeSpec::new("test3", vec![0, 0])?;
 	let up_tree4 = UpTreeSpec::new("test4", vec![1, 1, 0])?;
-	let vm_spec2 = VmSpec::new("vm2", vec!["foo"], vec!["c5", "c3", "c6"], vec![up_tree3.clone(), up_tree4])?;
-	let up_tree_def = DeploymentSpec::new("tree1", vec!["foo", "bar"], vec![vm_spec1, vm_spec2], vec![up_tree3])?;
+	let vm_spec2 = VmSpec::new("vm2", "RedHat", vec!["foo"], vec![&c5, &c3, &c6], vec![&up_tree3, &up_tree4])?;
+	let mut eqns = HashSet::new();
+	eqns.insert(GvmEqn::Recv("true"));
+	eqns.insert(GvmEqn::Send("true"));
+	eqns.insert(GvmEqn::Xtnd("hops<7"));
+	eqns.insert(GvmEqn::Save("false"));
+	let gvm_eqn = GvmEquation::new(eqns, vec![GvmVariable::new(GvmVariableType::PathLength, "hops")]);
+	let up_tree_def = DeploymentSpec::new("mytest", "cell_tree",
+		vec!["foo", "bar"], vec![&vm_spec1, &vm_spec2], vec![&up_tree3], gvm_eqn)?;
 	println!("{}", up_tree_def);
 	return Ok(());
 	let (outside_to_noc, noc_from_outside): (OutsideToNoc, NocFromOutside) = channel();

@@ -73,8 +73,8 @@ impl GvmEquation {
 }
 impl fmt::Display for GvmEquation {
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-		let mut s = format!("Gvm: receive {}, send {}, extend {}, save {}, Variables:", 
-			self.recv_eqn, self.send_eqn, self.save_eqn, self.xtnd_eqn);
+		let mut s = format!("Gvm: receive '{}', send '{}', extend '{}', save '{}', Variables:", 
+			self.recv_eqn, self.send_eqn, self.xtnd_eqn, self.save_eqn);
 		for variable in self.variables.iter() {
 			s = s + &format!(" {} ", variable);
 		}
@@ -109,7 +109,7 @@ impl GvmVariable {
 }
 impl fmt::Display for GvmVariable { 
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result { 
-		write!(f, "{}::{}", self.value, self.var_type) }
+		write!(f, "{}:{}", self.value, self.var_type) }
 }
 error_chain! {
 	foreign_links {
