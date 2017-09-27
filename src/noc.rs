@@ -98,24 +98,6 @@ impl Noc {
 			println!("{:?}", uptree_spec);
 		}
 	}
-	/*
-	fn new_uptraph(&mut self, str_params: Option<&str>, noc_to_port: NocToPort) -> Result<()> {
-		let new_cell_type = match self.cell_type {
-			CellType::NalCell => CellType::Vm,
-			CellType::Vm => CellType::Container,
-			_ => panic!("Bad CellType")
-		};
-		let name = format!("{}{}{}", self.id, SEPARATOR, *self.no_datacenters);
-		let up_id = UpTraphID::new(&name)?;
-		type Params = (CellNo, PortNo, Vec<Edge>);
-		if let Some(str_params) = str_params {
-			let params: Params = serde_json::from_str(str_params)?;
-			let _ = self.build_datacenter(&up_id, new_cell_type, params.0, params.1, params.2)?;
-			self.no_datacenters = DatacenterNo(*self.no_datacenters + 1);
-		} else { panic!("Parameter problem"); }
-		Ok(())
-	}
-	*/
 	fn write_err(&self, s: &str, e: Error) {
 		use ::std::io::Write;
 		let stderr = &mut ::std::io::stderr();
@@ -128,24 +110,6 @@ impl Noc {
 		}
 	}
 }
-/*
-#[derive(Debug)]
-struct ControlChannel {
-	channel: (NocToPort, NocFromPort)
-}
-impl ControlChannel {
-	fn new(send: NocToPort, recv: NocFromPort) -> ControlChannel {
-		ControlChannel { channel: (send, recv) }
-	}
-	fn get_send(&self) -> &NocToPort { &self.channel.0 }
-	fn get_recv(&self) -> &NocFromPort { &self.channel.1 }
-}
-impl fmt::Display for ControlChannel {
-	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-		write!(f, "Control Channel")	
-	}
-}
-*/
 // Errors
 error_chain! {
 	foreign_links {

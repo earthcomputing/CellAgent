@@ -46,7 +46,7 @@ impl Blueprint {
 }
 impl fmt::Display for Blueprint {
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result { 
-		let mut s = format!("Blueprint for {} cells", self.cell_type);
+		let mut s = format!("\nBlueprint for {} cells", self.cell_type);
 		for cell in self.border_cells.iter() { s = s + &format!("{}", cell); }
 		for cell in self.interior_cells.iter() { s = s + &format!("{}", cell); }
 		s = s + &format!("\n  Edges: ");

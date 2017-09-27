@@ -1,64 +1,108 @@
 use std::fmt;
 use std::collections::HashSet;
 
+use gvm_equation::GvmEquation;
 use utility::S;
 
 #[derive(Debug, Clone, Deserialize)]
 pub struct DeploymentSpec {
 	id: String,
+	deployment_tree: String,
+	gvm_eqn: GvmEquation,
 	allowed_trees: Vec<String>,
 	vms: Vec<VmSpec>,
 	trees: Vec<UpTreeSpec>
 }
 impl DeploymentSpec {
-	pub fn new(id: &str, allowed: Vec<&str>, vms: Vec<VmSpec>, trees: Vec<UpTreeSpec>) -> Result<DeploymentSpec> {
+	pub fn new(id: &str, deployment_tree: &str, allowed: Vec<&str>, 
+			vm_refs: Vec<&VmSpec>, tree_refs: Vec<&UpTreeSpec>, gvm_eqn: GvmEquation) -> Result<DeploymentSpec> {
 		let allowed_trees: Vec<String> = allowed.iter().map(|t| S(t)).collect();
-		for v in &vms {
+		let mut trees = Vec::new();
+		for t in tree_refs { trees.push(t.clone()); }
+		let mut vms = Vec::new();
+		for v in vm_refs {
+			vms.push(v.clone());
 			let allowed = v.get_allowed_trees();
 			for a in allowed { 
 				if !allowed_trees.contains(a) { return Err(ErrorKind::Allowed(v.get_id(), S(a)).into()); } 
 			}
 		}
-		Ok( DeploymentSpec { id: S(id), allowed_trees: allowed_trees, vms: vms, trees: trees })
+		Ok( DeploymentSpec { id: S(id), deployment_tree: S(deployment_tree), allowed_trees: allowed_trees, 
+				vms: vms, trees: trees, gvm_eqn: gvm_eqn })
 	}
 }
 impl fmt::Display for DeploymentSpec {
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result { 
-		let mut s = format!("\nUpTree Definition {}: ", self.id);
-		s = s + &format!("\n  Allowed Trees:");
+		let mut s = format!("\nDeploy {} with", self.id);
+		s = s + &format!(" allowed trees");
 		for a in &self.allowed_trees { s = s + &format!(" {}", a); }
-		for v in &self.vms { s = s + &format!("\n  {}", v); }
+		s = s + &format!("\n  Deploy on tree {} with {}", self.deployment_tree, self.gvm_eqn);
 		for t in &self.trees { s = s + &format!("\n  {}", t); }
+		for v in &self.vms { s = s + &format!("\n  {}", v); }
 		write!(f, "{}", s)
 	}	
 }
 #[derive(Debug, Clone, Deserialize)]
 pub struct VmSpec {
 	id: String,
+	image:String, 
 	allowed_trees: Vec<String>,
-	containers: Vec<String>,
+	containers: Vec<ContainerSpec>,
 	trees: Vec<UpTreeSpec>
 }
 impl VmSpec {
-	pub fn new(id: &str, allowed_trees: Vec<&str>, containers: Vec<&str>, trees: Vec<UpTreeSpec>) -> Result<VmSpec> {
+	pub fn new(id: &str, image: &str, allowed_str: Vec<&str>, 
+			container_refs: Vec<&ContainerSpec>, tree_refs: Vec<&UpTreeSpec>) -> Result<VmSpec> {
 		let mut max_tree_size = 0;
-		for t in trees.iter() { if t.get_tree_size() > max_tree_size { max_tree_size = t.get_tree_size() }; }
-		if max_tree_size > containers.len() { return Err(ErrorKind::Containers(S(id), containers.len()).into()); }
-		let allowed: Vec<String> = allowed_trees.iter().map(|t| S(t)).collect();
-		let cs: Vec<String> = containers.iter().map(|c| S(c)).collect();
-		Ok(VmSpec { id: S(id), allowed_trees: allowed, containers: cs, trees: trees })
+		let mut trees = Vec::new();
+		for t in tree_refs { 
+			trees.push(t.clone());
+			if t.get_tree_size() > max_tree_size { max_tree_size = t.get_tree_size() }; 
+		}
+		if max_tree_size > container_refs.len() { return Err(ErrorKind::Containers(S(id), container_refs.len()).into()); }
+		let mut containers = Vec::new();
+		let allowed_trees: Vec<String> = allowed_str.iter().map(|t| S(t)).collect();
+		for c in container_refs {
+			containers.push(c.clone());
+			let allowed = c.get_allowed_trees();
+			for a in allowed { 
+				if !allowed_trees.contains(&a) { return Err(ErrorKind::Allowed(c.get_id(), S(a)).into()); } 
+			}			
+		}
+		Ok(VmSpec { id: S(id), image: S(image), allowed_trees: allowed_trees, containers: containers, trees: trees })
 	}
 	fn get_id(&self) -> String { self.id.clone() }
 	fn get_allowed_trees(&self) -> &Vec<String> { &self.allowed_trees }
 }
 impl fmt::Display for VmSpec {
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-		let mut s = format!("Virtual Machine {}", self.id);
-		s = s + &format!("\n    Allowed Trees:");
+		let mut s = format!("Virtual Machine {}({})", self.id, self.image);
+		s = s + &format!(" Allowed Trees:");
 		for a in &self.allowed_trees { s = s + &format!(" {}", a); }
-		s = s + &format!("\n    Containers:");
-		for c in &self.containers { s = s + &format!(" {}", c); }
 		for t in &self.trees { s = s + &format!("\n    {}", t); }
+		for c in &self.containers { s = s + &format!("\n   {}", c); }
+		write!(f, "{}", s)
+	}
+}
+#[derive(Debug, Clone, Deserialize)]
+pub struct ContainerSpec {
+	id: String, 
+	image: String,
+	allowed_trees: Vec<String>
+}
+impl ContainerSpec {
+	pub fn new(id: &str, image: &str, allowed_str: Vec<&str>) -> Result<ContainerSpec> {
+		let allowed_trees: Vec<String> = allowed_str.iter().map(|t| S(t)).collect();
+		Ok(ContainerSpec { id: S(id), image: S(image), allowed_trees: allowed_trees })
+	}
+	fn get_id(&self) -> String { self.id.clone() }
+	fn get_allowed_trees(&self) -> &Vec<String> { &self.allowed_trees }
+}
+impl fmt::Display for ContainerSpec {
+	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+		let mut s = format!("    Container {}({})", self.id, self.image);
+		s = s + &format!(" Allowed Trees:");
+		for a in &self.allowed_trees { s = s + &format!(" {}", a); }
 		write!(f, "{}", s)
 	}
 }
