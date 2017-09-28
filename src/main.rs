@@ -50,7 +50,7 @@ use ecargs::{ECArgs};
 use gvm_equation::{GvmEquation, GvmEqn, GvmVariable, GvmVariableType};
 use message_types::{OutsideToNoc, NocFromOutside};
 use noc::Noc;
-use uptree_spec::{ContainerSpec, DeploymentSpec, UpTreeSpec, VmSpec};
+use uptree_spec::{AllowedTree, ContainerSpec, DeploymentSpec, UpTreeSpec, VmSpec};
 
 fn main() {
 	if let Err(ref e) = run() {
@@ -95,26 +95,28 @@ fn run() -> Result<()> {
 	border.insert(CellNo(7), vec![PortNo{v:2}]);
 	let blueprint = Blueprint::new(CellType::Physical, ncells, nports, edges, exceptions, border)?;
 	println!("{}", blueprint);
-	let up_tree1 = UpTreeSpec::new("test1", vec![0, 0, 0, 2, 2])?;
-	let up_tree2 = UpTreeSpec::new("test2", vec![1, 1, 0, 1])?;
-	let c1 = ContainerSpec::new("c1", "D1", vec!["foo", "bar"])?;
-	let c2 = ContainerSpec::new("c2", "D1", vec!["foo"])?;
-	let c3 = ContainerSpec::new("c3", "D3", vec!["foo"])?;
-	let c4 = ContainerSpec::new("c4", "D2", vec!["foo", "bar"])?;
-	let c5 = ContainerSpec::new("c5", "D2", vec!["foo"])?;
-	let c6 = ContainerSpec::new("c6", "D3", vec!["foo"])?;
-	let vm_spec1 = VmSpec::new("vm1", "Ubuntu", vec!["foo", "bar"], vec![&c1, &c2, &c4, &c5, &c5], vec![&up_tree1, &up_tree2])?;
-	let up_tree3 = UpTreeSpec::new("test3", vec![0, 0])?;
-	let up_tree4 = UpTreeSpec::new("test4", vec![1, 1, 0])?;
-	let vm_spec2 = VmSpec::new("vm2", "RedHat", vec!["foo"], vec![&c5, &c3, &c6], vec![&up_tree3, &up_tree4])?;
 	let mut eqns = HashSet::new();
 	eqns.insert(GvmEqn::Recv("true"));
 	eqns.insert(GvmEqn::Send("true"));
 	eqns.insert(GvmEqn::Xtnd("hops<7"));
 	eqns.insert(GvmEqn::Save("false"));
-	let gvm_eqn = GvmEquation::new(eqns, vec![GvmVariable::new(GvmVariableType::PathLength, "hops")]);
+	let ref gvm_eqn = GvmEquation::new(eqns, vec![GvmVariable::new(GvmVariableType::PathLength, "hops")]);
+	let up_tree1 = UpTreeSpec::new("test1", vec![0, 0, 0, 2, 2], gvm_eqn)?;
+	let up_tree2 = UpTreeSpec::new("test2", vec![1, 1, 0, 1], gvm_eqn)?;
+	let ref allowed_tree1 = AllowedTree::new("foo", gvm_eqn);
+	let ref allowed_tree2 = AllowedTree::new("bar", gvm_eqn);
+	let c1 = ContainerSpec::new("c1", "D1", vec![allowed_tree1, allowed_tree2])?;
+	let c2 = ContainerSpec::new("c2", "D1", vec![allowed_tree1])?;
+	let c3 = ContainerSpec::new("c3", "D3", vec![allowed_tree1])?;
+	let c4 = ContainerSpec::new("c4", "D2", vec![allowed_tree1, allowed_tree2])?;
+	let c5 = ContainerSpec::new("c5", "D2", vec![allowed_tree1])?;
+	let c6 = ContainerSpec::new("c6", "D3", vec![allowed_tree1])?;
+	let vm_spec1 = VmSpec::new("vm1", "Ubuntu", vec![allowed_tree1, allowed_tree2], vec![&c1, &c2, &c4, &c5, &c5], vec![&up_tree1, &up_tree2])?;
+	let up_tree3 = UpTreeSpec::new("test3", vec![0, 0], gvm_eqn)?;
+	let up_tree4 = UpTreeSpec::new("test4", vec![1, 1, 0], gvm_eqn)?;
+	let vm_spec2 = VmSpec::new("vm2", "RedHat", vec![allowed_tree1], vec![&c5, &c3, &c6], vec![&up_tree3, &up_tree4])?;
 	let up_tree_def = DeploymentSpec::new("mytest", "cell_tree",
-		vec!["foo", "bar"], vec![&vm_spec1, &vm_spec2], vec![&up_tree3], gvm_eqn)?;
+		vec![allowed_tree1, allowed_tree2], vec![&vm_spec1, &vm_spec2], vec![&up_tree3], gvm_eqn)?;
 	println!("{}", up_tree_def);
 	return Ok(());
 	let (outside_to_noc, noc_from_outside): (OutsideToNoc, NocFromOutside) = channel();

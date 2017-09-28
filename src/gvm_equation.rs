@@ -15,7 +15,7 @@ pub enum GvmEqn<'a> {
 }
 
 type GvmEqnType = String;
-#[derive(Debug, Clone, Hash, Serialize, Deserialize)]
+#[derive(Debug, Clone, Hash, Eq, PartialEq, Serialize, Deserialize)]
 pub struct GvmEquation {
 	recv_eqn: GvmEqnType,        // If true, add to traph and set "up" bit
 	send_eqn: GvmEqnType,        // If true, add to traph
@@ -73,7 +73,7 @@ impl GvmEquation {
 }
 impl fmt::Display for GvmEquation {
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-		let mut s = format!("Gvm: receive '{}', send '{}', extend '{}', save '{}', Variables:", 
+		let mut s = format!("GVM: receive '{}', send '{}', extend '{}', save '{}', Variables:", 
 			self.recv_eqn, self.send_eqn, self.xtnd_eqn, self.save_eqn);
 		for variable in self.variables.iter() {
 			s = s + &format!(" {} ", variable);
