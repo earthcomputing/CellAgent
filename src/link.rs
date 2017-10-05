@@ -1,11 +1,12 @@
 use std::fmt;
 use std::thread::JoinHandle;
+use serde_json;
 
 use message_types::{LinkToPort, LinkFromPort, LinkToPortPacket};
 use name::{Name, LinkID, PortID};
 use port::{PortStatus};
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize)]
 pub struct Link {
 	id: LinkID,
 	is_broken: bool,
@@ -14,7 +15,7 @@ pub struct Link {
 impl Link {
 	pub fn new(left_id: &PortID, rite_id: &PortID) -> Result<Link> {
 		let id = LinkID::new(left_id, rite_id)?;
-		::utility::append2file("LinkID: ".to_string() + &id.get_name().to_string())?;
+		::utility::append2file(serde_json::to_string(&id)?)?;
 		Ok(Link { id: id, is_broken: false, is_connected: true })
 	}
 //	pub fn get_id(&self) -> &LinkID { &self.id }
@@ -63,6 +64,7 @@ error_chain! {
 	foreign_links {
 		//Recv(::std::sync::mpsc::RecvError);
 		Send(::message_types::LinkPortError);
+		Serialize(::serde_json::Error);	
 	}
 	links {
 		Name(::name::Error, ::name::ErrorKind);

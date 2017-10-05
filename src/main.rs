@@ -93,8 +93,25 @@ fn run() -> Result<()> {
 	let mut border = HashMap::new();
 	border.insert(CellNo(2), vec![PortNo{v:2}]);
 	border.insert(CellNo(7), vec![PortNo{v:2}]);
-	let blueprint = Blueprint::new(CellType::Physical, ncells, nports, edges, exceptions, border)?;
+	let blueprint = Blueprint::new(ncells, nports, edges, exceptions, border)?;
 	println!("{}", blueprint);
+	//deployment_demo()?; 	// Demonstrate features of deployment spec
+//	return Ok(());
+	let (outside_to_noc, noc_from_outside): (OutsideToNoc, NocFromOutside) = channel();
+	let noc = Noc::new(PHYSICAL_UP_TREE_NAME)?;
+	let _ = noc.initialize(blueprint, noc_from_outside)?;
+	loop {
+		stdout().write(b"Enter filename specifying an up tree\n")?;
+		let mut filename = String::new();
+		let _ = stdin().read_line(&mut filename)?;
+		let mut f = File::open(filename.trim())?;
+		let mut uptree_spec = String::new();
+		let _ = f.read_to_string(&mut uptree_spec)?;
+		outside_to_noc.send(uptree_spec)?;
+	}
+}
+fn is2e(i: usize, j: usize) -> Edge { Edge { v: (CellNo(i),CellNo(j)) } }
+fn deployment_demo() -> Result<()> {
 	let mut eqns = HashSet::new();
 	eqns.insert(GvmEqn::Recv("true"));
 	eqns.insert(GvmEqn::Send("true"));
@@ -115,24 +132,10 @@ fn run() -> Result<()> {
 	let up_tree3 = UpTreeSpec::new("test3", vec![0, 0], gvm_eqn)?;
 	let up_tree4 = UpTreeSpec::new("test4", vec![1, 1, 0], gvm_eqn)?;
 	let vm_spec2 = VmSpec::new("vm2", "RedHat", vec![allowed_tree1], vec![&c5, &c3, &c6], vec![&up_tree3, &up_tree4])?;
-	let up_tree_def = DeploymentSpec::new("mytest", "cell_tree",
-		vec![allowed_tree1, allowed_tree2], vec![&vm_spec1, &vm_spec2], vec![&up_tree3], gvm_eqn)?;
+	let up_tree_def = DeploymentSpec::new("mytest", "cell_tree", vec![allowed_tree1, allowed_tree2], vec![&vm_spec1, &vm_spec2], vec![&up_tree3], gvm_eqn)?;
 	println!("{}", up_tree_def);
-	return Ok(());
-	let (outside_to_noc, noc_from_outside): (OutsideToNoc, NocFromOutside) = channel();
-	let noc = Noc::new(PHYSICAL_UP_TREE_NAME, CellType::Physical)?;
-	let _ = noc.initialize(blueprint, noc_from_outside)?;
-	loop {
-		stdout().write(b"Enter filename specifying an up tree\n")?;
-		let mut filename = String::new();
-		let _ = stdin().read_line(&mut filename)?;
-		let mut f = File::open(filename.trim())?;
-		let mut uptree_spec = String::new();
-		let _ = f.read_to_string(&mut uptree_spec)?;
-		outside_to_noc.send(uptree_spec)?;
-	}
+	Ok(())
 }
-fn is2e(i: usize, j: usize) -> Edge { Edge { v: (CellNo(i),CellNo(j)) } }
 // Errors
 error_chain! {
 	foreign_links {

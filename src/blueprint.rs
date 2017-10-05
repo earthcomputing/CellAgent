@@ -6,13 +6,12 @@ use config::{CellNo, CellType, Edge, PortNo};
 
 #[derive(Debug)]
 pub struct Blueprint {
-	cell_type: CellType,
 	interior_cells: Vec<InteriorCell>,
 	border_cells: Vec<BorderCell>,
 	edges: Vec<Edge>,
 }
 impl Blueprint {
-	pub fn new(cell_type: CellType, ncells: CellNo, ports_per_cell: PortNo, edges: Vec<Edge>,
+	pub fn new(ncells: CellNo, ports_per_cell: PortNo, edges: Vec<Edge>,
 			exceptions: HashMap<CellNo, PortNo>, border_cell_map: HashMap<CellNo, Vec<PortNo>>) -> Result<Blueprint> {
 		if border_cell_map.len() > *ncells { return Err(ErrorKind::CellCount(ncells, border_cell_map.len()).into()) }
 		let mut interior_cells = Vec::new();
@@ -27,15 +26,15 @@ impl Blueprint {
 			match border_cell_map.get(&cell_no) {
 				Some(ports) => {
 					let border: HashSet<PortNo> = HashSet::from_iter(ports.clone());
-					let all_interior: HashSet<PortNo> = HashSet::from_iter(port_list);
-					let mut interior = all_interior.difference(&border).cloned().collect::<Vec<_>>();
+					let all: HashSet<PortNo> = HashSet::from_iter(port_list);
+					let mut interior = all.difference(&border).cloned().collect::<Vec<_>>();
 					interior.sort();
 					border_cells.push(BorderCell { cell_no: cell_no, interior_ports: interior, border_ports: ports.clone() });					
 				},
 				None => interior_cells.push(InteriorCell { cell_no: cell_no, interior_ports : port_list })
 			}
 		}
-		Ok(Blueprint { cell_type: cell_type, interior_cells: interior_cells, border_cells: border_cells, edges: edges })
+		Ok(Blueprint { interior_cells: interior_cells, border_cells: border_cells, edges: edges })
 	}
 	pub fn get_ncells(&self) -> CellNo { CellNo(self.get_n_interior_cells() + self.get_n_border_cells()) }
 	pub fn get_n_border_cells(&self) -> usize { self.border_cells.len() }
@@ -46,7 +45,7 @@ impl Blueprint {
 }
 impl fmt::Display for Blueprint {
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result { 
-		let mut s = format!("\nBlueprint for {} cells", self.cell_type);
+		let mut s = format!("\nBlueprint");
 		for cell in self.border_cells.iter() { s = s + &format!("{}", cell); }
 		for cell in self.interior_cells.iter() { s = s + &format!("{}", cell); }
 		s = s + &format!("\n  Edges: ");

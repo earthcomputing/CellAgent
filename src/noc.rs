@@ -5,7 +5,7 @@ use std::time;
 use serde_json;
 
 use blueprint::{Blueprint};
-use config::{SEPARATOR, CellNo, CellType, DatacenterNo, Edge, PortNo};
+use config::{SEPARATOR, CellNo, DatacenterNo, Edge, PortNo};
 use datacenter::{Datacenter};
 use message::{MsgType};
 use message_types::{NocToPort, NocFromPort, PortToNoc, PortFromNoc, NocFromOutside};
@@ -16,27 +16,19 @@ use uptree_spec::DeploymentSpec;
 #[derive(Debug, Clone)]
 pub struct Noc {
 	id: UpTraphID,
-	cell_type: CellType,
 	no_datacenters: DatacenterNo,
 	packet_assemblers: PacketAssemblers
 }
 impl Noc {
-	pub fn new(id: &str, cell_type: CellType) -> Result<Noc> {
+	pub fn new(id: &str) -> Result<Noc> {
 		let id = UpTraphID::new(id)?;
-		Ok(Noc { id: id, cell_type: cell_type, packet_assemblers: PacketAssemblers::new(),
+		Ok(Noc { id: id, packet_assemblers: PacketAssemblers::new(),
 				 no_datacenters: DatacenterNo(0) })
 	}
 	pub fn initialize(&self, blueprint: Blueprint, noc_from_outside: NocFromOutside) -> Result<Vec<JoinHandle<()>>> {
-		match self.cell_type {
-			CellType::Physical  => self.initialize_physical(blueprint, noc_from_outside),
-			CellType::Vm        => self.initialize_vm(blueprint, noc_from_outside),
-			CellType::Container => self.initialize_container(blueprint, noc_from_outside)
-		}
-	}
-	fn initialize_physical(&self, blueprint: Blueprint, noc_from_outside: NocFromOutside) -> Result<Vec<JoinHandle<()>>> {
 		let (noc_to_port, port_from_noc): (NocToPort, NocFromPort) = channel();
 		let (port_to_noc, noc_from_port): (PortToNoc, PortFromNoc) = channel();
-		let (mut dc, join_handles) = self.build_datacenter(&self.id, self.cell_type, blueprint)?;
+		let (mut dc, join_handles) = self.build_datacenter(&self.id, blueprint)?;
 		dc.connect_to_noc(port_to_noc, port_from_noc)?;
 		let mut noc = self.clone();
 		spawn( move || { 
@@ -52,22 +44,13 @@ impl Noc {
 		self.control(&mut dc)?;
 		Ok(join_handles)
 	}
-	fn initialize_vm(&self, blueprint: Blueprint, noc_from_outside: NocFromOutside) -> Result<Vec<JoinHandle<()>>> {
-		let (mut dc, join_handles) = self.build_datacenter(&self.id, self.cell_type, blueprint)?;
-		Ok(join_handles)
-	}
-	fn initialize_container(&self, blueprint: Blueprint, noc_from_outside: NocFromOutside) -> Result<Vec<JoinHandle<()>>> {
-		let (mut dc, join_handles) = self.build_datacenter(&self.id, self.cell_type, blueprint)?;
-		Ok(join_handles)
-	}
-
 	fn control(&self, dc: &mut Datacenter) -> Result<()> {
 		Ok(())
 	}
-	fn build_datacenter(&self, id: &UpTraphID, cell_type: CellType, blueprint: Blueprint) 
+	fn build_datacenter(&self, id: &UpTraphID, blueprint: Blueprint) 
 			-> Result<(Datacenter, Vec<JoinHandle<()>>)> {
-		let mut dc = Datacenter::new(id, cell_type);
-		let join_handles = dc.initialize(self.cell_type, blueprint)?;
+		let mut dc = Datacenter::new(id,);
+		let join_handles = dc.initialize(blueprint)?;
 		Ok((dc, join_handles))
 	}
 //	fn get_msg(&self, msg_type: MsgType, serialized_msg:String) -> Result<Box<Message>> {

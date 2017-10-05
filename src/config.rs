@@ -38,16 +38,14 @@ pub struct VmNo(pub usize);
 // Cell types
 #[derive(Debug, Copy, Clone)]
 pub enum CellType {
-	Physical,
-	Vm,
-	Container
+	Border,
+	Interior
 }
 impl fmt::Display for CellType {
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result { 
 		let s = match *self {
-			CellType::Physical  => "Physical",
-			CellType::Vm        => "Virtual Machine",
-			CellType::Container => "Container"
+			CellType::Border   => "Border",
+			CellType::Interior => "Interior",
 		};
 		write!(f, "{}", s)
 	}	

@@ -68,7 +68,7 @@ impl<'a> TreeID {
 	}
 	pub fn append2file(&self) -> Result<()> {
 		let json = ::serde_json::to_string(&self)?;
-		::utility::append2file("Tree: ".to_string() + &json)?;
+		::utility::append2file(json)?;
 		Ok(())
 	}
 }
@@ -112,7 +112,7 @@ impl Name for TenantID {
 	fn create_from_string(&self, n: String) -> TenantID { TenantID { name: n, uuid: Uuid::new_v4() } }
 }
 impl fmt::Display for TenantID { fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result { self.name.fmt(f) } }
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize)]
 pub struct LinkID { name: NameType, uuid: Uuid}
 impl LinkID {
 	pub fn new(left_id: &PortID, rite_id: &PortID) -> Result<LinkID> { 
