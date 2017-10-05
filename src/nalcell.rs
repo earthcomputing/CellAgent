@@ -16,7 +16,6 @@ pub struct NalCell {
 	id: CellID,
 	cell_type: CellType,
 	cell_no: CellNo,
-	is_border: bool,
 	ports: Box<[Port]>,
 	cell_agent: CellAgent,
 	packet_engine: PacketEngine,
@@ -25,7 +24,7 @@ pub struct NalCell {
 }
 
 impl NalCell {
-	pub fn new(cell_no: CellNo, nports: PortNo, is_border: bool, cell_type: CellType) -> Result<NalCell> {
+	pub fn new(cell_no: CellNo, nports: PortNo, cell_type: CellType) -> Result<NalCell> {
 		if nports.v > MAX_PORTS.v { return Err(ErrorKind::NumberPorts(nports, "new".to_string()).into()) }
 		let cell_id = CellID::new(cell_no)?;
 		let (ca_to_pe, pe_from_ca): (CaToPe, PeFromCa) = channel();
@@ -36,8 +35,14 @@ impl NalCell {
 		let mut ports_from_pe = HashMap::new(); // So I can remove the item
 		let mut boundary_port_nos = HashSet::new();
 		for i in 0..nports.v + 1 {
-			let is_border_port = is_border & (i == 2);
-			if is_border_port { boundary_port_nos.insert(PortNo{v:i}); }
+			let is_border_port = match cell_type {
+				CellType::Border => {
+					let is_border_port = i == 2;
+					if is_border_port { boundary_port_nos.insert(PortNo{v:i}); }
+					is_border_port					
+				}
+				CellType::Interior => false
+			};
 			let (pe_to_port, port_from_pe): (PeToPort, PortFromPe) = channel();
 			pe_to_ports.push(pe_to_port);
 			ports_from_pe.insert(PortNo{v:i}, port_from_pe);
@@ -52,14 +57,19 @@ impl NalCell {
 		cell_agent.initialize(cell_type, ca_from_pe)?;
 		let packet_engine = PacketEngine::new(&cell_id, pe_to_ca, pe_to_ports, boundary_port_nos)?;
 		packet_engine.start_threads(pe_from_ca, pe_from_ports);
-		Ok(NalCell { id: cell_id, cell_no: cell_no, is_border: is_border, cell_type: cell_type, 
+		Ok(NalCell { id: cell_id, cell_no: cell_no, cell_type: cell_type, 
 				ports: boxed_ports, cell_agent: cell_agent, vms: Vec::new(),
 				packet_engine: packet_engine, ports_from_pe: ports_from_pe, })
 	}
 //	pub fn get_id(&self) -> &CellID { &self.id }
 //	pub fn get_no(&self) -> usize { self.cell_no }
 //	pub fn get_cell_agent(&self) -> &CellAgent { &self.cell_agent }
-	pub fn is_border(&self) -> bool { self.is_border }
+	pub fn is_border(&self) -> bool {
+		match self.cell_type {
+			CellType::Border => true,
+			CellType::Interior => false,
+		}  
+	}
 	pub fn get_free_ec_port_mut(&mut self) -> Result<(&mut Port, PortFromPe)> {
 		self.get_free_port_mut(false)
 	}
@@ -87,9 +97,10 @@ impl NalCell {
 impl fmt::Display for NalCell { 
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result { 
 		let mut s = String::new();
-		if self.is_border { s = s + &format!("Border Cell {}", self.id); }
-		else              { s = s + &format!("Cell {}", self.id); }
-
+		match self.cell_type { 
+			CellType::Border => s = s + &format!("Border Cell {}", self.id),
+			CellType::Interior => s = s + &format!("Cell {}", self.id)
+		}
 		s = s + &format!("{}", self.cell_agent);
 		s = s + &format!("\n{}", self.packet_engine);
 		write!(f, "{}", s) }

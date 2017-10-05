@@ -15,15 +15,14 @@ use utility::S;
 #[derive(Debug)]
 pub struct Datacenter {
 	id: UpTraphID,
-	cell_type: CellType,
 	cells: Vec<NalCell>,
 	links: Vec<Link>,
 }
 impl Datacenter {
-	pub fn new(id: &UpTraphID, cell_type: CellType) -> Datacenter {
-		Datacenter { id: id.clone(), cell_type: cell_type, cells: Vec::new(), links: Vec::new() }
+	pub fn new(id: &UpTraphID) -> Datacenter {
+		Datacenter { id: id.clone(), cells: Vec::new(), links: Vec::new() }
 	}
-	pub fn initialize(&mut self, cell_type: CellType, blueprint: Blueprint) -> Result<Vec<JoinHandle<()>>> {
+	pub fn initialize(&mut self, blueprint: Blueprint) -> Result<Vec<JoinHandle<()>>> {
 		let f = "initialize";
 		let ncells = blueprint.get_ncells();
 		let edge_list = blueprint.get_edge_list();
@@ -31,12 +30,12 @@ impl Datacenter {
 		if edge_list.len() < *ncells - 1 { return Err(ErrorKind::Edges(LinkNo(CellNo(edge_list.len())), S(f)).into()); }
 		let border_cells = blueprint.get_border_cells();
 		for cell in border_cells {
-			let cell = NalCell::new(cell.get_cell_no(), cell.get_nports(), true, cell_type)?;
+			let cell = NalCell::new(cell.get_cell_no(), cell.get_nports(), CellType::Border)?;
 			self.cells.push(cell);
 		}
 		let interior_cells = blueprint.get_interior_cells();
 		for cell in interior_cells {
-			let cell = NalCell::new(cell.get_cell_no(), cell.get_nports(), false, cell_type)?;
+			let cell = NalCell::new(cell.get_cell_no(), cell.get_nports(), CellType::Interior)?;
 			self.cells.push(cell);
 		}
 		let mut link_handles = Vec::new();

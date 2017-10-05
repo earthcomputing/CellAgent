@@ -43,10 +43,8 @@ impl PacketEngine {
 			match entry_pe_from_ca.recv()? {
 				CaToPePacket::Entry(e) => {
 					if *e.get_index() > 0 {
-						let json = ::serde_json::to_string(&e)?;
-						let json2 = ::serde_json::to_string(&e.get_mask().get_port_nos())?;
-						let string = format!("Entry {}: {} {}", self.cell_id, json, json2);
-						::utility::append2file(string)?;
+						let json = ::serde_json::to_string(&(&self.cell_id, &e, &e.get_mask().get_port_nos()))?;
+						::utility::append2file(json)?;
 					}
 					self.routing_table.lock().unwrap().set_entry(e)
 				},
