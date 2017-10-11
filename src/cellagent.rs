@@ -10,6 +10,7 @@ use container::Service;
 use gvm_equation::{GvmEquation, GvmEqn};
 use message::{DiscoverMsg, StackTreeMsg, Message, MsgType};
 use message_types::{CaToPe, CaFromPe, CaToVm, VmFromCa, VmToCa, CaFromVm, CaToPePacket, PeToCaPacket};
+use nalcell::CellConfig;
 use name::{Name, CellID, TreeID, UpTraphID, VmID};
 use packet::{Packet, PacketAssembler, PacketAssemblers};
 use port;
@@ -33,6 +34,7 @@ pub type SavedMsg = Vec<Packet>;
 pub struct CellAgent {
 	cell_id: CellID,
 	cell_type: CellType,
+	config: CellConfig,
 	no_ports: PortNo,
 	my_tree_id: TreeID,
 	control_tree_id: TreeID,
@@ -54,7 +56,7 @@ pub struct CellAgent {
 	packet_assemblers: PacketAssemblers,
 }
 impl CellAgent {
-	pub fn new(cell_id: &CellID, cell_type: CellType, no_ports: PortNo, ca_to_pe: CaToPe ) 
+	pub fn new(cell_id: &CellID, cell_type: CellType, config: CellConfig, no_ports: PortNo, ca_to_pe: CaToPe ) 
 				-> Result<CellAgent> {
 		let tenant_masks = vec![BASE_TENANT_MASK];
 		let my_tree_id = TreeID::new(cell_id.get_name())?;
@@ -69,7 +71,7 @@ impl CellAgent {
 		}
 		free_indices.reverse();
 		let traphs = Arc::new(Mutex::new(HashMap::new()));
-		Ok(CellAgent { cell_id: cell_id.clone(), my_tree_id: my_tree_id, cell_type: cell_type,
+		Ok(CellAgent { cell_id: cell_id.clone(), my_tree_id: my_tree_id, cell_type: cell_type, config: config,
 			control_tree_id: control_tree_id, connected_tree_id: connected_tree_id,	
 			no_ports: no_ports, traphs: traphs, vm_id_no: 0, tree_id_map: Arc::new(Mutex::new(HashMap::new())),
 			free_indices: Arc::new(Mutex::new(free_indices)), tree_map: Arc::new(Mutex::new(HashMap::new())),

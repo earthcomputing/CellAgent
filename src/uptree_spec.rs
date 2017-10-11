@@ -2,20 +2,22 @@ use std::fmt;
 use std::collections::HashSet;
 
 use gvm_equation::GvmEquation;
+use nalcell::CellConfig;
 use utility::S;
 
 #[derive(Debug, Clone, Deserialize)]
-pub struct DeploymentSpec {
+pub struct Manifest {
 	id: String,
+	cell_config: CellConfig,
 	deployment_tree: String,
 	gvm_eqn: GvmEquation,
 	allowed_trees: Vec<AllowedTree>,
 	vms: Vec<VmSpec>,
 	trees: Vec<UpTreeSpec>
 }
-impl DeploymentSpec {
-	pub fn new(id: &str, deployment_tree: &str, allowed_refs: Vec<&AllowedTree>,
-			vm_refs: Vec<&VmSpec>, tree_refs: Vec<&UpTreeSpec>, gvm_eqn: &GvmEquation) -> Result<DeploymentSpec> {
+impl Manifest {
+	pub fn new(id: &str, cell_config: CellConfig, deployment_tree: &str, allowed_refs: Vec<&AllowedTree>,
+			vm_refs: Vec<&VmSpec>, tree_refs: Vec<&UpTreeSpec>, gvm_eqn: &GvmEquation) -> Result<Manifest> {
 		let mut trees = Vec::new();
 		for t in tree_refs { trees.push(t.clone()); }
 		let mut allowed_trees = Vec::new();
@@ -28,11 +30,11 @@ impl DeploymentSpec {
 				if !allowed_trees.contains(a) { return Err(ErrorKind::Allowed(v.get_id(), S(a)).into()); } 
 			}
 		}
-		Ok( DeploymentSpec { id: S(id), deployment_tree: S(deployment_tree), allowed_trees: allowed_trees, 
-				vms: vms, trees: trees, gvm_eqn: gvm_eqn.clone() })
+		Ok(Manifest { id: S(id), cell_config: cell_config, deployment_tree: S(deployment_tree), 
+				allowed_trees: allowed_trees, vms: vms, trees: trees, gvm_eqn: gvm_eqn.clone() })
 	}
 }
-impl fmt::Display for DeploymentSpec {
+impl fmt::Display for Manifest {
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result { 
 		let mut s = format!("\nDeploy {} on tree {}: {}", self.id, self.deployment_tree, self.gvm_eqn);
 		s = s + &format!("\n  Allowed Trees");
@@ -117,26 +119,28 @@ pub struct UpTreeSpec {
 impl UpTreeSpec {
 	pub fn new(id: &str, parent_list: Vec<usize>, gvm_eqn: &GvmEquation) -> Result<UpTreeSpec> {
 		// Validate parent_list
-		let mut count = 0;
-		let mut root = 0;
-		for i in 0..parent_list.len() { if i == parent_list[i] { root = i; count = count + 1; } }
-		if count != 1 { return Err(ErrorKind::Tree(S(id), parent_list, S("More than one root")).into()); }
-		for p in parent_list.clone() {
-			let mut reached_root = true;
-			let mut r = p;
-			let mut visited = HashSet::new();
-			while r != root {
-				if visited.contains(&r) { return Err(ErrorKind::Tree(S(id), parent_list, S("Cycle")).into()); }
-				visited.insert(r);
-				match parent_list.clone().get(r) {
-					Some(p) => {
-						r = *p;
-						if r == root { reached_root = true; } else { reached_root = false; }
-					},
-					None => return Err(ErrorKind::Tree(S(id), parent_list, S("Index out of range")).into())
+		if parent_list.len() > 1 {
+			let mut count = 0;
+			let mut root = 0;
+			for i in 0..parent_list.len() { if i == parent_list[i] { root = i; count = count + 1; } }
+			if count != 1 { return Err(ErrorKind::Tree(S(id), parent_list, S("More than one root")).into()); }
+			for p in parent_list.clone() {
+				let mut reached_root = true;
+				let mut r = p;
+				let mut visited = HashSet::new();
+				while r != root {
+					if visited.contains(&r) { return Err(ErrorKind::Tree(S(id), parent_list, S("Cycle")).into()); }
+					visited.insert(r);
+					match parent_list.clone().get(r) {
+						Some(p) => {
+							r = *p;
+							if r == root { reached_root = true; } else { reached_root = false; }
+						},
+						None => return Err(ErrorKind::Tree(S(id), parent_list, S("Index out of range")).into())
+					}
 				}
+				if !reached_root { return Err(ErrorKind::Tree(S(id), parent_list, S("No path to root")).into()); }
 			}
-			if !reached_root { return Err(ErrorKind::Tree(S(id), parent_list, S("No path to root")).into()); }
 		}
 		Ok(UpTreeSpec { id: S(id), parent_list: parent_list, gvm_eqn: gvm_eqn.clone() })
 	}

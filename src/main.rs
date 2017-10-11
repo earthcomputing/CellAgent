@@ -45,12 +45,13 @@ use std::sync::mpsc::channel;
 use std::collections::HashMap;
 
 use blueprint::Blueprint;
-use config::{NCELLS, NPORTS, NLINKS, OUTPUT_FILE_NAME, PHYSICAL_UP_TREE_NAME, CellNo, CellType, Edge, PortNo};
+use config::{NCELLS, NPORTS, NLINKS, OUTPUT_FILE_NAME, PHYSICAL_UP_TREE_NAME, CellNo, Edge, PortNo};
 use ecargs::{ECArgs};
 use gvm_equation::{GvmEquation, GvmEqn, GvmVariable, GvmVariableType};
-use message_types::{OutsideToNoc, NocFromOutside};
+use message_types::{OutsideFromNoc, OutsideToNoc, NocFromOutside, NocToOutside};
+use nalcell::CellConfig;
 use noc::Noc;
-use uptree_spec::{AllowedTree, ContainerSpec, DeploymentSpec, UpTreeSpec, VmSpec};
+use uptree_spec::{AllowedTree, ContainerSpec, Manifest, UpTreeSpec, VmSpec};
 
 fn main() {
 	if let Err(ref e) = run() {
@@ -98,7 +99,8 @@ fn run() -> Result<()> {
 	//deployment_demo()?; 	// Demonstrate features of deployment spec
 //	return Ok(());
 	let (outside_to_noc, noc_from_outside): (OutsideToNoc, NocFromOutside) = channel();
-	let noc = Noc::new(PHYSICAL_UP_TREE_NAME)?;
+	let (noc_to_outside, outside_from_noc): (NocToOutside, OutsideFromNoc) = channel();
+	let noc = Noc::new(PHYSICAL_UP_TREE_NAME, noc_to_outside)?;
 	let _ = noc.initialize(blueprint, noc_from_outside)?;
 	loop {
 		stdout().write(b"Enter filename specifying an up tree\n")?;
@@ -132,7 +134,7 @@ fn deployment_demo() -> Result<()> {
 	let up_tree3 = UpTreeSpec::new("test3", vec![0, 0], gvm_eqn)?;
 	let up_tree4 = UpTreeSpec::new("test4", vec![1, 1, 0], gvm_eqn)?;
 	let vm_spec2 = VmSpec::new("vm2", "RedHat", vec![allowed_tree1], vec![&c5, &c3, &c6], vec![&up_tree3, &up_tree4])?;
-	let up_tree_def = DeploymentSpec::new("mytest", "cell_tree", vec![allowed_tree1, allowed_tree2], vec![&vm_spec1, &vm_spec2], vec![&up_tree3], gvm_eqn)?;
+	let up_tree_def = Manifest::new("mytest", CellConfig::Large, "cell_tree", vec![allowed_tree1, allowed_tree2], vec![&vm_spec1, &vm_spec2], vec![&up_tree3], gvm_eqn)?;
 	println!("{}", up_tree_def);
 	Ok(())
 }

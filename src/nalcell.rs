@@ -11,10 +11,24 @@ use port::{Port};
 use utility::{PortNumber};
 use vm::VirtualMachine;
 
+#[derive(Debug, Copy, Clone, Deserialize)]
+pub enum CellConfig { Small, Medium, Large }
+impl fmt::Display for CellConfig { 
+	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result { 
+		let s = match *self {
+			CellConfig::Small  => "Small",
+			CellConfig::Medium => "Medium",
+			CellConfig::Large  => "Large"
+		};
+		write!(f, "{}", s) 
+	}
+}
+
 #[derive(Debug)]
 pub struct NalCell {
 	id: CellID,
 	cell_type: CellType,
+	config: CellConfig,
 	cell_no: CellNo,
 	ports: Box<[Port]>,
 	cell_agent: CellAgent,
@@ -24,7 +38,7 @@ pub struct NalCell {
 }
 
 impl NalCell {
-	pub fn new(cell_no: CellNo, nports: PortNo, cell_type: CellType) -> Result<NalCell> {
+	pub fn new(cell_no: CellNo, nports: PortNo, cell_type: CellType, config: CellConfig) -> Result<NalCell> {
 		if nports.v > MAX_PORTS.v { return Err(ErrorKind::NumberPorts(nports, "new".to_string()).into()) }
 		let cell_id = CellID::new(cell_no)?;
 		let (ca_to_pe, pe_from_ca): (CaToPe, PeFromCa) = channel();
@@ -53,11 +67,11 @@ impl NalCell {
 			ports.push(port);
 		}
 		let boxed_ports: Box<[Port]> = ports.into_boxed_slice();
-		let mut cell_agent = CellAgent::new(&cell_id, cell_type, nports, ca_to_pe)?;
+		let mut cell_agent = CellAgent::new(&cell_id, cell_type, config, nports, ca_to_pe)?;
 		cell_agent.initialize(cell_type, ca_from_pe)?;
 		let packet_engine = PacketEngine::new(&cell_id, pe_to_ca, pe_to_ports, boundary_port_nos)?;
 		packet_engine.start_threads(pe_from_ca, pe_from_ports);
-		Ok(NalCell { id: cell_id, cell_no: cell_no, cell_type: cell_type, 
+		Ok(NalCell { id: cell_id, cell_no: cell_no, cell_type: cell_type, config: config,
 				ports: boxed_ports, cell_agent: cell_agent, vms: Vec::new(),
 				packet_engine: packet_engine, ports_from_pe: ports_from_pe, })
 	}
