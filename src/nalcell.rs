@@ -115,7 +115,8 @@ impl fmt::Display for NalCell {
 			CellType::Border => s = s + &format!("Border Cell {}", self.id),
 			CellType::Interior => s = s + &format!("Cell {}", self.id)
 		}
-		s = s + &format!("{}", self.cell_agent);
+		s = s + &format!(" {}", self.config);
+		s = s + &format!("\n{}", self.cell_agent);
 		s = s + &format!("\n{}", self.packet_engine);
 		write!(f, "{}", s) }
 }

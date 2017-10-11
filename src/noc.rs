@@ -67,7 +67,7 @@ impl Noc {
 		let noc_container = ContainerSpec::new("NocMaster", "NocMaster", vec![base_tree])?;
 		let noc_vm = VmSpec::new("NocVM", "Ubuntu", vec![base_tree], vec![&noc_container], vec![&container_uptree])?;
 		let up_tree_def = Manifest::new("NocMaster", CellConfig::Large, "NocMaster", vec![base_tree], vec![&noc_vm], vec![&vm_uptree], gvm_eqn)?;
-		println!("NOC Master Deployment {}", up_tree_def);
+		println!("NOC Master Manifest {}", up_tree_def);
 		Ok(())
 	}
 	fn build_datacenter(&self, id: &UpTraphID, blueprint: Blueprint) 
