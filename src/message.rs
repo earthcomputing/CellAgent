@@ -11,9 +11,11 @@ use cellagent::{CellAgent};
 use config::{MAX_PORTS, CellNo, MsgID, PathLength, PortNo, TableIndex};
 use container::Service;
 use gvm_equation::{GvmEquation, GvmEqn, GvmVariable, GvmVariableType};
+use nalcell::CellConfig;
 use name::{Name, CellID, TreeID, UpTraphID};
 use packet::{Packet, Packetizer, Serializer};
 use traph;
+use uptree_spec::Manifest;
 use utility::{DEFAULT_USER_MASK, Mask, Path, PortNumber, S};
 
 static MESSAGE_COUNT: AtomicUsize = ATOMIC_USIZE_INIT;
@@ -388,7 +390,9 @@ impl Message for StackTreeMsg {
 		let black_tree_name = self.payload.get_black_tree_name();
 		if let Some(black_tree_id) = tree_map.get(black_tree_name) {
 			if let Some(tree_id) = tree_map.get(tree_name) {
-				match ca.stack_tree(&tree_id, &tree_uuid, black_tree_id, gvm_eqn) {
+				let manifest = Manifest::new(black_tree_name, CellConfig::Large, &tree_name, Vec::new(), 
+					Vec::new(), Vec::new(), &gvm_eqn)?;
+				match ca.stack_tree(&tree_id, &tree_uuid, black_tree_id, &manifest) {
 					Ok(_) => (),
 					Err(err) => return Err(map_cellagent_errors(err))
 				}
@@ -513,6 +517,7 @@ error_chain! {
 		Serialize(::serde_json::Error);
 	}
 	links {
+		Manifest(::uptree_spec::Error, ::uptree_spec::ErrorKind);
 		Name(::name::Error, ::name::ErrorKind);
 		Packet(::packet::Error, ::packet::ErrorKind);
 		Utility(::utility::Error, ::utility::ErrorKind);

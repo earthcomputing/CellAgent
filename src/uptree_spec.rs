@@ -33,6 +33,7 @@ impl Manifest {
 		Ok(Manifest { id: S(id), cell_config: cell_config, deployment_tree: S(deployment_tree), 
 				allowed_trees: allowed_trees, vms: vms, trees: trees, gvm_eqn: gvm_eqn.clone() })
 	}
+	pub fn get_gvm(&self) -> &GvmEquation { &self.gvm_eqn }
 }
 impl fmt::Display for Manifest {
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result { 
