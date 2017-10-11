@@ -18,6 +18,7 @@ use routing_table_entry::{RoutingTableEntry};
 use traph;
 use traph::{Traph};
 use tree::Tree;
+use uptree_spec::Manifest;
 use utility::{BASE_TENANT_MASK, Mask, Path, PortNumber, S};
 use vm::VirtualMachine;
 
@@ -293,7 +294,7 @@ impl CellAgent {
 		}		
 	}
 	pub fn stack_tree(&mut self, tree_id: &TreeID, parent_tree_uuid: &Uuid, 
-			black_tree_id: &TreeID, gvm_eqn: &GvmEquation) -> Result<()> {
+			black_tree_id: &TreeID, manifest: &Manifest) -> Result<()> {
 		let mut traph = self.get_traph(black_tree_id)?;
 		if traph.has_tree(tree_id) { return Ok(()); } // Check for redundant StackTreeMsg
 		let parent_entry = traph.get_tree_entry(&parent_tree_uuid)?;
@@ -301,6 +302,7 @@ impl CellAgent {
 		let index = self.use_index()?; 
 		entry.set_table_index(index);
 		entry.set_uuid(&tree_id.get_uuid());
+		let gvm_eqn = manifest.get_gvm();
 		let params = traph.get_params(gvm_eqn.get_variables())?;
 		if !gvm_eqn.eval_recv(&params)? { 
 			let mask = entry.get_mask().and(Mask::all_but_zero(self.no_ports));
@@ -391,7 +393,10 @@ impl CellAgent {
 				Err(err) => return Err(map_message_errors(err))
 			};
 			self.send_msg(target_tree_id.get_uuid(), &packets, port_no_mask)?;
-			self.stack_tree(&new_tree_id, &my_tree_id.get_uuid(), my_tree_id, &gvm_eqn)		
+			let manifest = Manifest::new(id, CellConfig::Large, &self.my_tree_id.get_name(), Vec::new(), 
+				Vec::new(), Vec::new(), &gvm_eqn)?; 
+			self.stack_tree(&new_tree_id, &my_tree_id.get_uuid(), my_tree_id, &manifest)?;	
+			Ok(())	
 	}
 	fn port_connected(&mut self, port_no: PortNo, is_border: bool) -> Result<()> {
 		//println!("CellAgent {}: port {} is border {} connected", self.cell_id, port_no, is_border);
@@ -519,6 +524,7 @@ error_chain! {
 	links {
 		GvmEqn(::gvm_equation::Error, ::gvm_equation::ErrorKind);
 //		Message(Box<::message::Error>, Box<::message::ErrorKind>);
+		Manifest(::uptree_spec::Error, ::uptree_spec::ErrorKind);
 		Name(::name::Error, ::name::ErrorKind);
 		RoutingTableEntry(::routing_table_entry::Error, ::routing_table_entry::ErrorKind);
 		Traph(::traph::Error, ::traph::ErrorKind);
