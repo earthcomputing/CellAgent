@@ -51,6 +51,11 @@ pub type OutsideNocMsg = String;
 pub type OutsideToNoc = mpsc::Sender<OutsideNocMsg>;
 pub type NocFromOutside = mpsc::Receiver<OutsideNocMsg>;
 pub type OutsideNocError = mpsc::SendError<OutsideNocMsg>;
+// Noc to Outside
+pub type NocToOutsideMsg = String;
+pub type NocToOutside = mpsc::Sender<NocToOutsideMsg>;
+pub type OutsideFromNoc = mpsc::Receiver<NocToOutsideMsg>;
+pub type NocOutsideError = mpsc::SendError<NocToOutsideMsg>;
 // Cell agent to VM
 pub type CaToVmMsg = String;
 pub type CaToVm = mpsc::Sender<CaToVmMsg>;

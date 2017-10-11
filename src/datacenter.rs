@@ -8,7 +8,7 @@ use config::{MIN_BOUNDARY_CELLS, CellNo, CellType, Edge, LinkNo, PortNo};
 use message_types::{LinkToPort, PortFromLink, PortToLink, LinkFromPort,
 	PortToNoc, PortFromNoc};
 use link::{Link};
-use nalcell::{NalCell};
+use nalcell::{CellConfig, NalCell};
 use name::{UpTraphID};
 use utility::S;
 
@@ -30,12 +30,12 @@ impl Datacenter {
 		if edge_list.len() < *ncells - 1 { return Err(ErrorKind::Edges(LinkNo(CellNo(edge_list.len())), S(f)).into()); }
 		let border_cells = blueprint.get_border_cells();
 		for cell in border_cells {
-			let cell = NalCell::new(cell.get_cell_no(), cell.get_nports(), CellType::Border)?;
+			let cell = NalCell::new(cell.get_cell_no(), cell.get_nports(), CellType::Border, CellConfig::Large)?;
 			self.cells.push(cell);
 		}
 		let interior_cells = blueprint.get_interior_cells();
 		for cell in interior_cells {
-			let cell = NalCell::new(cell.get_cell_no(), cell.get_nports(), CellType::Interior)?;
+			let cell = NalCell::new(cell.get_cell_no(), cell.get_nports(), CellType::Interior, CellConfig::Large)?;
 			self.cells.push(cell);
 		}
 		let mut link_handles = Vec::new();
