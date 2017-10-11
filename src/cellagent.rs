@@ -499,7 +499,7 @@ impl CellAgent {
 }
 impl fmt::Display for CellAgent { 
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result { 
-		let mut s = format!(" Cell Agent");
+		let mut s = format!("Cell Agent");
 		for (_, traph) in self.traphs.lock().unwrap().iter() {
 			s = s + &format!("\n{}", traph);
 		}
