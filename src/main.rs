@@ -96,20 +96,20 @@ fn run() -> Result<()> {
 	border.insert(CellNo(7), vec![PortNo{v:2}]);
 	let blueprint = Blueprint::new(ncells, nports, edges, exceptions, border)?;
 	println!("{}", blueprint);
-	//deployment_demo()?; 	// Demonstrate features of deployment spec
+//	deployment_demo()?; 	// Demonstrate features of deployment spec
 //	return Ok(());
 	let (outside_to_noc, noc_from_outside): (OutsideToNoc, NocFromOutside) = channel();
 	let (noc_to_outside, outside_from_noc): (NocToOutside, OutsideFromNoc) = channel();
-	let noc = Noc::new(PHYSICAL_UP_TREE_NAME, noc_to_outside)?;
-	let _ = noc.initialize(blueprint, noc_from_outside)?;
+	let noc = Noc::new(noc_to_outside)?;
+	let _ = noc.initialize(&blueprint, noc_from_outside)?;
 	loop {
-		stdout().write(b"Enter filename specifying an up tree\n")?;
+		stdout().write(b"Enter the name of a file containing a manifest\n")?;
 		let mut filename = String::new();
 		let _ = stdin().read_line(&mut filename)?;
 		let mut f = File::open(filename.trim())?;
-		let mut uptree_spec = String::new();
-		let _ = f.read_to_string(&mut uptree_spec)?;
-		outside_to_noc.send(uptree_spec)?;
+		let mut manifest = String::new();
+		let _ = f.read_to_string(&mut manifest)?;
+		outside_to_noc.send(manifest)?;
 	}
 }
 fn is2e(i: usize, j: usize) -> Edge { Edge { v: (CellNo(i),CellNo(j)) } }
@@ -120,19 +120,19 @@ fn deployment_demo() -> Result<()> {
 	eqns.insert(GvmEqn::Xtnd("hops<7"));
 	eqns.insert(GvmEqn::Save("false"));
 	let ref gvm_eqn = GvmEquation::new(eqns, vec![GvmVariable::new(GvmVariableType::PathLength, "hops")]);
-	let up_tree1 = UpTreeSpec::new("test1", vec![0, 0, 0, 2, 2], gvm_eqn)?;
-	let up_tree2 = UpTreeSpec::new("test2", vec![1, 1, 0, 1], gvm_eqn)?;
-	let ref allowed_tree1 = AllowedTree::new("foo", gvm_eqn);
-	let ref allowed_tree2 = AllowedTree::new("bar", gvm_eqn);
-	let c1 = ContainerSpec::new("c1", "D1", vec![allowed_tree1, allowed_tree2])?;
-	let c2 = ContainerSpec::new("c2", "D1", vec![allowed_tree1])?;
-	let c3 = ContainerSpec::new("c3", "D3", vec![allowed_tree1])?;
-	let c4 = ContainerSpec::new("c4", "D2", vec![allowed_tree1, allowed_tree2])?;
-	let c5 = ContainerSpec::new("c5", "D2", vec![allowed_tree1])?;
-	let c6 = ContainerSpec::new("c6", "D3", vec![allowed_tree1])?;
+	let up_tree1 = UpTreeSpec::new("test1", vec![0, 0, 0, 2, 2])?;
+	let up_tree2 = UpTreeSpec::new("test2", vec![1, 1, 0, 1])?;
+	let ref allowed_tree1 = AllowedTree::new("foo");
+	let ref allowed_tree2 = AllowedTree::new("bar");
+	let c1 = ContainerSpec::new("c1", "D1", vec!["param1"], vec![allowed_tree1, allowed_tree2])?;
+	let c2 = ContainerSpec::new("c2", "D1", vec!["param1","param2"], vec![allowed_tree1])?;
+	let c3 = ContainerSpec::new("c3", "D3", vec!["param3"], vec![allowed_tree1])?;
+	let c4 = ContainerSpec::new("c4", "D2", vec![], vec![allowed_tree1, allowed_tree2])?;
+	let c5 = ContainerSpec::new("c5", "D2", vec![], vec![])?;
+	let c6 = ContainerSpec::new("c6", "D3", vec!["param4"], vec![allowed_tree1])?;
 	let vm_spec1 = VmSpec::new("vm1", "Ubuntu", vec![allowed_tree1, allowed_tree2], vec![&c1, &c2, &c4, &c5, &c5], vec![&up_tree1, &up_tree2])?;
-	let up_tree3 = UpTreeSpec::new("test3", vec![0, 0], gvm_eqn)?;
-	let up_tree4 = UpTreeSpec::new("test4", vec![1, 1, 0], gvm_eqn)?;
+	let up_tree3 = UpTreeSpec::new("test3", vec![0, 0])?;
+	let up_tree4 = UpTreeSpec::new("test4", vec![1, 1, 0])?;
 	let vm_spec2 = VmSpec::new("vm2", "RedHat", vec![allowed_tree1], vec![&c5, &c3, &c6], vec![&up_tree3, &up_tree4])?;
 	let up_tree_def = Manifest::new("mytest", CellConfig::Large, "cell_tree", vec![allowed_tree1, allowed_tree2], vec![&vm_spec1, &vm_spec2], vec![&up_tree3], gvm_eqn)?;
 	println!("{}", up_tree_def);

@@ -14,15 +14,14 @@ use utility::S;
 
 #[derive(Debug)]
 pub struct Datacenter {
-	id: UpTraphID,
 	cells: Vec<NalCell>,
 	links: Vec<Link>,
 }
 impl Datacenter {
-	pub fn new(id: &UpTraphID) -> Datacenter {
-		Datacenter { id: id.clone(), cells: Vec::new(), links: Vec::new() }
+	pub fn new() -> Datacenter {
+		Datacenter { cells: Vec::new(), links: Vec::new() }
 	}
-	pub fn initialize(&mut self, blueprint: Blueprint) -> Result<Vec<JoinHandle<()>>> {
+	pub fn initialize(&mut self, blueprint: &Blueprint) -> Result<Vec<JoinHandle<()>>> {
 		let f = "initialize";
 		let ncells = blueprint.get_ncells();
 		let edge_list = blueprint.get_edge_list();

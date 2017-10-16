@@ -1,6 +1,6 @@
 use std::thread::{JoinHandle, sleep, spawn};
 use std::sync::mpsc::channel;
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::time;
 
 use serde_json;
@@ -9,70 +9,78 @@ use blueprint::{Blueprint};
 use config::{SEPARATOR, CellNo, DatacenterNo, Edge, PortNo};
 use datacenter::{Datacenter};
 use gvm_equation::{GvmEquation, GvmEqn, GvmVariable, GvmVariableType};
-use message::{MsgType};
-use message_types::{NocToPort, NocFromPort, PortToNoc, PortFromNoc, NocFromOutside, NocToOutside};
+use message::{Message, MsgType, ManifestMsg};
+use message_types::{NocToPort, NocPortError, NocFromPort, PortToNoc, PortFromNoc, NocFromOutside, NocToOutside};
 use nalcell::CellConfig;
-use name::UpTraphID;
+use name::TreeID;
 use packet::{PacketAssembler, PacketAssemblers};
 use uptree_spec::{AllowedTree, ContainerSpec, Manifest, UpTreeSpec, VmSpec};
+use utility::S;
 
 #[derive(Debug, Clone)]
 pub struct Noc {
-	id: UpTraphID,
+	tree_id: TreeID, 
+	tree_names: Vec<String>,
 	noc_to_outside: NocToOutside,
 	packet_assemblers: PacketAssemblers
 }
 impl Noc {
-	pub fn new(id: &str, noc_to_outside: NocToOutside) -> Result<Noc> {
-		let id = UpTraphID::new(id)?;
-		Ok(Noc { id: id, packet_assemblers: PacketAssemblers::new(),
+	pub fn new(noc_to_outside: NocToOutside) -> Result<Noc> {
+		let tree_id = TreeID::new("CellAgentTree")?;
+		Ok(Noc { tree_id: tree_id, tree_names: Vec::new(), packet_assemblers: PacketAssemblers::new(),
 				 noc_to_outside: noc_to_outside })
 	}
-	pub fn initialize(&self, blueprint: Blueprint, noc_from_outside: NocFromOutside) -> Result<Vec<JoinHandle<()>>> {
+	pub fn initialize(&self, blueprint: &Blueprint, noc_from_outside: NocFromOutside) -> Result<Vec<JoinHandle<()>>> {
 		let (noc_to_port, port_from_noc): (NocToPort, NocFromPort) = channel();
 		let (port_to_noc, noc_from_port): (PortToNoc, PortFromNoc) = channel();
-		let (mut dc, mut join_handles) = self.build_datacenter(&self.id, blueprint)?;
+		let (mut dc, mut join_handles) = self.build_datacenter(blueprint)?;
 		dc.connect_to_noc(port_to_noc, port_from_noc)?;
 		let mut noc = self.clone();
 		let noc_to_port_clone = noc_to_port.clone();
 		let join_outside = spawn( move || { 
-			let _ = noc.listen_outside(noc_from_outside, noc_to_port).map_err(|e| noc.write_err("outside", e));
+			let _ = noc.listen_outside(noc_from_outside, noc_to_port_clone).map_err(|e| noc.write_err("outside", e));
 		});
 		join_handles.push(join_outside);
 		let mut noc = self.clone();
+		let noc_to_port_clone = noc_to_port.clone();
 		let join_port = spawn( move || {
-			let _ = noc.listen_port(noc_from_port).map_err(|e| noc.write_err("port", e));	
+			let _ = noc.listen_port(noc_to_port_clone, noc_from_port).map_err(|e| noc.write_err("port", e));	
 		});
 		join_handles.push(join_port);
 		let nap = time::Duration::from_millis(1000);
 		sleep(nap);
 		println!("{}", dc);
-		self.control(&mut dc, &noc_to_port_clone)?;
+		let noc_to_port_clone = noc_to_port.clone();
 		Ok(join_handles)
 	}
 	// Sets up the NOC Master and NOC Client services on up trees
-	fn control(&self, dc: &mut Datacenter, noc_to_port: &NocToPort) -> Result<()> { 
+	fn control(&self, noc_to_port: &NocToPort) -> Result<()> { 
 		// Create an up tree on the border cell for the NOC Master
-		let mut eqns = HashSet::new();
-		eqns.insert(GvmEqn::Recv("true"));
-		eqns.insert(GvmEqn::Send("true"));
-		eqns.insert(GvmEqn::Xtnd("false"));
-		eqns.insert(GvmEqn::Save("false"));
-		let ref gvm_eqn = GvmEquation::new(eqns, Vec::new());	
-		let vm_uptree = UpTreeSpec::new("NocMasterTreeVm", vec![0], gvm_eqn)?;
-		let container_uptree = UpTreeSpec::new("NocMasterTreeContainer", vec![0], gvm_eqn)?;
-		let ref base_tree = AllowedTree::new("BlackTree", gvm_eqn);
-		let ref vm_allowed = AllowedTree::new("NocMasterTreeVm", gvm_eqn);
-		let ref container_allowed = AllowedTree::new("NocMasterTreeContainer", gvm_eqn);
-		let noc_container = ContainerSpec::new("NocMaster", "NocMaster", vec![base_tree])?;
-		let noc_vm = VmSpec::new("NocVM", "Ubuntu", vec![base_tree], vec![&noc_container], vec![&container_uptree])?;
-		let up_tree_def = Manifest::new("NocMaster", CellConfig::Large, "NocMaster", vec![base_tree], vec![&noc_vm], vec![&vm_uptree], gvm_eqn)?;
-		println!("NOC Master Manifest {}", up_tree_def);
+		if let Some(deployment_tree) = self.tree_names.get(0) {
+			let mut eqns = HashSet::new();
+			eqns.insert(GvmEqn::Recv("true"));
+			eqns.insert(GvmEqn::Send("false"));
+			eqns.insert(GvmEqn::Xtnd("false"));
+			eqns.insert(GvmEqn::Save("false"));
+			let ref gvm_eqn = GvmEquation::new(eqns, Vec::new());	
+			let vm_uptree = UpTreeSpec::new("NocMasterTreeVm", vec![0])?;
+			let container_uptree = UpTreeSpec::new("NocMasterTreeContainer", vec![0])?;
+			let ref base_tree = AllowedTree::new(deployment_tree);
+			let noc_container = ContainerSpec::new("NocMaster", "NocMaster", vec![], vec![base_tree])?;
+			let noc_vm = VmSpec::new("NocVM", "Ubuntu", vec![base_tree], vec![&noc_container], vec![&container_uptree])?;
+			let ref manifest = Manifest::new("NocMaster", CellConfig::Large, deployment_tree, vec![base_tree], vec![&noc_vm], vec![&vm_uptree], gvm_eqn)?;
+			//println!("NOC Master Manifest {}", manifest);
+			let msg = ManifestMsg::new(manifest);
+			let packets = msg.to_packets(&self.tree_id)?;
+			for packet in packets { noc_to_port.send(packet)?; }
+		} else {
+			return Err(ErrorKind::Tree(S("control"), 0).into());
+		}
 		Ok(())
 	}
-	fn build_datacenter(&self, id: &UpTraphID, blueprint: Blueprint) 
+	fn build_datacenter(&self, blueprint: &Blueprint) 
 			-> Result<(Datacenter, Vec<JoinHandle<()>>)> {
-		let mut dc = Datacenter::new(id,);
+		let mut dc = Datacenter::new();
 		let join_handles = dc.initialize(blueprint)?;
 		Ok((dc, join_handles))
 	}
@@ -81,7 +89,7 @@ impl Noc {
 //			_ => panic!("Noc doesn't recognize message type {}", msg_type)
 //		})
 //	}
-	fn listen_port(&mut self, noc_from_port: NocFromPort) -> Result<()> {
+	fn listen_port(&mut self, noc_to_port: NocToPort, noc_from_port: NocFromPort) -> Result<()> {
 		loop {
 			let packet = noc_from_port.recv()?;
 			let msg_id = packet.get_header().get_msg_id();
@@ -89,7 +97,13 @@ impl Noc {
 			let (last_packet, packets) = packet_assembler.add(packet);
 			if last_packet {
 				let msg = MsgType::get_msg(&packets)?;
-				println!("Noc received {}", msg);
+				match msg.get_header().get_msg_type() {
+					MsgType::TreeName => {
+						self.tree_names.push(msg.get_payload().get_tree_name().clone());
+						self.control(&noc_to_port)?;						
+					}
+					_ => return Err(ErrorKind::MsgType(S("listen_port"), msg.get_header().get_msg_type()).into())
+				}
 			} else {
 				let assembler = PacketAssembler::create(msg_id, packets);
 				self.packet_assemblers.insert(msg_id, assembler);
@@ -100,8 +114,8 @@ impl Noc {
 		loop {
 			let input = &noc_from_outside.recv()?;
 			println!("{}", input);
-			let uptree_spec = serde_json::from_str::<Manifest>(input);
-			println!("{:?}", uptree_spec);
+			let manifest = serde_json::from_str::<Manifest>(input);
+			println!("{:?}", manifest);
 		}
 	}
 	fn write_err(&self, s: &str, e: Error) {
@@ -119,6 +133,7 @@ impl Noc {
 // Errors
 error_chain! {
 	foreign_links {
+		NocToPort(::message_types::NocPortError);
 		Recv(::std::sync::mpsc::RecvError);
 		Serialize(::serde_json::Error);
 	}
@@ -129,5 +144,11 @@ error_chain! {
 		UpTree(::uptree_spec::Error, ::uptree_spec::ErrorKind);
 	}
 	errors { 
+		MsgType(func_name: String, msg_type: MsgType) {
+			display("Noc {}: {} is not a valid message type for the NOC", func_name, msg_type)
+		}
+		Tree(func_name: String, index: usize) {
+			display("Noc {}: {} is not a valid index in the NOC's list of tree names", func_name, index)
+		}
 	}
 }

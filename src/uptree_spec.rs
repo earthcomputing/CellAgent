@@ -5,7 +5,7 @@ use gvm_equation::GvmEquation;
 use nalcell::CellConfig;
 use utility::S;
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Hash, Serialize, Deserialize)]
 pub struct Manifest {
 	id: String,
 	cell_config: CellConfig,
@@ -34,6 +34,9 @@ impl Manifest {
 				allowed_trees: allowed_trees, vms: vms, trees: trees, gvm_eqn: gvm_eqn.clone() })
 	}
 	pub fn get_gvm(&self) -> &GvmEquation { &self.gvm_eqn }
+	pub fn get_new_tree_name(&self) -> &String { &self.id }
+	pub fn get_deployment_tree_name(&self) -> &String { &self.deployment_tree }
+	pub fn get_allowed_trees(&self) -> &Vec<AllowedTree> { &self.allowed_trees }
 }
 impl fmt::Display for Manifest {
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result { 
@@ -45,7 +48,7 @@ impl fmt::Display for Manifest {
 		write!(f, "{}", s)
 	}	
 }
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Hash, Serialize, Deserialize)]
 pub struct VmSpec {
 	id: String,
 	image:String, 
@@ -88,37 +91,41 @@ impl fmt::Display for VmSpec {
 		write!(f, "{}", s)
 	}
 }
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Hash, Serialize, Deserialize)]
 pub struct ContainerSpec {
 	id: String, 
 	image: String,
+	params: Vec<String>,
 	allowed_trees: Vec<AllowedTree>
 }
 impl ContainerSpec {
-	pub fn new(id: &str, image: &str, allowed_refs: Vec<&AllowedTree>) -> Result<ContainerSpec> {
+	pub fn new(id: &str, image: &str, param_refs: Vec<&str>, allowed_refs: Vec<&AllowedTree>) -> Result<ContainerSpec> {
+		let mut params = Vec::new();
+		for p in param_refs { params.push(S(p)); } 
 		let mut allowed_trees = Vec::new();
 		for a in allowed_refs { allowed_trees.push(a.clone()); }
-		Ok(ContainerSpec { id: S(id), image: S(image), allowed_trees: allowed_trees })
+		Ok(ContainerSpec { id: S(id), image: S(image), params: params, allowed_trees: allowed_trees })
 	}
 	fn get_id(&self) -> String { self.id.clone() }
 	fn get_allowed_trees(&self) -> &Vec<AllowedTree> { &self.allowed_trees }
 }
 impl fmt::Display for ContainerSpec {
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-		let mut s = format!(" Container {}({})", self.id, self.image);
+		let mut s = format!(" Service {}({})", self.id, self.image);
+		if self.params.len() == 0 { s = s + &format!(" No parameters"); }
+		else                      { s = s + &format!(" Parameters: {:?}", self.params); }
 		s = s + &format!("\n        Allowed Trees");
 		for a in &self.allowed_trees { s = s + &format!("\n          {}", a); }
 		write!(f, "{}", s)
 	}
 }
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Hash, Serialize, Deserialize)]
 pub struct UpTreeSpec {
 	id: String,
 	parent_list: Vec<usize>,
-	gvm_eqn: GvmEquation
 }
 impl UpTreeSpec {
-	pub fn new(id: &str, parent_list: Vec<usize>, gvm_eqn: &GvmEquation) -> Result<UpTreeSpec> {
+	pub fn new(id: &str, parent_list: Vec<usize>) -> Result<UpTreeSpec> {
 		// Validate parent_list
 		if parent_list.len() > 1 {
 			let mut count = 0;
@@ -143,29 +150,29 @@ impl UpTreeSpec {
 				if !reached_root { return Err(ErrorKind::Tree(S(id), parent_list, S("No path to root")).into()); }
 			}
 		}
-		Ok(UpTreeSpec { id: S(id), parent_list: parent_list, gvm_eqn: gvm_eqn.clone() })
+		Ok(UpTreeSpec { id: S(id), parent_list: parent_list })
 	}
 	fn get_tree_size(&self) -> usize { self.parent_list.len() }
 }
 impl fmt::Display for UpTreeSpec {
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-		let s = format!("UpTree: {}, parent list {:?}: {}", self.id, self.parent_list, self.gvm_eqn);
+		let s = format!("UpTree: {}, parent list {:?}", self.id, self.parent_list);
 		write!(f, "{}", s)
 	}
 }
-#[derive(Debug, Clone, Eq, PartialEq, Deserialize)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize)]
 pub struct AllowedTree {
 	id: String,
-	gvm_eqn: GvmEquation
 }
 impl AllowedTree {
-	pub fn new(id: &str, gvm_eqn: &GvmEquation) -> AllowedTree {
-		AllowedTree { id: S(id), gvm_eqn: gvm_eqn.clone() }
+	pub fn new(id: &str) -> AllowedTree {
+		AllowedTree { id: S(id) }
 	}
+	pub fn get_id(&self) -> &String { &self.id }
 }
 impl fmt::Display for AllowedTree {
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-		let s = format!("{}: {}", self.id, self.gvm_eqn);
+		let s = format!("{}", self.id);
 		write!(f, "{}", s)
 	}
 }

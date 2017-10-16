@@ -9,45 +9,26 @@ use uuid::Uuid;
 
 use cellagent::{CellAgent};
 use config::{MAX_PORTS, CellNo, MsgID, PathLength, PortNo, TableIndex};
-use container::Service;
 use gvm_equation::{GvmEquation, GvmEqn, GvmVariable, GvmVariableType};
 use nalcell::CellConfig;
-use name::{Name, CellID, TreeID, UpTraphID};
+use name::{Name, CellID, TreeID};
 use packet::{Packet, Packetizer, Serializer};
 use traph;
 use uptree_spec::Manifest;
-use utility::{DEFAULT_USER_MASK, Mask, Path, PortNumber, S};
+use utility::{DEFAULT_USER_MASK, Mask, Path, PortNumber};
 
 static MESSAGE_COUNT: AtomicUsize = ATOMIC_USIZE_INIT;
 pub fn get_next_count() -> MsgID { MsgID(MESSAGE_COUNT.fetch_add(1, Ordering::SeqCst) as u64) } 
-#[derive(Debug, Clone, Hash, Serialize, Deserialize)]
-pub struct TypePlusMsg {
-	msg_type: MsgType,
-	serialized_msg: String
-}
-impl TypePlusMsg {
-	pub fn new(msg_type: MsgType, serialized_msg: String) -> TypePlusMsg {
-		TypePlusMsg { msg_type: msg_type, serialized_msg: serialized_msg }
-	}
-	fn get_type(&self) -> MsgType { self.msg_type }
-	fn get_serialized_msg(&self) -> &str { &self.serialized_msg }
-}
-impl fmt::Display for TypePlusMsg {
-	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-		write!(f, "{}: {}", self.msg_type, self.serialized_msg)
-	}
-}
 #[derive(Debug, Copy, Clone, Hash, Serialize, Deserialize)]
 pub enum MsgType {
 	Discover,
 	DiscoverD,
-	SetupVM,
+	Manifest,
 	StackTree,
-	Placeholder
+	TreeName,
 }
 impl MsgType {
 	pub fn get_msg(packets: &Vec<Packet>) -> Result<Box<Message>> {
-		let f = "get_msg";
 		let serialized = Packetizer::unpacketize(packets)?;
 		let type_msg = serde_json::from_str::<TypePlusMsg>(&serialized)?;
 		let msg_type = type_msg.get_type();
@@ -55,8 +36,9 @@ impl MsgType {
 		Ok(match msg_type {
 			MsgType::Discover  => Box::new(serde_json::from_str::<DiscoverMsg>(&serialized_msg)?),
 			MsgType::DiscoverD => Box::new(serde_json::from_str::<DiscoverDMsg>(&serialized_msg)?),
+			MsgType::Manifest  => Box::new(serde_json::from_str::<ManifestMsg>(&serialized_msg)?),
 			MsgType::StackTree => Box::new(serde_json::from_str::<StackTreeMsg>(&serialized_msg)?),
-			_ => return Err(ErrorKind::InvalidMsgType(S(f), msg_type).into())
+			MsgType::TreeName  => Box::new(serde_json::from_str::<TreeNameMsg>(&serialized_msg)?),
 		})		
 	}
 	// A hack for printing debug output only for a specific message type
@@ -72,9 +54,9 @@ impl fmt::Display for MsgType {
 		match *self {
 			MsgType::Discover  => write!(f, "Discover"),
 			MsgType::DiscoverD => write!(f, "DiscoverD"),
-			MsgType::SetupVM   => write!(f, "SetupVM"),
+			MsgType::Manifest  => write!(f, "Manifest"),
 			MsgType::StackTree => write!(f, "StackTree"),
-			_ => write!(f, "{} is an undefined type", self)
+			MsgType::TreeName  => write!(f, "TreeName"),
 		}
 	}
 }
@@ -89,6 +71,23 @@ impl fmt::Display for MsgDirection {
 			MsgDirection::Rootward => write!(f, "Rootward"),
 			MsgDirection::Leafward => write!(f, "Leafward")
 		}
+	}
+}
+#[derive(Debug, Clone, Hash, Serialize, Deserialize)]
+pub struct TypePlusMsg {
+	msg_type: MsgType,
+	serialized_msg: String
+}
+impl TypePlusMsg {
+	pub fn new(msg_type: MsgType, serialized_msg: String) -> TypePlusMsg {
+		TypePlusMsg { msg_type: msg_type, serialized_msg: serialized_msg }
+	}
+	fn get_type(&self) -> MsgType { self.msg_type }
+	fn get_serialized_msg(&self) -> &str { &self.serialized_msg }
+}
+impl fmt::Display for TypePlusMsg {
+	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+		write!(f, "{}: {}", self.msg_type, self.serialized_msg)
 	}
 }
 
@@ -350,34 +349,14 @@ pub struct StackTreeMsg {
 	payload: StackTreeMsgPayload
 }
 impl StackTreeMsg {
-	pub fn new(tree_id: &TreeID, black_tree_id: &TreeID) -> Result<StackTreeMsg> {
+	pub fn new(new_tree_id: &TreeID, base_tree_id: &TreeID) -> Result<StackTreeMsg> {
 		let mut tree_map = HashMap::new();
-		tree_map.insert(tree_id.stringify(), tree_id.clone());
-		tree_map.insert(black_tree_id.stringify(), black_tree_id.clone()); 
+		tree_map.insert(new_tree_id.stringify(), new_tree_id.clone());
+		tree_map.insert(base_tree_id.stringify(), base_tree_id.clone()); 
 		let header = MsgHeader::new(MsgType::StackTree, MsgDirection::Leafward, tree_map);
-		let payload = StackTreeMsgPayload::new(tree_id, black_tree_id.stringify())?;
+		let payload = StackTreeMsgPayload::new(new_tree_id, base_tree_id.stringify())?;
 		Ok(StackTreeMsg { header: header, payload: payload})
 	}
-/*	
-	fn build_gvm_params(&self, ca: &CellAgent, tree_id: &TreeID, gvm_eqn: GvmEquation) 
-			-> Result<HashMap<GvmVariable,String>> {
-		let f = "build_gvm_params";
-		let params = HashMap::new();
-		let variables = gvm_eqn.get_variables();
-		for variable in variables.iter() {
-			match variable.get_value().as_ref() {
-				"hops" => {
-					let hops = match ca.get_hops(&tree_id) {
-						Ok(h) => h,
-						Err(err) => return Err(map_cellagent_errors(err))
-					};
-				},
-				_ => ()
-			}
-		}
-		Ok(params)
-	}.
-*/
 }
 impl Message for StackTreeMsg {
 	fn get_header(&self) -> &MsgHeader { &self.header }
@@ -443,68 +422,105 @@ impl fmt::Display for StackTreeMsgPayload {
 	}
 }
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct SetupVMsMsg {
+pub struct ManifestMsg {
 	header: MsgHeader,
-	payload: SetupVMsMsgPayload
+	payload: ManifestMsgPayload
 }
-impl SetupVMsMsg {
-/*
-	pub fn new(id: &str, service_sets: Vec<Vec<Service>>) -> Result<SetupVMsMsg> {
+impl ManifestMsg {
+	pub fn new(manifest: &Manifest) -> ManifestMsg {
 		// Note that direction is rootward so cell agent will get the message
-		let header = MsgHeader::new(MsgType::SetupVM, MsgDirection::Rootward, HashMap::new());
-		let payload = SetupVMsMsgPayload::new(id, service_sets)?;
-		Ok(SetupVMsMsg { header: header, payload: payload })
+		let mut tree_map : TreeMap = HashMap::new();
+		let deployment_tree_name = manifest.get_deployment_tree_name();
+		let header = MsgHeader::new(MsgType::Manifest, MsgDirection::Rootward, HashMap::new());
+		let payload = ManifestMsgPayload::new(&manifest);
+		ManifestMsg { header: header, payload: payload }
 	}
-*/
 }
-impl Message for SetupVMsMsg {
+impl Message for ManifestMsg {
 	fn get_header(&self) -> &MsgHeader { &self.header }
 	fn get_payload(&self) -> &MsgPayload { &self.payload }
 	fn process(&mut self, ca: &mut CellAgent, tree_uuid: Uuid, port_no: PortNo) -> Result<()> {
-		let service_sets = self.payload.get_service_sets().clone();
-//		let dummy_tree_id = TreeID::new("foo")?; // Figure out what this name should be
-		match ca.create_vms(service_sets) {
+		let manifest = self.payload.get_manifest();
+		match ca.deploy(&manifest) {
 			Ok(_) => (),
-			Err(err) => return Err(map_cellagent_errors(err))
-		};		
-		Ok(())
+			Err(err) => {
+				println!("--- Problem in CellAgent deploy");
+				return Err(map_cellagent_errors(err))
+			}
+		}
+		Ok(())		
 	}
 }
-impl fmt::Display for SetupVMsMsg {
+impl fmt::Display for ManifestMsg {
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
 		write!(f, "{} {}", self.header, self.payload)
 	}
 }
 #[derive(Debug, Clone, Hash, Serialize, Deserialize)]
-pub struct SetupVMsMsgPayload {
-	tree_name: String, 
-	up_tree_id: UpTraphID,
-	// Each set of services runs on a single VM
-	// All the VMs setup in a single message are on an up-tree
-	service_sets: Vec<Vec<Service>>,
+pub struct ManifestMsgPayload {
+	tree_name: String,
+	manifest: Manifest 
 }
-impl SetupVMsMsgPayload {
-/*
-	fn new(id: &str, service_sets: Vec<Vec<Service>>) -> Result<SetupVMsMsgPayload> {
-		let f = "new SetupVms";
-		let up_tree_id = UpTraphID::new(id)?;
-		Ok(SetupVMsMsgPayload { tree_name: id.to_string(), up_tree_id: up_tree_id, service_sets: service_sets })
+impl ManifestMsgPayload {
+	fn new(manifest: &Manifest) -> ManifestMsgPayload {
+		let tree_name = manifest.get_new_tree_name();
+		ManifestMsgPayload { tree_name: tree_name.clone(), manifest: manifest.clone() }
 	}
-*/
-	pub fn get_service_sets(&self) -> &Vec<Vec<Service>> { &self.service_sets }
+	fn get_manifest(&self) -> &Manifest { &self.manifest }
 }
-impl MsgPayload for SetupVMsMsgPayload {
+impl MsgPayload for ManifestMsgPayload {
 	fn get_gvm_eqn(&self) -> Option<&GvmEquation> { None }
 	fn get_tree_name(&self) -> &String { &self.tree_name }
 }
-impl fmt::Display for SetupVMsMsgPayload {
+impl fmt::Display for ManifestMsgPayload {
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-		let mut s = format!("Setup virtual machine with containers");
-		for services in &self.service_sets {
-			for container in services.iter() {
-				s = s + &format!("{}", container);
-			}
-		}
+		let mut s = format!("Manifest: {}", self.get_manifest());
+		write!(f, "{}", s)
+	}
+}
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TreeNameMsg {
+	header: MsgHeader,
+	payload: TreeNameMsgPayload
+}
+impl TreeNameMsg {
+	pub fn new(id: &str) -> TreeNameMsg {
+		// Note that direction is rootward so cell agent will get the message
+		let header = MsgHeader::new(MsgType::TreeName, MsgDirection::Rootward, HashMap::new());
+		let payload = TreeNameMsgPayload::new(id);
+		TreeNameMsg { header: header, payload: payload }
+	}
+}
+impl Message for TreeNameMsg {
+	fn get_header(&self) -> &MsgHeader { &self.header }
+	fn get_payload(&self) -> &MsgPayload { &self.payload }
+	fn process(&mut self, ca: &mut CellAgent, tree_uuid: Uuid, port_no: PortNo) -> Result<()> {
+		// Never called, since message goes to NOC rather than CellAgent
+		Ok(())		
+	}
+}
+impl fmt::Display for TreeNameMsg {
+	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+		write!(f, "{} {}", self.header, self.payload)
+	}
+}
+#[derive(Debug, Clone, Hash, Serialize, Deserialize)]
+pub struct TreeNameMsgPayload {
+	tree_name: String 
+}
+impl TreeNameMsgPayload {
+	fn new(id: &str) -> TreeNameMsgPayload {
+		TreeNameMsgPayload { tree_name: id.to_string() }
+	}
+	fn get_tree_name(&self) -> &String { &self.tree_name }
+}
+impl MsgPayload for TreeNameMsgPayload {
+	fn get_gvm_eqn(&self) -> Option<&GvmEquation> { None }
+	fn get_tree_name(&self) -> &String { &self.tree_name }
+}
+impl fmt::Display for TreeNameMsgPayload {
+	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+		let mut s = format!("Tree name for border cell {}", self.tree_name);
 		write!(f, "{}", s)
 	}
 }
