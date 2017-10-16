@@ -11,7 +11,7 @@ use port::{Port};
 use utility::{PortNumber};
 use vm::VirtualMachine;
 
-#[derive(Debug, Copy, Clone, Deserialize)]
+#[derive(Debug, Copy, Clone, Hash, Serialize, Deserialize)]
 pub enum CellConfig { Small, Medium, Large }
 impl fmt::Display for CellConfig { 
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result { 
