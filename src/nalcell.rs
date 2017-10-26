@@ -76,7 +76,7 @@ impl NalCell {
 				packet_engine: packet_engine, ports_from_pe: ports_from_pe, })
 	}
 //	pub fn get_id(&self) -> &CellID { &self.id }
-//	pub fn get_no(&self) -> usize { self.cell_no }
+	pub fn get_no(&self) -> CellNo { self.cell_no }
 //	pub fn get_cell_agent(&self) -> &CellAgent { &self.cell_agent }
 	pub fn is_border(&self) -> bool {
 		match self.cell_type {
@@ -98,7 +98,7 @@ impl NalCell {
 				let port_no = port.get_port_no();
 				match self.ports_from_pe.remove(&port_no) { // Remove avoids a borrowed context error
 					Some(recvr) => {
-						Port::set_connected(port.get_is_connected());
+						port.set_connected();
 						return Ok((port, recvr))
 					},
 					None => return Err(ErrorKind::Channel(port_no, "get_free_port_mut".to_string()).into())

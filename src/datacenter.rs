@@ -37,6 +37,7 @@ impl Datacenter {
 			let cell = NalCell::new(cell.get_cell_no(), cell.get_nports(), CellType::Interior, CellConfig::Large)?;
 			self.cells.push(cell);
 		}
+		self.cells.sort_by(|a, b| (*a.get_no()).cmp(&*b.get_no())); // Sort to conform to edge list
 		let mut link_handles = Vec::new();
 		for edge in edge_list {
 			if *(edge.v.0) == *(edge.v.1) { return Err(ErrorKind::Wire(edge.clone(), S(f)).into()); }
@@ -53,7 +54,7 @@ impl Datacenter {
 				None => return Err(ErrorKind::Wire(edge.clone(), S(f)).into())
 			};
 			let (rite, rite_from_pe) = cell.get_free_ec_port_mut()?;
-			//println!("Datacenter: edge {:?}", edge);
+			//println!("Datacenter: edge {:?} {} {}", edge, *left.get_id(), *rite.get_id());
 			let (link_to_left, left_from_link): (LinkToPort, PortFromLink) = channel();
 			let (link_to_rite, rite_from_link): (LinkToPort, PortFromLink) = channel();
 			let (left_to_link, link_from_left): (PortToLink, LinkFromPort) = channel();

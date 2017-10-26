@@ -53,31 +53,6 @@ impl Noc {
 		let noc_to_port_clone = noc_to_port.clone();
 		Ok(join_handles)
 	}
-	// Sets up the NOC Master and NOC Client services on up trees
-	fn control(&self, noc_to_port: &NocToPort) -> Result<()> { 
-		// Create an up tree on the border cell for the NOC Master
-		if let Some(deployment_tree) = self.tree_names.get(0) {
-			let mut eqns = HashSet::new();
-			eqns.insert(GvmEqn::Recv("true"));
-			eqns.insert(GvmEqn::Send("false"));
-			eqns.insert(GvmEqn::Xtnd("false"));
-			eqns.insert(GvmEqn::Save("false"));
-			let ref gvm_eqn = GvmEquation::new(eqns, Vec::new());	
-			let vm_uptree = UpTreeSpec::new("NocMasterTreeVm", vec![0])?;
-			let container_uptree = UpTreeSpec::new("NocMasterTreeContainer", vec![0])?;
-			let ref base_tree = AllowedTree::new(deployment_tree);
-			let noc_container = ContainerSpec::new("NocMaster", "NocMaster", vec![], vec![base_tree])?;
-			let noc_vm = VmSpec::new("NocVM", "Ubuntu", vec![base_tree], vec![&noc_container], vec![&container_uptree])?;
-			let ref manifest = Manifest::new("NocMaster", CellConfig::Large, deployment_tree, vec![base_tree], vec![&noc_vm], vec![&vm_uptree], gvm_eqn)?;
-			//println!("NOC Master Manifest {}", manifest);
-			let msg = ManifestMsg::new(manifest);
-			let packets = msg.to_packets(&self.tree_id)?;
-			for packet in packets { noc_to_port.send(packet)?; }
-		} else {
-			return Err(ErrorKind::Tree(S("control"), 0).into());
-		}
-		Ok(())
-	}
 	fn build_datacenter(&self, blueprint: &Blueprint) 
 			-> Result<(Datacenter, Vec<JoinHandle<()>>)> {
 		let mut dc = Datacenter::new();
@@ -109,6 +84,32 @@ impl Noc {
 				self.packet_assemblers.insert(msg_id, assembler);
 			}
 		}
+	}
+	// Sets up the NOC Master and NOC Client services on up trees
+	fn control(&self, noc_to_port: &NocToPort) -> Result<()> { 
+		// Create an up tree on the border cell for the NOC Master
+		if let Some(deployment_tree) = self.tree_names.get(0) {
+			let mut eqns = HashSet::new();
+			eqns.insert(GvmEqn::Recv("true"));
+			eqns.insert(GvmEqn::Send("false"));
+			eqns.insert(GvmEqn::Xtnd("false"));
+			eqns.insert(GvmEqn::Save("false"));
+			let ref gvm_eqn = GvmEquation::new(eqns, Vec::new());	
+			let vm_uptree = UpTreeSpec::new("NocMasterTreeVm", vec![0])?;
+			let container_uptree = UpTreeSpec::new("NocMasterTreeContainer", vec![0])?;
+			let ref base_tree = AllowedTree::new(deployment_tree);
+			let noc_container = ContainerSpec::new("NocMaster", "NocMaster", vec![], vec![base_tree])?;
+			let noc_vm = VmSpec::new("NocVM", "Ubuntu", CellConfig::Large, 
+				vec![base_tree], vec![&noc_container], vec![&container_uptree])?;
+			let ref manifest = Manifest::new("NocMaster", CellConfig::Large, deployment_tree, vec![base_tree], vec![&noc_vm], vec![&vm_uptree], gvm_eqn)?;
+			//println!("NOC Master Manifest {}", manifest);
+			let msg = ManifestMsg::new(manifest);
+			let packets = msg.to_packets(&self.tree_id)?;
+			for packet in packets { noc_to_port.send(packet)?; }
+		} else {
+			return Err(ErrorKind::Tree(S("control"), 0).into());
+		}
+		Ok(())
 	}
 	fn listen_outside(&mut self, noc_from_outside: NocFromOutside, noc_to_port: NocToPort) -> Result<()> {
 		loop {

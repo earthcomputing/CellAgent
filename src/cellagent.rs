@@ -296,16 +296,50 @@ impl CellAgent {
 			Entry::Vacant(_) => Err(ErrorKind::NoTraph(self.cell_id.clone(), "stack_tree".to_string(), uuid).into())
 		}		
 	}
-	pub fn deploy(&mut self, manifest: &Manifest) -> Result<()> {
+	pub fn deploy(&mut self, port_no: PortNo, manifest: &Manifest) -> Result<()> {
 		println!("Cell {}: got manifest {}", self.cell_id, manifest);
 		let deployment_tree_name = manifest.get_deployment_tree_name();
-		if let Some(deployment_tree_id) = self.tree_name_map.get(deployment_tree_name) {
-			println!("Deploy on tree {}", deployment_tree_id);
-		} else {
-			return Err(ErrorKind::TreeMap(self.cell_id.clone(), S("deploy"), deployment_tree_name.clone()).into());
-		}
+		let deployment_tree_id = match self.tree_name_map.remove(deployment_tree_name) { // Needed to avoid borrow problem
+				Some(n) => n,
+				None => return Err(ErrorKind::TreeMap(self.cell_id.clone(), S("deploy"), deployment_tree_name.clone()).into())
+		};
+		println!("Deploy on tree {}", deployment_tree_id);
+		let new_tree_name = manifest.get_id();
+		let mut new_tree_id = self.my_tree_id.add_component(new_tree_name)?;
+		new_tree_id = TreeID::new(new_tree_id.get_name())?;
+		let ref my_tree_id = self.my_tree_id.clone(); // Need because self is borrowed mut
+		let msg = match StackTreeMsg::new(&new_tree_id, &self.my_tree_id, manifest) {
+			Ok(m) => m,
+			Err(err) => return Err(map_message_errors(err, "Error createing StackTreeMsg"))
+		};
+		let packets = match msg.to_packets(&self.my_tree_id) {
+			Ok(p) => p,
+			Err(err) => return Err(map_message_errors(err, "Error converting StackTreeMsg to packets"))
+		};
+		let port_number = PortNumber::new(port_no, self.no_ports)?;
+		let port_no_mask = Mask::all_but_zero(self.no_ports).and(Mask::new(port_number));
+		self.send_msg(deployment_tree_id.get_uuid(), &packets, port_no_mask)?;
+		self.stack_tree(&new_tree_id, &my_tree_id.get_uuid(), my_tree_id, &manifest)?;	
+		self.tree_name_map.insert(deployment_tree_name.clone(), deployment_tree_id);
 		Ok(())
 	}
+	fn create_tree(&mut self, id: &str, target_tree_id: &TreeID, port_no_mask: Mask, manifest: &Manifest) -> Result<()> {
+			let new_id = self.my_tree_id.add_component(id)?;
+			let new_tree_id = TreeID::new(new_id.get_name())?;
+			new_tree_id.append2file()?;
+			let ref my_tree_id = self.my_tree_id.clone(); // Need because self is borrowed mut
+			let msg = match StackTreeMsg::new(&new_tree_id, &self.my_tree_id, manifest) {
+				Ok(m) => m,
+				Err(err) => return Err(map_message_errors(err, "Error createing StackTreeMsg"))
+			};
+			let packets = match msg.to_packets(&self.my_tree_id) {
+				Ok(p) => p,
+				Err(err) => return Err(map_message_errors(err, "Error converting StackTreeMsg to packets"))
+			};
+			self.send_msg(target_tree_id.get_uuid(), &packets, port_no_mask)?;
+			self.stack_tree(&new_tree_id, &my_tree_id.get_uuid(), my_tree_id, &manifest)?;	
+			Ok(())	
+	}	
 	pub fn stack_tree(&mut self, new_tree_id: &TreeID, parent_tree_uuid: &Uuid, 
 			black_tree_id: &TreeID, manifest: &Manifest) -> Result<()> {
 		let mut traph = self.get_traph(black_tree_id)?;
@@ -324,7 +358,7 @@ impl CellAgent {
 		if !gvm_eqn.eval_xtnd(&params)? { entry.clear_children(); }
 		if gvm_eqn.eval_send(&params)? { entry.enable_send(); } else { entry.disable_send(); }
 		let tree = Tree::new(&new_tree_id, black_tree_id, Some(&gvm_eqn), entry);
-		//println!("Cell {}: stack tree {} {}", self.cell_id, tree_id, tree_id.get_uuid());
+		println!("Cell {}: stack tree {} {}", self.cell_id, new_tree_id, new_tree_id.get_uuid());
 		traph.stack_tree(&tree);
 		self.tree_map.lock().unwrap().insert(new_tree_id.get_uuid(), black_tree_id.get_uuid());
 		self.tree_id_map.lock().unwrap().insert(new_tree_id.get_uuid(), new_tree_id.clone());
@@ -382,7 +416,7 @@ impl CellAgent {
 				//println!("Cell {}: black_tree_uuid {}", self.cell_id, black_tree_uuid);
 				let mut locked = self.traphs.lock().unwrap();
 				let traph = match locked.entry(*black_tree_uuid) {
-					Entry::Occupied(o) => o.into_mut(),
+					Entry::Occupied(t) => t.into_mut(),
 					Entry::Vacant(_) => return Err(ErrorKind::Tree(self.cell_id.clone(), S(f), *black_tree_uuid).into())
 				};
 				let params = traph.get_params(gvm_eqn.get_variables())?;
@@ -395,27 +429,8 @@ impl CellAgent {
 			Ok(false)
 		}
 	}
-	fn create_tree(&mut self, id: &str, target_tree_id: &TreeID, port_no_mask: Mask, gvm_eqn: GvmEquation) -> Result<()> {
-			let new_id = self.my_tree_id.add_component(id)?;
-			let new_tree_id = TreeID::new(new_id.get_name())?;
-			new_tree_id.append2file()?;
-			let ref my_tree_id = self.my_tree_id.clone(); // Need because self is borrowed mut
-			let msg = match StackTreeMsg::new(&new_tree_id, &self.my_tree_id) {
-				Ok(m) => m,
-				Err(err) => return Err(map_message_errors(err, "Error createing StackTreeMsg"))
-			};
-			let packets = match msg.to_packets(&self.my_tree_id) {
-				Ok(p) => p,
-				Err(err) => return Err(map_message_errors(err, "Error converting StackTreeMsg to packets"))
-			};
-			self.send_msg(target_tree_id.get_uuid(), &packets, port_no_mask)?;
-			let manifest = Manifest::new(id, CellConfig::Large, &self.my_tree_id.get_name(), Vec::new(), 
-				Vec::new(), Vec::new(), &gvm_eqn)?; 
-			self.stack_tree(&new_tree_id, &my_tree_id.get_uuid(), my_tree_id, &manifest)?;	
-			Ok(())	
-	}
 	fn port_connected(&mut self, port_no: PortNo, is_border: bool) -> Result<()> {
-		//println!("CellAgent {}: port {} is border {} connected", self.cell_id, port_no, is_border);
+		//println!("CellAgent {}: port {} is border {} connected", self.cell_id, *port_no, is_border);
 		if is_border {
 			//println!("CellAgent {}: port {} is a border port", self.cell_id, *port_no);
 			// Create tree to talk to outside
@@ -437,16 +452,6 @@ impl CellAgent {
 				Err(err) => return Err(map_message_errors(err, "Error converting TreeNameMsg to packets"))
 			};
 			self.send_msg(new_tree_id.get_uuid(), &packets, port_no_mask)?;
-			// For NocMaster tree, eventually move into a container
-			let port_no_mask = Mask::all_but_zero(self.no_ports);
-			let mut eqns = HashSet::new();
-			eqns.insert(GvmEqn::Recv("true"));
-			eqns.insert(GvmEqn::Send("false"));
-			eqns.insert(GvmEqn::Xtnd("true"));
-			eqns.insert(GvmEqn::Save("true"));
-			let gvm_eqn = GvmEquation::new(eqns, Vec::new());
-			let ref target_tree_id = self.my_tree_id.clone();
-			self.create_tree("NocMaster", target_tree_id, port_no_mask, gvm_eqn)?;
 		} else {
 			//println!("Cell {}: port {} connected", self.cell_id, *port_no);
 			let port_no_mask = Mask::new(PortNumber::new(port_no, self.no_ports)?);

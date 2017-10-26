@@ -130,10 +130,12 @@ fn deployment_demo() -> Result<()> {
 	let c4 = ContainerSpec::new("c4", "D2", vec![], vec![allowed_tree1, allowed_tree2])?;
 	let c5 = ContainerSpec::new("c5", "D2", vec![], vec![])?;
 	let c6 = ContainerSpec::new("c6", "D3", vec!["param4"], vec![allowed_tree1])?;
-	let vm_spec1 = VmSpec::new("vm1", "Ubuntu", vec![allowed_tree1, allowed_tree2], vec![&c1, &c2, &c4, &c5, &c5], vec![&up_tree1, &up_tree2])?;
+	let vm_spec1 = VmSpec::new("vm1", "Ubuntu", CellConfig::Large,
+		vec![allowed_tree1, allowed_tree2], vec![&c1, &c2, &c4, &c5, &c5], vec![&up_tree1, &up_tree2])?;
 	let up_tree3 = UpTreeSpec::new("test3", vec![0, 0])?;
 	let up_tree4 = UpTreeSpec::new("test4", vec![1, 1, 0])?;
-	let vm_spec2 = VmSpec::new("vm2", "RedHat", vec![allowed_tree1], vec![&c5, &c3, &c6], vec![&up_tree3, &up_tree4])?;
+	let vm_spec2 = VmSpec::new("vm2", "RedHat",  CellConfig::Large,
+		vec![allowed_tree1], vec![&c5, &c3, &c6], vec![&up_tree3, &up_tree4])?;
 	let up_tree_def = Manifest::new("mytest", CellConfig::Large, "cell_tree", vec![allowed_tree1, allowed_tree2], vec![&vm_spec1, &vm_spec2], vec![&up_tree3], gvm_eqn)?;
 	println!("{}", up_tree_def);
 	Ok(())
