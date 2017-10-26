@@ -15,7 +15,7 @@ use name::{Name, CellID, TreeID};
 use packet::{Packet, Packetizer, Serializer};
 use traph;
 use uptree_spec::Manifest;
-use utility::{DEFAULT_USER_MASK, Mask, Path, PortNumber};
+use utility::{DEFAULT_USER_MASK, S, Mask, Path, PortNumber};
 
 static MESSAGE_COUNT: AtomicUsize = ATOMIC_USIZE_INIT;
 pub fn get_next_count() -> MsgID { MsgID(MESSAGE_COUNT.fetch_add(1, Ordering::SeqCst) as u64) } 
@@ -349,12 +349,12 @@ pub struct StackTreeMsg {
 	payload: StackTreeMsgPayload
 }
 impl StackTreeMsg {
-	pub fn new(new_tree_id: &TreeID, base_tree_id: &TreeID) -> Result<StackTreeMsg> {
+	pub fn new(new_tree_id: &TreeID, base_tree_id: &TreeID, manifest: &Manifest) -> Result<StackTreeMsg> {
 		let mut tree_map = HashMap::new();
 		tree_map.insert(new_tree_id.stringify(), new_tree_id.clone());
 		tree_map.insert(base_tree_id.stringify(), base_tree_id.clone()); 
 		let header = MsgHeader::new(MsgType::StackTree, MsgDirection::Leafward, tree_map);
-		let payload = StackTreeMsgPayload::new(new_tree_id, base_tree_id.stringify())?;
+		let payload = StackTreeMsgPayload::new(new_tree_id, base_tree_id.stringify(), manifest)?;
 		Ok(StackTreeMsg { header: header, payload: payload})
 	}
 }
@@ -365,21 +365,24 @@ impl Message for StackTreeMsg {
 		//println!("Cell {}: Stack tree msg {}", ca.get_id(), self);
 		let tree_map = self.header.get_tree_map();
 		let tree_name = self.payload.get_tree_name();
-		let gvm_eqn = self.payload.get_gvm_eqn();
-		let black_tree_name = self.payload.get_black_tree_name();
-		if let Some(black_tree_id) = tree_map.get(black_tree_name) {
-			if let Some(tree_id) = tree_map.get(tree_name) {
-				let manifest = Manifest::new(black_tree_name, CellConfig::Large, &tree_name, Vec::new(), 
-					Vec::new(), Vec::new(), &gvm_eqn)?;
-				match ca.stack_tree(&tree_id, &tree_uuid, black_tree_id, &manifest) {
-					Ok(_) => (),
-					Err(err) => return Err(map_cellagent_errors(err))
-				}
+		if let Some(gvm_eqn) = self.payload.get_gvm_eqn() {
+			let black_tree_name = self.payload.get_black_tree_name();
+			if let Some(black_tree_id) = tree_map.get(black_tree_name) {
+				if let Some(tree_id) = tree_map.get(tree_name) {
+					let manifest = Manifest::new(black_tree_name, CellConfig::Large, &tree_name, Vec::new(), 
+						Vec::new(), Vec::new(), &gvm_eqn)?;
+					match ca.stack_tree(&tree_id, &tree_uuid, black_tree_id, &manifest) {
+						Ok(_) => (),
+						Err(err) => return Err(map_cellagent_errors(err))
+					}
+				} else {
+					return Err(ErrorKind::TreeMapEntry(tree_name.to_string(), S("process stack tree (black)")).into());
+				}			
 			} else {
-				return Err(ErrorKind::TreeMapEntry(tree_name.to_string(), "process stack tree (black)".to_string()).into());
-			}			
+				return Err(ErrorKind::TreeMapEntry(black_tree_name.to_string(), S("process stack tree")).into());
+			}
 		} else {
-			return Err(ErrorKind::TreeMapEntry(black_tree_name.to_string(), "process stack tree".to_string()).into());
+			return Err(ErrorKind::ManifestGvm(S("process")).into());
 		}
 		Ok(())
 	}
@@ -393,27 +396,19 @@ impl fmt::Display for StackTreeMsg {
 pub struct StackTreeMsgPayload {
 	tree_name: String,
 	black_tree_name: String,
-	gvm_eqn: GvmEquation,
+	manifest: Manifest,
 }
 impl StackTreeMsgPayload {
-	fn new(tree_id: &TreeID, base_tree_name: String) -> Result<StackTreeMsgPayload> {
-		let mut gvm_vars = Vec::new();
-		gvm_vars.push(GvmVariable::new(GvmVariableType::PathLength, "hops"));
-		let mut eqns = HashSet::new();
-		eqns.insert(GvmEqn::Recv("hops == 0"));
-		eqns.insert(GvmEqn::Send("true"));
-		eqns.insert(GvmEqn::Xtnd("true"));
-		eqns.insert(GvmEqn::Save("true"));
-		let gvm_eqn = GvmEquation::new(eqns, gvm_vars);
+	fn new(tree_id: &TreeID, base_tree_name: String, manifest: &Manifest) -> Result<StackTreeMsgPayload> {
 		Ok(StackTreeMsgPayload { tree_name: tree_id.stringify(), black_tree_name: base_tree_name, 
-				gvm_eqn: gvm_eqn })
+				manifest: manifest.clone() })
 	}
 	pub fn get_black_tree_name(&self) -> &String { &self.black_tree_name }
 	pub fn get_tree_name(&self) -> &String { &self.tree_name}
-	pub fn get_gvm_eqn(&self) -> &GvmEquation { &self.gvm_eqn }
+	pub fn get_manifest(&self) -> &Manifest { &self.manifest }
 }
 impl MsgPayload for StackTreeMsgPayload {
-	fn get_gvm_eqn(&self) -> Option<&GvmEquation> { Some(&self.gvm_eqn) }
+	fn get_gvm_eqn(&self) -> Option<&GvmEquation> { Some(&self.manifest.get_gvm()) }
 	fn get_tree_name(&self) -> &String { &self.tree_name }
 }
 impl fmt::Display for StackTreeMsgPayload {
@@ -429,8 +424,6 @@ pub struct ManifestMsg {
 impl ManifestMsg {
 	pub fn new(manifest: &Manifest) -> ManifestMsg {
 		// Note that direction is rootward so cell agent will get the message
-		let mut tree_map : TreeMap = HashMap::new();
-		let deployment_tree_name = manifest.get_deployment_tree_name();
 		let header = MsgHeader::new(MsgType::Manifest, MsgDirection::Rootward, HashMap::new());
 		let payload = ManifestMsgPayload::new(&manifest);
 		ManifestMsg { header: header, payload: payload }
@@ -441,10 +434,10 @@ impl Message for ManifestMsg {
 	fn get_payload(&self) -> &MsgPayload { &self.payload }
 	fn process(&mut self, ca: &mut CellAgent, tree_uuid: Uuid, port_no: PortNo) -> Result<()> {
 		let manifest = self.payload.get_manifest();
-		match ca.deploy(&manifest) {
+		match ca.deploy(port_no, &manifest) {
 			Ok(_) => (),
 			Err(err) => {
-				println!("--- Problem in CellAgent deploy");
+				println!("--- Problem processing ManifestMsg");
 				return Err(map_cellagent_errors(err))
 			}
 		}
@@ -542,6 +535,9 @@ error_chain! {
 		CellAgent(err: Box<::cellagent::Error>)
 		InvalidMsgType(func_name: String, msg_type: MsgType) {
 			display("Message {}: Invalid message type {} from packet assembler", func_name, msg_type)
+		}
+		ManifestGvm(func_name: String) {
+			display("Message {}: No GVM in manifest", func_name)
 		}
 		TreeMapEntry(tree_name: String, func_name: String) {
 			display("Message {}: No tree named {} in map", func_name, tree_name)

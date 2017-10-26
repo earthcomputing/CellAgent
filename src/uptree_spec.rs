@@ -33,6 +33,7 @@ impl Manifest {
 		Ok(Manifest { id: S(id), cell_config: cell_config, deployment_tree: S(deployment_tree), 
 				allowed_trees: allowed_trees, vms: vms, trees: trees, gvm_eqn: gvm_eqn.clone() })
 	}
+	pub fn get_id(&self) -> &String { &self.id }
 	pub fn get_gvm(&self) -> &GvmEquation { &self.gvm_eqn }
 	pub fn get_new_tree_name(&self) -> &String { &self.id }
 	pub fn get_deployment_tree_name(&self) -> &String { &self.deployment_tree }
@@ -52,12 +53,13 @@ impl fmt::Display for Manifest {
 pub struct VmSpec {
 	id: String,
 	image:String, 
+	required_config: CellConfig,
 	allowed_trees: Vec<AllowedTree>,
 	containers: Vec<ContainerSpec>,
 	trees: Vec<UpTreeSpec>
 }
 impl VmSpec {
-	pub fn new(id: &str, image: &str, allowed_refs: Vec<&AllowedTree>, 
+	pub fn new(id: &str, image: &str, config: CellConfig, allowed_refs: Vec<&AllowedTree>,
 			container_refs: Vec<&ContainerSpec>, tree_refs: Vec<&UpTreeSpec>) -> Result<VmSpec> {
 		let mut max_tree_size = 0;
 		let mut allowed_trees = Vec::new();
@@ -76,14 +78,15 @@ impl VmSpec {
 				if !allowed_trees.contains(&a) { return Err(ErrorKind::Allowed(c.get_id(), S(a)).into()); } 
 			}			
 		}
-		Ok(VmSpec { id: S(id), image: S(image), allowed_trees: allowed_trees, containers: containers, trees: trees })
+		Ok(VmSpec { id: S(id), image: S(image), required_config: config,
+				allowed_trees: allowed_trees, containers: containers, trees: trees })
 	}
 	fn get_id(&self) -> String { self.id.clone() }
 	fn get_allowed_trees(&self) -> &Vec<AllowedTree> { &self.allowed_trees }
 }
 impl fmt::Display for VmSpec {
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-		let mut s = format!("  Virtual Machine {}({})", self.id, self.image);
+		let mut s = format!("  Virtual Machine {}({}, {})", self.id, self.image, self.required_config);
 		s = s + &format!("\n      Allowed Trees");
 		for a in &self.allowed_trees { s = s + &format!("\n        {}", a); }
 		for t in &self.trees { s = s + &format!("\n      {}", t); }
