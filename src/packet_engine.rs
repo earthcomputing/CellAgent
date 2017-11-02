@@ -102,14 +102,14 @@ impl PacketEngine {
 			let parent = entry.get_parent();
 			if let Some(other_index) = other_indices.get(parent.v as usize) {
 				if parent.v == 0 {
-					self.pe_to_ca.send(PeToCaPacket::Packet(recv_port_no, packet))?;
+					self.pe_to_ca.send(PeToCaPacket::Packet(recv_port_no, entry.get_index(), packet))?;
 				} else {
 					if let Some(sender) = self.pe_to_ports.get(parent.v as usize) {
 						sender.send((*other_index, packet))?;
 						//println!("PacketEngine {}: sent rootward on port {} sent packet {}", self.cell_id, recv_port_no, packet);
 						let is_up = entry.get_mask().equal(Mask::new0());
 						if is_up { // Send to cell agent, too
-							self.pe_to_ca.send(PeToCaPacket::Packet(recv_port_no, packet))?;
+							self.pe_to_ca.send(PeToCaPacket::Packet(recv_port_no, entry.get_index(), packet))?;
 						}
 					} else {
 						return Err(ErrorKind::Sender(self.cell_id.clone(), "forward root".to_string(), parent).into());
@@ -125,7 +125,7 @@ impl PacketEngine {
 				if let Some(other_index) = other_indices.get(port_no.v as usize) {
 					if port_no.v as usize == 0 { 
 						//println!("PacketEngine {}: sending to ca packet {}", self.cell_id, packet);
-						self.pe_to_ca.send(PeToCaPacket::Packet(recv_port_no, packet))?;
+						self.pe_to_ca.send(PeToCaPacket::Packet(recv_port_no, entry.get_index(), packet))?;
 					} else {
 						match self.pe_to_ports.get(port_no.v as usize) {
 							Some(s) => s.send((*other_index, packet))?,

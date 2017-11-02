@@ -38,6 +38,7 @@ impl Manifest {
 	pub fn get_new_tree_name(&self) -> &String { &self.id }
 	pub fn get_deployment_tree_name(&self) -> &String { &self.deployment_tree }
 	pub fn get_allowed_trees(&self) -> &Vec<AllowedTree> { &self.allowed_trees }
+	pub fn get_vms(&self) -> &Vec<VmSpec> { &self.vms }
 }
 impl fmt::Display for Manifest {
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result { 
@@ -81,8 +82,9 @@ impl VmSpec {
 		Ok(VmSpec { id: S(id), image: S(image), required_config: config,
 				allowed_trees: allowed_trees, containers: containers, trees: trees })
 	}
-	fn get_id(&self) -> String { self.id.clone() }
-	fn get_allowed_trees(&self) -> &Vec<AllowedTree> { &self.allowed_trees }
+	pub fn get_id(&self) -> String { self.id.clone() }
+	pub fn get_allowed_trees(&self) -> &Vec<AllowedTree> { &self.allowed_trees }
+	pub fn get_containers(&self) -> &Vec<ContainerSpec> { &self.containers }
 }
 impl fmt::Display for VmSpec {
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
@@ -94,7 +96,7 @@ impl fmt::Display for VmSpec {
 		write!(f, "{}", s)
 	}
 }
-#[derive(Debug, Clone, Hash, Serialize, Deserialize)]
+#[derive(Debug, Clone, Hash, Eq, PartialEq, Serialize, Deserialize)]
 pub struct ContainerSpec {
 	id: String, 
 	image: String,

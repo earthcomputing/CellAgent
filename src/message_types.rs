@@ -32,7 +32,7 @@ pub type PortToPe = mpsc::Sender<PortToPePacket>;
 pub type PeFromPort = mpsc::Receiver<PortToPePacket>;
 pub type PortPeError = mpsc::SendError<PortToPePacket>;
 // PacketEngine to CellAgent
-pub enum PeToCaPacket { Status(PortNo, bool, PortStatus), Packet(PortNo, Packet) }
+pub enum PeToCaPacket { Status(PortNo, bool, PortStatus), Packet(PortNo, TableIndex, Packet) }
 pub type PeToCa = mpsc::Sender<PeToCaPacket>;
 pub type CaFromPe = mpsc::Receiver<PeToCaPacket>;
 pub type PeCaError = mpsc::SendError<PeToCaPacket>;
@@ -60,12 +60,22 @@ pub type NocOutsideError = mpsc::SendError<NocToOutsideMsg>;
 pub type CaToVmMsg = String;
 pub type CaToVm = mpsc::Sender<CaToVmMsg>;
 pub type VmFromCa = mpsc::Receiver<CaToVmMsg>;
-//pub type CaVmError = mpsc::SendError<CaToVmMsg>;
+pub type CaVmError = mpsc::SendError<CaToVmMsg>;
 // VM to Cell agent
 pub type VmToCaMsg = String;
 pub type VmToCa = mpsc::Sender<VmToCaMsg>;
 pub type CaFromVm = mpsc::Receiver<VmToCaMsg>;
-//pub type VmCaError = mpsc::SendError<VmToCaMsg>;
+pub type VmCaError = mpsc::SendError<VmToCaMsg>;
+// Vm to Tree
+pub type VmToTreeMsg = String;
+pub type VmToTree = mpsc::Sender<VmToTreeMsg>;
+pub type TreeFromVm = mpsc::Receiver<VmToTreeMsg>;
+pub type VmTreeError = mpsc::SendError<VmToTreeMsg>;
+// Tree to Vm
+pub type TreeToVmMsg = String;
+pub type TreeToVm = mpsc::Sender<TreeToVmMsg>;
+pub type VmFromTree = mpsc::Receiver<TreeToVmMsg>;
+pub type TreeVmError = mpsc::SendError<TreeToVmMsg>;
 // Vm to Container
 pub type VmToContainerMsg = String;
 pub type VmToContainer = mpsc::Sender<VmToContainerMsg>;
@@ -76,3 +86,13 @@ pub type ContainerToVmMsg = String;
 pub type ContainerToVm = mpsc::Sender<ContainerToVmMsg>;
 pub type VmFromContainer = mpsc::Receiver<ContainerToVmMsg>;
 pub type ContainerVmError = mpsc::SendError<ContainerToVmMsg>;
+// Container to Tree
+pub type ContainerToTreeMsg = String;
+pub type ContainerToTree = mpsc::Sender<ContainerToTreeMsg>;
+pub type TreeFromContainer = mpsc::Receiver<ContainerToTreeMsg>;
+pub type ContainerTreeError = mpsc::SendError<ContainerToTreeMsg>;
+// Tree to Container
+pub type TreeToContainerMsg = String;
+pub type TreeToContainer = mpsc::Sender<TreeToContainerMsg>;
+pub type ContainerFromTree = mpsc::Receiver<TreeToContainerMsg>;
+pub type TreeContainerError = mpsc::SendError<TreeToContainerMsg>;

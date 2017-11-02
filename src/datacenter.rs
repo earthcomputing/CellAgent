@@ -9,7 +9,7 @@ use message_types::{LinkToPort, PortFromLink, PortToLink, LinkFromPort,
 	PortToNoc, PortFromNoc};
 use link::{Link};
 use nalcell::{CellConfig, NalCell};
-use name::{UpTraphID};
+use name::{UptreeID};
 use utility::S;
 
 #[derive(Debug)]

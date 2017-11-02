@@ -4,21 +4,22 @@ use std::sync::mpsc::channel;
 use container::{Container, Service};
 use message_types::{VmToCa, VmFromCa, VmToContainerMsg, VmToContainer, ContainerFromVm,
 	ContainerToVmMsg, ContainerToVm, VmFromContainer, ContainerVmError};
-use name::{ContainerID, TreeID, UpTraphID, VmID};
+use name::{ContainerID, TreeID, UptreeID, VmID};
+use uptree_spec::{AllowedTree, ContainerSpec};
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Hash, Eq, PartialEq, Serialize, Deserialize)]
 pub struct VirtualMachine {
 	id: VmID,
-	containers: Vec<Container>,
+	containers: Vec<ContainerSpec>,
 }
 impl VirtualMachine {
 	pub fn new(id: VmID) -> VirtualMachine {
 		VirtualMachine { id: id, containers: Vec::new() }
 	}
-	pub fn initialize(&mut self, services: &mut Vec<Service>,
-			up_tree_id: &UpTraphID, tree_ids: &HashMap<&str,TreeID>, 
-			vm_to_ca: &VmToCa, vm_from_ca: VmFromCa) -> Result<()> {
+	pub fn initialize(&mut self, up_tree_id: &TreeID, allowed_trees: &Vec<AllowedTree>,
+		containers: &Vec<ContainerSpec>, vm_to_ca: Option<&VmToCa>, vm_from_ca: VmFromCa) -> Result<()> {
 		self.listen_ca(vm_from_ca)?;
+/*		
 		while services.len() > 0 {
 			let (vm_to_container, container_from_vm): (VmToContainer, ContainerFromVm) = channel();
 			let (container_to_vm, vm_from_container): (ContainerToVm, VmFromContainer) = channel();
@@ -30,6 +31,7 @@ impl VirtualMachine {
 			//self.containers.insert(up_tree_id.clone(), vec![vm_to_container]);
 			self.listen_container(container_id, vm_from_container, vm_to_ca.clone())?;
 		}
+*/		
 		Ok(())
 	}
 	fn listen_ca(&self, vm_from_ca: VmFromCa) -> Result<()> {
