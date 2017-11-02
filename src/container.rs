@@ -2,7 +2,7 @@ use std::fmt;
 use std::collections::HashMap;
 
 use message_types::{ContainerToVm, ContainerFromVm};
-use name::{ContainerID, TreeID, UpTraphID};
+use name::{ContainerID, TreeID, UptreeID};
 
 #[derive(Debug, Clone, Hash, Serialize, Deserialize)]
 pub struct Container {
@@ -13,7 +13,7 @@ impl Container {
 	pub fn new(id: ContainerID, service: Service) -> Container {
 		Container { id: id, service: service }
 	}
-	pub fn initialize(&self, up_tree_id: &UpTraphID, tree_ids: &HashMap<&str, TreeID>,
+	pub fn initialize(&self, up_tree_id: &UptreeID, tree_ids: &HashMap<&str, TreeID>,
 			container_to_vm: ContainerToVm, container_from_vm: ContainerFromVm) -> Result<()> {
 		match self.service {
 			Service::NocMaster => {
@@ -56,7 +56,7 @@ impl NocMaster {
 	}
 //	fn get_container_id(&self) -> &ContainerID { &self.container_id }
 //	fn get_service(&self) -> Service { self.service }
-	fn initialize(&self, up_tree_id: &UpTraphID, tree_ids: &HashMap<&str, TreeID>,
+	fn initialize(&self, up_tree_id: &UptreeID, tree_ids: &HashMap<&str, TreeID>,
 			container_to_vm: ContainerToVm, container_from_vm: ContainerFromVm) -> Result<()> {
 		let f = "initialize";
 		self.listen_vm(container_from_vm)
@@ -87,7 +87,7 @@ struct NocAgent {
 }
 impl NocAgent {
 	fn new(container_id: &ContainerID) -> NocAgent { NocAgent { container_id: container_id.clone() } }
-	fn initialize(&self, up_tree_id: &UpTraphID, tree_ids: &HashMap<&str, TreeID>,
+	fn initialize(&self, up_tree_id: &UptreeID, tree_ids: &HashMap<&str, TreeID>,
 			container_to_vm: ContainerToVm, container_from_vm: ContainerFromVm) -> Result<()> {
 		Ok(())
 	}

@@ -79,22 +79,22 @@ impl Name for TreeID {
 }
 impl fmt::Display for TreeID { fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result { self.name.fmt(f) } }
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
-pub struct UpTraphID { name: NameType, uuid: Uuid}
-impl<'a> UpTraphID {
-	pub fn new(n: &str) -> Result<UpTraphID> { 
+pub struct UptreeID { name: NameType, uuid: Uuid}
+impl<'a> UptreeID {
+	pub fn new(n: &str) -> Result<UptreeID> { 
 		let str = n.to_string();
 		match n.find(' ') {
-			None => Ok(UpTraphID { name: str, uuid: Uuid::new_v4() }),
-			Some(_) => Err(ErrorKind::Format(str, "UpTraphID::new".to_string()).into())
+			None => Ok(UptreeID { name: str, uuid: Uuid::new_v4() }),
+			Some(_) => Err(ErrorKind::Format(str, "UptreeID::new".to_string()).into())
 		}
 	}
 }
-impl Name for UpTraphID {
+impl Name for UptreeID {
 	fn get_name(&self) -> &str { &self.name }
 	fn get_uuid(&self) -> Uuid { self.uuid }
-	fn create_from_string(&self, n: String) -> UpTraphID { UpTraphID { name: n, uuid: Uuid::new_v4() } }
+	fn create_from_string(&self, n: String) -> UptreeID { UptreeID { name: n, uuid: Uuid::new_v4() } }
 }
-impl fmt::Display for UpTraphID { fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result { self.name.fmt(f) } }
+impl fmt::Display for UptreeID { fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result { self.name.fmt(f) } }
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct TenantID { name: NameType, uuid: Uuid }
 impl TenantID {
@@ -126,11 +126,11 @@ impl Name for LinkID {
 	fn create_from_string(&self, n: String) -> LinkID { LinkID { name: n, uuid: Uuid::new_v4() } }
 }
 impl fmt::Display for LinkID { fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result { self.name.fmt(f) } }
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct VmID { name: NameType, uuid: Uuid}
 impl VmID {
-	pub fn new(cell_id: &CellID, id_no: usize) -> Result<VmID> { 
-		let name = format!("VM:{}+{}", cell_id, id_no);
+	pub fn new(cell_id: &CellID, name: &String) -> Result<VmID> { 
+		let name = format!("VM:{}+{}", cell_id, name);
 		Ok(VmID { name: name, uuid: Uuid::new_v4() })
 	}
 }

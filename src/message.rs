@@ -116,7 +116,8 @@ pub trait Message: fmt::Display {
 		let packets = Packetizer::packetize(tree_id, &bytes, direction,)?;		
 		Ok(packets)
 	}
-	fn process(&mut self, cell_agent: &mut CellAgent, tree_uuid: Uuid, port_no: PortNo) -> Result<()>;
+	// msg_tree_id is the tree the message was sent on
+	fn process(&mut self, cell_agent: &mut CellAgent, msg_tree_id: TreeID, port_no: PortNo) -> Result<()>;
 }
 pub trait MsgPayload {
 	fn get_gvm_eqn(&self) -> Option<&GvmEquation>;
@@ -178,7 +179,7 @@ impl DiscoverMsg {
 impl Message for DiscoverMsg {
 	fn get_header(&self) -> &MsgHeader { &self.header }
 	fn get_payload(&self) -> &MsgPayload { &self.payload }
-	fn process(&mut self, ca: &mut CellAgent, tree_uuid: Uuid, port_no: PortNo) -> Result<()> {
+	fn process(&mut self, ca: &mut CellAgent, msg_tree_id: TreeID, port_no: PortNo) -> Result<()> {
 		let port_number = PortNumber::new(port_no, ca.get_no_ports())?;
 		let hops = self.payload.get_hops();
 		let path = self.payload.get_path();
@@ -296,7 +297,7 @@ impl DiscoverDMsg {
 impl Message for DiscoverDMsg {
 	fn get_header(&self) -> &MsgHeader { &self.header }
 	fn get_payload(&self) -> &MsgPayload { &self.payload }
-	fn process(&mut self, ca: &mut CellAgent, tree_uuid: Uuid, port_no: PortNo) -> Result<()> {
+	fn process(&mut self, ca: &mut CellAgent, msg_tree_id: TreeID, port_no: PortNo) -> Result<()> {
 		let tree_name = self.payload.get_tree_name();
 		let tree_id = self.get_tree_id(tree_name)?;
 		let my_index = self.payload.get_table_index();
@@ -361,7 +362,7 @@ impl StackTreeMsg {
 impl Message for StackTreeMsg {
 	fn get_header(&self) -> &MsgHeader { &self.header }
 	fn get_payload(&self) -> &MsgPayload { &self.payload }
-	fn process(&mut self, ca: &mut CellAgent, tree_uuid: Uuid, port_no: PortNo) -> Result<()> {
+	fn process(&mut self, ca: &mut CellAgent, msg_tree_id: TreeID, port_no: PortNo) -> Result<()> {
 		//println!("Cell {}: Stack tree msg {}", ca.get_id(), self);
 		let tree_map = self.header.get_tree_map();
 		let tree_name = self.payload.get_tree_name();
@@ -371,7 +372,7 @@ impl Message for StackTreeMsg {
 				if let Some(tree_id) = tree_map.get(tree_name) {
 					let manifest = Manifest::new(black_tree_name, CellConfig::Large, &tree_name, Vec::new(), 
 						Vec::new(), Vec::new(), &gvm_eqn)?;
-					match ca.stack_tree(&tree_id, &tree_uuid, black_tree_id, &manifest) {
+					match ca.stack_tree(&tree_id, &msg_tree_id, black_tree_id, &manifest) {
 						Ok(_) => (),
 						Err(err) => return Err(map_cellagent_errors(err))
 					}
@@ -432,7 +433,7 @@ impl ManifestMsg {
 impl Message for ManifestMsg {
 	fn get_header(&self) -> &MsgHeader { &self.header }
 	fn get_payload(&self) -> &MsgPayload { &self.payload }
-	fn process(&mut self, ca: &mut CellAgent, tree_uuid: Uuid, port_no: PortNo) -> Result<()> {
+	fn process(&mut self, ca: &mut CellAgent, msg_tree_id: TreeID, port_no: PortNo) -> Result<()> {
 		let manifest = self.payload.get_manifest();
 		match ca.deploy(port_no, &manifest) {
 			Ok(_) => (),
@@ -467,7 +468,7 @@ impl MsgPayload for ManifestMsgPayload {
 }
 impl fmt::Display for ManifestMsgPayload {
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-		let mut s = format!("Manifest: {}", self.get_manifest());
+		let s = format!("Manifest: {}", self.get_manifest());
 		write!(f, "{}", s)
 	}
 }
@@ -487,7 +488,7 @@ impl TreeNameMsg {
 impl Message for TreeNameMsg {
 	fn get_header(&self) -> &MsgHeader { &self.header }
 	fn get_payload(&self) -> &MsgPayload { &self.payload }
-	fn process(&mut self, ca: &mut CellAgent, tree_uuid: Uuid, port_no: PortNo) -> Result<()> {
+	fn process(&mut self, ca: &mut CellAgent, msg_tree_id: TreeID, port_no: PortNo) -> Result<()> {
 		// Never called, since message goes to NOC rather than CellAgent
 		Ok(())		
 	}
@@ -513,7 +514,7 @@ impl MsgPayload for TreeNameMsgPayload {
 }
 impl fmt::Display for TreeNameMsgPayload {
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-		let mut s = format!("Tree name for border cell {}", self.tree_name);
+		let s = format!("Tree name for border cell {}", self.tree_name);
 		write!(f, "{}", s)
 	}
 }
