@@ -16,9 +16,9 @@ impl VirtualMachine {
 	pub fn new(id: VmID) -> VirtualMachine {
 		VirtualMachine { id: id, containers: Vec::new() }
 	}
-	pub fn initialize(&mut self, up_tree_id: &TreeID, allowed_trees: &Vec<AllowedTree>,
-		containers: &Vec<ContainerSpec>, vm_to_ca: Option<&VmToCa>, vm_from_ca: VmFromCa) -> Result<()> {
-		self.listen_ca(vm_from_ca)?;
+	pub fn initialize(&mut self, up_tree_id: &TreeID, tree_map: &Vec<&str>,
+			containers: &Vec<ContainerSpec>) -> Result<()> {
+		//self.listen_ca(vm_from_ca)?;
 /*		
 		while services.len() > 0 {
 			let (vm_to_container, container_from_vm): (VmToContainer, ContainerFromVm) = channel();
@@ -34,6 +34,7 @@ impl VirtualMachine {
 */		
 		Ok(())
 	}
+	pub fn get_id(&self) -> &VmID { &self.id }	
 	fn listen_ca(&self, vm_from_ca: VmFromCa) -> Result<()> {
 		println!("VM {}: listening to Ca", self.id);
 		let vm = self.clone();
