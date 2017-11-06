@@ -167,17 +167,17 @@ impl fmt::Display for UpTreeSpec {
 }
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize)]
 pub struct AllowedTree {
-	id: String,
+	name: String,
 }
 impl AllowedTree {
-	pub fn new(id: &str) -> AllowedTree {
-		AllowedTree { id: S(id) }
+	pub fn new(name: &str) -> AllowedTree {
+		AllowedTree { name: S(name) }
 	}
-	pub fn get_id(&self) -> &String { &self.id }
+	pub fn get_name(&self) -> &String { &self.name }
 }
 impl fmt::Display for AllowedTree {
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-		let s = format!("{}", self.id);
+		let s = format!("{}", self.name);
 		write!(f, "{}", s)
 	}
 }

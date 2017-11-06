@@ -117,7 +117,7 @@ pub trait Message: fmt::Display {
 		Ok(packets)
 	}
 	// msg_tree_id is the tree the message was sent on
-	fn process(&mut self, cell_agent: &mut CellAgent, msg_tree_id: TreeID, port_no: PortNo) -> Result<()>;
+	fn process(&mut self, cell_agent: &mut CellAgent, msg_tree_id: &TreeID, port_no: PortNo) -> Result<()>;
 }
 pub trait MsgPayload {
 	fn get_gvm_eqn(&self) -> Option<&GvmEquation>;
@@ -179,7 +179,7 @@ impl DiscoverMsg {
 impl Message for DiscoverMsg {
 	fn get_header(&self) -> &MsgHeader { &self.header }
 	fn get_payload(&self) -> &MsgPayload { &self.payload }
-	fn process(&mut self, ca: &mut CellAgent, msg_tree_id: TreeID, port_no: PortNo) -> Result<()> {
+	fn process(&mut self, ca: &mut CellAgent, msg_tree_id: &TreeID, port_no: PortNo) -> Result<()> {
 		let port_number = PortNumber::new(port_no, ca.get_no_ports())?;
 		let hops = self.payload.get_hops();
 		let path = self.payload.get_path();
@@ -297,7 +297,7 @@ impl DiscoverDMsg {
 impl Message for DiscoverDMsg {
 	fn get_header(&self) -> &MsgHeader { &self.header }
 	fn get_payload(&self) -> &MsgPayload { &self.payload }
-	fn process(&mut self, ca: &mut CellAgent, msg_tree_id: TreeID, port_no: PortNo) -> Result<()> {
+	fn process(&mut self, ca: &mut CellAgent, msg_tree_id: &TreeID, port_no: PortNo) -> Result<()> {
 		let tree_name = self.payload.get_tree_name();
 		let tree_id = self.get_tree_id(tree_name)?;
 		let my_index = self.payload.get_table_index();
@@ -362,7 +362,7 @@ impl StackTreeMsg {
 impl Message for StackTreeMsg {
 	fn get_header(&self) -> &MsgHeader { &self.header }
 	fn get_payload(&self) -> &MsgPayload { &self.payload }
-	fn process(&mut self, ca: &mut CellAgent, msg_tree_id: TreeID, port_no: PortNo) -> Result<()> {
+	fn process(&mut self, ca: &mut CellAgent, msg_tree_id: &TreeID, port_no: PortNo) -> Result<()> {
 		//println!("Cell {}: Stack tree msg {}", ca.get_id(), self);
 		let tree_map = self.header.get_tree_map();
 		let tree_name = self.payload.get_tree_name();
@@ -433,7 +433,7 @@ impl ManifestMsg {
 impl Message for ManifestMsg {
 	fn get_header(&self) -> &MsgHeader { &self.header }
 	fn get_payload(&self) -> &MsgPayload { &self.payload }
-	fn process(&mut self, ca: &mut CellAgent, msg_tree_id: TreeID, port_no: PortNo) -> Result<()> {
+	fn process(&mut self, ca: &mut CellAgent, msg_tree_id: &TreeID, port_no: PortNo) -> Result<()> {
 		let manifest = self.payload.get_manifest();
 		match ca.deploy(port_no, &manifest) {
 			Ok(_) => (),
@@ -488,7 +488,7 @@ impl TreeNameMsg {
 impl Message for TreeNameMsg {
 	fn get_header(&self) -> &MsgHeader { &self.header }
 	fn get_payload(&self) -> &MsgPayload { &self.payload }
-	fn process(&mut self, ca: &mut CellAgent, msg_tree_id: TreeID, port_no: PortNo) -> Result<()> {
+	fn process(&mut self, ca: &mut CellAgent, msg_tree_id: &TreeID, port_no: PortNo) -> Result<()> {
 		// Never called, since message goes to NOC rather than CellAgent
 		Ok(())		
 	}

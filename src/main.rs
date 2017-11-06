@@ -45,7 +45,7 @@ use std::sync::mpsc::channel;
 use std::collections::HashMap;
 
 use blueprint::Blueprint;
-use config::{NCELLS, NPORTS, NLINKS, OUTPUT_FILE_NAME, PHYSICAL_UP_TREE_NAME, CellNo, Edge, PortNo};
+use config::{NCELLS, NPORTS, NLINKS, OUTPUT_FILE_NAME, CellNo, Edge, PortNo};
 use ecargs::{ECArgs};
 use gvm_equation::{GvmEquation, GvmEqn, GvmVariable, GvmVariableType};
 use message_types::{OutsideFromNoc, OutsideToNoc, NocFromOutside, NocToOutside};
