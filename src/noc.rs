@@ -74,8 +74,9 @@ impl Noc {
 				let msg = MsgType::get_msg(&packets)?;
 				match msg.get_header().get_msg_type() {
 					MsgType::TreeName => {
-						//self.allowed_trees.push(msg.get_payload().get_allowed_trees().clone());
-						self.control(&noc_to_port)?;						
+						//println!("Noc got msg {}", msg);
+						let allowed_trees = msg.process_noc(&self)?; 
+						self.control(&allowed_trees, &noc_to_port)?;						
 					}
 					_ => return Err(ErrorKind::MsgType(S("listen_port"), msg.get_header().get_msg_type()).into())
 				}
@@ -86,7 +87,7 @@ impl Noc {
 		}
 	}
 	// Sets up the NOC Master and NOC Client services on up trees
-	fn control(&self, noc_to_port: &NocToPort) -> Result<()> { 
+	fn control(&mut self, allowed_trees: &Vec<AllowedTree>, noc_to_port: &NocToPort) -> Result<()> { 
 		// Create an up tree on the border cell for the NOC Master
 		if let Some(deployment_tree) = Some(AllowedTree::new("Base")) {
 			let mut eqns = HashSet::new();
