@@ -287,7 +287,7 @@ impl CellAgent {
 		}		
 	}
 	fn get_tree_id_from_tree_map(&self, tree_name: &String) -> Result<TreeID> {
-		println!("Cell {}: tree_name_map {:?}", self.cell_id, self.tree_name_map);
+		//println!("Cell {}: tree_name_map {:?}", self.cell_id, self.tree_name_map);
 		match self.tree_name_map.get(tree_name) {
 			Some(id) => Ok(id.clone()),
 			None => Err(ErrorKind::TreeMap(self.cell_id.clone(), S("get_tree_id_from_tree_map"), tree_name.clone()).into())
@@ -518,8 +518,7 @@ impl CellAgent {
 			let port_number = PortNumber::new(port_no, self.no_ports)?;
 			self.update_traph(&new_tree_id, port_number, traph::PortStatus::Parent, 
 				Some(&gvm_eqn), &mut HashSet::new(), TableIndex(0), PathLength(CellNo(1)), None)?;
-			let allowed_trees = vec![AllowedTree::new(self.control_tree_id.get_name()), 
-			                         AllowedTree::new(self.my_tree_id.get_name())];
+			let allowed_trees = vec![AllowedTree::new("Control"), AllowedTree::new("Base")];
 			self.tree_name_map.insert(S("Control"), self.control_tree_id.clone());
 			self.tree_name_map.insert(S("Base"), self.my_tree_id.clone());
 			let port_no_mask = Mask::new(port_number);
