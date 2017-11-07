@@ -107,7 +107,7 @@ impl PacketEngine {
 					if let Some(sender) = self.pe_to_ports.get(parent.v as usize) {
 						sender.send((*other_index, packet))?;
 						//println!("PacketEngine {}: sent rootward on port {} sent packet {}", self.cell_id, recv_port_no, packet);
-						let is_up = entry.get_mask().equal(Mask::new0());
+						let is_up = entry.get_mask().and(user_mask).equal(Mask::new0());
 						if is_up { // Send to cell agent, too
 							self.pe_to_ca.send(PeToCaPacket::Packet(recv_port_no, entry.get_index(), packet))?;
 						}

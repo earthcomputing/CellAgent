@@ -19,7 +19,7 @@ use routing_table_entry::{RoutingTableEntry};
 use traph;
 use traph::{Traph};
 use tree::Tree;
-use uptree_spec::{Manifest, VmSpec};
+use uptree_spec::{AllowedTree, Manifest, VmSpec};
 use utility::{BASE_TENANT_MASK, Mask, Path, PortNumber, S};
 use vm::VirtualMachine;
 
@@ -287,6 +287,7 @@ impl CellAgent {
 		}		
 	}
 	fn get_tree_id_from_tree_map(&self, tree_name: &String) -> Result<TreeID> {
+		println!("Cell {}: tree_name_map {:?}", self.cell_id, self.tree_name_map);
 		match self.tree_name_map.get(tree_name) {
 			Some(id) => Ok(id.clone()),
 			None => Err(ErrorKind::TreeMap(self.cell_id.clone(), S("get_tree_id_from_tree_map"), tree_name.clone()).into())
@@ -449,10 +450,10 @@ impl CellAgent {
 							Ok(m) => m,
 							Err(err) => return Err(map_message_errors(err, "Bad message format"))
 						};
-						match msg.process(self, &tree_id, port_no) {
+						match msg.process_ca(self, &tree_id, port_no) {
 							Ok(_) => (),
 							Err(err) => return {
-								println!("CellAgent {}: message {}", self.cell_id, msg);
+								println!("--- CellAgent {}: message {}", self.cell_id, msg);
 								Err(map_message_errors(err, "Message processing error"))
 							}
 						};
@@ -488,10 +489,15 @@ impl CellAgent {
 			Ok(false)
 		}
 	}
-	fn send_tree_name(&mut self, outside_tree_id: &TreeID, tree_name: &str, tree_id: &TreeID, port_number: PortNumber) -> Result<()> {
+	fn send_tree_names(&mut self, outside_tree_id: &TreeID, allowed_tree_ids: Vec<TreeID>, port_number: PortNumber) -> Result<()> {
 		let port_no_mask = Mask::new(port_number);
-		let tree_name_msg = TreeNameMsg::new(tree_name);
-		self.tree_name_map.insert(S(tree_name), tree_id.clone());
+		let mut allowed_trees = Vec::new();
+		for allowed_tree_id in allowed_tree_ids.iter().cloned() {
+			let allowed_tree_name = allowed_tree_id.get_name();
+			self.tree_name_map.insert(S(allowed_tree_name), allowed_tree_id.clone());
+			allowed_trees.push(AllowedTree::new(allowed_tree_name));
+		}
+		let tree_name_msg = TreeNameMsg::new(&outside_tree_id, &allowed_trees);
 		match tree_name_msg.to_packets(outside_tree_id) {
 			Ok(packets) => self.send_msg(outside_tree_id.get_uuid(), &packets, port_no_mask),
 			Err(err) => Err(map_message_errors(err, "Error converting TreeNameMsg to packets"))
@@ -512,10 +518,18 @@ impl CellAgent {
 			let port_number = PortNumber::new(port_no, self.no_ports)?;
 			self.update_traph(&new_tree_id, port_number, traph::PortStatus::Parent, 
 				Some(&gvm_eqn), &mut HashSet::new(), TableIndex(0), PathLength(CellNo(1)), None)?;
-			let control_tree_id = self.control_tree_id.clone();
-//			self.send_tree_name(&new_tree_id, CONTROL_TREE_NAME, &control_tree_id, port_number)?;
-			let base_tree_id = self.my_tree_id.clone();
-			self.send_tree_name(&new_tree_id, BASE_TREE_NAME, &base_tree_id, port_number)?;
+			let allowed_trees = vec![AllowedTree::new(self.control_tree_id.get_name()), 
+			                         AllowedTree::new(self.my_tree_id.get_name())];
+			self.tree_name_map.insert(S("Control"), self.control_tree_id.clone());
+			self.tree_name_map.insert(S("Base"), self.my_tree_id.clone());
+			let port_no_mask = Mask::new(port_number);
+			let tree_name_msg = TreeNameMsg::new(&new_tree_id, &allowed_trees);
+			//println!("Cell {}: Sending on ports {}: {}", self.cell_id, port_no_mask, tree_name_msg);
+			match tree_name_msg.to_packets(&new_tree_id) {
+				Ok(packets) => self.send_msg(new_tree_id.get_uuid(), &packets, port_no_mask),
+				Err(err) => return Err(map_message_errors(err, "Error converting TreeNameMsg to packets"))
+			}
+//			self.send_tree_names(&new_tree_id, allowed_trees, port_number)?;
 		} else {
 			//println!("Cell {}: port {} connected", self.cell_id, *port_no);
 			let port_no_mask = Mask::new(PortNumber::new(port_no, self.no_ports)?);
@@ -533,9 +547,9 @@ impl CellAgent {
 			self.ca_to_pe.send(entry)?;
 			self.send_msg(self.connected_tree_id.get_uuid(), &packets, port_no_mask)?;
 			let saved_msgs  = self.get_saved_msgs();
-			self.forward_discover(&saved_msgs, port_no_mask)?;		
+			self.forward_discover(&saved_msgs, port_no_mask)?;	
+			Ok(())	
 		}
-		Ok(())		
 	}
 	fn port_disconnected(&self, port_no: PortNo) -> Result<()> {
 		//println!("Cell Agent {} got disconnected on port {}", self.cell_id, port_no);
