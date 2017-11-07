@@ -20,14 +20,14 @@ use utility::S;
 #[derive(Debug, Clone)]
 pub struct Noc {
 	tree_id: TreeID, 
-	allowed_trees: Vec<AllowedTree>,
+	allowed_trees: HashSet<AllowedTree>,
 	noc_to_outside: NocToOutside,
 	packet_assemblers: PacketAssemblers
 }
 impl Noc {
 	pub fn new(noc_to_outside: NocToOutside) -> Result<Noc> {
 		let tree_id = TreeID::new("CellAgentTree")?;
-		Ok(Noc { tree_id: tree_id, allowed_trees: Vec::new(), packet_assemblers: PacketAssemblers::new(),
+		Ok(Noc { tree_id: tree_id, allowed_trees: HashSet::new(), packet_assemblers: PacketAssemblers::new(),
 				 noc_to_outside: noc_to_outside })
 	}
 	pub fn initialize(&self, blueprint: &Blueprint, noc_from_outside: NocFromOutside) -> Result<Vec<JoinHandle<()>>> {
@@ -89,6 +89,9 @@ impl Noc {
 	// Sets up the NOC Master and NOC Client services on up trees
 	fn control(&mut self, allowed_trees: &Vec<AllowedTree>, noc_to_port: &NocToPort) -> Result<()> { 
 		// Create an up tree on the border cell for the NOC Master
+		for allowed_tree in allowed_trees { self.allowed_trees.insert(allowed_tree.clone()); }
+		//println!("Noc allowed trees {:?}", allowed_trees);
+		if !allowed_trees.contains(&AllowedTree::new("Base")) { return Err(ErrorKind::AllowedTree(S("control"), S("Base")).into()); }
 		if let Some(deployment_tree) = Some(AllowedTree::new("Base")) {
 			let mut eqns = HashSet::new();
 			eqns.insert(GvmEqn::Recv("true"));
@@ -146,6 +149,9 @@ error_chain! {
 		UpTree(::uptree_spec::Error, ::uptree_spec::ErrorKind);
 	}
 	errors { 
+		AllowedTree(func_name: String, tree_name: String) {
+			display("Noc {}: {} is not an allowed tree", func_name, tree_name)
+		}
 		MsgType(func_name: String, msg_type: MsgType) {
 			display("Noc {}: {} is not a valid message type for the NOC", func_name, msg_type)
 		}
