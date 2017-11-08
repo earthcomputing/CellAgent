@@ -1,4 +1,3 @@
-use std::any::Any;
 use std::thread::{JoinHandle, sleep, spawn};
 use std::sync::mpsc::channel;
 use std::collections::{HashMap, HashSet};
@@ -6,7 +5,7 @@ use std::time;
 use serde_json;
 
 use blueprint::{Blueprint};
-use config::{SEPARATOR, CellNo, DatacenterNo, Edge, PortNo};
+use config::{BASE_TREE_NAME, CONTROL_TREE_NAME, SEPARATOR, CellNo, DatacenterNo, Edge, PortNo};
 use datacenter::{Datacenter};
 use gvm_equation::{GvmEquation, GvmEqn, GvmVariable, GvmVariableType};
 use message::{Message, MsgPayload, MsgType, ManifestMsg, TreeNameMsgPayload};
@@ -21,6 +20,8 @@ use utility::S;
 pub struct Noc {
 	tree_id: TreeID, 
 	allowed_trees: HashSet<AllowedTree>,
+	control_tree: AllowedTree,
+	base_tree: AllowedTree,
 	noc_to_outside: NocToOutside,
 	packet_assemblers: PacketAssemblers
 }
@@ -28,6 +29,7 @@ impl Noc {
 	pub fn new(noc_to_outside: NocToOutside) -> Result<Noc> {
 		let tree_id = TreeID::new("CellAgentTree")?;
 		Ok(Noc { tree_id: tree_id, allowed_trees: HashSet::new(), packet_assemblers: PacketAssemblers::new(),
+				 control_tree: AllowedTree::new(CONTROL_TREE_NAME), base_tree: AllowedTree::new(BASE_TREE_NAME),
 				 noc_to_outside: noc_to_outside })
 	}
 	pub fn initialize(&self, blueprint: &Blueprint, noc_from_outside: NocFromOutside) -> Result<Vec<JoinHandle<()>>> {
@@ -50,7 +52,6 @@ impl Noc {
 		let nap = time::Duration::from_millis(1000);
 		sleep(nap);
 		println!("{}", dc);
-		let noc_to_port_clone = noc_to_port.clone();
 		Ok(join_handles)
 	}
 	fn build_datacenter(&self, blueprint: &Blueprint) 
@@ -91,8 +92,7 @@ impl Noc {
 		// Create an up tree on the border cell for the NOC Master
 		for allowed_tree in allowed_trees { self.allowed_trees.insert(allowed_tree.clone()); }
 		//println!("Noc allowed trees {:?}", allowed_trees);
-		if !allowed_trees.contains(&AllowedTree::new("Base")) { return Err(ErrorKind::AllowedTree(S("control"), S("Base")).into()); }
-		if let Some(deployment_tree) = Some(AllowedTree::new("Base")) {
+		if let Some(deployment_tree) = self.allowed_trees.get(&self.base_tree) {
 			let mut eqns = HashSet::new();
 			eqns.insert(GvmEqn::Recv("true"));
 			eqns.insert(GvmEqn::Send("false"));
@@ -111,16 +111,16 @@ impl Noc {
 			let packets = msg.to_packets(&self.tree_id)?;
 			for packet in packets { noc_to_port.send(packet)?; }
 		} else {
-			return Err(ErrorKind::Tree(S("control"), 0).into());
+			return return Err(ErrorKind::AllowedTree(S("control"), S(self.base_tree.get_name())).into());
 		}
 		Ok(())
 	}
 	fn listen_outside(&mut self, noc_from_outside: NocFromOutside, noc_to_port: NocToPort) -> Result<()> {
 		loop {
 			let input = &noc_from_outside.recv()?;
-			println!("{}", input);
-			let manifest = serde_json::from_str::<Manifest>(input);
-			println!("{:?}", manifest);
+			println!("Noc: {}", input);
+			let manifest = serde_json::from_str::<Manifest>(input)?;
+			println!("Noc: {}", manifest);
 		}
 	}
 	fn write_err(&self, s: &str, e: Error) {
