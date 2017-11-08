@@ -62,8 +62,8 @@ impl CellAgent {
 		let tenant_masks = vec![BASE_TENANT_MASK];
 		let my_tree_id = TreeID::new(cell_id.get_name())?;
 		my_tree_id.append2file()?;	
-		let control_tree_id = TreeID::new(&(cell_id.get_name().to_string() + ":" + CONTROL_TREE_NAME))?;
-		let connected_tree_id = TreeID::new(&(cell_id.get_name().to_string() + ":" + CONNECTED_PORTS_TREE_NAME))?;
+		let control_tree_id = TreeID::new(cell_id.get_name())?.add_component(CONTROL_TREE_NAME)?;
+		let connected_tree_id = TreeID::new(cell_id.get_name())?.add_component(CONNECTED_PORTS_TREE_NAME)?;
 		connected_tree_id.append2file()?;
 		let mut free_indices = Vec::new();
 		let trees = HashMap::new(); // For getting TreeID from table index
@@ -286,17 +286,13 @@ impl CellAgent {
 			Entry::Vacant(_) => Err(ErrorKind::NoTraph(self.cell_id.clone(), "stack_tree".to_string(), uuid).into())
 		}		
 	}
-	fn get_tree_id_from_tree_map(&self, tree_name: &String) -> Result<TreeID> {
-		//println!("Cell {}: tree_name_map {:?}", self.cell_id, self.tree_name_map);
-		match self.tree_name_map.get(tree_name) {
-			Some(id) => Ok(id.clone()),
-			None => Err(ErrorKind::TreeMap(self.cell_id.clone(), S("get_tree_id_from_tree_map"), tree_name.clone()).into())
-		}
-	}
 	pub fn deploy(&mut self, port_no: PortNo, manifest: &Manifest) -> Result<()> {
 		println!("Cell {}: got manifest {}", self.cell_id, manifest);
 		let deployment_tree_name = manifest.get_deployment_tree_name();
-		let deployment_tree_id = self.get_tree_id_from_tree_map(&deployment_tree_name)?;
+		let deployment_tree_id = match self.tree_name_map.get(deployment_tree_name).cloned() {
+			Some(id) => id,
+			None => return Err(ErrorKind::TreeMap(self.cell_id.clone(), S("get_tree_id_from_tree_map"), deployment_tree_name.clone()).into())
+		};
 		println!("Deploy on tree {}", deployment_tree_id);
 		let up_tree_name = manifest.get_id();
 		let mut up_tree_id = self.my_tree_id.add_component(up_tree_name)?;
@@ -423,13 +419,6 @@ impl CellAgent {
 		});
 		Ok(())
 	}
-	fn get_tree_id_from_index(&self, index: &TableIndex) -> Result<TreeID> {
-		let locked = self.trees.lock().unwrap();
-		match locked.get(index).cloned() {
-			Some(t) => Ok(t),
-			None => Err(ErrorKind::TreeIndex(self.cell_id.clone(), S("get_tree_id_from_index"), *index).into())
-		}
-	}
 	fn listen_loop(&mut self, ca_from_pe: CaFromPe) -> Result<()> {
 		loop {
 			//println!("CellAgent {}: waiting for status or packet", ca.cell_id);
@@ -439,7 +428,10 @@ impl CellAgent {
 					port::PortStatus::Disconnected => self.port_disconnected(port_no)?
 				},
 				PeToCaPacket::Packet(port_no, index, packet) => {
-					let tree_id = self.get_tree_id_from_index(&index)?;
+					let tree_id = match self.trees.lock().unwrap().get(&index).cloned() {
+						Some(t) => t,
+						None => return Err(ErrorKind::TreeIndex(self.cell_id.clone(), S("get_tree_id_from_index"), index).into())
+					};
 					let msg_id = packet.get_header().get_msg_id();
 					let mut packet_assembler = self.packet_assemblers.remove(&msg_id).unwrap_or(PacketAssembler::new(msg_id));
 					// I hope I can remove the tree UUID from the packet header to save bits
