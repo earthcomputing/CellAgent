@@ -3,7 +3,7 @@ use std::marker::Sized;
 use uuid::Uuid;
 
 use config::{SEPARATOR, CellNo};
-use utility::{PortNumber};
+use utility::{PortNumber, S};
 
 // Using String means names are not Copy
 type NameType = String;
@@ -16,13 +16,13 @@ pub trait Name: Sized {
 	fn from_str(&self, s: &str) -> Result<Self> {
 		// Names may not contain blanks
 		match s.find(' ') {
-			Some(_) => Err(ErrorKind::Format(s.to_string(), "from_str".to_string()).into()), 
+			Some(_) => Err(ErrorKind::Format(s.to_string(), S("from_str")).into()), 
 			None => Ok(self.create_from_string(s.to_string()))
 		}
 	}
 	fn add_component(&self, s: &str) -> Result<Self> {	
 		match s.find(' ') {
-			Some(_) => Err(ErrorKind::Format(s.to_string(), "add_component".to_string()).into()),
+			Some(_) => Err(ErrorKind::Format(s.to_string(), S("add_component")).into()),
 			None => self.from_str(&([self.get_name(),s].join(SEPARATOR)))
 		}
 	}		
