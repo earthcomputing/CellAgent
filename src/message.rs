@@ -137,9 +137,9 @@ pub trait Message: fmt::Display {
 	fn get_payload(&self) -> &MsgPayload;
 	fn get_payload_discover(&self) -> Result<&DiscoverPayload> { Err(ErrorKind::Payload(S("get_payload_discover")).into()) }
 	fn get_payload_discoverd(&self) -> Result<&DiscoverDPayload> { Err(ErrorKind::Payload(S("get_payload_discoverd")).into()) }
-	fn get_payload_stack_tree(&self) -> Result<&StackTreeMsgPayload> { Err(ErrorKind::Payload(S("get_s_discover")).into()) }
-	fn get_payload_manifest(&self) -> Result<&ManifestMsgPayload> { Err(ErrorKind::Payload(S("get_manifest_discover")).into()) }
-	fn get_payload_tree_names(&self) -> Result<&TreeNameMsgPayload> { Err(ErrorKind::Payload(S("get_tree_name_discover")).into()) }
+	fn get_payload_stack_tree(&self) -> Result<&StackTreeMsgPayload> { Err(ErrorKind::Payload(S("get_payload_stack_tree")).into()) }
+	fn get_payload_manifest(&self) -> Result<&ManifestMsgPayload> { Err(ErrorKind::Payload(S("get_payload_manifest")).into()) }
+	fn get_payload_tree_names(&self) -> Result<&TreeNameMsgPayload> { Err(ErrorKind::Payload(S("get_payload_tree_names")).into()) }
 }
 pub trait MsgPayload {
 	fn get_gvm_eqn(&self) -> Option<&GvmEquation>;

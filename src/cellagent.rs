@@ -518,9 +518,9 @@ impl CellAgent {
 			let port_number = PortNumber::new(port_no, self.no_ports)?;
 			self.update_traph(&new_tree_id, port_number, traph::PortStatus::Parent, 
 				Some(&gvm_eqn), &mut HashSet::new(), TableIndex(0), PathLength(CellNo(1)), None)?;
-			let allowed_trees = vec![AllowedTree::new("Control"), AllowedTree::new("Base")];
-			self.tree_name_map.insert(S("Control"), self.control_tree_id.clone());
-			self.tree_name_map.insert(S("Base"), self.my_tree_id.clone());
+			let allowed_trees = vec![AllowedTree::new(CONTROL_TREE_NAME), AllowedTree::new(BASE_TREE_NAME)];
+			self.tree_name_map.insert(S(CONTROL_TREE_NAME), self.control_tree_id.clone());
+			self.tree_name_map.insert(S(BASE_TREE_NAME), self.my_tree_id.clone());
 			let port_no_mask = Mask::new(port_number);
 			let tree_name_msg = TreeNameMsg::new(&new_tree_id, &allowed_trees);
 			//println!("Cell {}: Sending on ports {}: {}", self.cell_id, port_no_mask, tree_name_msg);
