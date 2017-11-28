@@ -13,7 +13,7 @@ pub struct Link {
 	is_connected: bool,		      //     Left Port        Link        Right Port
 }
 impl Link {
-	pub fn new(left_id: &PortID, rite_id: &PortID) -> Result<Link> {
+	pub fn new(left_id: &PortID, rite_id: &PortID) -> Result<Link, Error> {
 		let id = LinkID::new(left_id, rite_id)?;
 		::utility::append2file(serde_json::to_string(&id)?)?;
 		Ok(Link { id: id, is_broken: false, is_connected: true })
@@ -22,13 +22,13 @@ impl Link {
 	pub fn start_threads(&self, 
 			link_to_left: LinkToPort, link_from_left: LinkFromPort,
 			link_to_rite: LinkToPort, link_from_rite: LinkFromPort ) 
-				-> Result<Vec<JoinHandle<()>>> {
+				-> Result<Vec<JoinHandle<()>>, Error> {
 		let left_handle = self.listen(link_to_left.clone(), link_from_left, link_to_rite.clone())?;
 		let rite_handle = self.listen(link_to_rite, link_from_rite, link_to_left)?;
 		Ok(vec![left_handle, rite_handle])
 	}
 	fn listen(&self, status: LinkToPort, link_from: LinkFromPort, link_to: LinkToPort) 
-			-> Result<JoinHandle<()>> {
+			-> Result<JoinHandle<()>, Error> {
 		status.send(LinkToPortPacket::Status(PortStatus::Connected))?;
 		let join_handle = ::std::thread::spawn( move || {
 		loop {
@@ -60,6 +60,8 @@ impl fmt::Display for Link {
 	}
 }
 // Errors
+use failure::{Error, Fail};
+/*
 error_chain! {
 	foreign_links {
 		//Recv(::std::sync::mpsc::RecvError);
@@ -73,3 +75,4 @@ error_chain! {
 	errors {
 	}
 }
+*/

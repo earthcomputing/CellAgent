@@ -12,8 +12,9 @@ pub struct Blueprint {
 }
 impl Blueprint {
 	pub fn new(ncells: CellNo, ports_per_cell: PortNo, edges: Vec<Edge>,
-			exceptions: HashMap<CellNo, PortNo>, border_cell_map: HashMap<CellNo, Vec<PortNo>>) -> Result<Blueprint> {
-		if border_cell_map.len() > *ncells { return Err(ErrorKind::CellCount(ncells, border_cell_map.len()).into()) }
+			exceptions: HashMap<CellNo, PortNo>, border_cell_map: HashMap<CellNo, Vec<PortNo>>) ->
+             Result<Blueprint, BlueprintError> {
+		if border_cell_map.len() > *ncells { return Err(BlueprintError::CellCount{ func_name: "new", ncells: *ncells, num_border: border_cell_map.len() }) };
 		let mut interior_cells = Vec::new();
 		let mut border_cells = 	Vec::new();
 		for no in 0..*ncells {
@@ -92,6 +93,14 @@ impl fmt::Display for InteriorCell {
 		write!(f, "{}", s)
 	}	
 }
+// Errors
+use failure::{Error, Fail};
+#[derive(Debug, Fail)]
+pub enum BlueprintError {
+    #[fail(display = "Blueprint {}: Invalid blueprint has more border cells {} than total cells {}", func_name, ncells, num_border)]
+    CellCount { func_name: &'static str, ncells: usize, num_border: usize}
+}
+/*
 error_chain! {
 	errors {
 		CellCount(total: CellNo, border_count: usize) {
@@ -99,3 +108,4 @@ error_chain! {
 		}
 	}
 }
+*/

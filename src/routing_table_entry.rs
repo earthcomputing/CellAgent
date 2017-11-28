@@ -2,6 +2,8 @@ use std::fmt;
 use std::collections::HashSet;
 use uuid::Uuid;
 
+use failure::Error;
+
 use config::{MAX_PORTS, PortNo, TableIndex};
 use name::{Name, TreeID};
 use utility::{Mask, PortNumber};
@@ -23,7 +25,7 @@ impl RoutingTableEntry {
 		RoutingTableEntry { index: index, uuid: tree_id.get_uuid(), parent: parent.get_port_no(),
 			may_send: may_send, inuse: inuse, mask: mask, other_indices: other_indices }
 	}
-	pub fn default(index: TableIndex) -> Result<RoutingTableEntry> {
+	pub fn default(index: TableIndex) -> Result<RoutingTableEntry, Error> {
 		let port_number = PortNumber::new(PortNo{v:0}, MAX_PORTS)?;
 		let tree_id = TreeID::new("default")?;
 		Ok(RoutingTableEntry::new(index, &tree_id, false, port_number, Mask::empty(), false, [TableIndex(0); MAX_PORTS.v as usize]))
@@ -90,6 +92,7 @@ impl fmt::Display for RoutingTableEntry {
 	}
 }
 // Errors
+/*
 error_chain! {
 	links { 
 		Name(::name::Error, ::name::ErrorKind);
@@ -98,3 +101,4 @@ error_chain! {
 	errors { 
 	}
 }
+*/

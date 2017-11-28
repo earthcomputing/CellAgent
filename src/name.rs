@@ -13,16 +13,16 @@ pub trait Name: Sized {
 	fn create_from_string(&self, n: String) -> Self;
 	// Default implementations
 	fn stringify(&self) -> String { self.get_name().to_string() }
-	fn from_str(&self, s: &str) -> Result<Self> {
+	fn from_str(&self, s: &str) -> Result<Self, NameError> {
 		// Names may not contain blanks
 		match s.find(' ') {
-			Some(_) => Err(ErrorKind::Format(s.to_string(), S("from_str")).into()), 
+			Some(_) => Err(NameError::Format { name: s.to_string(), func_name: "from_str" }),
 			None => Ok(self.create_from_string(s.to_string()))
 		}
 	}
-	fn add_component(&self, s: &str) -> Result<Self> {	
+	fn add_component(&self, s: &str) -> Result<Self, NameError> {
 		match s.find(' ') {
-			Some(_) => Err(ErrorKind::Format(s.to_string(), S("add_component")).into()),
+			Some(_) => Err(NameError::Format{ name: s.to_string(), func_name: "add_component" }),
 			None => self.from_str(&([self.get_name(),s].join(SEPARATOR)))
 		}
 	}		
@@ -30,7 +30,7 @@ pub trait Name: Sized {
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct CellID { name: NameType, uuid: Uuid }
 impl CellID {
-	pub fn new(CellNo(n): CellNo) -> Result<CellID> { 
+	pub fn new(CellNo(n): CellNo) -> Result<CellID, NameError> {
 		let name = format!("C:{}",n);
 		Ok(CellID { name: name, uuid: Uuid::new_v4() })
 	}
@@ -44,7 +44,7 @@ impl fmt::Display for CellID { fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Res
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct PortID { name: NameType, uuid: Uuid }
 impl PortID {
-	pub fn new(cell_id: &CellID, port_number: PortNumber) -> Result<PortID> { 
+	pub fn new(cell_id: &CellID, port_number: PortNumber) -> Result<PortID, NameError> {
 		let name = [cell_id.get_name(), &format!("P:{}",port_number)].join(SEPARATOR); 
 		Ok(PortID { name: name, uuid: Uuid::new_v4() })
 	}
@@ -58,15 +58,15 @@ impl fmt::Display for PortID { fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Res
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct TreeID { name: NameType, uuid: Uuid}
 impl<'a> TreeID {
-	pub fn new(n: &str) -> Result<TreeID> { 
+	pub fn new(n: &str) -> Result<TreeID, NameError> {
 		let str = n.to_string();
 		let tree_uuid = Uuid::new_v4();
 		match n.find(' ') {
 			None => Ok(TreeID { name: str, uuid: tree_uuid }),
-			Some(_) => Err(ErrorKind::Format(str, "TreeID::new".to_string()).into())
+			Some(_) => Err(NameError::Format { name: str, func_name: "TreeID::new" })
 		}
 	}
-	pub fn append2file(&self) -> Result<()> {
+	pub fn append2file(&self) -> Result<(), Error> {
 		let json = ::serde_json::to_string(&self)?;
 		::utility::append2file(json)?;
 		Ok(())
@@ -81,11 +81,11 @@ impl fmt::Display for TreeID { fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Res
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct UptreeID { name: NameType, uuid: Uuid}
 impl<'a> UptreeID {
-	pub fn new(n: &str) -> Result<UptreeID> { 
+	pub fn new(n: &str) -> Result<UptreeID, NameError> {
 		let str = n.to_string();
 		match n.find(' ') {
 			None => Ok(UptreeID { name: str, uuid: Uuid::new_v4() }),
-			Some(_) => Err(ErrorKind::Format(str, "UptreeID::new".to_string()).into())
+			Some(_) => Err(NameError::Format{ name: str, func_name: "UptreeID::new" })
 		}
 	}
 }
@@ -98,11 +98,11 @@ impl fmt::Display for UptreeID { fn fmt(&self, f: &mut fmt::Formatter) -> fmt::R
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct TenantID { name: NameType, uuid: Uuid }
 impl TenantID {
-	pub fn new(n: &str) -> Result<TenantID> { 
+	pub fn new(n: &str) -> Result<TenantID, NameError> {
 		let str = n.to_string();
 		match n.find(' ') {
 			None => Ok(TenantID { name: str, uuid: Uuid::new_v4() }),
-			Some(_) => Err(ErrorKind::Format(str, "TenantID::new".to_string()).into())
+			Some(_) => Err(NameError::Format { name: str, func_name: "TenantID::new" })
 		}
 	}
 }
@@ -115,7 +115,7 @@ impl fmt::Display for TenantID { fn fmt(&self, f: &mut fmt::Formatter) -> fmt::R
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize)]
 pub struct LinkID { name: NameType, uuid: Uuid}
 impl LinkID {
-	pub fn new(left_id: &PortID, rite_id: &PortID) -> Result<LinkID> { 
+	pub fn new(left_id: &PortID, rite_id: &PortID) -> Result<LinkID, NameError> {
 		let name = [left_id.get_name(),rite_id.get_name()].join(SEPARATOR);
 		Ok(LinkID { name: name, uuid: Uuid::new_v4() })
 	}
@@ -129,7 +129,7 @@ impl fmt::Display for LinkID { fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Res
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct VmID { name: NameType, uuid: Uuid}
 impl VmID {
-	pub fn new(cell_id: &CellID, name: &String) -> Result<VmID> { 
+	pub fn new(cell_id: &CellID, name: &String) -> Result<VmID, NameError> {
 		let name = format!("VM:{}+{}", cell_id, name);
 		Ok(VmID { name: name, uuid: Uuid::new_v4() })
 	}
@@ -143,11 +143,11 @@ impl fmt::Display for VmID { fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Resul
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct ContainerID { name: NameType, uuid: Uuid}
 impl ContainerID {
-	pub fn new(n: &str) -> Result<ContainerID> { 
+	pub fn new(n: &str) -> Result<ContainerID, NameError> {
 		let str = n.to_string();
 		match n.find(' ') {
 			None => Ok(ContainerID { name: str, uuid: Uuid::new_v4() }),
-			Some(_) => Err(ErrorKind::Format(str, "ContainerID::new".to_string()).into())
+			Some(_) => Err(NameError::Format { name: str, func_name: "ContainerID::new" })
 		}
 	}
 }
@@ -158,6 +158,13 @@ impl Name for ContainerID {
 }
 impl fmt::Display for ContainerID { fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result { self.name.fmt(f) } }
 // Errors
+use failure::{Error, Fail};
+#[derive(Debug, Fail)]
+pub enum NameError {
+	#[fail(display = "Name {}: '{}' contains blanks.", func_name, name)]
+	Format { func_name: &'static str, name: String }
+}
+/*
 error_chain! {
 	foreign_links {
 		Serialize(::serde_json::Error);
@@ -171,3 +178,4 @@ error_chain! {
 		}
 	}
 }
+*/
