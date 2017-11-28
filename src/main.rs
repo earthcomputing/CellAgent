@@ -135,7 +135,6 @@ fn deployment_demo() -> Result<(), Error> {
 	Ok(())
 }
 // Errors
-
 use failure::{Error, Fail};
 /*
 error_chain! {
