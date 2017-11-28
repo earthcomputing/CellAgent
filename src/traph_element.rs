@@ -1,5 +1,7 @@
 use std::fmt;
 
+use failure::Error;
+
 use config::{CellNo, PathLength, PortNo, TableIndex};
 use traph::{PortStatus};
 use utility::{Path, PortNumber};

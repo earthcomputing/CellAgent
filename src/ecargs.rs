@@ -1,4 +1,5 @@
 use std::fmt;
+
 use config::{MAX_PORTS, CellNo, LinkNo, PortNo};
 
 #[derive(Debug)]
@@ -8,11 +9,11 @@ pub struct ECArgs {
 	nlinks: LinkNo,
 }
 impl ECArgs {
-	pub fn new(ncells: CellNo, nports: PortNo, nlinks: CellNo) -> Result<ECArgs> {
+	pub fn new(ncells: CellNo, nports: PortNo, nlinks: CellNo) -> Result<ECArgs, Error> {
 		if *nports < (*MAX_PORTS - 1) {
 			Ok(ECArgs { nports: nports as PortNo, ncells: ncells, nlinks: LinkNo(CellNo(*nlinks)) })
 		} else {
-			Err(ErrorKind::NumberPorts(nports, "new".to_string()).into())
+			Err(EcargsError::NumberPorts { nports: nports, func_name: "new", max: MAX_PORTS }.into())
 		}	
 	}
 //	pub fn get_nports(&self) -> u8 { return self.nports }
@@ -58,6 +59,13 @@ impl fmt::Display for ECArgs {
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result { write!(f, "{}", self.to_string()) }
 }
 // Errors
+use failure::{Error, Fail};
+#[derive(Debug, Fail)]
+pub enum EcargsError {
+    #[fail(display = "Ecargs{}:  You asked for {:?} ports, but only {:?} are allowed", func_name, nports, max)]
+    NumberPorts { func_name: &'static str, nports: PortNo, max: PortNo}
+}
+/*
 error_chain! {
 	errors { 
 		NumberPorts(n: PortNo, func_name: String) {
@@ -65,3 +73,4 @@ error_chain! {
 		}
 	}
 }
+*/
