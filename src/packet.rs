@@ -4,6 +4,7 @@ use std::collections::HashMap;
 use std::sync::atomic::{ATOMIC_USIZE_INIT, AtomicUsize, Ordering};
 use std::str;
 
+use failure::Error;
 use rand;
 use serde;
 use serde_json;
@@ -138,7 +139,7 @@ impl fmt::Debug for Payload {
 }
 pub struct Serializer {}
 impl Serializer {
-	pub fn serialize<M>(msg: &M) -> Result<Box<Vec<u8>>>
+	pub fn serialize<M>(msg: &M) -> Result<Box<Vec<u8>>, Error>
 			where M: Message + serde::Serialize {		
 		let msg_type = msg.get_header().get_msg_type();
 		let serialized_msg = serde_json::to_string(&msg)?;
@@ -151,7 +152,7 @@ impl Serializer {
 pub struct Packetizer {}
 impl Packetizer {
 	pub fn packetize(tree_id: &TreeID, msg_bytes: &Box<Vec<u8>>, direction: MsgDirection) 
-			-> Result<Vec<Packet>> {
+			-> Result<Vec<Packet>, Error> {
 		let payload_size = Packetizer::packet_payload_size(msg_bytes.len());
 		let num_packets = (msg_bytes.len() + payload_size - 1)/ payload_size; // Poor man's ceiling
 		let last_packet_size = msg_bytes.len() - (num_packets-1)*payload_size;
@@ -177,7 +178,7 @@ impl Packetizer {
 		}
 		Ok(packets)
 	}
-	pub fn unpacketize(packets: &Vec<Packet>) -> Result<String> {
+	pub fn unpacketize(packets: &Vec<Packet>) -> Result<String, Error> {
 		let mut all_bytes = Vec::new();
 		for packet in packets {
 			let header = packet.get_header();
@@ -230,6 +231,7 @@ impl PacketAssembler {
 	}
 }
 // Errors
+/*
 error_chain! {
 	foreign_links {
 		Deserialize(::serde_json::Error);
@@ -238,3 +240,4 @@ error_chain! {
 	errors { 
 	}
 }
+*/

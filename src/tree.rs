@@ -57,7 +57,9 @@ impl fmt::Display for Tree {
 		write!(f, "{}", s)
 	}	
 }
+/*
 error_chain! {
 	errors {
 	}
 }
+*/

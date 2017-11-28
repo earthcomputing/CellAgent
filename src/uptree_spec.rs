@@ -17,7 +17,7 @@ pub struct Manifest {
 }
 impl Manifest {
 	pub fn new(id: &str, cell_config: CellConfig, deployment_tree: &str, allowed_refs: Vec<&AllowedTree>,
-			vm_refs: Vec<&VmSpec>, tree_refs: Vec<&UpTreeSpec>, gvm_eqn: &GvmEquation) -> Result<Manifest> {
+			vm_refs: Vec<&VmSpec>, tree_refs: Vec<&UpTreeSpec>, gvm_eqn: &GvmEquation) -> Result<Manifest, Error> {
 		let mut trees = Vec::new();
 		for t in tree_refs { trees.push(t.clone()); }
 		let mut allowed_trees = Vec::new();
@@ -26,8 +26,8 @@ impl Manifest {
 		for v in vm_refs {
 			vms.push(v.clone());
 			let allowed = v.get_allowed_trees();
-			for a in allowed { 
-				if !allowed_trees.contains(a) { return Err(ErrorKind::Allowed(v.get_id(), S(a)).into()); } 
+			for tree in allowed {
+				if !allowed_trees.contains(tree) { return Err(UptreeSpecError::Allowed { func_name: "new", vm_id: v.get_id(), tree: tree.clone() }.into()); }
 			}
 		}
 		Ok(Manifest { id: S(id), cell_config: cell_config, deployment_tree: S(deployment_tree), 
@@ -61,7 +61,7 @@ pub struct VmSpec {
 }
 impl VmSpec {
 	pub fn new(id: &str, image: &str, config: CellConfig, allowed_refs: Vec<&AllowedTree>,
-			container_refs: Vec<&ContainerSpec>, tree_refs: Vec<&UpTreeSpec>) -> Result<VmSpec> {
+			container_refs: Vec<&ContainerSpec>, tree_refs: Vec<&UpTreeSpec>) -> Result<VmSpec, Error> {
 		let mut max_tree_size = 0;
 		let mut allowed_trees = Vec::new();
 		for a in allowed_refs { allowed_trees.push(a.clone()); }
@@ -70,13 +70,13 @@ impl VmSpec {
 			trees.push(t.clone());
 			if t.get_tree_size() > max_tree_size { max_tree_size = t.get_tree_size() }; 
 		}
-		if max_tree_size > container_refs.len() { return Err(ErrorKind::Containers(S(id), container_refs.len()).into()); }
+		if max_tree_size > container_refs.len() { return Err(UptreeSpecError::Containers { func_name: "VmSpec::new", n_containers: container_refs.len() }.into()); }
 		let mut containers = Vec::new();
 		for c in container_refs {
 			containers.push(c.clone());
 			let allowed = c.get_allowed_trees();
-			for a in allowed { 
-				if !allowed_trees.contains(&a) { return Err(ErrorKind::Allowed(c.get_id(), S(a)).into()); } 
+			for tree in allowed {
+				if !allowed_trees.contains(&tree) { return Err(UptreeSpecError::Allowed { func_name: "VmSpec::new", vm_id: c.get_id(), tree: tree.clone() }.into()); }
 			}			
 		}
 		Ok(VmSpec { id: S(id), image: S(image), required_config: config,
@@ -104,7 +104,7 @@ pub struct ContainerSpec {
 	allowed_trees: Vec<AllowedTree>
 }
 impl ContainerSpec {
-	pub fn new(id: &str, image: &str, param_refs: Vec<&str>, allowed_refs: Vec<&AllowedTree>) -> Result<ContainerSpec> {
+	pub fn new(id: &str, image: &str, param_refs: Vec<&str>, allowed_refs: Vec<&AllowedTree>) -> Result<ContainerSpec, Error> {
 		let mut params = Vec::new();
 		for p in param_refs { params.push(S(p)); } 
 		let mut allowed_trees = Vec::new();
@@ -130,29 +130,28 @@ pub struct UpTreeSpec {
 	parent_list: Vec<usize>,
 }
 impl UpTreeSpec {
-	pub fn new(id: &str, parent_list: Vec<usize>) -> Result<UpTreeSpec> {
+	pub fn new(id: &str, parent_list: Vec<usize>) -> Result<UpTreeSpec, Error> {
 		// Validate parent_list
 		if parent_list.len() > 1 {
 			let mut count = 0;
 			let mut root = 0;
 			for i in 0..parent_list.len() { if i == parent_list[i] { root = i; count = count + 1; } }
-			if count != 1 { return Err(ErrorKind::Tree(S(id), parent_list, S("More than one root")).into()); }
+			if count != 1 { return Err(UptreeSpecError::Tree { func_name: "UptreeSpec::new", id: S(id), parent_list: parent_list, reason: "More than one root" }.into()); }
 			for p in parent_list.clone() {
 				let mut reached_root = true;
 				let mut r = p;
 				let mut visited = HashSet::new();
 				while r != root {
-					if visited.contains(&r) { return Err(ErrorKind::Tree(S(id), parent_list, S("Cycle")).into()); }
+					if visited.contains(&r) { return Err(UptreeSpecError::Tree { func_name: "UptreeSpec::new", id: S(id), parent_list: parent_list, reason: "Cycle" }.into()); }
 					visited.insert(r);
 					match parent_list.clone().get(r) {
 						Some(p) => {
 							r = *p;
 							if r == root { reached_root = true; } else { reached_root = false; }
 						},
-						None => return Err(ErrorKind::Tree(S(id), parent_list, S("Index out of range")).into())
+						None => return Err(UptreeSpecError::Tree{ func_name: "UptreeSpec::new", id: S(id), parent_list: parent_list, reason: "Index out of range" }.into())
 					}
 				}
-				if !reached_root { return Err(ErrorKind::Tree(S(id), parent_list, S("No path to root")).into()); }
 			}
 		}
 		Ok(UpTreeSpec { id: S(id), parent_list: parent_list })
@@ -181,6 +180,17 @@ impl fmt::Display for AllowedTree {
 		write!(f, "{}", s)
 	}
 }
+use failure::{Error, Fail};
+#[derive(Debug, Fail)]
+pub enum UptreeSpecError {
+	#[fail(display = "UpTreeSpec {}: tree {} is not in the allowed set for vm {}", func_name, tree, vm_id)]
+	Allowed { func_name: &'static str, vm_id: String, tree: AllowedTree },
+    #[fail(display = "UpTreeSpec {}: {} containers isn't enough for the specified trees", func_name, n_containers)]
+    Containers { func_name: &'static str, n_containers: usize },
+    #[fail(display = "UpTreeSpec {}: {} for parent list {:?} because {}", func_name, id, parent_list, reason)]
+    Tree { func_name: &'static str, id: String, parent_list: Vec<usize>, reason: &'static str }
+}
+/*
 error_chain! {
 	errors {
 		Allowed(id: String, tree: String) {
@@ -194,3 +204,4 @@ error_chain! {
 		}
 	}
 }
+*/

@@ -1,6 +1,8 @@
 use std::fmt;
 use std::collections::HashMap;
 
+use failure::Error;
+
 use message_types::{ContainerToVm, ContainerFromVm};
 use name::{ContainerID, TreeID, UptreeID};
 
@@ -14,7 +16,7 @@ impl Container {
 		Container { id: id, service: service }
 	}
 	pub fn initialize(&self, up_tree_id: &UptreeID, tree_ids: &HashMap<&str, TreeID>,
-			container_to_vm: ContainerToVm, container_from_vm: ContainerFromVm) -> Result<()> {
+			container_to_vm: ContainerToVm, container_from_vm: ContainerFromVm) -> Result<(), Error> {
 		match self.service {
 			Service::NocMaster => {
 				let master = NocMaster::new(&self.id);
@@ -57,11 +59,11 @@ impl NocMaster {
 //	fn get_container_id(&self) -> &ContainerID { &self.container_id }
 //	fn get_service(&self) -> Service { self.service }
 	fn initialize(&self, up_tree_id: &UptreeID, tree_ids: &HashMap<&str, TreeID>,
-			container_to_vm: ContainerToVm, container_from_vm: ContainerFromVm) -> Result<()> {
+			container_to_vm: ContainerToVm, container_from_vm: ContainerFromVm) -> Result<(), Error> {
 		let f = "initialize";
 		self.listen_vm(container_from_vm)
 	}
-	fn listen_vm(&self, container_from_vm: ContainerFromVm) -> Result<()> {
+	fn listen_vm(&self, container_from_vm: ContainerFromVm) -> Result<(), Error> {
 		let f = "listen_vm";
 		let master = self.clone();
 		loop {
@@ -69,17 +71,6 @@ impl NocMaster {
 			println!("Container {}: got msg {}", master.container_id, msg);
 		}
 	}
-//	fn write_err(&self, e: Error) {
-//		use ::std::io::Write;
-//		let stderr = &mut ::std::io::stderr();
-//		let _ = writeln!(stderr, "Container {} error: {}", self.container_id, e);
-//		for e in e.iter().skip(1) {
-//			let _ = writeln!(stderr, "Caused by: {}", e);
-//		}
-//		if let Some(backtrace) = e.backtrace() {
-//			let _ = writeln!(stderr, "Backtrace: {:?}", backtrace);
-//		}
-//	}
 }
 #[derive(Debug, Clone, Hash, Serialize, Deserialize, PartialEq, Eq)]
 struct NocAgent {
@@ -88,11 +79,12 @@ struct NocAgent {
 impl NocAgent {
 	fn new(container_id: &ContainerID) -> NocAgent { NocAgent { container_id: container_id.clone() } }
 	fn initialize(&self, up_tree_id: &UptreeID, tree_ids: &HashMap<&str, TreeID>,
-			container_to_vm: ContainerToVm, container_from_vm: ContainerFromVm) -> Result<()> {
+			container_to_vm: ContainerToVm, container_from_vm: ContainerFromVm) -> Result<(), Error> {
 		Ok(())
 	}
 }
 // Errors
+/*
 error_chain! {
 	foreign_links {
 		Recv(::std::sync::mpsc::RecvError);
@@ -100,3 +92,4 @@ error_chain! {
 	errors { 
 	}
 }
+*/

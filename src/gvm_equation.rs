@@ -3,6 +3,8 @@ use serde_json;
 use std::collections::{HashSet};
 use eval::{Expr, to_value};
 
+use failure::Error;
+
 use config::{CellNo, PathLength};
 use utility::S;
 
@@ -39,19 +41,19 @@ impl GvmEquation {
 			save_eqn: save, xtnd_eqn: xtnd, variables: variables }
 	}
 	pub fn get_variables(&self) -> &Vec<GvmVariable> { &self.variables }
-	pub fn eval_recv(&self, params: &Vec<GvmVariable>) -> Result<bool> {
+	pub fn eval_recv(&self, params: &Vec<GvmVariable>) -> Result<bool, Error> {
 		self.evaluate(&self.recv_eqn, params)
 	}
-	pub fn eval_send(&self, params: &Vec<GvmVariable>) -> Result<bool> {
+	pub fn eval_send(&self, params: &Vec<GvmVariable>) -> Result<bool, Error> {
 		self.evaluate(&self.send_eqn, params)
 	}
-	pub fn eval_save(&self, params: &Vec<GvmVariable>) -> Result<bool> {
+	pub fn eval_save(&self, params: &Vec<GvmVariable>) -> Result<bool, Error> {
 		self.evaluate(&self.save_eqn, params)
 	}
-	pub fn eval_xtnd(&self, params: &Vec<GvmVariable>) -> Result<bool> {
+	pub fn eval_xtnd(&self, params: &Vec<GvmVariable>) -> Result<bool, Error> {
 		self.evaluate(&self.xtnd_eqn, params)
 	}
-	fn evaluate(&self, eqn: &GvmEqnType, params: &Vec<GvmVariable>) -> Result<bool> {
+	fn evaluate(&self, eqn: &GvmEqnType, params: &Vec<GvmVariable>) -> Result<bool, Error> {
 		let mut expr = Expr::new(eqn.clone());
 		for variable in params.iter() {
 			let var_type = variable.get_type();
@@ -111,6 +113,8 @@ impl fmt::Display for GvmVariable {
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result { 
 		write!(f, "{}:{}", self.value, self.var_type) }
 }
+// Errors
+/*
 error_chain! {
 	foreign_links {
 		Eval(::eval::Error);
@@ -119,3 +123,4 @@ error_chain! {
 	errors {
 	}
 }
+*/

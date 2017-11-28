@@ -38,8 +38,8 @@ pub struct NalCell {
 }
 
 impl NalCell {
-	pub fn new(cell_no: CellNo, nports: PortNo, cell_type: CellType, config: CellConfig) -> Result<NalCell> {
-		if nports.v > MAX_PORTS.v { return Err(ErrorKind::NumberPorts(nports, "new".to_string()).into()) }
+	pub fn new(cell_no: CellNo, nports: PortNo, cell_type: CellType, config: CellConfig) -> Result<NalCell, Error> {
+		if nports.v > MAX_PORTS.v { return Err(NalcellError::NumberPorts { nports: nports, func_name: "new", max_ports: MAX_PORTS }.into()) }
 		let cell_id = CellID::new(cell_no)?;
 		let (ca_to_pe, pe_from_ca): (CaToPe, PeFromCa) = channel();
 		let (pe_to_ca, ca_from_pe): (PeToCa, CaFromPe) = channel();
@@ -84,14 +84,14 @@ impl NalCell {
 			CellType::Interior => false,
 		}  
 	}
-	pub fn get_free_ec_port_mut(&mut self) -> Result<(&mut Port, PortFromPe)> {
+	pub fn get_free_ec_port_mut(&mut self) -> Result<(&mut Port, PortFromPe), NalcellError> {
 		self.get_free_port_mut(false)
 	}
-	pub fn get_free_boundary_port_mut(&mut self) -> Result<(&mut Port, PortFromPe)> {
+	pub fn get_free_boundary_port_mut(&mut self) -> Result<(&mut Port, PortFromPe), NalcellError> {
 		self.get_free_port_mut(true)
 	}
 	pub fn get_free_port_mut(&mut self, want_boundary_port: bool) 
-			-> Result<(&mut Port, PortFromPe)> {
+			-> Result<(&mut Port, PortFromPe), NalcellError> {
 		for port in &mut self.ports.iter_mut() {
 			//println!("NalCell {}: port {} is connected {}", self.id, p.get_port_no(), p.is_connected());
 			if !port.is_connected() && !(want_boundary_port ^ port.is_border()) && (port.get_port_no().v != 0 as u8) {
@@ -101,11 +101,11 @@ impl NalCell {
 						port.set_connected();
 						return Ok((port, recvr))
 					},
-					None => return Err(ErrorKind::Channel(port_no, "get_free_port_mut".to_string()).into())
+					None => return Err(NalcellError::Channel { port_no: port_no, func_name: "get_free_port_mut" })
 				} 
 			}
 		}
-		Err(ErrorKind::NoFreePorts(self.id.clone(), "get_free_port_mut".to_string()).into())
+		Err(NalcellError::NoFreePorts{ cell_id: self.id.clone(), func_name: "get_free_port_mut" })
 	}
 }
 impl fmt::Display for NalCell { 
@@ -121,6 +121,17 @@ impl fmt::Display for NalCell {
 		write!(f, "{}", s) }
 }
 // Errors
+use failure::{Error, Fail};
+#[derive(Debug, Fail)]
+pub enum NalcellError {
+    #[fail(display = "NalCell {}: No receiver for port {:?}", func_name, port_no)]
+    Channel { func_name: &'static str, port_no: PortNo },
+    #[fail(display = "NalCell {}: All ports have been assigned for cell {}", func_name, cell_id)]
+    NoFreePorts { func_name: &'static str, cell_id: CellID },
+    #[fail(display = "NalCell {}: You asked for {:?} ports, but only {:?} are allowed", func_name, nports, max_ports)]
+    NumberPorts { func_name: &'static str, nports: PortNo, max_ports: PortNo }
+}
+/*
 error_chain! {
 	links {
 		CellAgent(::cellagent::Error, ::cellagent::ErrorKind);
@@ -141,3 +152,4 @@ error_chain! {
 		}
 	}
 }
+*/

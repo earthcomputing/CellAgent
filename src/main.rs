@@ -3,6 +3,9 @@
 #[macro_use]
 extern crate error_chain;
 extern crate eval;
+extern crate failure;
+#[macro_use]
+extern crate failure_derive;
 extern crate rand; 
 extern crate serde;
 #[macro_use]
@@ -52,25 +55,18 @@ use message_types::{OutsideFromNoc, OutsideToNoc, NocFromOutside, NocToOutside};
 use nalcell::CellConfig;
 use noc::Noc;
 use uptree_spec::{AllowedTree, ContainerSpec, Manifest, UpTreeSpec, VmSpec};
+use utility::write_err;
 
 fn main() {
-	if let Err(ref e) = run() {
-		use ::std::io::Write;
-		let stderr = &mut ::std::io::stderr();
-		let _ = writeln!(stderr, "Error: {}", e);
-		for e in e.iter().skip(1) {
-			let _ = writeln!(stderr, "Caused by: {}", e);
-
-		}
-		if let Some(backtrace) = e.backtrace() {
-			let _ = writeln!(stderr, "Backtrace: {:?}", backtrace);
-		}
-		::std::process::exit(1);
+	if let Err(e) = run() {
+        write_err("main", e);
+         ::std::process::exit(1);
 	}
 	println!("\nMain exit");
 }
-
-fn run() -> Result<()> {
+fn is2e(i: usize, j: usize) -> Edge { Edge { v: (CellNo(i),CellNo(j)) } }
+use blueprint::BlueprintError;
+fn run() -> Result<(), Error> {
 	println!("Multicell Routing: Output to file {} (set in config.rs)", OUTPUT_FILE_NAME);
 /* Doesn't work when debugging in Eclipse
 	let args: Vec<String> = env::args().collect();
@@ -97,7 +93,6 @@ fn run() -> Result<()> {
 	let blueprint = Blueprint::new(ncells, nports, edges, exceptions, border)?;
 	println!("{}", blueprint);
 //	deployment_demo()?; 	// Demonstrate features of deployment spec
-//	return Ok(());
 	let (outside_to_noc, noc_from_outside): (OutsideToNoc, NocFromOutside) = channel();
 	let (noc_to_outside, outside_from_noc): (NocToOutside, OutsideFromNoc) = channel();
 	let noc = Noc::new(noc_to_outside)?;
@@ -112,8 +107,7 @@ fn run() -> Result<()> {
 		outside_to_noc.send(manifest)?;
 	}
 }
-fn is2e(i: usize, j: usize) -> Edge { Edge { v: (CellNo(i),CellNo(j)) } }
-fn deployment_demo() -> Result<()> {
+fn deployment_demo() -> Result<(), Error> {
 	let mut eqns = HashSet::new();
 	eqns.insert(GvmEqn::Recv("true"));
 	eqns.insert(GvmEqn::Send("true"));
@@ -141,6 +135,9 @@ fn deployment_demo() -> Result<()> {
 	Ok(())
 }
 // Errors
+
+use failure::{Error, Fail};
+/*
 error_chain! {
 	foreign_links {
 		Io(::std::io::Error);
@@ -153,3 +150,4 @@ error_chain! {
 		UpTree(::uptree_spec::Error, ::uptree_spec::ErrorKind);
 	}
 }
+*/

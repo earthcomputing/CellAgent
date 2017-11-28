@@ -9,7 +9,7 @@ use name::{CellID};
 use packet::{Packet};
 use routing_table::{RoutingTable};
 use routing_table_entry::{RoutingTableEntry};
-use utility::{Mask, PortNumber};
+use utility::{Mask, PortNumber, write_err};
 
 #[derive(Debug, Clone)]
 pub struct PacketEngine {
@@ -22,7 +22,7 @@ pub struct PacketEngine {
 
 impl PacketEngine {
 	pub fn new(cell_id: &CellID, packet_pe_to_ca: PeToCa, pe_to_ports: Vec<PeToPort>, 
-			boundary_port_nos: HashSet<PortNo>) -> Result<PacketEngine> {
+			boundary_port_nos: HashSet<PortNo>) -> Result<PacketEngine, Error> {
 		let routing_table = Arc::new(Mutex::new(RoutingTable::new(cell_id.clone())?)); 
 		Ok(PacketEngine { cell_id: cell_id.clone(), routing_table: routing_table, 
 			boundary_port_nos: boundary_port_nos, pe_to_ca: packet_pe_to_ca, pe_to_ports: pe_to_ports })
@@ -30,15 +30,15 @@ impl PacketEngine {
 	pub fn start_threads(&self, pe_from_ca: PeFromCa, pe_from_ports: PeFromPort) {			
 		let pe = self.clone();
 		::std::thread::spawn( move ||  {
-			let _ = pe.listen_ca(pe_from_ca).map_err(|e| pe.write_err(e));
+			let _ = pe.listen_ca(pe_from_ca).map_err(|e| write_err("packet_engine", e));
 		});
 		let pe = self.clone();
 		::std::thread::spawn( move || {
-			let _ = pe.listen_port(pe_from_ports).map_err(|e| pe.write_err(e));
+			let _ = pe.listen_port(pe_from_ports).map_err(|e| write_err("packet_engine", e));
 		});
 	}
 	//pub fn get_table(&self) -> &Arc<Mutex<RoutingTable>> { &self.routing_table }
-	fn listen_ca(&self, entry_pe_from_ca: PeFromCa) -> Result<()> {
+	fn listen_ca(&self, entry_pe_from_ca: PeFromCa) -> Result<(), Error> {
 		loop { 
 			match entry_pe_from_ca.recv()? {
 				CaToPePacket::Entry(e) => {
@@ -58,7 +58,7 @@ impl PacketEngine {
 			}; 
 		}
 	}
-	fn listen_port(&self, pe_from_ports: PeFromPort) -> Result<()> {
+	fn listen_port(&self, pe_from_ports: PeFromPort) -> Result<(), Error> {
 		loop {
 			//println!("PacketEngine {}: waiting for status or packet", pe.cell_id);
 			match pe_from_ports.recv()? {
@@ -67,7 +67,7 @@ impl PacketEngine {
 			};
 		}		
 	}
-	fn process_packet(&self, port_no: PortNo, my_index: TableIndex, packet: Packet) -> Result<()> {
+	fn process_packet(&self, port_no: PortNo, my_index: TableIndex, packet: Packet) -> Result<(), Error> {
 		//println!("PacketEngine {}: received on port {} my index {} {}", self.cell_id, port_no.v, *my_index, packet);
 		let entry =
 		{   
@@ -86,14 +86,13 @@ impl PacketEngine {
 				PortNumber::new(port_no, PortNo{v:other_indices.len() as u8})?; // Verify that port_no is valid
 				self.forward(port_no, entry, mask, packet)?;	
 			} else {
-				return Err(ErrorKind::Uuid(self.cell_id.clone(), "process_packet".to_string(), entry.get_index(), entry.get_uuid(),
-						packet.get_tree_uuid()).into());
+				return Err(PacketEngineError::Uuid { cell_id: self.cell_id.clone(), func_name: "process_packet", index: entry.get_index(), packet_uuid: packet.get_tree_uuid(), table_uuid: entry.get_uuid() }.into());
 			}
 		}
 		Ok(())	
 	}
 	fn forward(&self, recv_port_no: PortNo, entry: RoutingTableEntry, user_mask: Mask, packet: Packet) 
-			-> Result<()>{
+			-> Result<(), Error>{
 		let header = packet.get_header();
 		//println!("PacketEngine {}: forward packet {}, mask {}, entry {}", self.cell_id, packet.get_count(), mask, entry);
 		let other_indices = entry.get_other_indices();
@@ -112,7 +111,7 @@ impl PacketEngine {
 							self.pe_to_ca.send(PeToCaPacket::Packet(recv_port_no, entry.get_index(), packet))?;
 						}
 					} else {
-						return Err(ErrorKind::Sender(self.cell_id.clone(), "forward root".to_string(), parent).into());
+						return Err(PacketEngineError::Sender { cell_id: self.cell_id.clone(), func_name: "forward root", port_no: parent }.into());
 					}
 				}
 			} 
@@ -129,7 +128,7 @@ impl PacketEngine {
 					} else {
 						match self.pe_to_ports.get(port_no.v as usize) {
 							Some(s) => s.send((*other_index, packet))?,
-							None => return Err(ErrorKind::Sender(self.cell_id.clone(), "forward leaf".to_string(), *port_no).into())
+							None => return Err(PacketEngineError::Sender { cell_id: self.cell_id.clone(), func_name: "forward leaf", port_no: *port_no }.into())
 						};
 						//if is_stack_msg { println!("Packet Engine {} sent to port {} packet {}", self.cell_id, port_no.v, packet); }
 					}
@@ -137,18 +136,6 @@ impl PacketEngine {
 			}
 		}
 		Ok(())
-	}
-	fn write_err(&self, e: Error) -> Result<()>{
-		use ::std::io::Write;
-		let stderr = &mut ::std::io::stderr();
-		let _ = writeln!(stderr, "PacketEngine {}: {}", self.cell_id, e);
-		for e in e.iter().skip(1) {
-			let _ = writeln!(stderr, "Caused by: {}", e);
-		}
-		if let Some(backtrace) = e.backtrace() {
-			let _ = writeln!(stderr, "Backtrace: {:?}", backtrace);
-		}
-		Err(e)
 	}
 }
 impl fmt::Display for PacketEngine {
@@ -158,6 +145,15 @@ impl fmt::Display for PacketEngine {
 		write!(f, "{}", s) }	
 }
 // Errors
+use failure::{Error, Fail};
+#[derive(Debug, Fail)]
+pub enum PacketEngineError {
+	#[fail(display = "PacketEngine {}: No sender for port {:?} on cell {}", func_name, port_no, cell_id)]
+	Sender { func_name: &'static str, cell_id: CellID, port_no: PortNo },
+    #[fail(display = "PacketEngine {}: CellID {}: index {:?}, entry uuid {}, packet uuid {}", func_name, cell_id, index, table_uuid, packet_uuid)]
+    Uuid { func_name: &'static str, cell_id: CellID, index: TableIndex, table_uuid: Uuid, packet_uuid: Uuid }
+}
+/*
 error_chain! {
 	foreign_links {
 		PeToCa(::message_types::PeCaError);
@@ -179,3 +175,4 @@ error_chain! {
 		}
 	}
 }
+*/

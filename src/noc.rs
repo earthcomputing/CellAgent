@@ -14,7 +14,7 @@ use nalcell::CellConfig;
 use name::TreeID;
 use packet::{PacketAssembler, PacketAssemblers};
 use uptree_spec::{AllowedTree, ContainerSpec, Manifest, UpTreeSpec, VmSpec};
-use utility::S;
+use utility::{S, write_err};
 
 #[derive(Debug, Clone)]
 pub struct Noc {
@@ -26,13 +26,14 @@ pub struct Noc {
 	packet_assemblers: PacketAssemblers
 }
 impl Noc {
-	pub fn new(noc_to_outside: NocToOutside) -> Result<Noc> {
+	pub fn new(noc_to_outside: NocToOutside) -> Result<Noc, Error> {
 		let tree_id = TreeID::new("CellAgentTree")?;
 		Ok(Noc { tree_id: tree_id, allowed_trees: HashSet::new(), packet_assemblers: PacketAssemblers::new(),
 				 control_tree: AllowedTree::new(CONTROL_TREE_NAME), base_tree: AllowedTree::new(BASE_TREE_NAME),
 				 noc_to_outside: noc_to_outside })
 	}
-	pub fn initialize(&self, blueprint: &Blueprint, noc_from_outside: NocFromOutside) -> Result<Vec<JoinHandle<()>>> {
+	pub fn initialize(&self, blueprint: &Blueprint, noc_from_outside: NocFromOutside) ->
+            Result<Vec<JoinHandle<()>>, Error> {
 		let (noc_to_port, port_from_noc): (NocToPort, NocFromPort) = channel();
 		let (port_to_noc, noc_from_port): (PortToNoc, PortFromNoc) = channel();
 		let (mut dc, mut join_handles) = self.build_datacenter(blueprint)?;
@@ -40,13 +41,13 @@ impl Noc {
 		let mut noc = self.clone();
 		let noc_to_port_clone = noc_to_port.clone();
 		let join_outside = spawn( move || { 
-			let _ = noc.listen_outside(noc_from_outside, noc_to_port_clone).map_err(|e| noc.write_err("outside", e));
+			let _ = noc.listen_outside(noc_from_outside, noc_to_port_clone).map_err(|e| write_err("outside", e));
 		});
 		join_handles.push(join_outside);
 		let mut noc = self.clone();
 		let noc_to_port_clone = noc_to_port.clone();
 		let join_port = spawn( move || {
-			let _ = noc.listen_port(noc_to_port_clone, noc_from_port).map_err(|e| noc.write_err("port", e));	
+			let _ = noc.listen_port(noc_to_port_clone, noc_from_port).map_err(|e| write_err("port", e));
 		});
 		join_handles.push(join_port);
 		let nap = time::Duration::from_millis(1000);
@@ -54,8 +55,7 @@ impl Noc {
 		println!("{}", dc);
 		Ok(join_handles)
 	}
-	fn build_datacenter(&self, blueprint: &Blueprint) 
-			-> Result<(Datacenter, Vec<JoinHandle<()>>)> {
+	fn build_datacenter(&self, blueprint: &Blueprint) -> Result<(Datacenter, Vec<JoinHandle<()>>), Error> {
 		let mut dc = Datacenter::new();
 		let join_handles = dc.initialize(blueprint)?;
 		Ok((dc, join_handles))
@@ -65,7 +65,7 @@ impl Noc {
 //			_ => panic!("Noc doesn't recognize message type {}", msg_type)
 //		})
 //	}
-	fn listen_port(&mut self, noc_to_port: NocToPort, noc_from_port: NocFromPort) -> Result<()> {
+	fn listen_port(&mut self, noc_to_port: NocToPort, noc_from_port: NocFromPort) -> Result<(), Error> {
 		loop {
 			let packet = noc_from_port.recv()?;
 			let msg_id = packet.get_header().get_msg_id();
@@ -79,7 +79,7 @@ impl Noc {
 						let allowed_trees = msg.process_noc(&self)?; 
 						self.control(&allowed_trees, &noc_to_port)?;						
 					}
-					_ => return Err(ErrorKind::MsgType(S("listen_port"), msg.get_header().get_msg_type()).into())
+					_ => return Err(NocError::MsgType { func_name: S("listen_port"), msg_type: msg.get_header().get_msg_type() }.into() )
 				}
 			} else {
 				let assembler = PacketAssembler::create(msg_id, packets);
@@ -88,7 +88,7 @@ impl Noc {
 		}
 	}
 	// Sets up the NOC Master and NOC Client services on up trees
-	fn control(&mut self, allowed_trees: &Vec<AllowedTree>, noc_to_port: &NocToPort) -> Result<()> { 
+	fn control(&mut self, allowed_trees: &Vec<AllowedTree>, noc_to_port: &NocToPort) -> Result<(), Error> {
 		// Create an up tree on the border cell for the NOC Master
 		for allowed_tree in allowed_trees { self.allowed_trees.insert(allowed_tree.clone()); }
 		//println!("Noc allowed trees {:?}", allowed_trees);
@@ -111,11 +111,11 @@ impl Noc {
 			let packets = msg.to_packets(&self.tree_id)?;
 			for packet in packets { noc_to_port.send(packet)?; }
 		} else {
-			return return Err(ErrorKind::AllowedTree(S("control"), S(self.base_tree.get_name())).into());
+			return return Err(NocError::AllowedTree { func_name: S("control"), tree_name: self.base_tree.get_name().clone() }.into());
 		}
 		Ok(())
 	}
-	fn listen_outside(&mut self, noc_from_outside: NocFromOutside, noc_to_port: NocToPort) -> Result<()> {
+	fn listen_outside(&mut self, noc_from_outside: NocFromOutside, noc_to_port: NocToPort) -> Result<(), Error> {
 		loop {
 			let input = &noc_from_outside.recv()?;
 			println!("Noc: {}", input);
@@ -123,19 +123,19 @@ impl Noc {
 			println!("Noc: {}", manifest);
 		}
 	}
-	fn write_err(&self, s: &str, e: Error) {
-		use ::std::io::Write;
-		let stderr = &mut ::std::io::stderr();
-		let _ = writeln!(stderr, "Noc {} error: {}", s, e);
-		for e in e.iter().skip(1) {
-			let _ = writeln!(stderr, "Caused by: {}", e);
-		}
-		if let Some(backtrace) = e.backtrace() {
-			let _ = writeln!(stderr, "Backtrace: {:?}", backtrace);
-		}
-	}
 }
 // Errors
+use failure::{Error, Fail};
+#[derive(Debug, Fail)]
+pub enum NocError {
+    #[fail(display = "Noc {}: {} is not an allowed tree", func_name, tree_name)]
+    AllowedTree { func_name: String, tree_name: String },
+    #[fail(display = "Noc {}: {} is not a valid message type for the NOC", func_name, msg_type)]
+    MsgType { func_name: String, msg_type: MsgType },
+    #[fail(display = "Noc {}: {} is not a valid index in the NOC's list of tree names", func_name, index)]
+    Tree { func_name: String, index: usize }
+}
+/*
 error_chain! {
 	foreign_links {
 		NocToPort(::message_types::NocPortError);
@@ -160,3 +160,4 @@ error_chain! {
 		}
 	}
 }
+*/

@@ -2,6 +2,7 @@ use std::fmt;
 use std::collections::HashSet;
 
 use config::{MAX_PORTS, OUTPUT_FILE_NAME, MaskValue, PortNo};
+use name::CellID;
 /*
 pub fn get_first_arg(a: Vec<String>) -> Option<i32> {
 	if a.len() != 2 {
@@ -82,9 +83,9 @@ impl fmt::Display for Mask {
 #[derive(Debug, Copy, Clone, Hash, PartialEq, Eq, Serialize, Deserialize)]
 pub struct PortNumber { pub port_no: PortNo }
 impl PortNumber {
-	pub fn new(no: PortNo, no_ports: PortNo) -> Result<PortNumber> {
+	pub fn new(no: PortNo, no_ports: PortNo) -> Result<PortNumber, UtilityError> {
 		if no.v > no_ports.v {
-			Err(ErrorKind::PortNumber(no, "PortNumber::new".to_string(), no_ports).into())
+			Err(UtilityError::PortNumber{ port_no: no, func_name: S("PortNumber::new"), max: no_ports }.into())
 		} else {
 			Ok(PortNumber { port_no: (no as PortNo) })
 		}
@@ -98,7 +99,7 @@ impl fmt::Display for PortNumber {
 #[derive(Debug, Copy, Clone, Hash, Serialize, Deserialize)]
 pub struct Path { port_number: PortNumber }
 impl Path {
-	pub fn new(port_no: PortNo, no_ports: PortNo) -> Result<Path> {
+	pub fn new(port_no: PortNo, no_ports: PortNo) -> Result<Path, UtilityError> {
 		let port_number = PortNumber::new(port_no, no_ports)?;
 		Ok(Path { port_number: port_number })
 	}
@@ -109,7 +110,7 @@ impl fmt::Display for Path {
 }
 use std::fs::{File, OpenOptions};
 use std::io::Write;
-pub fn append2file(line: String) -> Result<()> {
+pub fn append2file(line: String) -> Result<(), Error> {
 	let mut file_handle = match OpenOptions::new().append(true).open(OUTPUT_FILE_NAME) {
 		Ok(f) => Ok(f),
 		Err(_) => {
@@ -120,10 +121,36 @@ pub fn append2file(line: String) -> Result<()> {
 	file_handle.write(&(line + "\n").into_bytes())?;
 	Ok(())
 }
-// There are so many places in my code where it's more convenient 
+pub fn write_err(caller: &str, e: Error) {
+	use ::std::io::Write;
+	let stderr = &mut ::std::io::stderr();
+	let _ = writeln!(stderr, "Error {}: {}", caller, e);
+	let mut fail: &Fail = e.cause();
+	while let Some(cause) = fail.cause() {
+		let _ = writeln!(stderr, "Caused by: {}", cause);
+		fail = cause;
+	}
+	let fail: &Fail = e.cause();
+	if let Some(backtrace) = fail.cause().and_then(|cause| cause.backtrace()) {
+		let _ = writeln!(stderr, "Backtrace: {:?}", backtrace);
+	}
+}
+// There are so many places in my code where it's more convenient
 // to provide &str but I need String that I made the following
 pub fn S<T: fmt::Display>(s: T) -> String { s.to_string() }
 // Errors
+use failure::{Error, Fail};
+#[derive(Debug, Fail)]
+pub enum UtilityError {
+    #[fail(display = "{}: Utility: Cell {} has no tenant mask", func_name, cell_id)]
+    Mask { cell_id: CellID, func_name: String},
+    #[fail(display = "{}: Utility: Port number {:?} is larger than the maximum of {:?}", func_name, port_no, max)]
+    PortNumber { port_no: PortNo, func_name: String, max: PortNo },
+    #[fail(display = "{}: Utility: {} is not implemented", func_name, feature)]
+    Unimplemented { feature: String, func_name: String }
+}
+
+/*
 use name::CellID;
 error_chain! {
 	foreign_links {
@@ -141,3 +168,4 @@ error_chain! {
 		}
 	}
 }
+*/

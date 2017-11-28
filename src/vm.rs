@@ -6,6 +6,7 @@ use message_types::{VmToCa, VmFromCa, VmToContainerMsg, VmToContainer, Container
 	ContainerToVmMsg, ContainerToVm, VmFromContainer, ContainerVmError};
 use name::{ContainerID, TreeID, UptreeID, VmID};
 use uptree_spec::{AllowedTree, ContainerSpec};
+use utility::write_err;
 
 #[derive(Debug, Clone, Hash, Eq, PartialEq, Serialize, Deserialize)]
 pub struct VirtualMachine {
@@ -17,7 +18,7 @@ impl VirtualMachine {
 		VirtualMachine { id: id, containers: Vec::new() }
 	}
 	pub fn initialize(&mut self, up_tree_id: &TreeID, tree_map: &Vec<&str>,
-			containers: &Vec<ContainerSpec>) -> Result<()> {
+			containers: &Vec<ContainerSpec>) -> Result<(), Error> {
 		//self.listen_ca(vm_from_ca)?;
 /*		
 		while services.len() > 0 {
@@ -35,49 +36,40 @@ impl VirtualMachine {
 		Ok(())
 	}
 	pub fn get_id(&self) -> &VmID { &self.id }	
-	fn listen_ca(&self, vm_from_ca: VmFromCa) -> Result<()> {
+	fn listen_ca(&self, vm_from_ca: VmFromCa) -> Result<(), Error, > {
 		println!("VM {}: listening to Ca", self.id);
 		let vm = self.clone();
-		::std::thread::spawn( move || -> Result<()> {
-			let _ = vm.listen_ca_loop(vm_from_ca).map_err(|e| vm.write_err(e));
+		::std::thread::spawn( move || -> Result<(), Error> {
+			let _ = vm.listen_ca_loop(vm_from_ca).map_err(|e| write_err("vm", e));
 			Ok(())
 		});
 		Ok(())
 	}	
 	fn listen_container(&self, container_id: ContainerID, vm_from_container: VmFromContainer, 
-			vm_to_ca: VmToCa) -> Result<()> {
+			vm_to_ca: VmToCa) -> Result<(), Error> {
 		println!("VM {}: listening to container {}", self.id, container_id);
 		let vm = self.clone();
-		::std::thread::spawn( move || -> Result<()> {
-			let msg = vm.listen_container_loop(vm_from_container, vm_to_ca).map_err(|e| vm.write_err(e));
+		::std::thread::spawn( move || -> Result<(), Error> {
+			let msg = vm.listen_container_loop(vm_from_container, vm_to_ca).map_err(|e| write_err("vm", e));
 			Ok(())
 		});		
 		Ok(())	
 	}	
-	fn listen_ca_loop(&self, vm_from_ca: VmFromCa) -> Result<()> {
+	fn listen_ca_loop(&self, vm_from_ca: VmFromCa) -> Result<(), Error> {
 		loop {
 			let msg = vm_from_ca.recv()?;
 			
 		}
 	}
-	fn listen_container_loop(&self, vm_from_container: VmFromContainer, vm_to_ca: VmToCa) -> Result<()> {
+	fn listen_container_loop(&self, vm_from_container: VmFromContainer, vm_to_ca: VmToCa) -> Result<(), Error> {
 		loop {
 			let msg = vm_from_container.recv()?;
 			vm_to_ca.send(msg)?;
 		}
 	}
-	fn write_err(&self, e: Error) {
-		use ::std::io::Write;
-		let stderr = &mut ::std::io::stderr();
-		let _ = writeln!(stderr, "VM {}: {}", self.id, e);
-		for e in e.iter().skip(1) {
-			let _ = writeln!(stderr, "Caused by: {}", e);
-		}
-		if let Some(backtrace) = e.backtrace() {
-			let _ = writeln!(stderr, "Backtrace: {:?}", backtrace);
-		}
-	}
 }
+use failure::{Error, Fail};
+/*
 error_chain! {
 	foreign_links {
 		Recv(::std::sync::mpsc::RecvError);
@@ -90,3 +82,4 @@ error_chain! {
 	errors { 
 	}
 }
+*/

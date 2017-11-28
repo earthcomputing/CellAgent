@@ -12,7 +12,7 @@ pub struct RoutingTable {
 	connected_ports: Vec<u8>
 }
 impl RoutingTable {
-	pub fn new(id: CellID) -> Result<RoutingTable> {
+	pub fn new(id: CellID) -> Result<RoutingTable, Error> {
 		let mut entries = Vec::new();
 		for i in 0..*MAX_ENTRIES {
 			let entry = RoutingTableEntry::default(TableIndex(i))?;
@@ -20,11 +20,11 @@ impl RoutingTable {
 		}
 		Ok(RoutingTable { id: id, entries: entries, connected_ports: Vec::new() })
 	}
-	pub fn get_entry(&self, TableIndex(index): TableIndex) -> Result<RoutingTableEntry> { 
+	pub fn get_entry(&self, TableIndex(index): TableIndex) -> Result<RoutingTableEntry, RoutingTableError> {
 		let f = "get_entry";
 		match self.entries.get(index as usize) {
 			Some(e) => Ok(*e),
-			None => Err(ErrorKind::Index(self.id.clone(), TableIndex(index), S(f)).into())
+			None => Err(RoutingTableError::Index { cell_id: self.id.clone(), index: TableIndex(index), func_name: f })
 		}
 	}
 	pub fn set_entry(&mut self, entry: RoutingTableEntry) { 
@@ -43,6 +43,13 @@ impl fmt::Display for RoutingTable {
 	}	
 }
 // Errors
+use failure::{Error, Fail};
+#[derive(Debug, Fail)]
+pub enum RoutingTableError {
+    #[fail(display = "RoutingTable {}: {:?} is not a valid routing table index on cell {}", func_name, index, cell_id)]
+    Index { func_name: &'static str, index: TableIndex, cell_id: CellID}
+}
+/*
 error_chain! {
 	links {
 		RoutingTableEntry(::routing_table_entry::Error, ::routing_table_entry::ErrorKind);
@@ -53,3 +60,4 @@ error_chain! {
 		}
 	}
 }
+*/
