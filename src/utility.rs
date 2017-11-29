@@ -124,7 +124,7 @@ pub fn append2file(line: String) -> Result<(), Error> {
 pub fn write_err(caller: &str, e: Error) {
 	use ::std::io::Write;
 	let stderr = &mut ::std::io::stderr();
-	let _ = writeln!(stderr, "Error {}: {}", caller, e);
+	let _ = writeln!(stderr, "*** Error {}: {}", caller, e);
 	let mut fail: &Fail = e.cause();
 	while let Some(cause) = fail.cause() {
 		let _ = writeln!(stderr, "Caused by: {}", cause);

@@ -115,7 +115,7 @@ pub trait Message: fmt::Display {
 			where Self:std::marker::Sized + serde::Serialize {
 		let bytes = Serializer::serialize(self)?;
 		let direction = self.get_header().get_direction();
-		let packets = Packetizer::packetize(tree_id, &bytes, direction,)?;		
+		let packets = Packetizer::packetize(tree_id, &bytes, direction,);
 		Ok(packets)
 	}
 	// There has to be a better way to handle different message receivers, but I didn't realize when I 
