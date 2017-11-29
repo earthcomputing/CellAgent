@@ -2,6 +2,8 @@ use std::fmt;
 use std::collections::{HashMap, HashSet};
 use std::sync::mpsc::channel;
 
+use failure::{Error, Fail, ResultExt};
+
 use cellagent::{CellAgent};
 use config::{MAX_PORTS, CellNo, CellType, PortNo};
 use message_types::{CaToPe, PeFromCa, PeToCa, CaFromPe, PortToPe, PeFromPort, PeToPort,PortFromPe};
@@ -121,7 +123,6 @@ impl fmt::Display for NalCell {
 		write!(f, "{}", s) }
 }
 // Errors
-use failure::{Error, Fail};
 #[derive(Debug, Fail)]
 pub enum NalcellError {
     #[fail(display = "NalCell {}: No receiver for port {:?}", func_name, port_no)]
@@ -131,25 +132,3 @@ pub enum NalcellError {
     #[fail(display = "NalCell {}: You asked for {:?} ports, but only {:?} are allowed", func_name, nports, max_ports)]
     NumberPorts { func_name: &'static str, nports: PortNo, max_ports: PortNo }
 }
-/*
-error_chain! {
-	links {
-		CellAgent(::cellagent::Error, ::cellagent::ErrorKind);
-		Name(::name::Error, ::name::ErrorKind);
-		PacketEngine(::packet_engine::Error, ::packet_engine::ErrorKind);
-		Port(::port::Error, ::port::ErrorKind);
-		Utility(::utility::Error, ::utility::ErrorKind);
-	}
-	errors { 
-		Channel(port_no: PortNo, func_name: String) {
-			display("NalCell {}: No receiver for port {}", func_name, port_no.v)
-		}
-		NoFreePorts(cell_id: CellID, func_name: String) {
-			display("NalCell {}: All ports have been assigned for cell {}", func_name, cell_id)
-		}
-		NumberPorts(nports: PortNo, func_name: String) {
-			display("NalCell {}: You asked for {} ports, but only {} are allowed", func_name, nports.v, MAX_PORTS.v)
-		}
-	}
-}
-*/

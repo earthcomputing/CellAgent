@@ -1,7 +1,5 @@
 #![deny(unused_must_use)]
 #![recursion_limit="1024"]
-#[macro_use]
-extern crate error_chain;
 extern crate eval;
 extern crate failure;
 #[macro_use]
@@ -46,6 +44,8 @@ use std::collections::HashSet;
 use std::fs::File;
 use std::sync::mpsc::channel;
 use std::collections::HashMap;
+
+use failure::{Error, Fail};
 
 use blueprint::Blueprint;
 use config::{BASE_TREE_NAME, CONTROL_TREE_NAME, NCELLS, NPORTS, NLINKS, OUTPUT_FILE_NAME, CellNo, Edge, PortNo};
@@ -135,18 +135,3 @@ fn deployment_demo() -> Result<(), Error> {
 	Ok(())
 }
 // Errors
-use failure::{Error, Fail};
-/*
-error_chain! {
-	foreign_links {
-		Io(::std::io::Error);
-		SendNoc(::message_types::OutsideNocError);
-		Serialize(::serde_json::Error);
-	}
-	links {
-		Blueprint(::blueprint::Error, ::blueprint::ErrorKind);
-		Noc(::noc::Error, ::noc::ErrorKind);
-		UpTree(::uptree_spec::Error, ::uptree_spec::ErrorKind);
-	}
-}
-*/

@@ -91,14 +91,3 @@ impl fmt::Display for RoutingTableEntry {
 		write!(f, "{}", s) 
 	}
 }
-// Errors
-/*
-error_chain! {
-	links { 
-		Name(::name::Error, ::name::ErrorKind);
-		Utilty(::utility::Error, ::utility::ErrorKind);
-	}
-	errors { 
-	}
-}
-*/

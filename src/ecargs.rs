@@ -1,5 +1,7 @@
 use std::fmt;
 
+use failure::{Error, Fail, ResultExt};
+
 use config::{MAX_PORTS, CellNo, LinkNo, PortNo};
 
 #[derive(Debug)]
@@ -59,18 +61,8 @@ impl fmt::Display for ECArgs {
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result { write!(f, "{}", self.to_string()) }
 }
 // Errors
-use failure::{Error, Fail};
 #[derive(Debug, Fail)]
 pub enum EcargsError {
     #[fail(display = "Ecargs{}:  You asked for {:?} ports, but only {:?} are allowed", func_name, nports, max)]
     NumberPorts { func_name: &'static str, nports: PortNo, max: PortNo}
 }
-/*
-error_chain! {
-	errors { 
-		NumberPorts(n: PortNo, func_name: String) {
-			display("{}: ECArgs: You asked for {} ports, but only {} are allowed", func_name, n.v, *MAX_PORTS)			
-		}
-	}
-}
-*/

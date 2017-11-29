@@ -1,5 +1,8 @@
 use std::fmt;
 use std::collections::HashSet;
+
+
+use failure::{Error, Fail, ResultExt};
 use uuid::Uuid;
 
 use config::{PortNo, TableIndex};
@@ -57,9 +60,3 @@ impl fmt::Display for Tree {
 		write!(f, "{}", s)
 	}	
 }
-/*
-error_chain! {
-	errors {
-	}
-}
-*/

@@ -2,6 +2,8 @@ use std::fmt;
 use std::thread::JoinHandle;
 use serde_json;
 
+use failure::{Error, Fail, ResultExt};
+
 use message_types::{LinkToPort, LinkFromPort, LinkToPortPacket};
 use name::{Name, LinkID, PortID};
 use port::{PortStatus};
@@ -60,19 +62,3 @@ impl fmt::Display for Link {
 	}
 }
 // Errors
-use failure::{Error, Fail};
-/*
-error_chain! {
-	foreign_links {
-		//Recv(::std::sync::mpsc::RecvError);
-		Send(::message_types::LinkPortError);
-		Serialize(::serde_json::Error);	
-	}
-	links {
-		Name(::name::Error, ::name::ErrorKind);
-		Utility(::utility::Error, ::utility::ErrorKind);
-	}
-	errors {
-	}
-}
-*/

@@ -2,6 +2,8 @@ use std::thread::{JoinHandle, sleep, spawn};
 use std::sync::mpsc::channel;
 use std::collections::{HashMap, HashSet};
 use std::time;
+
+use failure::{Error, Fail, ResultExt};
 use serde_json;
 
 use blueprint::{Blueprint};
@@ -92,28 +94,29 @@ impl Noc {
 		// Create an up tree on the border cell for the NOC Master
 		for allowed_tree in allowed_trees { self.allowed_trees.insert(allowed_tree.clone()); }
 		//println!("Noc allowed trees {:?}", allowed_trees);
-		if let Some(deployment_tree) = self.allowed_trees.get(&self.base_tree) {
-			let mut eqns = HashSet::new();
-			eqns.insert(GvmEqn::Recv("true"));
-			eqns.insert(GvmEqn::Send("false"));
-			eqns.insert(GvmEqn::Xtnd("false"));
-			eqns.insert(GvmEqn::Save("false"));
-			let ref gvm_eqn = GvmEquation::new(eqns, Vec::new());	
-			let vm_uptree = UpTreeSpec::new("NocMasterTreeVm", vec![0])?;
-			let container_uptree = UpTreeSpec::new("NocMasterTreeContainer", vec![0])?;
-			let ref base_tree = AllowedTree::new(deployment_tree.get_name());
-			let noc_container = ContainerSpec::new("NocMaster", "NocMaster", vec![], vec![base_tree])?;
-			let noc_vm = VmSpec::new("NocVM", "Ubuntu", CellConfig::Large, 
-				vec![base_tree], vec![&noc_container], vec![&container_uptree])?;
-			let ref manifest = Manifest::new("NocMaster", CellConfig::Large, deployment_tree.get_name(), vec![base_tree], vec![&noc_vm], vec![&vm_uptree], gvm_eqn)?;
-			//println!("NOC Master Manifest {}", manifest);
-			let msg = ManifestMsg::new(manifest);
-			let packets = msg.to_packets(&self.tree_id)?;
-			for packet in packets { noc_to_port.send(packet)?; }
-		} else {
-			return return Err(NocError::AllowedTree { func_name: S("control"), tree_name: self.base_tree.get_name().clone() }.into());
-		}
-		Ok(())
+        match self.allowed_trees.get(&self.base_tree) {
+            Some(deployment_tree) => {
+                let mut eqns = HashSet::new();
+                eqns.insert(GvmEqn::Recv("true"));
+                eqns.insert(GvmEqn::Send("false"));
+                eqns.insert(GvmEqn::Xtnd("false"));
+                eqns.insert(GvmEqn::Save("false"));
+                let ref gvm_eqn = GvmEquation::new(eqns, Vec::new());
+                let vm_uptree = UpTreeSpec::new("NocMasterTreeVm", vec![0])?;
+                let container_uptree = UpTreeSpec::new("NocMasterTreeContainer", vec![0])?;
+                let ref base_tree = AllowedTree::new(deployment_tree.get_name());
+                let noc_container = ContainerSpec::new("NocMaster", "NocMaster", vec![], vec![base_tree])?;
+                let noc_vm = VmSpec::new("NocVM", "Ubuntu", CellConfig::Large,
+                                         vec![base_tree], vec![&noc_container], vec![&container_uptree])?;
+                let ref manifest = Manifest::new("NocMaster", CellConfig::Large, deployment_tree.get_name(), vec![base_tree], vec![&noc_vm], vec![&vm_uptree], gvm_eqn)?;
+                //println!("NOC Master Manifest {}", manifest);
+                let msg = ManifestMsg::new(manifest);
+                let packets = msg.to_packets(&self.tree_id)?;
+                for packet in packets { noc_to_port.send(packet)?; }
+                Ok(())
+            },
+            None => Err(NocError::AllowedTree { func_name: S("control"), tree_name: self.base_tree.get_name().clone() }.into())
+        }
 	}
 	fn listen_outside(&mut self, noc_from_outside: NocFromOutside, noc_to_port: NocToPort) -> Result<(), Error> {
 		loop {
@@ -125,7 +128,6 @@ impl Noc {
 	}
 }
 // Errors
-use failure::{Error, Fail};
 #[derive(Debug, Fail)]
 pub enum NocError {
     #[fail(display = "Noc {}: {} is not an allowed tree", func_name, tree_name)]
@@ -135,29 +137,3 @@ pub enum NocError {
     #[fail(display = "Noc {}: {} is not a valid index in the NOC's list of tree names", func_name, index)]
     Tree { func_name: String, index: usize }
 }
-/*
-error_chain! {
-	foreign_links {
-		NocToPort(::message_types::NocPortError);
-		Recv(::std::sync::mpsc::RecvError);
-		Serialize(::serde_json::Error);
-	}
-	links {
-		Datacenter(::datacenter::Error, ::datacenter::ErrorKind);
-		Message(::message::Error, ::message::ErrorKind);
-		Name(::name::Error, ::name::ErrorKind);
-		UpTree(::uptree_spec::Error, ::uptree_spec::ErrorKind);
-	}
-	errors { 
-		AllowedTree(func_name: String, tree_name: String) {
-			display("Noc {}: {} is not an allowed tree", func_name, tree_name)
-		}
-		MsgType(func_name: String, msg_type: MsgType) {
-			display("Noc {}: {} is not a valid message type for the NOC", func_name, msg_type)
-		}
-		Tree(func_name: String, index: usize) {
-			display("Noc {}: {} is not a valid index in the NOC's list of tree names", func_name, index)
-		}
-	}
-}
-*/

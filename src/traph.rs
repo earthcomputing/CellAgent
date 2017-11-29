@@ -2,6 +2,7 @@ use std::fmt;
 use std::collections::{HashMap, HashSet};
 use std::sync::{Arc, Mutex, MutexGuard};
 
+use failure::{Error, Fail, ResultExt};
 use uuid::Uuid;
 
 use config::{MAX_PORTS, PathLength, PortNo, TableIndex};
@@ -199,7 +200,6 @@ impl fmt::Display for PortStatus {
 	}
 }
 // Errors
-use failure::{Error, Fail};
 #[derive(Debug, Fail)]
 pub enum TraphError {
 	#[fail(display = "Traph {}: No parent element for tree {} on cell {}", func_name, tree_id, cell_id)]
@@ -207,23 +207,3 @@ pub enum TraphError {
     #[fail(display = "Traph {}: No tree with UUID {} on cell {}", func_name, tree_uuid, cell_id)]
     Tree { func_name: &'static str, cell_id: CellID, tree_uuid: Uuid }
 }
-/*
-error_chain! {
-	foreign_links {
-		Recv(::std::sync::mpsc::RecvError);
-	}
-	links {
-		Gvm(::gvm_equation::Error, ::gvm_equation::ErrorKind);
-		RoutingTableEntry(::routing_table_entry::Error, ::routing_table_entry::ErrorKind);
-		Utility(::utility::Error, ::utility::ErrorKind);
-	}
-	errors { 
-		ParentElement(cell_id: CellID, func_name: String, tree_id: TreeID) {
-			display("Traph {}: No parent element for tree {} on cell {}", func_name, tree_id, cell_id)
-		} 
-		Tree(cell_id: CellID, func_name: String, tree_uuid: Uuid) {
-			display("Traph {}: No tree with UUID {} on cell {}", func_name, tree_uuid, cell_id)
-		}
-	}
-}
-*/

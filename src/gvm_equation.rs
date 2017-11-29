@@ -113,14 +113,3 @@ impl fmt::Display for GvmVariable {
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result { 
 		write!(f, "{}:{}", self.value, self.var_type) }
 }
-// Errors
-/*
-error_chain! {
-	foreign_links {
-		Eval(::eval::Error);
-		Serialize(::serde_json::Error);
-	}
-	errors {
-	}
-}
-*/

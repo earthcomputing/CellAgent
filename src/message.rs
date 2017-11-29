@@ -3,6 +3,7 @@ use std::fmt;
 use std::collections::{HashMap, HashSet};
 use std::sync::atomic::{ATOMIC_USIZE_INIT, AtomicUsize, Ordering};
 
+use failure::{Error, Fail, ResultExt};
 use serde;
 use serde_json;
 use uuid::Uuid;
@@ -220,11 +221,8 @@ impl Message for DiscoverMsg {
 			eqns.insert(GvmEqn::Xtnd("true"));
 			eqns.insert(GvmEqn::Save("false"));
 			let gvm_equation = GvmEquation::new(eqns, Vec::new());
-			let entry = match ca.update_traph(new_tree_id, port_number, status, Some(&gvm_equation),
-					children, senders_index, hops, Some(path)) {
-				Ok(e) => e,
-				Err(err) => return Err(MessageError::Message { func_name: "process_ca", handler: "discover entry" }.into())
-			};
+			let entry = ca.update_traph(new_tree_id, port_number, status, Some(&gvm_equation),
+					children, senders_index, hops, Some(path))?;
 			if exists { 
 				return Ok(()); // Don't forward if traph exists for this tree - Simple quenching
 			}
@@ -234,10 +232,7 @@ impl Message for DiscoverMsg {
 			let packets = discoverd_msg.to_packets(new_tree_id)?;
 			//println!("DiscoverMsg {}: sending discoverd for tree {} packet {} {}",ca.get_id(), new_tree_id, packets[0].get_count(), discoverd_msg);
 			let mask = Mask::new(port_number);
-			match ca.send_msg(ca.get_connected_ports_tree_id().get_uuid(), &packets, mask) {
-				Ok(_) => (),
-				Err(err) => return Err(MessageError::Message { func_name: "process_ca", handler: "discover send connected ports" }.into())
-			};
+			ca.send_msg(ca.get_connected_ports_tree_id().get_uuid(), &packets, mask)?;
 			// Forward Discover on all except port_no with updated hops and path
 		}
 		self.update_discover_msg(&ca.get_id(), my_index);
@@ -245,11 +240,7 @@ impl Message for DiscoverMsg {
 		let user_mask = DEFAULT_USER_MASK.all_but_port(PortNumber::new(port_no, ca.get_no_ports())?);
 		//println!("DiscoverMsg {}: forwarding packet {} on connected ports {}", ca.get_id(), packets[0].get_count(), self);
 		ca.add_saved_discover(&packets); // Discover message are always saved for late port connect
-		match ca.send_msg(ca.get_connected_ports_tree_id().get_uuid(), &packets, user_mask){
-			Ok(_) => (),
-			Err(err) => return Err(MessageError::Message { func_name: "process_ca", handler: "discover send msg" }.into())
-		}
-		Ok(())
+        ca.send_msg(ca.get_connected_ports_tree_id().get_uuid(), &packets, user_mask)
 	}
 }
 impl fmt::Display for DiscoverMsg { 
@@ -461,14 +452,7 @@ impl Message for ManifestMsg {
 	fn get_payload_manifest(&self) -> Result<&ManifestMsgPayload, Error> { Ok(&self.payload) }
 	fn process_ca(&mut self, ca: &mut CellAgent, msg_tree_id: &TreeID, port_no: PortNo) -> Result<(), Error> {
 		let manifest = self.payload.get_manifest();
-		match ca.deploy(port_no, &manifest) {
-			Ok(_) => (),
-			Err(err) => {
-				println!("--- Problem processing ManifestMsg");
-				return Err(MessageError::Message { func_name: "process_ca", handler: "manifest" }.into())
-			}
-		}
-		Ok(())		
+		ca.deploy(port_no, &manifest)
 	}
 }
 impl fmt::Display for ManifestMsg {
@@ -547,7 +531,6 @@ impl fmt::Display for TreeNameMsgPayload {
 	}
 }
 // Errors
-use failure::{Error, Fail};
 #[derive(Debug, Fail)]
 pub enum MessageError {
     #[fail(display = "Message {}: Invalid message type {} from packet assembler", func_name, msg_type)]
@@ -563,37 +546,3 @@ pub enum MessageError {
     #[fail(display = "Message {}: No tree named {} in map", func_name, tree_name)]
     TreeMapEntry { func_name: &'static str, tree_name: String }
 }
-/*
-fn map_cellagent_errors(err: ::cellagent::Error) -> ::message::Error {
-	::message::ErrorKind::CellAgent(Box::new(err)).into()
-}
-error_chain! {
-	foreign_links {
-		Serialize(::serde_json::Error);
-	}
-	links {
-		Manifest(::uptree_spec::Error, ::uptree_spec::ErrorKind);
-		Name(::name::Error, ::name::ErrorKind);
-		Packet(::packet::Error, ::packet::ErrorKind);
-		Utility(::utility::Error, ::utility::ErrorKind);
-	}
-	errors { 
-		CellAgent(err: Box<::cellagent::Error>)
-		InvalidMsgType(func_name: String, msg_type: MsgType) {
-			display("Message {}: Invalid message type {} from packet assembler", func_name, msg_type)
-		}
-		ManifestGvm(func_name: String) {
-			display("Message {}: No GVM in manifest", func_name)
-		}
-		Payload(func_name: String) {
-			display("Message {}: Wrong payload for this message type", func_name)
-		}
-		Process(func_name: String) {
-			display("Message {}: Wrong message process function called", func_name)
-		}
-		TreeMapEntry(tree_name: String, func_name: String) {
-			display("Message {}: No tree named {} in map", func_name, tree_name)
-		}		
-	}
-}
-*/

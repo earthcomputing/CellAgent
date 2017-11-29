@@ -46,13 +46,3 @@ impl Service for NocMaster {
 		Ok(())
 	}
 }
-// Errors
-/*
-error_chain!{
-	foreign_links {
-		Recv(::std::sync::mpsc::RecvError);
-	}
-	errors {  
-	}
-}
-*/

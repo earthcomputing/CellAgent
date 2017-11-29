@@ -1,6 +1,8 @@
 use std::fmt;
 use std::collections::HashSet;
 
+use failure::{Error, Fail, ResultExt};
+
 use gvm_equation::GvmEquation;
 use nalcell::CellConfig;
 use utility::S;
@@ -138,7 +140,7 @@ impl UpTreeSpec {
 			for i in 0..parent_list.len() { if i == parent_list[i] { root = i; count = count + 1; } }
 			if count != 1 { return Err(UptreeSpecError::Tree { func_name: "UptreeSpec::new", id: S(id), parent_list: parent_list, reason: "More than one root" }.into()); }
 			for p in parent_list.clone() {
-				let mut reached_root = true;
+				//let mut reached_root = true;
 				let mut r = p;
 				let mut visited = HashSet::new();
 				while r != root {
@@ -147,7 +149,7 @@ impl UpTreeSpec {
 					match parent_list.clone().get(r) {
 						Some(p) => {
 							r = *p;
-							if r == root { reached_root = true; } else { reached_root = false; }
+							//if r == root { reached_root = true; } else { reached_root = false; }
 						},
 						None => return Err(UptreeSpecError::Tree{ func_name: "UptreeSpec::new", id: S(id), parent_list: parent_list, reason: "Index out of range" }.into())
 					}
@@ -180,7 +182,6 @@ impl fmt::Display for AllowedTree {
 		write!(f, "{}", s)
 	}
 }
-use failure::{Error, Fail};
 #[derive(Debug, Fail)]
 pub enum UptreeSpecError {
 	#[fail(display = "UpTreeSpec {}: tree {} is not in the allowed set for vm {}", func_name, tree, vm_id)]
@@ -190,18 +191,3 @@ pub enum UptreeSpecError {
     #[fail(display = "UpTreeSpec {}: {} for parent list {:?} because {}", func_name, id, parent_list, reason)]
     Tree { func_name: &'static str, id: String, parent_list: Vec<usize>, reason: &'static str }
 }
-/*
-error_chain! {
-	errors {
-		Allowed(id: String, tree: String) {
-			display("UpTreeSpec {}: tree {} is not in the allowed set", id, tree)
-		}
-		Containers(id: String, n_containers: usize) {
-			display("UpTreeSpec {}: {} containers isn't enough for the specified trees", id, n_containers)
-		}
-		Tree(id: String, parent_list: Vec<usize>, reason: String) {
-			display("UpTreeSpec {}: {} for parent list {:?}", id, reason, parent_list) 
-		}
-	}
-}
-*/

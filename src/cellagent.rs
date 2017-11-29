@@ -23,6 +23,8 @@ use uptree_spec::{AllowedTree, Manifest, VmSpec};
 use utility::{BASE_TENANT_MASK, Mask, Path, PortNumber, S, write_err};
 use vm::VirtualMachine;
 
+use failure::{Error, Fail, ResultExt};
+
 pub type Traphs = HashMap<Uuid, Traph>;
 pub type Trees = HashMap<TableIndex, TreeID>;
 pub type TreeMap = HashMap<Uuid, Uuid>;
@@ -224,7 +226,7 @@ impl CellAgent {
 			-> Result<RoutingTableEntry, Error> {
 		let entry = {
 			let mut traphs = self.traphs.lock().unwrap();
-			let mut traph = match traphs.entry(black_tree_id.get_uuid()) { // Avoids lifetime problem
+			let traph = match traphs.entry(black_tree_id.get_uuid()) { // Avoids lifetime problem
 				Entry::Occupied(t) => t.into_mut(),
 				Entry::Vacant(v) => {
 					//println!("Cell {}: update traph {} {}", self.cell_id, black_tree_id, black_tree_id.get_uuid());
@@ -573,7 +575,6 @@ impl fmt::Display for CellAgent {
 		write!(f, "{}", s) }
 }
 // Errors
-use failure::{Error, Fail, ResultExt};
 #[derive(Debug, Fail)]
 pub enum CellagentError {
     #[fail(display = "CellAgent {}: No VMs in manifest for cell {}", func_name, cell_id)]
@@ -595,54 +596,3 @@ pub enum CellagentError {
     #[fail(display = "Cellagent {}: No tree associated with index {:?} on cell {}", func_name, index, cell_id)]
     TreeIndex { func_name: &'static str, index: TableIndex, cell_id: CellID }
 }
-/*
-// This method is used to get around an infinite recurrsion in error_chain between cellagent.rs and message.rs
-fn map_message_errors(err: ::message::Error, reason: &str) -> ::cellagent::Error {
-	println!("--- {}", reason);
-	::cellagent::ErrorKind::Message(Box::new(err)).into()
-}
-error_chain! {
-	foreign_links {
-		CaToPePacket(::message_types::CaPeError);
-		Io(::std::io::Error);
-		Recv(::std::sync::mpsc::RecvError);
-	}
-	links {
-		GvmEqn(::gvm_equation::Error, ::gvm_equation::ErrorKind);
-//		Message(Box<::message::Error>, Box<::message::ErrorKind>);
-		Manifest(::uptree_spec::Error, ::uptree_spec::ErrorKind);
-		Name(::name::Error, ::name::ErrorKind);
-		RoutingTableEntry(::routing_table_entry::Error, ::routing_table_entry::ErrorKind);
-		Traph(::traph::Error, ::traph::ErrorKind);
-		Utility(::utility::Error, ::utility::ErrorKind);
-		Vm(::vm::Error, ::vm::ErrorKind);
-	}
-	errors { 
-		ManifestVms(cell_id: CellID, func_name: String) {
-			display("CellAgent {}: No VMs in manifest for cell {}", func_name, cell_id)
-		}
-		Message(err: Box<::message::Error>)
-		NoTraph(cell_id: CellID, func_name: String, tree_uuid: Uuid ) {
-			display("Cellagent {}: A Traph with TreeID {} does not exist on cell {}", func_name, tree_uuid, cell_id)
-		}
-		Size(cell_id: CellID, func_name: String) {
-			display("Cellagent {}: No more room in routing table for cell {}", func_name, cell_id)
-		}
-//		StackTree(cell_id: CellID, func_name: String, tree_id: TreeID) {
-//			display("Cellagent {}: Problem stacking tree {} on cell {}", func_name, tree_id, cell_id)
-//		}
-		TenantMask(cell_id: CellID, func_name: String) {
-			display("Cellagent {}: Cell {} has no tenant mask", func_name, cell_id)
-		}
-		TreeMap(cell_id: CellID, func_name: String, tree_name: String) {
-			display("Cellagent {}: Cell {} has no tree map entry for {}", func_name, cell_id, tree_name)
-		}
-		Tree(cell_id: CellID, func_name: String, tree_uuid: Uuid ) {
-			display("Cellagent {}: TreeID {} does not exist on cell {}", func_name, tree_uuid, cell_id)
-		}
-		TreeIndex(cell_id: CellID, func_name: String, index: TableIndex) {
-			display("Cellagent {}: No tree associated with index {} on cell {}", func_name, index.0, cell_id)
-		} 
-	}
-}
-*/
