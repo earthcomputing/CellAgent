@@ -295,17 +295,11 @@ impl CellAgent {
 		};
 		println!("Deploy on tree {}", deployment_tree_id);
 		let up_tree_name = manifest.get_id();
-		let mut up_tree_id = self.my_tree_id.add_component(up_tree_name)?;
+		let mut up_tree_id = self.my_tree_id.add_component(up_tree_name).context("UptreeID")?;
 		up_tree_id = TreeID::new(up_tree_id.get_name())?;
 		let ref my_tree_id = self.my_tree_id.clone(); // Need to clone because self is borrowed mut
-		let msg = match StackTreeMsg::new(&up_tree_id, &self.my_tree_id, manifest) {
-			Ok(m) => m,
-			Err(err) => return Err(CellagentError::Message { cell_id: self.cell_id.clone(), func_name: "deploy", reason: "Error creating StackTreeMsg" }.into())
-		};
-		let packets = match msg.to_packets(&self.my_tree_id) {
-            Ok(p) => p,
-            Err(err) => return Err(CellagentError::Message { cell_id: self.cell_id.clone(), func_name: "deploy", reason: "Error packetizing StackTreeMsg" }.into())
-        };
+		let msg= StackTreeMsg::new(&up_tree_id, &self.my_tree_id, manifest)?;
+		let packets =  msg.to_packets(&self.my_tree_id)?;
 		let port_number = PortNumber::new(port_no, self.no_ports)?;
 		let port_no_mask = Mask::all_but_zero(self.no_ports).and(Mask::new(port_number));
 		self.send_msg(deployment_tree_id.get_uuid(), &packets, port_no_mask)?;
@@ -377,14 +371,8 @@ impl CellAgent {
         let new_tree_id = TreeID::new(new_id.get_name())?;
         new_tree_id.append2file()?;
         let ref my_tree_id = self.my_tree_id.clone(); // Need because self is borrowed mut
-        let msg = match StackTreeMsg::new(&new_tree_id, &self.my_tree_id, manifest) {
-            Ok(m) => m,
-            Err(err) => return Err(CellagentError::Message { cell_id: self.cell_id.clone(), func_name: "create_tree", reason: "Problem creating StackTreeMsg" }.into())
-        };
-        let packets = match msg.to_packets(&self.my_tree_id) {
-            Ok(p) => p,
-            Err(err) => return Err(CellagentError::Message { cell_id: self.cell_id.clone(), func_name: "create_tree", reason: "Problem packetizing StackTreeMsg" }.into())
-        };
+        let msg =  StackTreeMsg::new(&new_tree_id, &self.my_tree_id, manifest)?;
+        let packets = msg.to_packets(&self.my_tree_id)?;
         self.send_msg(target_tree_id.get_uuid(), &packets, port_no_mask)?;
         self.stack_tree(&new_tree_id, &my_tree_id, my_tree_id, &manifest)?;
         Ok(())
@@ -417,7 +405,7 @@ impl CellAgent {
 	fn listen_pe(&mut self, ca_from_pe: CaFromPe) -> Result<(), Error>{
 		let mut ca = self.clone();
 		::std::thread::spawn( move || { 
-			let _ = ca.listen_loop(ca_from_pe).map_err(|e| ::utility::write_err("cellagent",e));
+			let _ = ca.listen_loop(ca_from_pe).map_err(|e| ::utility::write_err("cellagent", e));
 		});
 		Ok(())
 	}
@@ -440,17 +428,8 @@ impl CellAgent {
 					let tree_uuid = tree_id.get_uuid(); 
 					let (last_packet, packets) = packet_assembler.add(packet);
 					if last_packet {
-						let mut msg = match MsgType::get_msg(&packets) {
-							Ok(m) => m,
-							Err(err) => return Err(CellagentError::Message { cell_id: self.cell_id.clone(), func_name: "listen_loop", reason: "Bad message format" }.into())
-						};
-						match msg.process_ca(self, &tree_id, port_no) {
-							Ok(_) => (),
-							Err(err) => return {
-								println!("--- CellAgent {}: message {}", self.cell_id, msg);
-								Err(CellagentError::Message { cell_id: self.cell_id.clone(), func_name: "listen_loop", reason:  "Message processing error" }.into())
-							}
-						};
+						let mut msg = MsgType::get_msg(&packets)?;
+                        msg.process_ca(self, &tree_id, port_no)?;
 						let save = self.gvm_eval_save(tree_uuid, msg)?;
 						if save && (tree_uuid != self.connected_tree_id.get_uuid()) { self.add_saved_msg(packets); }
 					} else {
@@ -483,8 +462,8 @@ impl CellAgent {
 			Ok(false)
 		}
 	}
-	fn send_tree_names(&mut self, outside_tree_id: &TreeID, allowed_tree_ids: Vec<TreeID>, port_number: PortNumber)
-            -> Result<(), Error> {
+    /*
+	fn send_tree_names(&mut self, outside_tree_id: &TreeID, allowed_tree_ids: Vec<TreeID>, port_number: PortNumber) {
 		let port_no_mask = Mask::new(port_number);
 		let mut allowed_trees = Vec::new();
 		for allowed_tree_id in allowed_tree_ids.iter().cloned() {
@@ -493,11 +472,10 @@ impl CellAgent {
 			allowed_trees.push(AllowedTree::new(allowed_tree_name));
 		}
 		let tree_name_msg = TreeNameMsg::new(&outside_tree_id, &allowed_trees);
-		match tree_name_msg.to_packets(outside_tree_id) {
-			Ok(packets) => self.send_msg(outside_tree_id.get_uuid(), &packets, port_no_mask),
-			Err(err) => Err(CellagentError::Message { cell_id: self.cell_id.clone(), func_name: "send_tree_names", reason:  "Error packetizing TreeNameMsg" }.into())
-		}
+		let packets = tree_name_msg.to_packets(outside_tree_id)?;
+		self.send_msg(outside_tree_id.get_uuid(), &packets, port_no_mask);
 	}
+    */
 	fn port_connected(&mut self, port_no: PortNo, is_border: bool) -> Result<(), Error> {
 		//println!("CellAgent {}: port {} is border {} connected", self.cell_id, *port_no, is_border);
 		if is_border {
@@ -519,11 +497,10 @@ impl CellAgent {
 			let port_no_mask = Mask::new(port_number);
 			let tree_name_msg = TreeNameMsg::new(&new_tree_id, &allowed_trees);
 			//println!("Cell {}: Sending on ports {}: {}", self.cell_id, port_no_mask, tree_name_msg);
-			match tree_name_msg.to_packets(&new_tree_id) {
-				Ok(packets) => self.send_msg(new_tree_id.get_uuid(), &packets, port_no_mask),
-				Err(err) => return Err(CellagentError::Message { cell_id: self.cell_id.clone(), func_name: "port_connected", reason: "Error converting TreeNameMsg to packets" }.into())
-			}
-//			self.send_tree_names(&new_tree_id, allowed_trees, port_number)?;
+			let packets = tree_name_msg.to_packets(&new_tree_id)?;
+			self.send_msg(new_tree_id.get_uuid(), &packets, port_no_mask)?;
+//			self.send_tree_names(&new_tree_id, allowed_trees, port_number);
+            Ok(())
 		} else {
 			//println!("Cell {}: port {} connected", self.cell_id, *port_no);
 			let port_no_mask = Mask::new(PortNumber::new(port_no, self.no_ports)?);
@@ -532,10 +509,7 @@ impl CellAgent {
 			let hops = PathLength(CellNo(1));
 			let my_table_index = self.my_entry.get_index();
 			let msg = DiscoverMsg::new(&self.my_tree_id, my_table_index, &self.cell_id, hops, path);
-			let packets = match msg.to_packets(&self.control_tree_id) {
-				Ok(p) => p,
-				Err(err) => return Err(CellagentError::Message { cell_id: self.cell_id.clone(), func_name: "deploy", reason: "Error converting DiscoverMsg to packets" }.into())
-			};
+			let packets = msg.to_packets(&self.control_tree_id)?;
 			//println!("CellAgent {}: sending packet {} on port {} {} ", self.cell_id, packets[0].get_count(), port_no, msg);
 			let entry = CaToPePacket::Entry(*self.connected_tree_entry.lock().unwrap());
 			self.ca_to_pe.send(entry)?;
@@ -599,13 +573,13 @@ impl fmt::Display for CellAgent {
 		write!(f, "{}", s) }
 }
 // Errors
-use failure::{Error, Fail};
+use failure::{Error, Fail, ResultExt};
 #[derive(Debug, Fail)]
 pub enum CellagentError {
     #[fail(display = "CellAgent {}: No VMs in manifest for cell {}", func_name, cell_id)]
     ManifestVms { cell_id: CellID, func_name: &'static str },
-    #[fail(display = "CellAgent {}: Message error at cell {} for {}", func_name, cell_id, reason)]
-    Message { cell_id: CellID, func_name: &'static str, reason: &'static str },
+    //#[fail(display = "CellAgent {}: Error packetizing TreeNameMsg at cell {}: error {}", func_name, cell_id, error)]
+    //Message { cell_id: CellID, func_name: &'static str, #[cause] error: Error },
     #[fail(display = "Cellagent {}: A Traph with TreeID {} does not exist on cell {}", func_name, tree_uuid, cell_id)]
     NoTraph { cell_id: CellID, func_name: &'static str, tree_uuid: Uuid },
     #[fail(display = "Cellagent {}: No more room in routing table for cell {}", func_name, cell_id)]

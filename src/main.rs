@@ -58,8 +58,8 @@ use uptree_spec::{AllowedTree, ContainerSpec, Manifest, UpTreeSpec, VmSpec};
 use utility::write_err;
 
 fn main() {
-	if let Err(e) = run() {
-        write_err("main", e);
+	if let Err(e) = run() { println!("Main Error");
+        write_err("*** main", e);
          ::std::process::exit(1);
 	}
 	println!("\nMain exit");
