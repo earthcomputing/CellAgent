@@ -1,6 +1,8 @@
 use std::collections::HashMap;
 use std::sync::mpsc::channel;
 
+use failure::{Error, Fail, ResultExt};
+
 use container::{Container, Service};
 use message_types::{VmToCa, VmFromCa, VmToContainerMsg, VmToContainer, ContainerFromVm,
 	ContainerToVmMsg, ContainerToVm, VmFromContainer, ContainerVmError};
@@ -68,18 +70,3 @@ impl VirtualMachine {
 		}
 	}
 }
-use failure::{Error, Fail};
-/*
-error_chain! {
-	foreign_links {
-		Recv(::std::sync::mpsc::RecvError);
-		VmContainer(::message_types::VmContainerError);
-	}
-	links {
-		Container(::container::Error, ::container::ErrorKind);
-		Name(::name::Error, ::name::ErrorKind);
-	}
-	errors { 
-	}
-}
-*/

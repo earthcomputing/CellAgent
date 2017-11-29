@@ -1,6 +1,8 @@
 use std::fmt;
 use std::sync::{Arc, Mutex};
 use std::collections::HashSet;
+
+use failure::{Error, Fail, ResultExt};
 use uuid::Uuid;
 
 use config::{PortNo, TableIndex};
@@ -145,7 +147,6 @@ impl fmt::Display for PacketEngine {
 		write!(f, "{}", s) }	
 }
 // Errors
-use failure::{Error, Fail};
 #[derive(Debug, Fail)]
 pub enum PacketEngineError {
 	#[fail(display = "PacketEngine {}: No sender for port {:?} on cell {}", func_name, port_no, cell_id)]
@@ -153,26 +154,3 @@ pub enum PacketEngineError {
     #[fail(display = "PacketEngine {}: CellID {}: index {:?}, entry uuid {}, packet uuid {}", func_name, cell_id, index, table_uuid, packet_uuid)]
     Uuid { func_name: &'static str, cell_id: CellID, index: TableIndex, table_uuid: Uuid, packet_uuid: Uuid }
 }
-/*
-error_chain! {
-	foreign_links {
-		PeToCa(::message_types::PeCaError);
-		PeToPort(::message_types::PePortError);
-		Recv(::std::sync::mpsc::RecvError);	
-		Serialize(::serde_json::Error);	
-	}
-	links {
-		RoutingTable(::routing_table::Error, ::routing_table::ErrorKind);
-		Utility(::utility::Error, ::utility::ErrorKind);
-	}
-	errors { 
-		Sender(cell_id: CellID, func_name: String, port_no: PortNo) {
-			display("PacketEngine {}: No sender for port {} on cell {}", func_name, port_no.v, cell_id)
-		}
-		Uuid(cell_id: CellID, func_name: String, index: TableIndex, table_uuid: Uuid, packet_uuid: Uuid) {
-			display("PacketEngine {}: CellID {}: index {}, entry uuid {}, packet uuid {}", func_name, cell_id, index.0, 
-				table_uuid, packet_uuid)
-		}
-	}
-}
-*/

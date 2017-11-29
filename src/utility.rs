@@ -1,6 +1,8 @@
 use std::fmt;
 use std::collections::HashSet;
 
+use failure::{Error, Fail, ResultExt};
+
 use config::{MAX_PORTS, OUTPUT_FILE_NAME, MaskValue, PortNo};
 use name::CellID;
 /*
@@ -139,7 +141,6 @@ pub fn write_err(caller: &str, e: Error) {
 // to provide &str but I need String that I made the following
 pub fn S<T: fmt::Display>(s: T) -> String { s.to_string() }
 // Errors
-use failure::{Error, Fail};
 #[derive(Debug, Fail)]
 pub enum UtilityError {
     #[fail(display = "{}: Utility: Cell {} has no tenant mask", func_name, cell_id)]
@@ -149,23 +150,3 @@ pub enum UtilityError {
     #[fail(display = "{}: Utility: {} is not implemented", func_name, feature)]
     Unimplemented { feature: String, func_name: String }
 }
-
-/*
-use name::CellID;
-error_chain! {
-	foreign_links {
-		Io(::std::io::Error);
-	}
-	errors { 
-		Mask(cell_id: CellID, func_name: String) {
-			display("{}: Utility: Cell {} has no tenant mask", func_name, cell_id)
-		}
-		PortNumber(port_no: PortNo, func_name: String, max: PortNo) {
-			display("{}: Utility: Port number {} is larger than the maximum of {}", func_name, port_no.v, max.v)
-		}
-		Unimplemented(feature: String, func_name: String) {
-			display("{}: Utility: {} is not implemented", func_name, feature)
-		}
-	}
-}
-*/

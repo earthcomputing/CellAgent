@@ -83,13 +83,3 @@ impl NocAgent {
 		Ok(())
 	}
 }
-// Errors
-/*
-error_chain! {
-	foreign_links {
-		Recv(::std::sync::mpsc::RecvError);
-	}
-	errors { 
-	}
-}
-*/

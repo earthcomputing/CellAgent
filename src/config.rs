@@ -1,5 +1,7 @@
 use std::fmt;
 use std::ops::{Deref};
+
+use failure::{Error, Fail, ResultExt};
 // Size of various fields
 #[derive(Debug, Copy, Clone, Hash, Eq, PartialEq, Serialize, Deserialize)]
 pub struct CellNo(pub usize);

@@ -1,6 +1,8 @@
 use std::fmt;
 use std::collections::HashMap;
 
+use failure::{Error, Fail, ResultExt};
+
 use name::{Name,TenantID};
 use utility::S;
 
@@ -58,7 +60,6 @@ impl fmt::Debug for Tenant {
 }
 // Errors
 use config::CellNo;
-use failure::{Error, Fail};
 #[derive(Debug, Fail)]
 pub enum TenantError {
 	#[fail(display = "Tenant {}: A tenant named '{}' already exists.", func_name, tenant_name)]
@@ -66,18 +67,3 @@ pub enum TenantError {
     #[fail(display = "Tenant {}: You asked for {:?} cells, but only {:?} are available", func_name, request, available)]
     Quota { func_name: &'static str, request: CellNo, available: CellNo }
 }
-/*
-error_chain! {
-	links {
-		Name(::name::Error, ::name::ErrorKind);
-	}
-	errors { 
-		DuplicateName(tenant_id: String, func_name: String) {
-			display("Tenant {}: A tenant named '{}' already exists.", func_name, tenant_id)
-		}
-		Quota(request: CellNo, func_name: String, available: CellNo) {
-			display("Tenant {}: You asked for {} cells, but only {} are available", func_name, request.0, available.0)
-		}
-	}
-}
-*/

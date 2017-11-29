@@ -128,19 +128,3 @@ impl fmt::Display for Port {
 	}
 }
 // Errors
-/*
-error_chain! {
-	foreign_links {
-		Recv(::std::sync::mpsc::RecvError);
-		PortLink(::message_types::PortLinkError);
-		PortNoc(::message_types::PortNocError);
-		PortPePacket(::message_types::PortPeError);
-	}
-	links {
-		Name(::name::Error, ::name::ErrorKind);
-		Packet(::packet::Error, ::packet::ErrorKind);
-	}
-	errors { 
-	}
-}
-*/

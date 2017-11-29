@@ -1,5 +1,7 @@
 use std::fmt;
 use std::marker::Sized;
+
+use failure::{Error, Fail, ResultExt};
 use uuid::Uuid;
 
 use config::{SEPARATOR, CellNo};
@@ -158,24 +160,8 @@ impl Name for ContainerID {
 }
 impl fmt::Display for ContainerID { fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result { self.name.fmt(f) } }
 // Errors
-use failure::{Error, Fail};
 #[derive(Debug, Fail)]
 pub enum NameError {
 	#[fail(display = "Name {}: '{}' contains blanks.", func_name, name)]
 	Format { func_name: &'static str, name: String }
 }
-/*
-error_chain! {
-	foreign_links {
-		Serialize(::serde_json::Error);
-	}
-	links {
-		Utility(::utility::Error, ::utility::ErrorKind);
-	}
-	errors {
-		Format(name: String, func_name: String) {
-			display("Name {}: '{}' contains blanks.", func_name, name)
-		}
-	}
-}
-*/

@@ -230,14 +230,3 @@ impl PacketAssembler {
 		(header.is_last_packet(), &self.packets)
 	}
 }
-// Errors
-/*
-error_chain! {
-	foreign_links {
-		Deserialize(::serde_json::Error);
-		Utf8(::std::str::Utf8Error);
-	}
-	errors { 
-	}
-}
-*/

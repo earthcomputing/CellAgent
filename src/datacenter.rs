@@ -3,6 +3,8 @@ use std::cmp::max;
 use std::sync::mpsc::channel;
 use std::thread::{JoinHandle};
 
+use failure::{Error, Fail, ResultExt};
+
 use blueprint::{Blueprint};
 use config::{MIN_BOUNDARY_CELLS, CellNo, CellType, Edge, LinkNo, PortNo};
 use message_types::{LinkToPort, PortFromLink, PortToLink, LinkFromPort,
@@ -43,13 +45,13 @@ impl Datacenter {
 			if *(edge.v.0) == *(edge.v.1) { return Err(DatacenterError::Wire { edge: edge.clone(), func_name: f }.into()); }
 			if (*(edge.v.0) > ncells.0) | (*(edge.v.1) >= ncells.0) { return Err(DatacenterError::Wire { edge: edge.clone(), func_name: f }.into()); }
 			let split = self.cells.split_at_mut(max(*(edge.v.0),*(edge.v.1)));
-			let mut cell = match split.0.get_mut(*(edge.v.0)) {
+			let cell = match split.0.get_mut(*(edge.v.0)) {
 				Some(c) => c,
 				None => return Err(DatacenterError::Wire { edge: edge.clone(), func_name: f }.into())
 
 			};
 			let (left,left_from_pe) = cell.get_free_ec_port_mut()?;
-			let mut cell = match split.1.first_mut() {
+			let cell = match split.1.first_mut() {
 				Some(c) => c,
 				None => return Err(DatacenterError::Wire { edge: edge.clone(), func_name: f }.into())
 			};
@@ -82,7 +84,7 @@ impl Datacenter {
 		if boundary_cells.len() < *MIN_BOUNDARY_CELLS {
 			return Err(DatacenterError::Boundary { func_name: "connect_to_noc" }.into());
 		} else {
-			let (mut boundary_cell, _) = boundary_cells.split_at_mut(1);
+			let (boundary_cell, _) = boundary_cells.split_at_mut(1);
 			let (port, port_from_pe) = boundary_cell[0].get_free_boundary_port_mut()?;
 			port.outside_channel(port_to_noc, port_from_noc, port_from_pe)?;
 			Ok(())
@@ -103,7 +105,6 @@ impl fmt::Display for Datacenter {
 	}
 }
 // Errors
-use failure::{Error, Fail};
 #[derive(Debug, Fail)]
 pub enum DatacenterError {
     #[fail(display = "Datacenter {}: No boundary cells found", func_name)]
@@ -115,27 +116,3 @@ pub enum DatacenterError {
     #[fail(display = "Datacenter {}: {:?} is not a valid edge", func_name, edge)]
     Wire { edge: Edge, func_name: &'static str }
 }
-/*
-error_chain! {
-	links { 
-		Link(::link::Error, ::link::ErrorKind);
-		NalCell(::nalcell::Error, ::nalcell::ErrorKind);
-		Port(::port::Error, ::port::ErrorKind);
-	}
-	errors { 
-		Boundary(func_name: String) {
-			display("Datacenter {}: No boundary cells found", func_name)
-		}
-		Cells(n: CellNo, func_name: String) {
-			display("Datacenter {}: The number of cells {} must be at least 1", func_name, n.0)
-		}
-		Edges(nlinks: LinkNo, func_name: String) {
-			display("Datacenter {}: {} is not enough links to connect all cells", func_name, (nlinks.0).0)
-		}
-		Wire(edge: Edge, func_name: String) {
-			display("Datacenter {}: {:?} is not a valid edge", func_name, edge)
-		}
-	}
-}
-*/
-

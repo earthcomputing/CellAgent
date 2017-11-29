@@ -2,6 +2,8 @@ use std::fmt;
 use std::collections::{HashMap, HashSet};
 use std::iter::FromIterator;
 
+use failure::{Error, Fail};
+
 use config::{CellNo, CellType, Edge, PortNo};
 
 #[derive(Debug)]
@@ -94,18 +96,8 @@ impl fmt::Display for InteriorCell {
 	}	
 }
 // Errors
-use failure::{Error, Fail};
 #[derive(Debug, Fail)]
 pub enum BlueprintError {
     #[fail(display = "Blueprint {}: Invalid blueprint has more border cells {} than total cells {}", func_name, ncells, num_border)]
     CellCount { func_name: &'static str, ncells: usize, num_border: usize}
 }
-/*
-error_chain! {
-	errors {
-		CellCount(total: CellNo, border_count: usize) {
-			display("Invalid blueprint has more border cells {} than total cells {}", border_count, **total)
-		}
-	}
-}
-*/

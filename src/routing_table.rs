@@ -1,5 +1,7 @@
 use std::fmt;
 
+use failure::{Error, Fail, ResultExt};
+
 use config::{MAX_ENTRIES, TableIndex};
 use name::CellID;
 use routing_table_entry::{RoutingTableEntry};
@@ -43,21 +45,8 @@ impl fmt::Display for RoutingTable {
 	}	
 }
 // Errors
-use failure::{Error, Fail};
 #[derive(Debug, Fail)]
 pub enum RoutingTableError {
     #[fail(display = "RoutingTable {}: {:?} is not a valid routing table index on cell {}", func_name, index, cell_id)]
     Index { func_name: &'static str, index: TableIndex, cell_id: CellID}
 }
-/*
-error_chain! {
-	links {
-		RoutingTableEntry(::routing_table_entry::Error, ::routing_table_entry::ErrorKind);
-	}
-	errors { 
-		Index(cell_id: CellID, index: TableIndex, func_name: String) {
-			display("RoutingTable {}: {} is not a valid routing table index on cell {}", func_name, **index, cell_id)
-		}
-	}
-}
-*/
