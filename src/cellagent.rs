@@ -6,7 +6,6 @@ use std::collections::hash_map::Entry;
 use uuid::Uuid;
 
 use config::{BASE_TREE_NAME, CONNECTED_PORTS_TREE_NAME, CONTROL_TREE_NAME, MAX_ENTRIES, CellNo, CellType, PathLength, PortNo, TableIndex};
-use container::Service;
 use gvm_equation::{GvmEquation, GvmEqn};
 use message::{Message, MsgType, DiscoverMsg, StackTreeMsg, TreeNameMsg};
 use message_types::{CaToPe, CaFromPe, CaToVm, VmFromCa, VmToCa, CaFromVm, CaToPePacket, PeToCaPacket,
@@ -52,6 +51,7 @@ pub struct CellAgent {
 	tree_name_map: TreeNameMap,
 	tree_id_map: Arc<Mutex<TreeIDMap>>, // For debugging
 	tenant_masks: Vec<Mask>,
+    ca_to_vms: HashMap<VmID, CaToVm>,
 	ca_to_pe: CaToPe,
 	vm_id_no: usize,
 	up_tree_senders: HashMap<UptreeID, HashMap<String,TreeID>>,
@@ -78,7 +78,7 @@ impl CellAgent {
 			control_tree_id: control_tree_id, connected_tree_id: connected_tree_id,	
 			no_ports: no_ports, traphs: traphs, vm_id_no: 0, tree_id_map: Arc::new(Mutex::new(HashMap::new())),
 			free_indices: Arc::new(Mutex::new(free_indices)), tree_map: Arc::new(Mutex::new(HashMap::new())),
-			tree_name_map: HashMap::new(),
+			tree_name_map: HashMap::new(), ca_to_vms: HashMap::new(),
 			saved_msgs: Arc::new(Mutex::new(Vec::new())), saved_discover: Arc::new(Mutex::new(Vec::new())),
 			my_entry: RoutingTableEntry::default(TableIndex(0))?, 
 			connected_tree_entry: Arc::new(Mutex::new(RoutingTableEntry::default(TableIndex(0))?)),
@@ -297,8 +297,7 @@ impl CellAgent {
 		};
 		println!("Deploy on tree {}", deployment_tree_id);
 		let up_tree_name = manifest.get_id();
-		let mut up_tree_id = self.my_tree_id.add_component(up_tree_name).context("UptreeID")?;
-		up_tree_id = TreeID::new(up_tree_id.get_name())?;
+		let up_tree_id = self.my_tree_id.add_component(up_tree_name).context("UptreeID")?;
 		let ref my_tree_id = self.my_tree_id.clone(); // Need to clone because self is borrowed mut
 		let msg= StackTreeMsg::new(&up_tree_id, &self.my_tree_id, manifest)?;
 		let packets =  msg.to_packets(&self.my_tree_id)?;
@@ -306,51 +305,30 @@ impl CellAgent {
 		let port_no_mask = Mask::all_but_zero(self.no_ports).and(Mask::new(port_number));
 		self.send_msg(deployment_tree_id.get_uuid(), &packets, port_no_mask)?;
 		self.stack_tree(&up_tree_id, &my_tree_id, my_tree_id, &manifest)?;	
-		self.tree_name_map.insert(deployment_tree_name.clone(), deployment_tree_id.clone());
-		let vms = manifest.get_vms();
-		let mut ca_vms = HashMap::new();
-		let (vm0_spec, vm_rest_specs) = match vms.split_first() {
-			Some(pair) => pair, 
-			None => return Err(CellagentError::ManifestVms { cell_id: self.cell_id.clone(), func_name: "deploy" }.into())
-		};
-		self.deploy_vm(up_tree_id, vm0_spec)?;
-		// Following loop incomplete and untested
-		for vm_spec in vm_rest_specs {
+		self.tree_name_map.insert(deployment_tree_name.clone(), deployment_tree_id.to_owned());
+        let mut trees = Vec::new();
+		let vm_specs = manifest.get_vms();
+		for vm_spec in vm_specs {
 			let (vm_to_ca, ca_from_vm): (VmToCa, CaFromVm) = channel();
 			let (ca_to_vm, vm_from_ca): (CaToVm, VmFromCa) = channel();
-			ca_vms.insert(vm_spec.get_id(), (ca_to_vm, ca_from_vm));
-			let mut vm_channels = HashMap::new();
-			vm_channels.insert(S("CellAgent"), (vm_to_ca, vm_from_ca));
-			let containers = vm_spec.get_containers();
+            let vm_id = VmID::new(&self.cell_id,&vm_spec.get_id())?;
+			self.ca_to_vms.insert(vm_id, ca_to_vm,);
+			let container_specs = vm_spec.get_containers();
 			let allowed_trees = vm_spec.get_allowed_trees();
+            trees.push(self.control_tree_id.get_name());
+            for allowed_tree in allowed_trees {
+                let name = allowed_tree.get_name();
+                let tree_id = match self.tree_name_map.get(name) {
+                    Some(t) => t,
+                    None => return Err(CellagentError::TreeMap { cell_id: self.cell_id.clone(), func_name: "deploy", tree_name: name.clone() }.into())
+                };
+                trees.push(name);
+            }
+            let vm_id = VmID::new(&self.cell_id,&vm_spec.get_id())?;
+            let mut vm = VirtualMachine::new(vm_id);
+            vm.initialize(&up_tree_id, vm_from_ca,&trees, container_specs)?;
+            self.listen_uptree(&up_tree_id, vm.get_id(), ca_from_vm)?;
 		}
-		Ok(())
-	}
-	fn deploy_vm(&mut self, up_tree_id: TreeID, vm_spec: &VmSpec) -> Result<(), Error> {
-		let allowed_trees = vm_spec.get_allowed_trees();
-		let containers = vm_spec.get_containers();
-		let vm_id = VmID::new(&self.cell_id,&vm_spec.get_id())?;
-		let mut vm = VirtualMachine::new(vm_id);
-		let mut trees = Vec::new();
-		let (vm_to_ca, ca_from_vm): (VmToCa, CaFromVm) = channel();
-		let (ca_to_vm, vm_from_ca): (CaToVm, VmFromCa) = channel();
-		let mut channel_map = HashMap::new();
-		channel_map.insert(self.control_tree_id.clone(), ca_to_vm);
-		trees.push(self.control_tree_id.get_name());
-		for allowed_tree in allowed_trees {
-			let name = allowed_tree.get_name();
-			let tree_id = match self.tree_name_map.get(name) {
-				Some(t) => t,
-				None => return Err(CellagentError::TreeMap { cell_id: self.cell_id.clone(), func_name: "deploy", tree_name: name.clone() }.into())
-			};
-			let (vm_to_ca, ca_from_vm): (VmToCa, CaFromVm) = channel();
-			let (ca_to_vm, vm_from_ca): (CaToVm, VmFromCa) = channel();
-			channel_map.insert(tree_id.clone(), ca_to_vm);
-			trees.push(name);
-			self.listen_uptree(tree_id, vm.get_id(), ca_from_vm)?;
-		}
-		vm.initialize(&up_tree_id, &trees, containers)?;
-		self.listen_uptree(&self.control_tree_id, vm.get_id(), ca_from_vm)?;
 		Ok(())
 	}
 	fn listen_uptree(&self, tree_id_ref: &TreeID, vm_id_ref: &VmID, ca_from_vm: CaFromVm)

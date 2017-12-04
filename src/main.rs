@@ -1,13 +1,10 @@
 #![deny(unused_must_use)]
 #![recursion_limit="1024"]
 extern crate eval;
-extern crate failure;
-#[macro_use]
-extern crate failure_derive;
-extern crate rand; 
+#[macro_use] extern crate failure;
+extern crate rand;
 extern crate serde;
-#[macro_use]
-extern crate serde_derive;
+#[macro_use] extern crate serde_derive;
 extern crate serde_json;
 extern crate uuid;
 
@@ -65,7 +62,6 @@ fn main() {
 	println!("\nMain exit");
 }
 fn is2e(i: usize, j: usize) -> Edge { Edge { v: (CellNo(i),CellNo(j)) } }
-use blueprint::BlueprintError;
 fn run() -> Result<(), Error> {
 	println!("Multicell Routing: Output to file {} (set in config.rs)", OUTPUT_FILE_NAME);
 /* Doesn't work when debugging in Eclipse

@@ -6,7 +6,7 @@ authors = ["alanhkarp <alanhkarp@gmail.com>"]
 [dependencies]
 crossbeam = "0.2"
 eval = "^0.4"
-#failure = "0.1.0"
+failure = "0.1.0"
 #failure_derive = "0.1.0"
 rand = "*" # Or a specific version
 serde = "0.9"
@@ -14,7 +14,7 @@ serde_derive = "0.9"
 serde_json = "0.9.9"
 uuid = { version = "0.4", features = ["serde", "v4"] }
 
-[dependencies.failure]
-git = "https://github.com/withoutboats/failure.git"
-[dependencies.failure_derive]
-git = "https://github.com/withoutboats/failure_derive.git"
+#[dependencies.failure]
+#git = "https://github.com/withoutboats/failure.git"
+#[dependencies.failure_derive]
+#git = "https://github.com/withoutboats/failure_derive.git"

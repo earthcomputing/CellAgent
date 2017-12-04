@@ -3,7 +3,7 @@ use std::sync::mpsc::channel;
 
 use failure::{Error, Fail, ResultExt};
 
-use container::{Container, Service};
+use container::{Container};
 use message_types::{VmToCa, VmFromCa, VmToContainerMsg, VmToContainer, ContainerFromVm,
 	ContainerToVmMsg, ContainerToVm, VmFromContainer, ContainerVmError};
 use name::{ContainerID, TreeID, UptreeID, VmID};
@@ -13,28 +13,30 @@ use utility::write_err;
 #[derive(Debug, Clone, Hash, Eq, PartialEq, Serialize, Deserialize)]
 pub struct VirtualMachine {
 	id: VmID,
-	containers: Vec<ContainerSpec>,
+	container_specs: Vec<ContainerSpec>,
 }
 impl VirtualMachine {
 	pub fn new(id: VmID) -> VirtualMachine {
-		VirtualMachine { id: id, containers: Vec::new() }
+		VirtualMachine { id: id, container_specs: Vec::new() }
 	}
-	pub fn initialize(&mut self, up_tree_id: &TreeID, tree_map: &Vec<&str>,
-			containers: &Vec<ContainerSpec>) -> Result<(), Error> {
-		//self.listen_ca(vm_from_ca)?;
-/*		
-		while services.len() > 0 {
+	pub fn initialize(&mut self, up_tree_id: &TreeID, vm_from_ca: VmFromCa, tree_map: &Vec<&str>,
+			container_specs: &Vec<ContainerSpec>) -> Result<(), Error> {
+		self.listen_ca(vm_from_ca)?;
+		for container_spec in container_specs {
 			let (vm_to_container, container_from_vm): (VmToContainer, ContainerFromVm) = channel();
 			let (container_to_vm, vm_from_container): (ContainerToVm, VmFromContainer) = channel();
-			let service = services.pop().unwrap();
-			let name = format!("Container:{}+{}", self.id, self.containers.len() + 1);
+			let name = format!("Container:{}+{}", self.id, self.container_specs.len() + 1);
 			let container_id = ContainerID::new(&name)?;
-			let container = Container::new(container_id.clone(), service);
-			container.initialize(up_tree_id, tree_ids, container_to_vm, container_from_vm)?;
+            let service_name = container_spec.get_image();
+            let allowed_trees = container_spec.get_allowed_trees();
+            //let up_tree_id = container_spec.get_up_tree_id();
+			let container = Container::new(container_id.clone(), allowed_trees,
+                 container_to_vm, service_name.as_str());
+			//container.initialize(up_tree_id, container_from_vm)?;
 			//self.containers.insert(up_tree_id.clone(), vec![vm_to_container]);
-			self.listen_container(container_id, vm_from_container, vm_to_ca.clone())?;
+			//self.listen_container(container_id, vm_from_container, vm_to_ca.clone())?;
 		}
-*/		
+
 		Ok(())
 	}
 	pub fn get_id(&self) -> &VmID { &self.id }	

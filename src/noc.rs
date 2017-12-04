@@ -54,7 +54,7 @@ impl Noc {
 		join_handles.push(join_port);
 		let nap = time::Duration::from_millis(1000);
 		sleep(nap);
-		println!("{}", dc);
+		println!("---> Change line noc.rs:57 to print datacenter");//println!("{}", dc);
 		Ok(join_handles)
 	}
 	fn build_datacenter(&self, blueprint: &Blueprint) -> Result<(Datacenter, Vec<JoinHandle<()>>), Error> {

@@ -26,7 +26,7 @@ impl Manifest {
 		for a in allowed_refs { allowed_trees.push(a.clone()); }
 		let mut vms = Vec::new();
 		for v in vm_refs {
-			vms.push(v.clone());
+			vms.push(v.to_owned());
 			let allowed = v.get_allowed_trees();
 			for tree in allowed {
 				if !allowed_trees.contains(tree) { return Err(UptreeSpecError::Allowed { func_name: "new", vm_id: v.get_id(), tree: tree.clone() }.into()); }
@@ -113,8 +113,9 @@ impl ContainerSpec {
 		for a in allowed_refs { allowed_trees.push(a.clone()); }
 		Ok(ContainerSpec { id: S(id), image: S(image), params: params, allowed_trees: allowed_trees })
 	}
-	fn get_id(&self) -> String { self.id.clone() }
-	fn get_allowed_trees(&self) -> &Vec<AllowedTree> { &self.allowed_trees }
+	pub fn get_id(&self) -> String { self.id.clone() }
+	pub fn get_image(&self) -> String { self.image.clone() }
+	pub fn get_allowed_trees(&self) -> &Vec<AllowedTree> { &self.allowed_trees }
 }
 impl fmt::Display for ContainerSpec {
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
