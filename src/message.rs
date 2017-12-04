@@ -386,15 +386,11 @@ impl Message for StackTreeMsg {
 			let black_tree_name = self.payload.get_black_tree_name();
 			if let Some(black_tree_id) = tree_map.get(black_tree_name) {
 				if let Some(tree_id) = tree_map.get(tree_name) {
-					let manifest = Manifest::new(black_tree_name, CellConfig::Large, &tree_name, Vec::new(), 
-						Vec::new(), Vec::new(), &gvm_eqn)?;
-					match ca.stack_tree(&tree_id, &msg_tree_id, black_tree_id, &manifest) {
-						Ok(_) => (),
-						Err(err) => return Err(MessageError::Message { func_name: "process_ca", handler: "stack tree" }.into())
-					}
+					let manifest = Manifest::new(black_tree_name, CellConfig::Large, &tree_name,
+                        Vec::new(),Vec::new(), Vec::new(), &gvm_eqn)?;
+					ca.stack_tree(&tree_id, &msg_tree_id, black_tree_id, &manifest)?
 				} else {
-					return Err(MessageError::TreeMapEntry { tree_name: tree_name.to_string(), func_name: "process stack tree (black)" }.into());
-				}			
+					return Err(MessageError::TreeMapEntry { tree_name: tree_name.to_string(), func_name: "process stack tree (black)" }.into()); }
 			} else {
 				return Err(MessageError::TreeMapEntry { tree_name: S(black_tree_name), func_name: "process stack tree" }.into());
 			}

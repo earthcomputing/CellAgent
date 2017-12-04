@@ -3,7 +3,7 @@ use std::collections::HashMap;
 
 use failure::{Error, Fail, ResultExt};
 
-use name::{Name,TenantID};
+use name::{Name, TenantID};
 use utility::S;
 
 #[derive(Clone)]

@@ -127,10 +127,8 @@ pub fn write_err(caller: &str, e: Error) {
 	use ::std::io::Write;
 	let stderr = &mut ::std::io::stderr();
 	let _ = writeln!(stderr, "*** Error {}: {}", caller, e);
-	let mut fail: &Fail = e.cause();
-	while let Some(cause) = fail.cause() {
-		let _ = writeln!(stderr, "Caused by: {}", cause);
-		fail = cause;
+	for cause in e.causes() {
+		println!("*** Caused by {}", cause);
 	}
 	let fail: &Fail = e.cause();
 	if let Some(backtrace) = fail.cause().and_then(|cause| cause.backtrace()) {
