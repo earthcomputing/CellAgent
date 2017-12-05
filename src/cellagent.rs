@@ -277,7 +277,6 @@ impl CellAgent {
 			let (ca_to_vm, vm_from_ca): (CaToVm, VmFromCa) = channel();
             let vm_id = VmID::new(&self.cell_id, &vm_spec.get_id())?;
             let allowed_trees = vm_spec.get_allowed_trees();
-            let mut vm = VirtualMachine::new(&vm_id, vm_to_ca, allowed_trees);
             let mut trees = HashSet::new();
             trees.insert(AllowedTree::new(CONTROL_TREE_NAME));
             for allowed_tree in allowed_trees {
@@ -288,6 +287,7 @@ impl CellAgent {
                 };
             }
             let container_specs = vm_spec.get_containers();
+            let mut vm = VirtualMachine::new(&vm_id, vm_to_ca, allowed_trees);
             vm.initialize(&up_tree_id, vm_from_ca,&trees, container_specs)?;
             self.ca_to_vms.insert(vm_id, ca_to_vm,);
             self.listen_uptree(&up_tree_id, vm.get_id(), &trees, ca_from_vm)?;
@@ -454,7 +454,6 @@ impl CellAgent {
 			//println!("Cell {}: Sending on ports {}: {}", self.cell_id, port_no_mask, tree_name_msg);
 			let packets = tree_name_msg.to_packets(&new_tree_id)?;
 			self.send_msg(new_tree_id.get_uuid(), &packets, port_no_mask)?;
-//			self.send_tree_names(&new_tree_id, allowed_trees, port_number);
             Ok(())
 		} else {
 			//println!("Cell {}: port {} connected", self.cell_id, *port_no);
