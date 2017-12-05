@@ -17,7 +17,7 @@ pub enum Service {
     NocAgent { service: NocAgent }
 }
 impl Service {
-    pub fn create_service<>(container_id: &ContainerID, service_name: &str) -> Result<Service, Error> {
+    pub fn create_service(container_id: &ContainerID, service_name: &str) -> Result<Service, Error> {
         match service_name {
             NOCMASTER => Ok(Service::NocMaster { service: NocMaster::new(container_id.clone(), NOCMASTER) }),
             NOCAGENT => Ok(Service::NocAgent { service: NocAgent::new(container_id.clone(), NOCAGENT) }),
