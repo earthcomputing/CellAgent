@@ -12,19 +12,16 @@ use uptree_spec::AllowedTree;
 pub struct Container {
 	id: ContainerID,
     allowed_trees: Vec<AllowedTree>,
-    container_to_vm: ContainerToVm,
 	service: Service,
 }
 impl Container {
-	pub fn new(id: ContainerID, allowed_trees: &Vec<AllowedTree>, container_to_vm: ContainerToVm, service_name: &str,
-            ) -> Result<Container, Error> {
-        let service = Service::create_service( &id, service_name)?;
-        println!("{}", service);
- 		Ok(Container { id: id, allowed_trees: allowed_trees.clone(), container_to_vm: container_to_vm, service: service })
+	pub fn new(id: &ContainerID, service_name: &str, allowed_trees: &Vec<AllowedTree>,
+               container_to_vm: ContainerToVm) -> Result<Container, Error> {
+        let service = Service::new( &id, service_name, allowed_trees, container_to_vm)?;
+ 		Ok(Container { id: id.clone(), allowed_trees: allowed_trees.clone(), service: service })
 	}
-	pub fn initialize(&self, up_tree_id: &UptreeID, tree_ids: &HashMap<&str, TreeID>,
-			container_from_vm: ContainerFromVm) -> Result<(), Error> {
-        Ok(())
+	pub fn initialize(&self, up_tree_id: &TreeID, container_from_vm: ContainerFromVm) -> Result<(), Error> {
+        self.service.initialize(up_tree_id, container_from_vm)
 	}
 }
 impl fmt::Display for Container {
