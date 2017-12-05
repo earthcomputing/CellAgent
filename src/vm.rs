@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::sync::mpsc::channel;
 
 use failure::{Error, Fail, ResultExt};
@@ -10,28 +10,35 @@ use name::{ContainerID, TreeID, UptreeID, VmID};
 use uptree_spec::{AllowedTree, ContainerSpec};
 use utility::write_err;
 
-#[derive(Debug, Clone, Hash, Eq, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone)]
 pub struct VirtualMachine {
 	id: VmID,
-	container_specs: Vec<ContainerSpec>,
+    vm_to_ca: VmToCa,
+    allowed_trees: Vec<AllowedTree>
 }
 impl VirtualMachine {
-	pub fn new(id: VmID) -> VirtualMachine {
-		VirtualMachine { id: id, container_specs: Vec::new() }
+	pub fn new(id: &VmID, vm_to_ca: VmToCa, allowed_trees_ref: &Vec<AllowedTree>) -> VirtualMachine {
+		VirtualMachine { id: id.clone(), vm_to_ca: vm_to_ca, allowed_trees:allowed_trees_ref.clone() }
 	}
-	pub fn initialize(&mut self, up_tree_id: &TreeID, vm_from_ca: VmFromCa, tree_map: &Vec<&str>,
+	pub fn initialize(&mut self, up_tree_id: &TreeID, vm_from_ca: VmFromCa, vm_trees: &HashSet<AllowedTree>,
 			container_specs: &Vec<ContainerSpec>) -> Result<(), Error> {
 		self.listen_ca(vm_from_ca)?;
 		for container_spec in container_specs {
 			let (vm_to_container, container_from_vm): (VmToContainer, ContainerFromVm) = channel();
 			let (container_to_vm, vm_from_container): (ContainerToVm, VmFromContainer) = channel();
-			let name = format!("Container:{}+{}", self.id, self.container_specs.len() + 1);
+			let name = format!("Container:{}+{}", self.id, container_specs.len() + 1);
 			let container_id = ContainerID::new(&name)?;
             let service_name = container_spec.get_image();
             let allowed_trees = container_spec.get_allowed_trees();
-            //let up_tree_id = container_spec.get_up_tree_id();
+            let mut trees = Vec::new();
+			for allowed_tree in allowed_trees {
+                match vm_trees.get(allowed_tree) {
+                    Some(_) => trees.push(allowed_tree),
+                    None => return Err(VmError::AllowedTree { func_name: "deploy", tree: allowed_tree.clone(), vm_id: self.id.clone() }.into())
+                };
+            }
 			let container = Container::new(container_id.clone(), allowed_trees,
-                 container_to_vm, service_name.as_str());
+                 container_to_vm, service_name.as_str())?;
 			//container.initialize(up_tree_id, container_from_vm)?;
 			//self.containers.insert(up_tree_id.clone(), vec![vm_to_container]);
 			//self.listen_container(container_id, vm_from_container, vm_to_ca.clone())?;
@@ -71,4 +78,9 @@ impl VirtualMachine {
 			vm_to_ca.send(msg)?;
 		}
 	}
+}
+#[derive(Debug, Fail)]
+pub enum VmError {
+    #[fail(display = "VM {}: {} is not an allowed tree for VM {}", func_name, tree, vm_id)]
+    AllowedTree { func_name: &'static str, tree: AllowedTree, vm_id: VmID }
 }
