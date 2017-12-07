@@ -3,7 +3,7 @@ use serde_json;
 use std::collections::{HashSet};
 use eval::{Expr, to_value};
 
-use failure::Error;
+use failure::{Error, ResultExt};
 
 use config::{CellNo, PathLength};
 use utility::S;
@@ -37,8 +37,8 @@ impl GvmEquation {
 				GvmEqn::Save(s) => save = S(s),
 			}
 		}
-		GvmEquation { recv_eqn: recv, send_eqn: send, 
-			save_eqn: save, xtnd_eqn: xtnd, variables: variables }
+		GvmEquation { recv_eqn: recv, send_eqn: send,
+			save_eqn: save, xtnd_eqn: xtnd, variables: variables.clone() }
 	}
 	pub fn get_variables(&self) -> &Vec<GvmVariable> { &self.variables }
 	pub fn eval_recv(&self, params: &Vec<GvmVariable>) -> Result<bool, Error> {
@@ -60,16 +60,16 @@ impl GvmEquation {
 			let str_value = variable.get_value();
 			match *var_type {
 				GvmVariableType::CellNo => {
-					let value = serde_json::from_str::<CellNo>(&str_value)?;
-					expr = expr.clone().value(variable.get_value(), value);					
+					let value = serde_json::from_str::<CellNo>(&str_value).context(GvmEquationError::Deserialize { func_name: "evaluate", var_type: var_type.clone(), expr: str_value })?;
+ 					expr = expr.value(variable.get_value(), *value);
 				},
 				GvmVariableType::PathLength => {
-					let value = serde_json::from_str::<PathLength>(&str_value)?;
-					expr = expr.clone().value(variable.get_value(), value);
+					let value = serde_json::from_str::<PathLength>(&str_value).context(GvmEquationError::Deserialize { func_name: "evaluate", var_type: var_type.clone(), expr: str_value })?;
+					expr = expr.value(variable.get_value(), **value);
 				},
-			};
+			}
 		}
-		let result = expr.exec()?;
+		let result = expr.exec().context(GvmEquationError::Eval { func_name: "evaluate", eqn: self.clone() })?;
 		Ok(result == to_value(true))
 	}
 }
@@ -111,5 +111,12 @@ impl GvmVariable {
 }
 impl fmt::Display for GvmVariable { 
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result { 
-		write!(f, "{}:{}", self.value, self.var_type) }
+		write!(f, "{}:{:?}", self.var_type, self.value) }
+}
+#[derive(Debug, Fail)]
+pub enum GvmEquationError {
+    #[fail(display = "GvmEquationError::Eval {}: Equation {}", func_name, eqn)]
+    Eval { func_name: &'static str, eqn: GvmEquation },
+    #[fail(display = "GvmEquationError::Deserialize {}: Problem deserializing {} {}", func_name, var_type, expr)]
+    Deserialize { func_name: &'static str, var_type: GvmVariableType, expr: String }
 }

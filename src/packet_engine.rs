@@ -149,8 +149,8 @@ impl fmt::Display for PacketEngine {
 // Errors
 #[derive(Debug, Fail)]
 pub enum PacketEngineError {
-	#[fail(display = "PacketEngine {}: No sender for port {:?} on cell {}", func_name, port_no, cell_id)]
+	#[fail(display = "PacketEngineError::Sender {}: No sender for port {:?} on cell {}", func_name, port_no, cell_id)]
 	Sender { func_name: &'static str, cell_id: CellID, port_no: PortNo },
-    #[fail(display = "PacketEngine {}: CellID {}: index {:?}, entry uuid {}, packet uuid {}", func_name, cell_id, index, table_uuid, packet_uuid)]
+    #[fail(display = "PacketEngineError::Uuid {}: CellID {}: index {:?}, entry uuid {}, packet uuid {}", func_name, cell_id, index, table_uuid, packet_uuid)]
     Uuid { func_name: &'static str, cell_id: CellID, index: TableIndex, table_uuid: Uuid, packet_uuid: Uuid }
 }

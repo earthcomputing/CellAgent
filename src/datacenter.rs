@@ -106,12 +106,12 @@ impl fmt::Display for Datacenter {
 // Errors
 #[derive(Debug, Fail)]
 pub enum DatacenterError {
-    #[fail(display = "Datacenter {}: No boundary cells found", func_name)]
+    #[fail(display = "DatacenterError::Boundary {}: No boundary cells found", func_name)]
     Boundary { func_name: &'static str },
-    #[fail(display = "Datacenter {}: The number of cells {:?} must be at least 1", func_name, ncells)]
+    #[fail(display = "DatacenterError::Cells {}: The number of cells {:?} must be at least 1", func_name, ncells)]
     Cells { ncells: CellNo, func_name: &'static str },
-    #[fail(display = "Datacenter {}: {:?} is not enough links to connect all cells", func_name, nlinks)]
+    #[fail(display = "DatacenterError::Edges {}: {:?} is not enough links to connect all cells", func_name, nlinks)]
     Edges { nlinks: LinkNo, func_name: &'static str },
-    #[fail(display = "Datacenter {}: {:?} is not a valid edge", func_name, edge)]
+    #[fail(display = "DatacenterError::Wire {}: {:?} is not a valid edge", func_name, edge)]
     Wire { edge: Edge, func_name: &'static str }
 }

@@ -1,5 +1,5 @@
 use std::fmt;
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 
 use failure::{Error, Fail, ResultExt};
 
@@ -126,7 +126,7 @@ pub fn append2file(line: String) -> Result<(), Error> {
 pub fn write_err(caller: &str, e: Error) {
 	use ::std::io::Write;
 	let stderr = &mut ::std::io::stderr();
-	let _ = writeln!(stderr, "*** Error {}: {}", caller, e);
+	let _ = writeln!(stderr, "*** {}: {}", caller, e);
 	for cause in e.causes() {
 		println!("*** Caused by {}", cause);
 	}
@@ -141,10 +141,10 @@ pub fn S<T: fmt::Display>(s: T) -> String { s.to_string() }
 // Errors
 #[derive(Debug, Fail)]
 pub enum UtilityError {
-    #[fail(display = "{}: Utility: Cell {} has no tenant mask", func_name, cell_id)]
+    #[fail(display = "UtilityError::Mask {}: Cell {} has no tenant mask", func_name, cell_id)]
     Mask { cell_id: CellID, func_name: String},
-    #[fail(display = "{}: Utility: Port number {:?} is larger than the maximum of {:?}", func_name, port_no, max)]
+    #[fail(display = "UtilityError::PortNumber {}: Port number {:?} is larger than the maximum of {:?}", func_name, port_no, max)]
     PortNumber { port_no: PortNo, func_name: String, max: PortNo },
-    #[fail(display = "{}: Utility: {} is not implemented", func_name, feature)]
+    #[fail(display = "UtilityError::Unimplemented {}: {} is not implemented", func_name, feature)]
     Unimplemented { feature: String, func_name: String }
 }

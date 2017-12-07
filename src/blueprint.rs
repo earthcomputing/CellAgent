@@ -98,6 +98,6 @@ impl fmt::Display for InteriorCell {
 // Errors
 #[derive(Debug, Fail)]
 pub enum BlueprintError {
-    #[fail(display = "Blueprint {}: Invalid blueprint has more border cells {} than total cells {}", func_name, ncells, num_border)]
+    #[fail(display = "BlueprintError::CellCount {}: Invalid blueprint has more border cells {} than total cells {}", func_name, ncells, num_border)]
     CellCount { func_name: &'static str, ncells: usize, num_border: usize}
 }

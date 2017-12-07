@@ -5,7 +5,7 @@ authors = ["alanhkarp <alanhkarp@gmail.com>"]
 
 [dependencies]
 crossbeam = "0.2"
-eval = "^0.4"
+eval = "^0.4.1"
 failure = "0.1.0"
 #failure_derive = "0.1.0"
 rand = "*" # Or a specific version

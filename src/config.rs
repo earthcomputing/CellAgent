@@ -29,6 +29,7 @@ impl Deref for PacketNo { type Target = u16; fn deref(&self) -> &Self::Target { 
 #[derive(Debug, Copy, Clone, Hash, Serialize, Deserialize)]
 pub struct PathLength(pub CellNo);
 impl Deref for PathLength { type Target = CellNo; fn deref(&self) -> &Self::Target { &self.0 } }
+impl fmt::Display for PathLength { 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result { write!(f, "{}", *self.0)} }
 #[derive(Debug, Copy, Clone, Hash, Eq, PartialEq, Ord, PartialOrd, Serialize, Deserialize)]
 pub struct PortNo { pub v: u8 }
 impl Deref for PortNo { type Target = u8; fn deref(&self) -> &Self::Target { &self.v } }
