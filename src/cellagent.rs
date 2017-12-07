@@ -529,22 +529,22 @@ impl fmt::Display for CellAgent {
 // Errors
 #[derive(Debug, Fail)]
 pub enum CellagentError {
-    #[fail(display = "CellAgent {}: No VMs in manifest for cell {}", func_name, cell_id)]
+    #[fail(display = "CellAgentError::ManifestVms {}: No VMs in manifest for cell {}", func_name, cell_id)]
     ManifestVms { cell_id: CellID, func_name: &'static str },
-    //#[fail(display = "CellAgent {}: Error packetizing TreeNameMsg at cell {}: error {}", func_name, cell_id, error)]
+    //#[fail(display = "CellAgentError::Message {}: Error packetizing TreeNameMsg at cell {}: error {}", func_name, cell_id, error)]
     //Message { cell_id: CellID, func_name: &'static str, #[cause] error: Error },
-    #[fail(display = "Cellagent {}: A Traph with TreeID {} does not exist on cell {}", func_name, tree_uuid, cell_id)]
+    #[fail(display = "CellAgentError::NoTraph {}: A Traph with TreeID {} does not exist on cell {}", func_name, tree_uuid, cell_id)]
     NoTraph { cell_id: CellID, func_name: &'static str, tree_uuid: Uuid },
-    #[fail(display = "Cellagent {}: No more room in routing table for cell {}", func_name, cell_id)]
+    #[fail(display = "CellAgentError::Size {}: No more room in routing table for cell {}", func_name, cell_id)]
     Size { cell_id: CellID, func_name: &'static str },
-    #[fail(display = "Cellagent {}: Problem stacking tree {} on cell {}", func_name, tree_id, cell_id)]
+    #[fail(display = "CellAgentError::StackTree {}: Problem stacking tree {} on cell {}", func_name, tree_id, cell_id)]
     StackTree { func_name: &'static str, tree_id: TreeID, cell_id: CellID },
-    #[fail(display = "Cellagent {}: Cell {} has no tenant mask", func_name, cell_id)]
+    #[fail(display = "CellAgentError::TenantMask {}: Cell {} has no tenant mask", func_name, cell_id)]
     TenantMask { func_name: &'static str, cell_id: CellID },
-    #[fail(display = "Cellagent {}: Cell {} has no tree map entry for {}", func_name, cell_id, tree)]
+    #[fail(display = "CellAgentError::TreeMap {}: Cell {} has no tree map entry for {}", func_name, cell_id, tree)]
     TreeMap { func_name: &'static str, cell_id: CellID, tree: AllowedTree },
-    #[fail(display = "Cellagent {}: TreeID {} does not exist on cell {}", func_name, tree_uuid, cell_id)]
+    #[fail(display = "CellAgentError::Tree {}: TreeID {} does not exist on cell {}", func_name, tree_uuid, cell_id)]
     Tree { func_name: &'static str, cell_id: CellID, tree_uuid: Uuid },
-    #[fail(display = "Cellagent {}: No tree associated with index {:?} on cell {}", func_name, index, cell_id)]
+    #[fail(display = "CellAgentError::TreeIndex {}: No tree associated with index {:?} on cell {}", func_name, index, cell_id)]
     TreeIndex { func_name: &'static str, index: TableIndex, cell_id: CellID }
 }
