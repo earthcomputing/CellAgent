@@ -47,6 +47,6 @@ impl fmt::Display for RoutingTable {
 // Errors
 #[derive(Debug, Fail)]
 pub enum RoutingTableError {
-    #[fail(display = "RoutingTable {}: {:?} is not a valid routing table index on cell {}", func_name, index, cell_id)]
+    #[fail(display = "RoutingTableError::Index {}: {:?} is not a valid routing table index on cell {}", func_name, index, cell_id)]
     Index { func_name: &'static str, index: TableIndex, cell_id: CellID}
 }

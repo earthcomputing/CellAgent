@@ -63,6 +63,6 @@ impl fmt::Display for ECArgs {
 // Errors
 #[derive(Debug, Fail)]
 pub enum EcargsError {
-    #[fail(display = "Ecargs{}:  You asked for {:?} ports, but only {:?} are allowed", func_name, nports, max)]
+    #[fail(display = "EcargsError::NumberPorts {}:  You asked for {:?} ports, but only {:?} are allowed", func_name, nports, max)]
     NumberPorts { func_name: &'static str, nports: PortNo, max: PortNo}
 }

@@ -529,16 +529,16 @@ impl fmt::Display for TreeNameMsgPayload {
 // Errors
 #[derive(Debug, Fail)]
 pub enum MessageError {
-    #[fail(display = "Message {}: Invalid message type {} from packet assembler", func_name, msg_type)]
+    #[fail(display = "MessageError::InvalidMsgType {}: Invalid message type {} from packet assembler", func_name, msg_type)]
     InvalidMsgType { func_name: &'static str, msg_type: MsgType },
-    #[fail(display = "Message {}: No GVM in manifest", func_name)]
+    #[fail(display = "MessageError::ManifestGmv {}: No GVM in manifest", func_name)]
     ManifestGvm { func_name: &'static str },
-    #[fail(display = "Message {}: Message error from {}", func_name, handler)]
+    #[fail(display = "MessageError::Message {}: Message error from {}", func_name, handler)]
     Message { func_name: &'static str, handler: &'static str },
-    #[fail(display = "Message {}: Wrong payload for this message type", func_name)]
+    #[fail(display = "MessageError::Payload {}: Wrong payload for this message type", func_name)]
     Payload { func_name: &'static str },
-    #[fail(display = "Message {}: Wrong message process function called", func_name)]
+    #[fail(display = "MessageError::Process {}: Wrong message process function called", func_name)]
     Process { func_name: &'static str },
-    #[fail(display = "Message {}: No tree named {} in map", func_name, tree_name)]
+    #[fail(display = "MessageError::TreeMapEntry {}: No tree named {} in map", func_name, tree_name)]
     TreeMapEntry { func_name: &'static str, tree_name: String }
 }

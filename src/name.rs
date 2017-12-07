@@ -162,6 +162,6 @@ impl fmt::Display for ContainerID { fn fmt(&self, f: &mut fmt::Formatter) -> fmt
 // Errors
 #[derive(Debug, Fail)]
 pub enum NameError {
-	#[fail(display = "Name {}: '{}' contains blanks.", func_name, name)]
+	#[fail(display = "NameError::Format {}: '{}' contains blanks.", func_name, name)]
 	Format { func_name: &'static str, name: String }
 }

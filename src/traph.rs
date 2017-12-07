@@ -158,8 +158,8 @@ impl Traph {
 		for var in vars {
 			match var.get_value().as_ref() {
 				"hops" => {
-					let hops = *(self.get_hops()?);
-					variables.push(GvmVariable::new(GvmVariableType::CellNo, *hops));
+					let hops = self.get_hops()?;
+					variables.push(GvmVariable::new(GvmVariableType::PathLength, hops));
 				},
 				_ => ()
 			}
@@ -202,8 +202,8 @@ impl fmt::Display for PortStatus {
 // Errors
 #[derive(Debug, Fail)]
 pub enum TraphError {
-	#[fail(display = "Traph {}: No parent element for tree {} on cell {}", func_name, tree_id, cell_id)]
+	#[fail(display = "TraphError::ParentElement {}: No parent element for tree {} on cell {}", func_name, tree_id, cell_id)]
 	ParentElement { func_name: &'static str, cell_id: CellID, tree_id: TreeID },
-    #[fail(display = "Traph {}: No tree with UUID {} on cell {}", func_name, tree_uuid, cell_id)]
+    #[fail(display = "TraphError::Tree {}: No tree with UUID {} on cell {}", func_name, tree_uuid, cell_id)]
     Tree { func_name: &'static str, cell_id: CellID, tree_uuid: Uuid }
 }

@@ -17,6 +17,7 @@ pub struct Container {
 impl Container {
 	pub fn new(id: &ContainerID, service_name: &str, allowed_trees: &Vec<AllowedTree>,
                container_to_vm: ContainerToVm) -> Result<Container, Error> {
+        //println!("Create container {}", id);
         let service = Service::new( &id, service_name, allowed_trees, container_to_vm)?;
  		Ok(Container { id: id.clone(), allowed_trees: allowed_trees.clone(), service: service })
 	}

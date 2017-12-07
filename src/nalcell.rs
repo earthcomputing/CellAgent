@@ -125,10 +125,10 @@ impl fmt::Display for NalCell {
 // Errors
 #[derive(Debug, Fail)]
 pub enum NalcellError {
-    #[fail(display = "NalCell {}: No receiver for port {:?}", func_name, port_no)]
+    #[fail(display = "NalcellError::Channel {}: No receiver for port {:?}", func_name, port_no)]
     Channel { func_name: &'static str, port_no: PortNo },
-    #[fail(display = "NalCell {}: All ports have been assigned for cell {}", func_name, cell_id)]
+    #[fail(display = "NalcellError::NoFreePorts {}: All ports have been assigned for cell {}", func_name, cell_id)]
     NoFreePorts { func_name: &'static str, cell_id: CellID },
-    #[fail(display = "NalCell {}: You asked for {:?} ports, but only {:?} are allowed", func_name, nports, max_ports)]
+    #[fail(display = "NalcellError::NumberPorts {}: You asked for {:?} ports, but only {:?} are allowed", func_name, nports, max_ports)]
     NumberPorts { func_name: &'static str, nports: PortNo, max_ports: PortNo }
 }

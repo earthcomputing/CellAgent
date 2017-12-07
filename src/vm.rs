@@ -19,6 +19,7 @@ pub struct VirtualMachine {
 }
 impl VirtualMachine {
 	pub fn new(id: &VmID, vm_to_ca: VmToCa, allowed_trees_ref: &Vec<AllowedTree>) -> VirtualMachine {
+        //println!("Create VM {}", id);
 		VirtualMachine { id: id.clone(), vm_to_ca: vm_to_ca, allowed_trees:allowed_trees_ref.clone(),
             containers: HashMap::new() }
 	}
@@ -44,7 +45,7 @@ impl VirtualMachine {
 	}
 	pub fn get_id(&self) -> &VmID { &self.id }	
 	fn listen_ca(&self, vm_from_ca: VmFromCa) -> Result<(), Error> {
-		println!("VM {}: listening to Ca", self.id);
+		//println!("VM {}: listening to Ca", self.id);
 		let vm = self.clone();
 		::std::thread::spawn( move || -> Result<(), Error> {
 			let _ = vm.listen_ca_loop(vm_from_ca).map_err(|e| write_err("vm", e));
@@ -54,7 +55,7 @@ impl VirtualMachine {
 	}	
 	fn listen_container(&self, container_id: ContainerID, vm_from_container: VmFromContainer, 
 			vm_to_ca: VmToCa) -> Result<(), Error> {
-		println!("VM {}: listening to container {}", self.id, container_id);
+		//println!("VM {}: listening to container {}", self.id, container_id);
 		let vm = self.clone();
 		::std::thread::spawn( move || -> Result<(), Error> {
 			let _ = vm.listen_container_loop(container_id, vm_from_container, vm_to_ca).map_err(|e| write_err("vm", e));
@@ -79,6 +80,6 @@ impl VirtualMachine {
 }
 #[derive(Debug, Fail)]
 pub enum VmError {
-    #[fail(display = "VM {}: {} is not an allowed tree for VM {}", func_name, tree, vm_id)]
+    #[fail(display = "VmError::AllowedTree {}: {} is not an allowed tree for VM {}", func_name, tree, vm_id)]
     AllowedTree { func_name: &'static str, tree: AllowedTree, vm_id: VmID }
 }

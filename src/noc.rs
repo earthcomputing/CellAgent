@@ -54,7 +54,7 @@ impl Noc {
 		join_handles.push(join_port);
 		let nap = time::Duration::from_millis(1000);
 		sleep(nap);
-		println!("---> Change line noc.rs:57 to print datacenter");//println!("{}", dc);
+		println!("---> Change line noc.rs:57 to print datacenter"); println!("{}", dc);
 		Ok(join_handles)
 	}
 	fn build_datacenter(&self, blueprint: &Blueprint) -> Result<(Datacenter, Vec<JoinHandle<()>>), Error> {
@@ -97,11 +97,11 @@ impl Noc {
         match self.allowed_trees.get(&self.base_tree) {
             Some(deployment_tree) => {
                 let mut eqns = HashSet::new();
-                eqns.insert(GvmEqn::Recv("true"));
-                eqns.insert(GvmEqn::Send("false"));
-                eqns.insert(GvmEqn::Xtnd("false"));
-                eqns.insert(GvmEqn::Save("false"));
-                let ref gvm_eqn = GvmEquation::new(eqns, Vec::new());
+                eqns.insert(GvmEqn::Recv("hops == 0"));
+                eqns.insert(GvmEqn::Send("hops > 0"));
+                eqns.insert(GvmEqn::Xtnd("true"));
+                eqns.insert(GvmEqn::Save("true"));
+                let ref gvm_eqn = GvmEquation::new(eqns, vec![GvmVariable::new(GvmVariableType::PathLength,"hops")]);
                 let vm_uptree = UpTreeSpec::new("NocMasterTreeVm", vec![0])?;
                 let container_uptree = UpTreeSpec::new("NocMasterTreeContainer", vec![0])?;
                 let ref base_tree = AllowedTree::new(deployment_tree.get_name());
@@ -130,10 +130,10 @@ impl Noc {
 // Errors
 #[derive(Debug, Fail)]
 pub enum NocError {
-    #[fail(display = "Noc {}: {} is not an allowed tree", func_name, tree_name)]
+    #[fail(display = "NocError::AllowedTree {}: {} is not an allowed tree", func_name, tree_name)]
     AllowedTree { func_name: String, tree_name: String },
-    #[fail(display = "Noc {}: {} is not a valid message type for the NOC", func_name, msg_type)]
+    #[fail(display = "NocError::MsgType {}: {} is not a valid message type for the NOC", func_name, msg_type)]
     MsgType { func_name: String, msg_type: MsgType },
-    #[fail(display = "Noc {}: {} is not a valid index in the NOC's list of tree names", func_name, index)]
+    #[fail(display = "NocError::Tree {}: {} is not a valid index in the NOC's list of tree names", func_name, index)]
     Tree { func_name: String, index: usize }
 }

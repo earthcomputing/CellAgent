@@ -62,8 +62,8 @@ impl fmt::Debug for Tenant {
 use config::CellNo;
 #[derive(Debug, Fail)]
 pub enum TenantError {
-	#[fail(display = "Tenant {}: A tenant named '{}' already exists.", func_name, tenant_name)]
+	#[fail(display = "TenantError::DuplicateName {}: A tenant named '{}' already exists.", func_name, tenant_name)]
 	DuplicateName { func_name: &'static str, tenant_name: String },
-    #[fail(display = "Tenant {}: You asked for {:?} cells, but only {:?} are available", func_name, request, available)]
+    #[fail(display = "TenantError::Quota {}: You asked for {:?} cells, but only {:?} are available", func_name, request, available)]
     Quota { func_name: &'static str, request: CellNo, available: CellNo }
 }
