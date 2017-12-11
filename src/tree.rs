@@ -1,8 +1,6 @@
 use std::fmt;
 use std::collections::HashSet;
 
-
-use failure::{Error, Fail, ResultExt};
 use uuid::Uuid;
 
 use config::{PortNo, TableIndex};
@@ -59,4 +57,11 @@ impl fmt::Display for Tree {
 		}
 		write!(f, "{}", s)
 	}	
+}
+// Errors
+use failure::{Error, Fail, ResultExt};
+#[derive(Debug, Fail)]
+pub enum RoutingTableError {
+    #[fail(display = "RoutingTableError::Chain {} {}", func_name, comment)]
+    Chain { func_name: &'static str, comment: &'static str },
 }

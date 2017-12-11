@@ -1,8 +1,6 @@
 use std::fmt;
 use std::collections::HashSet;
 
-use failure::{Error, Fail, ResultExt};
-
 use gvm_equation::GvmEquation;
 use nalcell::CellConfig;
 use utility::S;
@@ -18,12 +16,12 @@ pub struct Manifest {
 	trees: Vec<UpTreeSpec>
 }
 impl Manifest {
-	pub fn new(id: &str, cell_config: CellConfig, deployment_tree: &str, allowed_refs: Vec<&AllowedTree>,
-			vm_refs: Vec<&VmSpec>, tree_refs: Vec<&UpTreeSpec>, gvm_eqn: &GvmEquation) -> Result<Manifest, Error> {
+	pub fn new(id: &str, cell_config: CellConfig, deployment_tree: &str, allowed_refs: &Vec<&AllowedTree>,
+			vm_refs: Vec<&VmSpec>, tree_refs: Vec<&UpTreeSpec>, gvm_eqn: &GvmEquation) -> Result<Manifest, UptreeSpecError> {
 		let mut trees = Vec::new();
 		for t in tree_refs { trees.push(t.clone()); }
 		let mut allowed_trees = Vec::new();
-		for a in allowed_refs { allowed_trees.push(a.clone()); }
+		for a in allowed_refs { allowed_trees.push(a.clone().clone()); }
 		let mut vms = Vec::new();
 		for v in vm_refs {
 			vms.push(v.to_owned());
@@ -33,7 +31,7 @@ impl Manifest {
 			}
 		}
 		Ok(Manifest { id: S(id), cell_config: cell_config, deployment_tree: S(deployment_tree), 
-				allowed_trees: allowed_trees, vms: vms, trees: trees, gvm_eqn: gvm_eqn.clone() })
+				allowed_trees: allowed_trees.clone(), vms: vms, trees: trees, gvm_eqn: gvm_eqn.clone() })
 	}
 	pub fn get_id(&self) -> &String { &self.id }
 	pub fn get_gvm(&self) -> &GvmEquation { &self.gvm_eqn }
@@ -62,11 +60,11 @@ pub struct VmSpec {
 	trees: Vec<UpTreeSpec>
 }
 impl VmSpec {
-	pub fn new(id: &str, image: &str, config: CellConfig, allowed_refs: Vec<&AllowedTree>,
-			container_refs: Vec<&ContainerSpec>, tree_refs: Vec<&UpTreeSpec>) -> Result<VmSpec, Error> {
+	pub fn new(id: &str, image: &str, config: CellConfig, allowed_refs: &Vec<&AllowedTree>,
+			container_refs: Vec<&ContainerSpec>, tree_refs: Vec<&UpTreeSpec>) -> Result<VmSpec, UptreeSpecError> {
 		let mut max_tree_size = 0;
 		let mut allowed_trees = Vec::new();
-		for a in allowed_refs { allowed_trees.push(a.clone()); }
+		for a in allowed_refs { allowed_trees.push(a.clone().clone()); }
 		let mut trees = Vec::new();
 		for t in tree_refs { 
 			trees.push(t.clone());
@@ -82,7 +80,7 @@ impl VmSpec {
 			}			
 		}
 		Ok(VmSpec { id: S(id), image: S(image), required_config: config,
-				allowed_trees: allowed_trees, containers: containers, trees: trees })
+				allowed_trees: allowed_trees.clone(), containers: containers, trees: trees })
 	}
 	pub fn get_id(&self) -> String { self.id.clone() }
 	pub fn get_allowed_trees(&self) -> &Vec<AllowedTree> { &self.allowed_trees }
@@ -106,12 +104,12 @@ pub struct ContainerSpec {
 	allowed_trees: Vec<AllowedTree>
 }
 impl ContainerSpec {
-	pub fn new(id: &str, image: &str, param_refs: Vec<&str>, allowed_refs: Vec<&AllowedTree>) -> Result<ContainerSpec, Error> {
+	pub fn new(id: &str, image: &str, param_refs: Vec<&str>, allowed_refs: &Vec<&AllowedTree>) -> Result<ContainerSpec, UptreeSpecError> {
 		let mut params = Vec::new();
 		for p in param_refs { params.push(S(p)); } 
 		let mut allowed_trees = Vec::new();
-		for a in allowed_refs { allowed_trees.push(a.clone()); }
-		Ok(ContainerSpec { id: S(id), image: S(image), params: params, allowed_trees: allowed_trees })
+		for a in allowed_refs { allowed_trees.push(a.clone().clone()); }
+		Ok(ContainerSpec { id: S(id), image: S(image), params: params, allowed_trees: allowed_trees.clone() })
 	}
 	pub fn get_id(&self) -> String { self.id.clone() }
 	pub fn get_image(&self) -> String { self.image.clone() }
@@ -133,7 +131,7 @@ pub struct UpTreeSpec {
 	parent_list: Vec<usize>,
 }
 impl UpTreeSpec {
-	pub fn new(id: &str, parent_list: Vec<usize>) -> Result<UpTreeSpec, Error> {
+	pub fn new(id: &str, parent_list: Vec<usize>) -> Result<UpTreeSpec, UptreeSpecError> {
 		// Validate parent_list
 		if parent_list.len() > 1 {
 			let mut count = 0;
@@ -183,8 +181,11 @@ impl fmt::Display for AllowedTree {
 		write!(f, "{}", s)
 	}
 }
+use failure::{Error, Fail, ResultExt};
 #[derive(Debug, Fail)]
 pub enum UptreeSpecError {
+	#[fail(display = "UptreeSpecError::Chain {} {}", func_name, comment)]
+	Chain { func_name: &'static str, comment: &'static str },
 	#[fail(display = "UpTreeSpecError::Allowed {}: tree {} is not in the allowed set for vm {}", func_name, tree, vm_id)]
 	Allowed { func_name: &'static str, vm_id: String, tree: AllowedTree },
     #[fail(display = "UpTreeSpecError::Containers {}: {} containers isn't enough for the specified trees", func_name, n_containers)]

@@ -42,8 +42,6 @@ use std::fs::File;
 use std::sync::mpsc::channel;
 use std::collections::HashMap;
 
-use failure::{Error, Fail};
-
 use blueprint::Blueprint;
 use config::{BASE_TREE_NAME, CONTROL_TREE_NAME, NCELLS, NPORTS, NLINKS, OUTPUT_FILE_NAME, CellNo, Edge, PortNo};
 use ecargs::{ECArgs};
@@ -86,7 +84,7 @@ fn run() -> Result<(), Error> {
 	let mut border = HashMap::new();
 	border.insert(CellNo(2), vec![PortNo{v:2}]);
 	border.insert(CellNo(7), vec![PortNo{v:2}]);
-	let blueprint = Blueprint::new(ncells, nports, edges, exceptions, border)?;
+	let blueprint = Blueprint::new(ncells, nports, edges, exceptions, border).context(MainError::Chain { func_name: "run", comment: ""})?;
 	println!("{}", blueprint);
 //	deployment_demo()?; 	// Demonstrate features of deployment spec
 	let (outside_to_noc, noc_from_outside): (OutsideToNoc, NocFromOutside) = channel();
@@ -94,13 +92,13 @@ fn run() -> Result<(), Error> {
 	let noc = Noc::new(noc_to_outside)?;
 	let _ = noc.initialize(&blueprint, noc_from_outside)?;
 	loop {
-		stdout().write(b"Enter the name of a file containing a manifest\n")?;
+		stdout().write(b"Enter the name of a file containing a manifest\n").context(MainError::Chain { func_name: "run", comment: ""})?;
 		let mut filename = String::new();
-		let _ = stdin().read_line(&mut filename)?;
-		let mut f = File::open(filename.trim())?;
+		let _ = stdin().read_line(&mut filename).context(MainError::Chain { func_name: "run", comment: ""})?;
+		let mut f = File::open(filename.trim()).context(MainError::Chain { func_name: "run", comment: ""})?;
 		let mut manifest = String::new();
-		let _ = f.read_to_string(&mut manifest)?;
-		outside_to_noc.send(manifest)?;
+		let _ = f.read_to_string(&mut manifest).context(MainError::Chain { func_name: "run", comment: ""})?;
+		outside_to_noc.send(manifest).context(MainError::Chain { func_name: "run", comment: ""})?;
 	}
 }
 fn deployment_demo() -> Result<(), Error> {
@@ -110,24 +108,31 @@ fn deployment_demo() -> Result<(), Error> {
 	eqns.insert(GvmEqn::Xtnd("hops<7"));
 	eqns.insert(GvmEqn::Save("false"));
 	let ref gvm_eqn = GvmEquation::new(eqns, vec![GvmVariable::new(GvmVariableType::PathLength, "hops")]);
-	let up_tree1 = UpTreeSpec::new("test1", vec![0, 0, 0, 2, 2])?;
-	let up_tree2 = UpTreeSpec::new("test2", vec![1, 1, 0, 1])?;
+	let up_tree1 = UpTreeSpec::new("test1", vec![0, 0, 0, 2, 2]).context(MainError::Chain { func_name: "deployment_demo", comment: ""})?;
+	let up_tree2 = UpTreeSpec::new("test2", vec![1, 1, 0, 1]).context(MainError::Chain { func_name: "deployment_demo", comment: ""})?;
 	let ref allowed_tree1 = AllowedTree::new("foo");
 	let ref allowed_tree2 = AllowedTree::new("bar");
-	let c1 = ContainerSpec::new("c1", "D1", vec!["param1"], vec![allowed_tree1, allowed_tree2])?;
-	let c2 = ContainerSpec::new("c2", "D1", vec!["param1","param2"], vec![allowed_tree1])?;
-	let c3 = ContainerSpec::new("c3", "D3", vec!["param3"], vec![allowed_tree1])?;
-	let c4 = ContainerSpec::new("c4", "D2", vec![], vec![allowed_tree1, allowed_tree2])?;
-	let c5 = ContainerSpec::new("c5", "D2", vec![], vec![])?;
-	let c6 = ContainerSpec::new("c6", "D3", vec!["param4"], vec![allowed_tree1])?;
+	let c1 = ContainerSpec::new("c1", "D1", vec!["param1"], &vec![allowed_tree1, allowed_tree2]).context(MainError::Chain { func_name: "deployment_demo", comment: ""})?;
+	let c2 = ContainerSpec::new("c2", "D1", vec!["param1","param2"], &vec![allowed_tree1]).context(MainError::Chain { func_name: "deployment_demo", comment: ""})?;
+	let c3 = ContainerSpec::new("c3", "D3", vec!["param3"], &vec![allowed_tree1]).context(MainError::Chain { func_name: "deployment_demo", comment: ""})?;
+	let c4 = ContainerSpec::new("c4", "D2", vec![], &vec![allowed_tree1, allowed_tree2]).context(MainError::Chain { func_name: "deployment_demo", comment: ""})?;
+	let c5 = ContainerSpec::new("c5", "D2", vec![], &vec![]).context(MainError::Chain { func_name: "deployment_demo", comment: ""})?;
+	let c6 = ContainerSpec::new("c6", "D3", vec!["param4"], &vec![allowed_tree1]).context(MainError::Chain { func_name: "deployment_demo", comment: ""})?;
 	let vm_spec1 = VmSpec::new("vm1", "Ubuntu", CellConfig::Large,
-		vec![allowed_tree1, allowed_tree2], vec![&c1, &c2, &c4, &c5, &c5], vec![&up_tree1, &up_tree2])?;
-	let up_tree3 = UpTreeSpec::new("test3", vec![0, 0])?;
-	let up_tree4 = UpTreeSpec::new("test4", vec![1, 1, 0])?;
+		&vec![allowed_tree1, allowed_tree2], vec![&c1, &c2, &c4, &c5, &c5], vec![&up_tree1, &up_tree2]).context(MainError::Chain { func_name: "deployment_demo", comment: ""})?;
+	let up_tree3 = UpTreeSpec::new("test3", vec![0, 0]).context(MainError::Chain { func_name: "deployment_demo", comment: ""})?;
+	let up_tree4 = UpTreeSpec::new("test4", vec![1, 1, 0]).context(MainError::Chain { func_name: "deployment_demo", comment: ""})?;
 	let vm_spec2 = VmSpec::new("vm2", "RedHat",  CellConfig::Large,
-		vec![allowed_tree1], vec![&c5, &c3, &c6], vec![&up_tree3, &up_tree4])?;
-	let up_tree_def = Manifest::new("mytest", CellConfig::Large, "cell_tree", vec![allowed_tree1, allowed_tree2], vec![&vm_spec1, &vm_spec2], vec![&up_tree3], gvm_eqn)?;
+		&vec![allowed_tree1], vec![&c5, &c3, &c6], vec![&up_tree3, &up_tree4]).context(MainError::Chain { func_name: "deployment_demo", comment: ""})?;
+	let up_tree_def = Manifest::new("mytest", CellConfig::Large, "cell_tree", &vec![allowed_tree1, allowed_tree2],
+									vec![&vm_spec1, &vm_spec2], vec![&up_tree3], gvm_eqn).context(MainError::Chain { func_name: "deployment_demo", comment: ""})?;
 	println!("{}", up_tree_def);
 	Ok(())
 }
 // Errors
+use failure::{Error, Fail, ResultExt};
+#[derive(Debug, Fail)]
+pub enum MainError {
+	#[fail(display = "MainError::Chain {} {}", func_name, comment)]
+	Chain { func_name: &'static str, comment: &'static str },
+}

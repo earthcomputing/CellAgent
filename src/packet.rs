@@ -4,7 +4,6 @@ use std::collections::HashMap;
 use std::sync::atomic::{ATOMIC_USIZE_INIT, AtomicUsize, Ordering};
 use std::str;
 
-use failure::Error;
 use rand;
 use serde;
 use serde_json;
@@ -142,9 +141,9 @@ impl Serializer {
 	pub fn serialize<M>(msg: &M) -> Result<Box<Vec<u8>>, Error>
 			where M: Message + serde::Serialize {		
 		let msg_type = msg.get_header().get_msg_type();
-		let serialized_msg = serde_json::to_string(&msg)?;
+		let serialized_msg = serde_json::to_string(&msg).context(PacketError::Chain { func_name: "serialize", comment: "msg"})?;
 		let msg_obj = TypePlusMsg::new(msg_type, serialized_msg);
-		let serialized = serde_json::to_string(&msg_obj)?;
+		let serialized = serde_json::to_string(&msg_obj).context(PacketError::Chain { func_name: "serialize", comment: "msg_obj"})?;
 		let msg_bytes = serialized.clone().into_bytes();
 		Ok(Box::new(msg_bytes))
 	}	
@@ -191,7 +190,7 @@ impl Packetizer {
 			};
 			all_bytes.extend_from_slice(&bytes);
 		}
-		Ok(str::from_utf8(&all_bytes)?.to_string())
+		Ok(str::from_utf8(&all_bytes).context(PacketError::Chain { func_name: "unpacketize", comment: ""})?.to_string())
 	}
 	fn packet_payload_size(len: usize) -> usize {
 		match len-1 { 
@@ -229,4 +228,11 @@ impl PacketAssembler {
 		let header = packet.get_header();
 		(header.is_last_packet(), &self.packets)
 	}
+}
+// Errors
+use failure::{Error, Fail, ResultExt};
+#[derive(Debug, Fail)]
+pub enum PacketError {
+	#[fail(display = "PacketError::Chain {} {}", func_name, comment)]
+	Chain { func_name: &'static str, comment: &'static str },
 }

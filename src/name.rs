@@ -1,7 +1,6 @@
 use std::fmt;
 use std::marker::Sized;
 
-use failure::{Error, Fail, ResultExt};
 use uuid::Uuid;
 
 use config::{SEPARATOR, CellNo};
@@ -69,8 +68,8 @@ impl<'a> TreeID {
 		}
 	}
 	pub fn append2file(&self) -> Result<(), Error> {
-		let json = ::serde_json::to_string(&self)?;
-		::utility::append2file(json)?;
+		let json = ::serde_json::to_string(&self).context(NameError::Chain { func_name: "append2file", comment: ""})?;
+		::utility::append2file(json).context(NameError::Chain { func_name: "append2file", comment: ""})?;
 		Ok(())
 	}
 }
@@ -160,8 +159,11 @@ impl Name for ContainerID {
 }
 impl fmt::Display for ContainerID { fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result { self.name.fmt(f) } }
 // Errors
+use failure::{Error, Fail, ResultExt};
 #[derive(Debug, Fail)]
 pub enum NameError {
+	#[fail(display = "NameError::Chain {} {}", func_name, comment)]
+	Chain { func_name: &'static str, comment: &'static str },
 	#[fail(display = "NameError::Format {}: '{}' contains blanks.", func_name, name)]
 	Format { func_name: &'static str, name: String }
 }
