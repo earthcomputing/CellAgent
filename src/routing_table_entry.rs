@@ -2,8 +2,6 @@ use std::fmt;
 use std::collections::HashSet;
 use uuid::Uuid;
 
-use failure::Error;
-
 use config::{MAX_PORTS, PortNo, TableIndex};
 use name::{Name, TreeID};
 use utility::{Mask, PortNumber};
@@ -26,8 +24,8 @@ impl RoutingTableEntry {
 			may_send: may_send, inuse: inuse, mask: mask, other_indices: other_indices }
 	}
 	pub fn default(index: TableIndex) -> Result<RoutingTableEntry, Error> {
-		let port_number = PortNumber::new(PortNo{v:0}, MAX_PORTS)?;
-		let tree_id = TreeID::new("default")?;
+		let port_number = PortNumber::new(PortNo{v:0}, MAX_PORTS).context(RoutingTableEntryError::Chain { func_name: "default", comment: ""})?;
+		let tree_id = TreeID::new("default").context(RoutingTableEntryError::Chain { func_name: "default", comment: ""})?;
 		Ok(RoutingTableEntry::new(index, &tree_id, false, port_number, Mask::empty(), false, [TableIndex(0); MAX_PORTS.v as usize]))
 	}
 	pub fn is_in_use(&self) -> bool { self.inuse }
@@ -90,4 +88,11 @@ impl fmt::Display for RoutingTableEntry {
 		s = s + &format!(" {:?}", other_indices);
 		write!(f, "{}", s) 
 	}
+}
+// Errors
+use failure::{Error, ResultExt};
+#[derive(Debug, Fail)]
+pub enum RoutingTableEntryError {
+    #[fail(display = "RoutingTableEntryError::Chain {} {}", func_name, comment)]
+    Chain { func_name: &'static str, comment: &'static str },
 }

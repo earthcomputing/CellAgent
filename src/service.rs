@@ -1,8 +1,6 @@
 use std::fmt;
 use std::collections::{HashMap, HashSet};
 
-use failure::{Error, ResultExt};
-
 use gvm_equation::GvmEquation;
 use nalcell::CellConfig;
 use name::{ContainerID, Name, TreeID, UptreeID};
@@ -21,11 +19,11 @@ pub enum Service {
 }
 impl Service {
     pub fn new(container_id: &ContainerID, service_name: &str, allowed_trees: &Vec<AllowedTree>,
-            container_to_vm: ContainerToVm) -> Result<Service, Error> {
+            container_to_vm: ContainerToVm) -> Result<Service, ServiceError> {
         match service_name {
             NOCMASTER => Ok(Service::NocMaster { service: NocMaster::new(container_id.clone(), NOCMASTER, container_to_vm, allowed_trees) }),
             NOCAGENT => Ok(Service::NocAgent { service: NocAgent::new(container_id.clone(), NOCAGENT, container_to_vm, allowed_trees) }),
-            _ => Err(ServiceError::NoSuchService { func_name: "create_service", service_name: S(service_name) }.into())
+            _ => Err(ServiceError::NoSuchService { func_name: "create_service", service_name: S(service_name) })
         }
     }
     pub fn initialize(&self, up_tree_id: &TreeID, container_from_vm: ContainerFromVm) -> Result<(), Error> {
@@ -60,10 +58,10 @@ impl NocMaster {
     //	fn get_container_id(&self) -> &ContainerID { &self.container_id }
 //	fn get_service(&self) -> Service { self.service }
     pub fn initialize(&self, up_tree_id: &TreeID, container_from_vm: ContainerFromVm) -> Result<(), Error> {
-        let new_tree_id = up_tree_id.add_component("NocAgent")?;
-        new_tree_id.append2file()?;
-        self.noc_agents(&new_tree_id, up_tree_id)?;
-        self.container_to_vm.send(S("Message from NocMaster"))?;
+        let new_tree_id = up_tree_id.add_component("NocAgent").context(ServiceError::Chain { func_name: "initialize", comment: ""})?;
+        new_tree_id.append2file().context(ServiceError::Chain { func_name: "initialize", comment: ""})?;
+        self.noc_agents(&new_tree_id, up_tree_id).context(ServiceError::Chain { func_name: "initialize", comment: ""})?;
+        self.container_to_vm.send(S("Message from NocMaster")).context(ServiceError::Chain { func_name: "initialize", comment: "send to vm"})?;
         self.listen_vm(container_from_vm)
     }
     fn noc_agents(&self, new_tree_id: &TreeID, up_tree_id: &TreeID) -> Result<(), Error> {
@@ -99,7 +97,7 @@ impl NocMaster {
     fn listen_vm_loop(&self, container_from_vm: ContainerFromVm) -> Result<(), Error> {
         //println!("NocMaster on container {} waiting for msg from VM", self.container_id);
         loop {
-            let msg = container_from_vm.recv().context("NocMaster container_from_vm")?;
+            let msg = container_from_vm.recv().context("NocMaster container_from_vm").context(ServiceError::Chain { func_name: "listen_vm_loop", comment: "recv from vm"})?;
             println!("NocMaster on container {} got msg {}", self.container_id, msg);
         }
     }
@@ -131,8 +129,12 @@ impl fmt::Display for NocAgent {
         write!(f, "{} running in {}", self.name, self.container_id)
     }
 }
+// Errors
+use failure::{Error, ResultExt};
 #[derive(Debug, Fail)]
 pub enum ServiceError {
+    #[fail(display = "ServiceError::Chain {} {}", func_name, comment)]
+    Chain { func_name: &'static str, comment: &'static str },
     #[fail(display = "ServiceError::NoSuchService {}: No image for service named {}", func_name, service_name)]
     NoSuchService { func_name: &'static str, service_name: String }
 }

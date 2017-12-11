@@ -1,8 +1,6 @@
 use std::fmt;
 use std::collections::{HashMap, HashSet};
 
-use failure::{Error, Fail, ResultExt};
-
 use config::{MAX_PORTS, OUTPUT_FILE_NAME, MaskValue, PortNo};
 use name::CellID;
 /*
@@ -101,8 +99,8 @@ impl fmt::Display for PortNumber {
 #[derive(Debug, Copy, Clone, Hash, Serialize, Deserialize)]
 pub struct Path { port_number: PortNumber }
 impl Path {
-	pub fn new(port_no: PortNo, no_ports: PortNo) -> Result<Path, UtilityError> {
-		let port_number = PortNumber::new(port_no, no_ports)?;
+	pub fn new(port_no: PortNo, no_ports: PortNo) -> Result<Path, Error> {
+		let port_number = PortNumber::new(port_no, no_ports).context(UtilityError::Chain { func_name: "Path::new", comment: ""})?;
 		Ok(Path { port_number: port_number })
 	}
 	pub fn get_port_no(&self) -> PortNo { self.port_number.get_port_no() }
@@ -120,7 +118,7 @@ pub fn append2file(line: String) -> Result<(), Error> {
 			File::create(OUTPUT_FILE_NAME)
 		}
 	}?;
-	file_handle.write(&(line + "\n").into_bytes())?;
+	file_handle.write(&(line + "\n").into_bytes()).context(UtilityError::Chain { func_name: "append2file", comment: ""})?;
 	Ok(())
 }
 pub fn write_err(caller: &str, e: Error) {
@@ -139,8 +137,11 @@ pub fn write_err(caller: &str, e: Error) {
 // to provide &str but I need String that I made the following
 pub fn S<T: fmt::Display>(s: T) -> String { s.to_string() }
 // Errors
+use failure::{Error, Fail, ResultExt};
 #[derive(Debug, Fail)]
 pub enum UtilityError {
+    #[fail(display = "UtilityError::Chain {} {}", func_name, comment)]
+    Chain { func_name: &'static str, comment: &'static str },
     #[fail(display = "UtilityError::Mask {}: Cell {} has no tenant mask", func_name, cell_id)]
     Mask { cell_id: CellID, func_name: String},
     #[fail(display = "UtilityError::PortNumber {}: Port number {:?} is larger than the maximum of {:?}", func_name, port_no, max)]

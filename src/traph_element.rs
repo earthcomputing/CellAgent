@@ -1,7 +1,5 @@
 use std::fmt;
 
-use failure::Error;
-
 use config::{CellNo, PathLength, PortNo, TableIndex};
 use traph::{PortStatus};
 use utility::{Path, PortNumber};
@@ -49,4 +47,11 @@ impl fmt::Display for TraphElement {
 		}
 		write!(f, "{}", s)
 	}
+}
+// Errors
+use failure::{Error, Fail, ResultExt};
+#[derive(Debug, Fail)]
+pub enum TraphElementError {
+	#[fail(display = "TraphElementError::Chain {} {}", func_name, comment)]
+	Chain { func_name: &'static str, comment: &'static str },
 }

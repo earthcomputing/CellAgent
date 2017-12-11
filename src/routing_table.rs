@@ -17,7 +17,7 @@ impl RoutingTable {
 	pub fn new(id: CellID) -> Result<RoutingTable, Error> {
 		let mut entries = Vec::new();
 		for i in 0..*MAX_ENTRIES {
-			let entry = RoutingTableEntry::default(TableIndex(i))?;
+			let entry = RoutingTableEntry::default(TableIndex(i)).context(RoutingTableError::Chain { func_name: "new", comment: ""})?;
 			entries.push(entry);
 		}
 		Ok(RoutingTable { id: id, entries: entries, connected_ports: Vec::new() })
@@ -47,6 +47,8 @@ impl fmt::Display for RoutingTable {
 // Errors
 #[derive(Debug, Fail)]
 pub enum RoutingTableError {
+	#[fail(display = "RoutingTableError::Chain {} {}", func_name, comment)]
+	Chain { func_name: &'static str, comment: &'static str },
     #[fail(display = "RoutingTableError::Index {}: {:?} is not a valid routing table index on cell {}", func_name, index, cell_id)]
     Index { func_name: &'static str, index: TableIndex, cell_id: CellID}
 }
