@@ -7,22 +7,22 @@ use port::{PortStatus};
 use utility::{Mask};
 
 // CellAgent to PacketEngine
-pub enum CaToPePacket { Entry(RoutingTableEntry), Packet((TableIndex,Mask,Packet)) }
+pub enum CaToPePacket { Entry(RoutingTableEntry), Packet((TableIndex, Mask, Packet)) }
 pub type CaToPe = mpsc::Sender<CaToPePacket>;
 pub type PeFromCa = mpsc::Receiver<CaToPePacket>;
 pub type CaPeError = mpsc::SendError<CaToPePacket>;
 // PacketEngine to Port
-pub type PeToPortPacket = ((TableIndex, Packet));
+pub type PeToPortPacket = (TableIndex, Packet);
 pub type PeToPort = mpsc::Sender<PeToPortPacket>;
 pub type PortFromPe = mpsc::Receiver<PeToPortPacket>;
 pub type PePortError = mpsc::SendError<PeToPortPacket>;
 // PacketEngine to Port, Port to Link
-pub type PortToLinkPacket = ((TableIndex, Packet));
+pub type PortToLinkPacket = (TableIndex, Packet);
 pub type PortToLink = mpsc::Sender<PortToLinkPacket>;
 pub type LinkFromPort = mpsc::Receiver<PortToLinkPacket>;
 pub type PortLinkError = mpsc::SendError<PortToLinkPacket>;
 // Link to Port
-pub enum LinkToPortPacket { Status(PortStatus),Packet((TableIndex, Packet)) }
+pub enum LinkToPortPacket { Status(PortStatus), Packet((TableIndex, Packet)) }
 pub type LinkToPort = mpsc::Sender<LinkToPortPacket>;
 pub type PortFromLink = mpsc::Receiver<LinkToPortPacket>;
 pub type LinkPortError = mpsc::SendError<LinkToPortPacket>;
@@ -37,12 +37,12 @@ pub type PeToCa = mpsc::Sender<PeToCaPacket>;
 pub type CaFromPe = mpsc::Receiver<PeToCaPacket>;
 pub type PeCaError = mpsc::SendError<PeToCaPacket>;
 // Port to Noc World
-pub type PortToNocMsg = Packet;
+pub type PortToNocMsg = (TableIndex, Packet);
 pub type PortToNoc = mpsc::Sender<PortToNocMsg>;
 pub type NocFromPort = mpsc::Receiver<PortToNocMsg>;
 pub type PortNocError = mpsc::SendError<PortToNocMsg>;
 // Noc to Port
-pub type NocToPortMsg = Packet;
+pub type NocToPortMsg = (TableIndex, Packet);
 pub type NocToPort = mpsc::Sender<NocToPortMsg>;
 pub type PortFromNoc = mpsc::Receiver<NocToPortMsg>;
 pub type NocPortError = mpsc::SendError<NocToPortMsg>;

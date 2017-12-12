@@ -6,10 +6,10 @@ use std::time;
 use serde_json;
 
 use blueprint::{Blueprint};
-use config::{BASE_TREE_NAME, CONTROL_TREE_NAME, SEPARATOR, CellNo, DatacenterNo, Edge, PortNo};
+use config::{BASE_TREE_NAME, CONTROL_TREE_NAME, SEPARATOR, CellNo, DatacenterNo, Edge, PortNo, TableIndex};
 use datacenter::{Datacenter};
 use gvm_equation::{GvmEquation, GvmEqn, GvmVariable, GvmVariableType};
-use message::{Message, MsgPayload, MsgType, ManifestMsg, TreeNameMsgPayload};
+use message::{Message, MsgPayload, MsgType, ManifestMsg, TreeIdMsgPayload};
 use message_types::{NocToPort, NocPortError, NocFromPort, PortToNoc, PortFromNoc, NocFromOutside, NocToOutside};
 use nalcell::CellConfig;
 use name::{Name, TreeID};
@@ -19,18 +19,20 @@ use utility::{S, write_err};
 
 #[derive(Debug, Clone)]
 pub struct Noc {
-	tree_id: TreeID, 
-	allowed_trees: HashSet<AllowedTree>,
 	control_tree: AllowedTree,
 	base_tree: AllowedTree,
+    allowed_trees: HashSet<AllowedTree>,
 	noc_to_outside: NocToOutside,
 	packet_assemblers: PacketAssemblers
 }
 impl Noc {
-	pub fn new(noc_to_outside: NocToOutside) -> Result<Noc, Error> {
-		let tree_id = TreeID::new("CellAgentTree").context(NocError::Chain { func_name: "new", comment: ""})?;
-		Ok(Noc { tree_id: tree_id, allowed_trees: HashSet::new(), packet_assemblers: PacketAssemblers::new(),
-				 control_tree: AllowedTree::new(CONTROL_TREE_NAME), base_tree: AllowedTree::new(BASE_TREE_NAME),
+	pub fn new(control_tree_name: &str, base_tree_name: &str, noc_to_outside: NocToOutside) -> Result<Noc, Error> {
+        let mut allowed_trees = HashSet::new();
+        allowed_trees.insert(AllowedTree::new(control_tree_name));
+        allowed_trees.insert(AllowedTree::new(base_tree_name));
+		Ok(Noc { packet_assemblers: PacketAssemblers::new(), allowed_trees: allowed_trees,
+				 control_tree: AllowedTree::new(control_tree_name),
+                 base_tree: AllowedTree::new(base_tree_name),
 				 noc_to_outside: noc_to_outside })
 	}
 	pub fn initialize(&self, blueprint: &Blueprint, noc_from_outside: NocFromOutside) ->
@@ -46,7 +48,7 @@ impl Noc {
 		});
 		join_handles.push(join_outside);
 		let mut noc = self.clone();
-		let noc_to_port_clone = noc_to_port.clone();
+ 		let noc_to_port_clone = noc_to_port.clone();
 		let join_port = spawn( move || {
 			let _ = noc.listen_port(noc_to_port_clone, noc_from_port).map_err(|e| write_err("port", e));
 		});
@@ -68,19 +70,19 @@ impl Noc {
 //	}
 	fn listen_port(&mut self, noc_to_port: NocToPort, noc_from_port: NocFromPort) -> Result<(), Error> {
 		loop {
-			let packet = noc_from_port.recv()?;
+			let (index, packet) = noc_from_port.recv()?;
 			let msg_id = packet.get_header().get_msg_id();
 			let mut packet_assembler = self.packet_assemblers.remove(&msg_id).unwrap_or(PacketAssembler::new(msg_id));
 			let (last_packet, packets) = packet_assembler.add(packet);
 			if last_packet {
 				let msg = MsgType::get_msg(&packets).context(NocError::Chain { func_name: "listen_port", comment: ""})?;
+                //println!("Noc got msg {}", msg);
 				match msg.get_header().get_msg_type() {
 					MsgType::TreeName => {
-						//println!("Noc got msg {}", msg);
-						let allowed_trees = msg.process_noc(&self)?; 
-						self.control(&allowed_trees, &noc_to_port).context(NocError::Chain { func_name: "listen_port", comment: ""})?;
+						let (tree_id, index, allowed_trees) = msg.process_noc(&self)?;
+						self.control(&tree_id, index, &allowed_trees, &noc_to_port).context(NocError::Chain { func_name: "listen_port", comment: ""})?;
 					}
-					_ => return Err(NocError::MsgType { func_name: S("listen_port"), msg_type: msg.get_header().get_msg_type() }.into() )
+					_ => write_err("Noc: listen_port: {}", NocError::MsgType { func_name: S("listen_port"), msg_type: msg.get_header().get_msg_type() }.into())
 				}
 			} else {
 				let assembler = PacketAssembler::create(msg_id, packets);
@@ -89,12 +91,13 @@ impl Noc {
 		}
 	}
 	// Sets up the NOC Master and NOC Client services on up trees
-	fn control(&mut self, allowed_trees: &Vec<AllowedTree>, noc_to_port: &NocToPort) -> Result<(), Error> {
+	fn control(&mut self, tree_id: &TreeID, other_index: TableIndex, allowed_trees: &Vec<AllowedTree>, noc_to_port: &NocToPort) -> Result<(), Error> {
 		// Create an up tree on the border cell for the NOC Master
-		for allowed_tree in allowed_trees { self.allowed_trees.insert(allowed_tree.clone()); }
+		for allowed_tree in allowed_trees { self.allowed_trees.insert(allowed_tree.to_owned()); }
 		//println!("Noc allowed trees {:?}", allowed_trees);
         match self.allowed_trees.get(&self.base_tree) {
             Some(deployment_tree) => {
+                //println!("Noc: me {} base {} deployment {}", tree_id, self.base_tree, deployment_tree);
                 let new_tree_id = TreeID::new("NocMaster")?;
                 let ref allowed_tree = AllowedTree::new(new_tree_id.get_name());
                 let allowed_trees = vec![allowed_tree];
@@ -113,8 +116,10 @@ impl Noc {
                                                  &allowed_trees, vec![&noc_vm], vec![&vm_uptree], gvm_eqn).context(NocError::Chain { func_name: "control", comment: ""})?;
                 //println!("NOC Master Manifest {}", manifest);
                 let msg = ManifestMsg::new(manifest);
-                let packets = msg.to_packets(&self.tree_id).context(NocError::Chain { func_name: "control", comment: ""})?;
-                for packet in packets { noc_to_port.send(packet).context(NocError::Chain { func_name: "control", comment: ""})?; }
+                let packets = msg.to_packets(tree_id).context(NocError::Chain { func_name: "control", comment: ""})?;
+                //println!("Noc sent on tree {} msg {}\n{}", tree_id, msg, packets[0]);
+                //println!("Noc to port other_index {} tree_id {}", *other_index, tree_id);
+                for packet in packets { noc_to_port.send((other_index, packet)).context(NocError::Chain { func_name: "control", comment: ""})?; }
                 Ok(())
             },
             None => Err(NocError::AllowedTree { func_name: S("control"), tree_name: self.base_tree.get_name().clone() }.into())

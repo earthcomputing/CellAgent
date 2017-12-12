@@ -89,7 +89,7 @@ fn run() -> Result<(), Error> {
 //	deployment_demo()?; 	// Demonstrate features of deployment spec
 	let (outside_to_noc, noc_from_outside): (OutsideToNoc, NocFromOutside) = channel();
 	let (noc_to_outside, outside_from_noc): (NocToOutside, OutsideFromNoc) = channel();
-	let noc = Noc::new(noc_to_outside)?;
+	let noc = Noc::new(CONTROL_TREE_NAME, BASE_TREE_NAME,noc_to_outside)?;
 	let _ = noc.initialize(&blueprint, noc_from_outside)?;
 	loop {
 		stdout().write(b"Enter the name of a file containing a manifest\n").context(MainError::Chain { func_name: "run", comment: ""})?;
