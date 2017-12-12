@@ -70,16 +70,10 @@ impl PacketEngine {
 	}
 	fn process_packet(&self, port_no: PortNo, my_index: TableIndex, packet: Packet) -> Result<(), Error> {
 		//println!("PacketEngine {}: received on port {} my index {} {}", self.cell_id, port_no.v, *my_index, packet);
-		let entry =
-		{   
-			let locked = self.routing_table.lock().unwrap();
-			match self.boundary_port_nos.get(&port_no) {
-				Some(_) => locked.get_entry(TableIndex(0)).context(PacketEngineError::Chain { func_name: "process_packet", comment: ""})?,
-				None => locked.get_entry(my_index).context(PacketEngineError::Chain { func_name: "process_packet", comment: ""})?
-			}
-		};
+        let locked = self.routing_table.lock().unwrap();
+		let entry = locked.get_entry(my_index).context(PacketEngineError::Chain { func_name: "process_packet", comment: "not border port"})?;
 		if entry.is_in_use() {
-			//println!("PacketEngine {}: packet {} entry {}", self.cell_id, packet.get_count(), entry);
+			//println!("PacketEngine {}: entry {} header UUID {}", self.cell_id, entry, packet.get_header().get_tree_uuid());
 			// The control tree is special since each cell has a different uuid
 			if (*entry.get_index() == 0) || (entry.get_uuid() == packet.get_header().get_tree_uuid()) {
 				let mask = entry.get_mask();
@@ -97,7 +91,7 @@ impl PacketEngine {
 		let header = packet.get_header();
 		//println!("PacketEngine {}: forward packet {}, mask {}, entry {}", self.cell_id, packet.get_count(), mask, entry);
 		let other_indices = entry.get_other_indices();
-		PortNumber::new(recv_port_no, PortNo{v:other_indices.len() as u8}).context(PacketEngineError::Chain { func_name: "forward", comment: ""})?; // Make sure recv_port_no is valid
+		let recv_port_number = PortNumber::new(recv_port_no, PortNo{v:other_indices.len() as u8}).context(PacketEngineError::Chain { func_name: "forward", comment: ""})?; // Make sure recv_port_no is valid
 		if header.is_rootcast() {
 			let parent = entry.get_parent();
 			if let Some(other_index) = other_indices.get(parent.v as usize) {
@@ -119,8 +113,8 @@ impl PacketEngine {
 		} else {
 			let mask = user_mask.and(entry.get_mask());
 			let port_nos = mask.get_port_nos();
-			//let is_stack_msg = match format!("{}", packet).find("StackTree") { Some(_) => true, None => false };
-			//if MsgType::is_type(packet, "StackTree") { println!("PacketEngine {}: forwarding packet {} on ports {:?}, {}", self.cell_id, packet.get_count(), port_nos, entry); }
+			//let is_manifest_msg = match format!("{}", packet).find("Manifest") { Some(_) => true, None => false };
+			//if ::message::MsgType::is_type(packet, "Manifest") { println!("PacketEngine {}: forwarding packet {} on ports {:?}, {}", self.cell_id, packet.get_count(), port_nos, entry); }
 			for port_no in port_nos.iter() {
 				if let Some(other_index) = other_indices.get(port_no.v as usize) {
 					if port_no.v as usize == 0 { 

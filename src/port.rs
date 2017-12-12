@@ -43,33 +43,35 @@ impl Port {
 	pub fn set_disconnected(&mut self) { self.is_connected.store(false, SeqCst); }
 	pub fn is_broken(&self) -> bool { self.is_broken.load(SeqCst) }
 	pub fn is_border(&self) -> bool { self.is_border }
-	pub fn outside_channel(&self, port_to_outside: PortToNoc, 
+	pub fn noc_channel(&self, port_to_outside: PortToNoc,
 			port_from_outside: PortFromNoc, port_from_pe: PortFromPe) -> Result<JoinHandle<()>, Error> {
 		self.port_to_pe.send(PortToPePacket::Status((self.get_port_no(), self.is_border, PortStatus::Connected))).context(PortError::Chain { func_name: "outside_channel", comment: "send to pe"})?;
 		let port_to_pe = self.port_to_pe.clone();
 		let port_number = self.port_number;
 		let id = self.id.clone();
 		::std::thread::spawn( move || {
-			let _ = Port::listen_outside_for_pe(port_number, port_to_pe, port_from_outside).map_err(|e| write_err("port", e));
+			let _ = Port::listen_noc_for_pe(port_number, port_to_pe, port_from_outside).map_err(|e| write_err("port", e));
 		});
 		let id = self.id.clone();
 		let join_handle = ::std::thread::spawn( move || {
-			let _ = Port::listen_pe_for_outside(port_to_outside, port_from_pe).map_err(|e| write_err("port", e));
+			let _ = Port::listen_pe_for_noc(port_to_outside, port_from_pe).map_err(|e| write_err("port", e));
 		});
 		Ok(join_handle)
 	}
-	fn listen_outside_for_pe(port_number: PortNumber, port_to_pe: PortToPe, port_from_outside: PortFromNoc) -> Result<(), Error> {
+	fn listen_noc_for_pe(port_number: PortNumber, port_to_pe: PortToPe, port_from_outside: PortFromNoc) -> Result<(), Error> {
 		let other_index = TableIndex(0);
 		loop {
-			let packet = port_from_outside.recv()?;
+			let (other_index, packet) = port_from_outside.recv()?;
+			//println!("Port to pe other_index {}", *other_index);
 			port_to_pe.send(PortToPePacket::Packet((port_number.get_port_no(), other_index, packet))).context(PortError::Chain { func_name: "listen_outside_for_pe", comment: "send to pe"})?;
 		}
 	}
-	fn listen_pe_for_outside(port_to_noc: PortToNoc, port_from_pe: PortFromPe) -> Result<(), Error> {
+	fn listen_pe_for_noc(port_to_noc: PortToNoc, port_from_pe: PortFromPe) -> Result<(), Error> {
 		loop {
 			//println!("Port {}: waiting for packet from pe", port.id);
-			let (_, packet) = port_from_pe.recv().context(PortError::Chain { func_name: "listen_pe_for_outside", comment: "recv from pe"})?;
-			port_to_noc.send(packet).context(PortError::Chain { func_name: "listen_pe_for_outside", comment: "send to noc"})?;
+			let tuple = port_from_pe.recv().context(PortError::Chain { func_name: "listen_pe_for_outside", comment: "recv from pe"})?;
+			//println!("Port to Noc other_index {}", *tuple.0);
+			port_to_noc.send(tuple).context(PortError::Chain { func_name: "listen_pe_for_outside", comment: "send to noc"})?;
 		}		
 	}
 	pub fn link_channel(&self, port_to_link: PortToLink, port_from_link: PortFromLink, port_from_pe: PortFromPe) {
@@ -95,7 +97,7 @@ impl Port {
 					self.port_to_pe.send(PortToPePacket::Status((self.port_number.get_port_no(), self.is_border, status))).context(PortError::Chain { func_name: "listen_pe_for_outside", comment: "send status to pe"})?;
 				}
 				LinkToPortPacket::Packet((my_index, packet)) => {
-					//println!("Port {}: got from link {}", self.id, packet);
+					//println!("Port {}: got from link {} {}", self.id, *my_index, packet);
 					self.port_to_pe.send(PortToPePacket::Packet((self.port_number.get_port_no(), my_index, packet))).context(PortError::Chain { func_name: "listen_pe_for_outside", comment: "send packet to pe"})?;
 					//println!("Port {}: sent from link to pe {}", self.id, packet);
 				}
@@ -106,7 +108,7 @@ impl Port {
 		loop {
 			//println!("Port {}: waiting for packet from pe", id);
 			let packet = port_from_pe.recv().context(PortError::Chain { func_name: "listen_pe", comment: "recv from port"})?;
-			//println!("Port {}: got from pe {}", id, packet);
+			//println!("Port {}: got other_index from pe {}", self.id, *packet.0);
 			port_to_link.send(packet).context(PortError::Chain { func_name: "listen_pe", comment: "send to link"})?;
 			//println!("Port {}: sent from pe to link {}", id, packet);
 		}		
