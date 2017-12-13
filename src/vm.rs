@@ -65,14 +65,14 @@ impl VirtualMachine {
 		loop {
 			let msg = vm_from_ca.recv().context("listen_ca_loop").context(VmError::Chain { func_name: "listen_ca_loop", comment: ""})?;
             println!("VM {} got msg from ca: {}", self.id, msg);
-            self.vm_to_ca.send(msg).context(VmError::Chain { func_name: "listen_ca_loop", comment: "send to ca"})?;
+            //self.vm_to_container.send(msg).context(VmError::Chain { func_name: "listen_ca_loop", comment: "send to container"})?;
 		}
 	}
 	fn listen_container_loop(&self, container_id: ContainerID, vm_from_container: VmFromContainer, vm_to_ca: VmToCa) -> Result<(), Error> {
 		loop {
-			let msg = vm_from_container.recv().context("listen_container_loop").context(VmError::Chain { func_name: "listen_container_loop", comment: "send to ca"})?;
-            println!("VM {} got msg from container: {}", self.id, msg);
-			vm_to_ca.send(msg).context(VmError::Chain { func_name: "listen_container_loop", comment: "send to ca"})?;
+			let (tree, msg) = vm_from_container.recv().context("listen_container_loop").context(VmError::Chain { func_name: "listen_container_loop", comment: "send to ca"})?;
+            println!("VM {} got msg for tree {} from container: {}", self.id, tree, msg);
+			vm_to_ca.send((tree, msg)).context(VmError::Chain { func_name: "listen_container_loop", comment: "send to ca"})?;
 		}
 	}
 }

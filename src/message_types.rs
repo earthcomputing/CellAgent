@@ -62,7 +62,7 @@ pub type CaToVm = mpsc::Sender<CaToVmMsg>;
 pub type VmFromCa = mpsc::Receiver<CaToVmMsg>;
 pub type CaVmError = mpsc::SendError<CaToVmMsg>;
 // VM to Cell agent
-pub type VmToCaMsg = String;
+pub type VmToCaMsg = (String, String);
 pub type VmToCa = mpsc::Sender<VmToCaMsg>;
 pub type CaFromVm = mpsc::Receiver<VmToCaMsg>;
 pub type VmCaError = mpsc::SendError<VmToCaMsg>;
@@ -77,12 +77,12 @@ pub type TreeToVm = mpsc::Sender<TreeToVmMsg>;
 pub type VmFromTree = mpsc::Receiver<TreeToVmMsg>;
 pub type TreeVmError = mpsc::SendError<TreeToVmMsg>;
 // Vm to Container
-pub type VmToContainerMsg = String;
+pub type VmToContainerMsg = (String, String);
 pub type VmToContainer = mpsc::Sender<VmToContainerMsg>;
 pub type ContainerFromVm = mpsc::Receiver<VmToContainerMsg>;
 pub type VmContainerError = mpsc::SendError<VmToContainerMsg>;
 // Container to VM
-pub type ContainerToVmMsg = String;
+pub type ContainerToVmMsg = (String, String);
 pub type ContainerToVm = mpsc::Sender<ContainerToVmMsg>;
 pub type VmFromContainer = mpsc::Receiver<ContainerToVmMsg>;
 pub type ContainerVmError = mpsc::SendError<ContainerToVmMsg>;

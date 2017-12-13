@@ -14,7 +14,7 @@ use nalcell::CellConfig;
 use name::{Name, CellID, TreeID};
 use noc::Noc;
 use packet::{Packet, Packetizer, Serializer};
-use service::Service;
+use service::{NOCAGENT, Service, NocAgent};
 use traph;
 use uptree_spec::{AllowedTree, Manifest};
 use utility::{DEFAULT_USER_MASK, S, Mask, Path, PortNumber};
@@ -115,7 +115,7 @@ pub trait Message: fmt::Display {
 			where Self:std::marker::Sized + serde::Serialize {
 		let bytes = Serializer::serialize(self).context(MessageError::Chain { func_name: "to_packets", comment: ""})?;
 		let direction = self.get_header().get_direction();
-		let packets = Packetizer::packetize(tree_id, &bytes, direction,);
+		let packets = Packetizer::packetize(tree_id, &bytes, direction);
 		Ok(packets)
 	}
 	// There has to be a better way to handle different message receivers, but I didn't realize when I 
@@ -378,16 +378,17 @@ impl Message for StackTreeMsg {
 	fn get_payload(&self) -> &MsgPayload { &self.payload }
 	fn get_payload_stack_tree(&self) -> Result<&StackTreeMsgPayload, Error> { Ok(&self.payload) }
 	fn process_ca(&mut self, ca: &mut CellAgent, msg_tree_id: &TreeID, port_no: PortNo) -> Result<(), Error> {
-		//println!("Cell {}: Stack tree msg {}", ca.get_id(), self);
+		//println!("Cell {}: msg_tree_id {} Stack tree msg {}", ca.get_id(), msg_tree_id, self);
 		let tree_map = self.header.get_tree_map();
 		let tree_name = self.payload.get_tree_name();
 		if let Some(gvm_eqn) = self.payload.get_gvm_eqn() {
 			let black_tree_name = self.payload.get_black_tree_name();
 			if let Some(black_tree_id) = tree_map.get(black_tree_name) {
 				if let Some(tree_id) = tree_map.get(tree_name) {
-					let manifest = Manifest::new(black_tree_name, CellConfig::Large, &tree_name,
-                        &Vec::new(),Vec::new(), Vec::new(), &gvm_eqn).context(MessageError::Chain { func_name: "process_ca", comment: "StackTreeMsg"})?;
-					ca.stack_tree(&tree_id, &msg_tree_id, black_tree_id, &manifest).context(MessageError::Chain { func_name: "process_ca", comment: "StackTreeMsg"})?
+					let manifest = NocAgent::make_manifest(&AllowedTree::new(NOCAGENT)).context(MessageError::Chain { func_name: "process_ca", comment: "StackTreeMsg"})?;
+					//println!("Cell {}: manifest {}", ca.get_id(), manifest);
+					ca.stack_tree(&tree_id, &msg_tree_id, black_tree_id, &manifest).context(MessageError::Chain { func_name: "process_ca", comment: "StackTreeMsg"})?;
+					ca.deploy(port_no, &tree_id, &manifest).context(MessageError::Chain { func_name: "process_ca", comment: "StackTreeMsg"})?;
 				} else {
 					return Err(MessageError::TreeMapEntry { tree_name: tree_name.to_string(), func_name: "process stack tree (black)" }.into()); }
 			} else {
@@ -425,7 +426,7 @@ impl MsgPayload for StackTreeMsgPayload {
 }
 impl fmt::Display for StackTreeMsgPayload {
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-		write!(f, "Tree {} stacked on black tree {}", self.tree_name, self.black_tree_name)
+		write!(f, "Tree {} stacked on tree {}", self.tree_name, self.tree_name)
 	}
 }
 #[derive(Debug, Clone, Serialize, Deserialize)]

@@ -16,7 +16,7 @@ pub struct Link {
 impl Link {
 	pub fn new(left_id: &PortID, rite_id: &PortID) -> Result<Link, Error> {
 		let id = LinkID::new(left_id, rite_id)?;
-		::utility::append2file(serde_json::to_string(&id).context(LinkError::Chain { func_name: "new", comment: ""})?).context(LinkError::Chain { func_name: "new", comment: ""})?;
+		::utility::append2file(serde_json::to_string(&id).context(LinkError::Chain { func_name: "new", comment: "serialize"})?).context(LinkError::Chain { func_name: "new", comment: "append2file"})?;
 		Ok(Link { id: id, is_broken: false, is_connected: true })
 	}
 //	pub fn get_id(&self) -> &LinkID { &self.id }
@@ -30,7 +30,7 @@ impl Link {
 	}
 	fn listen(&self, status: LinkToPort, link_from: LinkFromPort, link_to: LinkToPort) 
 			-> Result<JoinHandle<()>, Error> {
-		//status.send(LinkToPortPacket::Status(PortStatus::Connected)).context(LinkError::Chain { func_name: "listen", comment: "send status to port"})?;
+		status.send(LinkToPortPacket::Status(PortStatus::Connected)).context(LinkError::Chain { func_name: "listen", comment: "send status to port"})?;
         let link = self.clone();
 		let join_handle = ::std::thread::spawn( move || {
             let _ = link.listen_loop(status, link_from, link_to).map_err(|e| write_err("link", e.into()));
