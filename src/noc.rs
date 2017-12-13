@@ -8,12 +8,12 @@ use serde_json;
 use blueprint::{Blueprint};
 use config::{BASE_TREE_NAME, CONTROL_TREE_NAME, SEPARATOR, CellNo, DatacenterNo, Edge, PortNo, TableIndex};
 use datacenter::{Datacenter};
-use gvm_equation::{GvmEquation, GvmEqn, GvmVariable, GvmVariableType};
 use message::{Message, MsgPayload, MsgType, ManifestMsg, TreeIdMsgPayload};
 use message_types::{NocToPort, NocPortError, NocFromPort, PortToNoc, PortFromNoc, NocFromOutside, NocToOutside};
 use nalcell::CellConfig;
 use name::{Name, TreeID};
 use packet::{PacketAssembler, PacketAssemblers};
+use service::NocMaster;
 use uptree_spec::{AllowedTree, ContainerSpec, Manifest, UpTreeSpec, VmSpec};
 use utility::{S, write_err};
 
@@ -98,27 +98,9 @@ impl Noc {
         match self.allowed_trees.get(&self.base_tree) {
             Some(deployment_tree) => {
                 //println!("Noc: me {} base {} deployment {}", tree_id, self.base_tree, deployment_tree);
-                let new_tree_id = TreeID::new("NocMaster")?;
-                let ref allowed_tree = AllowedTree::new(new_tree_id.get_name());
-                let allowed_trees = vec![allowed_tree];
-                let mut eqns = HashSet::new();
-                eqns.insert(GvmEqn::Recv("hops == 0"));
-                eqns.insert(GvmEqn::Send("hops > 0"));
-                eqns.insert(GvmEqn::Xtnd("true"));
-                eqns.insert(GvmEqn::Save("true"));
-                let ref gvm_eqn = GvmEquation::new(eqns, vec![GvmVariable::new(GvmVariableType::PathLength,"hops")]);
-                let vm_uptree = UpTreeSpec::new("NocMasterTreeVm", vec![0]).context(NocError::Chain { func_name: "control", comment: ""})?;
-                let container_uptree = UpTreeSpec::new("NocMasterTreeContainer", vec![0]).context(NocError::Chain { func_name: "control", comment: ""})?;
-                let noc_container = ContainerSpec::new("NocMaster", "NocMaster", vec![], &allowed_trees).context(NocError::Chain { func_name: "control", comment: ""})?;
-                let noc_vm = VmSpec::new("NocVM", "Ubuntu", CellConfig::Large,
-                                         &allowed_trees, vec![&noc_container], vec![&container_uptree]).context(NocError::Chain { func_name: "control", comment: ""})?;
-                let ref manifest = Manifest::new("NocMaster", CellConfig::Large, deployment_tree.get_name(),
-                                                 &allowed_trees, vec![&noc_vm], vec![&vm_uptree], gvm_eqn).context(NocError::Chain { func_name: "control", comment: ""})?;
-                //println!("NOC Master Manifest {}", manifest);
+				let ref manifest = NocMaster::make_manifest(deployment_tree).context(NocError::Chain { func_name: "control", comment: ""})?;
                 let msg = ManifestMsg::new(manifest);
                 let packets = msg.to_packets(tree_id).context(NocError::Chain { func_name: "control", comment: ""})?;
-                //println!("Noc sent on tree {} msg {}\n{}", tree_id, msg, packets[0]);
-                //println!("Noc to port other_index {} tree_id {}", *other_index, tree_id);
                 for packet in packets { noc_to_port.send((other_index, packet)).context(NocError::Chain { func_name: "control", comment: ""})?; }
                 Ok(())
             },

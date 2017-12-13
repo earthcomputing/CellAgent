@@ -15,6 +15,7 @@ use name::{Name, CellID, TreeID, UptreeID, VmID};
 use packet::{Packet, PacketAssembler, PacketAssemblers};
 use port;
 use routing_table_entry::{RoutingTableEntry};
+use service::NocAgent;
 use traph;
 use traph::{Traph};
 use tree::Tree;
@@ -275,7 +276,7 @@ impl CellAgent {
         };
         let new_tree_name = manifest.get_new_tree_name();
         let up_tree_id = msg_tree_id.add_component(manifest.get_id()).context("UptreeID")?;
-        //println!("Deploy {} uptree {} on tree {}", new_tree_name, up_tree_id, deployment_tree_id);
+        println!("Deploy {} uptree {} on tree {}", new_tree_name, up_tree_id, deployment_tree_id);
         tree_name_map.insert(AllowedTree::new(new_tree_name), up_tree_id.clone());
         self.stack_uptree(&up_tree_id, &deployment_tree_id, port_no, manifest)?;
 		self.tree_name_map.insert(up_tree_id.clone(), tree_name_map.clone());
@@ -301,6 +302,12 @@ impl CellAgent {
             self.ca_to_vms.insert(vm_id, ca_to_vm,);
             self.listen_uptree(&up_tree_id, vm.get_id(), &trees, ca_from_vm)?;
 		}
+        let deployment_tree = AllowedTree::new(deployment_tree_id.get_name());
+        let ref manifest = NocAgent::make_manifest(&deployment_tree).context(CellagentError::Chain { func_name: "deploy", comment: ""})?;
+        let stack_tree_msg = StackTreeMsg::new(&up_tree_id, &deployment_tree_id, manifest).context(CellagentError::Chain { func_name: "deploy", comment: "StackTreeMsg"})?;
+        let packets = stack_tree_msg.to_packets(&deployment_tree_id).context(CellagentError::Chain { func_name: "deploy", comment: "StackTreeMsg to packets"})?;
+        let port_number = PortNumber::new(port_no, self.no_ports).context(CellagentError::Chain { func_name: "deploy", comment: ""})?;
+        self.send_msg(deployment_tree_id.get_uuid(), &packets, Mask::all_but_zero(self.no_ports)).context(CellagentError::Chain { func_name: "deploy", comment: ""})?;
 		Ok(())
 	}
     fn stack_uptree(&mut self, up_tree_id: &TreeID, deployment_tree_id: &TreeID, port_no: PortNo, manifest: &Manifest) -> Result<(), Error> {
@@ -311,18 +318,23 @@ impl CellAgent {
         let port_no_mask = Mask::all_but_zero(self.no_ports).and(Mask::new(port_number));
         self.send_msg(deployment_tree_id.get_uuid(), &packets, port_no_mask)?;
         self.stack_tree(&up_tree_id, &my_tree_id, my_tree_id, &manifest)?;
+        let mut tree_name_map = HashMap::new();
+        tree_name_map.insert(AllowedTree::new(up_tree_id.get_name()),up_tree_id.clone());
+        self.tree_name_map.insert(up_tree_id.clone(), tree_name_map);
         Ok(())
     }
 	fn listen_uptree(&self, tree_id_ref: &TreeID, vm_id_ref: &VmID, trees: &HashSet<AllowedTree>, ca_from_vm: CaFromVm)
             -> Result<(), Error> {
 		let ca = self.clone();
 		let vm_id = vm_id_ref.clone();
-		let tree_id = tree_id_ref.clone();
+		let tree_id = tree_id_ref.clone(); // Needed for lifetime under spawn
+        let tree_name_map = self.tree_name_map.get(tree_id_ref).unwrap().clone();
 		::std::thread::spawn( move || -> Result<(), Error> {
 		loop {
-			println!("CellAgent {}: listening to vm {} on tree {}", ca.cell_id, vm_id, tree_id);
-			let msg = ca_from_vm.recv()?;
-			println!("CellAgent {}: got vm msg {} on tree {}", ca.cell_id, msg, tree_id);
+			//println!("CellAgent {}: listening to vm {} on tree {}", ca.cell_id, vm_id, tree_id);
+			let (tree, msg) = ca_from_vm.recv()?;
+            let foo = tree_name_map.get(&AllowedTree::new(&tree)).unwrap();
+			println!("CellAgent {}: got vm msg {} for tree {} on tree {}", ca.cell_id, tree, msg, tree_id);
 		}	
 		});
 		Ok(())
@@ -539,6 +551,8 @@ impl fmt::Display for CellAgent {
 // Errors
 #[derive(Debug, Fail)]
 pub enum CellagentError {
+    #[fail(display = "CellagentNocError::Chain {} {}", func_name, comment)]
+    Chain { func_name: &'static str, comment: &'static str },
     #[fail(display = "CellAgentError::ManifestVms {}: No VMs in manifest for cell {}", func_name, cell_id)]
     ManifestVms { cell_id: CellID, func_name: &'static str },
     //#[fail(display = "CellAgentError::Message {}: Error packetizing TreeIdMsg at cell {}: error {}", func_name, cell_id, error)]
