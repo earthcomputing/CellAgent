@@ -8,8 +8,8 @@ use utility::S;
 #[derive(Debug, Clone, Hash, Serialize, Deserialize)]
 pub struct Manifest {
 	id: String,
-	cell_config: CellConfig,
 	deployment_tree: String,
+	cell_config: CellConfig,
 	gvm_eqn: GvmEquation,
 	allowed_trees: Vec<AllowedTree>,
 	vms: Vec<VmSpec>,
