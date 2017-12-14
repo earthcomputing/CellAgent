@@ -96,6 +96,7 @@ impl fmt::Display for TypePlusMsg {
 
 pub trait Message: fmt::Display {
 	fn get_header(&self) -> &MsgHeader;
+    fn get_msg_type(&self) -> MsgType;
 	fn is_rootward(&self) -> bool {
 		match self.get_header().get_direction() {
 			MsgDirection::Rootward => true,
@@ -134,6 +135,7 @@ pub trait Message: fmt::Display {
 	fn process_service(&mut self, service: &mut Service) -> Result<(), Error> {
 		Err(MessageError::Process { func_name: "process_service" }.into())
 	}
+    fn get_gvm_eqn(&self) -> Result<&GvmEquation, Error> { Err(MessageError::Gvm { func_name: "get_gvm_eqn", msg_type: self.get_msg_type() }.into()) }
 	fn get_payload(&self) -> &MsgPayload;
 	fn get_payload_discover(&self) -> Result<&DiscoverPayload, Error> { Err(MessageError::Payload { func_name: "get_payload_discover", payload: self.to_string() }.into()) }
 	fn get_payload_discoverd(&self) -> Result<&DiscoverDPayload, Error> { Err(MessageError::Payload { func_name: "get_payload_discoverd", payload: self.to_string() }.into()) }
@@ -142,7 +144,6 @@ pub trait Message: fmt::Display {
 	fn get_payload_tree_names(&self) -> Result<&TreeIdMsgPayload, Error> { Err(MessageError::Payload { func_name: "get_payload_tree_names", payload: self.to_string() }.into()) }
 }
 pub trait MsgPayload {
-	fn get_gvm_eqn(&self) -> Option<&GvmEquation>;
 	fn get_tree_name(&self) -> &String;
 }
 type TreeMap = HashMap<String, TreeID>;
@@ -200,7 +201,9 @@ impl DiscoverMsg {
 }
 impl Message for DiscoverMsg {
 	fn get_header(&self) -> &MsgHeader { &self.header }
+    fn get_msg_type(&self) -> MsgType { self.get_header().msg_type }
 	fn get_payload(&self) -> &MsgPayload { &self.payload }
+    fn get_gvm_eqn(&self) -> Result<&GvmEquation, Error> { Ok(&self.payload.gvm_eqn) }
 	fn get_payload_discover(&self) -> Result<&DiscoverPayload, Error> { Ok(&self.payload) }
 	fn process_ca(&mut self, ca: &mut CellAgent, msg_tree_id: &TreeID, port_no: PortNo) -> Result<(), Error> {
 		let port_number = PortNumber::new(port_no, ca.get_no_ports()).context(MessageError::Chain { func_name: "process_ca", comment: "DiscoverMsg"})?;
@@ -280,7 +283,6 @@ impl DiscoverPayload {
 	fn set_sending_cell(&mut self, sending_cell_id: CellID) { self.sending_cell_id = sending_cell_id; }
 }
 impl MsgPayload for DiscoverPayload {
-	fn get_gvm_eqn(&self) -> Option<&GvmEquation> { Some(&self.gvm_eqn) }
 	fn get_tree_name(&self) -> &String { &self.tree_name }
 }
 impl fmt::Display for DiscoverPayload { 
@@ -310,6 +312,7 @@ impl DiscoverDMsg {
 impl Message for DiscoverDMsg {
 	fn get_header(&self) -> &MsgHeader { &self.header }
 	fn get_payload(&self) -> &MsgPayload { &self.payload }
+    fn get_msg_type(&self) -> MsgType { self.get_header().msg_type }
 	fn get_payload_discoverd(&self) -> Result<&DiscoverDPayload, Error> { Ok(&self.payload) }
 	fn process_ca(&mut self, ca: &mut CellAgent, msg_tree_id: &TreeID, port_no: PortNo) -> Result<(), Error> {
 		let tree_name = self.payload.get_tree_name();
@@ -350,7 +353,6 @@ impl DiscoverDPayload {
 	pub fn get_table_index(&self) -> TableIndex { self.my_index }
 }
 impl MsgPayload for DiscoverDPayload {
-	fn get_gvm_eqn(&self) -> Option<&GvmEquation> { None }
 	fn get_tree_name(&self) -> &String { &self.tree_name }
 }
 impl fmt::Display for DiscoverDPayload {
@@ -364,38 +366,40 @@ pub struct StackTreeMsg {
 	payload: StackTreeMsgPayload
 }
 impl StackTreeMsg {
-	pub fn new(new_tree_id: &TreeID, base_tree_id: &TreeID, manifest: &Manifest) -> Result<StackTreeMsg, Error> {
+	pub fn new(new_tree_id: &TreeID, base_tree_id: &TreeID, gvm_eqn: &GvmEquation) -> Result<StackTreeMsg, Error> {
 		let mut tree_map = HashMap::new();
 		tree_map.insert(new_tree_id.stringify(), new_tree_id.clone());
 		tree_map.insert(base_tree_id.stringify(), base_tree_id.clone()); 
 		let header = MsgHeader::new(MsgType::StackTree, MsgDirection::Leafward, tree_map);
-		let payload = StackTreeMsgPayload::new(new_tree_id, base_tree_id.stringify(), manifest);
+		let payload = StackTreeMsgPayload::new(new_tree_id, base_tree_id.get_name(), gvm_eqn);
 		Ok(StackTreeMsg { header: header, payload: payload})
 	}
+    fn get_payload_stack_tree(&self) -> Result<&StackTreeMsgPayload, Error> { Ok(&self.payload) }
 }
 impl Message for StackTreeMsg {
 	fn get_header(&self) -> &MsgHeader { &self.header }
 	fn get_payload(&self) -> &MsgPayload { &self.payload }
-	fn get_payload_stack_tree(&self) -> Result<&StackTreeMsgPayload, Error> { Ok(&self.payload) }
+    fn get_gvm_eqn(&self) -> Result<&GvmEquation, Error> { Ok(&self.payload.gvm_eqn) }
+    fn get_msg_type(&self) -> MsgType { self.get_header().msg_type }
 	fn process_ca(&mut self, ca: &mut CellAgent, msg_tree_id: &TreeID, port_no: PortNo) -> Result<(), Error> {
 		//println!("Cell {}: msg_tree_id {} Stack tree msg {}", ca.get_id(), msg_tree_id, self);
 		let tree_map = self.header.get_tree_map();
 		let tree_name = self.payload.get_tree_name();
-		if let Some(gvm_eqn) = self.payload.get_gvm_eqn() {
-			let black_tree_name = self.payload.get_black_tree_name();
+		if let Ok(gvm_eqn) = self.get_gvm_eqn() {
+			let black_tree_name = self.payload.get_base_tree_name();
 			if let Some(black_tree_id) = tree_map.get(black_tree_name) {
 				if let Some(tree_id) = tree_map.get(tree_name) {
 					let manifest = NocAgent::make_manifest(&AllowedTree::new(NOCAGENT)).context(MessageError::Chain { func_name: "process_ca", comment: "StackTreeMsg"})?;
 					//println!("Cell {}: manifest {}", ca.get_id(), manifest);
-					ca.stack_tree(&tree_id, &msg_tree_id, black_tree_id, &manifest).context(MessageError::Chain { func_name: "process_ca", comment: "StackTreeMsg"})?;
+					ca.stack_tree(&tree_id, &msg_tree_id, black_tree_id, manifest.get_gvm()).context(MessageError::Chain { func_name: "process_ca", comment: "StackTreeMsg"})?;
 					ca.deploy(port_no, &tree_id, &manifest).context(MessageError::Chain { func_name: "process_ca", comment: "StackTreeMsg"})?;
 				} else {
-					return Err(MessageError::TreeMapEntry { tree_name: tree_name.to_string(), func_name: "process stack tree (black)" }.into()); }
+					return Err(MessageError::TreeMapEntry { tree_name: S(tree_name), func_name: "process_ca stack tree (black)" }.into()); }
 			} else {
-				return Err(MessageError::TreeMapEntry { tree_name: S(black_tree_name), func_name: "process stack tree" }.into());
+				return Err(MessageError::TreeMapEntry { tree_name: S(black_tree_name), func_name: "process_ca stack tree" }.into());
 			}
 		} else {
-			return Err(MessageError::ManifestGvm { func_name: "process" }.into());
+			return Err(MessageError::ManifestGvm { func_name: "process_ca" }.into());
 		}
 		Ok(())
 	}
@@ -408,20 +412,17 @@ impl fmt::Display for StackTreeMsg {
 #[derive(Debug, Clone, Hash, Serialize, Deserialize)]
 pub struct StackTreeMsgPayload {
 	tree_name: String,
-	black_tree_name: String,
-	manifest: Manifest,
+	base_tree_name: String,
+	gvm_eqn: GvmEquation
 }
 impl StackTreeMsgPayload {
-	fn new(tree_id: &TreeID, base_tree_name: String, manifest: &Manifest) -> StackTreeMsgPayload {
-		StackTreeMsgPayload { tree_name: tree_id.stringify(), black_tree_name: base_tree_name,
-				manifest: manifest.clone() }
+	fn new(tree_id: &TreeID, base_tree_name: &str, gvm_eqn: &GvmEquation) -> StackTreeMsgPayload {
+		StackTreeMsgPayload { tree_name: tree_id.stringify(), base_tree_name: base_tree_name.to_owned(), gvm_eqn: gvm_eqn.to_owned() }
 	}
-	pub fn get_black_tree_name(&self) -> &String { &self.black_tree_name }
+	pub fn get_base_tree_name(&self) -> &String { &self.base_tree_name }
 	pub fn get_tree_name(&self) -> &String { &self.tree_name}
-	pub fn get_manifest(&self) -> &Manifest { &self.manifest }
 }
 impl MsgPayload for StackTreeMsgPayload {
-	fn get_gvm_eqn(&self) -> Option<&GvmEquation> { Some(&self.manifest.get_gvm()) }
 	fn get_tree_name(&self) -> &String { &self.tree_name }
 }
 impl fmt::Display for StackTreeMsgPayload {
@@ -445,6 +446,7 @@ impl ManifestMsg {
 impl Message for ManifestMsg {
 	fn get_header(&self) -> &MsgHeader { &self.header }
 	fn get_payload(&self) -> &MsgPayload { &self.payload }
+    fn get_msg_type(&self) -> MsgType { self.get_header().msg_type }
 	fn get_payload_manifest(&self) -> Result<&ManifestMsgPayload, Error> { Ok(&self.payload) }
 	fn process_ca(&mut self, ca: &mut CellAgent, msg_tree_id: &TreeID, port_no: PortNo) -> Result<(), Error> {
 		let manifest = self.payload.get_manifest();
@@ -470,7 +472,6 @@ impl ManifestMsgPayload {
 	fn get_manifest(&self) -> &Manifest { &self.manifest }
 }
 impl MsgPayload for ManifestMsgPayload {
-	fn get_gvm_eqn(&self) -> Option<&GvmEquation> { None }
 	fn get_tree_name(&self) -> &String { &self.tree_name }
 }
 impl fmt::Display for ManifestMsgPayload {
@@ -495,6 +496,7 @@ impl TreeIdMsg {
 impl Message for TreeIdMsg {
 	fn get_header(&self) -> &MsgHeader { &self.header }
 	fn get_payload(&self) -> &MsgPayload { &self.payload }
+    fn get_msg_type(&self) -> MsgType { self.get_header().msg_type }
     fn get_payload_tree_names(&self) -> Result<&TreeIdMsgPayload, Error> { Ok(&self.payload) }
 	fn process_noc(&self, noc: &Noc) -> Result<(&TreeID, TableIndex, &Vec<AllowedTree>), Error> {
         let payload = self.get_payload_tree_names()?;
@@ -526,7 +528,6 @@ impl TreeIdMsgPayload {
 	fn get_allowed_trees(&self) -> &Vec<AllowedTree> { &self.allowed_trees }
 }
 impl MsgPayload for TreeIdMsgPayload {
-	fn get_gvm_eqn(&self) -> Option<&GvmEquation> { None }
 	fn get_tree_name(&self) -> &String { &self.tree_name }
 }
 impl fmt::Display for TreeIdMsgPayload {
@@ -541,6 +542,8 @@ use failure::{Error, Fail, ResultExt};
 pub enum MessageError {
 	#[fail(display = "MessageError::Chain {} {}", func_name, comment)]
 	Chain { func_name: &'static str, comment: &'static str },
+    #[fail(display = "MessageError::Gvm {}: No GVM for this message type {}", func_name, msg_type)]
+    Gvm { func_name: &'static str, msg_type: MsgType },
     #[fail(display = "MessageError::InvalidMsgType {}: Invalid message type {} from packet assembler", func_name, msg_type)]
     InvalidMsgType { func_name: &'static str, msg_type: MsgType },
     #[fail(display = "MessageError::ManifestGmv {}: No GVM in manifest", func_name)]

@@ -278,7 +278,7 @@ impl CellAgent {
         let up_tree_id = msg_tree_id.add_component(manifest.get_id()).context("UptreeID")?;
         println!("Deploy {} uptree {} on tree {}", new_tree_name, up_tree_id, deployment_tree_id);
         tree_name_map.insert(AllowedTree::new(new_tree_name), up_tree_id.clone());
-        self.stack_uptree(&up_tree_id, &deployment_tree_id, port_no, manifest)?;
+        self.stack_uptree(&up_tree_id, &deployment_tree_id, port_no, manifest.get_gvm())?;
 		self.tree_name_map.insert(up_tree_id.clone(), tree_name_map.clone());
         //for k in self.tree_name_map.keys() { println!("{} {:?}", k, self.tree_name_map.get(k).unwrap()); }
         //println!("tree_name_map {:?}", self.tree_name_map);
@@ -302,22 +302,16 @@ impl CellAgent {
             self.ca_to_vms.insert(vm_id, ca_to_vm,);
             self.listen_uptree(&up_tree_id, vm.get_id(), &trees, ca_from_vm)?;
 		}
-        let deployment_tree = AllowedTree::new(deployment_tree_id.get_name());
-        let ref manifest = NocAgent::make_manifest(&deployment_tree).context(CellagentError::Chain { func_name: "deploy", comment: ""})?;
-        let stack_tree_msg = StackTreeMsg::new(&up_tree_id, &deployment_tree_id, manifest).context(CellagentError::Chain { func_name: "deploy", comment: "StackTreeMsg"})?;
-        let packets = stack_tree_msg.to_packets(&deployment_tree_id).context(CellagentError::Chain { func_name: "deploy", comment: "StackTreeMsg to packets"})?;
-        let port_number = PortNumber::new(port_no, self.no_ports).context(CellagentError::Chain { func_name: "deploy", comment: ""})?;
-        self.send_msg(deployment_tree_id.get_uuid(), &packets, Mask::all_but_zero(self.no_ports)).context(CellagentError::Chain { func_name: "deploy", comment: ""})?;
 		Ok(())
 	}
-    fn stack_uptree(&mut self, up_tree_id: &TreeID, deployment_tree_id: &TreeID, port_no: PortNo, manifest: &Manifest) -> Result<(), Error> {
+    fn stack_uptree(&mut self, up_tree_id: &TreeID, deployment_tree_id: &TreeID, port_no: PortNo, gvm_eqn: &GvmEquation) -> Result<(), Error> {
         let ref my_tree_id = self.my_tree_id.clone(); // Need to clone because self is borrowed mut
-        let msg= StackTreeMsg::new(&up_tree_id, &self.my_tree_id, manifest)?;
+        let msg= StackTreeMsg::new(&up_tree_id, &self.my_tree_id, gvm_eqn)?;
         let packets =  msg.to_packets(&self.my_tree_id)?;
         let port_number = PortNumber::new(port_no, self.no_ports)?;
         let port_no_mask = Mask::all_but_zero(self.no_ports).and(Mask::new(port_number));
         self.send_msg(deployment_tree_id.get_uuid(), &packets, port_no_mask)?;
-        self.stack_tree(&up_tree_id, &my_tree_id, my_tree_id, &manifest)?;
+        self.stack_tree(&up_tree_id, &my_tree_id, my_tree_id, &gvm_eqn)?;
         let mut tree_name_map = HashMap::new();
         tree_name_map.insert(AllowedTree::new(up_tree_id.get_name()),up_tree_id.clone());
         self.tree_name_map.insert(up_tree_id.clone(), tree_name_map);
@@ -339,20 +333,20 @@ impl CellAgent {
 		});
 		Ok(())
 	}
-	fn create_tree(&mut self, id: &str, target_tree_id: &TreeID, port_no_mask: Mask, manifest: &Manifest)
+	fn create_tree(&mut self, id: &str, target_tree_id: &TreeID, port_no_mask: Mask, gvm_eqn: &GvmEquation)
             -> Result<(), Error> {
         let new_id = self.my_tree_id.add_component(id)?;
         let new_tree_id = TreeID::new(new_id.get_name())?;
         new_tree_id.append2file()?;
         let ref my_tree_id = self.my_tree_id.clone(); // Need because self is borrowed mut
-        let msg =  StackTreeMsg::new(&new_tree_id, &self.my_tree_id, manifest)?;
+        let msg =  StackTreeMsg::new(&new_tree_id, &self.my_tree_id, gvm_eqn)?;
         let packets = msg.to_packets(&self.my_tree_id)?;
         self.send_msg(target_tree_id.get_uuid(), &packets, port_no_mask)?;
-        self.stack_tree(&new_tree_id, &my_tree_id, my_tree_id, &manifest)?;
+        self.stack_tree(&new_tree_id, &my_tree_id, my_tree_id, &gvm_eqn)?;
         Ok(())
 	}	
 	pub fn stack_tree(&mut self, new_tree_id: &TreeID, parent_tree_id: &TreeID,
-			black_tree_id: &TreeID, manifest: &Manifest) -> Result<(), Error> {
+			black_tree_id: &TreeID, gvm_eqn: &GvmEquation) -> Result<(), Error> {
 		let mut traph = self.get_traph(black_tree_id)?;
 		if traph.has_tree(new_tree_id) { return Ok(()); } // Check for redundant StackTreeMsg
 		let parent_entry = traph.get_tree_entry(&parent_tree_id.get_uuid())?;
@@ -360,7 +354,6 @@ impl CellAgent {
 		let index = self.use_index()?; 
 		entry.set_table_index(index);
 		entry.set_uuid(&new_tree_id.get_uuid());
-		let gvm_eqn = manifest.get_gvm();
 		let params = traph.get_params(gvm_eqn.get_variables())?;
 		if !gvm_eqn.eval_recv(&params)? { 
 			let mask = entry.get_mask().and(Mask::all_but_zero(self.no_ports));
@@ -417,15 +410,15 @@ impl CellAgent {
 	}
 	fn gvm_eval_save(&self, tree_uuid: Uuid, msg: Box<Message>) -> Result<bool, Error> {
 		let f = "gvm_eval_save";
-		if let Some(gvm_eqn) = msg.get_payload().get_gvm_eqn() {
+		if let Ok(gvm_eqn) = msg.get_gvm_eqn() {
 			//let locked = self.tree_id_map.lock().unwrap();
 			//println!("Cell {}: tree_uuid {}", self.cell_id, tree_uuid);
-			if let Some(black_tree_uuid) = self.tree_map.lock().unwrap().get(&tree_uuid) {
-				//println!("Cell {}: black_tree_uuid {}", self.cell_id, black_tree_uuid);
+			if let Some(base_tree_uuid) = self.tree_map.lock().unwrap().get(&tree_uuid) {
+				//println!("Cell {}: base_tree_uuid {}", self.cell_id, base_tree_uuid);
 				let mut locked = self.traphs.lock().unwrap();
-				let traph = match locked.entry(*black_tree_uuid) {
+				let traph = match locked.entry(*base_tree_uuid) {
 					Entry::Occupied(t) => t.into_mut(),
-					Entry::Vacant(_) => return Err(CellagentError::Tree { cell_id: self.cell_id.clone(), func_name: f, tree_uuid: black_tree_uuid.clone() }.into())
+					Entry::Vacant(_) => return Err(CellagentError::Tree { cell_id: self.cell_id.clone(), func_name: f, tree_uuid: base_tree_uuid.clone() }.into())
 				};
 				let params = traph.get_params(gvm_eqn.get_variables())?;
 				let save = gvm_eqn.eval_save(&params)?;
@@ -551,7 +544,7 @@ impl fmt::Display for CellAgent {
 // Errors
 #[derive(Debug, Fail)]
 pub enum CellagentError {
-    #[fail(display = "CellagentNocError::Chain {} {}", func_name, comment)]
+    #[fail(display = "CellagentError::Chain {} {}", func_name, comment)]
     Chain { func_name: &'static str, comment: &'static str },
     #[fail(display = "CellAgentError::ManifestVms {}: No VMs in manifest for cell {}", func_name, cell_id)]
     ManifestVms { cell_id: CellID, func_name: &'static str },

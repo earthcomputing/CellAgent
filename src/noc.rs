@@ -90,7 +90,7 @@ impl Noc {
 			}
 		}
 	}
-	// Sets up the NOC Master and NOC Client services on up trees
+	// Sets up the NOC Master and NOC Agent services on up trees
 	fn control(&mut self, tree_id: &TreeID, other_index: TableIndex, allowed_trees: &Vec<AllowedTree>, noc_to_port: &NocToPort) -> Result<(), Error> {
 		// Create an up tree on the border cell for the NOC Master
 		for allowed_tree in allowed_trees { self.allowed_trees.insert(allowed_tree.to_owned()); }
