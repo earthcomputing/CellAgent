@@ -7,12 +7,12 @@ use uuid::Uuid;
 
 use config::{BASE_TREE_NAME, CONNECTED_PORTS_TREE_NAME, CONTROL_TREE_NAME, MAX_ENTRIES, CellNo, CellType, PathLength, PortNo, TableIndex};
 use gvm_equation::{GvmEquation, GvmEqn};
-use message::{Message, MsgType, DiscoverMsg, StackTreeMsg, TreeIdMsg};
+use message::{Message, MsgType, DiscoverMsg, StackTreeMsg, TreeNameMsg};
 use message_types::{CaToPe, CaFromPe, CaToVm, VmFromCa, VmToCa, CaFromVm, CaToPePacket, PeToCaPacket,
 	VmToTree, VmFromTree, TreeToVm, TreeFromVm};
 use nalcell::CellConfig;
 use name::{Name, CellID, TreeID, UptreeID, VmID};
-use packet::{Packet, PacketAssembler, PacketAssemblers};
+use packet::{Packet, PacketAssembler, PacketAssemblers, Packetizer};
 use port;
 use routing_table_entry::{RoutingTableEntry};
 use service::NocAgent;
@@ -468,7 +468,7 @@ impl CellAgent {
             tree_map.insert(noc, new_tree_id.clone());
 			self.tree_name_map.insert(new_tree_id.clone(),tree_map);
 			let port_no_mask = Mask::new(port_number);
-			let tree_name_msg = TreeIdMsg::new(&new_tree_id, entry.get_index(), &allowed_trees);
+			let tree_name_msg = TreeNameMsg::new(&new_tree_id, entry.get_index(), &allowed_trees);
 			//println!("Cell {}: Sending on ports {}: {}", self.cell_id, port_no_mask, tree_name_msg);
 			let packets = tree_name_msg.to_packets(&new_tree_id)?;
 			self.send_msg(new_tree_id.get_uuid(), &packets, port_no_mask)?;
