@@ -2,10 +2,8 @@
 <project version="4">
   <component name="ChangeListManager">
     <list default="true" id="eee480a2-146d-44ab-9647-cef5ea39b250" name="Default" comment="">
-      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" afterPath="$PROJECT_DIR$/.idea/workspace.xml" />
       <change beforePath="$PROJECT_DIR$/src/cellagent.rs" afterPath="$PROJECT_DIR$/src/cellagent.rs" />
       <change beforePath="$PROJECT_DIR$/src/message.rs" afterPath="$PROJECT_DIR$/src/message.rs" />
-      <change beforePath="$PROJECT_DIR$/src/noc.rs" afterPath="$PROJECT_DIR$/src/noc.rs" />
     </list>
     <ignored path="$PROJECT_DIR$/target/" />
     <ignored path="$PROJECT_DIR$/out/" />
@@ -22,7 +20,7 @@
         <entry file="file://$PROJECT_DIR$/src/cellagent.rs">
           <provider selected="true" editor-type-id="text-editor">
             <state relative-caret-position="195">
-              <caret line="204" column="23" lean-forward="false" selection-start-line="204" selection-start-column="23" selection-end-line="204" selection-end-column="23" />
+              <caret line="309" column="35" lean-forward="false" selection-start-line="309" selection-start-column="35" selection-end-line="309" selection-end-column="35" />
               <folding>
                 <element signature="e#6727#6728#0" expanded="true" />
                 <element signature="e#6773#6774#0" expanded="true" />
@@ -92,7 +90,7 @@
       <file leaf-file-name="noc.rs" pinned="false" current-in-tab="false">
         <entry file="file://$PROJECT_DIR$/src/noc.rs">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="144">
+            <state relative-caret-position="5">
               <caret line="77" column="43" lean-forward="false" selection-start-line="77" selection-start-column="43" selection-end-line="77" selection-end-column="43" />
               <folding />
             </state>
@@ -122,8 +120,8 @@
       <file leaf-file-name="message.rs" pinned="false" current-in-tab="true">
         <entry file="file://$PROJECT_DIR$/src/message.rs">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="257">
-              <caret line="347" column="88" lean-forward="false" selection-start-line="347" selection-start-column="88" selection-end-line="347" selection-end-column="88" />
+            <state relative-caret-position="480">
+              <caret line="405" column="68" lean-forward="true" selection-start-line="405" selection-start-column="68" selection-end-line="405" selection-end-column="68" />
               <folding />
             </state>
           </provider>
@@ -795,14 +793,6 @@
         </state>
       </provider>
     </entry>
-    <entry file="file://$PROJECT_DIR$/src/noc.rs">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="144">
-          <caret line="77" column="43" lean-forward="false" selection-start-line="77" selection-start-column="43" selection-end-line="77" selection-end-column="43" />
-          <folding />
-        </state>
-      </provider>
-    </entry>
     <entry file="file://$PROJECT_DIR$/src/uptree_spec.rs">
       <provider selected="true" editor-type-id="text-editor">
         <state relative-caret-position="432">
@@ -811,10 +801,18 @@
         </state>
       </provider>
     </entry>
+    <entry file="file://$PROJECT_DIR$/src/noc.rs">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="5">
+          <caret line="77" column="43" lean-forward="false" selection-start-line="77" selection-start-column="43" selection-end-line="77" selection-end-column="43" />
+          <folding />
+        </state>
+      </provider>
+    </entry>
     <entry file="file://$PROJECT_DIR$/src/cellagent.rs">
       <provider selected="true" editor-type-id="text-editor">
         <state relative-caret-position="195">
-          <caret line="204" column="23" lean-forward="false" selection-start-line="204" selection-start-column="23" selection-end-line="204" selection-end-column="23" />
+          <caret line="309" column="35" lean-forward="false" selection-start-line="309" selection-start-column="35" selection-end-line="309" selection-end-column="35" />
           <folding>
             <element signature="e#6727#6728#0" expanded="true" />
             <element signature="e#6773#6774#0" expanded="true" />
@@ -828,8 +826,8 @@
     </entry>
     <entry file="file://$PROJECT_DIR$/src/message.rs">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="257">
-          <caret line="347" column="88" lean-forward="false" selection-start-line="347" selection-start-column="88" selection-end-line="347" selection-end-column="88" />
+        <state relative-caret-position="480">
+          <caret line="405" column="68" lean-forward="true" selection-start-line="405" selection-start-column="68" selection-end-line="405" selection-end-column="68" />
           <folding />
         </state>
       </provider>
