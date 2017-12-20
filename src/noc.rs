@@ -8,7 +8,7 @@ use serde_json;
 use blueprint::{Blueprint};
 use config::{BASE_TREE_NAME, CONTROL_TREE_NAME, SEPARATOR, CellNo, DatacenterNo, Edge, PortNo, TableIndex};
 use datacenter::{Datacenter};
-use message::{Message, MsgPayload, MsgType, ManifestMsg, TreeNameMsgPayload};
+use message::{Message, MsgPayload, MsgType, ManifestMsg, TreeIdMsgPayload};
 use message_types::{NocToPort, NocPortError, NocFromPort, PortToNoc, PortFromNoc, NocFromOutside, NocToOutside};
 use nalcell::CellConfig;
 use name::{Name, TreeID};
