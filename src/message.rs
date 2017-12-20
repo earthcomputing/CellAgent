@@ -212,7 +212,7 @@ impl Message for DiscoverMsg {
 			}
 			my_index = entry.get_index();
 			// Send DiscoverD to sender
-			let discoverd_msg = DiscoverDMsg::new(new_tree_id.clone(), my_index);
+			let discoverd_msg = DiscoverDMsg::new(new_tree_id, my_index);
 			let packets = discoverd_msg.to_packets(new_tree_id).context(MessageError::Chain { func_name: "process_ca", comment: "DiscoverMsg"})?;
 			//println!("DiscoverMsg {}: sending discoverd for tree {} packet {} {}",ca.get_id(), new_tree_id, packets[0].get_count(), discoverd_msg);
 			let mask = Mask::new(port_number);
@@ -273,12 +273,12 @@ pub struct DiscoverDMsg {
 	payload: DiscoverDPayload
 }
 impl DiscoverDMsg {
-	pub fn new(tree_id: TreeID, index: TableIndex) -> DiscoverDMsg {
+	pub fn new(tree_id: &TreeID, index: TableIndex) -> DiscoverDMsg {
 		// Note that direction is leafward so we can use the connected ports tree
 		// If we send rootward, then the first recipient forwards the DiscoverD
 		let tree_name = tree_id.stringify();
 		let header = MsgHeader::new(MsgType::DiscoverD, MsgDirection::Leafward);
-		let payload = DiscoverDPayload::new(&tree_id, index);
+		let payload = DiscoverDPayload::new(tree_id, index);
 		DiscoverDMsg { header: header, payload: payload }
 	}
 }
@@ -332,9 +332,9 @@ pub struct StackTreeMsg {
 	payload: StackTreeMsgPayload
 }
 impl StackTreeMsg {
-	pub fn new(new_tree_id: &TreeID, base_tree_id: &TreeID, gvm_eqn: &GvmEquation) -> Result<StackTreeMsg, Error> {
+	pub fn new(new_tree_name: &str, base_tree_name: &str, gvm_eqn: &GvmEquation) -> Result<StackTreeMsg, Error> {
 		let header = MsgHeader::new(MsgType::StackTree, MsgDirection::Leafward);
-		let payload = StackTreeMsgPayload::new(new_tree_id, base_tree_id.get_name(), gvm_eqn);
+		let payload = StackTreeMsgPayload::new(new_tree_name, base_tree_name, gvm_eqn);
 		Ok(StackTreeMsg { header: header, payload: payload})
 	}
     fn get_gvm_eqn(&self) -> Result<&GvmEquation, Error> { Ok(&self.payload.gvm_eqn) }
@@ -346,7 +346,7 @@ impl Message for StackTreeMsg {
     fn get_msg_type(&self) -> MsgType { self.get_header().msg_type }
 	fn process_ca(&mut self, ca: &mut CellAgent, msg_tree_id: &TreeID, port_no: PortNo) -> Result<(), Error> {
 		//println!("Cell {}: msg_tree_id {} Stack tree msg {}", ca.get_id(), msg_tree_id, self);
-		let tree_name = self.payload.get_tree_name();
+		let tree_name = self.payload.get_new_tree_name();
 		if let Ok(gvm_eqn) = self.get_gvm_eqn() {
 			let base_tree_name = self.payload.get_base_tree_name();
 			if let Some(map) = ca.get_tree_name_map().get(msg_tree_id).cloned() {
@@ -369,21 +369,22 @@ impl Message for StackTreeMsg {
 }
 #[derive(Debug, Clone, Hash, Serialize, Deserialize)]
 pub struct StackTreeMsgPayload {
-	tree_name: String,
+	new_tree_name: String,
 	base_tree_name: String,
 	gvm_eqn: GvmEquation
 }
 impl StackTreeMsgPayload {
-	fn new(tree_id: &TreeID, base_tree_name: &str, gvm_eqn: &GvmEquation) -> StackTreeMsgPayload {
-		StackTreeMsgPayload { tree_name: tree_id.stringify(), base_tree_name: base_tree_name.to_owned(), gvm_eqn: gvm_eqn.to_owned() }
+	fn new(new_tree_name: &str, base_tree_name: &str, gvm_eqn: &GvmEquation) -> StackTreeMsgPayload {
+		StackTreeMsgPayload { new_tree_name: new_tree_name.to_owned(), base_tree_name: base_tree_name.to_owned(), gvm_eqn: gvm_eqn.to_owned() }
 	}
 	pub fn get_base_tree_name(&self) -> &String { &self.base_tree_name }
-	pub fn get_tree_name(&self) -> &String { &self.tree_name}
+	pub fn get_new_tree_name(&self) -> &String { &self.new_tree_name}
+    pub fn get_gvm_eqn(&self) -> &GvmEquation { &self.gvm_eqn }
 }
 impl MsgPayload for StackTreeMsgPayload {}
 impl fmt::Display for StackTreeMsgPayload {
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-		write!(f, "Tree {} stacked on tree {}", self.tree_name, self.tree_name)
+		write!(f, "Tree {} stacked on tree {} with GVM {}", self.new_tree_name, self.new_tree_name, self.gvm_eqn)
 	}
 }
 #[derive(Debug, Clone, Serialize, Deserialize)]
