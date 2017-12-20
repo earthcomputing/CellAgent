@@ -130,8 +130,17 @@ pub fn write_err(caller: &str, e: Error) {
 	}
 	let fail: &Fail = e.cause();
 	if let Some(backtrace) = fail.cause().and_then(|cause| cause.backtrace()) {
-		let _ = writeln!(stderr, "Backtrace: {:?}", backtrace);
+		let _ = writeln!(stderr, "Backtrace available: uncomment utitility.rs line 134");
+		// let _ = writeln!(stderr, "Backtrace: {:?}", backtrace);
 	}
+}
+// Only used to create comment for CellagentError::Chain
+pub fn to_static_str(s: String) -> &'static str {
+    unsafe {
+        let ret = ::std::mem::transmute(&s as &str);
+        ::std::mem::forget(s);
+        ret
+    }
 }
 // There are so many places in my code where it's more convenient
 // to provide &str but I need String that I made the following
