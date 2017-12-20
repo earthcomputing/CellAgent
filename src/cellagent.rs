@@ -7,7 +7,7 @@ use uuid::Uuid;
 
 use config::{BASE_TREE_NAME, CONNECTED_PORTS_TREE_NAME, CONTROL_TREE_NAME, MAX_ENTRIES, CellNo, CellType, PathLength, PortNo, TableIndex};
 use gvm_equation::{GvmEquation, GvmEqn};
-use message::{Message, MsgType, DiscoverMsg, StackTreeMsg, TreeNameMsg};
+use message::{Message, MsgType, DiscoverMsg, StackTreeMsg, TreeIdMsg};
 use message_types::{CaToPe, CaFromPe, CaToVm, VmFromCa, VmToCa, CaFromVm, CaToPePacket, PeToCaPacket,
 	VmToTree, VmFromTree, TreeToVm, TreeFromVm};
 use nalcell::CellConfig;
@@ -130,6 +130,7 @@ impl CellAgent {
 	pub fn get_no_ports(&self) -> PortNo { self.no_ports }	
 	pub fn get_id(&self) -> CellID { self.cell_id.clone() }
 	pub fn get_traphs(&self) -> &Arc<Mutex<Traphs>> { &self.traphs }
+    pub fn get_tree_name_map(&self) -> &TreeNameMap { &self.tree_name_map }
 	pub fn get_tree_id(&self, TableIndex(index): TableIndex) -> Result<TreeID, CellagentError> {
 		let f = "get_tree_id";
 		let trees = self.trees.lock().unwrap();
@@ -468,7 +469,7 @@ impl CellAgent {
             tree_map.insert(noc, new_tree_id.clone());
 			self.tree_name_map.insert(new_tree_id.clone(),tree_map);
 			let port_no_mask = Mask::new(port_number);
-			let tree_name_msg = TreeNameMsg::new(&new_tree_id, entry.get_index(), &allowed_trees);
+			let tree_name_msg = TreeIdMsg::new(&new_tree_id, entry.get_index(), &allowed_trees);
 			//println!("Cell {}: Sending on ports {}: {}", self.cell_id, port_no_mask, tree_name_msg);
 			let packets = tree_name_msg.to_packets(&new_tree_id)?;
 			self.send_msg(new_tree_id.get_uuid(), &packets, port_no_mask)?;
