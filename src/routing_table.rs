@@ -3,7 +3,7 @@ use std::fmt;
 use failure::{Error, Fail, ResultExt};
 
 use config::{MAX_ENTRIES, TableIndex};
-use name::CellID;
+use name::{Name, CellID};
 use routing_table_entry::{RoutingTableEntry};
 use utility::{S};
 
@@ -17,7 +17,7 @@ impl RoutingTable {
 	pub fn new(id: CellID) -> Result<RoutingTable, Error> {
 		let mut entries = Vec::new();
 		for i in 0..*MAX_ENTRIES {
-			let entry = RoutingTableEntry::default(TableIndex(i)).context(RoutingTableError::Chain { func_name: "new", comment: ""})?;
+			let entry = RoutingTableEntry::default(TableIndex(i)).context(RoutingTableError::Chain { func_name: "new", comment: S(id.get_name())})?;
 			entries.push(entry);
 		}
 		Ok(RoutingTable { id: id, entries: entries, connected_ports: Vec::new() })
@@ -48,7 +48,7 @@ impl fmt::Display for RoutingTable {
 #[derive(Debug, Fail)]
 pub enum RoutingTableError {
 	#[fail(display = "RoutingTableError::Chain {} {}", func_name, comment)]
-	Chain { func_name: &'static str, comment: &'static str },
+	Chain { func_name: &'static str, comment: String },
     #[fail(display = "RoutingTableError::Index {}: {:?} is not a valid routing table index on cell {}", func_name, index, cell_id)]
     Index { func_name: &'static str, index: TableIndex, cell_id: CellID}
 }

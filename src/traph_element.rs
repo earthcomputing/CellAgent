@@ -53,5 +53,5 @@ use failure::{Error, Fail, ResultExt};
 #[derive(Debug, Fail)]
 pub enum TraphElementError {
 	#[fail(display = "TraphElementError::Chain {} {}", func_name, comment)]
-	Chain { func_name: &'static str, comment: &'static str },
+	Chain { func_name: &'static str, comment: String },
 }

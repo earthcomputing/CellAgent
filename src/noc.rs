@@ -32,8 +32,8 @@ impl Noc {
             Result<Vec<JoinHandle<()>>, Error> {
 		let (noc_to_port, port_from_noc): (NocToPort, NocFromPort) = channel();
 		let (port_to_noc, noc_from_port): (PortToNoc, PortFromNoc) = channel();
-		let (mut dc, mut join_handles) = self.build_datacenter(blueprint).context(NocError::Chain { func_name: "initialize", comment: ""})?;
-		dc.connect_to_noc(port_to_noc, port_from_noc).context(NocError::Chain { func_name: "initialize", comment: ""})?;
+		let (mut dc, mut join_handles) = self.build_datacenter(blueprint).context(NocError::Chain { func_name: "initialize", comment: S("")})?;
+		dc.connect_to_noc(port_to_noc, port_from_noc).context(NocError::Chain { func_name: "initialize", comment: S("")})?;
 		let mut noc = self.clone();
 		let noc_to_port_clone = noc_to_port.clone();
 		let join_outside = spawn( move || { 
@@ -53,7 +53,7 @@ impl Noc {
 	}
 	fn build_datacenter(&self, blueprint: &Blueprint) -> Result<(Datacenter, Vec<JoinHandle<()>>), Error> {
 		let mut dc = Datacenter::new();
-		let join_handles = dc.initialize(blueprint).context(NocError::Chain { func_name: "build_datacenter", comment: ""})?;
+		let join_handles = dc.initialize(blueprint).context(NocError::Chain { func_name: "build_datacenter", comment: S("")})?;
 		Ok((dc, join_handles))
 	}
 //	fn get_msg(&self, msg_type: MsgType, serialized_msg:String) -> Result<Box<Message>> {
@@ -63,15 +63,15 @@ impl Noc {
 //	}
 	fn listen_port(&mut self, noc_to_port: NocToPort, noc_from_port: NocFromPort) -> Result<(), Error> {
 		loop {
-			let (msg_type, serialized) = noc_from_port.recv().context(NocError::Chain { func_name: "listen_port", comment: ""})?;
+			let (msg_type, serialized) = noc_from_port.recv().context(NocError::Chain { func_name: "listen_port", comment: S("")})?;
             match msg_type {
                 MsgType::TreeName => {
-                    let msg = serde_json::from_str::<TreeNameMsg>(&serialized).context(NocError::Chain { func_name: "listen_port", comment: "" })?;
-					let tree_name = msg.get_payload_tree_name().context(NocError::Chain { func_name: "listen_port", comment: "" })?;
+                    let msg = serde_json::from_str::<TreeNameMsg>(&serialized).context(NocError::Chain { func_name: "listen_port", comment: S("") })?;
+					let tree_name = msg.get_payload_tree_name().context(NocError::Chain { func_name: "listen_port", comment: S("") })?;
                     self.allowed_trees.insert(AllowedTree::new(tree_name));
                     // If this is the first tree, set up NocMaster and NocAgent
                     if self.allowed_trees.len() == 1 {
-                        self.create_noc(tree_name, &noc_to_port).context(NocError::Chain { func_name: "listen_port", comment: "" })?;
+                        self.create_noc(tree_name, &noc_to_port).context(NocError::Chain { func_name: "listen_port", comment: S("") })?;
                     }
                 }
                 _ => write_err("Noc: listen_port: {}", NocError::MsgType { func_name: "listen_port", msg_type: msg_type }.into())
@@ -84,16 +84,16 @@ impl Noc {
         let mut params = HashMap::new();
         params.insert(S("new_tree_name"), S(NOC_MASTER_TREE_NAME));
         params.insert(S("base_tree_name"), S(tree_name));
-        let gvm_eqn_ser = serde_json::to_string(&NocMaster::make_gvm()).context(NocError::Chain { func_name: "create_noc", comment: "gvm"})?;;
+        let gvm_eqn_ser = serde_json::to_string(&NocMaster::make_gvm()).context(NocError::Chain { func_name: "create_noc", comment: S("gvm")})?;;
         params.insert(S("gvm_eqn"), gvm_eqn_ser);
-        let stack_tree_msg = serde_json::to_string(&params).context(NocError::Chain { func_name: "create_noc", comment: ""})?;
-        Ok(noc_to_port.send((MsgType::StackTree, stack_tree_msg)).context(NocError::Chain { func_name: "create_noc", comment: ""})?)
+        let stack_tree_msg = serde_json::to_string(&params).context(NocError::Chain { func_name: "create_noc", comment: S("")})?;
+        Ok(noc_to_port.send((MsgType::StackTree, stack_tree_msg)).context(NocError::Chain { func_name: "create_noc", comment: S("")})?)
 	}
 	fn listen_outside(&mut self, noc_from_outside: NocFromOutside, noc_to_port: NocToPort) -> Result<(), Error> {
 		loop {
 			let input = &noc_from_outside.recv()?;
 			println!("Noc: {}", input);
-			let manifest = serde_json::from_str::<Manifest>(input).context(NocError::Chain { func_name: "listen_outside", comment: ""})?;
+			let manifest = serde_json::from_str::<Manifest>(input).context(NocError::Chain { func_name: "listen_outside", comment: S("")})?;
 			println!("Noc: {}", manifest);
 		}
 	}
@@ -103,7 +103,7 @@ use failure::{Error, Fail, ResultExt};
 #[derive(Debug, Fail)]
 pub enum NocError {
 	#[fail(display = "NocError::Chain {} {}", func_name, comment)]
-	Chain { func_name: &'static str, comment: &'static str },
+	Chain { func_name: &'static str, comment: String },
     #[fail(display = "NocError::AllowedTree {}: {} is not an allowed tree", func_name, tree_name)]
     AllowedTree { func_name: &'static str, tree_name: String },
 //    #[fail(display = "NocError::Message {}: Message type {} is malformed {}", func_name, msg_type, message)]

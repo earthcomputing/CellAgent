@@ -8,7 +8,7 @@ use message_types::{CaToPe, PeFromCa, PeToCa, CaFromPe, PortToPe, PeFromPort, Pe
 use name::{CellID};
 use packet_engine::{PacketEngine};
 use port::{Port};
-use utility::{PortNumber};
+use utility::{PortNumber, S};
 use vm::VirtualMachine;
 
 #[derive(Debug, Copy, Clone, Hash, Serialize, Deserialize)]
@@ -61,15 +61,15 @@ impl NalCell {
 			pe_to_ports.push(pe_to_port);
 			ports_from_pe.insert(PortNo{v:i}, port_from_pe);
 			let is_connected = if i == 0 { true } else { false };
-			let port_number = PortNumber::new(PortNo{v:i}, nports).context(NalcellError::Chain { func_name: "new", comment: ""})?;
+			let port_number = PortNumber::new(PortNo{v:i}, nports).context(NalcellError::Chain { func_name: "new", comment: S("")})?;
 			let port = Port::new(&cell_id, port_number, is_border_port, is_connected, 
-				port_to_pe.clone()).context(NalcellError::Chain { func_name: "new", comment: ""})?;
+				port_to_pe.clone()).context(NalcellError::Chain { func_name: "new", comment: S("")})?;
 			ports.push(port);
 		}
 		let boxed_ports: Box<[Port]> = ports.into_boxed_slice();
 		let mut cell_agent = CellAgent::new(&cell_id, cell_type, config, nports, ca_to_pe)?;
-		cell_agent.initialize(cell_type, ca_from_pe).context(NalcellError::Chain { func_name: "new", comment: ""})?;
-		let packet_engine = PacketEngine::new(&cell_id, pe_to_ca, pe_to_ports, boundary_port_nos).context(NalcellError::Chain { func_name: "new", comment: ""})?;
+		cell_agent.initialize(cell_type, ca_from_pe).context(NalcellError::Chain { func_name: "new", comment: S("")})?;
+		let packet_engine = PacketEngine::new(&cell_id, pe_to_ca, pe_to_ports, boundary_port_nos).context(NalcellError::Chain { func_name: "new", comment: S("")})?;
 		packet_engine.start_threads(pe_from_ca, pe_from_ports);
 		Ok(NalCell { id: cell_id, cell_no: cell_no, cell_type: cell_type, config: config,
 				ports: boxed_ports, cell_agent: cell_agent, vms: Vec::new(),
@@ -125,7 +125,7 @@ use failure::{Error, Fail, ResultExt};
 #[derive(Debug, Fail)]
 pub enum NalcellError {
 	#[fail(display = "NalcellError::Chain {} {}", func_name, comment)]
-	Chain { func_name: &'static str, comment: &'static str },
+	Chain { func_name: &'static str, comment: String },
     #[fail(display = "NalcellError::Channel {}: No receiver for port {:?}", func_name, port_no)]
     Channel { func_name: &'static str, port_no: PortNo },
     #[fail(display = "NalcellError::NoFreePorts {}: All ports have been assigned for cell {}", func_name, cell_id)]

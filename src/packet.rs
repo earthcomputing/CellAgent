@@ -13,6 +13,7 @@ use config::{PACKET_MIN, PACKET_MAX, PAYLOAD_DEFAULT_ELEMENT,
 	MsgID, PacketNo};
 use message::{Message, MsgDirection, TypePlusMsg};
 use name::{Name, TreeID};
+use utility::S;
  
 //const LARGEST_MSG: usize = std::u32::MAX as usize;
 const PAYLOAD_MIN: usize = PACKET_MAX - PACKET_HEADER_SIZE;
@@ -141,9 +142,9 @@ impl Serializer {
 	pub fn serialize<M>(msg: &M) -> Result<Box<Vec<u8>>, Error>
 			where M: Message + serde::Serialize {		
 		let msg_type = msg.get_header().get_msg_type();
-		let serialized_msg = serde_json::to_string(&msg).context(PacketError::Chain { func_name: "serialize", comment: "msg"})?;
+		let serialized_msg = serde_json::to_string(&msg).context(PacketError::Chain { func_name: "serialize", comment: S("msg")})?;
 		let msg_obj = TypePlusMsg::new(msg_type, serialized_msg);
-		let serialized = serde_json::to_string(&msg_obj).context(PacketError::Chain { func_name: "serialize", comment: "msg_obj"})?;
+		let serialized = serde_json::to_string(&msg_obj).context(PacketError::Chain { func_name: "serialize", comment: S("msg_obj")})?;
 		let msg_bytes = serialized.clone().into_bytes();
 		Ok(Box::new(msg_bytes))
 	}	
@@ -190,7 +191,7 @@ impl Packetizer {
 			};
 			all_bytes.extend_from_slice(&bytes);
 		}
-		Ok(str::from_utf8(&all_bytes).context(PacketError::Chain { func_name: "unpacketize", comment: ""})?.to_string())
+		Ok(str::from_utf8(&all_bytes).context(PacketError::Chain { func_name: "unpacketize", comment: S("")})?.to_string())
 	}
 	fn packet_payload_size(len: usize) -> usize {
 		match len-1 { 
@@ -234,5 +235,5 @@ use failure::{Error, Fail, ResultExt};
 #[derive(Debug, Fail)]
 pub enum PacketError {
 	#[fail(display = "PacketError::Chain {} {}", func_name, comment)]
-	Chain { func_name: &'static str, comment: &'static str },
+	Chain { func_name: &'static str, comment: String },
 }
