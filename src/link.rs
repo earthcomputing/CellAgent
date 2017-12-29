@@ -40,7 +40,7 @@ impl Link {
     fn listen_loop(&self, status: LinkToPort, link_from: LinkFromPort, link_to: LinkToPort) -> Result<(), Error> {
         loop {
             //println!("Link {}: waiting to recv", self.id);
-            let packet = link_from.recv()?;
+            let packet = link_from.recv().context(LinkError::Chain { func_name: "listen_loop", comment: "" })?;
             link_to.send(LinkToPortPacket::Packet(packet)).context(LinkError::Chain { func_name: "listen_loop", comment: "" })?;
         }
     }

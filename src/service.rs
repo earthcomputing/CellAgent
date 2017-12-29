@@ -55,6 +55,14 @@ impl NocMaster {
         NocMaster { container_id: container_id, name: S(name), container_to_vm: container_to_vm,
             allowed_trees: allowed_trees.clone() }
     }
+    pub fn make_gvm() -> GvmEquation {
+        let mut eqns = HashSet::new();
+        eqns.insert(GvmEqn::Recv("true"));
+        eqns.insert(GvmEqn::Send("false"));
+        eqns.insert(GvmEqn::Xtnd("true"));
+        eqns.insert(GvmEqn::Save("true"));
+        GvmEquation::new(eqns, Vec::new())
+    }
     pub fn make_manifest(deployment_tree: &AllowedTree) -> Result<Manifest, Error> {
         let new_tree_id = TreeID::new(NOCMASTER)?;
         let ref allowed_tree = AllowedTree::new(new_tree_id.get_name());
