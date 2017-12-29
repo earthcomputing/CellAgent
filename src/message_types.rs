@@ -2,17 +2,19 @@ use std::sync::mpsc;
 use routing_table_entry::{RoutingTableEntry};
 
 use config::{PortNo, TableIndex};
+use message::MsgType;
 use packet::{Packet};
 use port::{PortStatus};
-use utility::{Mask};
+use utility::{Mask, PortNumber};
 
+pub type TCP = (MsgType, String);
 // CellAgent to PacketEngine
-pub enum CaToPePacket { Entry(RoutingTableEntry), Packet((TableIndex, Mask, Packet)) }
+pub enum CaToPePacket { Entry(RoutingTableEntry), Packet((TableIndex, Mask, Packet)), Tcp((PortNumber, TCP)) }
 pub type CaToPe = mpsc::Sender<CaToPePacket>;
 pub type PeFromCa = mpsc::Receiver<CaToPePacket>;
 pub type CaPeError = mpsc::SendError<CaToPePacket>;
 // PacketEngine to Port
-pub type PeToPortPacket = (TableIndex, Packet);
+pub enum PeToPortPacket { Packet((TableIndex, Packet)), Tcp(TCP) }
 pub type PeToPort = mpsc::Sender<PeToPortPacket>;
 pub type PortFromPe = mpsc::Receiver<PeToPortPacket>;
 pub type PePortError = mpsc::SendError<PeToPortPacket>;
@@ -27,22 +29,22 @@ pub type LinkToPort = mpsc::Sender<LinkToPortPacket>;
 pub type PortFromLink = mpsc::Receiver<LinkToPortPacket>;
 pub type LinkPortError = mpsc::SendError<LinkToPortPacket>;
 // Port to PacketEngine
-pub enum PortToPePacket { Status((PortNo, bool, PortStatus)), Packet((PortNo, TableIndex, Packet)) }
+pub enum PortToPePacket { Status((PortNo, bool, PortStatus)), Packet((PortNo, TableIndex, Packet)), Tcp((PortNo, TCP)) }
 pub type PortToPe = mpsc::Sender<PortToPePacket>;
 pub type PeFromPort = mpsc::Receiver<PortToPePacket>;
 pub type PortPeError = mpsc::SendError<PortToPePacket>;
 // PacketEngine to CellAgent
-pub enum PeToCaPacket { Status(PortNo, bool, PortStatus), Packet(PortNo, TableIndex, Packet) }
+pub enum PeToCaPacket { Status((PortNo, bool, PortStatus)), Packet((PortNo, TableIndex, Packet)), Tcp((PortNo, TCP)) }
 pub type PeToCa = mpsc::Sender<PeToCaPacket>;
 pub type CaFromPe = mpsc::Receiver<PeToCaPacket>;
 pub type PeCaError = mpsc::SendError<PeToCaPacket>;
 // Port to Noc World
-pub type PortToNocMsg = (TableIndex, Packet);
+pub type PortToNocMsg = TCP;
 pub type PortToNoc = mpsc::Sender<PortToNocMsg>;
 pub type NocFromPort = mpsc::Receiver<PortToNocMsg>;
 pub type PortNocError = mpsc::SendError<PortToNocMsg>;
 // Noc to Port
-pub type NocToPortMsg = (TableIndex, Packet);
+pub type NocToPortMsg = TCP;
 pub type NocToPort = mpsc::Sender<NocToPortMsg>;
 pub type PortFromNoc = mpsc::Receiver<NocToPortMsg>;
 pub type NocPortError = mpsc::SendError<NocToPortMsg>;
