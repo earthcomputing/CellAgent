@@ -213,18 +213,18 @@ impl Message for DiscoverMsg {
 			my_index = entry.get_index();
 			// Send DiscoverD to sender
 			let discoverd_msg = DiscoverDMsg::new(new_tree_id, my_index);
-			let packets = discoverd_msg.to_packets(new_tree_id).context(MessageError::Chain { func_name: "process_ca", comment: "DiscoverMsg"})?;
 			//println!("DiscoverMsg {}: sending discoverd for tree {} packet {} {}",ca.get_id(), new_tree_id, packets[0].get_count(), discoverd_msg);
 			let mask = Mask::new(port_number);
-			ca.send_msg(ca.get_connected_ports_tree_id().get_uuid(), &packets, mask).context(MessageError::Chain { func_name: "process_ca", comment: "DiscoverMsg"})?;
+			ca.send_msg(&ca.get_connected_ports_tree_id(), &discoverd_msg, mask).context(MessageError::Chain { func_name: "process_ca", comment: "DiscoverMsg"})?;
 			// Forward Discover on all except port_no with updated hops and path
 		}
 		self.update_discover_msg(&ca.get_id(), my_index);
 		let packets = self.to_packets(&ca.get_control_tree_id()).context(MessageError::Chain { func_name: "process_ca", comment: ""})?;
 		let user_mask = DEFAULT_USER_MASK.all_but_port(PortNumber::new(port_no, ca.get_no_ports()).context(MessageError::Chain { func_name: "process_ca", comment: "DiscoverMsg"})?);
 		//println!("DiscoverMsg {}: forwarding packet {} on connected ports {}", ca.get_id(), packets[0].get_count(), self);
+        let packets = ca.send_msg(&ca.get_connected_ports_tree_id(), &self.clone(), user_mask).context(MessageError::Chain {func_name: "process_ca", comment: "DiscoverMsg"})?;
 		ca.add_saved_discover(&packets); // Discover message are always saved for late port connect
-        ca.send_msg(ca.get_connected_ports_tree_id().get_uuid(), &packets, user_mask)
+		Ok(())
 	}
 }
 #[derive(Debug, Clone, Hash, Serialize, Deserialize)]
