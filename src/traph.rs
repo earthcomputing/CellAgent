@@ -26,10 +26,10 @@ impl Traph {
 	pub fn new(cell_id: &CellID, black_tree_id: &TreeID, index: TableIndex, gvm_eqn: Option<&GvmEquation>) -> Result<Traph, Error> {
 		let mut elements = Vec::new();
 		for i in 1..MAX_PORTS.v {
-			let port_number = PortNumber::new(PortNo{v:i as u8}, MAX_PORTS).context(TraphError::Chain { func_name: "new", comment: ""})?;
+			let port_number = PortNumber::new(PortNo{v:i as u8}, MAX_PORTS).context(TraphError::Chain { func_name: "new", comment: S("")})?;
 			elements.push(TraphElement::default(port_number));
 		}
-		let entry = RoutingTableEntry::default(index).context(TraphError::Chain { func_name: "new", comment: ""})?;
+		let entry = RoutingTableEntry::default(index).context(TraphError::Chain { func_name: "new", comment: S("")})?;
 		let black_tree = Tree::new(black_tree_id, black_tree_id, gvm_eqn, entry);
 		let stacked_trees = Arc::new(Mutex::new(HashMap::new()));
 		{
@@ -49,7 +49,7 @@ impl Traph {
 		}
 	}
 	pub fn get_black_tree_entry(&self) -> Result<RoutingTableEntry, Error> {
-        Ok(self.get_tree_entry(&self.black_tree_id.get_uuid()).context(TraphError::Chain { func_name: "get_black_tree_entry", comment: ""})?)
+        Ok(self.get_tree_entry(&self.black_tree_id.get_uuid()).context(TraphError::Chain { func_name: "get_black_tree_entry", comment: S("")})?)
     }
 	pub fn get_stacked_trees(&self) -> &Arc<Mutex<StackedTrees>> { &self.stacked_trees }
 	pub fn has_tree(&self, tree_id: &TreeID) -> bool {
@@ -73,7 +73,7 @@ impl Traph {
 		Err(TraphError::ParentElement { cell_id: self.cell_id.clone(), func_name: "get_parent_element", tree_id: self.black_tree_id.clone() }.into())
 	}
 	pub fn get_hops(&self) -> Result<PathLength, Error> {
-		let element = self.get_parent_element().context(TraphError::Chain { func_name: "get_hops", comment: ""})?;
+		let element = self.get_parent_element().context(TraphError::Chain { func_name: "get_hops", comment: S("")})?;
 		return Ok(element.get_hops()); 
 	}
 	pub fn is_leaf(&self) -> bool {
@@ -98,7 +98,7 @@ impl Traph {
 	}
 	pub fn get_table_index(&self, tree_uuid: &Uuid) -> Result<TableIndex, Error> {
 		let locked = self.stacked_trees.lock().unwrap(); 
-		let table_entry = self.get_table_entry(&locked, tree_uuid).context(TraphError::Chain { func_name: "get_table_index", comment: ""})?;
+		let table_entry = self.get_table_entry(&locked, tree_uuid).context(TraphError::Chain { func_name: "get_table_index", comment: S("")})?;
 		Ok(table_entry.get_index())
 	}
 	pub fn new_element(&mut self, tree_id: &TreeID, port_number: PortNumber, port_status: PortStatus, 
@@ -138,12 +138,12 @@ impl Traph {
 			if stacked_tree.get_id() != stacked_tree.get_black_tree_id() {
 				let mut stacked_entry = stacked_tree.get_table_entry();
 				let port_no = PortNo{v: base_tree_entry.get_other_indices().len() as u8};
-				let port_number = PortNumber::new(base_tree_entry.get_parent(), port_no).context(TraphError::Chain { func_name: "update_stacked_entries", comment: "" })?;
+				let port_number = PortNumber::new(base_tree_entry.get_parent(), port_no).context(TraphError::Chain { func_name: "update_stacked_entries", comment: S("") })?;
 				stacked_entry.set_parent(port_number);
 				stacked_entry.set_mask(base_tree_entry.get_mask());
 				if let Some(gvm_eqn) = stacked_tree.get_gvm_eqn() {
-					let params = self.get_params(gvm_eqn.get_variables()).context(TraphError::Chain { func_name: "update_stacked_entries", comment: ""})?;
-					if !gvm_eqn.eval_recv(&params).context(TraphError::Chain { func_name: "update_stacked_entries", comment: "recv"})? {
+					let params = self.get_params(gvm_eqn.get_variables()).context(TraphError::Chain { func_name: "update_stacked_entries", comment: S("")})?;
+					if !gvm_eqn.eval_recv(&params).context(TraphError::Chain { func_name: "update_stacked_entries", comment: S(self.cell_id.get_name()) + " recv"})? {
 						let mask = stacked_entry.get_mask().and(Mask::all_but_zero(PortNo{v:stacked_entry.get_other_indices().len() as u8}));
 						stacked_entry.set_mask(mask);
 					}
@@ -162,7 +162,7 @@ impl Traph {
 		for var in vars {
 			match var.get_value().as_ref() {
 				"hops" => {
-					let hops = self.get_hops().context(TraphError::Chain { func_name: "get_params", comment: ""})?;
+					let hops = self.get_hops().context(TraphError::Chain { func_name: "get_params", comment: S("")})?;
 					variables.push(GvmVariable::new(GvmVariableType::PathLength, hops));
 				},
 				_ => ()
@@ -207,7 +207,7 @@ impl fmt::Display for PortStatus {
 #[derive(Debug, Fail)]
 pub enum TraphError {
 	#[fail(display = "TraphError::Chain {} {}", func_name, comment)]
-	Chain { func_name: &'static str, comment: &'static str },
+	Chain { func_name: &'static str, comment: String },
 	#[fail(display = "TraphError::ParentElement {}: No parent element for tree {} on cell {}", func_name, tree_id, cell_id)]
 	ParentElement { func_name: &'static str, cell_id: CellID, tree_id: TreeID },
     #[fail(display = "TraphError::Tree {}: No tree with UUID {} on cell {}", func_name, tree_uuid, cell_id)]

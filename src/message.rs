@@ -32,16 +32,16 @@ pub enum MsgType {
 }
 impl MsgType {
     pub fn get_msg(packets: &Vec<Packet>) -> Result<Box<Message>, Error> {
-        let serialized = Packetizer::unpacketize(packets).context(MessageError::Chain { func_name: "get_msg", comment: ""})?;
-		let type_msg = serde_json::from_str::<TypePlusMsg>(&serialized).context(MessageError::Chain { func_name: "get_msg", comment: ""})?;
+        let serialized = Packetizer::unpacketize(packets).context(MessageError::Chain { func_name: "get_msg", comment: S("")})?;
+		let type_msg = serde_json::from_str::<TypePlusMsg>(&serialized).context(MessageError::Chain { func_name: "get_msg", comment: S("")})?;
 		let msg_type = type_msg.get_type();
 		let serialized_msg = type_msg.get_serialized_msg();		
 		Ok(match msg_type {
-			MsgType::Discover  => Box::new(serde_json::from_str::<DiscoverMsg>(&serialized_msg).context(MessageError::Chain { func_name: "get_msg", comment: ""})?),
-			MsgType::DiscoverD => Box::new(serde_json::from_str::<DiscoverDMsg>(&serialized_msg).context(MessageError::Chain { func_name: "get_msg", comment: ""})?),
-			MsgType::Manifest  => Box::new(serde_json::from_str::<ManifestMsg>(&serialized_msg).context(MessageError::Chain { func_name: "get_msg", comment: ""})?),
-			MsgType::StackTree => Box::new(serde_json::from_str::<StackTreeMsg>(&serialized_msg).context(MessageError::Chain { func_name: "get_msg", comment: ""})?),
-			MsgType::TreeName  => Box::new(serde_json::from_str::<TreeNameMsg>(&serialized_msg).context(MessageError::Chain { func_name: "get_msg", comment: ""})?),
+			MsgType::Discover  => Box::new(serde_json::from_str::<DiscoverMsg>(&serialized_msg).context(MessageError::Chain { func_name: "get_msg", comment: S("DiscoverMsg")})?),
+			MsgType::DiscoverD => Box::new(serde_json::from_str::<DiscoverDMsg>(&serialized_msg).context(MessageError::Chain { func_name: "get_msg", comment: S("DiscoverDMsg")})?),
+			MsgType::Manifest  => Box::new(serde_json::from_str::<ManifestMsg>(&serialized_msg).context(MessageError::Chain { func_name: "get_msg", comment: S("ManifestMsg")})?),
+			MsgType::StackTree => Box::new(serde_json::from_str::<StackTreeMsg>(&serialized_msg).context(MessageError::Chain { func_name: "get_msg", comment: S("StackTreeMsg")})?),
+			MsgType::TreeName  => Box::new(serde_json::from_str::<TreeNameMsg>(&serialized_msg).context(MessageError::Chain { func_name: "get_msg", comment: S("TreeNameMsg")})?),
 		})		
 	}
 	// A hack for printing debug output only for a specific message type
@@ -109,7 +109,7 @@ pub trait Message {
     fn get_gvm_eqn(&self) -> Result<&GvmEquation, Error> { Err(MessageError::Gvm { func_name: "get_gvm_eqn", msg_type: self.get_msg_type() }.into()) }
     fn to_packets(&self, tree_id: &TreeID) -> Result<Vec<Packet>, Error>
 			where Self:std::marker::Sized + serde::Serialize {
-		let bytes = Serializer::serialize(self).context(MessageError::Chain { func_name: "to_packets", comment: ""})?;
+		let bytes = Serializer::serialize(self).context(MessageError::Chain { func_name: "to_packets", comment: S("")})?;
 		let direction = self.get_header().get_direction();
 		let packets = Packetizer::packetize(tree_id, &bytes, direction);
 		Ok(packets)
@@ -188,7 +188,7 @@ impl Message for DiscoverMsg {
 	fn get_payload(&self) -> &MsgPayload { &self.payload }
 	fn get_payload_discover(&self) -> Result<&DiscoverPayload, Error> { Ok(&self.payload) }
 	fn process_ca(&mut self, ca: &mut CellAgent, msg_tree_id: &TreeID, port_no: PortNo) -> Result<(), Error> {
-		let port_number = PortNumber::new(port_no, ca.get_no_ports()).context(MessageError::Chain { func_name: "process_ca", comment: "DiscoverMsg"})?;
+		let port_number = PortNumber::new(port_no, ca.get_no_ports()).context(MessageError::Chain { func_name: "process_ca", comment: S("DiscoverMsg")})?;
 		let hops = self.payload.get_hops();
 		let path = self.payload.get_path();
 		let my_index;
@@ -206,7 +206,7 @@ impl Message for DiscoverMsg {
 			eqns.insert(GvmEqn::Save("false"));
 			let gvm_equation = GvmEquation::new(eqns, Vec::new());
 			let entry = ca.update_traph(new_tree_id, port_number, status, Some(&gvm_equation),
-					children, senders_index, hops, Some(path)).context(MessageError::Chain { func_name: "process_ca", comment: "DiscoverMsg"})?;
+					children, senders_index, hops, Some(path)).context(MessageError::Chain { func_name: "process_ca", comment: S("DiscoverMsg")})?;
 			if exists { 
 				return Ok(()); // Don't forward if traph exists for this tree - Simple quenching
 			}
@@ -215,14 +215,14 @@ impl Message for DiscoverMsg {
 			let discoverd_msg = DiscoverDMsg::new(new_tree_id, my_index);
 			//println!("DiscoverMsg {}: sending discoverd for tree {} packet {} {}",ca.get_id(), new_tree_id, packets[0].get_count(), discoverd_msg);
 			let mask = Mask::new(port_number);
-			ca.send_msg(&ca.get_connected_ports_tree_id(), &discoverd_msg, mask).context(MessageError::Chain { func_name: "process_ca", comment: "DiscoverMsg"})?;
+			ca.send_msg(&ca.get_connected_ports_tree_id(), &discoverd_msg, mask).context(MessageError::Chain { func_name: "process_ca", comment: S("DiscoverMsg")})?;
 			// Forward Discover on all except port_no with updated hops and path
 		}
 		self.update_discover_msg(&ca.get_id(), my_index);
-		let packets = self.to_packets(&ca.get_control_tree_id()).context(MessageError::Chain { func_name: "process_ca", comment: ""})?;
-		let user_mask = DEFAULT_USER_MASK.all_but_port(PortNumber::new(port_no, ca.get_no_ports()).context(MessageError::Chain { func_name: "process_ca", comment: "DiscoverMsg"})?);
+		let packets = self.to_packets(&ca.get_control_tree_id()).context(MessageError::Chain { func_name: "process_ca", comment: S("")})?;
+		let user_mask = DEFAULT_USER_MASK.all_but_port(PortNumber::new(port_no, ca.get_no_ports()).context(MessageError::Chain { func_name: "process_ca", comment: S("DiscoverMsg")})?);
 		//println!("DiscoverMsg {}: forwarding packet {} on connected ports {}", ca.get_id(), packets[0].get_count(), self);
-        let packets = ca.send_msg(&ca.get_connected_ports_tree_id(), &self.clone(), user_mask).context(MessageError::Chain {func_name: "process_ca", comment: "DiscoverMsg"})?;
+        let packets = ca.send_msg(&ca.get_connected_ports_tree_id(), &self.clone(), user_mask).context(MessageError::Chain {func_name: "process_ca", comment: S("DiscoverMsg")})?;
 		ca.add_saved_discover(&packets); // Discover message are always saved for late port connect
 		Ok(())
 	}
@@ -291,7 +291,7 @@ impl Message for DiscoverDMsg {
 		let tree_id = self.payload.get_tree_id();
 		let my_index = self.payload.get_table_index();
 		let mut children = HashSet::new();
-		let port_number = PortNumber::new(port_no, MAX_PORTS).context(MessageError::Chain { func_name: "process_ca", comment: "DiscoverDMsg"})?;
+		let port_number = PortNumber::new(port_no, MAX_PORTS).context(MessageError::Chain { func_name: "process_ca", comment: S("DiscoverDMsg")})?;
 		children.insert(port_number);
 		//println!("DiscoverDMsg {}: process msg {} processing {} {} {}", ca.get_id(), self.get_header().get_count(), port_no, my_index, tree_id);
 		let mut eqns = HashSet::new();
@@ -351,11 +351,11 @@ impl Message for StackTreeMsg {
 			let base_tree_name = self.payload.get_base_tree_id().get_name();
 			if let Some(map) = ca.get_tree_name_map().get(msg_tree_id).cloned() {
 				if let Some(base_tree_id) = map.get(&AllowedTree::new(base_tree_name)) {
-					let manifest = NocAgent::make_manifest(&AllowedTree::new(NOCAGENT)).context(MessageError::Chain { func_name: "process_ca", comment: "StackTreeMsg"})?;
+					let manifest = NocAgent::make_manifest(&AllowedTree::new(NOCAGENT)).context(MessageError::Chain { func_name: "process_ca", comment: S("StackTreeMsg")})?;
 					//println!("Cell {}: manifest {}", ca.get_id(), manifest);
-                    let new_tree_id = TreeID::new(tree_name).context(MessageError::Chain { func_name: "process_ca", comment: "StackTreeMsg"})?;
-					ca.stack_tree(&new_tree_id, &msg_tree_id, base_tree_id, manifest.get_gvm()).context(MessageError::Chain { func_name: "process_ca", comment: "StackTreeMsg"})?;
-					ca.deploy(port_no, &new_tree_id, &manifest).context(MessageError::Chain { func_name: "process_ca", comment: "StackTreeMsg"})?;
+                    let new_tree_id = TreeID::new(tree_name).context(MessageError::Chain { func_name: "process_ca", comment: S("StackTreeMsg")})?;
+					ca.stack_tree(&new_tree_id, &msg_tree_id, base_tree_id, manifest.get_gvm()).context(MessageError::Chain { func_name: "process_ca", comment: S("StackTreeMsg")})?;
+					ca.deploy(port_no, &new_tree_id, &manifest).context(MessageError::Chain { func_name: "process_ca", comment: S("StackTreeMsg")})?;
 				} else {
 					return Err(MessageError::TreeMapEntry { tree_name: S(tree_name), func_name: "process_ca stack tree (black)" }.into()); }
 			} else {
@@ -408,7 +408,7 @@ impl Message for ManifestMsg {
 	fn process_ca(&mut self, ca: &mut CellAgent, msg_tree_id: &TreeID, port_no: PortNo) -> Result<(), Error> {
 		let manifest = self.payload.get_manifest();
 		//println!("ManifestMsg: tree {} msg {}", msg_tree_id, self);
-		Ok(ca.deploy(port_no, &msg_tree_id, &manifest).context(MessageError::Chain { func_name: "process_ca", comment: "ManifestMsg"})?)
+		Ok(ca.deploy(port_no, &msg_tree_id, &manifest).context(MessageError::Chain { func_name: "process_ca", comment: S("ManifestMsg")})?)
 	}
 }
 #[derive(Debug, Clone, Hash, Serialize, Deserialize)]
@@ -475,7 +475,7 @@ use failure::{Error, Fail, ResultExt};
 #[derive(Debug, Fail)]
 pub enum MessageError {
 	#[fail(display = "MessageError::Chain {} {}", func_name, comment)]
-	Chain { func_name: &'static str, comment: &'static str },
+	Chain { func_name: &'static str, comment: String },
     #[fail(display = "MessageError::Gvm {}: No GVM for this message type {}", func_name, msg_type)]
     Gvm { func_name: &'static str, msg_type: MsgType },
     #[fail(display = "MessageError::InvalidMsgType {}: Invalid message type {} from packet assembler", func_name, msg_type)]

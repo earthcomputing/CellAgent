@@ -68,8 +68,8 @@ impl<'a> TreeID {
 		}
 	}
 	pub fn append2file(&self) -> Result<(), Error> {
-		let json = ::serde_json::to_string(&self).context(NameError::Chain { func_name: "append2file", comment: ""})?;
-		::utility::append2file(json).context(NameError::Chain { func_name: "append2file", comment: ""})?;
+		let json = ::serde_json::to_string(&self).context(NameError::Chain { func_name: "append2file", comment: S("")})?;
+		::utility::append2file(json).context(NameError::Chain { func_name: "append2file", comment: S("")})?;
 		Ok(())
 	}
 }
@@ -163,7 +163,7 @@ use failure::{Error, Fail, ResultExt};
 #[derive(Debug, Fail)]
 pub enum NameError {
 	#[fail(display = "NameError::Chain {} {}", func_name, comment)]
-	Chain { func_name: &'static str, comment: &'static str },
+	Chain { func_name: &'static str, comment: String },
 	#[fail(display = "NameError::Format {}: '{}' contains blanks.", func_name, name)]
 	Format { func_name: &'static str, name: String }
 }

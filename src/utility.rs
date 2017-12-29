@@ -100,7 +100,7 @@ impl fmt::Display for PortNumber {
 pub struct Path { port_number: PortNumber }
 impl Path {
 	pub fn new(port_no: PortNo, no_ports: PortNo) -> Result<Path, Error> {
-		let port_number = PortNumber::new(port_no, no_ports).context(UtilityError::Chain { func_name: "Path::new", comment: ""})?;
+		let port_number = PortNumber::new(port_no, no_ports).context(UtilityError::Chain { func_name: "Path::new", comment: S("")})?;
 		Ok(Path { port_number: port_number })
 	}
 	pub fn get_port_no(&self) -> PortNo { self.port_number.get_port_no() }
@@ -118,7 +118,7 @@ pub fn append2file(line: String) -> Result<(), Error> {
 			File::create(OUTPUT_FILE_NAME)
 		}
 	}?;
-	file_handle.write(&(line + "\n").into_bytes()).context(UtilityError::Chain { func_name: "append2file", comment: ""})?;
+	file_handle.write(&(line + "\n").into_bytes()).context(UtilityError::Chain { func_name: "append2file", comment: S("")})?;
 	Ok(())
 }
 pub fn write_err(caller: &str, e: Error) {
@@ -130,7 +130,7 @@ pub fn write_err(caller: &str, e: Error) {
 	}
 	let fail: &Fail = e.cause();
 	if let Some(backtrace) = fail.cause().and_then(|cause| cause.backtrace()) {
-		let _ = writeln!(stderr, "Backtrace available: uncomment utitility.rs line 134");
+		let _ = writeln!(stderr, "---> Backtrace available: uncomment line in utility.rs containing --->");
 		// let _ = writeln!(stderr, "Backtrace: {:?}", backtrace);
 	}
 }
@@ -150,7 +150,7 @@ use failure::{Error, Fail, ResultExt};
 #[derive(Debug, Fail)]
 pub enum UtilityError {
     #[fail(display = "UtilityError::Chain {} {}", func_name, comment)]
-    Chain { func_name: &'static str, comment: &'static str },
+    Chain { func_name: &'static str, comment: String },
     #[fail(display = "UtilityError::Mask {}: Cell {} has no tenant mask", func_name, cell_id)]
     Mask { cell_id: CellID, func_name: String},
     #[fail(display = "UtilityError::PortNumber {}: Port number {:?} is larger than the maximum of {:?}", func_name, port_no, max)]

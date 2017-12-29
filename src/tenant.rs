@@ -16,7 +16,7 @@ pub struct Tenant {
 impl Tenant {
 	pub fn new(id: &'static str, n: CellNo, parent_id: Option<TenantID>) -> Result<Tenant, Error> {
 		let name = match parent_id {
-			Some(p) => Ok(p.add_component(id).context(TenantError::Chain { func_name: "new", comment: ""})?),
+			Some(p) => Ok(p.add_component(id).context(TenantError::Chain { func_name: "new", comment: S("")})?),
 			None => TenantID::new(id)
 		}?; 
 		Ok(Tenant { id: name, ncells: n, children: HashMap::new() })
@@ -63,7 +63,7 @@ use config::CellNo;
 #[derive(Debug, Fail)]
 pub enum TenantError {
 	#[fail(display = "TenantError::Chain {} {}", func_name, comment)]
-	Chain { func_name: &'static str, comment: &'static str },
+	Chain { func_name: &'static str, comment: String },
 	#[fail(display = "TenantError::DuplicateName {}: A tenant named '{}' already exists.", func_name, tenant_name)]
 	DuplicateName { func_name: &'static str, tenant_name: String },
     #[fail(display = "TenantError::Quota {}: You asked for {:?} cells, but only {:?} are available", func_name, request, available)]

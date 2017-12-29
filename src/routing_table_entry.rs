@@ -4,7 +4,7 @@ use uuid::Uuid;
 
 use config::{MAX_PORTS, PortNo, TableIndex};
 use name::{Name, TreeID};
-use utility::{Mask, PortNumber};
+use utility::{Mask, PortNumber, S};
 
 type OtherIndices = [TableIndex; MAX_PORTS.v as usize];
 #[derive(Debug, Copy, Clone, Serialize, Deserialize)]
@@ -24,8 +24,8 @@ impl RoutingTableEntry {
 			may_send: may_send, inuse: inuse, mask: mask, other_indices: other_indices }
 	}
 	pub fn default(index: TableIndex) -> Result<RoutingTableEntry, Error> {
-		let port_number = PortNumber::new(PortNo{v:0}, MAX_PORTS).context(RoutingTableEntryError::Chain { func_name: "default", comment: ""})?;
-		let tree_id = TreeID::new("default").context(RoutingTableEntryError::Chain { func_name: "default", comment: ""})?;
+		let port_number = PortNumber::new(PortNo{v:0}, MAX_PORTS).context(RoutingTableEntryError::Chain { func_name: "default", comment: S("")})?;
+		let tree_id = TreeID::new("default").context(RoutingTableEntryError::Chain { func_name: "default", comment: S("")})?;
 		Ok(RoutingTableEntry::new(index, &tree_id, false, port_number, Mask::empty(), false, [TableIndex(0); MAX_PORTS.v as usize]))
 	}
 	pub fn is_in_use(&self) -> bool { self.inuse }
@@ -94,5 +94,5 @@ use failure::{Error, ResultExt};
 #[derive(Debug, Fail)]
 pub enum RoutingTableEntryError {
     #[fail(display = "RoutingTableEntryError::Chain {} {}", func_name, comment)]
-    Chain { func_name: &'static str, comment: &'static str },
+    Chain { func_name: &'static str, comment: String },
 }
