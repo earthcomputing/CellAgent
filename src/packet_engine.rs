@@ -58,10 +58,9 @@ impl PacketEngine {
 				},
 				CaToPePacket::Tcp((port_number, msg)) => {
                     let port_no = port_number.get_port_no();
-                    if let Some(sender) = self.pe_to_ports.get(*port_no as usize) {
-                        sender.send(PeToPortPacket::Tcp(msg)).context(PacketEngineError::Chain { func_name: "listen_ca", comment: S("send TCP to port ") + self.cell_id.get_name() })?
-                    } else {
-                        return Err(PacketEngineError::Sender { func_name: "listen_ca", cell_id: self.cell_id.clone(), port_no: *port_no}.into());
+                    match self.pe_to_ports.get(*port_no as usize) {
+                        Some(sender) => sender.send(PeToPortPacket::Tcp(msg)).context(PacketEngineError::Chain { func_name: "listen_ca", comment: S("send TCP to port ") + self.cell_id.get_name() })?,
+                        _ => return Err(PacketEngineError::Sender { func_name: "listen_ca", cell_id: self.cell_id.clone(), port_no: *port_no }.into())
                     }
                 }
 			}; 
@@ -84,6 +83,7 @@ impl PacketEngine {
 		if entry.is_in_use() {
 			//println!("PacketEngine {}: entry {} header UUID {}", self.cell_id, entry, packet.get_header().get_tree_uuid());
 			// The control tree is special since each cell has a different uuid
+            if ::message::MsgType::is_type(packet, "StackTree") && self.cell_id.get_name() == "C:1" { println!("PacketEngine {}: entry {}", self.cell_id, entry); }
 			if (*entry.get_index() == 0) || (entry.get_uuid() == packet.get_header().get_tree_uuid()) {
 				let mask = entry.get_mask();
 				let other_indices = entry.get_other_indices();
@@ -122,8 +122,8 @@ impl PacketEngine {
 		} else {
 			let mask = user_mask.and(entry.get_mask());
 			let port_nos = mask.get_port_nos();
-			//let is_manifest_msg = match format!("{}", packet).find("Manifest") { Some(_) => true, None => false };
-			//if ::message::MsgType::is_type(packet, "Manifest") { println!("PacketEngine {}: forwarding packet {} on ports {:?}, {}", self.cell_id, packet.get_count(), port_nos, entry); }
+			//let is_stack_msg = match format!("{}", packet).find("StackTree") { Some(_) => true, None => false };
+			if ::message::MsgType::is_type(packet, "StackTree") { println!("PacketEngine {}: forwarding packet {} on ports {:?}, {}", self.cell_id, packet.get_count(), port_nos, entry); }
 			for port_no in port_nos.iter() {
 				if let Some(other_index) = other_indices.get(port_no.v as usize).cloned() {
 					if port_no.v as usize == 0 {

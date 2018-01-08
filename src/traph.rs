@@ -56,7 +56,14 @@ impl Traph {
 		let stacked_trees = self.stacked_trees.lock().unwrap();
 		stacked_trees.contains_key(&tree_id.get_uuid())
 	}
-	pub fn get_port_status(&self, port_number: PortNumber) -> PortStatus { 
+	pub fn is_port_connected(&self, port_number: PortNumber) -> bool {
+        let port_no = port_number.get_port_no();
+        match self.elements.get(*port_no as usize) {
+            Some(e) => e.is_connected(),
+            None => false
+        }
+    }
+	pub fn get_port_status(&self, port_number: PortNumber) -> PortStatus {
 		let port_no = port_number.get_port_no();
 		match self.elements.get(port_no.v as usize) {
 			Some(e) => e.get_status(),
@@ -105,10 +112,10 @@ impl Traph {
 			other_index: TableIndex, children: &HashSet<PortNumber>, hops: PathLength, path: Option<Path>) 
 			-> Result<RoutingTableEntry, TraphError> {
 		let port_no = port_number.get_port_no();
-		let mut locked = self.stacked_trees.lock().unwrap();
+		let mut stacked_trees = self.stacked_trees.lock().unwrap();
 		// I get lifetime errors if I put this block in a function
-		let mut tree = match locked.get(&tree_id.get_uuid()) {
-			Some(tree) => tree.clone(),
+		let mut tree = match stacked_trees.get(&tree_id.get_uuid()).cloned() {
+			Some(tree) => tree,
 			None => return Err(TraphError::Tree { cell_id: self.cell_id.clone(), func_name: "new_element", tree_uuid: tree_id.get_uuid() }.into())
 		};
 		let mut table_entry = tree.get_table_entry();
@@ -126,7 +133,7 @@ impl Traph {
 		table_entry.set_inuse();
 		table_entry.set_tree_id(tree_id);
 		tree.set_table_entry(table_entry);
-		locked.insert(tree_id.get_uuid(), tree);
+		stacked_trees.insert(tree_id.get_uuid(), tree);
 		let element = TraphElement::new(true, port_no, other_index, port_status, hops, path);
 		self.elements[*port_no as usize] = element;
 		Ok(table_entry)
