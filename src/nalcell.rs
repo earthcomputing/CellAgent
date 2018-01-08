@@ -40,7 +40,7 @@ pub struct NalCell {
 impl NalCell {
 	pub fn new(cell_no: CellNo, nports: PortNo, cell_type: CellType, config: CellConfig) -> Result<NalCell, Error> {
 		if nports.v > MAX_PORTS.v { return Err(NalcellError::NumberPorts { nports: nports, func_name: "new", max_ports: MAX_PORTS }.into()) }
-		let cell_id = CellID::new(cell_no)?;
+		let cell_id = CellID::new(cell_no).context(NalcellError::Chain { func_name: "new", comment: S("cell_id")})?;
 		let (ca_to_pe, pe_from_ca): (CaToPe, PeFromCa) = channel();
 		let (pe_to_ca, ca_from_pe): (PeToCa, CaFromPe) = channel();
 		let (port_to_pe, pe_from_ports): (PortToPe, PeFromPort) = channel();
@@ -61,15 +61,14 @@ impl NalCell {
 			pe_to_ports.push(pe_to_port);
 			ports_from_pe.insert(PortNo{v:i}, port_from_pe);
 			let is_connected = if i == 0 { true } else { false };
-			let port_number = PortNumber::new(PortNo{v:i}, nports).context(NalcellError::Chain { func_name: "new", comment: S("")})?;
-			let port = Port::new(&cell_id, port_number, is_border_port, is_connected, 
-				port_to_pe.clone()).context(NalcellError::Chain { func_name: "new", comment: S("")})?;
+			let port_number = PortNumber::new(PortNo{v:i}, nports).context(NalcellError::Chain { func_name: "new", comment: S("port number")})?;
+			let port = Port::new(&cell_id, port_number, is_border_port, is_connected,port_to_pe.clone()).context(NalcellError::Chain { func_name: "new", comment: S("port")})?;
 			ports.push(port);
 		}
 		let boxed_ports: Box<[Port]> = ports.into_boxed_slice();
-		let mut cell_agent = CellAgent::new(&cell_id, cell_type, config, nports, ca_to_pe)?;
-		cell_agent.initialize(cell_type, ca_from_pe).context(NalcellError::Chain { func_name: "new", comment: S("")})?;
-		let packet_engine = PacketEngine::new(&cell_id, pe_to_ca, pe_to_ports, boundary_port_nos).context(NalcellError::Chain { func_name: "new", comment: S("")})?;
+		let mut cell_agent = CellAgent::new(&cell_id, cell_type, config, nports, ca_to_pe).context(NalcellError::Chain { func_name: "new", comment: S("cell agent create")})?;
+		cell_agent.initialize(cell_type, ca_from_pe).context(NalcellError::Chain { func_name: "new", comment: S("cell agent init")})?;
+		let packet_engine = PacketEngine::new(&cell_id, pe_to_ca, pe_to_ports, boundary_port_nos).context(NalcellError::Chain { func_name: "new", comment: S("packet engine create")})?;
 		packet_engine.start_threads(pe_from_ca, pe_from_ports);
 		Ok(NalCell { id: cell_id, cell_no: cell_no, cell_type: cell_type, config: config,
 				ports: boxed_ports, cell_agent: cell_agent, vms: Vec::new(),

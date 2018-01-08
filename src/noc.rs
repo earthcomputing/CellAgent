@@ -17,7 +17,9 @@ use service::NocMaster;
 use uptree_spec::{AllowedTree, ContainerSpec, Manifest, UpTreeSpec, VmSpec};
 use utility::{S, write_err};
 
-const NOC_MASTER_TREE_NAME: &'static str = "NocMaster";
+const NOC_MASTER_TREE_NAME:  &'static str = "NocMaster";
+const NOC_CONTROL_TREE_NAME: &'static str = "NocControl";
+const NOC_LISTEN_TREE_NAME:  &'static str = "NocListen";
 
 #[derive(Debug, Clone)]
 pub struct Noc {
@@ -29,7 +31,7 @@ impl Noc {
 		Ok(Noc { allowed_trees: HashSet::new(), noc_to_outside: noc_to_outside })
 	}
 	pub fn initialize(&self, blueprint: &Blueprint, noc_from_outside: NocFromOutside) ->
-            Result<Vec<JoinHandle<()>>, Error> {
+            Result<(Datacenter, Vec<JoinHandle<()>>), Error> {
 		let (noc_to_port, port_from_noc): (NocToPort, NocFromPort) = channel();
 		let (port_to_noc, noc_from_port): (PortToNoc, PortFromNoc) = channel();
 		let (mut dc, mut join_handles) = self.build_datacenter(blueprint).context(NocError::Chain { func_name: "initialize", comment: S("")})?;
@@ -48,8 +50,8 @@ impl Noc {
 		join_handles.push(join_port);
 		let nap = time::Duration::from_millis(1000);
 		sleep(nap);
-		println!("---> Change line in noc.rs with ---> to print datacenter"); //println!("{}", dc);
-		Ok(join_handles)
+		//println!("---> Change line in noc.rs with ---> to print datacenter"); println!("{}", dc);
+		Ok((dc, join_handles))
 	}
 	fn build_datacenter(&self, blueprint: &Blueprint) -> Result<(Datacenter, Vec<JoinHandle<()>>), Error> {
 		let mut dc = Datacenter::new();
@@ -82,8 +84,8 @@ impl Noc {
 	fn create_noc(&mut self, tree_name: &String, noc_to_port: &NocToPort) -> Result<(), Error> {
         // Stack a tree for the NocMaster
         let mut params = HashMap::new();
-        params.insert(S("new_tree_name"), S(NOC_MASTER_TREE_NAME));
-        params.insert(S("base_tree_name"), S(tree_name));
+        params.insert(S("new_tree_name"), S(NOC_CONTROL_TREE_NAME));
+        params.insert(S("parent_tree_name"), S(tree_name));
         let gvm_eqn_ser = serde_json::to_string(&NocMaster::make_gvm()).context(NocError::Chain { func_name: "create_noc", comment: S("gvm")})?;;
         params.insert(S("gvm_eqn"), gvm_eqn_ser);
         let stack_tree_msg = serde_json::to_string(&params).context(NocError::Chain { func_name: "create_noc", comment: S("")})?;
