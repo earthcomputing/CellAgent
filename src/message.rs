@@ -348,9 +348,9 @@ pub struct StackTreeMsg {
 	payload: StackTreeMsgPayload
 }
 impl StackTreeMsg {
-	pub fn new(new_tree_id: &TreeID, parent_tree_id: &TreeID, base_tree_id: &TreeID, gvm_eqn: &GvmEquation) -> StackTreeMsg {
+	pub fn new(new_tree_id: &TreeID, parent_tree_id: &TreeID, gvm_eqn: &GvmEquation) -> StackTreeMsg {
 		let header = MsgHeader::new(MsgType::StackTree, MsgDirection::Leafward);
-		let payload = StackTreeMsgPayload::new(new_tree_id, parent_tree_id, base_tree_id, gvm_eqn);
+		let payload = StackTreeMsgPayload::new(new_tree_id, parent_tree_id, gvm_eqn);
 		StackTreeMsg { header: header, payload: payload}
 	}
     fn get_payload_stack_tree(&self) -> Result<&StackTreeMsgPayload, Error> { Ok(&self.payload) }
@@ -365,8 +365,7 @@ impl Message for StackTreeMsg {
 		if let Some(gvm_eqn) = self.get_gvm_eqn() {
             let parent_tree_id = self.payload.get_parent_tree_id();
             let new_tree_id = self.payload.get_new_tree_id();
-            let base_tree_id = self.payload.get_base_tree_id();
-            ca.stack_tree(&new_tree_id, parent_tree_id, base_tree_id, gvm_eqn).context(MessageError::Chain { func_name: "process_ca", comment: S("StackTreeMsg") })?;
+            ca.stack_tree(&new_tree_id, parent_tree_id, gvm_eqn).context(MessageError::Chain { func_name: "process_ca", comment: S("StackTreeMsg") })?;
         } else {
 			return Err(MessageError::NoGvm { func_name: "process_ca" }.into());
 		}
@@ -383,24 +382,22 @@ impl fmt::Display for StackTreeMsg {
 pub struct StackTreeMsgPayload {
 	new_tree_id: TreeID,
 	parent_tree_id: TreeID,
-    base_tree_id: TreeID,
 	gvm_eqn: GvmEquation
 }
 impl StackTreeMsgPayload {
-	fn new(new_tree_id: &TreeID, parent_tree_id: &TreeID, base_tree_id: &TreeID, gvm_eqn: &GvmEquation) -> StackTreeMsgPayload {
+	fn new(new_tree_id: &TreeID, parent_tree_id: &TreeID, gvm_eqn: &GvmEquation) -> StackTreeMsgPayload {
 		StackTreeMsgPayload { new_tree_id: new_tree_id.to_owned(), parent_tree_id: parent_tree_id.to_owned(),
-            base_tree_id: base_tree_id.to_owned(), gvm_eqn: gvm_eqn.to_owned() }
+            gvm_eqn: gvm_eqn.to_owned() }
 	}
     pub fn get_new_tree_id(&self) -> &TreeID { &self.new_tree_id }
 	pub fn get_parent_tree_id(&self) -> &TreeID { &self.parent_tree_id }
-    pub fn get_base_tree_id(&self) -> &TreeID { &self.base_tree_id }
 }
 impl MsgPayload for StackTreeMsgPayload {
     fn get_gvm_eqn(&self) -> Option<&GvmEquation> { Some(&self.gvm_eqn) }
 }
 impl fmt::Display for StackTreeMsgPayload {
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-		write!(f, "Tree {} stacked on tree {} on base {} with GVM {}", self.new_tree_id, self.parent_tree_id, self.base_tree_id, self.gvm_eqn)
+		write!(f, "Tree {} stacked on tree {} with GVM {}", self.new_tree_id, self.parent_tree_id, self.gvm_eqn)
 	}
 }
 #[derive(Debug, Clone, Serialize, Deserialize)]
