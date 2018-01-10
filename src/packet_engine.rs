@@ -83,7 +83,7 @@ impl PacketEngine {
 		if entry.is_in_use() {
 			//println!("PacketEngine {}: entry {} header UUID {}", self.cell_id, entry, packet.get_header().get_tree_uuid());
 			// The control tree is special since each cell has a different uuid
-            if ::message::MsgType::is_type(packet, "StackTree") && self.cell_id.get_name() == "C:1" { println!("PacketEngine {}: entry {}", self.cell_id, entry); }
+            //if ::message::MsgType::is_type(packet, "StackTree") && self.cell_id.get_name() == "C:1" { println!("PacketEngine {}: entry {}", self.cell_id, entry); }
 			if (*entry.get_index() == 0) || (entry.get_uuid() == packet.get_header().get_tree_uuid()) {
 				let mask = entry.get_mask();
 				let other_indices = entry.get_other_indices();
@@ -101,18 +101,19 @@ impl PacketEngine {
 		//println!("PacketEngine {}: forward packet {}, mask {}, entry {}", self.cell_id, packet.get_count(), mask, entry);
 		let other_indices = entry.get_other_indices();
 		let recv_port_number = PortNumber::new(recv_port_no, PortNo{v:other_indices.len() as u8}).context(PacketEngineError::Chain { func_name: "forward", comment: S(self.cell_id.clone())})?; // Make sure recv_port_no is valid
+        let default_mask = Mask::empty().not(); // Prevents resending a message
 		if header.is_rootcast() {
 			let parent = entry.get_parent();
 			if let Some(other_index) = other_indices.get(parent.v as usize) {
 				if parent.v == 0 {
-					self.pe_to_ca.send(PeToCaPacket::Packet((recv_port_no, entry.get_index(), packet)))?;
+					self.pe_to_ca.send(PeToCaPacket::Packet((recv_port_no, default_mask, entry.get_index(), packet)))?;
 				} else {
 					if let Some(sender) = self.pe_to_ports.get(parent.v as usize) {
 						sender.send(PeToPortPacket::Packet((*other_index, packet))).context(PacketEngineError::Chain { func_name: "forward", comment: S(self.cell_id.clone())})?;
 						//println!("PacketEngine {}: sent rootward on port {} sent packet {}", self.cell_id, recv_port_no, packet);
 						let is_up = entry.get_mask().and(user_mask).equal(Mask::new0());
 						if is_up { // Send to cell agent, too
-							self.pe_to_ca.send(PeToCaPacket::Packet((recv_port_no, entry.get_index(), packet))).context(PacketEngineError::Chain { func_name: "forward", comment: S("rootcast packet to ca ") + self.cell_id.get_name()})?;
+							self.pe_to_ca.send(PeToCaPacket::Packet((recv_port_no, default_mask, entry.get_index(), packet))).context(PacketEngineError::Chain { func_name: "forward", comment: S("rootcast packet to ca ") + self.cell_id.get_name()})?;
 						}
 					} else {
 						return Err(PacketEngineError::Sender { cell_id: self.cell_id.clone(), func_name: "forward root", port_no: *parent }.into());
@@ -123,12 +124,12 @@ impl PacketEngine {
 			let mask = user_mask.and(entry.get_mask());
 			let port_nos = mask.get_port_nos();
 			//let is_stack_msg = match format!("{}", packet).find("StackTree") { Some(_) => true, None => false };
-			if ::message::MsgType::is_type(packet, "StackTree") { println!("PacketEngine {}: forwarding packet {} on ports {:?}, {}", self.cell_id, packet.get_count(), port_nos, entry); }
+			//if ::message::MsgType::is_type(packet, "StackTree") { println!("PacketEngine {}: forwarding packet {} on ports {:?}, {}", self.cell_id, packet.get_count(), port_nos, entry); }
 			for port_no in port_nos.iter() {
 				if let Some(other_index) = other_indices.get(port_no.v as usize).cloned() {
 					if port_no.v as usize == 0 {
 						//println!("PacketEngine {}: sending to ca packet {}", self.cell_id, packet);
-						self.pe_to_ca.send(PeToCaPacket::Packet((recv_port_no, entry.get_index(), packet))).context(PacketEngineError::Chain { func_name: "forward", comment: S("leafcast packet to ca ") + self.cell_id.get_name()})?;
+						self.pe_to_ca.send(PeToCaPacket::Packet((recv_port_no, user_mask, entry.get_index(), packet))).context(PacketEngineError::Chain { func_name: "forward", comment: S("leafcast packet to ca ") + self.cell_id.get_name()})?;
 					} else {
 						match self.pe_to_ports.get(port_no.v as usize) {
 							Some(s) => s.send(PeToPortPacket::Packet((other_index, packet))).context(PacketEngineError::Chain { func_name: "forward", comment: S("send packet leafward ") + self.cell_id.get_name()})?,

@@ -157,7 +157,7 @@ Cell C:5: saving msg Packet 219: Header: Message ID 17647862366380162401, UUID 5
 Cell C:6: Port 3 received Message 42 Discover 'Leafward': Tree C:2, sending cell C:7, index 7, hops 2, path 4
 Cell C:0: Port 1 received Message 90 StackTree 'Leafward': Tree C:2+NocControl stacked on tree C:2 on base C:2 with GVM GVM: receive 'true', send 'false', extend 'true', save 'true', Variables:
 Cell C:0: msg_tree_id C:2 Stack tree msg Message 90 StackTree 'Leafward': Tree C:2+NocControl stacked on tree C:2 on base C:2 with GVM GVM: receive 'true', send 'false', extend 'true', save 'true', Variables:
-***Cell C:4: Port 1 received Message 76 DiscoverD 'Leafward': My table index 7 for tree C:9
+Cell C:4: Port 1 received Message 76 DiscoverD 'Leafward': My table index 7 for tree C:9
 Cell C:0: saving msg Packet 219: Header: Message ID 17647862366380162401, UUID 5f1ba02f-2b8f-4760-8458-b126ce042483 Leafward, Last packet, Size 533, Payload: Ok("{\"msg_type\":\"StackTree\",\"serialized_msg\":\"{\\\"header\\\":{\\\"msg_count\\\":90,\\\"msg_type\\\":\\\"StackTree\\\",\\\"direction\\\":\\\"Leafward\\\"},\\\"payload\\\":{\\\"new_tree_id\\\":{\\\"name\\\":\\\"C:2+NocControl\\\",\\\"uuid\\\":\\\"c9222d58-e864-42e1-91a6-8c95caec5f08\\\"},\\\"parent_tree_id\\\":{\\\"name\\\":\\\"C:2\\\",\\\"uuid\\\":\\\"5f1ba02f-2b8f-4760-8458-b126ce042483\\\"},\\\"base_tree_id\\\":{\\\"name\\\":\\\"C:2\\\",\\\"uuid\\\":\\\"5f1ba02f-2b8f-4760-8458-b126ce042483\\\"},\\\"gvm_eqn\\\":{\\\"recv_eqn\\\":\\\"true\\\",\\\"send_eqn\\\":\\\"false\\\",\\\"save_eqn\\\":\\\"true\\\",\\\"xtnd_eqn\\\":\\\"true\\\",\\\"variables\\\":[]}}}\"}")
 Cell C:6: Port 1 received Message 33 Discover 'Leafward': Tree C:3, sending cell C:1, index 8, hops 3, path 2
 Cell C:7: Port 3 received Message 47 DiscoverD 'Leafward': My table index 5 for tree C:6
@@ -176,7 +176,7 @@ Cell C:1: Port 2 received Message 70 DiscoverD 'Leafward': My table index 8 for 
 Cell C:5: Port 1 received Message 23 Discover 'Leafward': Tree C:9, sending cell C:6, index 9, hops 4, path 1
 Cell C:1: Port 1 received Message 11 Discover 'Leafward': Tree C:7, sending cell C:0, index 7, hops 4, path 1
 Cell C:0: Port 1 received Message 4 Discover 'Leafward': Tree C:4, sending cell C:1, index 9, hops 4, path 1
-Cell C:4: Port 2 received Message 82 DiscoverD 'Leafward': My table index 9 for tree C:2
+***Cell C:4: Port 2 received Message 82 DiscoverD 'Leafward': My table index 9 for tree C:2
 Cell C:1: Port 2 received Message 87 DiscoverD 'Leafward': My table index 9 for tree C:5
 Cell C:1: Port 2 received Message 90 StackTree 'Leafward': Tree C:2+NocControl stacked on tree C:2 on base C:2 with GVM GVM: receive 'true', send 'false', extend 'true', save 'true', Variables:
 Cell C:1: msg_tree_id C:2 Stack tree msg Message 90 StackTree 'Leafward': Tree C:2+NocControl stacked on tree C:2 on base C:2 with GVM GVM: receive 'true', send 'false', extend 'true', save 'true', Variables:

@@ -95,8 +95,8 @@ fn run() -> Result<(), Error> {
 		stdout().write(b"Enter any character to print datacenter\n").context(MainError::Chain { func_name: "run", comment: S("")})?;
         let mut print_opt = String::new();
         stdin().read_line(&mut print_opt).context(MainError::Chain { func_name: "run", comment: S("")})?;
-        if print_opt.len() > 1 { println!("{}", dc)
-        };
+        //println!("main: print_opt {} {}", print_opt, print_opt.len());
+        if print_opt.len() > 1 { println!("{}", dc) };
 		stdout().write(b"Enter the name of a file containing a manifest\n").context(MainError::Chain { func_name: "run", comment: S("")})?;
 		let mut filename = String::new();
 		let _ = stdin().read_line(&mut filename).context(MainError::Chain { func_name: "run", comment: S("")})?;

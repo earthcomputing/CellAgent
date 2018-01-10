@@ -91,16 +91,16 @@ impl Datacenter {
 	}
 }
 impl fmt::Display for Datacenter { 
-	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result { 
+	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
 		let mut s = format!("Links");
 		for l in &self.links {
 			s = s + &format!("{}",l);
 		}
 		s = s + "\nCells";
-		for i in 0..self.cells.len() {			
-			if i < 30 { s = s + &format!("\n{}", self.cells[i]); }
+		for i in 0..self.cells.len() {
+			if i < 30 { s = s + &format!("\n{}", self.cells.get(i).unwrap()); }
 		}
-		write!(f, "{}", s) 
+		write!(f, "{}", s)
 	}
 }
 // Errors

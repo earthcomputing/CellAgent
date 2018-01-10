@@ -34,7 +34,8 @@ pub type Trees = HashMap<TableIndex, TreeID>;
 pub type TreeMap = HashMap<Uuid, Uuid>;
 pub type TreeIDMap = HashMap<Uuid, TreeID>;
 pub type TreeNameMap = HashMap<TreeID, HashMap<AllowedTree, TreeID>>;
-pub type SavedMsg = Vec<Packet>;
+pub type SavedDiscover = Vec<Packet>;
+pub type SavedMsg = (Mask, Vec<Packet>);
 pub type SavedMsgs = HashMap<TreeID, Vec<SavedMsg>>;
 
 #[derive(Debug, Clone)]
@@ -49,7 +50,7 @@ pub struct CellAgent {
 	my_entry: RoutingTableEntry,
 	connected_tree_entry: Arc<Mutex<RoutingTableEntry>>,
 	saved_msgs: Arc<Mutex<SavedMsgs>>,
-	saved_discover: Arc<Mutex<Vec<SavedMsg>>>,
+	saved_discover: Arc<Mutex<Vec<SavedDiscover>>>,
 	free_indices: Arc<Mutex<Vec<TableIndex>>>,
 	trees: Arc<Mutex<Trees>>,
 	traphs: Arc<Mutex<Traphs>>,
@@ -159,27 +160,27 @@ impl CellAgent {
             None => None
         }
 	}
-	pub fn get_saved_discover(&self) -> Vec<SavedMsg> {
+	pub fn get_saved_discover(&self) -> Vec<SavedDiscover> {
 		self.saved_discover.lock().unwrap().to_vec()
 	}
-	pub fn add_saved_msg(&mut self, base_tree_id: &TreeID, packets: &SavedMsg) -> Option<Vec<SavedMsg>> {
+	pub fn add_saved_msg(&mut self, base_tree_id: &TreeID, mask: Mask, packets: &Vec<Packet>) -> Option<Vec<SavedMsg>> {
         {
             let mut locked = self.saved_msgs.lock().unwrap();
             let saved_msgs = match locked.get_mut(base_tree_id) {
                 Some(saved) => {
-                    saved.push(packets.to_owned());
+                    saved.push((mask, packets.to_owned()));
                     saved.to_owned()
                 },
-                None => vec![packets.to_owned()]
+                None => vec![(mask, packets.to_owned())]
             };
-            println!("Cell {}: saving msg {}", self.cell_id, packets[0]);
+            //println!("Cell {}: saving msg {}", self.cell_id, packets[0]);
             //let msg = MsgType::get_msg(&packets).unwrap();
             //println!("Cell {}: save generic {}", self.cell_id, msg);
             locked.insert(base_tree_id.clone(), saved_msgs);
         }
 		self.get_saved_msgs(base_tree_id)
 	}
-	pub fn add_saved_discover(&mut self, packets: &SavedMsg) -> Vec<SavedMsg> {
+	pub fn add_saved_discover(&mut self, packets: &SavedDiscover) -> Vec<SavedDiscover> {
 		{
 			let mut saved_discover = self.saved_discover.lock().unwrap();
 			//let msg = MsgType::get_msg(&packets).unwrap();
@@ -216,6 +217,7 @@ impl CellAgent {
 				gvm_eqn: Option<&GvmEquation>, children: &mut HashSet<PortNumber>, 
 				other_index: TableIndex, hops: PathLength, path: Option<Path>) 
 			-> Result<RoutingTableEntry, Error> {
+        let f = "update_traph";
 		let (entry, is_new_port) = {
 			let mut traphs = self.traphs.lock().unwrap();
 			let traph = match traphs.entry(base_tree_id.get_uuid()) { // Avoids lifetime problem
@@ -224,7 +226,7 @@ impl CellAgent {
 					//println!("Cell {}: update traph {} {}", self.cell_id, base_tree_id, base_tree_id.get_uuid());
 					self.tree_map.lock().unwrap().insert(base_tree_id.get_uuid(), base_tree_id.get_uuid());
 					self.tree_id_map.lock().unwrap().insert(base_tree_id.get_uuid(), base_tree_id.clone());
-					let index = self.clone().use_index().context(CellagentError::Chain { func_name: "update_traph", comment: S("") })?;
+					let index = self.clone().use_index().context(CellagentError::Chain { func_name: f, comment: S("") })?;
 					let t = Traph::new(&self.cell_id, &base_tree_id, index, gvm_eqn).context(CellagentError::Chain { func_name: "update_traph", comment: S("") })?;
 					v.insert(t)
 				}
@@ -232,17 +234,17 @@ impl CellAgent {
 			let (gvm_recv, gvm_send, gvm_xtnd, gvm_save) = match gvm_eqn {
 				Some(eqn) => {
 					let variables = traph.get_params(eqn.get_variables()).context(CellagentError::Chain { func_name: "update_traph", comment: S("") })?;
-					let recv = eqn.eval_recv(&variables).context(CellagentError::Chain { func_name: "update_traph", comment: S("eval_recv") })?;
-					let send = eqn.eval_send(&variables).context(CellagentError::Chain { func_name: "update_traph", comment: S("eval_send") })?;
-					let xtnd = eqn.eval_xtnd(&variables).context(CellagentError::Chain { func_name: "update_traph", comment: S("eval_xtnd") })?;
-					let save = eqn.eval_save(&variables).context(CellagentError::Chain { func_name: "update_traph", comment: S("eval_save") })?;
+					let recv = eqn.eval_recv(&variables).context(CellagentError::Chain { func_name: f, comment: S("eval_recv") })?;
+					let send = eqn.eval_send(&variables).context(CellagentError::Chain { func_name: f, comment: S("eval_send") })?;
+					let xtnd = eqn.eval_xtnd(&variables).context(CellagentError::Chain { func_name: "f", comment: S("eval_xtnd") })?;
+					let save = eqn.eval_save(&variables).context(CellagentError::Chain { func_name: "f", comment: S("eval_save") })?;
 					(recv, send, xtnd, save)
 				},
 				None => (false, false, false, false),
 			};
 			let (hops, path) = match port_status {
 				traph::PortStatus::Child => {
-					let element = traph.get_parent_element().context(CellagentError::Chain { func_name: "update_traph", comment: S("") })?;
+					let element = traph.get_parent_element().context(CellagentError::Chain { func_name: "f", comment: S("") })?;
 					// Need to coordinate the following with DiscoverMsg.update_discover_msg
 					(element.hops_plus_one(), element.get_path())
 				},
@@ -260,22 +262,17 @@ impl CellAgent {
 			//println!("CellAgent {}: entry {}", self.cell_id, entry);
 			// Need traph even if cell only forwards on this tree
 			self.trees.lock().unwrap().insert(entry.get_index(), base_tree_id.clone());
-			self.ca_to_pe.send(CaToPePacket::Entry(entry)).context(CellagentError::Chain { func_name: "update_traph", comment: S("") })?;
+			self.ca_to_pe.send(CaToPePacket::Entry(entry)).context(CellagentError::Chain { func_name: "f", comment: S("") })?;
 			// Update entries for stacked trees
-			let entries = traph.update_stacked_entries(entry).context(CellagentError::Chain { func_name: "update_traph", comment: S("") })?;
+			let entries = traph.update_stacked_entries(entry).context(CellagentError::Chain { func_name: "f", comment: S("") })?;
 			for entry in entries {
 				//println!("Cell {}: sending entry {}", self.cell_id, entry);
-				self.ca_to_pe.send(CaToPePacket::Entry(entry)).context(CellagentError::Chain { func_name: "update_traph", comment: S("") })?;
+				self.ca_to_pe.send(CaToPePacket::Entry(entry)).context(CellagentError::Chain { func_name: "f", comment: S("") })?;
 			}
             (entry, is_new_port)
 		};
-        if is_new_port {
-            // Forward saved messages whenever the new port is added to traph
-            match self.get_saved_msgs(base_tree_id) {
-                Some(saved_msgs) => self.forward_saved(&saved_msgs, Mask::new(port_number)).context(CellagentError::Chain { func_name: "update_traph", comment: S("") })?,
-                None => {}
-            }
-        }
+        // Forward saved messages whenever the new port is added to traph
+        if is_new_port { self.forward_saved(base_tree_id, entry.get_mask()).context(CellagentError::Chain { func_name: "f", comment: S("") })? }
 		Ok(entry)
 	}
 	pub fn get_traph(&self, black_tree_id: &TreeID) -> Result<Traph, CellagentError> {
@@ -399,14 +396,15 @@ impl CellAgent {
 		Ok(())
 	}
 	fn listen_pe_loop(&mut self, ca_from_pe: CaFromPe) -> Result<(), Error> {
+        let f = "listen_pe_loop";
 		loop {
 			//println!("CellAgent {}: waiting for status or packet", ca.cell_id);
-			match ca_from_pe.recv().context(CellagentError::Chain { func_name: "listen_pe_loop", comment: S(self.cell_id.clone())})? {
+			match ca_from_pe.recv().context(CellagentError::Chain { func_name: f, comment: S(self.cell_id.clone())})? {
 				PeToCaPacket::Status((port_no, is_border, status)) => match status {
 					port::PortStatus::Connected => self.port_connected(port_no, is_border)?,
 					port::PortStatus::Disconnected => self.port_disconnected(port_no)?
 				},
-				PeToCaPacket::Packet((port_no, index, packet)) => {
+				PeToCaPacket::Packet((port_no, old_mask, index, packet)) => {
                     //println!("Cellagent other_index {}", *index);
 					let tree_id = match self.trees.lock().unwrap().get(&index).cloned() {
 						Some(t) => t,
@@ -418,19 +416,23 @@ impl CellAgent {
 					let tree_uuid = tree_id.get_uuid(); 
 					let (last_packet, packets) = packet_assembler.add(packet);
 					if last_packet {
-						let mut msg = MsgType::get_msg(&packets).context(CellagentError::Chain { func_name: "listen_pe_loop", comment: S(self.cell_id.clone())})?;
-                        println!("Cell {}: Port {} received {}", self.cell_id, *port_no, msg);
-                        msg.process_ca(self, &tree_id, port_no).context(CellagentError::Chain { func_name: "listen_pe_loop", comment: S(self.cell_id.clone())})?;
-						let save = self.gvm_eval_save(tree_uuid, &msg).context(CellagentError::Chain { func_name: "listen_pe_loop", comment: S(self.cell_id.clone())})?;
+						let mut msg = MsgType::get_msg(&packets).context(CellagentError::Chain { func_name: f, comment: S(self.cell_id.clone())})?;
+                        //if msg.get_msg_type() != MsgType::Discover { println!("Cell {}: Port {} old_mask {}, received {}", self.cell_id, *port_no, old_mask, msg); }
+                        msg.process_ca(self, &tree_id, port_no).context(CellagentError::Chain { func_name: f, comment: S(self.cell_id.clone())})?;
+						let save = self.gvm_eval_save(tree_uuid, &msg).context(CellagentError::Chain { func_name: f, comment: S(self.cell_id.clone())})?;
 						if save && (tree_uuid != self.connected_tree_id.get_uuid()) {
                             let msg_type = msg.get_msg_type();
                             if msg_type == MsgType::Discover { self.add_saved_discover(packets); }
                             else { // Any msg type that can be saved must implement get_base_tree_id()
                                 let base_tree_id = match msg_type {
                                     MsgType::StackTree => msg.get_payload_stack_tree()?.get_base_tree_id(),
-                                    _ => return Err(CellagentError::SavedMsgType { func_name: "listen_pe_loop", msg_type: msg_type }.into())
+                                    _ => return Err(CellagentError::SavedMsgType { func_name: f, msg_type: msg_type }.into())
                                 };
-                                self.add_saved_msg(base_tree_id, packets);
+                                self.add_saved_msg(base_tree_id, old_mask, packets);
+                                let base_tree_uuid = base_tree_id.get_uuid();
+                                let traph = self.get_traph(&base_tree_id).context(CellagentError::Chain { func_name: f, comment: S("") })?;
+                                let entry = traph.get_tree_entry(&base_tree_uuid).context(CellagentError::Chain { func_name: f, comment: S(self.cell_id.clone())})?;
+                                self.forward_saved(base_tree_id, entry.get_mask()).context(CellagentError::Chain { func_name: f, comment: S("") })?;
                             }
                         }
 					} else {
@@ -439,7 +441,7 @@ impl CellAgent {
 					}
 				},
                 PeToCaPacket::Tcp((port_no, (msg_type, serialized))) => {
-                    let port_number = PortNumber::new(port_no, self.no_ports).context(CellagentError::Chain { func_name: "listen_pe_loop", comment: S(self.cell_id.clone()) + " PortNumber" })?;
+                    let port_number = PortNumber::new(port_no, self.no_ports).context(CellagentError::Chain { func_name: f, comment: S(self.cell_id.clone()) + " PortNumber" })?;
                     let tree_map = match self.border_port_tree_id_map.get(&port_number) {
                         Some(tree_id) => match self.tree_name_map.get(&tree_id).cloned() {
                             Some(map) => map,
@@ -449,7 +451,7 @@ impl CellAgent {
                     };
                     match msg_type {
                         MsgType::StackTree => {
-                            let msg = serde_json::from_str::<HashMap<String, String>>(&serialized).context(CellagentError::Chain { func_name: "listen_pe_loop", comment: S(self.cell_id.clone()) + " deserialize" })?;
+                            let msg = serde_json::from_str::<HashMap<String, String>>(&serialized).context(CellagentError::Chain { func_name: f, comment: S(self.cell_id.clone()) + " deserialize" })?;
                             let new_tree_name = self.get_msg_params(&msg, "new_tree_name")?;
                             let parent_tree_name = self.get_msg_params(&msg, "parent_tree_name")?;
                             let parent_tree_id = match tree_map.get(&AllowedTree::new(&parent_tree_name)) {
@@ -457,15 +459,15 @@ impl CellAgent {
                                 None => return Err(CellagentError::TreeMap { func_name: "listen_pe_loop 3", cell_id: self.cell_id.clone(), tree_name: S(parent_tree_name) }.into())
                             };
                             let ref my_tree_id = self.my_tree_id.clone();
-                            let ref new_tree_id = self.my_tree_id.add_component(&new_tree_name).context(CellagentError::Chain { func_name: "listen_pe_loop", comment: S(self.cell_id.clone()) + " new_tree_id" })?;
+                            let ref new_tree_id = self.my_tree_id.add_component(&new_tree_name).context(CellagentError::Chain { func_name: f, comment: S(self.cell_id.clone()) + " new_tree_id" })?;
                             let gvm_eqn_serialized = self.get_msg_params(&msg, "gvm_eqn")?;
-                            let ref gvm_eqn = serde_json::from_str::<GvmEquation>(&gvm_eqn_serialized).context(CellagentError::Chain { func_name: "listen_pe_loop", comment: S(self.cell_id.clone()) + " gvm" })?;
-                            self.stack_tree(new_tree_id, parent_tree_id, my_tree_id, gvm_eqn).context(CellagentError::Chain { func_name: "listen_pe_loop", comment: S("stack tree")})?;
+                            let ref gvm_eqn = serde_json::from_str::<GvmEquation>(&gvm_eqn_serialized).context(CellagentError::Chain { func_name: f, comment: S(self.cell_id.clone()) + " gvm" })?;
+                            self.stack_tree(new_tree_id, parent_tree_id, my_tree_id, gvm_eqn).context(CellagentError::Chain { func_name: f, comment: S("stack tree")})?;
                             let stack_tree_msg = StackTreeMsg::new(new_tree_id, parent_tree_id, my_tree_id, gvm_eqn);
-                            let packets = stack_tree_msg.to_packets(parent_tree_id).context(CellagentError::Chain { func_name: "listen_pe_loop", comment: S("get packets") })?;
-                            self.add_saved_msg(my_tree_id, &packets);
-                            println!("Cellagent {}: Sending with mask {} msg {}", self.cell_id, DEFAULT_USER_MASK, stack_tree_msg);
-                            self.send_msg(parent_tree_id, &stack_tree_msg, DEFAULT_USER_MASK).context(CellagentError::Chain { func_name: "listen_pe_loop", comment: S(self.cell_id.clone()) + " send_msg" })?;
+                            let packets = stack_tree_msg.to_packets(parent_tree_id).context(CellagentError::Chain { func_name: f, comment: S("get packets") })?;
+                            self.add_saved_msg(my_tree_id, Mask::empty(), &packets);
+                            //println!("Cellagent {}: Sending with old_mask {} msg {}", self.cell_id, DEFAULT_USER_MASK, stack_tree_msg);
+                            self.send_msg(parent_tree_id, &stack_tree_msg, DEFAULT_USER_MASK).context(CellagentError::Chain { func_name: f, comment: S(self.cell_id.clone()) + " send_msg" })?;
                         },
                         _ => return Err(CellagentError::BorderMsgType { func_name: "listen_pe_loop 4", cell_id: self.cell_id.clone(), msg_type: msg_type }.into())
                     }
@@ -568,7 +570,7 @@ impl CellAgent {
 		self.ca_to_pe.send(entry)?;
 		Ok(())	
 	}		
-	fn forward_discover(&mut self, saved_discover: &Vec<SavedMsg>, mask: Mask) -> Result<(), Error> {
+	fn forward_discover(&mut self, saved_discover: &Vec<SavedDiscover>, mask: Mask) -> Result<(), Error> {
 		//println!("Cell {}: forwarding {} discover msgs", self.cell_id, saved_msgs.len());
 		for packets in saved_discover.iter() {
 			self.send_packets(self.connected_tree_id.get_uuid(), packets, mask)?;
@@ -577,15 +579,23 @@ impl CellAgent {
 		}
 		Ok(())	
 	}
-	fn forward_saved(&mut self, saved_msgs: &Vec<SavedMsg>, mask: Mask) -> Result<(), Error> {
-		println!("Cell {}: forwarding {} messages", self.cell_id, saved_msgs.len());
-		for packets in saved_msgs.iter() {
-			let msg = MsgType::get_msg(&packets)?;
-			println!("Cell {}: forward {}", self.cell_id, msg.get_msg_type());
-			let uuid = packets[0].get_tree_uuid();
-			self.send_packets(uuid, packets, mask)?;
-			//println!("CellAgent {}: forward on ports {:?} {}", self.cell_id, mask.get_port_nos(), msg);
-		}
+	fn forward_saved(&self, base_tree_id: &TreeID, current_mask: Mask) -> Result<(), Error> {
+        match self.get_saved_msgs(base_tree_id) {
+            Some(saved_msgs) => {
+                for &(old_mask, ref packets) in saved_msgs.iter() {
+                    let update_mask = old_mask.not().and(current_mask);
+                    //println!("Cell {}: forwarding message with masks current {}, entry {}, send {}", self.cell_id, current_mask, old_mask, update_mask);
+                    if !Mask::empty().equal(update_mask) {
+                        let msg = MsgType::get_msg(&packets)?;
+                        //println!("Cell {}: forward {}", self.cell_id, msg.get_msg_type());
+                        let uuid = packets[0].get_tree_uuid();
+                        self.send_packets(uuid, packets, update_mask)?;
+                        //println!("CellAgent {}: forward on ports {:?} {}", self.cell_id, mask.get_port_nos(), msg);
+                    }
+                }
+            }
+            None => {}
+        }
 		Ok(())	
 	}
     pub fn send_msg<T>(&self, tree_id: &TreeID, msg: &T, user_mask: Mask) -> Result<Vec<Packet>, Error>
@@ -611,7 +621,7 @@ impl CellAgent {
 	}
 }
 impl fmt::Display for CellAgent { 
-	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result { 
+	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
 		let mut s = format!("Cell Agent");
 		for (_, traph) in self.traphs.lock().unwrap().iter() {
 			s = s + &format!("\n{}", traph);

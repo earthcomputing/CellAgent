@@ -339,7 +339,7 @@ impl MsgPayload for DiscoverDPayload {
 }
 impl fmt::Display for DiscoverDPayload {
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-		write!(f, "My table index {} for tree {}", *self.my_index, self.tree_id)
+		write!(f, "My table index {} for Tree {}", *self.my_index, self.tree_id)
 	}
 }
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -361,7 +361,7 @@ impl Message for StackTreeMsg {
     fn get_payload_stack_tree(&self) -> Result<&StackTreeMsgPayload, Error> { Ok(&self.payload) }
     fn get_msg_type(&self) -> MsgType { self.header.msg_type }
 	fn process_ca(&mut self, ca: &mut CellAgent, msg_tree_id: &TreeID, port_no: PortNo) -> Result<(), Error> {
-		println!("Cell {}: msg_tree_id {} Stack tree msg {}", ca.get_id(), msg_tree_id, self);
+		//println!("Cell {}: msg_tree_id {} Stack tree msg {}", ca.get_id(), msg_tree_id, self);
 		if let Some(gvm_eqn) = self.get_gvm_eqn() {
             let parent_tree_id = self.payload.get_parent_tree_id();
             let new_tree_id = self.payload.get_new_tree_id();

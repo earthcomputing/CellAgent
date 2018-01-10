@@ -108,9 +108,9 @@ impl NalCell {
 	}
 }
 impl fmt::Display for NalCell { 
-	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result { 
+	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
 		let mut s = String::new();
-		match self.cell_type { 
+		match self.cell_type {
 			CellType::Border => s = s + &format!("Border Cell {}", self.id),
 			CellType::Interior => s = s + &format!("Cell {}", self.id)
 		}
