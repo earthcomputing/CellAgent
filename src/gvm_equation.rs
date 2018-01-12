@@ -1,8 +1,8 @@
 use std::fmt;
-use serde_json;
 use std::collections::{HashSet};
-use eval::{Expr, to_value};
 
+use eval::{Expr, to_value};
+use serde_json;
 use failure::{Error, ResultExt};
 
 use config::{CellNo, PathLength};
@@ -20,14 +20,14 @@ type GvmEqnType = String;
 #[derive(Debug, Clone, Hash, Eq, PartialEq, Serialize, Deserialize)]
 pub struct GvmEquation {
 	recv_eqn: GvmEqnType,        // If true, add to traph and set "up" bit
-	send_eqn: GvmEqnType,        // If true, add to traph
-	save_eqn: GvmEqnType,		 // If true, save the message for future ports being connected
-	xtnd_eqn: GvmEqnType,		 // If true, propagate message
-	variables: Vec<GvmVariable>  // Local variables used in the two equations
+	send_eqn: GvmEqnType,        // If true, add to set maySend true in routing table entry
+	save_eqn: GvmEqnType,		 // If true, save the message for future traph updates
+	xtnd_eqn: GvmEqnType,		 // If false, turn off all ports in routing table entry
+	variables: Vec<GvmVariable>  // Local variables used in the equations
 }
 // Sample GvmEquation: "hops < 7 || n_childen == 0",  associated variables vec!["hops", "n_children"]
 impl GvmEquation {
-	pub fn new(equations: HashSet<GvmEqn>, variables: Vec<GvmVariable>) -> GvmEquation { 
+	pub fn new(equations: HashSet<GvmEqn>, variables: Vec<GvmVariable>) -> GvmEquation {
 		let (mut recv, mut send, mut xtnd, mut save) = (S("false"), S("false"), S("false"), S("false")); 
 		for eqn in equations.iter() {
 			match *eqn {
@@ -56,16 +56,18 @@ impl GvmEquation {
 	fn evaluate(&self, eqn: &GvmEqnType, params: &Vec<GvmVariable>) -> Result<bool, Error> {
 		let mut expr = Expr::new(eqn.clone());
 		for variable in params.iter() {
-			let var_type = variable.get_type();
-			let str_value = variable.get_value();
+			let var_type = variable.get_var_type();
+			let var_name = S(variable.get_var_name());
+            let str_val = S(variable.get_value());
 			match *var_type {
 				GvmVariableType::CellNo => {
-					let value = serde_json::from_str::<CellNo>(&str_value).context(GvmEquationError::Deserialize { func_name: "evaluate", var_type: var_type.clone(), expr: str_value })?;
- 					expr = expr.value(variable.get_value(), *value);
+					let value = serde_json::from_str::<CellNo>(&str_val).context(GvmEquationError::Deserialize { func_name: "evaluate", var_type: var_type.clone(), expr: S(str_val) })?;
+ 					expr = expr.value(var_name, *value);
 				},
 				GvmVariableType::PathLength => {
-					let value = serde_json::from_str::<PathLength>(&str_value).context(GvmEquationError::Deserialize { func_name: "evaluate", var_type: var_type.clone(), expr: str_value })?;
-					expr = expr.value(variable.get_value(), **value);
+					let value = serde_json::from_str::<PathLength>(&str_val).context(GvmEquationError::Deserialize { func_name: "evaluate", var_type: var_type.clone(), expr: S(str_val) })?;
+					expr = expr.value(var_name, *value.0);
+					//println!("GvmEquation: expr {:?}, variable {}, second {}, result {:?}", expr, variable, *value.0, expr.exec());
 				},
 			}
 		}
@@ -98,20 +100,23 @@ impl fmt::Display for GvmVariableType {
 	}
 }
 #[derive(Debug, Clone, Eq, PartialEq,Hash, Serialize, Deserialize)]
-pub struct GvmVariable { 
-	var_type: GvmVariableType, 
-	value: String 
+pub struct GvmVariable {
+	var_type: GvmVariableType,
+    var_name: String,
+	value:    String
 }
 impl GvmVariable {
-	pub fn new<T: fmt::Display>(var_type: GvmVariableType, value: T) -> GvmVariable {
-		GvmVariable { var_type: var_type, value: value.to_string() }
+	pub fn new(var_type: GvmVariableType, var_name: &str) -> GvmVariable {
+		GvmVariable { var_type: var_type, var_name: var_name.to_string(), value: S("") }
 	}
-	pub fn get_type(&self) -> &GvmVariableType { &self.var_type }
-	pub fn get_value(&self) -> String { self.value.clone() }
+	pub fn get_var_type(&self) -> &GvmVariableType { &self.var_type }
+	pub fn get_var_name(&self) -> &String { &self.var_name }
+    pub fn get_value(&self)    -> &String { &self.value }
+    pub fn set_value(&mut self, value: String) { self.value = value; }
 }
-impl fmt::Display for GvmVariable { 
+impl fmt::Display for GvmVariable {
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result { 
-		write!(f, "{}:{:?}", self.var_type, self.value) }
+		write!(f, "{}:{} = {}", self.var_type, self.var_name, self.value) }
 }
 #[derive(Debug, Fail)]
 pub enum GvmEquationError {

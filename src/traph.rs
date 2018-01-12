@@ -3,6 +3,7 @@ use std::collections::{HashMap, HashSet};
 use std::sync::{Arc, Mutex, MutexGuard};
 
 use failure::{Error, Fail, ResultExt};
+use serde_json;
 use uuid::Uuid;
 
 use config::{MAX_PORTS, PathLength, PortNo, TableIndex};
@@ -142,7 +143,7 @@ impl Traph {
 		let locked = self.stacked_trees.lock().unwrap();
 		let mut updated_entries = Vec::new();
 		for stacked_tree in locked.values() {
-			if stacked_tree.get_id() != stacked_tree.get_black_tree_id() {
+			if stacked_tree.get_id() != stacked_tree.get_base_tree_id() {
 				let mut stacked_entry = stacked_tree.get_table_entry();
 				let port_no = PortNo{v: base_tree_entry.get_other_indices().len() as u8};
 				let port_number = PortNumber::new(base_tree_entry.get_parent(), port_no).context(TraphError::Chain { func_name: "update_stacked_entries", comment: S("") })?;
@@ -167,10 +168,13 @@ impl Traph {
 	pub fn get_params(&self, vars: &Vec<GvmVariable>) -> Result<Vec<GvmVariable>, Error> {
 		let mut variables = Vec::new();
 		for var in vars {
-			match var.get_value().as_ref() {
+			match var.get_var_name().as_ref() {
 				"hops" => {
-					let hops = self.get_hops().context(TraphError::Chain { func_name: "get_params", comment: S("")})?;
-					variables.push(GvmVariable::new(GvmVariableType::PathLength, hops));
+					let ref hops = self.get_hops().context(TraphError::Chain { func_name: "get_params", comment: S("")})?;
+                    let str_hops = serde_json::to_string(hops).context(TraphError::Chain { func_name: "get_params", comment: S("") })?;
+                    let mut updated = GvmVariable::new(GvmVariableType::PathLength, "hops");
+                    updated.set_value(str_hops);
+					variables.push(updated);
 				},
 				_ => ()
 			}
