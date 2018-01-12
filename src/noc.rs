@@ -8,6 +8,7 @@ use serde_json;
 use blueprint::{Blueprint};
 use config::{BASE_TREE_NAME, CONTROL_TREE_NAME, SEPARATOR, CellNo, DatacenterNo, Edge, PortNo, TableIndex};
 use datacenter::{Datacenter};
+use gvm_equation::{GvmEquation, GvmEqn, GvmVariable, GvmVariableType};
 use message::{Message, MsgPayload, MsgType, ManifestMsg, TreeNameMsg};
 use message_types::{NocToPort, NocPortError, NocFromPort, PortToNoc, PortFromNoc, NocFromOutside, NocToOutside, TCP};
 use nalcell::CellConfig;
@@ -17,9 +18,10 @@ use service::NocMaster;
 use uptree_spec::{AllowedTree, ContainerSpec, Manifest, UpTreeSpec, VmSpec};
 use utility::{S, write_err};
 
-const NOC_MASTER_TREE_NAME:  &'static str = "NocMaster";
-const NOC_CONTROL_TREE_NAME: &'static str = "NocControl";
-const NOC_LISTEN_TREE_NAME:  &'static str = "NocListen";
+const NOC_MASTER_DEPLOY_TREE_NAME:  &'static str = "NocMasterDeploy";
+const NOC_AGENT_DEPLOY_TREE_NAME:   &'static str = "NocAgentDeploy";
+const NOC_CONTROL_TREE_NAME: &'static str = "NocMasterAgent";
+const NOC_LISTEN_TREE_NAME:  &'static str = "NocAgentMaster";
 
 #[derive(Debug, Clone)]
 pub struct Noc {
@@ -82,15 +84,85 @@ impl Noc {
 	}
 	// Sets up the NOC Master and NOC Agent services on up trees
 	fn create_noc(&mut self, tree_name: &String, noc_to_port: &NocToPort) -> Result<(), Error> {
-        // Stack a tree for the NocMaster
+        Noc::noc_master_deploy_tree(tree_name, noc_to_port).context(NocError::Chain { func_name: "create_noc", comment: S("noc master deploy")})?;
+        Noc::noc_agent_deploy_tree(tree_name, noc_to_port).context(NocError::Chain { func_name: "create_noc", comment: S("noc agent deploy")})?;
+        Noc::noc_master_agent_tree(tree_name, noc_to_port).context(NocError::Chain { func_name: "create_noc", comment: S("noc master tree")})?;
+        Noc::noc_agent_master_tree(tree_name, noc_to_port).context(NocError::Chain { func_name: "create_noc", comment: S("noc agent tree")})?;
+        Ok(())
+	}
+    // Because of packet forwarding, this tree gets stacked on all cells even though only one of them can receive the deployment message
+    fn noc_master_deploy_tree(tree_name: &String, noc_to_port: &NocToPort) -> Result<(), Error> {
+        // Tree for deploying the NocMaster, which only runs on the border cell connected to this instance of Noc
+        let mut params = HashMap::new();
+        params.insert(S("new_tree_name"), S(NOC_MASTER_DEPLOY_TREE_NAME));
+        params.insert(S("parent_tree_name"), S(tree_name));
+        let mut eqns = HashSet::new();
+        eqns.insert(GvmEqn::Recv("hops == 0"));
+        eqns.insert(GvmEqn::Send("false"));
+        eqns.insert(GvmEqn::Xtnd("false"));
+        eqns.insert(GvmEqn::Save("false"));
+        let gvm_eqn = GvmEquation::new(eqns, vec![GvmVariable::new(GvmVariableType::PathLength, "hops")]);
+        let gvm_eqn_ser = serde_json::to_string(&gvm_eqn).context(NocError::Chain { func_name: "noc_master_deploy_tree", comment: S("gvm")})?;;
+        params.insert(S("gvm_eqn"), gvm_eqn_ser);
+        let stack_tree_msg = serde_json::to_string(&params).context(NocError::Chain { func_name: "noc_master_deploy_tree", comment: S("")})?;
+        noc_to_port.send((MsgType::StackTree, stack_tree_msg)).context(NocError::Chain { func_name: "noc_master_deploy_tree", comment: S("")})?;
+        Ok(())
+    }
+    // For the reasons given in the comments to the following two functions, the agent does not run
+    // on the same cell as the master
+    fn noc_agent_deploy_tree(tree_name: &String, noc_to_port: &NocToPort) -> Result<(), Error> {
+        // Stack a tree for deploying the NocAgents, which run on all cells, including the one running the NocMaster
+        let mut params = HashMap::new();
+        params.insert(S("new_tree_name"), S(NOC_AGENT_DEPLOY_TREE_NAME));
+        params.insert(S("parent_tree_name"), S(tree_name));
+        let mut eqns = HashSet::new();
+        eqns.insert(GvmEqn::Recv("hops > 0"));
+        eqns.insert(GvmEqn::Send("false"));
+        eqns.insert(GvmEqn::Xtnd("true"));
+        eqns.insert(GvmEqn::Save("true"));
+        let gvm_eqn = GvmEquation::new(eqns, vec![GvmVariable::new(GvmVariableType::PathLength, "hops")]);
+        let gvm_eqn_ser = serde_json::to_string(&gvm_eqn).context(NocError::Chain { func_name: "noc_agent_deploy_tree", comment: S("gvm")})?;;
+        params.insert(S("gvm_eqn"), gvm_eqn_ser);
+        let stack_tree_msg = serde_json::to_string(&params).context(NocError::Chain { func_name: "noc_agent_deploy_tree", comment: S("")})?;
+        noc_to_port.send((MsgType::StackTree, stack_tree_msg)).context(NocError::Chain { func_name: "noc_agent_deploy_tree", comment: S("")})?;
+        Ok(())
+    }
+    // I need a more comprehensive GVM to express the fact that the agent running on the same cell as the master
+    // can receive messages from the master
+    fn noc_master_agent_tree(tree_name: &String, noc_to_port: &NocToPort) -> Result<(), Error> {
         let mut params = HashMap::new();
         params.insert(S("new_tree_name"), S(NOC_CONTROL_TREE_NAME));
-        params.insert(S("parent_tree_name"), S(tree_name));
-        let gvm_eqn_ser = serde_json::to_string(&NocMaster::make_gvm()).context(NocError::Chain { func_name: "create_noc", comment: S("gvm")})?;;
+        params.insert( S("parent_tree_name"), S(tree_name));
+        let mut eqns = HashSet::new();
+        eqns.insert(GvmEqn::Recv("true"));
+        eqns.insert(GvmEqn::Send("hops == 0"));
+        eqns.insert(GvmEqn::Xtnd("true"));
+        eqns.insert(GvmEqn::Save("true"));
+        let gvm_eqn = GvmEquation::new(eqns, vec![GvmVariable::new(GvmVariableType::PathLength, "hops")]);
+        let gvm_eqn_ser = serde_json::to_string(&gvm_eqn).context(NocError::Chain { func_name: "noc_master_tree", comment: S("gvm")})?;;
         params.insert(S("gvm_eqn"), gvm_eqn_ser);
-        let stack_tree_msg = serde_json::to_string(&params).context(NocError::Chain { func_name: "create_noc", comment: S("")})?;
-        Ok(noc_to_port.send((MsgType::StackTree, stack_tree_msg)).context(NocError::Chain { func_name: "create_noc", comment: S("")})?)
-	}
+        let stack_tree_msg = serde_json::to_string(&params).context(NocError::Chain { func_name: "noc_master_tree", comment: S("")})?;
+        noc_to_port.send((MsgType::StackTree, stack_tree_msg)).context(NocError::Chain { func_name: "noc_master_tree", comment: S("")})?;
+        Ok(())
+    }
+    // I need a more comprehensive GVM to express the fact that the agent running on the same cell as the master
+    // can send messages to the master
+    fn noc_agent_master_tree(tree_name: &String, noc_to_port: &NocToPort) -> Result<(), Error> {
+        let mut params = HashMap::new();
+        params.insert(S("new_tree_name"), S(NOC_LISTEN_TREE_NAME));
+        params.insert( S("parent_tree_name"), S(tree_name));
+        let mut eqns = HashSet::new();
+        eqns.insert(GvmEqn::Recv("hops == 0"));
+        eqns.insert(GvmEqn::Send("true"));
+        eqns.insert(GvmEqn::Xtnd("true"));
+        eqns.insert(GvmEqn::Save("true"));
+        let gvm_eqn = GvmEquation::new(eqns, vec![GvmVariable::new(GvmVariableType::PathLength, "hops")]);
+        let gvm_eqn_ser = serde_json::to_string(&gvm_eqn).context(NocError::Chain { func_name: "noc_master_tree", comment: S("gvm")})?;;
+        params.insert(S("gvm_eqn"), gvm_eqn_ser);
+        let stack_tree_msg = serde_json::to_string(&params).context(NocError::Chain { func_name: "noc_master_tree", comment: S("")})?;
+        noc_to_port.send((MsgType::StackTree, stack_tree_msg)).context(NocError::Chain { func_name: "noc_master_tree", comment: S("")})?;
+        Ok(())
+    }
 	fn listen_outside(&mut self, noc_from_outside: NocFromOutside, noc_to_port: NocToPort) -> Result<(), Error> {
 		loop {
 			let input = &noc_from_outside.recv()?;

@@ -130,7 +130,7 @@ fn deployment_demo() -> Result<(), Error> {
 	let vm_spec2 = VmSpec::new("vm2", "RedHat",  CellConfig::Large,
 		&vec![allowed_tree1], vec![&c5, &c3, &c6], vec![&up_tree3, &up_tree4]).context(MainError::Chain { func_name: "deployment_demo", comment: S("")})?;
 	let up_tree_def = Manifest::new("mytest", CellConfig::Large, "cell_tree", &vec![allowed_tree1, allowed_tree2],
-									vec![&vm_spec1, &vm_spec2], vec![&up_tree3], gvm_eqn).context(MainError::Chain { func_name: "deployment_demo", comment: S("")})?;
+									vec![&vm_spec1, &vm_spec2], vec![&up_tree3]).context(MainError::Chain { func_name: "deployment_demo", comment: S("")})?;
 	println!("{}", up_tree_def);
 	Ok(())
 }

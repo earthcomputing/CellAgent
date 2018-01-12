@@ -10,14 +10,13 @@ pub struct Manifest {
 	id: String,
 	deployment_tree: String,
 	cell_config: CellConfig,
-	gvm_eqn: GvmEquation,
 	allowed_trees: Vec<AllowedTree>,
 	vms: Vec<VmSpec>,
 	trees: Vec<UpTreeSpec>
 }
 impl Manifest {
 	pub fn new(id: &str, cell_config: CellConfig, deployment_tree: &str, allowed_refs: &Vec<&AllowedTree>,
-			vm_refs: Vec<&VmSpec>, tree_refs: Vec<&UpTreeSpec>, gvm_eqn: &GvmEquation) -> Result<Manifest, UptreeSpecError> {
+			vm_refs: Vec<&VmSpec>, tree_refs: Vec<&UpTreeSpec>) -> Result<Manifest, UptreeSpecError> {
 		let mut trees = Vec::new();
 		for t in tree_refs { trees.push(t.clone()); }
 		let mut allowed_trees = Vec::new();
@@ -31,10 +30,9 @@ impl Manifest {
 			}
 		}
 		Ok(Manifest { id: S(id), cell_config: cell_config, deployment_tree: S(deployment_tree), 
-				allowed_trees: allowed_trees.clone(), vms: vms, trees: trees, gvm_eqn: gvm_eqn.clone() })
+				allowed_trees: allowed_trees.clone(), vms: vms, trees: trees })
 	}
 	pub fn get_id(&self) -> &String { &self.id }
-	pub fn get_gvm(&self) -> &GvmEquation { &self.gvm_eqn }
 	pub fn get_new_tree_name(&self) -> &String { &self.id }
 	pub fn get_deployment_tree_name(&self) -> &String { &self.deployment_tree }
 	pub fn get_allowed_trees(&self) -> &Vec<AllowedTree> { &self.allowed_trees }
@@ -42,7 +40,7 @@ impl Manifest {
 }
 impl fmt::Display for Manifest {
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result { 
-		let mut s = format!("\nDeploy {} on tree {}: {}", self.id, self.deployment_tree, self.gvm_eqn);
+		let mut s = format!("\nDeploy {} on tree {}", self.id, self.deployment_tree);
 		s = s + &format!("\n  Allowed Trees");
 		for a in &self.allowed_trees { s = s + &format!("\n    {}", a); }
 		for t in &self.trees { s = s + &format!("\n  {}", t); }
