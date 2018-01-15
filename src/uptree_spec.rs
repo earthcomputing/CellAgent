@@ -15,7 +15,7 @@ pub struct Manifest {
 	trees: Vec<UpTreeSpec>
 }
 impl Manifest {
-	pub fn new(id: &str, cell_config: CellConfig, deployment_tree: &str, allowed_refs: &Vec<&AllowedTree>,
+	pub fn new(id: &str, cell_config: CellConfig, deployment_tree: &AllowedTree, allowed_refs: &Vec<&AllowedTree>,
 			vm_refs: Vec<&VmSpec>, tree_refs: Vec<&UpTreeSpec>) -> Result<Manifest, UptreeSpecError> {
 		let mut trees = Vec::new();
 		for t in tree_refs { trees.push(t.clone()); }
@@ -34,7 +34,7 @@ impl Manifest {
 	}
 	pub fn get_id(&self) -> &String { &self.id }
 	pub fn get_new_tree_name(&self) -> &String { &self.id }
-	pub fn get_deployment_tree_name(&self) -> &String { &self.deployment_tree }
+	pub fn get_deployment_tree(&self) -> &String { &self.deployment_tree }
 	pub fn get_allowed_trees(&self) -> &Vec<AllowedTree> { &self.allowed_trees }
 	pub fn get_vms(&self) -> &Vec<VmSpec> { &self.vms }
 }

@@ -7,7 +7,7 @@ use uuid::Uuid;
 
 use config::{BASE_TREE_NAME, CONNECTED_PORTS_TREE_NAME, CONTROL_TREE_NAME, MAX_ENTRIES, CellNo, CellType, PathLength, PortNo, TableIndex};
 use gvm_equation::{GvmEquation, GvmEqn};
-use message::{Message, MsgType, DiscoverMsg, StackTreeMsg, TreeNameMsg};
+use message::{Message, MsgType, DiscoverMsg, ManifestMsg, StackTreeMsg, TreeNameMsg};
 use message_types::{CaToPe, CaFromPe, CaToVm, VmFromCa, VmToCa, CaFromVm, CaToPePacket, PeToCaPacket,
 	VmToTree, VmFromTree, TreeToVm, TreeFromVm};
 use nalcell::CellConfig;
@@ -286,7 +286,7 @@ impl CellAgent {
 	}
 	pub fn deploy(&mut self, port_no: PortNo, msg_tree_id: &TreeID, manifest: &Manifest) -> Result<(), Error> {
 		println!("Cell {}: got manifest on tree {} {}", self.cell_id, msg_tree_id, manifest);
-		let deployment_tree = AllowedTree::new(manifest.get_deployment_tree_name());
+		let deployment_tree = AllowedTree::new(manifest.get_deployment_tree());
 		let mut tree_name_map = match self.tree_name_map.get(  msg_tree_id).cloned() {
 			Some(map) => map,
 			None => return Err(CellagentError::TreeMap { cell_id: self.cell_id.clone(), func_name: "deploy(map)", tree_name: S(msg_tree_id.get_name()) }.into())
@@ -466,7 +466,7 @@ impl CellAgent {
                     };
                     match msg_type {
                         MsgType::StackTree => {
-                            let msg = serde_json::from_str::<HashMap<String, String>>(&serialized).context(CellagentError::Chain { func_name: f, comment: S(self.cell_id.clone()) + " deserialize" })?;
+                            let msg = serde_json::from_str::<HashMap<String, String>>(&serialized).context(CellagentError::Chain { func_name: f, comment: S(self.cell_id.clone()) + " deserialize StackTree" })?;
                             let new_tree_name = self.get_msg_params(&msg, "new_tree_name")?;
                             let parent_tree_name = self.get_msg_params(&msg, "parent_tree_name")?;
                             let parent_tree_id = match tree_map.get(&AllowedTree::new(&parent_tree_name)) {
@@ -485,7 +485,20 @@ impl CellAgent {
                             //println!("Cellagent {}: Sending with old_mask {} msg {}", self.cell_id, DEFAULT_USER_MASK, stack_tree_msg);
                             self.send_msg(parent_tree_id, &stack_tree_msg, DEFAULT_USER_MASK).context(CellagentError::Chain { func_name: f, comment: S(self.cell_id.clone()) + " send_msg" })?;
                         },
-                        _ => return Err(CellagentError::BorderMsgType { func_name: "listen_pe_loop 4", cell_id: self.cell_id.clone(), msg_type: msg_type }.into())
+                        MsgType::Manifest => {
+                            let msg = serde_json::from_str::<HashMap<String, String>>(&serialized).context(CellagentError::Chain { func_name: f, comment: S(self.cell_id.clone()) + " deserialize StackTree" })?;
+                            let parent_tree_name = self.get_msg_params(&msg, "deploy_tree_name").context(CellagentError::Chain { func_name: f, comment: S(self.cell_id.clone()) + " parent tree name" })?;
+                            let parent_tree_id = match tree_map.get(&AllowedTree::new(&parent_tree_name)) {
+                                Some(id) => id,
+                                None => return Err(CellagentError::TreeMap { func_name: "listen_pe_loop 4", cell_id: self.cell_id.clone(), tree_name: S(parent_tree_name) }.into())
+                            };
+                            let manifest_ser = self.get_msg_params(&msg, "manifest").context(CellagentError::Chain { func_name: f, comment: S(self.cell_id.clone()) + " manifest" })?;
+                            let manifest = serde_json::from_str::<Manifest>(&manifest_ser)?;
+                            println!("Cell {} deploy on tree {} {}", self.cell_id, parent_tree_id, manifest);
+                            let msg = ManifestMsg::new(&manifest);
+                            //self.send_msg(parent_tree_id, &msg, DEFAULT_USER_MASK).context(CellagentError::Chain { func_name: f, comment: S(self.cell_id.clone()) + " send manifest" })?;
+                        },
+                        _ => return Err(CellagentError::BorderMsgType { func_name: "listen_pe_loop 5", cell_id: self.cell_id.clone(), msg_type: msg_type }.into())
                     }
                 }
 			}
@@ -653,7 +666,7 @@ pub enum CellagentError {
     BaseTree { func_name: &'static str, cell_id: CellID, tree_id: TreeID },
     #[fail(display = "CellagentError::Border {}: Port {} is not a border port on cell {}", func_name, port_no, cell_id)]
     Border { func_name: &'static str, cell_id: CellID, port_no: u8 },
-    #[fail(display = "CellAgentError::BorderMsgType {}: Message type {} is not accepted from a border port on cell {}", func_name, cell_id, msg_type)]
+    #[fail(display = "CellAgentError::BorderMsgType {}: Message type {} is not accepted from a border port on cell {}", func_name, msg_type, cell_id)]
     BorderMsgType { func_name: &'static str, cell_id: CellID, msg_type: MsgType },
     #[fail(display = "CellagentError::ManifestVms {}: No VMs in manifest for cell {}", func_name, cell_id)]
     ManifestVms { cell_id: CellID, func_name: &'static str },
