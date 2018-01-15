@@ -84,10 +84,43 @@ impl Noc {
 	}
 	// Sets up the NOC Master and NOC Agent services on up trees
 	fn create_noc(&mut self, tree_name: &String, noc_to_port: &NocToPort) -> Result<(), Error> {
+        // Stack the trees needed to deploy the master and agent and for them to talk master->agent and agent->master
         Noc::noc_master_deploy_tree(tree_name, noc_to_port).context(NocError::Chain { func_name: "create_noc", comment: S("noc master deploy")})?;
         Noc::noc_agent_deploy_tree(tree_name, noc_to_port).context(NocError::Chain { func_name: "create_noc", comment: S("noc agent deploy")})?;
-        Noc::noc_master_agent_tree(tree_name, noc_to_port).context(NocError::Chain { func_name: "create_noc", comment: S("noc master tree")})?;
-        Noc::noc_agent_master_tree(tree_name, noc_to_port).context(NocError::Chain { func_name: "create_noc", comment: S("noc agent tree")})?;
+        let control_tree_name = Noc::noc_master_agent_tree(tree_name, noc_to_port).context(NocError::Chain { func_name: "create_noc", comment: S("noc master tree")})?;
+        let listen_tree_name  = Noc::noc_agent_master_tree(tree_name, noc_to_port).context(NocError::Chain { func_name: "create_noc", comment: S("noc agent tree")})?;
+        // Deploy NocMaster
+        let up_tree = UpTreeSpec::new("NocMaster", vec![0]).context(NocError::Chain { func_name: "create_noc", comment: S("NocMaster") })?;
+        let allowed_control = AllowedTree::new(&control_tree_name);
+        let allowed_listen = AllowedTree::new(&listen_tree_name);
+        let allowed_trees = vec![&allowed_control, &allowed_listen];
+        let service = ContainerSpec::new("NocMaster", "NocMaster", vec![], &allowed_trees).context(NocError::Chain { func_name: "create_noc", comment: S("NocMaster") })?;
+        let vm_spec = VmSpec::new("vm1", "Ubuntu", CellConfig::Large,
+                 &allowed_trees, vec![&service], vec![&up_tree]).context(NocError::Chain { func_name: "create_noc", comment: S("NocMaster")})?;
+        let manifest = Manifest::new("NocMaster", CellConfig::Large, &AllowedTree::new("Base"), &allowed_trees,
+                  vec![&vm_spec], vec![&up_tree]).context(NocError::Chain { func_name: "create_noc", comment: S("NocMaster")})?;
+        let manifest_ser = serde_json::to_string(&manifest).context(NocError::Chain { func_name: "create_noc", comment: S("") })?;
+        let mut params = HashMap::new();
+        params.insert(S("deploy_tree_name"), tree_name);
+        params.insert( S("manifest"), &manifest_ser);
+        let manifest_msg = serde_json::to_string(&params).context(NocError::Chain { func_name: "create_noc", comment: S("NocMaster")})?;
+        noc_to_port.send((MsgType::Manifest, manifest_msg)).context(NocError::Chain { func_name: "create_noc", comment: S("NocMaster")})?;
+        // Deploy NocAgent
+        let up_tree = UpTreeSpec::new("NocAgent", vec![0]).context(NocError::Chain { func_name: "create_noc", comment: S("NocAgent") })?;
+        let allowed_control = AllowedTree::new(&control_tree_name);
+        let allowed_listen = AllowedTree::new(&listen_tree_name);
+        let allowed_trees = vec![&allowed_control, &allowed_listen];
+        let service = ContainerSpec::new("NocAgent", "NocAgent", vec![], &allowed_trees).context(NocError::Chain { func_name: "create_noc", comment: S("NocAgent") })?;
+        let vm_spec = VmSpec::new("vm1", "Ubuntu", CellConfig::Large,
+                                  &allowed_trees, vec![&service], vec![&up_tree]).context(NocError::Chain { func_name: "create_noc", comment: S("NocAgent")})?;
+        let manifest = Manifest::new("NocAgent", CellConfig::Large, &AllowedTree::new("Base"), &allowed_trees,
+                                     vec![&vm_spec], vec![&up_tree]).context(NocError::Chain { func_name: "create_noc", comment: S("NocAgent")})?;
+        let manifest_ser = serde_json::to_string(&manifest).context(NocError::Chain { func_name: "create_noc", comment: S("NocAgent") })?;
+        let mut params = HashMap::new();
+        params.insert(S("deploy_tree_name"), tree_name);
+        params.insert( S("manifest"), &manifest_ser);
+        let manifest_msg = serde_json::to_string(&params).context(NocError::Chain { func_name: "create_noc", comment: S("NocAgent")})?;
+        noc_to_port.send((MsgType::Manifest, manifest_msg)).context(NocError::Chain { func_name: "create_noc", comment: S("NocAgent")})?;
         Ok(())
 	}
     // Because of packet forwarding, this tree gets stacked on all cells even though only one of them can receive the deployment message
@@ -129,7 +162,7 @@ impl Noc {
     }
     // I need a more comprehensive GVM to express the fact that the agent running on the same cell as the master
     // can receive messages from the master
-    fn noc_master_agent_tree(tree_name: &String, noc_to_port: &NocToPort) -> Result<(), Error> {
+    fn noc_master_agent_tree(tree_name: &String, noc_to_port: &NocToPort) -> Result<String, Error> {
         let mut params = HashMap::new();
         params.insert(S("new_tree_name"), S(NOC_CONTROL_TREE_NAME));
         params.insert( S("parent_tree_name"), S(tree_name));
@@ -143,11 +176,11 @@ impl Noc {
         params.insert(S("gvm_eqn"), gvm_eqn_ser);
         let stack_tree_msg = serde_json::to_string(&params).context(NocError::Chain { func_name: "noc_master_tree", comment: S("")})?;
         noc_to_port.send((MsgType::StackTree, stack_tree_msg)).context(NocError::Chain { func_name: "noc_master_tree", comment: S("")})?;
-        Ok(())
+        Ok(S(NOC_CONTROL_TREE_NAME))
     }
     // I need a more comprehensive GVM to express the fact that the agent running on the same cell as the master
     // can send messages to the master
-    fn noc_agent_master_tree(tree_name: &String, noc_to_port: &NocToPort) -> Result<(), Error> {
+    fn noc_agent_master_tree(tree_name: &String, noc_to_port: &NocToPort) -> Result<String, Error> {
         let mut params = HashMap::new();
         params.insert(S("new_tree_name"), S(NOC_LISTEN_TREE_NAME));
         params.insert( S("parent_tree_name"), S(tree_name));
@@ -161,7 +194,7 @@ impl Noc {
         params.insert(S("gvm_eqn"), gvm_eqn_ser);
         let stack_tree_msg = serde_json::to_string(&params).context(NocError::Chain { func_name: "noc_master_tree", comment: S("")})?;
         noc_to_port.send((MsgType::StackTree, stack_tree_msg)).context(NocError::Chain { func_name: "noc_master_tree", comment: S("")})?;
-        Ok(())
+        Ok(S(NOC_LISTEN_TREE_NAME))
     }
 	fn listen_outside(&mut self, noc_from_outside: NocFromOutside, noc_to_port: NocToPort) -> Result<(), Error> {
 		loop {
