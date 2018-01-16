@@ -21,7 +21,10 @@ use utility::{DEFAULT_USER_MASK, S, Mask, Path, PortNumber};
 use vm::VirtualMachine;
 
 static MESSAGE_COUNT: AtomicUsize = ATOMIC_USIZE_INIT;
-pub fn get_next_count() -> MsgID { MsgID(MESSAGE_COUNT.fetch_add(1, Ordering::SeqCst) as u64) } 
+pub fn get_next_count() -> MsgID { MsgID(MESSAGE_COUNT.fetch_add(1, Ordering::SeqCst) as u64) }
+
+pub type MsgTreeMap = HashMap<AllowedTree, TreeID>;
+
 #[derive(Debug, Copy, Clone, Hash, Eq, PartialEq, Serialize, Deserialize)]
 pub enum MsgType {
 	Discover,
@@ -136,21 +139,23 @@ impl fmt::Display for Message {
 pub trait MsgPayload: fmt::Display {
     fn get_gvm_eqn(&self) -> Option<&GvmEquation>;
 }
-type TreeMap = HashMap<String, TreeID>;
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct MsgHeader { // Header may not contain '{' or '}' or a separate object, such as TreeID
+pub struct MsgHeader {
 	msg_count: MsgID,
 	msg_type: MsgType,
 	direction: MsgDirection,
+	tree_map: MsgTreeMap,
 }
 impl MsgHeader {
 	pub fn new(msg_type: MsgType, direction: MsgDirection) -> MsgHeader {
 		let msg_count = get_next_count();
-		MsgHeader { msg_type: msg_type, direction: direction, msg_count: msg_count }
+		MsgHeader { msg_type: msg_type, direction: direction, msg_count: msg_count, tree_map: HashMap::new() }
 	}
 	pub fn get_msg_type(&self) -> MsgType { self.msg_type }
 	pub fn get_count(&self) -> MsgID { self.msg_count }
 	pub fn get_direction(&self) -> MsgDirection { self.direction }
+    pub fn get_tree_map(&self) -> &MsgTreeMap { &self.tree_map }
+    pub fn set_tree_map(&mut self, tree_map: MsgTreeMap) { self.tree_map = tree_map; } // Should this be set in new()?
 	//pub fn set_direction(&mut self, direction: MsgDirection) { self.direction = direction; }
 }
 impl fmt::Display for MsgHeader { 
@@ -406,9 +411,10 @@ pub struct ManifestMsg {
 	payload: ManifestMsgPayload
 }
 impl ManifestMsg {
-	pub fn new(manifest: &Manifest) -> ManifestMsg {
+	pub fn new(tree_map: &MsgTreeMap, manifest: &Manifest) -> ManifestMsg {
 		// Note that direction is leafward so cell agent will get the message
-		let header = MsgHeader::new(MsgType::Manifest, MsgDirection::Leafward);
+		let mut header = MsgHeader::new(MsgType::Manifest, MsgDirection::Leafward);
+        header.set_tree_map(tree_map.to_owned());
 		let payload = ManifestMsgPayload::new(&manifest);
 		ManifestMsg { header: header, payload: payload }
 	}
@@ -420,8 +426,9 @@ impl Message for ManifestMsg {
 	fn get_payload_manifest(&self) -> Result<&ManifestMsgPayload, Error> { Ok(&self.payload) }
 	fn process_ca(&mut self, ca: &mut CellAgent, msg_tree_id: &TreeID, port_no: PortNo) -> Result<(), Error> {
 		let manifest = self.payload.get_manifest();
+        let tree_map = self.header.get_tree_map();
 		//println!("ManifestMsg: tree {} msg {}", msg_tree_id, self);
-		Ok(ca.deploy(port_no, &msg_tree_id, &manifest).context(MessageError::Chain { func_name: "process_ca", comment: S("ManifestMsg")})?)
+		Ok(ca.deploy(port_no, &msg_tree_id, tree_map, manifest).context(MessageError::Chain { func_name: "process_ca", comment: S("ManifestMsg")})?)
 	}
 }
 impl fmt::Display for ManifestMsg {
@@ -432,16 +439,16 @@ impl fmt::Display for ManifestMsg {
 }
 #[derive(Debug, Clone, Hash, Serialize, Deserialize)]
 pub struct ManifestMsgPayload {
-	tree_name: String,
+	tree_name: AllowedTree,
 	manifest: Manifest 
 }
 impl ManifestMsgPayload {
 	fn new(manifest: &Manifest) -> ManifestMsgPayload {
-		let tree_name = manifest.get_new_tree_name();
+        let tree_name = manifest.get_deployment_tree();
 		ManifestMsgPayload { tree_name: tree_name.clone(), manifest: manifest.clone() }
 	}
 	fn get_manifest(&self) -> &Manifest { &self.manifest }
-	fn get_tree_name(&self) -> &String { &self.tree_name }
+	fn get_tree_name(&self) -> String { S(self.tree_name.get_name()) }
 }
 impl MsgPayload for ManifestMsgPayload {
     fn get_gvm_eqn(&self) -> Option<&GvmEquation> { None }
