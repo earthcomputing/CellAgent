@@ -8,7 +8,7 @@ use utility::S;
 #[derive(Debug, Clone, Hash, Serialize, Deserialize)]
 pub struct Manifest {
 	id: String,
-	deployment_tree: String,
+	deployment_tree: AllowedTree,
 	cell_config: CellConfig,
 	allowed_trees: Vec<AllowedTree>,
 	vms: Vec<VmSpec>,
@@ -29,12 +29,11 @@ impl Manifest {
 				if !allowed_trees.contains(tree) { return Err(UptreeSpecError::Allowed { func_name: "new", vm_id: v.get_id(), tree: tree.clone() }.into()); }
 			}
 		}
-		Ok(Manifest { id: S(id), cell_config: cell_config, deployment_tree: S(deployment_tree), 
+		Ok(Manifest { id: S(id), cell_config: cell_config, deployment_tree: deployment_tree.clone(),
 				allowed_trees: allowed_trees.clone(), vms: vms, trees: trees })
 	}
 	pub fn get_id(&self) -> &String { &self.id }
-	pub fn get_new_tree_name(&self) -> &String { &self.id }
-	pub fn get_deployment_tree(&self) -> &String { &self.deployment_tree }
+	pub fn get_deployment_tree(&self) -> &AllowedTree { &self.deployment_tree }
 	pub fn get_allowed_trees(&self) -> &Vec<AllowedTree> { &self.allowed_trees }
 	pub fn get_vms(&self) -> &Vec<VmSpec> { &self.vms }
 }
