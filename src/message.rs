@@ -33,6 +33,27 @@ pub enum MsgType {
 	StackTree,
 	TreeName,
 }
+#[derive(Debug, Copy, Clone, Hash, Eq, PartialEq, Serialize, Deserialize)]
+pub enum TcpMsgType {
+	Application,
+    DeleteTree,
+    Manifest,
+    Query,
+    StackTree,
+    TreeName,
+}
+impl fmt::Display for TcpMsgType {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match *self {
+            TcpMsgType::Application  => write!(f, "Application"),
+            TcpMsgType::DeleteTree   => write!(f, "DeleteTree"),
+            TcpMsgType::Manifest     => write!(f, "Manifest"),
+            TcpMsgType::Query        => write!(f, "Query"),
+            TcpMsgType::StackTree    => write!(f, "StackTree"),
+            TcpMsgType::TreeName     => write!(f, "TreeName"),
+        }
+    }
+}
 impl MsgType {
     pub fn get_msg(packets: &Vec<Packet>) -> Result<Box<Message>, Error> {
         let serialized = Packetizer::unpacketize(packets).context(MessageError::Chain { func_name: "get_msg", comment: S("unpacketize")})?;
@@ -427,7 +448,7 @@ impl Message for ManifestMsg {
 	fn process_ca(&mut self, ca: &mut CellAgent, msg_tree_id: &TreeID, port_no: PortNo) -> Result<(), Error> {
 		let manifest = self.payload.get_manifest();
         let tree_map = self.header.get_tree_map();
-		//println!("ManifestMsg: tree {} msg {}", msg_tree_id, self);
+		println!("ManifestMsg on cell {}: tree {} msg {}", ca.get_id(), msg_tree_id, manifest.get_id());
 		Ok(ca.deploy(port_no, &msg_tree_id, tree_map, manifest).context(MessageError::Chain { func_name: "process_ca", comment: S("ManifestMsg")})?)
 	}
 }

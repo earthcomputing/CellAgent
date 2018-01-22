@@ -1,13 +1,14 @@
 use std::fmt;
 use std::collections::HashSet;
 
-use uuid::Uuid;
+//use uuid::Uuid;
 
 use config::{PortNo, TableIndex};
 use gvm_equation::GvmEquation;
 use name::{Name, TreeID};
 use routing_table_entry::RoutingTableEntry;
 use utility::{PortNumber};
+use uuid_fake::Uuid;
 
 #[derive(Debug, Clone)]
 pub struct Tree {

@@ -21,9 +21,11 @@ impl VirtualMachine {
 		VirtualMachine { id: id.clone(), vm_to_ca: vm_to_ca, allowed_trees:allowed_trees_ref.clone(),
             containers: HashMap::new() }
 	}
-	pub fn initialize(&mut self, up_tree_id: &TreeID, vm_from_ca: VmFromCa, vm_trees: &HashSet<AllowedTree>,
+	pub fn initialize(&mut self, up_tree_name: &String, vm_from_ca: VmFromCa, vm_trees: &HashSet<AllowedTree>,
 			container_specs: &Vec<ContainerSpec>) -> Result<(), Error> {
+		println!("VM {} initializing", self.id);
 		self.listen_ca(vm_from_ca).context(VmError::Chain { func_name: "initialize", comment: S(self.id.get_name()) + " listen_ca"})?;
+		let up_tree_id = UptreeID::new(up_tree_name).context(VmError::Chain { func_name: "initialize", comment: S(self.id.get_name()) + " up tree id"})?;
         let mut senders = Vec::new();
 		for container_spec in container_specs {
 			let (vm_to_container, container_from_vm): (VmToContainer, ContainerFromVm) = channel();
@@ -33,7 +35,7 @@ impl VirtualMachine {
             let service_name = container_spec.get_image();
 			let container = Container::new(&container_id, service_name.as_str(), &self.allowed_trees,
                  container_to_vm).context(VmError::Chain { func_name: "initialize", comment: S("")})?;
-			container.initialize(up_tree_id, container_from_vm).context(VmError::Chain { func_name: "initialize", comment: S(self.id.get_name())})?;
+			container.initialize(&up_tree_id, container_from_vm).context(VmError::Chain { func_name: "initialize", comment: S(self.id.get_name())})?;
             senders.push(vm_to_container);
             // Next line must be inside loop or vm_to_container goes out of scope in listen_container
             self.containers.insert(container_id.clone(), senders.clone());

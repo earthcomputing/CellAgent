@@ -4,7 +4,7 @@ use std::sync::{Arc, Mutex, MutexGuard};
 
 use failure::{Error, Fail, ResultExt};
 use serde_json;
-use uuid::Uuid;
+//use uuid::Uuid;
 
 use config::{MAX_PORTS, PathLength, PortNo, TableIndex};
 use gvm_equation::{GvmEquation, GvmEqn, GvmVariable, GvmVariableType};
@@ -13,6 +13,7 @@ use routing_table_entry::{RoutingTableEntry};
 use traph_element::TraphElement;
 use tree::Tree;
 use utility::{Mask, Path, PortNumber, S};
+use uuid_fake::Uuid;
 
 type StackedTrees = HashMap<Uuid, Tree>;
 
@@ -162,8 +163,8 @@ impl Traph {
 		}
 		Ok(updated_entries)		
 	}
-	pub fn stack_tree(&mut self, tree: &Tree) {
-		self.stacked_trees.lock().unwrap().insert(tree.get_uuid(), tree.clone());
+	pub fn stack_tree(&mut self, tree: Tree) {
+		self.stacked_trees.lock().unwrap().insert(tree.get_uuid(), tree);
 	}
 	pub fn get_params(&self, vars: &Vec<GvmVariable>) -> Result<Vec<GvmVariable>, Error> {
 		let mut variables = Vec::new();
