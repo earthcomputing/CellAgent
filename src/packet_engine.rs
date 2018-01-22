@@ -2,7 +2,7 @@ use std::fmt;
 use std::sync::{Arc, Mutex};
 use std::collections::HashSet;
 
-use uuid::Uuid;
+//use uuid::Uuid;
 
 use config::{PortNo, TableIndex};
 use message_types::{TCP, PeFromCa, PeToCa, PeToPort, PeFromPort, CaToPePacket, PortToPePacket, PeToPortPacket, PeToCaPacket};
@@ -11,6 +11,7 @@ use packet::{Packet};
 use routing_table::{RoutingTable};
 use routing_table_entry::{RoutingTableEntry};
 use utility::{Mask, PortNumber, S, write_err};
+use uuid_fake::Uuid;
 
 #[derive(Debug, Clone)]
 pub struct PacketEngine {

@@ -26,7 +26,7 @@ impl Service {
             _ => Err(ServiceError::NoSuchService { func_name: "create_service", service_name: S(service_name) })
         }
     }
-    pub fn initialize(&self, up_tree_id: &TreeID, container_from_vm: ContainerFromVm) -> Result<(), Error> {
+    pub fn initialize(&self, up_tree_id: &UptreeID, container_from_vm: ContainerFromVm) -> Result<(), Error> {
         match self {
             &Service::NocMaster { ref service } => service.initialize(up_tree_id, container_from_vm),
             &Service::NocAgent  { ref service } => service.initialize(up_tree_id, container_from_vm)
@@ -85,14 +85,15 @@ impl NocMaster {
     }
     //	fn get_container_id(&self) -> &ContainerID { &self.container_id }
 //	fn get_service(&self) -> Service { self.service }
-    pub fn initialize(&self, up_tree_id: &TreeID, container_from_vm: ContainerFromVm) -> Result<(), Error> {
+    pub fn initialize(&self, up_tree_id: &UptreeID, container_from_vm: ContainerFromVm) -> Result<(), Error> {
         let new_tree_id = up_tree_id.add_component("NocAgent").context(ServiceError::Chain { func_name: "initialize", comment: S("")})?;
         new_tree_id.append2file().context(ServiceError::Chain { func_name: "initialize", comment: S("")})?;
         self.noc_agents(&new_tree_id, up_tree_id).context(ServiceError::Chain { func_name: "initialize", comment: S("")})?;
         self.container_to_vm.send((S("NocMaster"), S("Message from NocMaster"))).context(ServiceError::Chain { func_name: "initialize", comment: S("send to vm")})?;
+        println!("Service {} running", self.container_id);
         self.listen_vm(container_from_vm)
     }
-    fn noc_agents(&self, new_tree_id: &TreeID, up_tree_id: &TreeID) -> Result<(), Error> {
+    fn noc_agents(&self, new_tree_id: &UptreeID, up_tree_id: &UptreeID) -> Result<(), Error> {
         /*
         let mut eqns = HashSet::new();
         eqns.insert(GvmEqn::Recv("false"));
@@ -168,7 +169,8 @@ impl NocAgent {
                          &allowed_trees, vec![&noc_vm], vec![&vm_uptree]).context(ServiceError::Chain { func_name: "make_manifest", comment: S(NOCAGENT)})?;
         Ok(manifest)
     }
-    pub fn initialize(&self, up_tree_id: &TreeID, container_from_vm: ContainerFromVm) -> Result<(), Error> {
+    pub fn initialize(&self, up_tree_id: &UptreeID, container_from_vm: ContainerFromVm) -> Result<(), Error> {
+        println!("Service {} running", self.container_id);
         Ok(())
     }
 }

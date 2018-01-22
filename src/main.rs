@@ -34,6 +34,7 @@ mod traph_element;
 mod tree;
 mod uptree_spec;
 mod utility;
+mod uuid_fake;
 mod vm;
 
 use std::io::{stdin, stdout, Read, Write};

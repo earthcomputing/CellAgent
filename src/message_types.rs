@@ -2,12 +2,12 @@ use std::sync::mpsc;
 use routing_table_entry::{RoutingTableEntry};
 
 use config::{PortNo, TableIndex};
-use message::MsgType;
+use message::TcpMsgType;
 use packet::{Packet};
 use port::{PortStatus};
 use utility::{Mask, PortNumber};
 
-pub type TCP = (MsgType, String);
+pub type TCP = (TcpMsgType, String);
 // CellAgent to PacketEngine
 pub enum CaToPePacket { Entry(RoutingTableEntry), Packet((TableIndex, Mask, Packet)), Tcp((PortNumber, TCP)) }
 pub type CaToPe = mpsc::Sender<CaToPePacket>;

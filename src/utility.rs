@@ -85,7 +85,7 @@ pub struct PortNumber { pub port_no: PortNo }
 impl PortNumber {
 	pub fn new(no: PortNo, no_ports: PortNo) -> Result<PortNumber, UtilityError> {
 		if no.v > no_ports.v {
-			Err(UtilityError::PortNumber{ port_no: no, func_name: S("PortNumber::new"), max: no_ports }.into())
+			Err(UtilityError::PortNumber{ port_no: no, func_name: "PortNumber::new", max: no_ports }.into())
 		} else {
 			Ok(PortNumber { port_no: (no as PortNo) })
 		}
@@ -152,9 +152,9 @@ pub enum UtilityError {
     #[fail(display = "UtilityError::Chain {} {}", func_name, comment)]
     Chain { func_name: &'static str, comment: String },
     #[fail(display = "UtilityError::Mask {}: Cell {} has no tenant mask", func_name, cell_id)]
-    Mask { cell_id: CellID, func_name: String},
+    Mask { cell_id: CellID, func_name: &'static str},
     #[fail(display = "UtilityError::PortNumber {}: Port number {:?} is larger than the maximum of {:?}", func_name, port_no, max)]
-    PortNumber { port_no: PortNo, func_name: String, max: PortNo },
+    PortNumber { port_no: PortNo, func_name: &'static str, max: PortNo },
     #[fail(display = "UtilityError::Unimplemented {}: {} is not implemented", func_name, feature)]
-    Unimplemented { feature: String, func_name: String }
+    Unimplemented { feature: String, func_name: &'static str }
 }

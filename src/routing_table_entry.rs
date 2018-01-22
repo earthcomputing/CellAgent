@@ -1,10 +1,11 @@
 use std::fmt;
 use std::collections::HashSet;
-use uuid::Uuid;
+//use uuid::Uuid;
 
 use config::{MAX_PORTS, PortNo, TableIndex};
 use name::{Name, TreeID};
 use utility::{Mask, PortNumber, S};
+use uuid_fake::Uuid;
 
 type OtherIndices = [TableIndex; MAX_PORTS.v as usize];
 #[derive(Debug, Copy, Clone, Serialize, Deserialize)]

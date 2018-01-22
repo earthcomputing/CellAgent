@@ -26,11 +26,11 @@ impl Manifest {
 			vms.push(v.to_owned());
 			let allowed = v.get_allowed_trees();
 			for tree in allowed {
-				if !allowed_trees.contains(tree) { return Err(UptreeSpecError::Allowed { func_name: "new", vm_id: v.get_id(), tree: tree.clone() }.into()); }
+				if !allowed_trees.contains(tree) { return Err(UptreeSpecError::Allowed { func_name: "new", vm_id: v.get_id().clone(), tree: tree.clone() }.into()); }
 			}
 		}
-		Ok(Manifest { id: S(id), cell_config: cell_config, deployment_tree: deployment_tree.clone(),
-				allowed_trees: allowed_trees.clone(), vms: vms, trees: trees })
+		Ok(Manifest { id: S(id), deployment_tree: deployment_tree.clone(), cell_config: cell_config,
+		     allowed_trees: allowed_trees, vms: vms, trees: trees })
 	}
 	pub fn get_id(&self) -> &String { &self.id }
 	pub fn get_deployment_tree(&self) -> &AllowedTree { &self.deployment_tree }
@@ -79,7 +79,7 @@ impl VmSpec {
 		Ok(VmSpec { id: S(id), image: S(image), required_config: config,
 				allowed_trees: allowed_trees.clone(), containers: containers, trees: trees })
 	}
-	pub fn get_id(&self) -> String { self.id.clone() }
+	pub fn get_id(&self) -> &String { &self.id }
 	pub fn get_allowed_trees(&self) -> &Vec<AllowedTree> { &self.allowed_trees }
 	pub fn get_containers(&self) -> &Vec<ContainerSpec> { &self.containers }
 }
