@@ -51,7 +51,7 @@ impl PacketEngine {
 					self.routing_table.lock().unwrap().set_entry(e)
 				},
 				CaToPePacket::Packet((index, user_mask, packet)) => {
-					//println!("PacketEngine {}: received from ca packet {}", self.cell_id, packet);
+                    //if ::message::MsgType::is_type(&packet, "Manifest") { println!("PacketEngine {}: received from ca packet {}", self.cell_id, packet); }
 					let locked = self.routing_table.lock().unwrap();	// Hold lock until forwarding is done			
 					let entry = locked.get_entry(index).context(PacketEngineError::Chain { func_name: "listen_ca", comment: S(self.cell_id.get_name())})?;
 					let port_no = PortNo{v:0};
@@ -125,7 +125,7 @@ impl PacketEngine {
 			let mask = user_mask.and(entry.get_mask());
 			let port_nos = mask.get_port_nos();
 			//let is_stack_msg = match format!("{}", packet).find("StackTree") { Some(_) => true, None => false };
-			//if ::message::MsgType::is_type(packet, "StackTree") { println!("PacketEngine {}: forwarding packet {} on ports {:?}, {}", self.cell_id, packet.get_count(), port_nos, entry); }
+			//if ::message::MsgType::is_type(&packet, "Manifest") { println!("PacketEngine {}: forwarding packet {} on ports {:?}, {}", self.cell_id, packet.get_count(), port_nos, entry); }
 			for port_no in port_nos.iter() {
 				if let Some(other_index) = other_indices.get(port_no.v as usize).cloned() {
 					if port_no.v as usize == 0 {
