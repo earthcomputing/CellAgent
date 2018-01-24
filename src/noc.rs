@@ -128,7 +128,7 @@ impl Noc {
         params.insert(S("parent_tree_name"), S(tree_name));
         let mut eqns = HashSet::new();
         eqns.insert(GvmEqn::Recv("hops == 0"));
-        eqns.insert(GvmEqn::Send("false"));
+        eqns.insert(GvmEqn::Send("true"));
         eqns.insert(GvmEqn::Xtnd("false"));
         eqns.insert(GvmEqn::Save("false"));
         let gvm_eqn = GvmEquation::new(eqns, vec![GvmVariable::new(GvmVariableType::PathLength, "hops")]);
@@ -148,7 +148,7 @@ impl Noc {
         params.insert(S("parent_tree_name"), S(tree_name));
         let mut eqns = HashSet::new();
         eqns.insert(GvmEqn::Recv("hops > 0"));
-        eqns.insert(GvmEqn::Send("false"));
+        eqns.insert(GvmEqn::Send("true"));
         eqns.insert(GvmEqn::Xtnd("true"));
         eqns.insert(GvmEqn::Save("true"));
         let gvm_eqn = GvmEquation::new(eqns, vec![GvmVariable::new(GvmVariableType::PathLength, "hops")]);

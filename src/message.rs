@@ -70,7 +70,7 @@ impl MsgType {
 		})		
 	}
 	// A hack for printing debug output only for a specific message type
-	pub fn is_type(packet: Packet, type_of_msg: &str) -> bool {
+	pub fn is_type(packet: &Packet, type_of_msg: &str) -> bool {
 		match format!("{}", packet).find(type_of_msg) {
 			Some(_) => true,
 			None => false
