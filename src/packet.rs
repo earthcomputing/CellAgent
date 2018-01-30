@@ -38,7 +38,7 @@ impl Packet {
 	pub fn get_count(&self) -> usize { self.packet_count }
 	pub fn get_header(&self) -> PacketHeader { self.header }
 	pub fn get_payload(&self) -> Payload { self.payload }
-	pub fn get_tree_uuid(&self) -> Uuid { self.header.get_tree_uuid() }
+	pub fn get_tree_uuid(&self) -> Uuid { self.header.get_uuid() }
 //	pub fn get_payload_bytes(&self) -> Vec<u8> { self.get_payload().get_bytes() }
 //	pub fn get_payload_size(&self) -> usize { self.payload.get_no_bytes() }
 }
@@ -84,7 +84,8 @@ impl PacketHeader {
 		ph
 	}
 	pub fn get_msg_id(&self) -> MsgID { self.msg_id }
-	pub fn get_tree_uuid(&self) -> Uuid { self.uuid }
+	pub fn get_uuid(&self) -> Uuid { self.uuid }
+	pub fn set_uuid(&mut self, new_uuid: Uuid) { self.uuid = new_uuid; }
 	pub fn get_size(&self) -> PacketNo { self.size }
 	pub fn is_leafcast(&self) -> bool { (self.flags & 1) == 1 }
 	pub fn is_rootcast(&self) -> bool { !self.is_leafcast() }

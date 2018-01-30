@@ -85,7 +85,7 @@ impl PacketEngine {
 			//println!("PacketEngine {}: entry {} header UUID {}", self.cell_id, entry, packet.get_header().get_tree_uuid());
 			// The control tree is special since each cell has a different uuid
             //if ::message::MsgType::is_type(packet, "StackTree") && self.cell_id.get_name() == "C:1" { println!("PacketEngine {}: entry {}", self.cell_id, entry); }
-			if (*entry.get_index() == 0) || (entry.get_uuid() == packet.get_header().get_tree_uuid()) {
+			if (*entry.get_index() == 0) || (entry.get_uuid() == packet.get_header().get_uuid()) {
 				let mask = entry.get_mask();
 				let other_indices = entry.get_other_indices();
 				PortNumber::new(port_no, PortNo{v:other_indices.len() as u8}).context(PacketEngineError::Chain { func_name: "process_packet", comment: S("port number ") + self.cell_id.get_name()})?; // Verify that port_no is valid

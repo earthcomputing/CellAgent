@@ -236,6 +236,7 @@ impl Message for DiscoverMsg {
 			let entry = ca.update_traph(new_tree_id, port_number, status, Some(&gvm_equation),
 					children, senders_index, hops, Some(path)).context(MessageError::Chain { func_name: "process_ca", comment: S("DiscoverMsg")})?;
 			if exists { return Ok(()); } // Don't forward if traph exists for this tree - Simple quenching
+            ca.update_base_tree_map(new_tree_id, new_tree_id);
 			my_index = entry.get_index();
 			// Send DiscoverD to sender
 			let discoverd_msg = DiscoverDMsg::new(new_tree_id, my_index);
@@ -374,11 +375,14 @@ pub struct StackTreeMsg {
 	payload: StackTreeMsgPayload
 }
 impl StackTreeMsg {
-	pub fn new(new_tree_id: &TreeID, parent_tree_id: &TreeID, gvm_eqn: &GvmEquation) -> StackTreeMsg {
+	pub fn new(new_tree_id: &TreeID, parent_tree_id: &TreeID, index: TableIndex, gvm_eqn: &GvmEquation) -> StackTreeMsg {
 		let header = MsgHeader::new(MsgType::StackTree, MsgDirection::Leafward);
-		let payload = StackTreeMsgPayload::new(new_tree_id, parent_tree_id, gvm_eqn);
-		StackTreeMsg { header: header, payload: payload}
+		let payload = StackTreeMsgPayload::new(new_tree_id, parent_tree_id, index, gvm_eqn);
+		StackTreeMsg { header, payload}
 	}
+    fn update_payload(&self, payload: StackTreeMsgPayload) -> StackTreeMsg {
+        StackTreeMsg { header: self.header.clone(), payload }
+    }
     fn get_payload_stack_tree(&self) -> Result<&StackTreeMsgPayload, Error> { Ok(&self.payload) }
 }
 impl Message for StackTreeMsg {
@@ -387,14 +391,27 @@ impl Message for StackTreeMsg {
     fn get_payload_stack_tree(&self) -> Result<&StackTreeMsgPayload, Error> { Ok(&self.payload) }
     fn get_msg_type(&self) -> MsgType { self.header.msg_type }
 	fn process_ca(&mut self, ca: &mut CellAgent, msg_tree_id: &TreeID, port_no: PortNo) -> Result<(), Error> {
+        let f = "process_ca";
 		//println!("Cell {}: msg_tree_id {} Stack tree msg {}", ca.get_id(), msg_tree_id, self);
-		if let Some(gvm_eqn) = self.get_gvm_eqn() {
-            let parent_tree_id = self.payload.get_parent_tree_id();
-            let new_tree_id = self.payload.get_new_tree_id();
-            ca.stack_tree(&new_tree_id, parent_tree_id, gvm_eqn).context(MessageError::Chain { func_name: "process_ca", comment: S("StackTreeMsg") })?;
-        } else {
-			return Err(MessageError::NoGvm { func_name: "process_ca" }.into());
-		}
+        let ref parent_tree_id = self.payload.get_parent_tree_id().clone();
+        let ref new_tree_id = self.payload.get_new_tree_id().clone();
+        let index = self.payload.get_table_index();
+        let gvm_eqn = match self.payload.get_gvm_eqn() {
+            Some(gvm) => gvm,
+            None => return Err(MessageError::NoGvm { func_name: f }.into())
+        };
+        if let Some(mut entry) = ca.stack_tree(new_tree_id, parent_tree_id, gvm_eqn)? {
+            let port_number = PortNumber::new(port_no, ca.get_no_ports())?;
+            entry.add_other_index(port_number,  index);
+            let mut payload = self.get_payload_stack_tree()?.clone();
+            payload.set_table_index(entry.get_index());
+            let msg = self.update_payload(payload);
+            let traph = ca.get_traph(&parent_tree_id)?;
+            let parent_entry = traph.get_tree_entry(&parent_tree_id.get_uuid())?;
+            let mask = parent_entry.get_mask();
+            let variables = traph.get_params(gvm_eqn.get_variables())?;
+            if gvm_eqn.eval_xtnd(&variables)? { ca.send_msg(ca.get_connected_ports_tree_id(), &msg, mask)?; }
+        }
 		Ok(())
 	}
 }
@@ -408,15 +425,18 @@ impl fmt::Display for StackTreeMsg {
 pub struct StackTreeMsgPayload {
 	new_tree_id: TreeID,
 	parent_tree_id: TreeID,
+	index: TableIndex,
 	gvm_eqn: GvmEquation
 }
 impl StackTreeMsgPayload {
-	fn new(new_tree_id: &TreeID, parent_tree_id: &TreeID, gvm_eqn: &GvmEquation) -> StackTreeMsgPayload {
+	fn new(new_tree_id: &TreeID, parent_tree_id: &TreeID, index: TableIndex, gvm_eqn: &GvmEquation) -> StackTreeMsgPayload {
 		StackTreeMsgPayload { new_tree_id: new_tree_id.to_owned(), parent_tree_id: parent_tree_id.to_owned(),
-            gvm_eqn: gvm_eqn.to_owned() }
+            index, gvm_eqn: gvm_eqn.to_owned() }
 	}
     pub fn get_new_tree_id(&self) -> &TreeID { &self.new_tree_id }
 	pub fn get_parent_tree_id(&self) -> &TreeID { &self.parent_tree_id }
+    pub fn get_table_index(&self) -> TableIndex { self.index }
+    pub fn set_table_index(&mut self, index: TableIndex) { self.index = index }
 }
 impl MsgPayload for StackTreeMsgPayload {
     fn get_gvm_eqn(&self) -> Option<&GvmEquation> { Some(&self.gvm_eqn) }

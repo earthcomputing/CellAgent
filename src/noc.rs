@@ -103,7 +103,7 @@ impl Noc {
         params.insert(S("deploy_tree_name"), deployment_tree_name);
         params.insert( S("manifest"), &manifest_ser);
         let manifest_msg = serde_json::to_string(&params).context(NocError::Chain { func_name: "create_noc", comment: S("NocMaster")})?;
-        noc_to_port.send((TcpMsgType::Manifest, manifest_msg)).context(NocError::Chain { func_name: "create_noc", comment: S("NocMaster")})?;
+        //noc_to_port.send((TcpMsgType::Manifest, manifest_msg)).context(NocError::Chain { func_name: "create_noc", comment: S("NocMaster")})?;
         // Deploy NocAgent
         let up_tree = UpTreeSpec::new("NocAgent", vec![0]).context(NocError::Chain { func_name: "create_noc", comment: S("NocAgent") })?;
         let service = ContainerSpec::new("NocAgent", "NocAgent", vec![], &allowed_trees).context(NocError::Chain { func_name: "create_noc", comment: S("NocAgent") })?;
@@ -117,7 +117,7 @@ impl Noc {
         params.insert(S("deploy_tree_name"), deployment_tree_name);
         params.insert( S("manifest"), &manifest_ser);
         let manifest_msg = serde_json::to_string(&params).context(NocError::Chain { func_name: "create_noc", comment: S("NocAgent")})?;
-        noc_to_port.send((TcpMsgType::Manifest, manifest_msg)).context(NocError::Chain { func_name: "create_noc", comment: S("NocAgent")})?;
+        //noc_to_port.send((TcpMsgType::Manifest, manifest_msg)).context(NocError::Chain { func_name: "create_noc", comment: S("NocAgent")})?;
         Ok(())
 	}
     // Because of packet forwarding, this tree gets stacked on all cells even though only one of them can receive the deployment message
