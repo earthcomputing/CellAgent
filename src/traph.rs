@@ -44,15 +44,18 @@ impl Traph {
 	pub fn get_black_tree_id(&self) -> &TreeID { &self.black_tree_id }
 	pub fn get_tree_entry(&self, tree_uuid: &Uuid) -> Result<RoutingTableEntry, Error> {
 		let locked = self.stacked_trees.lock().unwrap();
-		if let Some(tree) = locked.get(tree_uuid) {
-			Ok(tree.get_table_entry())
-		} else {
-            for stacked_tree in locked.iter() {
-                println!("Traph for cell {}: stacked_trees {}", self.cell_id, stacked_tree.0);
-            }
-			Err(TraphError::Tree { cell_id: self.cell_id.clone(), func_name: "get_tree_entry", tree_uuid: *tree_uuid }.into())
-		}
+        match locked.get(tree_uuid) {
+            Some(tree) => Ok(tree.get_table_entry()),
+            None => Err(TraphError::Tree { cell_id: self.cell_id.clone(), func_name: "get_tree_entry", tree_uuid: *tree_uuid }.into())
+        }
 	}
+    pub fn set_tree_entry(&mut self, tree_uuid: &Uuid, entry: RoutingTableEntry) -> Result<(), Error> {
+        let mut locked = self.stacked_trees.lock().unwrap();
+        match locked.get_mut(tree_uuid) {
+            Some(tree) => Ok(tree.set_table_entry(entry)),
+            None => Err(TraphError::Tree { cell_id: self.cell_id.clone(), func_name: "set_tree_entry", tree_uuid: *tree_uuid }.into())
+        }
+    }
 	pub fn get_black_tree_entry(&self) -> Result<RoutingTableEntry, Error> {
         Ok(self.get_tree_entry(&self.black_tree_id.get_uuid()).context(TraphError::Chain { func_name: "get_black_tree_entry", comment: S("")})?)
     }
