@@ -47,6 +47,9 @@ impl Traph {
 		if let Some(tree) = locked.get(tree_uuid) {
 			Ok(tree.get_table_entry())
 		} else {
+            for stacked_tree in locked.iter() {
+                println!("Traph for cell {}: stacked_trees {}", self.cell_id, stacked_tree.0);
+            }
 			Err(TraphError::Tree { cell_id: self.cell_id.clone(), func_name: "get_tree_entry", tree_uuid: *tree_uuid }.into())
 		}
 	}
