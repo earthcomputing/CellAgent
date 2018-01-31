@@ -433,12 +433,13 @@ impl CellAgent {
     }
 	fn listen_pe(&mut self, ca_from_pe: CaFromPe) -> Result<(), Error>{
 		let mut ca = self.clone();
-		::std::thread::spawn( move || { 
-			let _ = ca.listen_pe_loop(ca_from_pe).map_err(|e| ::utility::write_err("cellagent", e));
+		::std::thread::spawn( move || {
+			let _ = ca.listen_pe_loop(&ca_from_pe).map_err(|e| ::utility::write_err("cellagent", e));
+            let _ = ca.listen_pe(ca_from_pe);
 		});
 		Ok(())
 	}
-	fn listen_pe_loop(&mut self, ca_from_pe: CaFromPe) -> Result<(), Error> {
+	fn listen_pe_loop(&mut self, ca_from_pe: &CaFromPe) -> Result<(), Error> {
         let f = "listen_pe_loop";
 		loop {
 			//println!("CellAgent {}: waiting for status or packet", ca.cell_id);

@@ -69,7 +69,7 @@ impl NalCell {
 		let mut cell_agent = CellAgent::new(&cell_id, cell_type, config, nports, ca_to_pe).context(NalcellError::Chain { func_name: "new", comment: S("cell agent create")})?;
 		cell_agent.initialize(cell_type, ca_from_pe).context(NalcellError::Chain { func_name: "new", comment: S("cell agent init")})?;
 		let packet_engine = PacketEngine::new(&cell_id, pe_to_ca, pe_to_ports, boundary_port_nos).context(NalcellError::Chain { func_name: "new", comment: S("packet engine create")})?;
-		packet_engine.start_threads(pe_from_ca, pe_from_ports);
+		packet_engine.start_threads(pe_from_ca, pe_from_ports)?;
 		Ok(NalCell { id: cell_id, cell_no: cell_no, cell_type: cell_type, config: config,
 				ports: boxed_ports, cell_agent: cell_agent, vms: Vec::new(),
 				packet_engine: packet_engine, ports_from_pe: ports_from_pe, })
