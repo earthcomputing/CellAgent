@@ -32,27 +32,18 @@ impl Noc {
 	pub fn new(noc_to_outside: NocToOutside) -> Result<Noc, Error> {
 		Ok(Noc { allowed_trees: HashSet::new(), noc_to_outside: noc_to_outside })
 	}
-	pub fn initialize(&self, blueprint: &Blueprint, noc_from_outside: NocFromOutside) ->
+	pub fn initialize(&mut self, blueprint: &Blueprint, noc_from_outside: NocFromOutside) ->
             Result<(Datacenter, Vec<JoinHandle<()>>), Error> {
 		let (noc_to_port, port_from_noc): (NocToPort, NocFromPort) = channel();
 		let (port_to_noc, noc_from_port): (PortToNoc, PortFromNoc) = channel();
 		let (mut dc, mut join_handles) = self.build_datacenter(blueprint).context(NocError::Chain { func_name: "initialize", comment: S("")})?;
 		dc.connect_to_noc(port_to_noc, port_from_noc).context(NocError::Chain { func_name: "initialize", comment: S("")})?;
-		let mut noc = self.clone();
-		let noc_to_port_clone = noc_to_port.clone();
-		let join_outside = spawn( move || { 
-			let _ = noc.listen_outside(noc_from_outside, noc_to_port_clone).map_err(|e| write_err("outside", e));
-		});
-		join_handles.push(join_outside);
-		let mut noc = self.clone();
- 		let noc_to_port_clone = noc_to_port.clone();
-		let join_port = spawn( move || {
-			let _ = noc.listen_port(noc_to_port_clone, noc_from_port).map_err(|e| write_err("port", e));
-		});
-		join_handles.push(join_port);
+        let join_outside = self.listen_outside(noc_from_outside, noc_to_port.clone())?;
+        join_handles.push(join_outside);
+        let join_port = self.listen_port(noc_to_port, noc_from_port)?;
+        join_handles.push(join_port);
 		let nap = time::Duration::from_millis(1000);
 		sleep(nap);
-		//println!("---> Change line in noc.rs with ---> to print datacenter"); println!("{}", dc);
 		Ok((dc, join_handles))
 	}
 	fn build_datacenter(&self, blueprint: &Blueprint) -> Result<(Datacenter, Vec<JoinHandle<()>>), Error> {
@@ -65,7 +56,15 @@ impl Noc {
 //			_ => panic!("Noc doesn't recognize message type {}", msg_type)
 //		})
 //	}
-	fn listen_port(&mut self, noc_to_port: NocToPort, noc_from_port: NocFromPort) -> Result<(), Error> {
+    fn listen_port(&mut self, noc_to_port: NocToPort, noc_from_port: NocFromPort) -> Result<JoinHandle<()>, Error> {
+        let mut noc = self.clone();
+        let join_port = spawn( move || {
+            let _ = noc.listen_port_loop(&noc_to_port, &noc_from_port).map_err(|e| write_err("port", e));
+            let _ = noc.listen_port(noc_to_port, noc_from_port);
+        });
+        Ok(join_port)
+    }
+	fn listen_port_loop(&mut self, noc_to_port: &NocToPort, noc_from_port: &NocFromPort) -> Result<(), Error> {
 		loop {
 			let (msg_type, serialized) = noc_from_port.recv().context(NocError::Chain { func_name: "listen_port", comment: S("")})?;
             match msg_type {
@@ -82,6 +81,21 @@ impl Noc {
             }
 		}
 	}
+    fn listen_outside(&mut self, noc_from_outside: NocFromOutside, noc_to_port: NocToPort) -> Result<JoinHandle<()>,Error> {
+        let mut noc = self.clone();
+        let join_outside = spawn( move || {
+            let _ = noc.listen_outside_loop(&noc_from_outside, &noc_to_port).map_err(|e| write_err("outside", e));
+        });
+        Ok(join_outside)
+    }
+    fn listen_outside_loop(&mut self, noc_from_outside: &NocFromOutside, noc_to_port: &NocToPort) -> Result<(), Error> {
+        loop {
+            let input = &noc_from_outside.recv()?;
+            println!("Noc: {}", input);
+            let manifest = serde_json::from_str::<Manifest>(input).context(NocError::Chain { func_name: "listen_outside", comment: S("")})?;
+            println!("Noc: {}", manifest);
+        }
+    }
 	// Sets up the NOC Master and NOC Agent services on up trees
 	fn create_noc(&mut self, tree_name: &String, noc_to_port: &NocToPort) -> Result<(), Error> {
         // Stack the trees needed to deploy the master and agent and for them to talk master->agent and agent->master
@@ -197,14 +211,6 @@ impl Noc {
         noc_to_port.send((TcpMsgType::StackTree, stack_tree_msg)).context(NocError::Chain { func_name: "noc_master_tree", comment: S("")})?;
         Ok(AllowedTree::new(NOC_LISTEN_TREE_NAME))
     }
-	fn listen_outside(&mut self, noc_from_outside: NocFromOutside, noc_to_port: NocToPort) -> Result<(), Error> {
-		loop {
-			let input = &noc_from_outside.recv()?;
-			println!("Noc: {}", input);
-			let manifest = serde_json::from_str::<Manifest>(input).context(NocError::Chain { func_name: "listen_outside", comment: S("")})?;
-			println!("Noc: {}", manifest);
-		}
-	}
 }
 // Errors
 use failure::{Error, Fail, ResultExt};

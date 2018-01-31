@@ -29,20 +29,31 @@ impl PacketEngine {
 		Ok(PacketEngine { cell_id: cell_id.clone(), routing_table: routing_table, 
 			boundary_port_nos: boundary_port_nos, pe_to_ca: packet_pe_to_ca, pe_to_ports: pe_to_ports })
 	}
-	pub fn start_threads(&self, pe_from_ca: PeFromCa, pe_from_ports: PeFromPort) {			
-		let pe = self.clone();
-		::std::thread::spawn( move ||  {
-			let _ = pe.listen_ca(pe_from_ca).map_err(|e| write_err("packet_engine", e));
-		});
-		let pe = self.clone();
-		::std::thread::spawn( move || {
-			let _ = pe.listen_port(pe_from_ports).map_err(|e| write_err("packet_engine", e));
-		});
+	pub fn start_threads(&self, pe_from_ca: PeFromCa, pe_from_ports: PeFromPort) -> Result<(), Error> {
+        self.listen_ca(pe_from_ca)?;
+        self.listen_port(pe_from_ports)?;
+        Ok(())
 	}
+	fn listen_ca(&self, pe_from_ca: PeFromCa) -> Result<(), Error> {
+        let pe = self.clone();
+        ::std::thread::spawn( move ||  {
+            let _ = pe.listen_ca_loop(&pe_from_ca).map_err(|e| write_err("packet_engine", e));
+            let _ = pe.listen_ca(pe_from_ca);
+        });
+        Ok(())
+    }
+    fn listen_port(&self, pe_from_ports: PeFromPort) -> Result<(),Error> {
+        let pe = self.clone();
+        ::std::thread::spawn( move || {
+            let _ = pe.listen_port_loop(&pe_from_ports).map_err(|e| write_err("packet_engine", e));
+            let _ = pe.listen_port(pe_from_ports);
+        });
+        Ok(())
+    }
 	//pub fn get_table(&self) -> &Arc<Mutex<RoutingTable>> { &self.routing_table }
-	fn listen_ca(&self, entry_pe_from_ca: PeFromCa) -> Result<(), Error> {
+	fn listen_ca_loop(&self, pe_from_ca: &PeFromCa) -> Result<(), Error> {
 		loop { 
-			match entry_pe_from_ca.recv().context(PacketEngineError::Chain { func_name: "listen_ca", comment: S("recv entry from ca") + self.cell_id.get_name()})? {
+			match pe_from_ca.recv().context(PacketEngineError::Chain { func_name: "listen_ca", comment: S("recv entry from ca") + self.cell_id.get_name()})? {
 				CaToPePacket::Entry(e) => {
 					if *e.get_index() > 0 {
 						let json = ::serde_json::to_string(&(&self.cell_id, &e, &e.get_mask().get_port_nos())).context(PacketEngineError::Chain { func_name: "listen_ca", comment: S(self.cell_id.get_name())})?;
@@ -67,7 +78,7 @@ impl PacketEngine {
 			}; 
 		}
 	}
-	fn listen_port(&self, pe_from_ports: PeFromPort) -> Result<(), Error> {
+	fn listen_port_loop(&self, pe_from_ports: &PeFromPort) -> Result<(), Error> {
 		loop {
 			//println!("PacketEngine {}: waiting for status or packet", pe.cell_id);
 			match pe_from_ports.recv().context(PacketEngineError::Chain { func_name: "listen_port", comment: S("receive")})? {

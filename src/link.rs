@@ -31,13 +31,18 @@ impl Link {
 	fn listen(&self, status: LinkToPort, link_from: LinkFromPort, link_to: LinkToPort) 
 			-> Result<JoinHandle<()>, Error> {
 		status.send(LinkToPortPacket::Status(PortStatus::Connected)).context(LinkError::Chain { func_name: "listen", comment: S(self.id.clone()) + " send status to port"})?;
-        let link = self.clone();
-		let join_handle = ::std::thread::spawn( move || {
-            let _ = link.listen_loop(status, link_from, link_to).map_err(|e| write_err("link", e.into()));
-		});
+        let join_handle = self.listen_port(link_from, link_to)?;
         Ok(join_handle)
 	}
-    fn listen_loop(&self, status: LinkToPort, link_from: LinkFromPort, link_to: LinkToPort) -> Result<(), Error> {
+    fn listen_port(&self, link_from: LinkFromPort, link_to: LinkToPort) -> Result<JoinHandle<()>, Error> {
+        let link = self.clone();
+        let join_handle = ::std::thread::spawn( move || {
+            let _ = link.listen_loop(&link_from, &link_to).map_err(|e| write_err("link", e.into()));
+            let _ = link.listen_port(link_from, link_to);
+        });
+        Ok(join_handle)
+    }
+    fn listen_loop(&self, link_from: &LinkFromPort, link_to: &LinkToPort) -> Result<(), Error> {
         loop {
             //println!("Link {}: waiting to recv", self.id);
             let packet = link_from.recv().context(LinkError::Chain { func_name: "listen_loop", comment: S(self.id.clone()) })?;

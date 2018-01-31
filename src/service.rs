@@ -118,12 +118,13 @@ impl NocMaster {
         //println!("Service {} on {}: listening to VM", self.name, self.container_id);
         let vm = self.clone();
         ::std::thread::spawn(move || -> Result<(), Error> {
-            let _ = master.listen_vm_loop(container_from_vm).map_err(|e| write_err("service", e));
+            let _ = master.listen_vm_loop(&container_from_vm).map_err(|e| write_err("service", e));
+            let _ = vm.listen_vm(container_from_vm);
             Ok(())
         });
         Ok(())
     }
-    fn listen_vm_loop(&self, container_from_vm: ContainerFromVm) -> Result<(), Error> {
+    fn listen_vm_loop(&self, container_from_vm: &ContainerFromVm) -> Result<(), Error> {
         //println!("NocMaster on container {} waiting for msg from VM", self.container_id);
         loop {
             let (tree, msg) = container_from_vm.recv().context("NocMaster container_from_vm").context(ServiceError::Chain { func_name: "listen_vm_loop", comment: S("recv from vm")})?;
