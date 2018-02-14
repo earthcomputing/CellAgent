@@ -396,17 +396,19 @@ impl Message for StackTreeMsg {
     fn get_msg_type(&self) -> MsgType { self.header.msg_type }
 	fn process_ca(&mut self, ca: &mut CellAgent, msg_tree_id: &TreeID, port_no: PortNo) -> Result<(), Error> {
         let f = "process_ca";
-		println!("Cell {}: msg_tree_id {} Stack tree msg {}", ca.get_id(), msg_tree_id, self);
+		//println!("Message Cell {}: port_no {} Stack tree msg {}", ca.get_id(), *port_no, self);
         let ref parent_tree_id = self.payload.get_parent_tree_id().clone();
         let ref new_tree_id = self.payload.get_new_tree_id().clone();
         let index = self.payload.get_table_index();
+        let port_number = PortNumber::new(port_no, ca.get_no_ports())?;
         let gvm_eqn = match self.payload.get_gvm_eqn() {
             Some(gvm) => gvm,
             None => return Err(MessageError::NoGvm { func_name: f }.into())
         };
         if let Some(mut entry) = ca.stack_tree(new_tree_id, parent_tree_id, gvm_eqn)? {
-            let port_number = PortNumber::new(port_no, ca.get_no_ports())?;
+            let mut traph = ca.get_traph(new_tree_id)?;
             entry.add_other_index(port_number,  index);
+            traph.set_tree_entry(&new_tree_id.get_uuid(), entry)?;
             ca.update_entry(entry).context(MessageError::Chain { func_name: f, comment: S("")})?;
             let mut payload = self.get_payload_stack_tree()?.clone();
             payload.set_table_index(entry.get_index());
@@ -415,8 +417,13 @@ impl Message for StackTreeMsg {
             let parent_entry = traph.get_tree_entry(&parent_tree_id.get_uuid())?;
             let mask = parent_entry.get_mask();
             let variables = traph.get_params(gvm_eqn.get_variables())?;
-            if gvm_eqn.eval_xtnd(&variables)? { ca.send_msg(ca.get_connected_ports_tree_id(), &msg, mask)?; }
-            ca.send_msg(new_tree_id, &msg, DEFAULT_USER_MASK)?;
+            if gvm_eqn.eval_xtnd(&variables)? {
+                //println!("Message Cell {}: sending on connected ports {}", ca.get_id(), msg);
+                ca.send_msg(ca.get_connected_ports_tree_id(), &msg, mask)?;
+            }
+            let mask = Mask::new(port_number);
+            let msg = StackTreeDMsg::new(new_tree_id, index);
+            ca.send_msg(ca.get_connected_ports_tree_id(), &msg, mask)?;
         }
 		Ok(())
 	}
@@ -459,7 +466,7 @@ pub struct StackTreeDMsg {
 }
 impl StackTreeDMsg {
     pub fn new(tree_id: &TreeID, index: TableIndex,) -> StackTreeDMsg {
-        let header = MsgHeader::new(MsgType::StackTreeD, MsgDirection::Rootward);
+        let header = MsgHeader::new(MsgType::StackTreeD, MsgDirection::Leafward);
         let payload = StackTreeMsgDPayload::new(tree_id, index);
         StackTreeDMsg { header, payload}
     }
@@ -475,11 +482,14 @@ impl Message for StackTreeDMsg {
     fn get_msg_type(&self) -> MsgType { self.header.msg_type }
     fn process_ca(&mut self, ca: &mut CellAgent, msg_tree_id: &TreeID, port_no: PortNo) -> Result<(), Error> {
         let f = "process_ca";
-        println!("Cell {}: msg_tree_id {} Stack tree d msg {}", ca.get_id(), msg_tree_id, self);
         let ref tree_id = self.payload.get_tree_id().clone();
+        let mut traph = ca.get_traph(tree_id)?;
         let other_index = self.payload.get_table_index();
         let mut entry = ca.get_tree_entry(tree_id)?;
         entry.add_other_index(PortNumber::new(port_no,ca.get_no_ports())?, other_index);
+        traph.set_tree_entry(&tree_id.get_uuid(), entry)?;
+        //println!("Message Cell {}: StackTreeD on port {} entry {} Stack tree d msg {}", *port_no, ca.get_id(), entry, self);
+        ca.update_entry(entry)?;
         Ok(())
     }
 }

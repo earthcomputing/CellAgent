@@ -149,8 +149,8 @@ impl Noc {
         let gvm_eqn_ser = serde_json::to_string(&gvm_eqn).context(NocError::Chain { func_name: "noc_master_deploy_tree", comment: S("gvm")})?;;
         params.insert(S("gvm_eqn"), gvm_eqn_ser);
         let stack_tree_msg = serde_json::to_string(&params).context(NocError::Chain { func_name: "noc_master_deploy_tree", comment: S("")})?;
-        println!("Noc: stack {} on tree {} msg {}", NOC_MASTER_DEPLOY_TREE_NAME, tree_name, stack_tree_msg);
-        noc_to_port.send((TcpMsgType::StackTree, stack_tree_msg)).context(NocError::Chain { func_name: "noc_master_deploy_tree", comment: S("")})?;
+        //println!("Noc: stack {} on tree {} msg {}", NOC_MASTER_DEPLOY_TREE_NAME, tree_name, stack_tree_msg);
+        //noc_to_port.send((TcpMsgType::StackTree, stack_tree_msg)).context(NocError::Chain { func_name: "noc_master_deploy_tree", comment: S("")})?;
         Ok(AllowedTree::new(NOC_MASTER_DEPLOY_TREE_NAME))
     }
     // For the reasons given in the comments to the following two functions, the agent does not run
@@ -169,7 +169,7 @@ impl Noc {
         let gvm_eqn_ser = serde_json::to_string(&gvm_eqn).context(NocError::Chain { func_name: "noc_agent_deploy_tree", comment: S("gvm")})?;;
         params.insert(S("gvm_eqn"), gvm_eqn_ser);
         let stack_tree_msg = serde_json::to_string(&params).context(NocError::Chain { func_name: "noc_agent_deploy_tree", comment: S("")})?;
-        println!("Noc: stack {} on tree {} msg {}", NOC_AGENT_DEPLOY_TREE_NAME, tree_name, stack_tree_msg);
+        //println!("Noc: stack {} on tree {} msg {}", NOC_AGENT_DEPLOY_TREE_NAME, tree_name, stack_tree_msg);
         noc_to_port.send((TcpMsgType::StackTree, stack_tree_msg)).context(NocError::Chain { func_name: "noc_agent_deploy_tree", comment: S("")})?;
         Ok(AllowedTree::new(NOC_AGENT_DEPLOY_TREE_NAME))
     }
@@ -188,8 +188,8 @@ impl Noc {
         let gvm_eqn_ser = serde_json::to_string(&gvm_eqn).context(NocError::Chain { func_name: "noc_master_tree", comment: S("gvm")})?;;
         params.insert(S("gvm_eqn"), gvm_eqn_ser);
         let stack_tree_msg = serde_json::to_string(&params).context(NocError::Chain { func_name: "noc_master_tree", comment: S("")})?;
-        println!("Noc: stack {} on tree {} msg {}", NOC_CONTROL_TREE_NAME, tree_name, stack_tree_msg);
-        noc_to_port.send((TcpMsgType::StackTree, stack_tree_msg)).context(NocError::Chain { func_name: "noc_master_tree", comment: S("")})?;
+        //println!("Noc: stack {} on tree {} msg {}", NOC_CONTROL_TREE_NAME, tree_name, stack_tree_msg);
+        //noc_to_port.send((TcpMsgType::StackTree, stack_tree_msg)).context(NocError::Chain { func_name: "noc_master_tree", comment: S("")})?;
         Ok(AllowedTree::new(NOC_CONTROL_TREE_NAME))
     }
     // I need a more comprehensive GVM to express the fact that the agent running on the same cell as the master
@@ -207,8 +207,8 @@ impl Noc {
         let gvm_eqn_ser = serde_json::to_string(&gvm_eqn).context(NocError::Chain { func_name: "noc_master_tree", comment: S("gvm")})?;;
         params.insert(S("gvm_eqn"), gvm_eqn_ser);
         let stack_tree_msg = serde_json::to_string(&params).context(NocError::Chain { func_name: "noc_master_tree", comment: S("")})?;
-        println!("Noc: stack {} on tree {} msg {}", NOC_LISTEN_TREE_NAME, tree_name, stack_tree_msg);
-        noc_to_port.send((TcpMsgType::StackTree, stack_tree_msg)).context(NocError::Chain { func_name: "noc_master_tree", comment: S("")})?;
+        //println!("Noc: stack {} on tree {} msg {}", NOC_LISTEN_TREE_NAME, tree_name, stack_tree_msg);
+        //noc_to_port.send((TcpMsgType::StackTree, stack_tree_msg)).context(NocError::Chain { func_name: "noc_master_tree", comment: S("")})?;
         Ok(AllowedTree::new(NOC_LISTEN_TREE_NAME))
     }
 }
