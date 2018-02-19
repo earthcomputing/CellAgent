@@ -134,14 +134,6 @@ pub fn write_err(caller: &str, e: Error) {
 		// let _ = writeln!(stderr, "Backtrace: {:?}", backtrace);
 	}
 }
-// Only used to create comment for CellagentError::Chain
-pub fn to_static_str(s: String) -> &'static str {
-    unsafe {
-        let ret = ::std::mem::transmute(&s as &str);
-        ::std::mem::forget(s);
-        ret
-    }
-}
 // There are so many places in my code where it's more convenient
 // to provide &str but I need String that I made the following
 pub fn S<T: fmt::Display>(s: T) -> String { s.to_string() }

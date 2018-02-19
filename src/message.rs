@@ -23,7 +23,7 @@ use vm::VirtualMachine;
 static MESSAGE_COUNT: AtomicUsize = ATOMIC_USIZE_INIT;
 pub fn get_next_count() -> MsgID { MsgID(MESSAGE_COUNT.fetch_add(1, Ordering::SeqCst) as u64) }
 
-pub type MsgTreeMap = HashMap<AllowedTree, TreeID>;
+pub type MsgTreeMap = HashMap<String, TreeID>;
 
 #[derive(Debug, Copy, Clone, Hash, Eq, PartialEq, Serialize, Deserialize)]
 pub enum MsgType {
@@ -525,11 +525,11 @@ pub struct ManifestMsg {
 	payload: ManifestMsgPayload
 }
 impl ManifestMsg {
-	pub fn new(tree_map: &MsgTreeMap, manifest: &Manifest) -> ManifestMsg {
+	pub fn new(deploy_tree_id: &TreeID, tree_map: &MsgTreeMap, manifest: &Manifest) -> ManifestMsg {
 		// Note that direction is leafward so cell agent will get the message
 		let mut header = MsgHeader::new(MsgType::Manifest, MsgDirection::Leafward);
         header.set_tree_map(tree_map.to_owned());
-		let payload = ManifestMsgPayload::new(&manifest);
+		let payload = ManifestMsgPayload::new(deploy_tree_id, &manifest);
 		ManifestMsg { header: header, payload: payload }
 	}
 }
@@ -540,9 +540,14 @@ impl Message for ManifestMsg {
 	fn get_payload_manifest(&self) -> Result<&ManifestMsgPayload, Error> { Ok(&self.payload) }
 	fn process_ca(&mut self, ca: &mut CellAgent, msg_tree_id: &TreeID, port_no: PortNo) -> Result<(), Error> {
 		let manifest = self.payload.get_manifest();
-        let tree_map = self.header.get_tree_map();
-		println!("ManifestMsg on cell {}: tree {} msg {}", ca.get_id(), msg_tree_id, manifest.get_id());
-		Ok(ca.deploy(port_no, &msg_tree_id, tree_map, manifest).context(MessageError::Chain { func_name: "process_ca", comment: S("ManifestMsg")})?)
+        let msg_tree_map = self.header.get_tree_map();
+        let deployment_tree_id = self.payload.get_deploy_tree_id();
+		//println!("ManifestMsg on cell {}: tree {} manifest {}", ca.get_id(), msg_tree_id, manifest.get_id());
+		let resend = ca.deploy(port_no, deployment_tree_id, msg_tree_id, msg_tree_map, manifest).context(MessageError::Chain { func_name: "process_ca", comment: S("ManifestMsg")})?;
+        ca.send_msg(deployment_tree_id, self, DEFAULT_USER_MASK)?;
+        let packets = self.to_packets(msg_tree_id)?;
+        if resend { ca.add_saved_msg(msg_tree_id, DEFAULT_USER_MASK, packets)?; }
+        Ok(())
 	}
 }
 impl fmt::Display for ManifestMsg {
@@ -553,16 +558,19 @@ impl fmt::Display for ManifestMsg {
 }
 #[derive(Debug, Clone, Hash, Serialize, Deserialize)]
 pub struct ManifestMsgPayload {
+    deploy_tree_id: TreeID,
 	tree_name: AllowedTree,
 	manifest: Manifest 
 }
 impl ManifestMsgPayload {
-	fn new(manifest: &Manifest) -> ManifestMsgPayload {
+	fn new(deploy_tree_id: &TreeID, manifest: &Manifest) -> ManifestMsgPayload {
         let tree_name = manifest.get_deployment_tree();
-		ManifestMsgPayload { tree_name: tree_name.clone(), manifest: manifest.clone() }
+		ManifestMsgPayload { deploy_tree_id: deploy_tree_id.to_owned(), tree_name: tree_name.to_owned(),
+            manifest: manifest.to_owned() }
 	}
-	fn get_manifest(&self) -> &Manifest { &self.manifest }
-	fn get_tree_name(&self) -> String { S(self.tree_name.get_name()) }
+	pub fn get_manifest(&self) -> &Manifest { &self.manifest }
+	pub fn get_tree_name(&self) -> String { S(self.tree_name.get_name()) }
+    pub fn get_deploy_tree_id(&self) -> &TreeID { &self.deploy_tree_id }
 }
 impl MsgPayload for ManifestMsgPayload {
     fn get_gvm_eqn(&self) -> Option<&GvmEquation> { None }

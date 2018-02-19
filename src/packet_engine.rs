@@ -54,12 +54,13 @@ impl PacketEngine {
 	fn listen_ca_loop(&self, pe_from_ca: &PeFromCa) -> Result<(), Error> {
 		loop { 
 			match pe_from_ca.recv().context(PacketEngineError::Chain { func_name: "listen_ca", comment: S("recv entry from ca") + self.cell_id.get_name()})? {
-				CaToPePacket::Entry(e) => {
-					if *e.get_index() > 0 {
-						let json = ::serde_json::to_string(&(&self.cell_id, &e, &e.get_mask().get_port_nos())).context(PacketEngineError::Chain { func_name: "listen_ca", comment: S(self.cell_id.get_name())})?;
+				CaToPePacket::Entry(entry) => {
+					if *entry.get_index() > 0 {
+                        //if *entry.get_index() > 11 { println!("PacketEngine {}: updated entry {}", self.cell_id, entry); }
+						let json = ::serde_json::to_string(&(&self.cell_id, &entry, &entry.get_mask().get_port_nos())).context(PacketEngineError::Chain { func_name: "listen_ca", comment: S(self.cell_id.get_name())})?;
 						::utility::append2file(json).context(PacketEngineError::Chain { func_name: "listen_ca", comment: S("")})?;
 					}
-					self.routing_table.lock().unwrap().set_entry(e)
+					self.routing_table.lock().unwrap().set_entry(entry)
 				},
 				CaToPePacket::Packet((index, user_mask, packet)) => {
                     //if ::message::MsgType::is_type(&packet, "Manifest") { println!("PacketEngine {}: received from ca packet {}", self.cell_id, packet); }

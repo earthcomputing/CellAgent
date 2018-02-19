@@ -55,71 +55,23 @@ impl NocMaster {
         NocMaster { container_id: container_id, name: S(name), container_to_vm: container_to_vm,
             allowed_trees: allowed_trees.clone() }
     }
-    pub fn make_gvm() -> GvmEquation {
-        let mut eqns = HashSet::new();
-        eqns.insert(GvmEqn::Recv("true"));
-        eqns.insert(GvmEqn::Send("false"));
-        eqns.insert(GvmEqn::Xtnd("true"));
-        eqns.insert(GvmEqn::Save("true"));
-        GvmEquation::new(eqns, Vec::new())
-    }
-    pub fn make_manifest(deployment_tree: &AllowedTree) -> Result<Manifest, Error> {
-        let new_tree_id = TreeID::new(NOCMASTER)?;
-        let ref allowed_tree = AllowedTree::new(new_tree_id.get_name());
-        let allowed_trees = vec![allowed_tree];
-        let mut eqns = HashSet::new();
-        eqns.insert(GvmEqn::Recv("true"));
-        eqns.insert(GvmEqn::Send("false"));
-        eqns.insert(GvmEqn::Xtnd("true"));
-        eqns.insert(GvmEqn::Save("true"));
-        let ref gvm_eqn = GvmEquation::new(eqns, vec![GvmVariable::new(GvmVariableType::PathLength,"hops")]);
-        let vm_uptree = UpTreeSpec::new("NocMasterTreeVm", vec![0]).context(ServiceError::Chain { func_name: "make_manifest", comment: S(NOCMASTER)})?;
-        let container_uptree = UpTreeSpec::new("NocMasterTreeContainer", vec![0]).context(ServiceError::Chain { func_name: "make_manifest", comment: S(NOCMASTER) })?;
-        let noc_container = ContainerSpec::new("NocMaster", "NocMaster", vec![], &allowed_trees).context(ServiceError::Chain { func_name: "make_manifest", comment: S(NOCMASTER)})?;
-        let noc_vm = VmSpec::new("NocVM", "Ubuntu", CellConfig::Large,
-                                 &allowed_trees, vec![&noc_container], vec![&container_uptree]).context(ServiceError::Chain { func_name: "make_manifest", comment: S(NOCMASTER)})?;
-        Ok(Manifest::new(NOCMASTER, CellConfig::Large, deployment_tree,
-               &allowed_trees, vec![&noc_vm], vec![&vm_uptree]).context(ServiceError::Chain { func_name: "make_manifest", comment: S(NOCMASTER)})?)
-        //println!("NOC Master Manifest {}", manifest);
-
-    }
-    //	fn get_container_id(&self) -> &ContainerID { &self.container_id }
-//	fn get_service(&self) -> Service { self.service }
+    fn get_container_id(&self) -> &ContainerID { &self.container_id }
     pub fn initialize(&self, up_tree_id: &UptreeID, container_from_vm: ContainerFromVm) -> Result<(), Error> {
-        let new_tree_id = up_tree_id.add_component("NocAgent").context(ServiceError::Chain { func_name: "initialize", comment: S("")})?;
-        new_tree_id.append2file().context(ServiceError::Chain { func_name: "initialize", comment: S("")})?;
-        self.noc_agents(&new_tree_id, up_tree_id).context(ServiceError::Chain { func_name: "initialize", comment: S("")})?;
-        self.container_to_vm.send((S("NocMaster"), S("Message from NocMaster"))).context(ServiceError::Chain { func_name: "initialize", comment: S("send to vm")})?;
+        let f = "initialize";
+        let new_tree_id = up_tree_id.add_component("NocMaster").context(ServiceError::Chain { func_name: f, comment: S("NocMaster")})?;
+        new_tree_id.append2file().context(ServiceError::Chain { func_name: f, comment: S("")})?;
+        //self.container_to_vm.send((S("NocMaster"), S("Message from NocMaster"))).context(ServiceError::Chain { func_name: f, comment: S("NocMaster to vm")})?;
         println!("Service {} running", self.container_id);
-        self.listen_vm(container_from_vm)
-    }
-    fn noc_agents(&self, new_tree_id: &UptreeID, up_tree_id: &UptreeID) -> Result<(), Error> {
-        /*
-        let mut eqns = HashSet::new();
-        eqns.insert(GvmEqn::Recv("false"));
-        eqns.insert(GvmEqn::Send("true"));
-        eqns.insert(GvmEqn::Xtnd("true"));
-        eqns.insert(GvmEqn::Save("true"));
-        let gvm_eqn = GvmEquation::new(eqns, Vec::new());
-        let vm_uptree = UpTreeSpec::new("NocAgentTreeVm", vec![0])?;
-        let container_uptree = UpTreeSpec::new("NocAgentTreeContainer", vec![0])?;
-        let ref new_tree = AllowedTree::new(new_tree.get_name());
-        let noc_container = ContainerSpec::new("NocAgent", "NocAgent", vec![], vec![new_tree])?;
-        let noc_vm = VmSpec::new("NocVM", "Ubuntu", CellConfig::Large,
-              vec![new_tree], vec![&noc_container], vec![&container_uptree])?;
-        let ref manifest = Manifest::new("NocAgent", CellConfig::Large,"Base",
-              vec![new_tree_id.get_name()], vec![&noc_vm], vec![&vm_uptree], gvm_eqn)?;
-        let msg = StackTreeMsg::new(new_tree_id, up_tree_id.get_name(), &manifest);
-        */
+        self.listen_vm(container_from_vm)?;
+        self.container_to_vm.send((S("NocMasterAgent"), S("Hello from Master")))?;
         Ok(())
     }
     fn listen_vm(&self, container_from_vm: ContainerFromVm) -> Result<(), Error> {
         let master = self.clone();
         //println!("Service {} on {}: listening to VM", self.name, self.container_id);
-        let vm = self.clone();
         ::std::thread::spawn(move || -> Result<(), Error> {
             let _ = master.listen_vm_loop(&container_from_vm).map_err(|e| write_err("service", e));
-            let _ = vm.listen_vm(container_from_vm);
+            //let _ = master.listen_vm(container_from_vm);
             Ok(())
         });
         Ok(())
@@ -127,7 +79,7 @@ impl NocMaster {
     fn listen_vm_loop(&self, container_from_vm: &ContainerFromVm) -> Result<(), Error> {
         //println!("NocMaster on container {} waiting for msg from VM", self.container_id);
         loop {
-            let (tree, msg) = container_from_vm.recv().context("NocMaster container_from_vm").context(ServiceError::Chain { func_name: "listen_vm_loop", comment: S("recv from vm")})?;
+            let (tree, msg) = container_from_vm.recv().context("NocMaster container_from_vm").context(ServiceError::Chain { func_name: "listen_vm_loop", comment: S("NocMaster from vm")})?;
             println!("NocMaster on container {} got msg {} {}", self.container_id, tree, msg);
         }
     }
@@ -151,28 +103,30 @@ impl NocAgent {
         NocAgent { container_id: container_id, name: S(name), container_to_vm: container_to_vm,
             allowed_trees: allowed_trees.clone() }
     }
-    pub fn make_manifest(deployment_tree: &AllowedTree) -> Result<Manifest, Error> {
-        let new_tree_id = TreeID::new(NOCAGENT)?;
-        let ref allowed_tree = AllowedTree::new(new_tree_id.get_name());
-        let allowed_trees = vec![allowed_tree];
-        let mut eqns = HashSet::new();
-        eqns.insert(GvmEqn::Recv("false"));
-        eqns.insert(GvmEqn::Send("true"));
-        eqns.insert(GvmEqn::Xtnd("true"));
-        eqns.insert(GvmEqn::Save("true"));
-        let ref gvm_eqn = GvmEquation::new(eqns, vec![GvmVariable::new(GvmVariableType::PathLength,"hops")]);
-        let vm_uptree = UpTreeSpec::new("NocAgentTreeVm", vec![0]).context(ServiceError::Chain { func_name: "make_manifest", comment: S(NOCAGENT)})?;
-        let container_uptree = UpTreeSpec::new("NocAgentTreeContainer", vec![0]).context(ServiceError::Chain { func_name: "make_manifest", comment: S(NOCAGENT)})?;
-        let noc_container = ContainerSpec::new("NocAgent", "NocAgent", vec![], &allowed_trees).context(ServiceError::Chain { func_name: "make_manifest", comment: S(NOCAGENT)})?;
-        let noc_vm = VmSpec::new("NocVM", "Ubuntu", CellConfig::Large,
-                                 &allowed_trees, vec![&noc_container], vec![&container_uptree]).context(ServiceError::Chain { func_name: "make_manifest", comment: S(NOCAGENT)})?;
-        let manifest = Manifest::new(NOCAGENT, CellConfig::Large, deployment_tree,
-                         &allowed_trees, vec![&noc_vm], vec![&vm_uptree]).context(ServiceError::Chain { func_name: "make_manifest", comment: S(NOCAGENT)})?;
-        Ok(manifest)
-    }
     pub fn initialize(&self, up_tree_id: &UptreeID, container_from_vm: ContainerFromVm) -> Result<(), Error> {
+        let f = "initialize";
+        let new_tree_id = up_tree_id.add_component("NocAgent").context(ServiceError::Chain { func_name: f, comment: S("NocAgent") })?;
+        new_tree_id.append2file().context(ServiceError::Chain { func_name: f, comment: S("NocAgent") })?;
+        //self.container_to_vm.send((S("NocAgent"), S("Message from NocAgent"))).context(ServiceError::Chain { func_name: f, comment: S("NocAgent") })?;
         println!("Service {} running", self.container_id);
+        self.listen_vm(container_from_vm)
+    }
+    fn listen_vm(&self, container_from_vm: ContainerFromVm) -> Result<(), Error> {
+        let agent = self.clone();
+        //println!("Service {} on {}: listening to VM", self.name, self.container_id);
+        ::std::thread::spawn(move || -> Result<(), Error> {
+            let _ = agent.listen_vm_loop(&container_from_vm).map_err(|e| write_err("service", e));
+            //let _ = agent.listen_vm(container_from_vm);
+            Ok(())
+        });
         Ok(())
+    }
+    fn listen_vm_loop(&self, container_from_vm: &ContainerFromVm) -> Result<(), Error> {
+        let f = "listen_vm_loop";
+        loop {
+            let (tree, msg) = container_from_vm.recv().context(ServiceError::Chain { func_name: f, comment: S("Agent recv from vm") })?;
+            println!("NocAgent on container {} got msg {} {}", self.container_id, tree, msg);
+        }
     }
 }
 impl fmt::Display for NocAgent {
