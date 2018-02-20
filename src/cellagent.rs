@@ -211,7 +211,7 @@ impl CellAgent {
         saved_stack.push(packets.clone());
     }
     fn add_tree_name_map_item(&mut self, tree_id: &TreeID, allowed_tree: &AllowedTree, allowed_tree_id: &TreeID) {
-        let mut tree_map = match self.tree_name_map.get(tree_id) {
+        let mut tree_map = match self.tree_name_map.get(tree_id).cloned() {
             Some(map) => map,
             None => HashMap::new()
         };
@@ -369,8 +369,8 @@ impl CellAgent {
             let up_tree_name = vm_spec.get_id();
             //println!("Cell {} starting VM on up tree {}", self.cell_id, up_tree_name);
             vm.initialize(up_tree_name, vm_from_ca, &trees, container_specs)?;
-            self.ca_to_vms.insert(vm_id, ca_to_vm,);
-            self.listen_uptree(&deployment_tree_id, vm.get_id(), &trees, ca_from_vm)?;
+            self.ca_to_vms.insert(vm_id.clone(), ca_to_vm,);
+            self.listen_uptree(deployment_tree_id.clone(), vm_id, trees, ca_from_vm);
 		}
 		Ok(false)
 	}
@@ -388,25 +388,26 @@ impl CellAgent {
         Ok(())
     }
 */
-	fn listen_uptree(&self, tree_id_ref: &TreeID, vm_id_ref: &VmID, trees: &HashSet<AllowedTree>, ca_from_vm: CaFromVm)
-            -> Result<(), Error> {
+	fn listen_uptree(&self, tree_id: TreeID, vm_id: VmID, trees: HashSet<AllowedTree>, ca_from_vm: CaFromVm) {
 		let ca = self.clone();
-		let vm_id = vm_id_ref.clone();  // Needed for lifetime under spawn in println!
-		let tree_id = tree_id_ref.clone(); // Needed for lifetime under spawn in println!
-        let tree_name_map = self.tree_name_map.get(tree_id_ref).unwrap().clone();
-		::std::thread::spawn( move || -> Result<(), Error> {
-		loop {
-			//println!("CellAgent {}: listening to vm {} on tree {}", ca.cell_id, vm_id, tree_id);
-			let (tree, msg) = ca_from_vm.recv()?;
-            let allowed_tree_id = match tree_name_map.get(&AllowedTree::new(&tree)) {
-                Some(a) => a,
-                None => println!("CellAgent {}: tree {} is not allowed for vm {}", tree, vm_id)
-            };
-			println!("CellAgent {}: got on tree {} msg {}", ca.cell_id, tree, msg);
-		}	
+		::std::thread::spawn( move ||  {
+            let _ = ca.listen_uptree_loop( &tree_id, &ca_from_vm).map_err(|e| ::utility::write_err("service", e));
+            let _ = ca.listen_uptree(tree_id, vm_id, trees, ca_from_vm);
 		});
-		Ok(())
 	}
+    fn listen_uptree_loop(&self, tree_id: &TreeID, ca_from_vm: &CaFromVm) -> Result<(), Error> {
+        let f = "listen_uptree_loop";
+        let tree_name_map = self.tree_name_map.get(tree_id).unwrap().clone();
+        loop {
+            //println!("CellAgent {}: listening to vm {} on tree {}", ca.cell_id, vm_id, tree_id);
+            let (tree, msg) = ca_from_vm.recv()?;
+            let allowed_tree_id = match tree_name_map.get(&tree).cloned() {
+                Some(a) => a,
+                None => return Err(CellagentError::TreeNameMap { func_name: f, cell_id: self.cell_id.clone(), tree_name: tree_id.clone() }.into())
+            };
+            println!("CellAgent {}: got on tree {} msg {}", self.cell_id, tree, msg);
+        }
+    }
 /*
 	fn create_tree(&mut self, id: &str, target_tree_id: &TreeID, port_no_mask: Mask, gvm_eqn: &GvmEquation)
             -> Result<(), Error> {
