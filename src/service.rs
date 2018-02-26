@@ -4,7 +4,7 @@ use std::collections::{HashMap, HashSet};
 use gvm_equation::{GvmEquation, GvmEqn, GvmVariable, GvmVariableType};
 use nalcell::CellConfig;
 use name::{ContainerID, Name, TreeID, UptreeID};
-use message::{Message, StackTreeMsg};
+use message::{MsgDirection, StackTreeMsg};
 use message_types::{ContainerToVm, ContainerFromVm};
 use uptree_spec::{AllowedTree, ContainerSpec, Manifest, UpTreeSpec, VmSpec};
 use utility::{S, write_err};
@@ -63,7 +63,7 @@ impl NocMaster {
         //self.container_to_vm.send((S("NocMaster"), S("Message from NocMaster"))).context(ServiceError::Chain { func_name: f, comment: S("NocMaster to vm")})?;
         println!("Service {} running", self.container_id);
         self.listen_vm(container_from_vm)?;
-        self.container_to_vm.send((S("NocMasterAgent"), S("Hello from Master")))?;
+        self.container_to_vm.send((S("NocMasterAgent"), MsgDirection::Leafward, S("Hello from Master")))?;
         Ok(())
     }
     fn listen_vm(&self, container_from_vm: ContainerFromVm) -> Result<(), Error> {
