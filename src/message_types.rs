@@ -2,12 +2,12 @@ use std::sync::mpsc;
 use routing_table_entry::{RoutingTableEntry};
 
 use config::{PortNo, TableIndex};
-use message::TcpMsgType;
+use message::{MsgDirection, TcpMsgType};
 use packet::{Packet};
 use port::{PortStatus};
 use utility::{Mask, PortNumber};
 
-pub type TCP = (TcpMsgType, String);
+pub type TCP = (TcpMsgType, MsgDirection, String);
 // CellAgent to PacketEngine
 pub enum CaToPePacket { Entry(RoutingTableEntry), Packet((TableIndex, Mask, Packet)), Tcp((PortNumber, TCP)) }
 pub type CaToPe = mpsc::Sender<CaToPePacket>;
@@ -64,7 +64,7 @@ pub type CaToVm = mpsc::Sender<CaToVmMsg>;
 pub type VmFromCa = mpsc::Receiver<CaToVmMsg>;
 pub type CaVmError = mpsc::SendError<CaToVmMsg>;
 // VM to Cell agent
-pub type VmToCaMsg = (String, String);
+pub type VmToCaMsg = (String, MsgDirection, String);
 pub type VmToCa = mpsc::Sender<VmToCaMsg>;
 pub type CaFromVm = mpsc::Receiver<VmToCaMsg>;
 pub type VmCaError = mpsc::SendError<VmToCaMsg>;
@@ -84,7 +84,7 @@ pub type VmToContainer = mpsc::Sender<VmToContainerMsg>;
 pub type ContainerFromVm = mpsc::Receiver<VmToContainerMsg>;
 pub type VmContainerError = mpsc::SendError<VmToContainerMsg>;
 // Container to VM
-pub type ContainerToVmMsg = (String, String);
+pub type ContainerToVmMsg = (String, MsgDirection, String);
 pub type ContainerToVm = mpsc::Sender<ContainerToVmMsg>;
 pub type VmFromContainer = mpsc::Receiver<ContainerToVmMsg>;
 pub type ContainerVmError = mpsc::SendError<ContainerToVmMsg>;

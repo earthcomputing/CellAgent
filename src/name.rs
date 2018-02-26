@@ -135,7 +135,7 @@ impl fmt::Display for LinkID { fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Res
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct VmID { name: NameType, uuid: Uuid}
 impl VmID {
-	pub fn new(cell_id: &CellID, name: &String) -> Result<VmID, Error> {
+	pub fn new(cell_id: &CellID, name: &str) -> Result<VmID, Error> {
 		let name = format!("VM:{}+{}", cell_id, name);
 		Ok(VmID { name: name.clone(), uuid: Uuid::new_v4(&name) })
 	}
@@ -146,6 +146,20 @@ impl Name for VmID {
 	fn create_from_string(&self, name: String) -> VmID { VmID { name: name.clone(), uuid: Uuid::new_v4(&name) } }
 }
 impl fmt::Display for VmID { fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result { self.name.fmt(f) } }
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub struct SenderID { name: NameType, uuid: Uuid}
+impl SenderID {
+	pub fn new(cell_id: &CellID, name: &str) -> Result<SenderID, Error> {
+		let name = format!("Sender:{}+{}", cell_id, name);
+		Ok(SenderID { name: name.clone(), uuid: Uuid::new_v4(&name) })
+	}
+}
+impl Name for SenderID {
+	fn get_name(&self) -> &str { &self.name }
+	fn get_uuid(&self) -> Uuid { self.uuid }
+	fn create_from_string(&self, name: String) -> SenderID { SenderID { name: name.clone(), uuid: Uuid::new_v4(&name) } }
+}
+impl fmt::Display for SenderID { fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result { self.name.fmt(f) } }
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct ContainerID { name: NameType, uuid: Uuid}
 impl ContainerID {
