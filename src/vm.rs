@@ -14,20 +14,18 @@ pub struct VirtualMachine {
 	id: VmID,
     vm_to_ca: VmToCa,
     allowed_trees: Vec<AllowedTree>,
-    containers: HashMap<ContainerID, Vec<VmToContainer>>
+    vm_to_containers: Vec<VmToContainer>,
 }
 impl VirtualMachine {
 	pub fn new(id: &VmID, vm_to_ca: VmToCa, allowed_trees_ref: &Vec<AllowedTree>) -> VirtualMachine {
         //println!("Create VM {}", id);
 		VirtualMachine { id: id.clone(), vm_to_ca: vm_to_ca, allowed_trees:allowed_trees_ref.clone(),
-            containers: HashMap::new() }
+            vm_to_containers: Vec::new() }
 	}
 	pub fn initialize(&mut self, up_tree_name: &String, vm_from_ca: VmFromCa, vm_trees: &HashSet<AllowedTree>,
 			container_specs: &Vec<ContainerSpec>) -> Result<(), Error> {
 		//println!("VM {} initializing", self.id);
-		self.listen_ca(vm_from_ca).context(VmError::Chain { func_name: "initialize", comment: S(self.id.get_name()) + " listen_ca"})?;
 		let up_tree_id = UptreeID::new(up_tree_name).context(VmError::Chain { func_name: "initialize", comment: S(self.id.get_name()) + " up tree id"})?;
-        let mut senders = Vec::new();
 		for container_spec in container_specs {
 			let (vm_to_container, container_from_vm): (VmToContainer, ContainerFromVm) = channel();
 			let (container_to_vm, vm_from_container): (ContainerToVm, VmFromContainer) = channel();
@@ -37,11 +35,12 @@ impl VirtualMachine {
 			let container = Container::new(&container_id, service_name.as_str(), &self.allowed_trees,
                  container_to_vm).context(VmError::Chain { func_name: "initialize", comment: S("")})?;
 			container.initialize(&up_tree_id, container_from_vm).context(VmError::Chain { func_name: "initialize", comment: S(self.id.get_name())})?;
-            senders.push(vm_to_container);
+            self.vm_to_containers.push(vm_to_container);
             // Next line must be inside loop or vm_to_container goes out of scope in listen_container
-            self.containers.insert(container_id.clone(), senders.clone());
 			self.listen_container(container_id, vm_from_container, self.vm_to_ca.clone()).context(VmError::Chain { func_name: "initialize", comment: S(self.id.get_name()) + " listen_container"})?;
 		}
+        //println!("VM {}: {} containers", self.id, self.vm_to_containers.len());
+        self.listen_ca(vm_from_ca).context(VmError::Chain { func_name: "initialize", comment: S(self.id.get_name()) + " listen_ca"})?;
 		Ok(())
 	}
 	pub fn get_id(&self) -> &VmID { &self.id }	
@@ -67,16 +66,18 @@ impl VirtualMachine {
 	}	
 	fn listen_ca_loop(&self, vm_from_ca: &VmFromCa) -> Result<(), Error> {
 		loop {
-			let msg = vm_from_ca.recv().context("listen_ca_loop").context(VmError::Chain { func_name: "listen_ca_loop", comment: S(self.id.get_name())})?;
-            println!("VM {} got msg from ca: {}", self.id, msg);
-            //self.vm_to_container.send(msg).context(VmError::Chain { func_name: "listen_ca_loop", comment: "send to container"})?;
+            let msg = vm_from_ca.recv().context("listen_ca_loop").context(VmError::Chain { func_name: "listen_ca_loop", comment: S(self.id.get_name()) })?;
+            println!("VM {} send to {} containers msg from ca: {}", self.id,  self.vm_to_containers.len(), msg);
+            for vm_to_container in &self.vm_to_containers {
+                vm_to_container.send(msg.clone()).context(VmError::Chain { func_name: "listen_ca_loop", comment: S("send to container") })?;
+            }
 		}
 	}
 	fn listen_container_loop(&self, container_id: &ContainerID, vm_from_container: &VmFromContainer, vm_to_ca: &VmToCa) -> Result<(), Error> {
 		loop {
-			let (tree, direction, msg) = vm_from_container.recv().context("listen_container_loop").context(VmError::Chain { func_name: "listen_container_loop", comment: S(self.id.get_name()) + " recv from container"})?;
-            println!("VM {} got from container {} msg {} for tree {}: {}", self.id, container_id, direction, tree, msg);
-			vm_to_ca.send((tree, direction, msg)).context(VmError::Chain { func_name: "listen_container_loop", comment: S(self.id.get_name()) + " send to ca"})?;
+			let msg = vm_from_container.recv().context("listen_container_loop").context(VmError::Chain { func_name: "listen_container_loop", comment: S(self.id.get_name()) + " recv from container"})?;
+            println!("VM {} got from container {} msg {} {} {} {}", self.id, container_id, msg.0, msg.1, msg.2, msg.3);
+			vm_to_ca.send(msg).context(VmError::Chain { func_name: "listen_container_loop", comment: S(self.id.get_name()) + " send to ca"})?;
 		}
 	}
 }

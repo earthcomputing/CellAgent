@@ -4,7 +4,7 @@ use std::collections::{HashMap, HashSet};
 use gvm_equation::{GvmEquation, GvmEqn, GvmVariable, GvmVariableType};
 use nalcell::CellConfig;
 use name::{ContainerID, Name, TreeID, UptreeID};
-use message::{MsgDirection, StackTreeMsg};
+use message::{MsgDirection, StackTreeMsg, TcpMsgType};
 use message_types::{ContainerToVm, ContainerFromVm};
 use uptree_spec::{AllowedTree, ContainerSpec, Manifest, UpTreeSpec, VmSpec};
 use utility::{S, write_err};
@@ -63,7 +63,7 @@ impl NocMaster {
         //self.container_to_vm.send((S("NocMaster"), S("Message from NocMaster"))).context(ServiceError::Chain { func_name: f, comment: S("NocMaster to vm")})?;
         println!("Service {} running", self.container_id);
         self.listen_vm(container_from_vm)?;
-        self.container_to_vm.send((S("NocMasterAgent"), MsgDirection::Leafward, S("Hello from Master")))?;
+        self.container_to_vm.send((AllowedTree::new("NocMasterAgent"), TcpMsgType::Application, MsgDirection::Leafward, S("Hello from Master")))?;
         Ok(())
     }
     fn listen_vm(&self, container_from_vm: ContainerFromVm) -> Result<(), Error> {
@@ -79,8 +79,8 @@ impl NocMaster {
     fn listen_vm_loop(&self, container_from_vm: &ContainerFromVm) -> Result<(), Error> {
         //println!("NocMaster on container {} waiting for msg from VM", self.container_id);
         loop {
-            let (tree, msg) = container_from_vm.recv().context("NocMaster container_from_vm").context(ServiceError::Chain { func_name: "listen_vm_loop", comment: S("NocMaster from vm")})?;
-            println!("NocMaster on container {} got msg {} {}", self.container_id, tree, msg);
+            let msg = container_from_vm.recv().context("NocMaster container_from_vm").context(ServiceError::Chain { func_name: "listen_vm_loop", comment: S("NocMaster from vm")})?;
+            println!("NocMaster on container {} got msg {}", self.container_id, msg);
         }
     }
 }
@@ -124,8 +124,8 @@ impl NocAgent {
     fn listen_vm_loop(&self, container_from_vm: &ContainerFromVm) -> Result<(), Error> {
         let f = "listen_vm_loop";
         loop {
-            let (tree, msg) = container_from_vm.recv().context(ServiceError::Chain { func_name: f, comment: S("Agent recv from vm") })?;
-            println!("NocAgent on container {} got msg {} {}", self.container_id, tree, msg);
+            let msg = container_from_vm.recv().context(ServiceError::Chain { func_name: f, comment: S("Agent recv from vm") })?;
+            println!("NocAgent on container {} got msg {}", self.container_id, msg);
         }
     }
 }

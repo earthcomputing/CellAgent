@@ -63,10 +63,10 @@ impl PacketEngine {
 					self.routing_table.lock().unwrap().set_entry(entry)
 				},
 				CaToPePacket::Packet((index, user_mask, packet)) => {
-                    //if ::message::MsgType::is_type(&packet, "Manifest") { println!("PacketEngine {}: received from ca packet {}", self.cell_id, packet); }
-					let locked = self.routing_table.lock().unwrap();	// Hold lock until forwarding is done			
+					let locked = self.routing_table.lock().unwrap();	// Hold lock until forwarding is done
 					let entry = locked.get_entry(index).context(PacketEngineError::Chain { func_name: "listen_ca", comment: S(self.cell_id.get_name())})?;
 					let port_no = PortNo{v:0};
+                    //if ::message::MsgType::is_type(&packet, "Application") { println!("PacketEngine {}: received from ca entry {}", self.cell_id, entry); }
 					if entry.may_send() { self.forward(port_no, entry, user_mask, packet).context(PacketEngineError::Chain { func_name:"listen_ca", comment: S(self.cell_id.get_name())})?; }
 				},
 				CaToPePacket::Tcp((port_number, msg)) => {
@@ -96,7 +96,7 @@ impl PacketEngine {
 		if entry.is_in_use() {
 			//println!("PacketEngine {}: entry {} header UUID {}", self.cell_id, entry, packet.get_header().get_tree_uuid());
 			// The control tree is special since each cell has a different uuid
-            //if ::message::MsgType::is_type(packet, "StackTree") && self.cell_id.get_name() == "C:1" { println!("PacketEngine {}: entry {}", self.cell_id, entry); }
+            //if ::message::MsgType::is_type(&packet, "Application") && self.cell_id.get_name() == "C:3" { println!("PacketEngine {}: on port {} entry {}", self.cell_id, *port_no, entry); }
 			if (*entry.get_index() == 0) || (entry.get_uuid() == packet.get_header().get_uuid()) {
 				let mask = entry.get_mask();
 				let other_indices = entry.get_other_indices();
