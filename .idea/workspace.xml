@@ -6,10 +6,11 @@
       <change beforePath="$PROJECT_DIR$/Multicell.key" afterPath="$PROJECT_DIR$/Multicell.key" />
       <change beforePath="$PROJECT_DIR$/src/cellagent.rs" afterPath="$PROJECT_DIR$/src/cellagent.rs" />
       <change beforePath="$PROJECT_DIR$/src/message.rs" afterPath="$PROJECT_DIR$/src/message.rs" />
-      <change beforePath="$PROJECT_DIR$/src/message_types.rs" afterPath="$PROJECT_DIR$/src/message_types.rs" />
       <change beforePath="$PROJECT_DIR$/src/noc.rs" afterPath="$PROJECT_DIR$/src/noc.rs" />
       <change beforePath="$PROJECT_DIR$/src/packet_engine.rs" afterPath="$PROJECT_DIR$/src/packet_engine.rs" />
+      <change beforePath="$PROJECT_DIR$/src/routing_table_entry.rs" afterPath="$PROJECT_DIR$/src/routing_table_entry.rs" />
       <change beforePath="$PROJECT_DIR$/src/service.rs" afterPath="$PROJECT_DIR$/src/service.rs" />
+      <change beforePath="$PROJECT_DIR$/src/traph.rs" afterPath="$PROJECT_DIR$/src/traph.rs" />
       <change beforePath="$PROJECT_DIR$/src/vm.rs" afterPath="$PROJECT_DIR$/src/vm.rs" />
     </list>
     <ignored path="$PROJECT_DIR$/target/" />
@@ -26,17 +27,55 @@
   </component>
   <component name="FileEditorManager">
     <leaf SIDE_TABS_SIZE_LIMIT_KEY="300">
-      <file leaf-file-name="cellagent.rs" pinned="false" current-in-tab="false">
+      <file leaf-file-name="cellagent.rs" pinned="false" current-in-tab="true">
         <entry file="file://$PROJECT_DIR$/src/cellagent.rs">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="325">
-              <caret line="744" column="49" lean-forward="true" selection-start-line="744" selection-start-column="49" selection-end-line="744" selection-end-column="49" />
+            <state relative-caret-position="388">
+              <caret line="526" column="50" lean-forward="false" selection-start-line="526" selection-start-column="50" selection-end-line="526" selection-end-column="50" />
               <folding>
-                <element signature="e#9093#9094#0" expanded="true" />
-                <element signature="e#9149#9150#0" expanded="true" />
-                <element signature="e#12638#12639#0" expanded="true" />
-                <element signature="e#12699#12700#0" expanded="true" />
+                <element signature="e#12756#12757#0" expanded="true" />
+                <element signature="e#12817#12818#0" expanded="true" />
               </folding>
+            </state>
+          </provider>
+        </entry>
+      </file>
+      <file leaf-file-name="routing_table_entry.rs" pinned="false" current-in-tab="false">
+        <entry file="file://$PROJECT_DIR$/src/routing_table_entry.rs">
+          <provider selected="true" editor-type-id="text-editor">
+            <state relative-caret-position="502">
+              <caret line="57" column="45" lean-forward="false" selection-start-line="57" selection-start-column="45" selection-end-line="57" selection-end-column="45" />
+              <folding>
+                <element signature="e#2686#2687#0" expanded="true" />
+                <element signature="e#2738#2739#0" expanded="true" />
+              </folding>
+            </state>
+          </provider>
+        </entry>
+      </file>
+      <file leaf-file-name="message.rs" pinned="false" current-in-tab="false">
+        <entry file="file://$PROJECT_DIR$/src/message.rs">
+          <provider selected="true" editor-type-id="text-editor">
+            <state relative-caret-position="313">
+              <caret line="164" column="12" lean-forward="false" selection-start-line="164" selection-start-column="12" selection-end-line="164" selection-end-column="12" />
+              <folding>
+                <element signature="e#30334#30335#0" expanded="true" />
+                <element signature="e#30346#30347#0" expanded="true" />
+                <element signature="e#30738#30739#0" expanded="true" />
+                <element signature="e#30790#30791#0" expanded="true" />
+                <element signature="e#33223#33224#0" expanded="true" />
+                <element signature="e#33277#33278#0" expanded="true" />
+              </folding>
+            </state>
+          </provider>
+        </entry>
+      </file>
+      <file leaf-file-name="traph.rs" pinned="false" current-in-tab="false">
+        <entry file="file://$PROJECT_DIR$/src/traph.rs">
+          <provider selected="true" editor-type-id="text-editor">
+            <state relative-caret-position="478">
+              <caret line="165" column="25" lean-forward="false" selection-start-line="165" selection-start-column="25" selection-end-line="165" selection-end-column="25" />
+              <folding />
             </state>
           </provider>
         </entry>
@@ -44,18 +83,8 @@
       <file leaf-file-name="message_types.rs" pinned="false" current-in-tab="false">
         <entry file="file://$PROJECT_DIR$/src/message_types.rs">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="258">
+            <state relative-caret-position="1230">
               <caret line="82" column="34" lean-forward="false" selection-start-line="82" selection-start-column="34" selection-end-line="82" selection-end-column="34" />
-              <folding />
-            </state>
-          </provider>
-        </entry>
-      </file>
-      <file leaf-file-name="name.rs" pinned="false" current-in-tab="false">
-        <entry file="file://$PROJECT_DIR$/src/name.rs">
-          <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="1676">
-              <caret line="153" column="19" lean-forward="false" selection-start-line="153" selection-start-column="19" selection-end-line="153" selection-end-column="19" />
               <folding />
             </state>
           </provider>
@@ -64,38 +93,18 @@
       <file leaf-file-name="service.rs" pinned="false" current-in-tab="false">
         <entry file="file://$PROJECT_DIR$/src/service.rs">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="382">
-              <caret line="127" column="55" lean-forward="false" selection-start-line="127" selection-start-column="55" selection-end-line="127" selection-end-column="55" />
+            <state relative-caret-position="227">
+              <caret line="62" column="0" lean-forward="false" selection-start-line="62" selection-start-column="0" selection-end-line="62" selection-end-column="0" />
               <folding />
             </state>
           </provider>
         </entry>
       </file>
-      <file leaf-file-name="utility.rs" pinned="false" current-in-tab="false">
-        <entry file="file://$PROJECT_DIR$/src/utility.rs">
-          <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="1503">
-              <caret line="136" column="0" lean-forward="false" selection-start-line="136" selection-start-column="0" selection-end-line="136" selection-end-column="0" />
-              <folding />
-            </state>
-          </provider>
-        </entry>
-      </file>
-      <file leaf-file-name="uuid_fake.rs" pinned="false" current-in-tab="false">
-        <entry file="file://$PROJECT_DIR$/src/uuid_fake.rs">
-          <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="270">
-              <caret line="19" column="40" lean-forward="false" selection-start-line="19" selection-start-column="40" selection-end-line="19" selection-end-column="40" />
-              <folding />
-            </state>
-          </provider>
-        </entry>
-      </file>
-      <file leaf-file-name="vm.rs" pinned="false" current-in-tab="true">
+      <file leaf-file-name="vm.rs" pinned="false" current-in-tab="false">
         <entry file="file://$PROJECT_DIR$/src/vm.rs">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="420">
-              <caret line="48" column="24" lean-forward="false" selection-start-line="48" selection-start-column="24" selection-end-line="48" selection-end-column="24" />
+            <state relative-caret-position="908">
+              <caret line="78" column="14" lean-forward="false" selection-start-line="78" selection-start-column="14" selection-end-line="78" selection-end-column="14" />
               <folding />
             </state>
           </provider>
@@ -104,8 +113,18 @@
       <file leaf-file-name="packet_engine.rs" pinned="false" current-in-tab="false">
         <entry file="file://$PROJECT_DIR$/src/packet_engine.rs">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="401">
-              <caret line="84" column="49" lean-forward="true" selection-start-line="84" selection-start-column="49" selection-end-line="84" selection-end-column="49" />
+            <state relative-caret-position="370">
+              <caret line="153" column="26" lean-forward="false" selection-start-line="153" selection-start-column="26" selection-end-line="153" selection-end-column="26" />
+              <folding />
+            </state>
+          </provider>
+        </entry>
+      </file>
+      <file leaf-file-name="packet.rs" pinned="false" current-in-tab="false">
+        <entry file="file://$PROJECT_DIR$/src/packet.rs">
+          <provider selected="true" editor-type-id="text-editor">
+            <state relative-caret-position="642">
+              <caret line="100" column="59" lean-forward="true" selection-start-line="100" selection-start-column="59" selection-end-line="100" selection-end-column="59" />
               <folding />
             </state>
           </provider>
@@ -114,26 +133,9 @@
       <file leaf-file-name="noc.rs" pinned="false" current-in-tab="false">
         <entry file="file://$PROJECT_DIR$/src/noc.rs">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="427">
-              <caret line="134" column="73" lean-forward="false" selection-start-line="134" selection-start-column="73" selection-end-line="134" selection-end-column="73" />
+            <state relative-caret-position="1029">
+              <caret line="218" column="9" lean-forward="true" selection-start-line="218" selection-start-column="9" selection-end-line="218" selection-end-column="9" />
               <folding />
-            </state>
-          </provider>
-        </entry>
-      </file>
-      <file leaf-file-name="message.rs" pinned="false" current-in-tab="false">
-        <entry file="file://$PROJECT_DIR$/src/message.rs">
-          <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="442">
-              <caret line="676" column="47" lean-forward="true" selection-start-line="676" selection-start-column="47" selection-end-line="676" selection-end-column="47" />
-              <folding>
-                <element signature="e#29839#29840#0" expanded="true" />
-                <element signature="e#29851#29852#0" expanded="true" />
-                <element signature="e#30243#30244#0" expanded="true" />
-                <element signature="e#30295#30296#0" expanded="true" />
-                <element signature="e#32094#32095#0" expanded="true" />
-                <element signature="e#32148#32149#0" expanded="true" />
-              </folding>
             </state>
           </provider>
         </entry>
@@ -141,7 +143,7 @@
       <file leaf-file-name="uptree_spec.rs" pinned="false" current-in-tab="false">
         <entry file="file://$PROJECT_DIR$/src/uptree_spec.rs">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="162">
+            <state relative-caret-position="195">
               <caret line="13" column="21" lean-forward="false" selection-start-line="13" selection-start-column="21" selection-end-line="13" selection-end-column="21" />
               <folding />
             </state>
@@ -159,36 +161,36 @@
   </component>
   <component name="FindInProjectRecents">
     <findStrings>
-      <find>new tree</find>
-      <find>base tree m</find>
-      <find>{:?</find>
-      <find>b9f0</find>
-      <find>686e</find>
-      <find>b1dc</find>
-      <find>37a7</find>
-      <find>return</find>
-      <find>spawn</find>
-      <find>closed</find>
-      <find>println</find>
-      <find>StackTreeD</find>
-      <find>***</find>
-      <find>forward</find>
-      <find>base_tree_id</find>
-      <find>d</find>
-      <find>stack</find>
-      <find>get_traph(</find>
-      <find>Rece</find>
-      <find>self.tree_name</find>
-      <find>listen_uptree</find>
-      <find>NocAgentD</find>
-      <find>NocAgentDeploy</find>
-      <find>2dde</find>
       <find>sending</find>
-      <find>Cre</find>
-      <find>Create</find>
-      <find>ca_from_vm</find>
-      <find>packet_engine</find>
       <find>PacketEngine</find>
+      <find>C:2:</find>
+      <find>new tree id</find>
+      <find>got m</find>
+      <find>new tree</find>
+      <find>forwarding</find>
+      <find>Manifest</find>
+      <find>Message Cell</find>
+      <find>forwarding type</find>
+      <find>: entry</find>
+      <find>C:0:</find>
+      <find>StackTreeD</find>
+      <find>:Entry</find>
+      <find>Manif</find>
+      <find>sending on tree {}</find>
+      <find>1523</find>
+      <find>1419</find>
+      <find>15321288138249834882</find>
+      <find>add_saved</find>
+      <find>Port</find>
+      <find>sending</find>
+      <find>7: DiscoverD</find>
+      <find>forward  s</find>
+      <find>forward</find>
+      <find>saving</find>
+      <find>base</find>
+      <find>msg_type {</find>
+      <find>C:7: a</find>
+      <find>: forward</find>
     </findStrings>
     <replaceStrings>
       <replace>Arc::</replace>
@@ -216,10 +218,8 @@
         <option value="$PROJECT_DIR$/src/gvm_equation.rs" />
         <option value="$PROJECT_DIR$/src/uptree_spec.rs" />
         <option value="$PROJECT_DIR$/src/uuid_fake.rs" />
-        <option value="$PROJECT_DIR$/src/routing_table_entry.rs" />
         <option value="$PROJECT_DIR$/src/tree.rs" />
         <option value="$PROJECT_DIR$/src/packet.rs" />
-        <option value="$PROJECT_DIR$/src/traph.rs" />
         <option value="$PROJECT_DIR$/src/port.rs" />
         <option value="$PROJECT_DIR$/src/nalcell.rs" />
         <option value="$PROJECT_DIR$/src/link.rs" />
@@ -228,26 +228,28 @@
         <option value="$PROJECT_DIR$/Cargo.toml" />
         <option value="$PROJECT_DIR$/src/container.rs" />
         <option value="$PROJECT_DIR$/src/name.rs" />
-        <option value="$PROJECT_DIR$/src/noc.rs" />
-        <option value="$PROJECT_DIR$/src/cellagent.rs" />
-        <option value="$PROJECT_DIR$/src/message.rs" />
-        <option value="$PROJECT_DIR$/src/packet_engine.rs" />
         <option value="$PROJECT_DIR$/src/message_types.rs" />
-        <option value="$PROJECT_DIR$/src/service.rs" />
         <option value="$PROJECT_DIR$/src/vm.rs" />
+        <option value="$PROJECT_DIR$/src/routing_table_entry.rs" />
+        <option value="$PROJECT_DIR$/src/traph.rs" />
+        <option value="$PROJECT_DIR$/src/service.rs" />
+        <option value="$PROJECT_DIR$/src/noc.rs" />
+        <option value="$PROJECT_DIR$/src/packet_engine.rs" />
+        <option value="$PROJECT_DIR$/src/message.rs" />
+        <option value="$PROJECT_DIR$/src/cellagent.rs" />
       </list>
     </option>
   </component>
   <component name="ProjectFrameBounds">
-    <option name="x" value="141" />
-    <option name="y" value="-958" />
+    <option name="x" value="140" />
+    <option name="y" value="-959" />
     <option name="width" value="1410" />
     <option name="height" value="946" />
   </component>
   <component name="ProjectView">
     <navigator currentView="ProjectPane" proportions="" version="1">
       <flattenPackages />
-      <showMembers />
+      <showMembers ProjectPane="false" />
       <showModules />
       <showLibraryContents />
       <hideEmptyPackages />
@@ -259,9 +261,7 @@
       <foldersAlwaysOnTop value="true" />
     </navigator>
     <panes>
-      <pane id="AndroidView" />
       <pane id="Scratches" />
-      <pane id="Scope" />
       <pane id="PackagesPane" />
       <pane id="ProjectPane">
         <subPane>
@@ -279,6 +279,8 @@
           <select />
         </subPane>
       </pane>
+      <pane id="Scope" />
+      <pane id="AndroidView" />
     </panes>
   </component>
   <component name="PropertiesComponent">
@@ -425,26 +427,24 @@
     <servers />
   </component>
   <component name="ToolWindowManager">
-    <frame x="141" y="-958" width="1410" height="946" extended-state="0" />
-    <editor active="true" />
+    <frame x="140" y="-959" width="1410" height="946" extended-state="0" />
     <layout>
       <window_info id="Palette" active="false" anchor="right" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.33" sideWeight="0.5" order="3" side_tool="false" content_ui="tabs" />
       <window_info id="TODO" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.33" sideWeight="0.5" order="6" side_tool="false" content_ui="tabs" />
       <window_info id="Cargo" active="false" anchor="right" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.32907802" sideWeight="0.5" order="4" side_tool="false" content_ui="tabs" />
-      <window_info id="Messages" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.33" sideWeight="0.5" order="8" side_tool="false" content_ui="tabs" />
       <window_info id="Palette&#9;" active="false" anchor="right" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.33" sideWeight="0.5" order="5" side_tool="false" content_ui="tabs" />
       <window_info id="Image Layers" active="false" anchor="left" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.33" sideWeight="0.5" order="1" side_tool="false" content_ui="tabs" />
       <window_info id="Capture Analysis" active="false" anchor="right" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.33" sideWeight="0.5" order="6" side_tool="false" content_ui="tabs" />
-      <window_info id="Event Log" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="true" show_stripe_button="true" weight="0.26556993" sideWeight="0.5248227" order="7" side_tool="true" content_ui="tabs" />
+      <window_info id="Event Log" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="true" show_stripe_button="true" weight="0.26556993" sideWeight="0.5276596" order="7" side_tool="true" content_ui="tabs" />
       <window_info id="Maven Projects" active="false" anchor="right" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.33" sideWeight="0.5" order="7" side_tool="false" content_ui="tabs" />
-      <window_info id="Run" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="FLOATING" visible="true" show_stripe_button="true" weight="0.32941177" sideWeight="0.5" order="2" side_tool="false" content_ui="tabs" x="504" y="51" width="807" height="774" />
+      <window_info id="Run" active="true" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="FLOATING" visible="true" show_stripe_button="true" weight="0.32941177" sideWeight="0.5" order="2" side_tool="false" content_ui="tabs" x="605" y="99" width="807" height="774" />
       <window_info id="Version Control" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.18286446" sideWeight="0.49461642" order="10" side_tool="false" content_ui="tabs" />
       <window_info id="Terminal" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.32942554" sideWeight="0.4968" order="9" side_tool="false" content_ui="tabs" />
       <window_info id="Capture Tool" active="false" anchor="left" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.33" sideWeight="0.5" order="2" side_tool="false" content_ui="tabs" />
       <window_info id="Designer" active="false" anchor="left" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.33" sideWeight="0.5" order="3" side_tool="false" content_ui="tabs" />
+      <window_info id="Problems" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.1386604" sideWeight="0.49148935" order="11" side_tool="false" content_ui="tabs" />
       <window_info id="Project" active="false" anchor="left" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="true" show_stripe_button="true" weight="0.12695035" sideWeight="0.5" order="0" side_tool="false" content_ui="combo" />
-      <window_info id="Problems" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.13938619" sideWeight="0.49716312" order="-1" side_tool="false" content_ui="tabs" />
-      <window_info id="Find" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="true" show_stripe_button="true" weight="0.26556993" sideWeight="0.47517732" order="1" side_tool="false" content_ui="tabs" />
+      <window_info id="Find" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="true" show_stripe_button="true" weight="0.26556993" sideWeight="0.47234043" order="1" side_tool="false" content_ui="tabs" />
       <window_info id="Structure" active="false" anchor="right" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="true" show_stripe_button="true" weight="0.1858156" sideWeight="0.5" order="9" side_tool="false" content_ui="tabs" />
       <window_info id="Ant Build" active="false" anchor="right" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.25" sideWeight="0.5" order="1" side_tool="false" content_ui="tabs" />
       <window_info id="UI Designer" active="false" anchor="left" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.33" sideWeight="0.5" order="4" side_tool="false" content_ui="tabs" />
@@ -452,25 +452,11 @@
       <window_info id="Debug" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.4" sideWeight="0.5" order="3" side_tool="false" content_ui="tabs" />
       <window_info id="Favorites" active="false" anchor="left" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.33" sideWeight="0.5" order="5" side_tool="true" content_ui="tabs" />
       <window_info id="Cvs" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.25" sideWeight="0.5" order="4" side_tool="false" content_ui="tabs" />
-      <window_info id="Palette" active="false" anchor="right" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.33" sideWeight="0.5" order="3" side_tool="false" content_ui="tabs" />
-      <window_info id="Cargo" active="false" anchor="right" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.32907802" sideWeight="0.5" order="4" side_tool="false" content_ui="tabs" />
       <window_info id="Message" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.33" sideWeight="0.5" order="0" side_tool="false" content_ui="tabs" />
       <window_info id="Commander" active="false" anchor="right" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.4" sideWeight="0.5" order="0" side_tool="false" content_ui="tabs" />
-      <window_info id="Event Log" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="true" show_stripe_button="true" weight="0.26556993" sideWeight="0.5248227" order="7" side_tool="true" content_ui="tabs" />
-      <window_info id="Maven Projects" active="false" anchor="right" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.33" sideWeight="0.5" order="7" side_tool="false" content_ui="tabs" />
-      <window_info id="Capture Tool" active="false" anchor="left" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.33" sideWeight="0.5" order="2" side_tool="false" content_ui="tabs" />
       <window_info id="Hierarchy" active="false" anchor="right" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.25" sideWeight="0.5" order="2" side_tool="false" content_ui="combo" />
-      <window_info id="Designer" active="false" anchor="left" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.33" sideWeight="0.5" order="3" side_tool="false" content_ui="tabs" />
-      <window_info id="TODO" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.33" sideWeight="0.5" order="6" side_tool="false" content_ui="tabs" />
       <window_info id="Messages" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.33" sideWeight="0.5" order="8" side_tool="false" content_ui="tabs" />
-      <window_info id="Palette&#9;" active="false" anchor="right" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.33" sideWeight="0.5" order="5" side_tool="false" content_ui="tabs" />
-      <window_info id="Image Layers" active="false" anchor="left" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.33" sideWeight="0.5" order="1" side_tool="false" content_ui="tabs" />
-      <window_info id="Capture Analysis" active="false" anchor="right" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.33" sideWeight="0.5" order="6" side_tool="false" content_ui="tabs" />
       <window_info id="Inspection" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.4" sideWeight="0.5" order="5" side_tool="false" content_ui="tabs" />
-      <window_info id="Run" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="FLOATING" visible="true" show_stripe_button="true" weight="0.32941177" sideWeight="0.5" order="2" side_tool="false" content_ui="tabs" x="564" y="113" width="807" height="774" />
-      <window_info id="Version Control" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.18286446" sideWeight="0.49461642" order="10" side_tool="false" content_ui="tabs" />
-      <window_info id="Terminal" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.32942554" sideWeight="0.4968" order="9" side_tool="false" content_ui="tabs" />
-      <window_info id="Project" active="false" anchor="left" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="true" show_stripe_button="true" weight="0.12695035" sideWeight="0.5" order="0" side_tool="false" content_ui="combo" />
     </layout>
   </component>
   <component name="VcsContentAnnotationSettings">
@@ -511,10 +497,8 @@
         <state relative-caret-position="105">
           <caret line="7" column="138" lean-forward="false" selection-start-line="7" selection-start-column="138" selection-end-line="7" selection-end-column="138" />
           <folding>
-            <element signature="e#9093#9094#0" expanded="true" />
-            <element signature="e#9149#9150#0" expanded="true" />
-            <element signature="e#12638#12639#0" expanded="true" />
-            <element signature="e#12699#12700#0" expanded="true" />
+            <element signature="e#12756#12757#0" expanded="true" />
+            <element signature="e#12817#12818#0" expanded="true" />
           </folding>
         </state>
       </provider>
@@ -552,10 +536,8 @@
         <state relative-caret-position="9210">
           <caret line="614" column="12" lean-forward="false" selection-start-line="614" selection-start-column="12" selection-end-line="614" selection-end-column="12" />
           <folding>
-            <element signature="e#9093#9094#0" expanded="true" />
-            <element signature="e#9149#9150#0" expanded="true" />
-            <element signature="e#12638#12639#0" expanded="true" />
-            <element signature="e#12699#12700#0" expanded="true" />
+            <element signature="e#12756#12757#0" expanded="true" />
+            <element signature="e#12817#12818#0" expanded="true" />
           </folding>
         </state>
       </provider>
@@ -707,13 +689,6 @@
         </state>
       </provider>
     </entry>
-    <entry file="file://$PROJECT_DIR$/src/packet.rs">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="-1644">
-          <caret line="100" column="59" lean-forward="true" selection-start-line="100" selection-start-column="59" selection-end-line="100" selection-end-column="59" />
-        </state>
-      </provider>
-    </entry>
     <entry file="file://$PROJECT_DIR$/src/port.rs">
       <provider selected="true" editor-type-id="text-editor">
         <state relative-caret-position="-744">
@@ -725,13 +700,6 @@
       <provider selected="true" editor-type-id="text-editor">
         <state relative-caret-position="-264">
           <caret line="5" column="24" lean-forward="false" selection-start-line="5" selection-start-column="24" selection-end-line="5" selection-end-column="24" />
-        </state>
-      </provider>
-    </entry>
-    <entry file="file://$PROJECT_DIR$/src/routing_table_entry.rs">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="-459">
-          <caret line="29" column="130" lean-forward="false" selection-start-line="29" selection-start-column="93" selection-end-line="29" selection-end-column="130" />
         </state>
       </provider>
     </entry>
@@ -756,13 +724,6 @@
         </state>
       </provider>
     </entry>
-    <entry file="file://$PROJECT_DIR$/src/traph.rs">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="187">
-          <caret line="51" column="11" lean-forward="false" selection-start-line="51" selection-start-column="11" selection-end-line="51" selection-end-column="11" />
-        </state>
-      </provider>
-    </entry>
     <entry file="file://$PROJECT_DIR$/Cargo.toml">
       <provider selected="true" editor-type-id="text-editor">
         <state relative-caret-position="225">
@@ -774,13 +735,12 @@
       <provider selected="true" editor-type-id="text-editor">
         <state relative-caret-position="270">
           <caret line="19" column="40" lean-forward="false" selection-start-line="19" selection-start-column="40" selection-end-line="19" selection-end-column="40" />
-          <folding />
         </state>
       </provider>
     </entry>
     <entry file="file://$PROJECT_DIR$/src/uptree_spec.rs">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="162">
+        <state relative-caret-position="195">
           <caret line="13" column="21" lean-forward="false" selection-start-line="13" selection-start-column="21" selection-end-line="13" selection-end-column="21" />
           <folding />
         </state>
@@ -790,23 +750,6 @@
       <provider selected="true" editor-type-id="text-editor">
         <state relative-caret-position="285">
           <caret line="19" column="10" lean-forward="false" selection-start-line="19" selection-start-column="10" selection-end-line="19" selection-end-column="10" />
-          <folding />
-        </state>
-      </provider>
-    </entry>
-    <entry file="file://$PROJECT_DIR$/src/noc.rs">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="427">
-          <caret line="134" column="73" lean-forward="false" selection-start-line="134" selection-start-column="73" selection-end-line="134" selection-end-column="73" />
-          <folding />
-        </state>
-      </provider>
-    </entry>
-    <entry file="file://$PROJECT_DIR$/src/utility.rs">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="1503">
-          <caret line="136" column="0" lean-forward="false" selection-start-line="136" selection-start-column="0" selection-end-line="136" selection-end-column="0" />
-          <folding />
         </state>
       </provider>
     </entry>
@@ -814,67 +757,107 @@
       <provider selected="true" editor-type-id="text-editor">
         <state relative-caret-position="1676">
           <caret line="153" column="19" lean-forward="false" selection-start-line="153" selection-start-column="19" selection-end-line="153" selection-end-column="19" />
-          <folding />
-        </state>
-      </provider>
-    </entry>
-    <entry file="file://$PROJECT_DIR$/src/message.rs">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="442">
-          <caret line="676" column="47" lean-forward="true" selection-start-line="676" selection-start-column="47" selection-end-line="676" selection-end-column="47" />
-          <folding>
-            <element signature="e#29839#29840#0" expanded="true" />
-            <element signature="e#29851#29852#0" expanded="true" />
-            <element signature="e#30243#30244#0" expanded="true" />
-            <element signature="e#30295#30296#0" expanded="true" />
-            <element signature="e#32094#32095#0" expanded="true" />
-            <element signature="e#32148#32149#0" expanded="true" />
-          </folding>
-        </state>
-      </provider>
-    </entry>
-    <entry file="file://$PROJECT_DIR$/src/packet_engine.rs">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="401">
-          <caret line="84" column="49" lean-forward="true" selection-start-line="84" selection-start-column="49" selection-end-line="84" selection-end-column="49" />
-          <folding />
-        </state>
-      </provider>
-    </entry>
-    <entry file="file://$PROJECT_DIR$/src/cellagent.rs">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="325">
-          <caret line="744" column="49" lean-forward="true" selection-start-line="744" selection-start-column="49" selection-end-line="744" selection-end-column="49" />
-          <folding>
-            <element signature="e#9093#9094#0" expanded="true" />
-            <element signature="e#9149#9150#0" expanded="true" />
-            <element signature="e#12638#12639#0" expanded="true" />
-            <element signature="e#12699#12700#0" expanded="true" />
-          </folding>
         </state>
       </provider>
     </entry>
     <entry file="file://$PROJECT_DIR$/src/message_types.rs">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="258">
+        <state relative-caret-position="1230">
           <caret line="82" column="34" lean-forward="false" selection-start-line="82" selection-start-column="34" selection-end-line="82" selection-end-column="34" />
           <folding />
         </state>
       </provider>
     </entry>
-    <entry file="file://$PROJECT_DIR$/src/service.rs">
+    <entry file="file://$PROJECT_DIR$/src/utility.rs">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="382">
-          <caret line="127" column="55" lean-forward="false" selection-start-line="127" selection-start-column="55" selection-end-line="127" selection-end-column="55" />
+        <state relative-caret-position="1920">
+          <caret line="136" column="0" lean-forward="false" selection-start-line="136" selection-start-column="0" selection-end-line="136" selection-end-column="0" />
           <folding />
         </state>
       </provider>
     </entry>
     <entry file="file://$PROJECT_DIR$/src/vm.rs">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="420">
-          <caret line="48" column="24" lean-forward="false" selection-start-line="48" selection-start-column="24" selection-end-line="48" selection-end-column="24" />
+        <state relative-caret-position="908">
+          <caret line="78" column="14" lean-forward="false" selection-start-line="78" selection-start-column="14" selection-end-line="78" selection-end-column="14" />
           <folding />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/src/routing_table_entry.rs">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="502">
+          <caret line="57" column="45" lean-forward="false" selection-start-line="57" selection-start-column="45" selection-end-line="57" selection-end-column="45" />
+          <folding>
+            <element signature="e#2686#2687#0" expanded="true" />
+            <element signature="e#2738#2739#0" expanded="true" />
+          </folding>
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/src/traph.rs">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="478">
+          <caret line="165" column="25" lean-forward="false" selection-start-line="165" selection-start-column="25" selection-end-line="165" selection-end-column="25" />
+          <folding />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/src/service.rs">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="227">
+          <caret line="62" column="0" lean-forward="false" selection-start-line="62" selection-start-column="0" selection-end-line="62" selection-end-column="0" />
+          <folding />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/src/packet.rs">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="642">
+          <caret line="100" column="59" lean-forward="true" selection-start-line="100" selection-start-column="59" selection-end-line="100" selection-end-column="59" />
+          <folding />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/src/packet_engine.rs">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="370">
+          <caret line="153" column="26" lean-forward="false" selection-start-line="153" selection-start-column="26" selection-end-line="153" selection-end-column="26" />
+          <folding />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/src/noc.rs">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="1029">
+          <caret line="218" column="9" lean-forward="true" selection-start-line="218" selection-start-column="9" selection-end-line="218" selection-end-column="9" />
+          <folding />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/src/message.rs">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="313">
+          <caret line="164" column="12" lean-forward="false" selection-start-line="164" selection-start-column="12" selection-end-line="164" selection-end-column="12" />
+          <folding>
+            <element signature="e#30334#30335#0" expanded="true" />
+            <element signature="e#30346#30347#0" expanded="true" />
+            <element signature="e#30738#30739#0" expanded="true" />
+            <element signature="e#30790#30791#0" expanded="true" />
+            <element signature="e#33223#33224#0" expanded="true" />
+            <element signature="e#33277#33278#0" expanded="true" />
+          </folding>
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/src/cellagent.rs">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="388">
+          <caret line="526" column="50" lean-forward="false" selection-start-line="526" selection-start-column="50" selection-end-line="526" selection-end-column="50" />
+          <folding>
+            <element signature="e#12756#12757#0" expanded="true" />
+            <element signature="e#12817#12818#0" expanded="true" />
+          </folding>
         </state>
       </provider>
     </entry>

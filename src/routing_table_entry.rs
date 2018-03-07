@@ -8,6 +8,8 @@ use utility::{Mask, PortNumber, S};
 use uuid_fake::Uuid;
 
 type OtherIndices = [TableIndex; MAX_PORTS.v as usize];
+
+const DEFAULT_INDICES: OtherIndices = [TableIndex(0); MAX_PORTS.v as usize];
 #[derive(Debug, Copy, Clone, Serialize, Deserialize)]
 pub struct RoutingTableEntry {
 	index: TableIndex,
@@ -52,6 +54,9 @@ impl RoutingTableEntry {
 		let port_no = port_number.get_port_no().v as usize;
 		self.other_indices[port_no]
 	}
+	pub fn clear_other_indices(&mut self) {
+        self.other_indices = DEFAULT_INDICES;
+    }
 	pub fn add_other_index(&mut self, port_index: PortNumber, other_index: TableIndex) {
 		let port_no = port_index.get_port_no();
 		self.other_indices[port_no.v as usize] = other_index;

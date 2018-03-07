@@ -42,6 +42,13 @@ impl Traph {
 				stacked_trees: stacked_trees, elements: elements })
 	}
 	pub fn get_black_tree_id(&self) -> &TreeID { &self.black_tree_id }
+    pub fn get_table_entry(&self, stacked_trees_locked: &MutexGuard<StackedTrees>, tree_uuid: &Uuid)
+                           -> Result<RoutingTableEntry, TraphError> {
+        match stacked_trees_locked.get(tree_uuid) {
+            Some(tree) => Ok(tree.get_table_entry()),
+            None => Err(TraphError::Tree { cell_id: self.cell_id.clone(), func_name: "get_table_entry", tree_uuid: tree_uuid.clone() }.into())
+        }
+    }
 	pub fn get_tree_entry(&self, tree_uuid: &Uuid) -> Result<RoutingTableEntry, Error> {
 		let locked = self.stacked_trees.lock().unwrap();
         match locked.get(tree_uuid) {
@@ -104,13 +111,6 @@ impl Traph {
 		}
 		i
 	}
-	pub fn get_table_entry(&self, stacked_trees_locked: &MutexGuard<StackedTrees>, tree_uuid: &Uuid)
-            -> Result<RoutingTableEntry, TraphError> {
-		match stacked_trees_locked.get(tree_uuid) {
-			Some(tree) => Ok(tree.get_table_entry()),
-			None => Err(TraphError::Tree { cell_id: self.cell_id.clone(), func_name: "get_table_entry", tree_uuid: tree_uuid.clone() }.into())
-		}
-	}
 	pub fn get_table_index(&self, tree_uuid: &Uuid) -> Result<TableIndex, Error> {
 		let locked = self.stacked_trees.lock().unwrap(); 
 		let table_entry = self.get_table_entry(&locked, tree_uuid).context(TraphError::Chain { func_name: "get_table_index", comment: S("")})?;
@@ -163,7 +163,8 @@ impl Traph {
 						stacked_entry.set_mask(mask);
 					}
 				}
-				stacked_entry.set_other_indices(base_tree_entry.get_other_indices());	
+				// TODO: The following is wrong, but what should I do on a failover???
+				//stacked_entry.set_other_indices(base_tree_entry.get_other_indices());
 				updated_entries.push(stacked_entry);
 			}
 		}
