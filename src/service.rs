@@ -51,7 +51,7 @@ pub struct NocMaster {
 impl NocMaster {
     pub fn new(container_id: ContainerID, name: &str, container_to_vm: ContainerToVm,
                allowed_trees: &Vec<AllowedTree>) -> NocMaster {
-        println!("NocMaster started in container {}", container_id);
+        //println!("NocMaster started in container {}", container_id);
         NocMaster { container_id: container_id, name: S(name), container_to_vm: container_to_vm,
             allowed_trees: allowed_trees.clone() }
     }
@@ -60,8 +60,7 @@ impl NocMaster {
         let f = "initialize";
         let new_tree_id = up_tree_id.add_component("NocMaster").context(ServiceError::Chain { func_name: f, comment: S("NocMaster")})?;
         new_tree_id.append2file().context(ServiceError::Chain { func_name: f, comment: S("")})?;
-        //self.container_to_vm.send((S("NocMaster"), S("Message from NocMaster"))).context(ServiceError::Chain { func_name: f, comment: S("NocMaster to vm")})?;
-        println!("Service {} running", self.container_id);
+        //println!("Service {} running", self.container_id);
         self.listen_vm(container_from_vm)?;
         self.container_to_vm.send((AllowedTree::new("NocMasterAgent"), TcpMsgType::Application, MsgDirection::Leafward, S("Hello from Master")))?;
         Ok(())
@@ -71,7 +70,7 @@ impl NocMaster {
         //println!("Service {} on {}: listening to VM", self.name, self.container_id);
         ::std::thread::spawn(move || -> Result<(), Error> {
             let _ = master.listen_vm_loop(&container_from_vm).map_err(|e| write_err("service", e));
-            //let _ = master.listen_vm(container_from_vm);
+            let _ = master.listen_vm(container_from_vm);
             Ok(())
         });
         Ok(())
@@ -99,7 +98,7 @@ pub struct NocAgent {
 impl NocAgent {
     pub fn new(container_id: ContainerID, name: &str, container_to_vm: ContainerToVm,
             allowed_trees: &Vec<AllowedTree>) -> NocAgent {
-        println!("NocAgent started in container {}", container_id);
+        //println!("NocAgent started in container {}", container_id);
         NocAgent { container_id: container_id, name: S(name), container_to_vm: container_to_vm,
             allowed_trees: allowed_trees.clone() }
     }
@@ -108,7 +107,7 @@ impl NocAgent {
         let new_tree_id = up_tree_id.add_component("NocAgent").context(ServiceError::Chain { func_name: f, comment: S("NocAgent") })?;
         new_tree_id.append2file().context(ServiceError::Chain { func_name: f, comment: S("NocAgent") })?;
         //self.container_to_vm.send((S("NocAgent"), S("Message from NocAgent"))).context(ServiceError::Chain { func_name: f, comment: S("NocAgent") })?;
-        println!("Service {} running", self.container_id);
+        //println!("Service {} running", self.container_id);
         self.listen_vm(container_from_vm)
     }
     fn listen_vm(&self, container_from_vm: ContainerFromVm) -> Result<(), Error> {
@@ -116,7 +115,7 @@ impl NocAgent {
         //println!("Service {} on {}: listening to VM", self.name, self.container_id);
         ::std::thread::spawn(move || -> Result<(), Error> {
             let _ = agent.listen_vm_loop(&container_from_vm).map_err(|e| write_err("service", e));
-            //let _ = agent.listen_vm(container_from_vm);
+            let _ = agent.listen_vm(container_from_vm);
             Ok(())
         });
         Ok(())

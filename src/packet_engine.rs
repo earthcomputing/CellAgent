@@ -5,6 +5,7 @@ use std::collections::HashSet;
 //use uuid::Uuid;
 
 use config::{PortNo, TableIndex};
+use message::MsgType;
 use message_types::{TCP, PeFromCa, PeToCa, PeToPort, PeFromPort, CaToPePacket, PortToPePacket, PeToPortPacket, PeToCaPacket};
 use name::{Name, CellID};
 use packet::{Packet};
@@ -60,13 +61,14 @@ impl PacketEngine {
 						let json = ::serde_json::to_string(&(&self.cell_id, &entry, &entry.get_mask().get_port_nos())).context(PacketEngineError::Chain { func_name: "listen_ca", comment: S(self.cell_id.get_name())})?;
 						::utility::append2file(json).context(PacketEngineError::Chain { func_name: "listen_ca", comment: S("")})?;
 					}
+                    //if self.cell_id.get_name() == "C:2" && *entry.get_index() > 11 { println!("PacketEngine {}: entry {}", self.cell_id, entry); }
 					self.routing_table.lock().unwrap().set_entry(entry)
 				},
 				CaToPePacket::Packet((index, user_mask, packet)) => {
 					let locked = self.routing_table.lock().unwrap();	// Hold lock until forwarding is done
 					let entry = locked.get_entry(index).context(PacketEngineError::Chain { func_name: "listen_ca", comment: S(self.cell_id.get_name())})?;
 					let port_no = PortNo{v:0};
-                    //if ::message::MsgType::is_type(&packet, "Application") { println!("PacketEngine {}: received from ca entry {}", self.cell_id, entry); }
+                    //if ::message::MsgType::is_type(&packet, "Manifest") { println!("PacketEngine {}: received from ca entry {}", self.cell_id, entry); }
 					if entry.may_send() { self.forward(port_no, entry, user_mask, packet).context(PacketEngineError::Chain { func_name:"listen_ca", comment: S(self.cell_id.get_name())})?; }
 				},
 				CaToPePacket::Tcp((port_number, msg)) => {
@@ -96,23 +98,29 @@ impl PacketEngine {
 		if entry.is_in_use() {
 			//println!("PacketEngine {}: entry {} header UUID {}", self.cell_id, entry, packet.get_header().get_tree_uuid());
 			// The control tree is special since each cell has a different uuid
-            //if ::message::MsgType::is_type(&packet, "Application") && self.cell_id.get_name() == "C:3" { println!("PacketEngine {}: on port {} entry {}", self.cell_id, *port_no, entry); }
+            let msg_type = MsgType::msg_type(&packet);
+            //if msg_type == MsgType::StackTree || msg_type == MsgType::Manifest || msg_type == MsgType::Application { println!("PacketEngine {}: msg {} on port {} entry {}", self.cell_id, msg_type, *port_no, entry); }
 			if (*entry.get_index() == 0) || (entry.get_uuid() == packet.get_header().get_uuid()) {
 				let mask = entry.get_mask();
 				let other_indices = entry.get_other_indices();
 				PortNumber::new(port_no, PortNo{v:other_indices.len() as u8}).context(PacketEngineError::Chain { func_name: "process_packet", comment: S("port number ") + self.cell_id.get_name()})?; // Verify that port_no is valid
 				self.forward(port_no, entry, mask, packet).context(PacketEngineError::Chain { func_name: "process_packet", comment: S("forward ") + self.cell_id.get_name()})?;
 			} else {
-				return Err(PacketEngineError::Uuid { cell_id: self.cell_id.clone(), func_name: "process_packet", index: *entry.get_index(), packet_uuid: packet.get_tree_uuid(), table_uuid: entry.get_uuid() }.into());
+                return Err(PacketEngineError::Uuid { cell_id: self.cell_id.clone(), func_name: "process_packet", msg_type, index: *entry.get_index(), packet_uuid: packet.get_tree_uuid(), table_uuid: entry.get_uuid() }.into());
 			}
 		}
 		Ok(())	
 	}
 	fn forward(&self, recv_port_no: PortNo, entry: RoutingTableEntry, user_mask: Mask, packet: Packet) 
 			-> Result<(), Error>{
+        let msg_type = MsgType::msg_type(&packet);
+        //if msg_type == MsgType::StackTree || msg_type == MsgType::Manifest || msg_type == MsgType::Application { println!("PacketEngine {}: got {} on port {} packet {}", self.cell_id, msg_type, *recv_port_no, packet); }
 		let header = packet.get_header();
 		//println!("PacketEngine {}: forward packet {}, mask {}, entry {}", self.cell_id, packet.get_count(), mask, entry);
 		let other_indices = entry.get_other_indices();
+        if msg_type == MsgType::Application || msg_type == MsgType::Manifest {
+            //println!("PacketEngine {}: forwarding type {} with entry {}", self.cell_id, msg_type, entry);
+        }
 		let recv_port_number = PortNumber::new(recv_port_no, PortNo{v:other_indices.len() as u8}).context(PacketEngineError::Chain { func_name: "forward", comment: S(self.cell_id.clone())})?; // Make sure recv_port_no is valid
         let default_mask = Mask::empty().not(); // Prevents resending a message
 		if header.is_rootcast() {
@@ -123,7 +131,7 @@ impl PacketEngine {
 				} else {
 					if let Some(sender) = self.pe_to_ports.get(parent.v as usize) {
 						sender.send(PeToPortPacket::Packet((*other_index, packet))).context(PacketEngineError::Chain { func_name: "forward", comment: S(self.cell_id.clone())})?;
-						//println!("PacketEngine {}: sent rootward on port {} sent packet {}", self.cell_id, recv_port_no, packet);
+                        //if msg_type == MsgType::StackTree || msg_type == MsgType::Manifest || msg_type == MsgType::Application { println!("PacketEngine {}: sent {} rootward on port {} packet {}", self.cell_id, msg_type, *recv_port_no, packet); }
 						let is_up = entry.get_mask().and(user_mask).equal(Mask::new0());
 						if is_up { // Send to cell agent, too
 							self.pe_to_ca.send(PeToCaPacket::Packet((recv_port_no, default_mask, entry.get_index(), packet))).context(PacketEngineError::Chain { func_name: "forward", comment: S("rootcast packet to ca ") + self.cell_id.get_name()})?;
@@ -136,7 +144,6 @@ impl PacketEngine {
 		} else {
 			let mask = user_mask.and(entry.get_mask());
 			let port_nos = mask.get_port_nos();
-			//let is_stack_msg = match format!("{}", packet).find("StackTree") { Some(_) => true, None => false };
 			//if ::message::MsgType::is_type(&packet, "Manifest") { println!("PacketEngine {}: forwarding packet {} on ports {:?}, {}", self.cell_id, packet.get_count(), port_nos, entry); }
 			for port_no in port_nos.iter() {
 				if let Some(other_index) = other_indices.get(port_no.v as usize).cloned() {
@@ -144,11 +151,11 @@ impl PacketEngine {
 						//println!("PacketEngine {}: sending to ca packet {}", self.cell_id, packet);
 						self.pe_to_ca.send(PeToCaPacket::Packet((recv_port_no, user_mask, entry.get_index(), packet))).context(PacketEngineError::Chain { func_name: "forward", comment: S("leafcast packet to ca ") + self.cell_id.get_name()})?;
 					} else {
+                        //if msg_type == MsgType::StackTree || msg_type == MsgType::Manifest || msg_type == MsgType::Application { println!("PacketEngine {}: sent {} leafward on port {} packet {}", self.cell_id, msg_type, port_no.v, packet); }
 						match self.pe_to_ports.get(port_no.v as usize) {
 							Some(s) => s.send(PeToPortPacket::Packet((other_index, packet))).context(PacketEngineError::Chain { func_name: "forward", comment: S("send packet leafward ") + self.cell_id.get_name()})?,
 							None => return Err(PacketEngineError::Sender { cell_id: self.cell_id.clone(), func_name: "forward leaf", port_no: **port_no }.into())
 						};
-						//if is_stack_msg { println!("Packet Engine {} sent to port {} packet {}", self.cell_id, port_no.v, packet); }
 					}
 				}
 			}
@@ -170,6 +177,6 @@ pub enum PacketEngineError {
 	Chain { func_name: &'static str, comment: String },
 	#[fail(display = "PacketEngineError::Sender {}: No sender for port {:?} on cell {}", func_name, port_no, cell_id)]
 	Sender { func_name: &'static str, cell_id: CellID, port_no: u8 },
-    #[fail(display = "PacketEngineError::Uuid {}: CellID {}: index {}, entry uuid {}, packet uuid {}", func_name, cell_id, index, table_uuid, packet_uuid)]
-    Uuid { func_name: &'static str, cell_id: CellID, index: u32, table_uuid: Uuid, packet_uuid: Uuid }
+    #[fail(display = "PacketEngineError::Uuid {}: CellID {}: type {} index {} entry uuid {}, packet uuid {}", func_name, cell_id, msg_type, index, table_uuid, packet_uuid)]
+    Uuid { func_name: &'static str, cell_id: CellID, msg_type: MsgType, index: u32, table_uuid: Uuid, packet_uuid: Uuid }
 }
