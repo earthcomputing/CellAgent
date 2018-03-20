@@ -153,7 +153,7 @@ impl Noc {
         let gvm_eqn_ser = serde_json::to_string(&gvm_eqn).context(NocError::Chain { func_name: "noc_master_deploy_tree", comment: S("gvm")})?;;
         params.insert(S("gvm_eqn"), gvm_eqn_ser);
         let stack_tree_msg = serde_json::to_string(&params).context(NocError::Chain { func_name: "noc_master_deploy_tree", comment: S("")})?;
-        println!("Noc: stack {} on tree {} msg {}", NOC_MASTER_DEPLOY_TREE_NAME, tree_name, stack_tree_msg);
+        println!("Noc: stack {} on tree {}", NOC_MASTER_DEPLOY_TREE_NAME, tree_name);
         noc_to_port.send((noc_master_deploy_tree.clone(), TcpMsgType::StackTree, MsgDirection::Leafward, stack_tree_msg)).context(NocError::Chain { func_name: "noc_master_deploy_tree", comment: S("")})?;
         Ok(())
     }
@@ -173,7 +173,7 @@ impl Noc {
         let gvm_eqn_ser = serde_json::to_string(&gvm_eqn).context(NocError::Chain { func_name: "noc_agent_deploy_tree", comment: S("gvm")})?;;
         params.insert(S("gvm_eqn"), gvm_eqn_ser);
         let stack_tree_msg = serde_json::to_string(&params).context(NocError::Chain { func_name: "noc_agent_deploy_tree", comment: S("")})?;
-        println!("Noc: stack {} on tree {} msg {}", NOC_AGENT_DEPLOY_TREE_NAME, tree_name, stack_tree_msg);
+        println!("Noc: stack {} on tree {}", NOC_AGENT_DEPLOY_TREE_NAME, tree_name);
         noc_to_port.send((noc_agent_deploy_tree.clone(), TcpMsgType::StackTree, MsgDirection::Leafward, stack_tree_msg)).context(NocError::Chain { func_name: "noc_agent_deploy_tree", comment: S("")})?;
         Ok(())
     }
@@ -192,7 +192,7 @@ impl Noc {
         let gvm_eqn_ser = serde_json::to_string(&gvm_eqn).context(NocError::Chain { func_name: "noc_master_tree", comment: S("gvm")})?;;
         params.insert(S("gvm_eqn"), gvm_eqn_ser);
         let stack_tree_msg = serde_json::to_string(&params).context(NocError::Chain { func_name: "noc_master_tree", comment: S("")})?;
-        println!("Noc: stack {} on tree {} msg {}", NOC_CONTROL_TREE_NAME, tree_name, stack_tree_msg);
+        println!("Noc: stack {} on tree {}", NOC_CONTROL_TREE_NAME, tree_name);
         noc_to_port.send((noc_master_agent.clone(), TcpMsgType::StackTree, MsgDirection::Leafward, stack_tree_msg)).context(NocError::Chain { func_name: "noc_master_tree", comment: S("")})?;
         Ok(())
     }
@@ -211,7 +211,7 @@ impl Noc {
         let gvm_eqn_ser = serde_json::to_string(&gvm_eqn).context(NocError::Chain { func_name: "noc_master_tree", comment: S("gvm")})?;;
         params.insert(S("gvm_eqn"), gvm_eqn_ser);
         let stack_tree_msg = serde_json::to_string(&params).context(NocError::Chain { func_name: "noc_master_tree", comment: S("")})?;
-        println!("Noc: stack {} on tree {} msg {}", NOC_LISTEN_TREE_NAME, tree_name, stack_tree_msg);
+        println!("Noc: stack {} on tree {}", NOC_LISTEN_TREE_NAME, tree_name);
         noc_to_port.send((noc_agent_master.clone(), TcpMsgType::StackTree, MsgDirection::Leafward, stack_tree_msg)).context(NocError::Chain { func_name: "noc_master_tree", comment: S("")})?;
         Ok(())
     }

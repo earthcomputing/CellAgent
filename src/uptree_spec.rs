@@ -39,11 +39,12 @@ impl Manifest {
 }
 impl fmt::Display for Manifest {
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result { 
-		let mut s = format!("\nDeploy {} on tree {}", self.id, self.deployment_tree);
-		s = s + &format!("\n  Allowed Trees");
-		for a in &self.allowed_trees { s = s + &format!("\n    {}", a); }
-		for t in &self.trees { s = s + &format!("\n  {}", t); }
-		for v in &self.vms { s = s + &format!("\n  {}", v); }
+		let mut s = format!("Deploy {} on tree {}", self.id, self.deployment_tree);
+		// Next 4 lines commented out for debugging purposes
+		//s = s + &format!("\n  Allowed Trees");
+		//for a in &self.allowed_trees { s = s + &format!("\n    {}", a); }
+		//for t in &self.trees { s = s + &format!("\n  {}", t); }
+		//for v in &self.vms { s = s + &format!("\n  {}", v); }
 		write!(f, "{}", s)
 	}	
 }
