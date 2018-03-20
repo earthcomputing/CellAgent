@@ -27,7 +27,8 @@ pub trait Name: Sized {
 			Some(_) => Err(NameError::Format{ name: s.to_string(), func_name: "add_component" }.into()),
 			None => self.from_str(&([self.get_name(),s].join(SEPARATOR)))
 		}
-	}		
+	}
+	fn is_name(&self, name: &str) -> bool { self.get_name() == name }
 }
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct CellID { name: NameType, uuid: Uuid }

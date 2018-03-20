@@ -32,7 +32,7 @@ impl Traph {
 			elements.push(TraphElement::default(port_number));
 		}
 		let entry = RoutingTableEntry::default(index).context(TraphError::Chain { func_name: "new", comment: S("")})?;
-		let black_tree = Tree::new(black_tree_id, black_tree_id, gvm_eqn, entry);
+		let black_tree = Tree::new(black_tree_id, black_tree_id, black_tree_id, gvm_eqn, entry);
 		let stacked_trees = Arc::new(Mutex::new(HashMap::new()));
 		{
 			let mut locked = stacked_trees.lock().unwrap();
@@ -49,12 +49,20 @@ impl Traph {
             None => Err(TraphError::Tree { cell_id: self.cell_id.clone(), func_name: "get_table_entry", tree_uuid: tree_uuid.clone() }.into())
         }
     }
-	pub fn get_tree_entry(&self, tree_uuid: &Uuid) -> Result<RoutingTableEntry, Error> {
-		let locked = self.stacked_trees.lock().unwrap();
-        match locked.get(tree_uuid) {
-            Some(tree) => Ok(tree.get_table_entry()),
+    pub fn get_tree(&self, tree_uuid: &Uuid) -> Result<Tree, Error> {
+        let locked = self.stacked_trees.lock().unwrap();
+        match locked.get(tree_uuid).cloned() {
+            Some(t) => Ok(t),
             None => Err(TraphError::Tree { cell_id: self.cell_id.clone(), func_name: "get_tree_entry", tree_uuid: *tree_uuid }.into())
         }
+    }
+    pub fn get_tree_parent_id(&self, tree_id: &TreeID) -> Result<TreeID, Error> {
+        let tree = self.get_tree(&tree_id.get_uuid())?;
+        Ok(tree.get_parent_tree_id().clone())
+    }
+	pub fn get_tree_entry(&self, tree_uuid: &Uuid) -> Result<RoutingTableEntry, Error> {
+        let tree = self.get_tree(tree_uuid)?;
+        Ok(tree.get_table_entry())
 	}
     pub fn set_tree_entry(&mut self, tree_uuid: &Uuid, entry: RoutingTableEntry) -> Result<(), Error> {
         let mut locked = self.stacked_trees.lock().unwrap();
@@ -150,7 +158,7 @@ impl Traph {
 		let locked = self.stacked_trees.lock().unwrap();
 		let mut updated_entries = Vec::new();
 		for stacked_tree in locked.values() {
-			if stacked_tree.get_id() != stacked_tree.get_base_tree_id() {
+			if stacked_tree.get_tree_id() != stacked_tree.get_base_tree_id() {
 				let mut stacked_entry = stacked_tree.get_table_entry();
 				let port_no = PortNo{v: base_tree_entry.get_other_indices().len() as u8};
 				let port_number = PortNumber::new(base_tree_entry.get_parent(), port_no).context(TraphError::Chain { func_name: "update_stacked_entries", comment: S("") })?;
@@ -171,7 +179,10 @@ impl Traph {
 		Ok(updated_entries)		
 	}
 	pub fn stack_tree(&mut self, tree: Tree) {
-		self.stacked_trees.lock().unwrap().insert(tree.get_uuid(), tree);
+		let f = "stack_tree";
+        let mut locked = self.stacked_trees.lock().unwrap();
+		locked.insert(tree.get_uuid(), tree);
+        //println!("Traph Cell {}: {} stacking tree number {}", self.cell_id, f, locked.len());
 	}
 	pub fn get_params(&self, vars: &Vec<GvmVariable>) -> Result<Vec<GvmVariable>, Error> {
 		let mut variables = Vec::new();

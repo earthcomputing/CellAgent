@@ -56,7 +56,7 @@ impl PacketEngine {
 		loop { 
 			match pe_from_ca.recv().context(PacketEngineError::Chain { func_name: "listen_ca", comment: S("recv entry from ca") + self.cell_id.get_name()})? {
 				CaToPePacket::Entry(entry) => {
-					if *entry.get_index() > 0 {
+					if self.cell_id.get_name() == "C:1" && *entry.get_index() > 0 {
                         //if *entry.get_index() > 11 { println!("PacketEngine {}: updated entry {}", self.cell_id, entry); }
 						let json = ::serde_json::to_string(&(&self.cell_id, &entry, &entry.get_mask().get_port_nos())).context(PacketEngineError::Chain { func_name: "listen_ca", comment: S(self.cell_id.get_name())})?;
 						::utility::append2file(json).context(PacketEngineError::Chain { func_name: "listen_ca", comment: S("")})?;
@@ -92,14 +92,21 @@ impl PacketEngine {
 		}		
 	}
 	fn process_packet(&self, port_no: PortNo, my_index: TableIndex, packet: Packet) -> Result<(), Error> {
-		//println!("PacketEngine {}: received on port {} my index {} {}", self.cell_id, port_no.v, *my_index, packet);
+        let f = "process_packet";
+        //println!("PacketEngine {}: received on port {} my index {} {}", self.cell_id, port_no.v, *my_index, packet);
+        let msg_type = MsgType::msg_type(&packet);
         let locked = self.routing_table.lock().unwrap();
-		let entry = locked.get_entry(my_index).context(PacketEngineError::Chain { func_name: "process_packet", comment: S("not border port ") + self.cell_id.get_name()})?;
+        let entry = locked.get_entry(my_index).context(PacketEngineError::Chain { func_name: "process_packet", comment: S("not border port ") + self.cell_id.get_name() })?;
 		if entry.is_in_use() {
 			//println!("PacketEngine {}: entry {} header UUID {}", self.cell_id, entry, packet.get_header().get_tree_uuid());
 			// The control tree is special since each cell has a different uuid
-            let msg_type = MsgType::msg_type(&packet);
-            //if msg_type == MsgType::StackTree || msg_type == MsgType::Manifest || msg_type == MsgType::Application { println!("PacketEngine {}: msg {} on port {} entry {}", self.cell_id, msg_type, *port_no, entry); }
+            {/*
+                match msg_type {
+                    MsgType::StackTree | MsgType::Manifest | MsgType::Application => {
+                    println ! ("PacketEngine {}: {} got msg {} on port {} entry {}", self.cell_id, f, msg_type, * port_no, entry); },
+                    _ => ()
+                }
+            */}
 			if (*entry.get_index() == 0) || (entry.get_uuid() == packet.get_header().get_uuid()) {
 				let mask = entry.get_mask();
 				let other_indices = entry.get_other_indices();
@@ -114,13 +121,17 @@ impl PacketEngine {
 	fn forward(&self, recv_port_no: PortNo, entry: RoutingTableEntry, user_mask: Mask, packet: Packet) 
 			-> Result<(), Error>{
         let msg_type = MsgType::msg_type(&packet);
-        //if msg_type == MsgType::StackTree || msg_type == MsgType::Manifest || msg_type == MsgType::Application { println!("PacketEngine {}: got {} on port {} packet {}", self.cell_id, msg_type, *recv_port_no, packet); }
+        {
+            match msg_type {
+                MsgType::StackTree | MsgType::Manifest | MsgType::Application => {
+                    //println!("PacketEngine {}: forward {} with mask {} packet {}", self.cell_id, msg_type, user_mask, packet);
+                },
+                _ => ()
+            }
+        }
 		let header = packet.get_header();
 		//println!("PacketEngine {}: forward packet {}, mask {}, entry {}", self.cell_id, packet.get_count(), mask, entry);
 		let other_indices = entry.get_other_indices();
-        if msg_type == MsgType::Application || msg_type == MsgType::Manifest {
-            //println!("PacketEngine {}: forwarding type {} with entry {}", self.cell_id, msg_type, entry);
-        }
 		let recv_port_number = PortNumber::new(recv_port_no, PortNo{v:other_indices.len() as u8}).context(PacketEngineError::Chain { func_name: "forward", comment: S(self.cell_id.clone())})?; // Make sure recv_port_no is valid
         let default_mask = Mask::empty().not(); // Prevents resending a message
 		if header.is_rootcast() {
@@ -131,7 +142,8 @@ impl PacketEngine {
 				} else {
 					if let Some(sender) = self.pe_to_ports.get(parent.v as usize) {
 						sender.send(PeToPortPacket::Packet((*other_index, packet))).context(PacketEngineError::Chain { func_name: "forward", comment: S(self.cell_id.clone())})?;
-                        //if msg_type == MsgType::StackTree || msg_type == MsgType::Manifest || msg_type == MsgType::Application { println!("PacketEngine {}: sent {} rootward on port {} packet {}", self.cell_id, msg_type, *recv_port_no, packet); }
+                        //if msg_type == MsgType::StackTree || msg_type == MsgType::Manifest || msg_type == MsgType::Application {
+                        //    println!("PacketEngine {}: sent {} rootward on port {} packet {}", self.cell_id, msg_type, parent.v, packet); }
 						let is_up = entry.get_mask().and(user_mask).equal(Mask::new0());
 						if is_up { // Send to cell agent, too
 							self.pe_to_ca.send(PeToCaPacket::Packet((recv_port_no, default_mask, entry.get_index(), packet))).context(PacketEngineError::Chain { func_name: "forward", comment: S("rootcast packet to ca ") + self.cell_id.get_name()})?;
@@ -151,7 +163,8 @@ impl PacketEngine {
 						//println!("PacketEngine {}: sending to ca packet {}", self.cell_id, packet);
 						self.pe_to_ca.send(PeToCaPacket::Packet((recv_port_no, user_mask, entry.get_index(), packet))).context(PacketEngineError::Chain { func_name: "forward", comment: S("leafcast packet to ca ") + self.cell_id.get_name()})?;
 					} else {
-                        //if msg_type == MsgType::StackTree || msg_type == MsgType::Manifest || msg_type == MsgType::Application { println!("PacketEngine {}: sent {} leafward on port {} packet {}", self.cell_id, msg_type, port_no.v, packet); }
+                        //if msg_type == MsgType::StackTree || msg_type == MsgType::Manifest || msg_type == MsgType::Application {
+                        //    println!("PacketEngine {}: sent {} leafward on port {}", self.cell_id, msg_type, port_no.v); }
 						match self.pe_to_ports.get(port_no.v as usize) {
 							Some(s) => s.send(PeToPortPacket::Packet((other_index, packet))).context(PacketEngineError::Chain { func_name: "forward", comment: S("send packet leafward ") + self.cell_id.get_name()})?,
 							None => return Err(PacketEngineError::Sender { cell_id: self.cell_id.clone(), func_name: "forward leaf", port_no: **port_no }.into())
