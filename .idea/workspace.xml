@@ -2,11 +2,8 @@
 <project version="4">
   <component name="ChangeListManager">
     <list default="true" id="eee480a2-146d-44ab-9647-cef5ea39b250" name="Default" comment="">
-      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" afterPath="$PROJECT_DIR$/.idea/workspace.xml" />
       <change beforePath="$PROJECT_DIR$/Multicell.key" afterPath="$PROJECT_DIR$/Multicell.key" />
       <change beforePath="$PROJECT_DIR$/src/cellagent.rs" afterPath="$PROJECT_DIR$/src/cellagent.rs" />
-      <change beforePath="$PROJECT_DIR$/src/noc.rs" afterPath="$PROJECT_DIR$/src/noc.rs" />
-      <change beforePath="$PROJECT_DIR$/src/uptree_spec.rs" afterPath="$PROJECT_DIR$/src/uptree_spec.rs" />
     </list>
     <ignored path="$PROJECT_DIR$/target/" />
     <ignored path="$PROJECT_DIR$/out/" />
@@ -22,11 +19,24 @@
   </component>
   <component name="FileEditorManager">
     <leaf SIDE_TABS_SIZE_LIMIT_KEY="300">
-      <file leaf-file-name="cellagent.rs" pinned="false" current-in-tab="false">
+      <file leaf-file-name="cellagent.rs" pinned="false" current-in-tab="true">
         <entry file="file://$PROJECT_DIR$/src/cellagent.rs">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="442">
-              <caret line="549" column="38" lean-forward="false" selection-start-line="549" selection-start-column="38" selection-end-line="549" selection-end-column="38" />
+            <state relative-caret-position="224">
+              <caret line="345" column="21" lean-forward="false" selection-start-line="345" selection-start-column="21" selection-end-line="345" selection-end-column="21" />
+              <folding>
+                <element signature="e#14373#14374#0" expanded="true" />
+                <element signature="e#14434#14435#0" expanded="true" />
+              </folding>
+            </state>
+          </provider>
+        </entry>
+      </file>
+      <file leaf-file-name="utility.rs" pinned="false" current-in-tab="false">
+        <entry file="file://$PROJECT_DIR$/src/utility.rs">
+          <provider selected="true" editor-type-id="text-editor">
+            <state relative-caret-position="1614">
+              <caret line="136" column="0" lean-forward="false" selection-start-line="136" selection-start-column="0" selection-end-line="136" selection-end-column="0" />
               <folding />
             </state>
           </provider>
@@ -45,8 +55,8 @@
       <file leaf-file-name="message.rs" pinned="false" current-in-tab="false">
         <entry file="file://$PROJECT_DIR$/src/message.rs">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="238">
-              <caret line="163" column="12" lean-forward="false" selection-start-line="163" selection-start-column="12" selection-end-line="163" selection-end-column="12" />
+            <state relative-caret-position="386">
+              <caret line="358" column="21" lean-forward="false" selection-start-line="358" selection-start-column="21" selection-end-line="358" selection-end-column="21" />
               <folding />
             </state>
           </provider>
@@ -65,8 +75,8 @@
       <file leaf-file-name="traph.rs" pinned="false" current-in-tab="false">
         <entry file="file://$PROJECT_DIR$/src/traph.rs">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="177">
-              <caret line="184" column="18" lean-forward="false" selection-start-line="184" selection-start-column="10" selection-end-line="184" selection-end-column="18" />
+            <state relative-caret-position="187">
+              <caret line="156" column="11" lean-forward="false" selection-start-line="156" selection-start-column="11" selection-end-line="156" selection-end-column="11" />
               <folding />
             </state>
           </provider>
@@ -145,11 +155,11 @@
           </provider>
         </entry>
       </file>
-      <file leaf-file-name="noc.rs" pinned="false" current-in-tab="true">
+      <file leaf-file-name="noc.rs" pinned="false" current-in-tab="false">
         <entry file="file://$PROJECT_DIR$/src/noc.rs">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="311">
-              <caret line="155" column="83" lean-forward="false" selection-start-line="155" selection-start-column="83" selection-end-line="155" selection-end-column="83" />
+            <state relative-caret-position="280">
+              <caret line="151" column="45" lean-forward="true" selection-start-line="151" selection-start-column="45" selection-end-line="151" selection-end-column="45" />
               <folding />
             </state>
           </provider>
@@ -176,18 +186,10 @@
   </component>
   <component name="FindInProjectRecents">
     <findStrings>
-      <find>forward</find>
-      <find>***</find>
-      <find>forward_stack_tree</find>
-      <find>C:6:</find>
-      <find>C:4:</find>
       <find>forward_stacked_tree</find>
       <find>stack tree</find>
       <find>forward_stacked</find>
       <find>&quot;;</find>
-      <find>C:3:</find>
-      <find>C:1:</find>
-      <find>C:3:</find>
       <find>C:2: | C:7</find>
       <find>C:3: | C:4</find>
       <find>C:3 | C:4:</find>
@@ -195,16 +197,24 @@
       <find>C:3: | C:4:</find>
       <find>C:3: | C:8:</find>
       <find>Hello</find>
-      <find>msg Hello</find>
       <find>tree_id_m</find>
       <find>update</find>
       <find>added</find>
-      <find>println!</find>
       <find>Deploy</find>
-      <find>C:2:</find>
       <find>C:2: | C:7:</find>
       <find>cellagent</find>
       <find>msg H</find>
+      <find>C:0:</find>
+      <find>C:1:</find>
+      <find>C:2:</find>
+      <find>C:3:</find>
+      <find>C:4:</find>
+      <find>Service Container:VM</find>
+      <find>msg Hello</find>
+      <find>Sta</find>
+      <find>tree on ports</find>
+      <find>Cellagent C:8:</find>
+      <find>println!</find>
       <find>*</find>
     </findStrings>
     <replaceStrings>
@@ -250,14 +260,14 @@
         <option value="$PROJECT_DIR$/src/name.rs" />
         <option value="$PROJECT_DIR$/src/uptree_spec.rs" />
         <option value="$PROJECT_DIR$/src/message.rs" />
-        <option value="$PROJECT_DIR$/src/cellagent.rs" />
         <option value="$PROJECT_DIR$/src/noc.rs" />
+        <option value="$PROJECT_DIR$/src/cellagent.rs" />
       </list>
     </option>
   </component>
   <component name="ProjectFrameBounds">
-    <option name="x" value="140" />
-    <option name="y" value="-959" />
+    <option name="x" value="210" />
+    <option name="y" value="-982" />
     <option name="width" value="1410" />
     <option name="height" value="946" />
   </component>
@@ -442,7 +452,7 @@
     <servers />
   </component>
   <component name="ToolWindowManager">
-    <frame x="140" y="-959" width="1410" height="946" extended-state="0" />
+    <frame x="210" y="-982" width="1410" height="946" extended-state="0" />
     <layout>
       <window_info id="Palette" active="false" anchor="right" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.33" sideWeight="0.5" order="3" side_tool="false" content_ui="tabs" />
       <window_info id="TODO" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.33" sideWeight="0.5" order="6" side_tool="false" content_ui="tabs" />
@@ -511,7 +521,10 @@
       <provider selected="true" editor-type-id="text-editor">
         <state relative-caret-position="105">
           <caret line="7" column="138" lean-forward="false" selection-start-line="7" selection-start-column="138" selection-end-line="7" selection-end-column="138" />
-          <folding />
+          <folding>
+            <element signature="e#14373#14374#0" expanded="true" />
+            <element signature="e#14434#14435#0" expanded="true" />
+          </folding>
         </state>
       </provider>
     </entry>
@@ -547,7 +560,10 @@
       <provider selected="true" editor-type-id="text-editor">
         <state relative-caret-position="9210">
           <caret line="614" column="12" lean-forward="false" selection-start-line="614" selection-start-column="12" selection-end-line="614" selection-end-column="12" />
-          <folding />
+          <folding>
+            <element signature="e#14373#14374#0" expanded="true" />
+            <element signature="e#14434#14435#0" expanded="true" />
+          </folding>
         </state>
       </provider>
     </entry>
@@ -741,13 +757,6 @@
         </state>
       </provider>
     </entry>
-    <entry file="file://$PROJECT_DIR$/src/utility.rs">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="1920">
-          <caret line="136" column="0" lean-forward="false" selection-start-line="136" selection-start-column="0" selection-end-line="136" selection-end-column="0" />
-        </state>
-      </provider>
-    </entry>
     <entry file="file://$PROJECT_DIR$/src/vm.rs">
       <provider selected="true" editor-type-id="text-editor">
         <state relative-caret-position="1170">
@@ -795,7 +804,6 @@
       <provider selected="true" editor-type-id="text-editor">
         <state relative-caret-position="225">
           <caret line="15" column="25" lean-forward="false" selection-start-line="15" selection-start-column="25" selection-end-line="15" selection-end-column="25" />
-          <folding />
         </state>
       </provider>
     </entry>
@@ -803,14 +811,6 @@
       <provider selected="true" editor-type-id="text-editor">
         <state relative-caret-position="531">
           <caret line="100" column="59" lean-forward="false" selection-start-line="100" selection-start-column="59" selection-end-line="100" selection-end-column="59" />
-          <folding />
-        </state>
-      </provider>
-    </entry>
-    <entry file="file://$PROJECT_DIR$/src/traph.rs">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="177">
-          <caret line="184" column="18" lean-forward="false" selection-start-line="184" selection-start-column="10" selection-end-line="184" selection-end-column="18" />
           <folding />
         </state>
       </provider>
@@ -839,27 +839,46 @@
         </state>
       </provider>
     </entry>
+    <entry file="file://$PROJECT_DIR$/src/noc.rs">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="280">
+          <caret line="151" column="45" lean-forward="true" selection-start-line="151" selection-start-column="45" selection-end-line="151" selection-end-column="45" />
+          <folding />
+        </state>
+      </provider>
+    </entry>
     <entry file="file://$PROJECT_DIR$/src/message.rs">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="238">
-          <caret line="163" column="12" lean-forward="false" selection-start-line="163" selection-start-column="12" selection-end-line="163" selection-end-column="12" />
+        <state relative-caret-position="386">
+          <caret line="358" column="21" lean-forward="false" selection-start-line="358" selection-start-column="21" selection-end-line="358" selection-end-column="21" />
+          <folding />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/src/utility.rs">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="1614">
+          <caret line="136" column="0" lean-forward="false" selection-start-line="136" selection-start-column="0" selection-end-line="136" selection-end-column="0" />
+          <folding />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/src/traph.rs">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="187">
+          <caret line="156" column="11" lean-forward="false" selection-start-line="156" selection-start-column="11" selection-end-line="156" selection-end-column="11" />
           <folding />
         </state>
       </provider>
     </entry>
     <entry file="file://$PROJECT_DIR$/src/cellagent.rs">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="442">
-          <caret line="549" column="38" lean-forward="false" selection-start-line="549" selection-start-column="38" selection-end-line="549" selection-end-column="38" />
-          <folding />
-        </state>
-      </provider>
-    </entry>
-    <entry file="file://$PROJECT_DIR$/src/noc.rs">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="311">
-          <caret line="155" column="83" lean-forward="false" selection-start-line="155" selection-start-column="83" selection-end-line="155" selection-end-column="83" />
-          <folding />
+        <state relative-caret-position="224">
+          <caret line="345" column="21" lean-forward="false" selection-start-line="345" selection-start-column="21" selection-end-line="345" selection-end-column="21" />
+          <folding>
+            <element signature="e#14373#14374#0" expanded="true" />
+            <element signature="e#14434#14435#0" expanded="true" />
+          </folding>
         </state>
       </provider>
     </entry>
