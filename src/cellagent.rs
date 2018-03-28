@@ -492,6 +492,7 @@ impl CellAgent {
         let index = self.use_index().context(CellagentError::Chain { func_name: f, comment: S("")})?;
         let mut entry = parent_entry.clone();
         entry.clear_other_indices();
+        entry.set_mask(Mask::empty());
         entry.set_table_index(index);
         entry.set_uuid(&new_tree_id.get_uuid());
         entry.set_other_indices([TableIndex(0); MAX_PORTS.v as usize]);
@@ -554,7 +555,11 @@ impl CellAgent {
                                     let payload = msg.get_payload_discoverd()?;
                                     let tree_id = payload.get_tree_id();
                                     if tree_id.is_name("C:2") { println!("Cellagent {}: {} got on on port {} msg {}", self.cell_id, f, port_no.v, msg); }
-                                }
+                                },
+                                MsgType::Application | MsgType::Manifest => {
+                                    let save = self.gvm_eval_save(msg.get_tree_id()?, &msg).context(CellagentError::Chain { func_name: f, comment: S(self.cell_id.clone())})?;
+                                    //println!("Cellagent {}: {} {} save {}", self.cell_id, f, msg_type, save);
+                                },
                                 _ => println!("Cellagent {}: {} got on port {} msg {}", self.cell_id, f, port_no.v, msg)
                             }
                         }
@@ -583,7 +588,7 @@ impl CellAgent {
                         msg.process_ca(self, &msg_tree_id, port_no).context(CellagentError::Chain { func_name: f, comment: S(self.cell_id.clone())})?;
                         let save = self.gvm_eval_save(&msg_tree_id, &msg).context(CellagentError::Chain { func_name: f, comment: S(self.cell_id.clone())})?;
                         match msg_type {
-                            MsgType::Application | MsgType::Manifest => if save {
+                            MsgType::Application | MsgType::Manifest | MsgType::StackTree => if save {
                                 let tree_id = msg.get_tree_id().context(CellagentError::Chain { func_name: f, comment: S("")})?;
                                 let traph = self.get_traph(tree_id).context(CellagentError::Chain { func_name: f, comment: S("")})?;
                                 let entry = traph.get_tree_entry(&tree_id.get_uuid())?;
@@ -631,6 +636,18 @@ impl CellAgent {
                                 let mask = Mask::new(PortNumber::new(port_no, self.no_ports)?);
                                 let payload = msg.get_payload_stack_tree_d().context(CellagentError::Chain { func_name: f, comment: S("get payload stack tree")})?;
                                 let tree_id = payload.get_tree_id();
+                                let tree_uuid = tree_id.get_uuid();
+                                let mut traph = match self.get_traph(tree_id) {
+                                    Ok(t) => t,
+                                    Err(e) => return Err(CellagentError::NoTraph { func_name: f, cell_id: self.cell_id.clone(), tree_uuid: tree_uuid }.into())
+                                };
+                                let mut entry = traph.get_tree_entry(&tree_uuid)?;
+                                let other_index = payload.get_table_index();
+                                entry.set_table_index(other_index);
+                                let mask = entry.get_mask().or(Mask::new(PortNumber::new(port_no, self.no_ports)?));
+                                entry.set_mask(mask);
+                                traph.set_tree_entry(&tree_uuid, entry)?;
+                                self.ca_to_pe.send(CaToPePacket::Entry(entry)).context(CellagentError::Chain { func_name: f, comment: S(self.cell_id.clone()) })?;
                                 {   // Debug print
                                     let ports = mask.get_port_nos();
                                     let no_saved = self.get_saved_msgs(tree_id).len();
@@ -768,6 +785,8 @@ impl CellAgent {
     }
     fn gvm_eval_save(&self, tree_id: &TreeID, msg: &Box<Message>) -> Result<bool, Error> {
         let f = "gvm_eval_save";
+        // True if I should save this message for children that join this tree later
+        // TODO: Add test to see if all child ports on the parent tree have responded, in which case I can delete saved msgs
         let msg_type = msg.get_msg_type();
         let gvm_eqn_opt = match msg_type {
             // The GVM equation comes from the tree these messages are sent on
@@ -792,7 +811,8 @@ impl CellAgent {
                     };
                     let params = traph.get_params(gvm_eqn.get_variables())?;
                     let save = gvm_eqn.eval_save(&params)?;
-                    Ok(save)
+                    let xtnd = gvm_eqn.eval_xtnd(&params)?;
+                    Ok(save && xtnd)
                 },
                 Err(_) => Ok(false)
             }
@@ -852,9 +872,9 @@ impl CellAgent {
             let discover_msg = DiscoverMsg::new(&sender_id, &self.my_tree_id, my_table_index, &self.cell_id, hops, path);
             //println!("CellAgent {}: sending packet {} on port {} {} ", self.cell_id, packets[0].get_count(), port_no, discover_msg);
             let entry = CaToPePacket::Entry(*self.connected_tree_entry.lock().unwrap());
-            self.ca_to_pe.send(entry).context(CellagentError::Chain { func_name: "port_connected", comment: S(self.cell_id.clone()) })?;
+            self.ca_to_pe.send(entry).context(CellagentError::Chain { func_name: f, comment: S(self.cell_id.clone()) })?;
             self.send_msg(&self.connected_tree_id, &discover_msg, port_no_mask).context(CellagentError::Chain { func_name: "port_connected", comment: S(self.cell_id.clone()) })?;
-            self.forward_discover(port_no_mask).context(CellagentError::Chain { func_name: "port_connected", comment: S(self.cell_id.clone()) })?;
+            self.forward_discover(port_no_mask).context(CellagentError::Chain { func_name: f, comment: S(self.cell_id.clone()) })?;
             //println!("Cellagent {}: {} forward {} stack tree msgs", self.cell_id, f, self.get_saved_stack_tree().len());
             Ok(())
         }

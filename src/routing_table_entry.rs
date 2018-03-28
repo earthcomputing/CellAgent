@@ -54,6 +54,9 @@ impl RoutingTableEntry {
 		let port_no = port_number.get_port_no().v as usize;
 		self.other_indices[port_no]
 	}
+    pub fn set_other_index(&mut self, port_number: PortNumber, other_index: TableIndex) {
+        self.other_indices[port_number.get_port_no().v as usize] = other_index;
+    }
 	pub fn clear_other_indices(&mut self) {
         self.other_indices = DEFAULT_INDICES;
     }
@@ -71,9 +74,8 @@ impl RoutingTableEntry {
 	pub fn set_parent(&mut self, port_number: PortNumber) {
 		self.parent = port_number.get_port_no();
 	}
-	pub fn set_table_index(&mut self, index: TableIndex) {
-		self.index = index;
-	}
+	pub fn set_table_index(&mut self, index: TableIndex) { self.index = index; }
+
 }
 impl fmt::Display for RoutingTableEntry {
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result { 

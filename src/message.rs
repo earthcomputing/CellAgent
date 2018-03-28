@@ -495,6 +495,8 @@ impl Message for StackTreeDMsg {
         //println!("Message Cell {}: StackTreeDMsg on port {} index {} for tree {}", ca.get_id(), *port_no, *other_index, tree_id);
         let mut entry = ca.get_tree_entry(tree_id)?;
         let port_number = PortNumber::new(port_no,ca.get_no_ports())?;
+        let entry_mask = entry.get_mask();
+        entry.set_mask(entry_mask.or(Mask::new(port_number)));
         entry.add_other_index(port_number, other_index);
         traph.set_tree_entry(&tree_id.get_uuid(), entry)?;
         //println!("Message Cell {}: StackTreeD {} on port {} entry {} Stack tree d msg {}", ca.get_id(), tree_id, *port_no, entry, self);
