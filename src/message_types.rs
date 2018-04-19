@@ -35,7 +35,7 @@ pub type PortToPe = mpsc::Sender<PortToPePacket>;
 pub type PeFromPort = mpsc::Receiver<PortToPePacket>;
 pub type PortPeError = mpsc::SendError<PortToPePacket>;
 // PacketEngine to CellAgent
-pub enum PeToCaPacket { Status((PortNo, bool, PortStatus)), Packet((PortNo, Mask, TableIndex, Packet)), Tcp((PortNo, TCP)) }
+pub enum PeToCaPacket { Status((PortNo, bool, PortStatus)), Packet((PortNo, TableIndex, Packet)), Tcp((PortNo, TCP)) }
 pub type PeToCa = mpsc::Sender<PeToCaPacket>;
 pub type CaFromPe = mpsc::Receiver<PeToCaPacket>;
 pub type PeCaError = mpsc::SendError<PeToCaPacket>;
