@@ -70,7 +70,7 @@ impl Noc {
             match msg_type {
                 TcpMsgType::TreeName => {
                     let msg = serde_json::from_str::<TreeNameMsg>(&serialized).context(NocError::Chain { func_name: "listen_port", comment: S("") })?;
-					let tree_name = msg.get_payload_tree_name().context(NocError::Chain { func_name: "listen_port", comment: S("") })?;
+					let tree_name = msg.get_tree_name();
                     self.allowed_trees.insert(AllowedTree::new(tree_name));
                     // If this is the first tree, set up NocMaster and NocAgent
                     if self.allowed_trees.len() == 1 {
