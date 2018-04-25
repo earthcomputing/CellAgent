@@ -17,17 +17,13 @@ pub struct Tree {
 	parent_tree_id: TreeID,
 	stacked_tree_ids: Vec<TreeID>,
 	table_entry: RoutingTableEntry,
-	gvm_eqn: Option<GvmEquation>,
+	gvm_eqn: GvmEquation,
 }
 impl Tree {
 	pub fn new(tree_id: &TreeID, base_tree_id: &TreeID, parent_tree_id: &TreeID,
-               opt_gvm_eqn: Option<&GvmEquation>, table_entry: RoutingTableEntry) -> Tree {
-		let gvm_eqn = match opt_gvm_eqn {
-			Some(g) => Some(g.clone()),
-			None => None
-		};
+               gvm_eqn: &GvmEquation, table_entry: RoutingTableEntry) -> Tree {
 		Tree { base_tree_id: base_tree_id.clone(), tree_id: tree_id.clone(), parent_tree_id: parent_tree_id.clone(),
-            gvm_eqn: gvm_eqn, table_entry: table_entry, stacked_tree_ids: Vec::new() }
+            gvm_eqn: gvm_eqn.clone(), table_entry, stacked_tree_ids: Vec::new() }
 	}
 	pub fn get_tree_id(&self) -> &TreeID { &self.tree_id }
 	pub fn get_base_tree_id(&self) -> &TreeID { &self.base_tree_id }
@@ -37,8 +33,8 @@ impl Tree {
 	pub fn get_table_entry(&self) -> RoutingTableEntry { self.table_entry }
 	pub fn set_table_entry(&mut self, entry: RoutingTableEntry) { self.table_entry = entry; }
 	pub fn get_table_index(&self) -> TableIndex { self.table_entry.get_index() }
-	pub fn get_gvm_eqn(&self) -> Option<GvmEquation> { self.gvm_eqn.clone() }
-	pub fn set_gvm_eqn(&mut self, gvm_eqn: GvmEquation) { self.gvm_eqn = Some(gvm_eqn) }
+	pub fn get_gvm_eqn(&self) -> &GvmEquation { &self.gvm_eqn }
+	pub fn set_gvm_eqn(&mut self, gvm_eqn: GvmEquation) { self.gvm_eqn = gvm_eqn; }
 	pub fn get_parent(&self) -> PortNo { self.get_table_entry().get_parent() }	
 	pub fn set_parent(&mut self, port_number: PortNumber) { self.get_table_entry().set_parent(port_number); }
 	pub fn add_children(&mut self, children: &HashSet<PortNumber>) { 
@@ -51,11 +47,7 @@ impl Tree {
 }
 impl fmt::Display for Tree {
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-		let mut s = format!("TreeID {}, ", self.tree_id);
-		match self.gvm_eqn {
-			Some(ref eqn) => s = s + &format!("{}", eqn),
-			None => s = s + &format!("No GVM equation")
-		};
+		let mut s = format!("TreeID {} {}, ", self.tree_id, self.gvm_eqn);
 		for stacked in &self.stacked_tree_ids {
 			s = s + &format!("\n{}", stacked);
 		}

@@ -25,7 +25,7 @@ pub struct Traph {
 	elements: Vec<TraphElement>,
 }
 impl Traph {
-	pub fn new(cell_id: &CellID, black_tree_id: &TreeID, index: TableIndex, gvm_eqn: Option<&GvmEquation>) -> Result<Traph, Error> {
+	pub fn new(cell_id: &CellID, black_tree_id: &TreeID, index: TableIndex, gvm_eqn: &GvmEquation) -> Result<Traph, Error> {
 		let mut elements = Vec::new();
 		for i in 1..MAX_PORTS.v {
 			let port_number = PortNumber::new(PortNo{v:i as u8}, MAX_PORTS).context(TraphError::Chain { func_name: "new", comment: S("")})?;
@@ -164,12 +164,11 @@ impl Traph {
 				let port_number = PortNumber::new(base_tree_entry.get_parent(), port_no).context(TraphError::Chain { func_name: "update_stacked_entries", comment: S("") })?;
 				stacked_entry.set_parent(port_number);
 				stacked_entry.set_mask(base_tree_entry.get_mask());
-				if let Some(gvm_eqn) = stacked_tree.get_gvm_eqn() {
-					let params = self.get_params(gvm_eqn.get_variables()).context(TraphError::Chain { func_name: "update_stacked_entries", comment: S("")})?;
-					if !gvm_eqn.eval_recv(&params).context(TraphError::Chain { func_name: "update_stacked_entries", comment: S(self.cell_id.get_name()) + " recv"})? {
-						let mask = stacked_entry.get_mask().and(Mask::all_but_zero(PortNo{v:stacked_entry.get_other_indices().len() as u8}));
-						stacked_entry.set_mask(mask);
-					}
+				let gvm_eqn = stacked_tree.get_gvm_eqn();
+				let params = self.get_params(gvm_eqn.get_variables()).context(TraphError::Chain { func_name: "update_stacked_entries", comment: S("")})?;
+				if !gvm_eqn.eval_recv(&params).context(TraphError::Chain { func_name: "update_stacked_entries", comment: S(self.cell_id.get_name()) + " recv"})? {
+					let mask = stacked_entry.get_mask().and(Mask::all_but_zero(PortNo{v:stacked_entry.get_other_indices().len() as u8}));
+					stacked_entry.set_mask(mask);
 				}
 				// TODO: The following is wrong, but what should I do on a failover???
 				//stacked_entry.set_other_indices(base_tree_entry.get_other_indices());
