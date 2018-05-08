@@ -20,7 +20,7 @@ impl RoutingTable {
 			let entry = RoutingTableEntry::default(TableIndex(i)).context(RoutingTableError::Chain { func_name: "new", comment: S(id.get_name())})?;
 			entries.push(entry);
 		}
-		Ok(RoutingTable { id: id, entries: entries, connected_ports: Vec::new() })
+		Ok(RoutingTable { id, entries, connected_ports: Vec::new() })
 	}
 	pub fn get_entry(&self, TableIndex(index): TableIndex) -> Result<RoutingTableEntry, RoutingTableError> {
 		let f = "get_entry";

@@ -11,7 +11,7 @@ use serde_json;
 
 use config::{PACKET_MIN, PACKET_MAX, PAYLOAD_DEFAULT_ELEMENT, 
 	MsgID, PacketNo};
-use message::{Message, MsgDirection, TypePlusMsg};
+use message::{Message, MsgDirection, MsgType, TypePlusMsg};
 use name::{Name, TreeID};
 use utility::S;
 use uuid_fake::Uuid;
@@ -39,8 +39,15 @@ impl Packet {
 	pub fn get_header(&self) -> PacketHeader { self.header }
 	pub fn get_payload(&self) -> Payload { self.payload }
 	pub fn get_tree_uuid(&self) -> Uuid { self.header.get_uuid() }
-//	pub fn get_payload_bytes(&self) -> Vec<u8> { self.get_payload().get_bytes() }
-//	pub fn get_payload_size(&self) -> usize { self.payload.get_no_bytes() }
+    pub fn is_blocking(&self) -> bool { self.header.is_blocking() }
+    pub fn is_last_packet(&self) -> bool { self.header.is_last_packet() }
+    // Debug hack to get tree_id out of packets.  Assumes msg is one packet
+    pub fn get_tree_id(self) -> TreeID {
+        let msg = MsgType::get_msg(&vec![self]).unwrap();
+        msg.get_tree_id().unwrap().clone()
+    }
+    //	pub fn get_payload_bytes(&self) -> Vec<u8> { self.get_payload().get_bytes() }
+    //	pub fn get_payload_size(&self) -> usize { self.payload.get_no_bytes() }
 }
 impl fmt::Display for Packet {
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result { 
@@ -68,18 +75,21 @@ pub struct PacketHeader {
 					// xxxx xxx0 => rootcast
 					// xxxx xxx1 => leafcast
 					// xxxx xx0x => Not last packet
-					// xxxx xx1x => Last packet
+					// xxxx xx1x => Is last packet
+					// xxxx x0xx => Is not blocking
+                    // xxxx x1xx => Is blocking
 					// xx00 xxxx => EC Protocol to VirtualMachine
 					// xx01 xxxx => Legacy Protocol to VirtualMachine
 }
 #[deny(unused_must_use)]
 impl PacketHeader {
-	pub fn new(msg_id: MsgID, tree_id: &TreeID, size: PacketNo, direction: MsgDirection, is_last_packet: bool) 
-			-> PacketHeader {
+	pub fn new(msg_id: MsgID, tree_id: &TreeID, size: PacketNo, direction: MsgDirection,
+               is_last_packet: bool, is_blocking: bool) -> PacketHeader {
 		// Assertion fails if I forgot to change PACKET_HEADER_SIZE when I changed PacketHeader struct
 		assert_eq!(PACKET_HEADER_SIZE, mem::size_of::<PacketHeader>());
-		let flags = if is_last_packet { 2 } else { 0 };
-		let mut ph = PacketHeader { msg_id: msg_id, uuid: tree_id.get_uuid(), size: size, flags: flags };
+		let mut flags = if is_last_packet { 2 } else { 0 };
+        if is_blocking { flags = flags | 4; }
+        let mut ph = PacketHeader { msg_id, uuid: tree_id.get_uuid(), size, flags };
 		ph.set_direction(direction);
 		ph
 	}
@@ -90,7 +100,8 @@ impl PacketHeader {
 	pub fn is_leafcast(&self) -> bool { (self.flags & 1) == 1 }
 	pub fn is_rootcast(&self) -> bool { !self.is_leafcast() }
 	pub fn is_last_packet(&self) -> bool { (self.flags & 2) == 2 }
-	fn set_direction(&mut self, direction: MsgDirection) { 
+    pub fn is_blocking(&self) -> bool { (self.flags & 4) == 4 }
+	fn set_direction(&mut self, direction: MsgDirection) {
 		match direction {
 			MsgDirection::Leafward => self.flags = self.flags | 1,
 			MsgDirection::Rootward => self.flags = self.flags & 254
@@ -153,7 +164,7 @@ impl Serializer {
 }
 pub struct Packetizer {}
 impl Packetizer {
-	pub fn packetize(tree_id: &TreeID, msg_bytes: &Box<Vec<u8>>, direction: MsgDirection) 
+	pub fn packetize(tree_id: &TreeID, msg_bytes: &Box<Vec<u8>>, direction: MsgDirection, is_blocking: bool)
 			-> Vec<Packet> {
 		let payload_size = Packetizer::packet_payload_size(msg_bytes.len());
 		let num_packets = (msg_bytes.len() + payload_size - 1)/ payload_size; // Poor man's ceiling
@@ -166,7 +177,8 @@ impl Packetizer {
 			} else {
 				(num_packets - i, false)
 			};
-			let packet_header = PacketHeader::new(msg_id, tree_id, PacketNo(size as u16), direction, is_last_packet);
+			let packet_header = PacketHeader::new(msg_id, tree_id, PacketNo(size as u16), direction,
+                                                  is_last_packet, is_blocking);
 			// Not a very Rusty way to put bytes into payload
 			let mut packet_bytes = vec![PAYLOAD_DEFAULT_ELEMENT; payload_size];
 			for j in 0..payload_size {

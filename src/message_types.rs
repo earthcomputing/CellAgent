@@ -9,8 +9,13 @@ use uptree_spec::AllowedTree;
 use utility::{Mask, PortNumber};
 
 pub type TCP = (AllowedTree, TcpMsgType, MsgDirection, String);
+// PacketEngine to PacketEngine to unblock
+pub type PeToPePacket = String;
+pub type PeToPe = mpsc::Sender<PeToPePacket>;
+pub type PeFromPe = mpsc::Receiver<PeToPePacket>;
+pub type PePeError = mpsc::SendError<PeToPePacket>;
 // CellAgent to PacketEngine
-pub enum CaToPePacket { Entry(RoutingTableEntry), Packet((TableIndex, Mask, Packet)), Tcp((PortNumber, TCP)) }
+pub enum CaToPePacket { Entry(RoutingTableEntry), Packet((TableIndex, Mask, Packet)), Tcp((PortNumber, TCP)),  Unblock }
 pub type CaToPe = mpsc::Sender<CaToPePacket>;
 pub type PeFromCa = mpsc::Receiver<CaToPePacket>;
 pub type CaPeError = mpsc::SendError<CaToPePacket>;

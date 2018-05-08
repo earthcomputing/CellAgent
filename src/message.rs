@@ -34,27 +34,6 @@ pub enum MsgType {
     StackTreeD,
 	TreeName,
 }
-#[derive(Debug, Copy, Clone, Hash, Eq, PartialEq, Serialize, Deserialize)]
-pub enum TcpMsgType {
-	Application,
-    DeleteTree,
-    Manifest,
-    Query,
-    StackTree,
-    TreeName,
-}
-impl fmt::Display for TcpMsgType {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        match *self {
-            TcpMsgType::Application  => write!(f, "Application"),
-            TcpMsgType::DeleteTree   => write!(f, "DeleteTree"),
-            TcpMsgType::Manifest     => write!(f, "Manifest"),
-            TcpMsgType::Query        => write!(f, "Query"),
-            TcpMsgType::StackTree    => write!(f, "StackTree"),
-            TcpMsgType::TreeName     => write!(f, "TreeName"),
-        }
-    }
-}
 impl MsgType {
     pub fn get_msg(packets: &Vec<Packet>) -> Result<Box<Message>, Error> {
         let serialized = Packetizer::unpacketize(packets).context(MessageError::Chain { func_name: "get_msg", comment: S("unpacketize")})?;
@@ -81,13 +60,13 @@ impl MsgType {
 	}
 	// A hack for finding the message type
     pub fn msg_type(packet: &Packet) -> MsgType {
-        if MsgType::is_type(packet, MsgType::Application) { MsgType::Application }
-        else if MsgType::is_type(packet, MsgType::Discover) { MsgType::Discover }
-        else if MsgType::is_type(packet, MsgType::DiscoverD) { MsgType::DiscoverD }
-        else if MsgType::is_type(packet, MsgType::Manifest) { MsgType::Manifest }
-        else if MsgType::is_type(packet, MsgType::StackTree) { MsgType::StackTree }
-        else if MsgType::is_type(packet, MsgType::StackTreeD) { MsgType::StackTreeD }
-        else if MsgType::is_type(packet, MsgType::TreeName) { MsgType::TreeName }
+        if      MsgType::is_type(packet, MsgType::Application) { MsgType::Application }
+        else if MsgType::is_type(packet, MsgType::Discover)    { MsgType::Discover }
+        else if MsgType::is_type(packet, MsgType::DiscoverD)   { MsgType::DiscoverD }
+        else if MsgType::is_type(packet, MsgType::Manifest)    { MsgType::Manifest }
+        else if MsgType::is_type(packet, MsgType::StackTree)   { MsgType::StackTree }
+        else if MsgType::is_type(packet, MsgType::StackTreeD)  { MsgType::StackTreeD }
+        else if MsgType::is_type(packet, MsgType::TreeName)    { MsgType::TreeName }
         else { panic!("Invalid message type") }
     }
 }
@@ -103,6 +82,27 @@ impl fmt::Display for MsgType {
 			MsgType::TreeName    => write!(f, "TreeName"),
 		}
 	}
+}
+#[derive(Debug, Copy, Clone, Hash, Eq, PartialEq, Serialize, Deserialize)]
+pub enum TcpMsgType {
+    Application,
+    DeleteTree,
+    Manifest,
+    Query,
+    StackTree,
+    TreeName,
+}
+impl fmt::Display for TcpMsgType {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match *self {
+            TcpMsgType::Application  => write!(f, "Application"),
+            TcpMsgType::DeleteTree   => write!(f, "DeleteTree"),
+            TcpMsgType::Manifest     => write!(f, "Manifest"),
+            TcpMsgType::Query        => write!(f, "Query"),
+            TcpMsgType::StackTree    => write!(f, "StackTree"),
+            TcpMsgType::TreeName     => write!(f, "TreeName"),
+        }
+    }
 }
 #[derive(Debug, Copy, Clone, Hash, Serialize, Deserialize)]
 pub enum MsgDirection {
@@ -137,6 +137,7 @@ impl fmt::Display for TypePlusMsg {
 
 pub trait Message {
 	fn get_header(&self) -> &MsgHeader;
+    fn get_payload(&self) -> &MsgPayload;
     fn get_msg_type(&self) -> MsgType;
 	fn is_rootward(&self) -> bool {
 		match self.get_header().get_direction() {
@@ -145,22 +146,22 @@ pub trait Message {
 		}
 	}
 	fn is_leafward(&self) -> bool { !self.is_rootward() }
+    fn is_blocking(&self) -> bool;
 	fn get_count(&self) -> MsgID { self.get_header().get_count() }
     fn to_packets(&self, tree_id: &TreeID) -> Result<Vec<Packet>, Error>
 			where Self:std::marker::Sized + serde::Serialize {
 		let bytes = Serializer::serialize(self).context(MessageError::Chain { func_name: "to_packets", comment: S("")})?;
 		let direction = self.get_header().get_direction();
-		let packets = Packetizer::packetize(tree_id, &bytes, direction);
+		let packets = Packetizer::packetize(tree_id, &bytes, direction, self.is_blocking());
 		Ok(packets)
 	}
-	// If I had known then what I know now, I would have used an enum instead of a trait for Message.  I'm going with this
-    // simple kludge so I can get on with things.
+    fn get_tree_id(&self) -> Option<&TreeID> { None }
 	fn process_ca(&mut self, cell_agent: &mut CellAgent, index: TableIndex, port_no: PortNo,
                   msg_tree_id: &TreeID, packets: &Vec<Packet>) -> Result<(), Error> { Err(MessageError::Process { func_name: "process_ca" }.into()) }
 }
 impl fmt::Display for Message {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        let s = format!("{}", self.get_header());
+        let s = format!("{} {}", self.get_header(), self.get_payload());
         write!(f, "{}", s)
     }
 }
@@ -221,7 +222,10 @@ impl DiscoverMsg {
 }
 impl Message for DiscoverMsg {
 	fn get_header(&self) -> &MsgHeader { &self.header }
+    fn get_payload(&self) -> &MsgPayload { &self.payload }
     fn get_msg_type(&self) -> MsgType { self.get_header().msg_type }
+    fn is_blocking(&self) -> bool { false }
+	fn get_tree_id(&self) -> Option<&TreeID> { Some(&self.payload.tree_id) }
 	fn process_ca(&mut self, cell_agent: &mut CellAgent, index: TableIndex, port_no: PortNo,
                   msg_tree_id: &TreeID, packets: &Vec<Packet>) -> Result<(), Error> {
         let f = "process_ca";
@@ -286,13 +290,16 @@ impl DiscoverDMsg {
 		let tree_name = tree_id.stringify();
 		let header = MsgHeader::new(sender_id,MsgType::DiscoverD, MsgDirection::Leafward);
 		let payload = DiscoverDPayload::new(tree_id, index);
-		DiscoverDMsg { header: header, payload: payload }
+		DiscoverDMsg { header, payload }
 	}
     pub fn get_payload(&self) -> &DiscoverDPayload { &self.payload }
 }
 impl Message for DiscoverDMsg {
 	fn get_header(&self) -> &MsgHeader { &self.header }
+    fn get_payload(&self) -> &MsgPayload { &self.payload }
     fn get_msg_type(&self) -> MsgType { self.get_header().msg_type }
+    fn is_blocking(&self) -> bool { true }
+    fn get_tree_id(&self) -> Option<&TreeID> { Some(&self.payload.get_tree_id()) }
 	fn process_ca(&mut self, cell_agent: &mut CellAgent, index: TableIndex, port_no: PortNo,
                   msg_tree_id: &TreeID, packets: &Vec<Packet>) -> Result<(), Error> {
         let f = "process_ca";
@@ -343,11 +350,14 @@ impl StackTreeMsg {
 }
 impl Message for StackTreeMsg {
 	fn get_header(&self) -> &MsgHeader { &self.header }
+    fn get_payload(&self) -> &MsgPayload { &self.payload }
     fn get_msg_type(&self) -> MsgType { self.header.msg_type }
+    fn is_blocking(&self) -> bool { false }
+    fn get_tree_id(&self) -> Option<&TreeID> { Some(&self.payload.get_new_tree_id()) }
 	fn process_ca(&mut self, cell_agent: &mut CellAgent, index: TableIndex, port_no: PortNo,
                   msg_tree_id: &TreeID, packets: &Vec<Packet>) -> Result<(), Error> {
         let f = "process_ca";
-        cell_agent.process_stack_tree_msg(&self, port_no, msg_tree_id, packets)
+        cell_agent.process_stack_tree_msg(&self, index, port_no, msg_tree_id, packets)
 	}
 }
 impl fmt::Display for StackTreeMsg {
@@ -395,11 +405,14 @@ impl StackTreeDMsg {
         StackTreeDMsg { header: self.header.clone(), payload }
     }
     pub fn get_payload(&self) -> &StackTreeMsgDPayload { &self.payload }
-    fn get_payload_stack_tree(&self) -> Result<&StackTreeMsgDPayload, Error> { Ok(&self.payload) }
+    pub fn get_tree_id(&self) -> Option<&TreeID> { Some(&self.payload.get_tree_id()) }
 }
 impl Message for StackTreeDMsg {
     fn get_header(&self) -> &MsgHeader { &self.header }
+    fn get_payload(&self) -> &MsgPayload { &self.payload }
     fn get_msg_type(&self) -> MsgType { self.header.msg_type }
+    fn get_tree_id(&self) -> Option<&TreeID> { Some(self.payload.get_tree_id()) }
+    fn is_blocking(&self) -> bool { true }
     fn process_ca(&mut self, cell_agent: &mut CellAgent, index: TableIndex, port_no: PortNo,
                   msg_tree_id: &TreeID, packets: &Vec<Packet>) -> Result<(), Error> {
         let f = "process_ca";
@@ -447,7 +460,10 @@ impl ManifestMsg {
 }
 impl Message for ManifestMsg {
 	fn get_header(&self) -> &MsgHeader { &self.header }
+    fn get_payload(&self) -> &MsgPayload { &self.payload }
     fn get_msg_type(&self) -> MsgType { self.get_header().msg_type }
+    fn is_blocking(&self) -> bool { false }
+    fn get_tree_id(&self) -> Option<&TreeID> { Some(&self.payload.get_deploy_tree_id()) }
 	fn process_ca(&mut self, cell_agent: &mut CellAgent, index: TableIndex, port_no: PortNo,
                   msg_tree_id: &TreeID, packets: &Vec<Packet>) -> Result<(), Error> {
         let f = "process_ca";
@@ -499,7 +515,10 @@ impl ApplicationMsg {
 }
 impl Message for ApplicationMsg {
     fn get_header(&self) -> &MsgHeader { &self.header }
+    fn get_payload(&self) -> &MsgPayload { &self.payload }
     fn get_msg_type(&self) -> MsgType { self.get_header().msg_type }
+    fn is_blocking(&self) -> bool { false }
+    fn get_tree_id(&self) -> Option<&TreeID> { Some(&self.payload.get_tree_id()) }
     fn process_ca(&mut self, cell_agent: &mut CellAgent, index: TableIndex, port_no: PortNo,
                   msg_tree_id: &TreeID, packets: &Vec<Packet>) -> Result<(), Error> {
         let f = "process_ca";
@@ -548,7 +567,9 @@ impl TreeNameMsg {
 }
 impl Message for TreeNameMsg {
     fn get_header(&self) -> &MsgHeader { &self.header }
+    fn get_payload(&self) -> &MsgPayload { &self.payload }
     fn get_msg_type(&self) -> MsgType { self.get_header().msg_type }
+    fn is_blocking(&self) -> bool { false }
 }
 impl fmt::Display for TreeNameMsg {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
