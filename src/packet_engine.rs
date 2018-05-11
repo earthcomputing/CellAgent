@@ -65,7 +65,7 @@ impl PacketEngine {
 		loop {
 			match pe_from_ca.recv().context(PacketEngineError::Chain { func_name: f, comment: S("recv entry from ca") + self.cell_id.get_name()})? {
 				CaToPePacket::Entry(entry) => {
-                    {   // Visualization output
+                    {/*   // Visualization output
                         if *entry.get_index() > 0 {
                             {/*  // Debug print
                                 if *entry.get_index() == 4 && self.cell_id.is_name("C:3") { println!("PacketEngine {}: updated entry {}", self.cell_id, entry); }
@@ -73,7 +73,9 @@ impl PacketEngine {
                             let json = ::serde_json::to_string(&(&self.cell_id, &entry, &entry.get_mask().get_port_nos())).context(PacketEngineError::Chain { func_name: "listen_ca", comment: S(self.cell_id.get_name()) })?;
                             ::utility::append2file(json).context(PacketEngineError::Chain { func_name: "listen_ca", comment: S("") })?;
                         }
-                    }
+                    */}
+                    let tree_id = entry.get_uuid().to_string();
+                    //if tree_id.starts_with("b1dc43ed") || tree_id.starts_with("2c8b871d") { println!("PacketEngine {}: {} entry {}", self.cell_id, f, entry); }
 					self.routing_table.lock().unwrap().set_entry(entry)
 				},
 				CaToPePacket::Packet((index, user_mask, packet)) => {
@@ -82,14 +84,15 @@ impl PacketEngine {
 					let port_no = PortNo{v:0};
                     {/*   // Debug print
                         let msg_type = MsgType::msg_type(&packet);
+                        let tree_id = packet.get_tree_id();
                         match msg_type {
-                            MsgType::Discover | MsgType::DiscoverD => (),
-                            _ => {
-                                println!("PacketEngine {}: got from ca {} {}", self.cell_id, msg_type, packet.get_tree_id());
+                            MsgType::DiscoverD => {
+                                if tree_id.is_name("C:2") { println!("PacketEngine {}: got from ca {} {}", self.cell_id, msg_type, tree_id); }
                             },
+                            _ => (),
                         }
                     */}
- 					if entry.may_send() { self.forward(port_no, entry, user_mask, packet).context(PacketEngineError::Chain { func_name:"listen_ca", comment: S(self.cell_id.get_name())})?; }
+ 					self.forward(port_no, entry, user_mask, packet).context(PacketEngineError::Chain { func_name:"listen_ca", comment: S(self.cell_id.get_name())})?;
 				},
 				CaToPePacket::Tcp((port_number, msg)) => {
                     let port_no = port_number.get_port_no();
@@ -127,22 +130,16 @@ impl PacketEngine {
         };
         {/*   // Debug print
             let msg_type = MsgType::msg_type(&packet);
+            let tree_id = packet.get_tree_id();
             match msg_type {
-                MsgType::Discover | MsgType::DiscoverD => (),
+                MsgType::Discover => (),
+                MsgType::DiscoverD => if tree_id.is_name("C:2") { println!("PacketEngine {}: got from {} {} {}", self.cell_id, port_no.v, msg_type, tree_id); }
                 _ => {
-                    println!("PacketEngine {}: got from {} {} {}", self.cell_id, port_no.v, msg_type, packet.get_tree_id());
+                    println!("PacketEngine {}: got from {} {} {} {}", self.cell_id, port_no.v, msg_type, tree_id, entry);
                 },
             }
         */}
         if entry.is_in_use() {
-            {/*   //Debug print
-                let msg_type = MsgType::msg_type(&packet);
-                match msg_type {
-                    MsgType::Manifest | MsgType::Application => {
-                    println ! ("PacketEngine {}: {} got msg {} on port {} tree_id {} entry {}", self.cell_id, f, msg_type, *port_no, packet.get_tree_id(), entry); },
-                    _ => ()
-                }
-            */}
             // The control tree is special since each cell has a different uuid
             if (*entry.get_index() == 0) || (entry.get_uuid() == packet.get_header().get_uuid()) {
                 let mask = entry.get_mask();
@@ -156,9 +153,10 @@ impl PacketEngine {
             // TODO: Fix to block only the parent port of the specific tree
             // Wait for permission to proceed if packet is from a port and will result in a tree update
             if packet.is_blocking() && packet.is_last_packet() {
-                //println!("PacketEngine {}: {} blocking for {}", self.cell_id, f, MsgType::msg_type(&packet));
+                let tree_id = packet.get_tree_id();
+                //if tree_id.is_name("C:2") { println!("PacketEngine {}: {} blocking for {} on port {}", self.cell_id, f, MsgType::msg_type(&packet), port_no.v); }
                 pe_from_pe.recv()?;
-                //println!("PacketEngine {}: {} unblocked for {}", self.cell_id, f, MsgType::msg_type(&packet));
+                //if tree_id.is_name("C:2") { println!("PacketEngine {}: {} unblocked for {} on port {}", self.cell_id, f, MsgType::msg_type(&packet), port_no.v); }
             }
         }
 		Ok(())
@@ -179,10 +177,11 @@ impl PacketEngine {
 						sender.send(PeToPortPacket::Packet((*other_index, packet))).context(PacketEngineError::Chain { func_name: f, comment: S(self.cell_id.clone())})?;
                         {/*   // Debug print
                             let msg_type = MsgType::msg_type(&packet);
+                            let tree_id = packet.get_tree_id();
                             match msg_type {
-                                MsgType::Discover | MsgType::DiscoverD => (),
+                                MsgType::Discover => (),
                                 _ => {
-                                    println!("PacketEngine {}: {} [{}] {} {}", self.cell_id, f, parent.v, msg_type, packet.get_tree_id());
+                                    println!("PacketEngine {}: {} [{}] {} {}", self.cell_id, f, parent.v, msg_type, tree_id);
                                 },
 
                             }
@@ -201,12 +200,13 @@ impl PacketEngine {
 			let port_nos = mask.get_port_nos();
             {/*   // Debug print
                 let msg_type = MsgType::msg_type(&packet);
+                let tree_id = packet.get_tree_id();
                 match msg_type {
-                    MsgType::Discover | MsgType::DiscoverD => (),
+                    MsgType::Discover => (),
+                    MsgType::DiscoverD => if tree_id.is_name("C:2") { println!("PacketEngine {}: {} on {:?} {} {}", self.cell_id, f, port_nos, msg_type, tree_id); }
                     _ => {
-                        println!("PacketEngine {}: {} on {:?} {} {}", self.cell_id, f, port_nos, msg_type, packet.get_tree_id());
-                    },
-
+                        println!("PacketEngine {}: {} on {:?} {} {}", self.cell_id, f, port_nos, msg_type, tree_id);
+                    }
                 }
             */}
 			for port_no in port_nos.iter() {

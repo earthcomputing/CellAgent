@@ -303,7 +303,7 @@ impl Message for DiscoverDMsg {
 	fn process_ca(&mut self, cell_agent: &mut CellAgent, index: TableIndex, port_no: PortNo,
                   msg_tree_id: &TreeID, packets: &Vec<Packet>) -> Result<(), Error> {
         let f = "process_ca";
-        cell_agent.process_discoverd_msg(&self, port_no)
+        cell_agent.process_discover_d_msg(&self, port_no)
     }
 }
 impl fmt::Display for DiscoverDMsg {
@@ -416,7 +416,7 @@ impl Message for StackTreeDMsg {
     fn process_ca(&mut self, cell_agent: &mut CellAgent, index: TableIndex, port_no: PortNo,
                   msg_tree_id: &TreeID, packets: &Vec<Packet>) -> Result<(), Error> {
         let f = "process_ca";
-        cell_agent.process_stack_treed_msg(&self, port_no)
+        cell_agent.process_stack_tree_d_msg(&self, port_no)
     }
 }
 impl fmt::Display for StackTreeDMsg {
