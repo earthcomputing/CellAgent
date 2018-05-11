@@ -14,7 +14,7 @@ const DEFAULT_INDICES: OtherIndices = [TableIndex(0); MAX_PORTS.v as usize];
 pub struct RoutingTableEntry {
 	index: TableIndex,
 	uuid: Uuid,
-	may_send: bool, 
+	may_send: bool, // TODO: Not needed because I moved check to CellAgent
 	inuse: bool,
 	parent: PortNo,
 	mask: Mask,

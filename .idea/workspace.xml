@@ -2,15 +2,12 @@
 <project version="4">
   <component name="ChangeListManager">
     <list default="true" id="eee480a2-146d-44ab-9647-cef5ea39b250" name="Default" comment="">
-      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/Multicell.key" beforeDir="false" afterPath="$PROJECT_DIR$/Multicell.key" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/cellagent.rs" beforeDir="false" afterPath="$PROJECT_DIR$/src/cellagent.rs" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/message.rs" beforeDir="false" afterPath="$PROJECT_DIR$/src/message.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/message_types.rs" beforeDir="false" afterPath="$PROJECT_DIR$/src/message_types.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/nalcell.rs" beforeDir="false" afterPath="$PROJECT_DIR$/src/nalcell.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/packet.rs" beforeDir="false" afterPath="$PROJECT_DIR$/src/packet.rs" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/packet_engine.rs" beforeDir="false" afterPath="$PROJECT_DIR$/src/packet_engine.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/routing_table.rs" beforeDir="false" afterPath="$PROJECT_DIR$/src/routing_table.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/routing_table_entry.rs" beforeDir="false" afterPath="$PROJECT_DIR$/src/routing_table_entry.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/traph_element.rs" beforeDir="false" afterPath="$PROJECT_DIR$/src/traph_element.rs" afterDir="false" />
     </list>
     <ignored path="$PROJECT_DIR$/target/" />
     <ignored path="$PROJECT_DIR$/out/" />
@@ -26,11 +23,11 @@
   </component>
   <component name="FileEditorManager">
     <leaf SIDE_TABS_SIZE_LIMIT_KEY="300">
-      <file leaf-file-name="cellagent.rs" pinned="false" current-in-tab="true">
+      <file leaf-file-name="cellagent.rs" pinned="false" current-in-tab="false">
         <entry file="file://$PROJECT_DIR$/src/cellagent.rs">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="172">
-              <caret line="1031" column="26" selection-start-line="1031" selection-start-column="21" selection-end-line="1031" selection-end-column="26" />
+            <state relative-caret-position="367">
+              <caret line="802" column="123" selection-start-line="802" selection-start-column="123" selection-end-line="802" selection-end-column="123" />
             </state>
           </provider>
         </entry>
@@ -38,8 +35,8 @@
       <file leaf-file-name="routing_table_entry.rs" pinned="false" current-in-tab="false">
         <entry file="file://$PROJECT_DIR$/src/routing_table_entry.rs">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="95">
-              <caret line="56" column="11" selection-start-line="56" selection-start-column="11" selection-end-line="56" selection-end-column="11" />
+            <state relative-caret-position="240">
+              <caret line="16" column="74" selection-start-line="16" selection-start-column="74" selection-end-line="16" selection-end-column="74" />
             </state>
           </provider>
         </entry>
@@ -49,15 +46,6 @@
           <provider selected="true" editor-type-id="text-editor">
             <state relative-caret-position="45">
               <caret line="3" selection-start-line="2" selection-end-line="3" />
-            </state>
-          </provider>
-        </entry>
-      </file>
-      <file leaf-file-name="utility.rs" pinned="false" current-in-tab="false">
-        <entry file="file://$PROJECT_DIR$/src/utility.rs">
-          <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="1920">
-              <caret line="136" selection-start-line="136" selection-end-line="136" />
             </state>
           </provider>
         </entry>
@@ -74,8 +62,8 @@
       <file leaf-file-name="message.rs" pinned="false" current-in-tab="false">
         <entry file="file://$PROJECT_DIR$/src/message.rs">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="410">
-              <caret line="516" column="55" selection-start-line="516" selection-start-column="55" selection-end-line="516" selection-end-column="55" />
+            <state relative-caret-position="-2288">
+              <caret line="154" column="79" lean-forward="true" selection-start-line="154" selection-start-column="79" selection-end-line="154" selection-end-column="79" />
             </state>
           </provider>
         </entry>
@@ -92,8 +80,8 @@
       <file leaf-file-name="packet_engine.rs" pinned="false" current-in-tab="false">
         <entry file="file://$PROJECT_DIR$/src/packet_engine.rs">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="377">
-              <caret line="155" column="75" selection-start-line="155" selection-start-column="75" selection-end-line="155" selection-end-column="75" />
+            <state relative-caret-position="394">
+              <caret line="94" column="165" lean-forward="true" selection-start-line="94" selection-start-column="165" selection-end-line="94" selection-end-column="165" />
             </state>
           </provider>
         </entry>
@@ -110,8 +98,17 @@
       <file leaf-file-name="traph.rs" pinned="false" current-in-tab="false">
         <entry file="file://$PROJECT_DIR$/src/traph.rs">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="720">
+            <state relative-caret-position="517">
               <caret line="48" column="96" selection-start-line="48" selection-start-column="96" selection-end-line="48" selection-end-column="96" />
+            </state>
+          </provider>
+        </entry>
+      </file>
+      <file leaf-file-name="traph_element.rs" pinned="false" current-in-tab="true">
+        <entry file="file://$PROJECT_DIR$/src/traph_element.rs">
+          <provider selected="true" editor-type-id="text-editor">
+            <state relative-caret-position="165">
+              <caret line="11" column="28" lean-forward="true" selection-start-line="11" selection-start-column="28" selection-end-line="11" selection-end-column="28" />
             </state>
           </provider>
         </entry>
@@ -146,8 +143,8 @@
       <file leaf-file-name="packet.rs" pinned="false" current-in-tab="false">
         <entry file="file://$PROJECT_DIR$/src/packet.rs">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="328">
-              <caret line="46" column="42" selection-start-line="46" selection-start-column="42" selection-end-line="46" selection-end-column="42" />
+            <state relative-caret-position="2002">
+              <caret line="166" column="16" selection-start-line="166" selection-start-column="16" selection-end-line="166" selection-end-column="16" />
             </state>
           </provider>
         </entry>
@@ -172,36 +169,36 @@
   </component>
   <component name="FindInProjectRecents">
     <findStrings>
-      <find>b1dc43ed</find>
-      <find>MsgType</find>
-      <find>C:3:</find>
-      <find>blocking</find>
-      <find>recv</find>
-      <find>.recv</find>
-      <find>CaToPePacket::Unblock</find>
-      <find>C:4:</find>
-      <find>wait</find>
-      <find>send on</find>
-      <find>pe_to_pe</find>
-      <find>pe_to_pe.</find>
-      <find>forwarded</find>
-      <find>&quot;C:1</find>
-      <find>on ports</find>
-      <find>DiscoverD</find>
-      <find>Cell C:2: Port 1</find>
-      <find>Discover</find>
-      <find>forwarding</find>
-      <find>C:2:.*DiscoverD</find>
-      <find>Cell C:3: Port</find>
-      <find>in use</find>
       <find>forward le</find>
       <find>C:2:</find>
       <find>C:1: .*Manifest</find>
-      <find>C:1:</find>
       <find>Cell</find>
       <find>NocAgent on container</find>
       <find>running</find>
       <find>Debug</find>
+      <find>C:3: add_saved_stack_tree</find>
+      <find>Cell C:3: forward_stack_tree</find>
+      <find>add_saved_stack_tree</find>
+      <find>got msg Hello from Maste</find>
+      <find>DiscoverD</find>
+      <find>Message 53</find>
+      <find>C:2:.*blocking</find>
+      <find>DiscoverD 'Leafward</find>
+      <find>forward_sav</find>
+      <find>Cellagent C:1:</find>
+      <find>DiscoverD 'Leafward'</find>
+      <find>C:2:</find>
+      <find>Message 133</find>
+      <find>Message 76</find>
+      <find>C:3:</find>
+      <find>C:1: forward_saved</find>
+      <find>C:1</find>
+      <find>&quot;b</find>
+      <find>C:1:</find>
+      <find>C:6:</find>
+      <find>got msg Hello from Master</find>
+      <find>may_send</find>
+      <find>forward_stack_tree</find>
     </findStrings>
     <replaceStrings>
       <replace>Arc::</replace>
@@ -217,7 +214,6 @@
         <option value="$PROJECT_DIR$/src/ecargs.rs" />
         <option value="$PROJECT_DIR$/src/blueprint.rs" />
         <option value="$PROJECT_DIR$/src/tenant.rs" />
-        <option value="$PROJECT_DIR$/src/traph_element.rs" />
         <option value="$PROJECT_DIR$/src/datacenter.rs" />
         <option value="$PROJECT_DIR$/src/config.rs" />
         <option value="$PROJECT_DIR$/src/gvm_equation.rs" />
@@ -231,7 +227,6 @@
         <option value="$PROJECT_DIR$/Cargo.toml" />
         <option value="$PROJECT_DIR$/src/name.rs" />
         <option value="$PROJECT_DIR$/src/uptree_spec.rs" />
-        <option value="$PROJECT_DIR$/src/routing_table_entry.rs" />
         <option value="$PROJECT_DIR$/src/tree.rs" />
         <option value="$PROJECT_DIR$/src/noc.rs" />
         <option value="$PROJECT_DIR$/src/traph.rs" />
@@ -244,6 +239,8 @@
         <option value="$PROJECT_DIR$/src/message.rs" />
         <option value="$PROJECT_DIR$/src/packet_engine.rs" />
         <option value="$PROJECT_DIR$/src/cellagent.rs" />
+        <option value="$PROJECT_DIR$/src/routing_table_entry.rs" />
+        <option value="$PROJECT_DIR$/src/traph_element.rs" />
       </list>
     </option>
   </component>
@@ -395,6 +392,7 @@
   </component>
   <component name="ToolWindowManager">
     <frame x="222" y="-1001" width="1305" height="896" extended-state="0" />
+    <editor active="true" />
     <layout>
       <window_info anchor="right" id="Palette" order="3" />
       <window_info anchor="bottom" id="TODO" order="6" />
@@ -404,7 +402,7 @@
       <window_info anchor="right" id="Capture Analysis" order="6" />
       <window_info anchor="bottom" id="Event Log" order="7" sideWeight="0.5386973" side_tool="true" visible="true" weight="0.23529412" />
       <window_info anchor="right" id="Maven Projects" order="7" />
-      <window_info active="true" anchor="bottom" x="597" y="94" width="807" height="774" id="Run" internal_type="FLOATING" order="2" type="FLOATING" visible="true" weight="0.32941177" />
+      <window_info active="true" anchor="bottom" x="523" y="94" width="881" height="774" id="Run" internal_type="FLOATING" order="2" type="FLOATING" visible="true" weight="0.32941177" />
       <window_info anchor="bottom" id="Version Control" order="10" sideWeight="0.49461642" weight="0.18286446" />
       <window_info anchor="bottom" id="Terminal" order="9" sideWeight="0.4968" weight="0.32942554" />
       <window_info id="Capture Tool" order="2" />
@@ -668,13 +666,6 @@
         </state>
       </provider>
     </entry>
-    <entry file="file://$PROJECT_DIR$/src/traph_element.rs">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="825">
-          <caret line="55" column="53" selection-start-line="55" selection-start-column="53" selection-end-line="55" selection-end-column="53" />
-        </state>
-      </provider>
-    </entry>
     <entry file="file://$PROJECT_DIR$/src/utility.rs">
       <provider selected="true" editor-type-id="text-editor">
         <state relative-caret-position="1920">
@@ -686,13 +677,6 @@
       <provider selected="true" editor-type-id="text-editor">
         <state relative-caret-position="525">
           <caret line="35" column="61" selection-start-line="35" selection-start-column="61" selection-end-line="35" selection-end-column="61" />
-        </state>
-      </provider>
-    </entry>
-    <entry file="file://$PROJECT_DIR$/src/traph.rs">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="720">
-          <caret line="48" column="96" selection-start-line="48" selection-start-column="96" selection-end-line="48" selection-end-column="96" />
         </state>
       </provider>
     </entry>
@@ -746,38 +730,52 @@
         </state>
       </provider>
     </entry>
-    <entry file="file://$PROJECT_DIR$/src/packet.rs">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="328">
-          <caret line="46" column="42" selection-start-line="46" selection-start-column="42" selection-end-line="46" selection-end-column="42" />
-        </state>
-      </provider>
-    </entry>
     <entry file="file://$PROJECT_DIR$/src/message.rs">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="410">
-          <caret line="516" column="55" selection-start-line="516" selection-start-column="55" selection-end-line="516" selection-end-column="55" />
+        <state relative-caret-position="-2288">
+          <caret line="154" column="79" lean-forward="true" selection-start-line="154" selection-start-column="79" selection-end-line="154" selection-end-column="79" />
         </state>
       </provider>
     </entry>
-    <entry file="file://$PROJECT_DIR$/src/routing_table_entry.rs">
+    <entry file="file://$PROJECT_DIR$/src/packet.rs">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="95">
-          <caret line="56" column="11" selection-start-line="56" selection-start-column="11" selection-end-line="56" selection-end-column="11" />
+        <state relative-caret-position="2002">
+          <caret line="166" column="16" selection-start-line="166" selection-start-column="16" selection-end-line="166" selection-end-column="16" />
         </state>
       </provider>
     </entry>
     <entry file="file://$PROJECT_DIR$/src/packet_engine.rs">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="377">
-          <caret line="155" column="75" selection-start-line="155" selection-start-column="75" selection-end-line="155" selection-end-column="75" />
+        <state relative-caret-position="394">
+          <caret line="94" column="165" lean-forward="true" selection-start-line="94" selection-start-column="165" selection-end-line="94" selection-end-column="165" />
         </state>
       </provider>
     </entry>
     <entry file="file://$PROJECT_DIR$/src/cellagent.rs">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="172">
-          <caret line="1031" column="26" selection-start-line="1031" selection-start-column="21" selection-end-line="1031" selection-end-column="26" />
+        <state relative-caret-position="367">
+          <caret line="802" column="123" selection-start-line="802" selection-start-column="123" selection-end-line="802" selection-end-column="123" />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/src/routing_table_entry.rs">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="240">
+          <caret line="16" column="74" selection-start-line="16" selection-start-column="74" selection-end-line="16" selection-end-column="74" />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/src/traph.rs">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="517">
+          <caret line="48" column="96" selection-start-line="48" selection-start-column="96" selection-end-line="48" selection-end-column="96" />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/src/traph_element.rs">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="165">
+          <caret line="11" column="28" lean-forward="true" selection-start-line="11" selection-start-column="28" selection-end-line="11" selection-end-column="28" />
         </state>
       </provider>
     </entry>

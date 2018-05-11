@@ -17,9 +17,8 @@ pub struct TraphElement {
 impl TraphElement {
 	pub fn new(is_connected: bool, port_no: PortNo, other_index: TableIndex, 
 			status: PortStatus, hops: PathLength, path: Option<Path>) -> TraphElement {
-		TraphElement { port_no: port_no,  other_index: other_index, 
-			is_connected: is_connected, is_broken: false, status: status, 
-			hops: hops, path: path } 
+		TraphElement { port_no,  other_index, is_connected, is_broken: false, status,
+			hops, path }
 	}
 	pub fn default(port_number: PortNumber) -> TraphElement {
 		let port_no = port_number.get_port_no();
