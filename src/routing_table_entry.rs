@@ -14,7 +14,7 @@ const DEFAULT_INDICES: OtherIndices = [TableIndex(0); MAX_PORTS.v as usize];
 pub struct RoutingTableEntry {
 	index: TableIndex,
 	uuid: Uuid,
-	may_send: bool, // TODO: Not needed because I moved check to CellAgent
+	may_send: bool, // TODO: Not needed here because I moved check to CellAgent
 	inuse: bool,
 	parent: PortNo,
 	mask: Mask,
@@ -23,13 +23,13 @@ pub struct RoutingTableEntry {
 impl RoutingTableEntry {
 	pub fn new(index: TableIndex, tree_id: &TreeID, inuse: bool, parent: PortNumber, mask: Mask, 
 			may_send: bool, other_indices: [TableIndex; MAX_PORTS.v as usize]) -> RoutingTableEntry {
-		RoutingTableEntry { index: index, uuid: tree_id.get_uuid(), parent: parent.get_port_no(),
-			may_send: may_send, inuse: inuse, mask: mask, other_indices: other_indices }
+		RoutingTableEntry { index, uuid: tree_id.get_uuid(), parent: parent.get_port_no(),
+			may_send, inuse, mask, other_indices }
 	}
 	pub fn default(index: TableIndex) -> Result<RoutingTableEntry, Error> {
 		let port_number = PortNumber::new(PortNo{v:0}, MAX_PORTS).context(RoutingTableEntryError::Chain { func_name: "default", comment: S("")})?;
 		let tree_id = TreeID::new("default").context(RoutingTableEntryError::Chain { func_name: "default", comment: S("")})?;
-		Ok(RoutingTableEntry::new(index, &tree_id, false, port_number, Mask::empty(), false, [TableIndex(0); MAX_PORTS.v as usize]))
+		Ok(RoutingTableEntry::new(index, &tree_id, false, port_number, Mask::empty(), true, [TableIndex(0); MAX_PORTS.v as usize]))
 	}
 	pub fn is_in_use(&self) -> bool { self.inuse }
 	pub fn may_send(&self) -> bool { self.may_send }

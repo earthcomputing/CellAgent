@@ -39,7 +39,7 @@ impl Traph {
 			locked.insert(black_tree_id.get_uuid(), black_tree);
 		}
 		Ok(Traph { cell_id: cell_id.clone(), black_tree_id: black_tree_id.clone(),
-				stacked_trees: stacked_trees, elements: elements })
+				stacked_trees, elements })
 	}
 	pub fn get_black_tree_id(&self) -> &TreeID { &self.black_tree_id }
     pub fn get_table_entry(&self, stacked_trees_locked: &MutexGuard<StackedTrees>, tree_uuid: &Uuid)
