@@ -624,9 +624,6 @@ impl CellAgent {
         }
         let tree_id = msg.get_tree_id();
         let user_mask = self.get_mask(&tree_id)?;
-        // The sender didn't know my table index, but I do
-        //println!("Cellagent {}: resending {} msg with entry {}", self.cell_id, msg_type, entry);
-        //self.send_msg(&msg_tree_id, &msg.clone(), user_mask)?;
         let gvm_eqn = self.get_gvm_eqn(tree_id)?;
         let save = self.gvm_eval_save(&msg_tree_id, &gvm_eqn).context(CellagentError::Chain { func_name: f, comment: S(self.cell_id.clone())})?;
         //println!("Cellagent {}: {} save {} msg {}", self.cell_id, f, save, msg);
@@ -720,8 +717,6 @@ impl CellAgent {
         let traph = self.get_traph(tree_id).context(CellagentError::Chain { func_name: f, comment: S("")})?;
         let entry = traph.get_tree_entry(&tree_id.get_uuid())?;
         let user_mask = entry.get_mask();
-        //println!("Cellagent {}: resending {} msg with entry {}", self.cell_id, msg_type, entry);
-        //self.send_msg(&msg_tree_id, &msg.clone(), user_mask)?;
         let gvm_eqn = self.get_gvm_eqn(tree_id)?;
         let save = self.gvm_eval_save(&msg_tree_id, &gvm_eqn).context(CellagentError::Chain { func_name: f, comment: S(self.cell_id.clone())})?;
         //println!("Cellagent {}: {} save {} msg {}", self.cell_id, f, save, msg);
@@ -756,9 +751,11 @@ impl CellAgent {
             let gvm_eqn = payload.get_gvm_eqn();
             let save = self.gvm_eval_save(&msg_tree_id, gvm_eqn).context(CellagentError::Chain { func_name: f, comment: S(self.cell_id.clone()) })?;
             if save { self.add_saved_stack_tree(parent_tree_id, packets); }
-            let locked = self.saved_stack.lock().unwrap();
-            let count = locked.get(parent_tree_id).unwrap_or(&vec![]).len();
-            //println!("Cellagent {}: {} saved {} msgs for tree {}", self.cell_id, f, count, parent_tree_id);
+            {/*   // Debug print
+                let locked = self.saved_stack.lock().unwrap();
+                let count = locked.get(parent_tree_id).unwrap_or(&vec![]).len();
+                println!("Cellagent {}: {} saved {} msgs for tree {}", self.cell_id, f, count, parent_tree_id);
+            */}
         }
         Ok(())
 
@@ -789,8 +786,8 @@ impl CellAgent {
         let entry = self.get_tree_entry(tree_id)?;
         Ok(entry.may_send())
     }
-    fn tcp_application(&mut self, sender_id: &SenderID, allowed_tree: &AllowedTree, serialized: &String, direction: MsgDirection, tree_map: &MsgTreeMap)
-            -> Result<MsgTreeMap, Error> {
+    fn tcp_application(&mut self, sender_id: &SenderID, allowed_tree: &AllowedTree, serialized: &String,
+                       direction: MsgDirection, tree_map: &MsgTreeMap) -> Result<MsgTreeMap, Error> {
         let f = "tcp_application";
         let tree_id = match tree_map.get(allowed_tree.get_name()) {
             Some(id) => id,
@@ -1062,11 +1059,11 @@ impl CellAgent {
         let f = "send_packets";
         let base_tree_uuid = match self.tree_map.lock().unwrap().get(&tree_uuid).cloned() {
             Some(id) => id,
-            None => return Err(CellagentError::Tree { func_name: f, cell_id: self.cell_id.clone(), tree_uuid: tree_uuid }.into())
+            None => return Err(CellagentError::Tree { func_name: f, cell_id: self.cell_id.clone(), tree_uuid }.into())
         };
         let index = match self.traphs.lock().unwrap().get(&base_tree_uuid) {
             Some(traph) => traph.get_table_index(&tree_uuid).context(CellagentError::Chain { func_name: f, comment: S("")})?,
-            None => return Err(CellagentError::NoTraph { cell_id: self.cell_id.clone(), func_name: f, tree_uuid: tree_uuid }.into())
+            None => return Err(CellagentError::NoTraph { cell_id: self.cell_id.clone(), func_name: f, tree_uuid }.into())
         };
         {/*
             let msg_type = ::message::MsgType::msg_type(&packets[0]);
@@ -1078,6 +1075,11 @@ impl CellAgent {
 
             }
         */}
+        self.send_packets_by_index(index, user_mask, packets)
+    }
+    // Used for forwarding saved messages on the branch of a new addition to a stacked tree
+    // NB: I tried using map instead of a loop, but the #^@$ thing didn't do anything because of lazy evaluation
+    fn send_packets_by_index(&self, index: TableIndex, user_mask: Mask, packets: &Vec<Packet>) -> Result<(), Error> {
         for packet in packets.iter() {
             let msg = CaToPePacket::Packet((index, user_mask, *packet));
             self.ca_to_pe.send(msg)?;
