@@ -785,6 +785,10 @@ impl CellAgent {
         self.ca_to_pe.send(CaToPePacket::Unblock)?;
         Ok(())
     }
+    fn may_send(&self, tree_id: &TreeID) -> Result<bool, Error> {
+        let entry = self.get_tree_entry(tree_id)?;
+        Ok(entry.may_send())
+    }
     fn tcp_application(&mut self, sender_id: &SenderID, allowed_tree: &AllowedTree, serialized: &String, direction: MsgDirection, tree_map: &MsgTreeMap)
             -> Result<MsgTreeMap, Error> {
         let f = "tcp_application";
@@ -792,20 +796,17 @@ impl CellAgent {
             Some(id) => id,
             None => return Err(CellagentError::TreeMap { func_name: f, cell_id: self.cell_id.clone(), tree_name: allowed_tree.clone() }.into())
         };
-        let entry = self.get_tree_entry(tree_id)?;
-        if entry.may_send() {
-            let msg = ApplicationMsg::new(sender_id, tree_id, direction, serialized);
-            //println!("Cellagent {}: sending on tree {} application msg {}", self.cell_id, tree_id, msg);
-            let packets = self.send_msg(tree_id, &msg, DEFAULT_USER_MASK)?;
-            self.add_saved_msg(tree_id, DEFAULT_USER_MASK, &packets);
-            Ok(tree_map.clone())
-        } else {
-            Err(CellagentError::MayNotSend { func_name: f, cell_id: self.cell_id.clone(), tree_id: tree_id.clone() }.into())
-        }
+        if !self.may_send(tree_id)? { return Err(CellagentError::MayNotSend { func_name: f, cell_id: self.cell_id.clone(), tree_id: tree_id.clone() }.into()); }
+        let msg = ApplicationMsg::new(sender_id, tree_id, direction, serialized);
+        //println!("Cellagent {}: sending on tree {} application msg {}", self.cell_id, tree_id, msg);
+        let packets = self.send_msg(tree_id, &msg, DEFAULT_USER_MASK)?;
+        self.add_saved_msg(tree_id, DEFAULT_USER_MASK, &packets);
+        Ok(tree_map.clone())
     }
     fn tcp_delete_tree(&self, sender_id: &SenderID, serialized: &String, direction: MsgDirection, tree_map: &MsgTreeMap)
             -> Result<MsgTreeMap, Error> {
         let f = "tcp_delete_tree";
+        // Needs may_send test
         Err(UtilityError::Unimplemented { func_name: f, feature: S("TcpMsgType::Application")}.into())
     }
     fn tcp_manifest(&mut self, sender_id: &SenderID, serialized: &String, direction: MsgDirection, tree_map: &MsgTreeMap)
@@ -817,6 +818,7 @@ impl CellAgent {
             Some(id) => id,
             None => return Err(CellagentError::TreeMap { func_name: "listen_pe_loop 4", cell_id: self.cell_id.clone(), tree_name: AllowedTree::new(deploy_tree_name) }.into())
         };
+        if !self.may_send(deploy_tree_id)? { return Err(CellagentError::MayNotSend { func_name: f, cell_id: self.cell_id.clone(), tree_id: deploy_tree_id.clone() }.into()); }
         let manifest_ser = self.get_msg_params(&msg, "manifest").context(CellagentError::Chain { func_name: f, comment: S(self.cell_id.clone()) + " manifest" })?;
         let manifest = serde_json::from_str::<Manifest>(&manifest_ser)?;
         let allowed_trees = manifest.get_allowed_trees().clone();
@@ -837,6 +839,7 @@ impl CellAgent {
     fn tcp_query(&self, sender_id: &SenderID, serialized: &String, direction: MsgDirection, tree_map: &MsgTreeMap)
             -> Result<MsgTreeMap, Error> {
         let f = "tcp_query";
+        // Needs may_send test
         Err(UtilityError::Unimplemented { func_name: f, feature: S("TcpMsgType::Application")}.into())
     }
     fn tcp_stack_tree(&mut self, sender_id: &SenderID, serialized: &String, direction: MsgDirection, tree_map: &MsgTreeMap)
@@ -849,6 +852,7 @@ impl CellAgent {
             Some(id) => id,
             None => return Err(CellagentError::TreeMap { func_name: f, cell_id: self.cell_id.clone(), tree_name: parent_tree_name }.into())
         };
+        if !self.may_send(parent_tree_id)? { return Err(CellagentError::MayNotSend { func_name: f, cell_id: self.cell_id.clone(), tree_id: parent_tree_id.clone() }.into()); }
         let my_tree_id = &self.my_tree_id.clone();
         let new_tree_name = self.get_msg_params(&msg, "new_tree_name")?;
         let ref new_tree_id = self.my_tree_id.add_component(&new_tree_name).context(CellagentError::Chain { func_name: f, comment: S(self.cell_id.clone()) + " new_tree_id" })?;
