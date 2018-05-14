@@ -62,7 +62,9 @@ impl NocMaster {
         new_tree_id.append2file().context(ServiceError::Chain { func_name: f, comment: S("")})?;
         println!("Service {} running NocMaster", self.container_id);
         self.listen_vm(container_from_vm)?;
-        self.container_to_vm.send((AllowedTree::new("NocMasterAgent"), TcpMsgType::Application, MsgDirection::Leafward, S("Hello from Master")))?;
+        let msg = S("Hello From Master");
+        println!("Service {} sending {}", self.container_id, msg);
+        self.container_to_vm.send((AllowedTree::new("NocMasterAgent"), TcpMsgType::Application, MsgDirection::Leafward, msg))?;
         Ok(())
     }
     fn listen_vm(&self, container_from_vm: ContainerFromVm) -> Result<(), Error> {

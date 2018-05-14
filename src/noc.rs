@@ -121,6 +121,7 @@ impl Noc {
         params.insert(S("deploy_tree_name"), deployment_tree_name.clone());
         params.insert( S("manifest"), manifest_ser);
         let manifest_msg = serde_json::to_string(&params).context(NocError::Chain { func_name: "create_noc", comment: S("NocMaster")})?;
+        println!("Noc: deploy {} on tree {}", manifest.get_id(), noc_master_deploy_tree);
         noc_to_port.send((noc_master_deploy_tree.clone(), TcpMsgType::Manifest, MsgDirection::Leafward, manifest_msg)).context(NocError::Chain { func_name: "create_noc", comment: S("NocMaster")})?;
         // Deploy NocAgent
         let up_tree = UpTreeSpec::new("NocAgent", vec![0]).context(NocError::Chain { func_name: "create_noc", comment: S("NocAgent") })?;
@@ -135,6 +136,7 @@ impl Noc {
         params.insert(S("deploy_tree_name"), deployment_tree_name.clone());
         params.insert( S("manifest"), manifest_ser);
         let manifest_msg = serde_json::to_string(&params).context(NocError::Chain { func_name: "create_noc", comment: S("NocAgent")})?;
+        println!("Noc: deploy {} on tree {}", manifest.get_id(), noc_master_deploy_tree);
         noc_to_port.send((noc_agent_deploy_tree.clone(), TcpMsgType::Manifest, MsgDirection::Leafward, manifest_msg)).context(NocError::Chain { func_name: "create_noc", comment: S("NocAgent")})?;
         Ok(())
 	}
