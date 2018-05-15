@@ -127,6 +127,9 @@ impl NocAgent {
         loop {
             let msg = container_from_vm.recv().context(ServiceError::Chain { func_name: f, comment: S("Agent recv from vm") })?;
             println!("NocAgent on container {} got msg {}", self.container_id, msg);
+            let msg = format!("Reply from {}", self.container_id);
+            //println!("Service {} sending {}", self.container_id, msg);
+            self.container_to_vm.send((AllowedTree::new("NocAgentMaster"), TcpMsgType::Application, MsgDirection::Rootward, msg))?;
         }
     }
 }

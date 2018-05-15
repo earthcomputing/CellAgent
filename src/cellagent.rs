@@ -665,7 +665,7 @@ impl CellAgent {
             // Forward Discover on all except port_no with updated hops and path
             self.send_msg(&self.get_connected_ports_tree_id(), &discoverd_msg, mask).context(CellagentError::Chain { func_name: "process_ca", comment: S("DiscoverMsg")})?;
         }
-        let updated_msg = msg.update_discover_msg(&self.get_id(), my_index);
+        let updated_msg = msg.update(&self.get_id(), my_index);
         let user_mask = DEFAULT_USER_MASK.all_but_port(PortNumber::new(port_no, self.get_no_ports()).context(CellagentError::Chain { func_name: "process_ca", comment: S("DiscoverMsg")})?);
         //println!("DiscoverMsg {}: forwarding packet {} on connected ports {}", ca.get_id(), packets[0].get_count(), self);
         let packets = self.send_msg(&self.get_connected_ports_tree_id(), &updated_msg, user_mask).context(CellagentError::Chain {func_name: "process_ca", comment: S("DiscoverMsg")})?;
@@ -728,7 +728,7 @@ impl CellAgent {
         let f = "process_stack_tree_msg";
         let header = msg.get_header();
         let payload = msg.get_payload();
-        //println!("Message Cell {}: tree {} port_no {} Stack tree msg {}", ca.get_id(), msg_tree_id, *port_no, self);
+        //println!("Cellagent {}: {} tree {} port_no {} {}", self.cell_id, f, msg_tree_id, *port_no, msg);
         let parent_tree_id = &payload.get_parent_tree_id().clone();
         let new_tree_id = &payload.get_new_tree_id().clone();
         let other_index = payload.get_table_index();
@@ -741,6 +741,11 @@ impl CellAgent {
             entry.add_other_index(port_number, other_index);
             traph.set_tree_entry(&new_tree_id.get_uuid(), entry)?;
             self.update_entry(entry).context(CellagentError::Chain { func_name: f, comment: S("") })?;
+            let updated_msg = msg.update(entry.get_index());
+            let parent_entry = self.get_tree_entry(parent_tree_id)?;
+            let parent_mask = parent_entry.get_mask().and(DEFAULT_USER_MASK);  // Excludes port 0
+            //println!("Cellagent {}: {} sending on ports {:?} {}", self.cell_id, f, parent_mask.get_port_nos(), updated_msg);
+            let packets = &self.send_msg(&self.connected_tree_id, &updated_msg, parent_mask)?; // Send to children of parent tree
             let mask = Mask::new(port_number);
             let msg = StackTreeDMsg::new(sender_id, new_tree_id, entry.get_index());
             self.send_msg(self.get_connected_ports_tree_id(), &msg, mask)?;
@@ -772,7 +777,7 @@ impl CellAgent {
         let mut entry = traph.get_tree_entry(&tree_uuid)?;
         let other_index = payload.get_table_index();
         entry.set_other_index(port_number, other_index);
-        let user_mask = Mask::new(PortNumber::new(port_no, self.no_ports)?);
+        let user_mask = Mask::new(port_number);
         let mask = entry.get_mask().or(user_mask);
         entry.set_mask(mask);
         traph.set_tree_entry(&tree_uuid, entry)?;
@@ -860,7 +865,7 @@ impl CellAgent {
             None => return Err(CellagentError::StackTree { func_name: f, cell_id: self.cell_id.clone(), tree_id: new_tree_id.clone() }.into())
         };
         //println!("Cellagent {}: new tree id {} entry {}", self.cell_id, new_tree_id, entry_opt.unwrap());
-        let stack_tree_msg = StackTreeMsg::new(sender_id,new_tree_id, parent_tree_id, direction, entry.get_index(), gvm_eqn);
+        let stack_tree_msg = StackTreeMsg::new(sender_id, new_tree_id, parent_tree_id, direction, entry.get_index(), gvm_eqn);
         let mut tree_map_clone = tree_map.clone();
         tree_map_clone.insert(S(AllowedTree::new(&new_tree_name).get_name()), new_tree_id.clone());
         let parent_entry = self.get_tree_entry(&parent_tree_id).context(CellagentError::Chain { func_name: f, comment: S("get parent_entry") })?;
@@ -870,7 +875,7 @@ impl CellAgent {
         let variables = traph.get_params(gvm_eqn.get_variables())?;
         if gvm_eqn.eval_xtnd(&variables)? {
             //println!("Cellagent {}: sending on tree {} {}", self.cell_id, parent_tree_id, stack_tree_msg);
-            let packets = self.send_msg(parent_tree_id, &stack_tree_msg, parent_mask)?;
+            let packets = self.send_msg(&self.connected_tree_id, &stack_tree_msg, parent_mask)?;
             //println!("Cell {}: {} saving msg {}", self.cell_id, f, packets[0]);
             self.add_saved_stack_tree(my_tree_id, &packets);
         }

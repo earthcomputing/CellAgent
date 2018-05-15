@@ -206,7 +206,7 @@ impl DiscoverMsg {
 		let payload = DiscoverPayload::new(tree_id, my_index, &sending_cell_id, hops, path);
 		DiscoverMsg { header: header, payload: payload }
 	}
-	pub fn update_discover_msg(&self, cell_id: &CellID, index: TableIndex) -> DiscoverMsg {
+	pub fn update(&self, cell_id: &CellID, index: TableIndex) -> DiscoverMsg {
         let mut msg = self.clone();
 		let hops = self.update_hops();
 		let path = self.update_path();
@@ -345,7 +345,11 @@ impl StackTreeMsg {
         StackTreeMsg { header: self.header.clone(), payload }
     }
     pub fn get_payload(&self) -> &StackTreeMsgPayload { &self.payload }
-    fn get_payload_stack_tree(&self) -> Result<&StackTreeMsgPayload, Error> { Ok(&self.payload) }
+    pub fn update(&self, index: TableIndex) -> StackTreeMsg {
+        let mut msg = self.clone();
+        msg.payload.set_table_index(index);
+        msg
+    }
     pub fn get_tree_id(&self) -> &TreeID { self.payload.get_parent_tree_id() }
 }
 impl Message for StackTreeMsg {
@@ -427,21 +431,21 @@ impl fmt::Display for StackTreeDMsg {
 }
 #[derive(Debug, Clone, Hash, Serialize, Deserialize)]
 pub struct StackTreeMsgDPayload {
-	tree_id: TreeID,
-	index: TableIndex,
+    tree_id: TreeID,
+    index: TableIndex,
 }
 impl StackTreeMsgDPayload {
-	fn new(tree_id: &TreeID, index: TableIndex) -> StackTreeMsgDPayload {
-		StackTreeMsgDPayload { tree_id: tree_id.to_owned(), index }
-	}
+    fn new(tree_id: &TreeID, index: TableIndex) -> StackTreeMsgDPayload {
+        StackTreeMsgDPayload { tree_id: tree_id.to_owned(), index }
+    }
     pub fn get_tree_id(&self) -> &TreeID { &self.tree_id }
     pub fn get_table_index(&self) -> TableIndex { self.index }
 }
 impl MsgPayload for StackTreeMsgDPayload {}
 impl fmt::Display for StackTreeMsgDPayload {
-	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-		write!(f, "Tree {} at index {}", self.tree_id, *self.index)
-	}
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "Tree {} at index {}", self.tree_id, *self.index)
+    }
 }
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ManifestMsg {
