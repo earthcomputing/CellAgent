@@ -356,12 +356,12 @@ impl Message for StackTreeMsg {
 	fn get_header(&self) -> &MsgHeader { &self.header }
     fn get_payload(&self) -> &MsgPayload { &self.payload }
     fn get_msg_type(&self) -> MsgType { self.header.msg_type }
-    fn is_blocking(&self) -> bool { false }
+    fn is_blocking(&self) -> bool { true }
     fn get_tree_id(&self) -> Option<&TreeID> { Some(&self.payload.get_new_tree_id()) }
 	fn process_ca(&mut self, cell_agent: &mut CellAgent, index: TableIndex, port_no: PortNo,
                   msg_tree_id: &TreeID, packets: &Vec<Packet>) -> Result<(), Error> {
         let f = "process_ca";
-        cell_agent.process_stack_tree_msg(&self, index, port_no, msg_tree_id, packets)
+        cell_agent.process_stack_tree_msg(&self, port_no, msg_tree_id)
 	}
 }
 impl fmt::Display for StackTreeMsg {
