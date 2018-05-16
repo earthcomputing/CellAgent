@@ -627,7 +627,7 @@ impl CellAgent {
         let gvm_eqn = self.get_gvm_eqn(tree_id)?;
         let save = self.gvm_eval_save(&msg_tree_id, &gvm_eqn).context(CellagentError::Chain { func_name: f, comment: S(self.cell_id.clone())})?;
         //println!("Cellagent {}: {} save {} msg {}", self.cell_id, f, save, msg);
-        if save { self.add_saved_msg(tree_id, user_mask, packets); }
+        if save && msg.is_leafward() { self.add_saved_msg(tree_id, user_mask, packets); }
         Ok(())
     }
     pub fn process_discover_msg(&mut self, msg: &DiscoverMsg, port_no: PortNo)
@@ -723,12 +723,12 @@ impl CellAgent {
         if save { self.add_saved_msg(tree_id, user_mask, packets); }
         Ok(())
     }
-    pub fn process_stack_tree_msg(&mut self, msg: &StackTreeMsg, index: TableIndex, port_no: PortNo,
-                                  msg_tree_id: &TreeID, packets: &Vec<Packet>) -> Result<(), Error> {
+    pub fn process_stack_tree_msg(&mut self, msg: &StackTreeMsg, port_no: PortNo,
+                                  msg_tree_id: &TreeID) -> Result<(), Error> {
         let f = "process_stack_tree_msg";
         let header = msg.get_header();
         let payload = msg.get_payload();
-        //println!("Cellagent {}: {} tree {} port_no {} {}", self.cell_id, f, msg_tree_id, *port_no, msg);
+        //println!("Cellagent {}: {} port_no {} got {}", self.cell_id, f, *port_no, msg);
         let parent_tree_id = &payload.get_parent_tree_id().clone();
         let new_tree_id = &payload.get_new_tree_id().clone();
         let other_index = payload.get_table_index();
@@ -754,7 +754,7 @@ impl CellAgent {
             let base_tree_id = self.get_base_tree_id(parent_tree_id).context(CellagentError::Chain { func_name: f, comment: S("") })?;
             self.update_base_tree_map(parent_tree_id, &base_tree_id);
             let gvm_eqn = payload.get_gvm_eqn();
-            let save = self.gvm_eval_save(&msg_tree_id, gvm_eqn).context(CellagentError::Chain { func_name: f, comment: S(self.cell_id.clone()) })?;
+            let save = self.gvm_eval_save(&parent_tree_id, gvm_eqn).context(CellagentError::Chain { func_name: f, comment: S(self.cell_id.clone()) })?;
             if save { self.add_saved_stack_tree(parent_tree_id, packets); }
             {/*   // Debug print
                 let locked = self.saved_stack.lock().unwrap();
@@ -762,6 +762,7 @@ impl CellAgent {
                 println!("Cellagent {}: {} saved {} msgs for tree {}", self.cell_id, f, count, parent_tree_id);
             */}
         }
+        self.ca_to_pe.send(CaToPePacket::Unblock)?;
         Ok(())
 
     }
@@ -802,7 +803,7 @@ impl CellAgent {
         let msg = ApplicationMsg::new(sender_id, tree_id, direction, serialized);
         //println!("Cellagent {}: sending on tree {} application msg {}", self.cell_id, tree_id, msg);
         let packets = self.send_msg(tree_id, &msg, DEFAULT_USER_MASK)?;
-        self.add_saved_msg(tree_id, DEFAULT_USER_MASK, &packets);
+        if msg.is_leafward() { self.add_saved_msg(tree_id, DEFAULT_USER_MASK, &packets); }
         Ok(tree_map.clone())
     }
     fn tcp_delete_tree(&self, sender_id: &SenderID, serialized: &String, direction: MsgDirection, tree_map: &MsgTreeMap)
@@ -1016,10 +1017,10 @@ impl CellAgent {
         let saved = self.get_saved_stack_tree(tree_id);
         //if tree_id.is_name("C:2") { println!("Cellagent {}: {} {} msgs on tree {}", self.cell_id, f, saved.len(), tree_id); }
         for packets in saved.iter() {
-            {/*   // Debug print
+            {   // Debug print
                 let msg_type = MsgType::msg_type(&packets[0]);
                 println!("CellAgent {}: {} tree on ports {:?} {}", self.cell_id, f, mask.get_port_nos(), msg_type);
-            */}
+            }
             self.send_packets(self.connected_tree_id.get_uuid(), packets, mask)?;
         }
         Ok(())
@@ -1083,7 +1084,7 @@ impl CellAgent {
         self.send_packets_by_index(index, user_mask, packets)
     }
     // Used for forwarding saved messages on the branch of a new addition to a stacked tree
-    // NB: I tried using map instead of a loop, but the #^@$ thing didn't do anything because of lazy evaluation
+    // NB: I tried using map instead of a loop, but the #^@$ing thing didn't do anything because of lazy evaluation
     fn send_packets_by_index(&self, index: TableIndex, user_mask: Mask, packets: &Vec<Packet>) -> Result<(), Error> {
         for packet in packets.iter() {
             let msg = CaToPePacket::Packet((index, user_mask, *packet));
