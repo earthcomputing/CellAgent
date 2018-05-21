@@ -39,7 +39,8 @@ pub struct NalCell {
 }
 
 impl NalCell {
-	pub fn new(cell_no: CellNo, nports: PortNo, cell_type: CellType, config: CellConfig) -> Result<NalCell, Error> {
+	pub fn new(cell_no: CellNo, nports: PortNo,
+               cell_type: CellType, config: CellConfig) -> Result<NalCell, Error> {
 		if nports.v > MAX_PORTS.v { return Err(NalcellError::NumberPorts { nports: nports, func_name: "new", max_ports: MAX_PORTS }.into()) }
 		let cell_id = CellID::new(cell_no).context(NalcellError::Chain { func_name: "new", comment: S("cell_id")})?;
 		let (ca_to_pe, pe_from_ca): (CaToPe, PeFromCa) = channel();

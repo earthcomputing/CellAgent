@@ -19,9 +19,7 @@ pub struct Datacenter {
 	links: Vec<Link>,
 }
 impl Datacenter {
-	pub fn new() -> Datacenter {
-		Datacenter { cells: Vec::new(), links: Vec::new() }
-	}
+	pub fn new() -> Datacenter { Datacenter { cells: Vec::new(), links: Vec::new() } }
 	pub fn initialize(&mut self, blueprint: &Blueprint) -> Result<Vec<JoinHandle<()>>, Error> {
 		let f = "initialize";
 		let ncells = blueprint.get_ncells();
