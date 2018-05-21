@@ -682,13 +682,14 @@ impl CellAgent {
         let mut children = HashSet::new();
         let port_number = PortNumber::new(port_no, MAX_PORTS).context(CellagentError::Chain { func_name: "process_ca", comment: S("DiscoverDMsg")})?;
         children.insert(port_number);
-        //if tree_id.get_name() == "C:2" { println!("Message Cell {}: DiscoverD tree {} port {} tree {}", ca.get_id(), msg_tree_id, *port_no, tree_id); }
+        if tree_id.get_name() == "C:2" { println!("Cellagent {}: {} add child on port {} for tree {}", self.cell_id, f, *port_no, tree_id); }
         let mut eqns = HashSet::new();
         eqns.insert(GvmEqn::Recv("true"));
         eqns.insert(GvmEqn::Send("true"));
         eqns.insert(GvmEqn::Xtnd("false"));
         eqns.insert(GvmEqn::Save("false"));
         let gvm_eqn = GvmEquation::new(eqns, Vec::new());
+        // Need next statement even though "entry" is only used in debug print
         let entry = self.update_traph(tree_id, port_number, traph::PortStatus::Child, &gvm_eqn,
                               &mut children, my_index, PathLength(CellNo(0)), None)?;
         let mask = Mask::new(PortNumber::new(port_no, self.no_ports)?);

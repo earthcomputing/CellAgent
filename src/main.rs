@@ -45,7 +45,9 @@ use std::sync::mpsc::channel;
 use std::collections::HashMap;
 
 use blueprint::Blueprint;
-use config::{BASE_TREE_NAME, CONTROL_TREE_NAME, NCELLS, NPORTS, NLINKS, OUTPUT_FILE_NAME, CellNo, Edge, PortNo};
+use config::{BASE_TREE_NAME, CONTROL_TREE_NAME, NCELLS, NPORTS, NLINKS, OUTPUT_FILE_NAME,
+             CellNo, Edge, PortNo};
+use datacenter::Datacenter;
 use ecargs::{ECArgs};
 use gvm_equation::{GvmEquation, GvmEqn, GvmVariable, GvmVariableType};
 use message_types::{OutsideFromNoc, OutsideToNoc, NocFromOutside, NocToOutside};
@@ -54,17 +56,9 @@ use noc::Noc;
 use uptree_spec::{AllowedTree, ContainerSpec, Manifest, UpTreeSpec, VmSpec};
 use utility::{S, write_err};
 
-fn main() {
-	if let Err(e) = run() { println!("Main Error");
-        write_err("*** main", e);
-         ::std::process::exit(1);
-	}
-	println!("\nMain exit");
-}
-fn is2e(i: usize, j: usize) -> Edge { Edge { v: (CellNo(i),CellNo(j)) } }
-fn run() -> Result<(), Error> {
+fn main() -> Result<(), Error> {
 	println!("Multicell Routing: Output to file {} (set in config.rs)", OUTPUT_FILE_NAME);
-/* Doesn't work when debugging in Eclipse
+    /* Doesn't work when debugging in Eclipse
 	let args: Vec<String> = env::args().collect();
 	println!("Main: args {:?}",args);
 	let ecargs = match ECArgs::get_args(args) {
@@ -108,6 +102,7 @@ fn run() -> Result<(), Error> {
 		outside_to_noc.send(manifest).context(MainError::Chain { func_name: "run", comment: S("")})?;
 	}
 }
+fn is2e(i: usize, j: usize) -> Edge { Edge { v: (CellNo(i),CellNo(j)) } }
 fn deployment_demo() -> Result<(), Error> {
 	let mut eqns = HashSet::new();
 	eqns.insert(GvmEqn::Recv("true"));
