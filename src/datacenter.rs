@@ -3,15 +3,14 @@ use std::cmp::max;
 use std::sync::mpsc::channel;
 use std::thread::{JoinHandle};
 
-use failure::{Error, Fail, ResultExt};
+use failure::{Error};
 
 use blueprint::{Blueprint};
-use config::{MIN_BOUNDARY_CELLS, CellNo, CellType, Edge, LinkNo, PortNo};
+use config::{MIN_BOUNDARY_CELLS, CellNo, CellType, Edge, LinkNo};
 use message_types::{LinkToPort, PortFromLink, PortToLink, LinkFromPort,
 	PortToNoc, PortFromNoc};
 use link::{Link};
 use nalcell::{CellConfig, NalCell};
-use utility::S;
 
 #[derive(Debug)]
 pub struct Datacenter {
@@ -24,7 +23,7 @@ impl Datacenter {
 		let f = "initialize";
 		let ncells = blueprint.get_ncells();
 		let edge_list = blueprint.get_edge_list();
-		if *ncells < 1  { return Err(DatacenterError::Cells{ ncells: ncells, func_name: f }.into()); }
+		if *ncells < 1  { return Err(DatacenterError::Cells{ ncells, func_name: f }.into()); }
 		if edge_list.len() < *ncells - 1 { return Err(DatacenterError::Edges { nlinks: LinkNo(CellNo(edge_list.len())), func_name: f }.into() ); }
 		let border_cells = blueprint.get_border_cells();
 		for cell in border_cells {

@@ -1,6 +1,5 @@
 use std::fmt;
 use std::thread::JoinHandle;
-use serde_json;
 
 use message_types::{LinkToPort, LinkFromPort, LinkToPortPacket};
 use name::{Name, LinkID, PortID};
@@ -16,8 +15,7 @@ pub struct Link {
 impl Link {
 	pub fn new(left_id: &PortID, rite_id: &PortID) -> Result<Link, Error> {
 		let id = LinkID::new(left_id, rite_id)?;
-		::utility::append2file(serde_json::to_string(&id).context(LinkError::Chain { func_name: "new", comment: S(id.clone()) + " serialize"})?).context(LinkError::Chain { func_name: "new", comment: S(id.clone()) + " append2file"})?;
-		Ok(Link { id: id, is_broken: false, is_connected: true })
+		Ok(Link { id, is_broken: false, is_connected: true })
 	}
 //	pub fn get_id(&self) -> &LinkID { &self.id }
 	pub fn start_threads(&self, 
@@ -44,7 +42,6 @@ impl Link {
     }
     fn listen_loop(&self, link_from: &LinkFromPort, link_to: &LinkToPort) -> Result<(), Error> {
         loop {
-            //println!("Link {}: waiting to recv", self.id);
             let packet = link_from.recv().context(LinkError::Chain { func_name: "listen_loop", comment: S(self.id.clone()) })?;
             link_to.send(LinkToPortPacket::Packet(packet)).context(LinkError::Chain { func_name: "listen_loop", comment: S(self.id.clone()) })?;
         }
@@ -59,7 +56,7 @@ impl fmt::Display for Link {
 	}
 }
 // Errors
-use failure::{Error, Fail, ResultExt};
+use failure::{Error, ResultExt};
 #[derive(Debug, Fail)]
 pub enum LinkError {
 	#[fail(display = "LinkError::Chain {} {}", func_name, comment)]

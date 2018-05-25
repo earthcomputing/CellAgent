@@ -32,10 +32,10 @@ pub struct Packet {
 #[deny(unused_must_use)]
 impl Packet {
 	fn new(header: PacketHeader, payload: Payload) -> Packet {
-		Packet { header: header, payload: payload, packet_count: Packet::get_next_count() }
+		Packet { header, payload, packet_count: Packet::get_next_count() }
 	}
 	pub fn get_next_count() -> usize { PACKET_COUNT.fetch_add(1, Ordering::SeqCst) } 
-	pub fn get_count(&self) -> usize { self.packet_count }
+	pub fn get_count(&self) -> usize { self.packet_count }  // For debugging
 	pub fn get_header(&self) -> PacketHeader { self.header }
 	pub fn get_payload(&self) -> Payload { self.payload }
 	pub fn get_tree_uuid(&self) -> Uuid { self.header.get_uuid() }
@@ -95,7 +95,7 @@ impl PacketHeader {
 	}
 	pub fn get_msg_id(&self) -> MsgID { self.msg_id }
 	pub fn get_uuid(&self) -> Uuid { self.uuid }
-	pub fn set_uuid(&mut self, new_uuid: Uuid) { self.uuid = new_uuid; }
+//	pub fn set_uuid(&mut self, new_uuid: Uuid) { self.uuid = new_uuid; }
 	pub fn get_size(&self) -> PacketNo { self.size }
 	pub fn is_leafcast(&self) -> bool { (self.flags & 1) == 1 }
 	pub fn is_rootcast(&self) -> bool { !self.is_leafcast() }
@@ -222,10 +222,10 @@ pub struct PacketAssembler {
 }
 impl PacketAssembler {
 	pub fn new(msg_id: MsgID) -> PacketAssembler {
-		PacketAssembler { msg_id: msg_id, packets: Vec::new() }
+		PacketAssembler { msg_id, packets: Vec::new() }
 	}
 	pub fn create(msg_id: MsgID, packets: &Vec<Packet>) -> PacketAssembler {
-		PacketAssembler { msg_id: msg_id, packets: packets.clone() }
+		PacketAssembler { msg_id, packets: packets.clone() }
 	}
 /*
 	pub fn get_msg_id(&self) -> MsgID { self.msg_id }
@@ -245,7 +245,7 @@ impl PacketAssembler {
 	}
 }
 // Errors
-use failure::{Error, Fail, ResultExt};
+use failure::{Error, ResultExt};
 #[derive(Debug, Fail)]
 pub enum PacketError {
 	#[fail(display = "PacketError::Chain {} {}", func_name, comment)]

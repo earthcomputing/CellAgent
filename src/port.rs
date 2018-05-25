@@ -4,7 +4,7 @@ use std::sync::atomic::AtomicBool;
 use std::sync::{Arc};
 use std::sync::atomic::Ordering::SeqCst;
 
-use config::{PortNo, TableIndex};
+use config::{PortNo};
 use message_types::{PortToLink, PortFromLink, PortToPe, PortFromPe, LinkToPortPacket, PortToPePacket,
 			  PeToPortPacket, PortToNoc, PortFromNoc};
 use name::{Name, PortID, CellID};
@@ -29,15 +29,15 @@ impl Port {
 	pub fn new(cell_id: &CellID, port_number: PortNumber, is_border: bool, is_connected: bool,
 			   port_to_pe: PortToPe) -> Result<Port, Error> {
 		let port_id = PortID::new(cell_id, port_number).context(PortError::Chain { func_name: "new", comment: S(cell_id.get_name()) + &S(*port_number.get_port_no())})?;
-		Ok(Port{ id: port_id, port_number: port_number, is_border: is_border, 
+		Ok(Port{ id: port_id, port_number, is_border,
 			is_connected: Arc::new(AtomicBool::new(is_connected)), 
 			is_broken: Arc::new(AtomicBool::new(false)),
-			port_to_pe: port_to_pe})
+			port_to_pe})
 	}
 	pub fn get_id(&self) -> &PortID { &self.id }
 	pub fn get_port_no(&self) -> PortNo { self.port_number.get_port_no() }
 //	pub fn get_port_number(&self) -> PortNumber { self.port_number }
-	pub fn get_is_connected(&self) -> Arc<AtomicBool> { self.is_connected.clone() }
+//	pub fn get_is_connected(&self) -> Arc<AtomicBool> { self.is_connected.clone() }
 	pub fn is_connected(&self) -> bool { self.is_connected.load(SeqCst) }
 	pub fn set_connected(&mut self) { self.is_connected.store(true, SeqCst); }
 	pub fn set_disconnected(&mut self) { self.is_connected.store(false, SeqCst); }
@@ -59,7 +59,6 @@ impl Port {
         Ok(())
     }
 	fn listen_noc_for_pe_loop(&self, port_from_noc: &PortFromNoc) -> Result<(), Error> {
-        let is_border = self.is_border();
 		loop {
 			let tcp_msg = port_from_noc.recv()?;
 			//println!("Port to pe other_index {}", *other_index);
@@ -143,7 +142,7 @@ impl fmt::Display for Port {
 	}
 }
 // Errors
-use failure::{Error, Fail, ResultExt};
+use failure::{Error, ResultExt};
 #[derive(Debug, Fail)]
 pub enum PortError {
 	#[fail(display = "PortError::Chain {} {}", func_name, comment)]

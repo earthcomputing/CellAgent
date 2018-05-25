@@ -1,11 +1,10 @@
-use std::collections::{HashMap, HashSet};
+use std::collections::{HashSet};
 use std::sync::mpsc::channel;
 
 use container::{Container};
-use message::MsgDirection;
-use message_types::{VmToCa, VmFromCa, VmToContainerMsg, VmToContainer, ContainerFromVm,
-	ContainerToVmMsg, ContainerToVm, VmFromContainer, ContainerVmError};
-use name::{Name, ContainerID, TreeID, UptreeID, VmID};
+use message_types::{VmToCa, VmFromCa, VmToContainer, ContainerFromVm,
+	ContainerToVm, VmFromContainer};
+use name::{Name, ContainerID, UptreeID, VmID};
 use uptree_spec::{AllowedTree, ContainerSpec};
 use utility::{S, write_err};
 
@@ -19,10 +18,10 @@ pub struct VirtualMachine {
 impl VirtualMachine {
 	pub fn new(id: &VmID, vm_to_ca: VmToCa, allowed_trees_ref: &Vec<AllowedTree>) -> VirtualMachine {
         //println!("Create VM {}", id);
-		VirtualMachine { id: id.clone(), vm_to_ca: vm_to_ca, allowed_trees:allowed_trees_ref.clone(),
+		VirtualMachine { id: id.clone(), vm_to_ca, allowed_trees:allowed_trees_ref.clone(),
             vm_to_containers: Vec::new() }
 	}
-	pub fn initialize(&mut self, up_tree_name: &String, vm_from_ca: VmFromCa, vm_trees: &HashSet<AllowedTree>,
+	pub fn initialize(&mut self, up_tree_name: &String, vm_from_ca: VmFromCa, _: &HashSet<AllowedTree>,
 			container_specs: &Vec<ContainerSpec>) -> Result<(), Error> {
 		//println!("VM {} initializing", self.id);
 		let up_tree_id = UptreeID::new(up_tree_name).context(VmError::Chain { func_name: "initialize", comment: S(self.id.get_name()) + " up tree id"})?;
@@ -43,7 +42,7 @@ impl VirtualMachine {
         self.listen_ca(vm_from_ca).context(VmError::Chain { func_name: "initialize", comment: S(self.id.get_name()) + " listen_ca"})?;
 		Ok(())
 	}
-	pub fn get_id(&self) -> &VmID { &self.id }	
+	//pub fn get_id(&self) -> &VmID { &self.id }
 	fn listen_ca(&self, vm_from_ca: VmFromCa) -> Result<(), Error> {
 		//println!("VM {}: listening to Ca", self.id);
 		let vm = self.clone();
@@ -73,7 +72,7 @@ impl VirtualMachine {
             }
 		}
 	}
-	fn listen_container_loop(&self, container_id: &ContainerID, vm_from_container: &VmFromContainer, vm_to_ca: &VmToCa) -> Result<(), Error> {
+	fn listen_container_loop(&self, _: &ContainerID, vm_from_container: &VmFromContainer, vm_to_ca: &VmToCa) -> Result<(), Error> {
 		loop {
 			let msg = vm_from_container.recv().context("listen_container_loop").context(VmError::Chain { func_name: "listen_container_loop", comment: S(self.id.get_name()) + " recv from container"})?;
             //println!("VM {} got from container {} msg {} {} {} {}", self.id, container_id, msg.0, msg.1, msg.2, msg.3);
@@ -82,11 +81,11 @@ impl VirtualMachine {
 	}
 }
 // Errors
-use failure::{Error, Fail, ResultExt};
+use failure::{Error, ResultExt};
 #[derive(Debug, Fail)]
 pub enum VmError {
     #[fail(display = "VmError::Chain {} {}", func_name, comment)]
     Chain { func_name: &'static str, comment: String },
-    #[fail(display = "VmError::AllowedTree {}: {} is not an allowed tree for VM {}", func_name, tree, vm_id)]
-    AllowedTree { func_name: &'static str, tree: AllowedTree, vm_id: VmID }
+//    #[fail(display = "VmError::AllowedTree {}: {} is not an allowed tree for VM {}", func_name, tree, vm_id)]
+//    AllowedTree { func_name: &'static str, tree: AllowedTree, vm_id: VmID }
 }

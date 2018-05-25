@@ -45,16 +45,15 @@ use std::sync::mpsc::channel;
 use std::collections::HashMap;
 
 use blueprint::Blueprint;
-use config::{BASE_TREE_NAME, CONTROL_TREE_NAME, NCELLS, NPORTS, NLINKS, OUTPUT_FILE_NAME,
+use config::{NCELLS, NPORTS, NLINKS, OUTPUT_FILE_NAME,
              CellNo, Edge, PortNo};
-use datacenter::Datacenter;
 use ecargs::{ECArgs};
-use gvm_equation::{GvmEquation, GvmEqn, GvmVariable, GvmVariableType};
+use gvm_equation::{GvmEqn};
 use message_types::{OutsideFromNoc, OutsideToNoc, NocFromOutside, NocToOutside};
 use nalcell::CellConfig;
 use noc::Noc;
 use uptree_spec::{AllowedTree, ContainerSpec, Manifest, UpTreeSpec, VmSpec};
-use utility::{S, write_err};
+use utility::{S};
 
 fn main() -> Result<(), Error> {
 	println!("Multicell Routing: Output to file {} (set in config.rs)", OUTPUT_FILE_NAME);
@@ -84,7 +83,7 @@ fn main() -> Result<(), Error> {
 	println!("{}", blueprint);
 //	deployment_demo()?; 	// Demonstrate features of deployment spec
 	let (outside_to_noc, noc_from_outside): (OutsideToNoc, NocFromOutside) = channel();
-	let (noc_to_outside, outside_from_noc): (NocToOutside, OutsideFromNoc) = channel();
+	let (noc_to_outside, _outside_from_noc): (NocToOutside, OutsideFromNoc) = channel();
 	let mut noc = Noc::new(noc_to_outside)?;
 	let (dc, _) = noc.initialize(&blueprint, noc_from_outside).context(MainError::Chain { func_name: "run", comment: S("")})?;
 	loop {
@@ -109,7 +108,7 @@ fn deployment_demo() -> Result<(), Error> {
 	eqns.insert(GvmEqn::Send("true"));
 	eqns.insert(GvmEqn::Xtnd("hops<7"));
 	eqns.insert(GvmEqn::Save("false"));
-	let ref gvm_eqn = GvmEquation::new(eqns, vec![GvmVariable::new(GvmVariableType::PathLength, "hops")]);
+//	let ref gvm_eqn = GvmEquation::new(eqns, vec![GvmVariable::new(GvmVariableType::PathLength, "hops")]);
 	let up_tree1 = UpTreeSpec::new("test1", vec![0, 0, 0, 2, 2]).context(MainError::Chain { func_name: "deployment_demo", comment: S("")})?;
 	let up_tree2 = UpTreeSpec::new("test2", vec![1, 1, 0, 1]).context(MainError::Chain { func_name: "deployment_demo", comment: S("")})?;
 	let ref allowed_tree1 = AllowedTree::new("foo");
@@ -132,7 +131,7 @@ fn deployment_demo() -> Result<(), Error> {
 	Ok(())
 }
 // Errors
-use failure::{Error, Fail, ResultExt};
+use failure::{Error, ResultExt};
 #[derive(Debug, Fail)]
 pub enum MainError {
 	#[fail(display = "MainError::Chain {} {}", func_name, comment)]

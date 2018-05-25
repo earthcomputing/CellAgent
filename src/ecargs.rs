@@ -1,6 +1,6 @@
 use std::fmt;
 
-use failure::{Error, Fail, ResultExt};
+use failure::{Error};
 
 use config::{MAX_PORTS, CellNo, LinkNo, PortNo};
 
@@ -13,9 +13,9 @@ pub struct ECArgs {
 impl ECArgs {
 	pub fn new(ncells: CellNo, nports: PortNo, nlinks: CellNo) -> Result<ECArgs, Error> {
 		if *nports < (*MAX_PORTS - 1) {
-			Ok(ECArgs { nports: nports as PortNo, ncells: ncells, nlinks: LinkNo(CellNo(*nlinks)) })
+			Ok(ECArgs { nports: nports as PortNo, ncells, nlinks: LinkNo(CellNo(*nlinks)) })
 		} else {
-			Err(EcargsError::NumberPorts { nports: nports, func_name: "new", max: MAX_PORTS }.into())
+			Err(EcargsError::NumberPorts { nports, func_name: "new", max: MAX_PORTS }.into())
 		}	
 	}
 //	pub fn get_nports(&self) -> u8 { return self.nports }

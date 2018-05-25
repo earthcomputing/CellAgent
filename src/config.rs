@@ -1,7 +1,6 @@
 use std::fmt;
 use std::ops::{Deref};
 
-use failure::{Error, Fail, ResultExt};
 // Size of various fields
 #[derive(Debug, Copy, Clone, Hash, Eq, PartialEq, Serialize, Deserialize)]
 pub struct CellNo(pub usize);
@@ -74,6 +73,6 @@ pub const PACKET_MAX: usize = 9000;
 // Default names for up trees
 pub const CONTROL_TREE_NAME: &'static str = "Control";
 pub const CONNECTED_PORTS_TREE_NAME: &'static str = "Connected";
-pub const BASE_TREE_NAME: &'static str = "Base";
+//pub const BASE_TREE_NAME: &'static str = "Base";
 // Place to write output data
-pub const OUTPUT_FILE_NAME: &'static str = "/dev/null";
+pub const OUTPUT_FILE_NAME: &'static str = "/Users/alan/Documents/multicell-trace.json";

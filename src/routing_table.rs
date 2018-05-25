@@ -1,6 +1,6 @@
 use std::fmt;
 
-use failure::{Error, Fail, ResultExt};
+use failure::{Error, ResultExt};
 
 use config::{MAX_ENTRIES, TableIndex};
 use name::{Name, CellID};
