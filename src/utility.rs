@@ -1,8 +1,7 @@
 use std::fmt;
-use std::collections::{HashMap, HashSet};
+use std::collections::{HashSet};
 
 use config::{MAX_PORTS, OUTPUT_FILE_NAME, MaskValue, PortNo};
-use name::CellID;
 /*
 pub fn get_first_arg(a: Vec<String>) -> Option<i32> {
 	if a.len() != 2 {
@@ -31,15 +30,15 @@ pub struct Mask { mask: MaskValue }
 impl Mask {
 	pub fn new(i: PortNumber) -> Mask {
 	    let mask = MaskValue((1 as u16).rotate_left(i.get_port_no().v as u32));
-        Mask { mask: mask } 
+        Mask { mask }
 	}
-	pub fn new0() -> Mask { Mask { mask: MaskValue(1) } }
+	pub fn port0() -> Mask { Mask { mask: MaskValue(1) } }
 	pub fn empty() -> Mask { Mask { mask: MaskValue(0) } }
 	pub fn all_but_zero(no_ports: PortNo) -> Mask { 
 		Mask { mask: MaskValue((2 as u16).pow(no_ports.v as u32)-2) }
 	}
 	pub fn equal(&self, other: Mask) -> bool { *self.mask == *other.mask }
-	pub fn get_as_value(&self) -> MaskValue { self.mask }
+	//pub fn get_as_value(&self) -> MaskValue { self.mask }
 	pub fn or(&self, mask: Mask) -> Mask {
 		Mask { mask: MaskValue(*self.mask | *mask.mask) }
 	}
@@ -101,7 +100,7 @@ pub struct Path { port_number: PortNumber }
 impl Path {
 	pub fn new(port_no: PortNo, no_ports: PortNo) -> Result<Path, Error> {
 		let port_number = PortNumber::new(port_no, no_ports).context(UtilityError::Chain { func_name: "Path::new", comment: S("")})?;
-		Ok(Path { port_number: port_number })
+		Ok(Path { port_number })
 	}
 	pub fn get_port_no(&self) -> PortNo { self.port_number.get_port_no() }
 }
@@ -129,7 +128,7 @@ pub fn write_err(caller: &str, e: Error) {
 		println!("*** Caused by {}", cause);
 	}
 	let fail: &Fail = e.cause();
-	if let Some(backtrace) = fail.cause().and_then(|cause| cause.backtrace()) {
+	if let Some(_) = fail.cause().and_then(|cause| cause.backtrace()) {
 		let _ = writeln!(stderr, "---> Backtrace available: uncomment line in utility.rs containing --->");
 		// let _ = writeln!(stderr, "Backtrace: {:?}", backtrace);
 	}
@@ -143,8 +142,8 @@ use failure::{Error, Fail, ResultExt};
 pub enum UtilityError {
     #[fail(display = "UtilityError::Chain {} {}", func_name, comment)]
     Chain { func_name: &'static str, comment: String },
-    #[fail(display = "UtilityError::Mask {}: Cell {} has no tenant mask", func_name, cell_id)]
-    Mask { cell_id: CellID, func_name: &'static str},
+//    #[fail(display = "UtilityError::Mask {}: Cell {} has no tenant mask", func_name, cell_id)]
+//    Mask { cell_id: CellID, func_name: &'static str},
     #[fail(display = "UtilityError::PortNumber {}: Port number {:?} is larger than the maximum of {:?}", func_name, port_no, max)]
     PortNumber { port_no: PortNo, func_name: &'static str, max: PortNo },
     #[fail(display = "UtilityError::Unimplemented {}: {} is not implemented", func_name, feature)]

@@ -1,10 +1,9 @@
-use std::fmt;
+//use std::fmt;
 use std::collections::HashMap;
 
-use failure::{Error, Fail, ResultExt};
-
-use name::{Name, TenantID};
-use utility::S;
+use config::CellNo;
+use name::{TenantID};
+//use utility::S;
 
 #[derive(Clone)]
 pub struct Tenant { 
@@ -12,6 +11,7 @@ pub struct Tenant {
 	ncells: CellNo, 
 	children: HashMap<TenantID,Box<Tenant>>,
 }
+/*
 #[deny(unused_must_use)]
 impl Tenant {
 	pub fn new(id: &'static str, n: CellNo, parent_id: Option<TenantID>) -> Result<Tenant, Error> {
@@ -58,7 +58,9 @@ impl fmt::Debug for Tenant {
 		write!(f, "{}", s) 
 	} 
 }
+*/
 // Errors
+/*
 use config::CellNo;
 #[derive(Debug, Fail)]
 pub enum TenantError {
@@ -69,3 +71,4 @@ pub enum TenantError {
     #[fail(display = "TenantError::Quota {}: You asked for {:?} cells, but only {:?} are available", func_name, request, available)]
     Quota { func_name: &'static str, request: CellNo, available: CellNo }
 }
+*/

@@ -15,7 +15,7 @@ pub trait Name: Sized {
 	fn create_from_string(&self, n: String) -> Self;
 	// Default implementations
 	fn stringify(&self) -> String { self.get_name().to_string() }
-	fn from_str(&self, s: &str) -> Result<Self, Error> {
+	fn name_from_str(&self, s: &str) -> Result<Self, Error> {
 		// Names may not contain blanks
 		match s.find(' ') {
 			Some(_) => Err(NameError::Format { name: s.to_string(), func_name: "from_str" }.into()),
@@ -25,7 +25,7 @@ pub trait Name: Sized {
 	fn add_component(&self, s: &str) -> Result<Self, Error> {
 		match s.find(' ') {
 			Some(_) => Err(NameError::Format{ name: s.to_string(), func_name: "add_component" }.into()),
-			None => self.from_str(&([self.get_name(),s].join(SEPARATOR)))
+			None => self.name_from_str(&([self.get_name(),s].join(SEPARATOR)))
 		}
 	}
 	fn is_name(&self, name: &str) -> bool { self.get_name() == name }
@@ -65,13 +65,8 @@ impl<'a> TreeID {
 		let name = S(n);
 		match name.find(' ') {
 			None => Ok(TreeID { name: name.clone(), uuid: Uuid::new_v4(&name) }),
-			Some(_) => Err(NameError::Format { name: name, func_name: "TreeID::new" }.into())
+			Some(_) => Err(NameError::Format { name, func_name: "TreeID::new" }.into())
 		}
-	}
-	pub fn append2file(&self) -> Result<(), Error> {
-		let json = ::serde_json::to_string(&self).context(NameError::Chain { func_name: "append2file", comment: S("")})?;
-		::utility::append2file(json).context(NameError::Chain { func_name: "append2file", comment: S("")})?;
-		Ok(())
 	}
 }
 impl Name for TreeID {
@@ -87,14 +82,9 @@ impl<'a> UptreeID {
 		let name = S(n);
 		match n.find(' ') {
 			None => Ok(UptreeID { name: name.clone(), uuid: Uuid::new_v4(&name) }),
-			Some(_) => Err(NameError::Format{ name: name, func_name: "UptreeID::new" }.into())
+			Some(_) => Err(NameError::Format{ name, func_name: "UptreeID::new" }.into())
 		}
 	}
-    pub fn append2file(&self) -> Result<(), Error> {
-        let json = ::serde_json::to_string(&self).context(NameError::Chain { func_name: "append2file", comment: S("")})?;
-        ::utility::append2file(json).context(NameError::Chain { func_name: "append2file", comment: S("")})?;
-        Ok(())
-    }
 }
 impl Name for UptreeID {
 	fn get_name(&self) -> &str { &self.name }
@@ -109,7 +99,7 @@ impl TenantID {
 		let name = n.to_string();
 		match n.find(' ') {
 			None => Ok(TenantID { name: name.clone(), uuid: Uuid::new_v4(&name) }),
-			Some(_) => Err(NameError::Format { name: name, func_name: "TenantID::new" }.into())
+			Some(_) => Err(NameError::Format { name, func_name: "TenantID::new" }.into())
 		}
 	}
 }
@@ -168,7 +158,7 @@ impl ContainerID {
 		let name = S(n);
 		match n.find(' ') {
 			None => Ok(ContainerID { name: name.clone(), uuid: Uuid::new_v4(&name) }),
-			Some(_) => Err(NameError::Format { name: name, func_name: "ContainerID::new" }.into())
+			Some(_) => Err(NameError::Format { name, func_name: "ContainerID::new" }.into())
 		}
 	}
 }
@@ -179,11 +169,11 @@ impl Name for ContainerID {
 }
 impl fmt::Display for ContainerID { fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result { self.name.fmt(f) } }
 // Errors
-use failure::{Error, Fail, ResultExt};
+use failure::{Error};
 #[derive(Debug, Fail)]
 pub enum NameError {
-	#[fail(display = "NameError::Chain {} {}", func_name, comment)]
-	Chain { func_name: &'static str, comment: String },
+//	#[fail(display = "NameError::Chain {} {}", func_name, comment)]
+//	Chain { func_name: &'static str, comment: String },
 	#[fail(display = "NameError::Format {}: '{}' contains blanks.", func_name, name)]
 	Format { func_name: &'static str, name: String }
 }

@@ -6,15 +6,11 @@ use std::time;
 use serde_json;
 
 use blueprint::{Blueprint};
-use config::{BASE_TREE_NAME, CONTROL_TREE_NAME, SEPARATOR, CellNo, DatacenterNo, Edge, PortNo, TableIndex};
 use datacenter::{Datacenter};
 use gvm_equation::{GvmEquation, GvmEqn, GvmVariable, GvmVariableType};
-use message::{Message, MsgDirection, MsgType, TcpMsgType, ManifestMsg, TreeNameMsg};
-use message_types::{NocToPort, NocPortError, NocFromPort, PortToNoc, PortFromNoc, NocFromOutside, NocToOutside, TCP};
+use message::{MsgDirection, TcpMsgType, TreeNameMsg};
+use message_types::{NocToPort, NocFromPort, PortToNoc, PortFromNoc, NocFromOutside, NocToOutside};
 use nalcell::CellConfig;
-use name::{Name, TreeID};
-use packet::{PacketAssembler, PacketAssemblers};
-use service::NocMaster;
 use uptree_spec::{AllowedTree, ContainerSpec, Manifest, UpTreeSpec, VmSpec};
 use utility::{S, write_err};
 
@@ -30,7 +26,7 @@ pub struct Noc {
 }
 impl Noc {
 	pub fn new(noc_to_outside: NocToOutside) -> Result<Noc, Error> {
-		Ok(Noc { allowed_trees: HashSet::new(), noc_to_outside: noc_to_outside })
+		Ok(Noc { allowed_trees: HashSet::new(), noc_to_outside })
 	}
 	pub fn initialize(&mut self, blueprint: &Blueprint, noc_from_outside: NocFromOutside) ->
             Result<(Datacenter, Vec<JoinHandle<()>>), Error> {
@@ -66,7 +62,7 @@ impl Noc {
     }
 	fn listen_port_loop(&mut self, noc_to_port: &NocToPort, noc_from_port: &NocFromPort) -> Result<(), Error> {
 		loop {
-			let (allowed_tree, msg_type, direction, serialized) = noc_from_port.recv().context(NocError::Chain { func_name: "listen_port", comment: S("")})?;
+			let (_, msg_type, _, serialized) = noc_from_port.recv().context(NocError::Chain { func_name: "listen_port", comment: S("")})?;
             match msg_type {
                 TcpMsgType::TreeName => {
                     let msg = serde_json::from_str::<TreeNameMsg>(&serialized).context(NocError::Chain { func_name: "listen_port", comment: S("") })?;
@@ -77,7 +73,7 @@ impl Noc {
                         self.create_noc(tree_name, &noc_to_port).context(NocError::Chain { func_name: "listen_port", comment: S("") })?;
                     }
                 }
-                _ => write_err("Noc: listen_port: {}", NocError::MsgType { func_name: "listen_port", msg_type: msg_type }.into())
+                _ => write_err("Noc: listen_port: {}", NocError::MsgType { func_name: "listen_port", msg_type }.into())
             }
 		}
 	}
@@ -88,7 +84,7 @@ impl Noc {
         });
         Ok(join_outside)
     }
-    fn listen_outside_loop(&mut self, noc_from_outside: &NocFromOutside, noc_to_port: &NocToPort) -> Result<(), Error> {
+    fn listen_outside_loop(&mut self, noc_from_outside: &NocFromOutside, _: &NocToPort) -> Result<(), Error> {
         loop {
             let input = &noc_from_outside.recv()?;
             println!("Noc: {}", input);
@@ -219,17 +215,17 @@ impl Noc {
     }
 }
 // Errors
-use failure::{Error, Fail, ResultExt};
+use failure::{Error, ResultExt};
 #[derive(Debug, Fail)]
 pub enum NocError {
 	#[fail(display = "NocError::Chain {} {}", func_name, comment)]
 	Chain { func_name: &'static str, comment: String },
-    #[fail(display = "NocError::AllowedTree {}: {} is not an allowed tree", func_name, tree_name)]
-    AllowedTree { func_name: &'static str, tree_name: String },
+//    #[fail(display = "NocError::AllowedTree {}: {} is not an allowed tree", func_name, tree_name)]
+//    AllowedTree { func_name: &'static str, tree_name: String },
 //    #[fail(display = "NocError::Message {}: Message type {} is malformed {}", func_name, msg_type, message)]
 //    Message { func_name: &'static str, msg_type: MsgType, message: String },
     #[fail(display = "NocError::MsgType {}: {} is not a valid message type for the NOC", func_name, msg_type)]
     MsgType { func_name: &'static str, msg_type: TcpMsgType },
-    #[fail(display = "NocError::Tree {}: {} is not a valid index in the NOC's list of tree names", func_name, index)]
-    Tree { func_name: &'static str, index: usize }
+//    #[fail(display = "NocError::Tree {}: {} is not a valid index in the NOC's list of tree names", func_name, index)]
+//    Tree { func_name: &'static str, index: usize }
 }

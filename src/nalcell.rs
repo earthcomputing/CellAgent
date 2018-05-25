@@ -4,8 +4,7 @@ use std::sync::mpsc::channel;
 
 use cellagent::{CellAgent};
 use config::{MAX_PORTS, CellNo, CellType, PortNo};
-use message_types::{CaToPe, PeFromCa, PeToCa, CaFromPe, PortToPe, PeFromPort, PeToPort,PortFromPe,
-                    PeToPe, PeFromPe};
+use message_types::{CaToPe, PeFromCa, PeToCa, CaFromPe, PortToPe, PeFromPort, PeToPort,PortFromPe};
 use name::{CellID};
 use packet_engine::{PacketEngine};
 use port::{Port};
@@ -41,7 +40,7 @@ pub struct NalCell {
 impl NalCell {
 	pub fn new(cell_no: CellNo, nports: PortNo,
                cell_type: CellType, config: CellConfig) -> Result<NalCell, Error> {
-		if nports.v > MAX_PORTS.v { return Err(NalcellError::NumberPorts { nports: nports, func_name: "new", max_ports: MAX_PORTS }.into()) }
+		if nports.v > MAX_PORTS.v { return Err(NalcellError::NumberPorts { nports, func_name: "new", max_ports: MAX_PORTS }.into()) }
 		let cell_id = CellID::new(cell_no).context(NalcellError::Chain { func_name: "new", comment: S("cell_id")})?;
 		let (ca_to_pe, pe_from_ca): (CaToPe, PeFromCa) = channel();
 		let (pe_to_ca, ca_from_pe): (PeToCa, CaFromPe) = channel();
@@ -69,12 +68,12 @@ impl NalCell {
 		}
 		let boxed_ports: Box<[Port]> = ports.into_boxed_slice();
 		let mut cell_agent = CellAgent::new(&cell_id, cell_type, config, nports, ca_to_pe).context(NalcellError::Chain { func_name: "new", comment: S("cell agent create")})?;
-		cell_agent.initialize(cell_type, ca_from_pe).context(NalcellError::Chain { func_name: "new", comment: S("cell agent init")})?;
+		cell_agent.initialize(ca_from_pe).context(NalcellError::Chain { func_name: "new", comment: S("cell agent init")})?;
 		let packet_engine = PacketEngine::new(&cell_id, pe_to_ca, pe_to_ports, boundary_port_nos).context(NalcellError::Chain { func_name: "new", comment: S("packet engine create")})?;
 		packet_engine.start_threads(pe_from_ca, pe_from_ports)?;
-		Ok(NalCell { id: cell_id, cell_no: cell_no, cell_type: cell_type, config: config,
-				ports: boxed_ports, cell_agent: cell_agent, vms: Vec::new(),
-				packet_engine: packet_engine, ports_from_pe: ports_from_pe, })
+		Ok(NalCell { id: cell_id, cell_no, cell_type, config,
+				ports: boxed_ports, cell_agent, vms: Vec::new(),
+				packet_engine, ports_from_pe })
 	}
 //	pub fn get_id(&self) -> &CellID { &self.id }
 	pub fn get_no(&self) -> CellNo { self.cell_no }
@@ -85,16 +84,20 @@ impl NalCell {
 			CellType::Interior => false,
 		}  
 	}
-	pub fn get_free_ec_port_mut(&mut self) -> Result<(&mut Port, PortFromPe), NalcellError> {
+	pub fn get_free_ec_port_mut(&mut self) -> Result<(&mut Port, PortFromPe), Error> {
 		self.get_free_port_mut(false)
 	}
-	pub fn get_free_boundary_port_mut(&mut self) -> Result<(&mut Port, PortFromPe), NalcellError> {
+	pub fn get_free_boundary_port_mut(&mut self) -> Result<(&mut Port, PortFromPe), Error> {
 		self.get_free_port_mut(true)
 	}
 	pub fn get_free_port_mut(&mut self, want_boundary_port: bool) 
-			-> Result<(&mut Port, PortFromPe), NalcellError> {
+			-> Result<(&mut Port, PortFromPe), Error> {
+        let f = "Nalcell::get_free_port_mut";
 		for port in &mut self.ports.iter_mut() {
-			//println!("NalCell {}: port {} is connected {}", self.id, p.get_port_no(), p.is_connected());
+            /*{   // Debug print
+                println!("NalCell {}: {} port {} is connected {}", self.id, f, *port.get_port_no(), port.is_connected());
+                ::utility::append2file(::serde_json::to_string(&(self.id.clone(), f, *port.get_port_no(), port.is_connected()))?)?;
+            }*/
 			if !port.is_connected() && !(want_boundary_port ^ port.is_border()) && (port.get_port_no().v != 0 as u8) {
 				let port_no = port.get_port_no();
 				match self.ports_from_pe.remove(&port_no) { // Remove avoids a borrowed context error
@@ -102,11 +105,11 @@ impl NalCell {
 						port.set_connected();
 						return Ok((port, recvr))
 					},
-					None => return Err(NalcellError::Channel { port_no: port_no, func_name: "get_free_port_mut" })
+					None => return Err(NalcellError::Channel { port_no, func_name: f }.into())
 				} 
 			}
 		}
-		Err(NalcellError::NoFreePorts{ cell_id: self.id.clone(), func_name: "get_free_port_mut" })
+		Err(NalcellError::NoFreePorts{ cell_id: self.id.clone(), func_name: f }.into())
 	}
 }
 impl fmt::Display for NalCell { 
@@ -122,7 +125,7 @@ impl fmt::Display for NalCell {
 		write!(f, "{}", s) }
 }
 // Errors
-use failure::{Error, Fail, ResultExt};
+use failure::{Error, ResultExt};
 #[derive(Debug, Fail)]
 pub enum NalcellError {
 	#[fail(display = "NalcellError::Chain {} {}", func_name, comment)]

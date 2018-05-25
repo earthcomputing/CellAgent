@@ -8,7 +8,7 @@ use std::collections::HashSet;
 use config::{PortNo, TableIndex};
 use message::MsgType;
 use message_types::{PeFromCa, PeToCa, PeToPort, PeFromPort, CaToPePacket, PortToPePacket, PeToPortPacket, PeToCaPacket,
-    PeToPe, PeFromPe, PeToPePacket};
+    PeToPe, PeFromPe};
 use name::{Name, CellID};
 use packet::{Packet};
 use routing_table::{RoutingTable};
@@ -39,7 +39,6 @@ impl PacketEngine {
         Ok(())
 	}
 	fn listen_ca(&self, pe_from_ca: PeFromCa, pe_to_pe: PeToPe) -> Result<(), Error> {
-        let f = "listen_ca";
         let mut pe = self.clone();
         ::std::thread::spawn( move || -> Result<(), Error> {
             let _ = pe.listen_ca_loop(&pe_from_ca, &pe_to_pe).map_err(|e| write_err("packet_engine", e));
@@ -50,7 +49,6 @@ impl PacketEngine {
     }
     // One thread for all ports; should be a different thread for each port
     fn listen_port(&self, pe_from_ports: PeFromPort, pe_from_pe: PeFromPe) -> Result<(),Error> {
-        let f = "listen_port";
         let mut pe = self.clone();
         ::std::thread::spawn( move || -> Result<(), Error> {
             let _ = pe.listen_port_loop(&pe_from_ports, &pe_from_pe).map_err(|e| write_err("packet_engine", e));
@@ -61,7 +59,7 @@ impl PacketEngine {
     }
 	//pub fn get_table(&self) -> &Arc<Mutex<RoutingTable>> { &self.routing_table }
 	fn listen_ca_loop(&mut self, pe_from_ca: &PeFromCa, pe_to_pe: &PeToPe) -> Result<(), Error> {
-        let f = "listen_ca_loop";
+        let f = "PacketEngine: listen_ca_loop";
 		loop {
 			match pe_from_ca.recv().context(PacketEngineError::Chain { func_name: f, comment: S("recv entry from ca") + self.cell_id.get_name()})? {
 				CaToPePacket::Entry(entry) => {
@@ -74,8 +72,6 @@ impl PacketEngine {
                             ::utility::append2file(json).context(PacketEngineError::Chain { func_name: "listen_ca", comment: S("") })?;
                         }
                     */}
-                    let tree_id = entry.get_uuid().to_string();
-                    //if tree_id.starts_with("b1dc43ed") || tree_id.starts_with("2c8b871d") { println!("PacketEngine {}: {} entry {}", self.cell_id, f, entry); }
 					self.routing_table.lock().unwrap().set_entry(entry)
 				},
 				CaToPePacket::Packet((index, user_mask, packet)) => {
@@ -153,10 +149,7 @@ impl PacketEngine {
             // TODO: Fix to block only the parent port of the specific tree
             // Wait for permission to proceed if packet is from a port and will result in a tree update
             if packet.is_blocking() && packet.is_last_packet() {
-                let tree_id = packet.get_tree_id();
-                //if tree_id.is_name("C:2") { println!("PacketEngine {}: {} blocking for {} on port {}", self.cell_id, f, MsgType::msg_type(&packet), port_no.v); }
                 pe_from_pe.recv()?;
-                //if tree_id.is_name("C:2") { println!("PacketEngine {}: {} unblocked for {} on port {}", self.cell_id, f, MsgType::msg_type(&packet), port_no.v); }
             }
         }
 		Ok(())
@@ -186,7 +179,7 @@ impl PacketEngine {
 
                             }
                         */}
-						let is_up = entry.get_mask().and(user_mask).equal(Mask::new0());
+						let is_up = entry.get_mask().and(user_mask).equal(Mask::port0());
 						if is_up { // Send to cell agent, too
 							self.pe_to_ca.send(PeToCaPacket::Packet((recv_port_no, entry.get_index(), packet))).context(PacketEngineError::Chain { func_name: "forward", comment: S("rootcast packet to ca ") + self.cell_id.get_name()})?;
 						}

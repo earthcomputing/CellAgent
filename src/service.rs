@@ -1,12 +1,9 @@
 use std::fmt;
-use std::collections::{HashMap, HashSet};
 
-use gvm_equation::{GvmEquation, GvmEqn, GvmVariable, GvmVariableType};
-use nalcell::CellConfig;
-use name::{ContainerID, Name, TreeID, UptreeID};
-use message::{MsgDirection, StackTreeMsg, TcpMsgType};
+use name::{ContainerID, UptreeID};
+use message::{MsgDirection, TcpMsgType};
 use message_types::{ContainerToVm, ContainerFromVm};
-use uptree_spec::{AllowedTree, ContainerSpec, Manifest, UpTreeSpec, VmSpec};
+use uptree_spec::{AllowedTree};
 use utility::{S, write_err};
 
 pub const NOCMASTER: &'static str ="NocMaster";
@@ -52,14 +49,11 @@ impl NocMaster {
     pub fn new(container_id: ContainerID, name: &str, container_to_vm: ContainerToVm,
                allowed_trees: &Vec<AllowedTree>) -> NocMaster {
         //println!("NocMaster started in container {}", container_id);
-        NocMaster { container_id: container_id, name: S(name), container_to_vm: container_to_vm,
+        NocMaster { container_id, name: S(name), container_to_vm,
             allowed_trees: allowed_trees.clone() }
     }
-    fn get_container_id(&self) -> &ContainerID { &self.container_id }
-    pub fn initialize(&self, up_tree_id: &UptreeID, container_from_vm: ContainerFromVm) -> Result<(), Error> {
-        let f = "initialize";
-        let new_tree_id = up_tree_id.add_component("NocMaster").context(ServiceError::Chain { func_name: f, comment: S("NocMaster")})?;
-        new_tree_id.append2file().context(ServiceError::Chain { func_name: f, comment: S("")})?;
+    //fn get_container_id(&self) -> &ContainerID { &self.container_id }
+    pub fn initialize(&self, _: &UptreeID, container_from_vm: ContainerFromVm) -> Result<(), Error> {
         println!("Service {} running NocMaster", self.container_id);
         self.listen_vm(container_from_vm)?;
         let msg = S("Hello From Master");
@@ -101,13 +95,11 @@ impl NocAgent {
     pub fn new(container_id: ContainerID, name: &str, container_to_vm: ContainerToVm,
             allowed_trees: &Vec<AllowedTree>) -> NocAgent {
         //println!("NocAgent started in container {}", container_id);
-        NocAgent { container_id: container_id, name: S(name), container_to_vm: container_to_vm,
+        NocAgent { container_id, name: S(name), container_to_vm,
             allowed_trees: allowed_trees.clone() }
     }
-    pub fn initialize(&self, up_tree_id: &UptreeID, container_from_vm: ContainerFromVm) -> Result<(), Error> {
-        let f = "initialize";
-        let new_tree_id = up_tree_id.add_component("NocAgent").context(ServiceError::Chain { func_name: f, comment: S("NocAgent") })?;
-        new_tree_id.append2file().context(ServiceError::Chain { func_name: f, comment: S("NocAgent") })?;
+    pub fn initialize(&self, _up_tree_id: &UptreeID, container_from_vm: ContainerFromVm) -> Result<(), Error> {
+        //let f = "initialize";
         //self.container_to_vm.send((S("NocAgent"), S("Message from NocAgent"))).context(ServiceError::Chain { func_name: f, comment: S("NocAgent") })?;
         println!("Service {} running NocAgent", self.container_id);
         self.listen_vm(container_from_vm)

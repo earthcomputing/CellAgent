@@ -107,7 +107,7 @@ pub struct GvmVariable {
 }
 impl GvmVariable {
 	pub fn new(var_type: GvmVariableType, var_name: &str) -> GvmVariable {
-		GvmVariable { var_type: var_type, var_name: var_name.to_string(), value: S("") }
+		GvmVariable { var_type, var_name: var_name.to_string(), value: S("") }
 	}
 	pub fn get_var_type(&self) -> &GvmVariableType { &self.var_type }
 	pub fn get_var_name(&self) -> &String { &self.var_name }

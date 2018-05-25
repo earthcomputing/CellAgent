@@ -22,7 +22,7 @@ pub trait Name: Sized {
 	fn add_component(&self, s: &str) -> Result<Self> {	
 		match s.find(' ') {
 			Some(_) => Err(ErrorKind::Format(s.to_string()).into()),
-			None => self.from_str(&([self.get_name(),s].join(SEPARATOR)))
+			None => self.name_from_str(&([self.get_name(),s].join(SEPARATOR)))
 		}
 	}		
 }
