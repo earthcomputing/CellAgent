@@ -1,5 +1,9 @@
 use std::fmt;
 use std::collections::{HashSet};
+use std::thread::ThreadId;
+
+use serde::Serialize;
+use serde_json;
 
 use config::{MAX_PORTS, OUTPUT_FILE_NAME, MaskValue, PortNo};
 /*
@@ -109,7 +113,7 @@ impl fmt::Display for Path {
 }
 use std::fs::{File, OpenOptions};
 use std::io::Write;
-pub fn append2file(line: String) -> Result<(), Error> {
+pub fn append2file<T: Serialize>(obj: &T) -> Result<(), Error> {
 	let mut file_handle = match OpenOptions::new().append(true).open(OUTPUT_FILE_NAME) {
 		Ok(f) => Ok(f),
 		Err(_) => {
@@ -117,8 +121,49 @@ pub fn append2file(line: String) -> Result<(), Error> {
 			File::create(OUTPUT_FILE_NAME)
 		}
 	}?;
+    let line = serde_json::to_string(obj).context(UtilityError::Chain { func_name: "append2file", comment: S("")})?;
 	file_handle.write(&(line + "\n").into_bytes()).context(UtilityError::Chain { func_name: "append2file", comment: S("")})?;
 	Ok(())
+}
+use std::thread;
+#[derive(Debug, Copy, Clone, Serialize)]
+pub struct TraceHeader {
+    thread_id: u64,
+    event_id: u64,
+    trace_type: TraceType,
+}
+impl TraceHeader {
+    pub fn new() -> TraceHeader {
+        let thread_id = TraceHeader::parse(thread::current().id());
+        TraceHeader { thread_id, event_id: 0, trace_type: TraceType::Trace }
+    }
+    pub fn next(&mut self, trace_type: TraceType) -> TraceHeader {
+        self.event_id = self.event_id + 1;
+        TraceHeader { thread_id: self.thread_id, event_id: self.event_id, trace_type }
+    }
+    fn parse(thread_id: ThreadId) -> u64 {
+        let as_string = format!("{:?}",::std::thread::current().id());
+        let r: Vec<&str> = as_string.split('(').collect();
+        let n_as_str: Vec<&str> = r[1].split(')').collect();
+        n_as_str[0].parse().expect(&format!("Problem parsing ThreadId {:?}", thread_id))
+    }
+}
+impl fmt::Display for TraceHeader {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "Thread id {}, Event id {}", self.thread_id, self.event_id) }
+}
+#[derive(Debug, Copy, Clone, Serialize)]
+pub enum TraceType {
+    Trace,
+    Debug,
+}
+impl fmt::Display for TraceType {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "Trace type {}", match self {
+            &TraceType::Trace => "Trace",
+            &TraceType::Debug => "Debug"
+        })
+    }
 }
 pub fn write_err(caller: &str, e: Error) {
 	use ::std::io::Write;
@@ -146,6 +191,8 @@ pub enum UtilityError {
 //    Mask { cell_id: CellID, func_name: &'static str},
     #[fail(display = "UtilityError::PortNumber {}: Port number {:?} is larger than the maximum of {:?}", func_name, port_no, max)]
     PortNumber { port_no: PortNo, func_name: &'static str, max: PortNo },
+    #[fail(display = "UtilityError::Serialize {}: Cannot serialize in append2file", func_name)]
+    Serialize { func_name: &'static str},
     #[fail(display = "UtilityError::Unimplemented {}: {} is not implemented", func_name, feature)]
     Unimplemented { feature: String, func_name: &'static str }
 }

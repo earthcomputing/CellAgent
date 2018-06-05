@@ -218,7 +218,7 @@ impl fmt::Display for Traph {
 		write!(f, "{}", s) 
 	}
 }
-#[derive(Debug, Copy, Clone, PartialEq)]
+#[derive(Debug, Copy, Clone, PartialEq, Serialize)]
 pub enum PortStatus {
 	Parent,
 	Child,

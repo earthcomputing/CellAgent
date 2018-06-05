@@ -1,6 +1,7 @@
 use std::fmt;
 use std::collections::{HashMap, HashSet};
 use std::sync::mpsc::channel;
+use std::thread;
 
 use cellagent::{CellAgent};
 use config::{MAX_PORTS, CellNo, CellType, PortNo};
@@ -8,9 +9,10 @@ use message_types::{CaToPe, PeFromCa, PeToCa, CaFromPe, PortToPe, PeFromPort, Pe
 use name::{CellID};
 use packet_engine::{PacketEngine};
 use port::{Port};
-use utility::{PortNumber, S};
+use utility::{append2file, PortNumber, S, TraceHeader, TraceType};
 use vm::VirtualMachine;
 
+const MODULE: &'static str = "nalcell.rs";
 #[derive(Debug, Copy, Clone, Hash, Serialize, Deserialize)]
 pub enum CellConfig { Small, Medium, Large }
 impl fmt::Display for CellConfig { 
@@ -66,15 +68,47 @@ impl NalCell {
 			let port = Port::new(&cell_id, port_number, is_border_port, is_connected,port_to_pe.clone()).context(NalcellError::Chain { func_name: "new", comment: S("port")})?;
 			ports.push(port);
 		}
+        let ref mut trace_header = TraceHeader::new();
 		let boxed_ports: Box<[Port]> = ports.into_boxed_slice();
-		let mut cell_agent = CellAgent::new(&cell_id, cell_type, config, nports, ca_to_pe).context(NalcellError::Chain { func_name: "new", comment: S("cell agent create")})?;
-		cell_agent.initialize(ca_from_pe).context(NalcellError::Chain { func_name: "new", comment: S("cell agent init")})?;
+		let cell_agent = CellAgent::new(&cell_id, cell_type, config, nports, ca_to_pe).context(NalcellError::Chain { func_name: "new", comment: S("cell agent create")})?;
+        NalCell::start_cell(&cell_agent, ca_from_pe, trace_header);
 		let packet_engine = PacketEngine::new(&cell_id, pe_to_ca, pe_to_ports, boundary_port_nos).context(NalcellError::Chain { func_name: "new", comment: S("packet engine create")})?;
-		packet_engine.start_threads(pe_from_ca, pe_from_ports)?;
+		NalCell::start_packet_engine(&packet_engine, pe_from_ca, pe_from_ports, trace_header);
 		Ok(NalCell { id: cell_id, cell_no, cell_type, config,
 				ports: boxed_ports, cell_agent, vms: Vec::new(),
 				packet_engine, ports_from_pe })
 	}
+    fn start_cell(cell_agent: &CellAgent, ca_from_pe: CaFromPe, trace_header: &mut TraceHeader) {
+        let f = "start_cell";
+        let mut ca = cell_agent.clone();
+        #[derive(Debug, Serialize)]
+        struct TraceRecord<'a> { trace_header: TraceHeader, module: &'a str, function: &'a str,
+            cell_id: &'a CellID, comment: &'a str }
+        let trace = TraceRecord { trace_header: trace_header.next(TraceType::Trace), module: MODULE,
+            function: f, cell_id: &ca.get_id(), comment: "starting cell agent"};
+        append2file(&trace).expect("append2file error in NalCell start_cell");
+        thread::spawn( move || {
+            let trace_header = TraceHeader::new();
+            let _ = ca.initialize(ca_from_pe, trace_header).map_err(|e| ::utility::write_err("nalcell", e));
+            // Don't automatically restart cell agent if it crashes
+        });
+    }
+    fn start_packet_engine(packet_engine: &PacketEngine, pe_from_ca: PeFromCa,
+                           pe_from_ports: PeFromPort, trace_header: &mut TraceHeader) {
+        let f = "start_packet_engine";
+        let pe = packet_engine.clone();
+        #[derive(Debug, Serialize)]
+        struct TraceRecord<'a> { trace_header: TraceHeader, module: &'a str, function: &'a str,
+            cell_id: &'a CellID, comment: &'a str }
+        let trace = TraceRecord { trace_header: trace_header.next(TraceType::Trace), module: MODULE,
+            function: f, cell_id: &pe.get_id(), comment: "starting packet engine"};
+        append2file(&trace).expect("append2file error in NalCell start_cell");
+        thread::spawn( move || {
+            let trace_header = TraceHeader::new();
+            let _ = pe.start_threads(pe_from_ca, pe_from_ports, trace_header).map_err(|e| ::utility::write_err("nalcell", e));
+            // Don't automatically restart packet engine if it crashes
+        });
+    }
 //	pub fn get_id(&self) -> &CellID { &self.id }
 	pub fn get_no(&self) -> CellNo { self.cell_no }
 //	pub fn get_cell_agent(&self) -> &CellAgent { &self.cell_agent }
