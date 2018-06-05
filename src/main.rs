@@ -40,7 +40,7 @@ mod vm;
 
 use std::io::{stdin, stdout, Read, Write};
 use std::collections::HashSet;
-use std::fs::File;
+use std::fs::{File, OpenOptions};
 use std::sync::mpsc::channel;
 use std::collections::HashMap;
 
@@ -57,6 +57,7 @@ use utility::{S};
 
 fn main() -> Result<(), Error> {
 	println!("Multicell Routing: Output to file {} (set in config.rs)", OUTPUT_FILE_NAME);
+    let _ = OpenOptions::new().write(true).truncate(true).open(OUTPUT_FILE_NAME);
     /* Doesn't work when debugging in Eclipse
 	let args: Vec<String> = env::args().collect();
 	println!("Main: args {:?}",args);

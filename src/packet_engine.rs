@@ -13,7 +13,7 @@ use name::{Name, CellID};
 use packet::{Packet};
 use routing_table::{RoutingTable};
 use routing_table_entry::{RoutingTableEntry};
-use utility::{Mask, PortNumber, S, write_err};
+use utility::{Mask, PortNumber, S, TraceHeader, write_err};
 use uuid_fake::Uuid;
 
 #[derive(Debug, Clone)]
@@ -32,12 +32,14 @@ impl PacketEngine {
 		Ok(PacketEngine { cell_id: cell_id.clone(), routing_table, boundary_port_nos,
             pe_to_ca: packet_pe_to_ca, pe_to_ports })
 	}
-	pub fn start_threads(&self, pe_from_ca: PeFromCa, pe_from_ports: PeFromPort) -> Result<(), Error> {
+	pub fn start_threads(&self, pe_from_ca: PeFromCa,
+                         pe_from_ports: PeFromPort, mut trace_header: TraceHeader) -> Result<(), Error> {
         let (pe_to_pe, pe_from_pe): (PeToPe, PeFromPe) = channel();
         self.listen_ca(pe_from_ca, pe_to_pe)?;
         self.listen_port(pe_from_ports, pe_from_pe)?;
         Ok(())
 	}
+    pub fn get_id(&self) -> CellID { self.cell_id.clone() }
 	fn listen_ca(&self, pe_from_ca: PeFromCa, pe_to_pe: PeToPe) -> Result<(), Error> {
         let mut pe = self.clone();
         ::std::thread::spawn( move || -> Result<(), Error> {

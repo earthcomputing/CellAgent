@@ -12,7 +12,7 @@ use gvm_equation::{GvmEquation, GvmEqn};
 use name::{CellID, SenderID, TreeID};
 use packet::{Packet, Packetizer, Serializer};
 use uptree_spec::{AllowedTree, Manifest};
-use utility::{S, Path};
+use utility::{S, Path, TraceHeader};
 
 static MESSAGE_COUNT: AtomicUsize = ATOMIC_USIZE_INIT;
 pub fn get_next_count() -> MsgID { MsgID(MESSAGE_COUNT.fetch_add(1, Ordering::SeqCst) as u64) }
@@ -129,7 +129,6 @@ impl fmt::Display for TypePlusMsg {
 		write!(f, "{}: {}", self.msg_type, self.serialized_msg)
 	}
 }
-
 pub trait Message {
 	fn get_header(&self) -> &MsgHeader;
     fn get_payload(&self) -> &MsgPayload;
@@ -143,6 +142,14 @@ pub trait Message {
 	}
 	fn is_leafward(&self) -> bool { !self.is_rootward() }
     fn is_blocking(&self) -> bool;
+    fn serialize(&self) -> String;
+    // A kludge used to get the actual message type when all I have is the message trait
+    fn get_application_msg(&self) -> Option<&ApplicationMsg>;
+    fn get_discover_msg(&self)    -> Option<&DiscoverMsg>;
+    fn get_discoverd_msg(&self)   -> Option<&DiscoverDMsg>;
+    fn get_manifest_msg(&self)    -> Option<&ManifestMsg>;
+    fn get_stack_tree_msg(&self)  -> Option<&StackTreeMsg>;
+    fn get_stack_treed_msg(&self) -> Option<&StackTreeDMsg>;
 //	fn get_count(&self) -> MsgID { self.get_header().get_count() }
     fn to_packets(&self, tree_id: &TreeID) -> Result<Vec<Packet>, Error>
 			where Self:std::marker::Sized + serde::Serialize {
@@ -152,7 +159,7 @@ pub trait Message {
 		Ok(packets)
 	}
 	fn process_ca(&mut self, _cell_agent: &mut CellAgent, _index: TableIndex, _port_no: PortNo,
-                  _msg_tree_id: &TreeID, _packets: &Vec<Packet>) -> Result<(), Error> { Err(MessageError::Process { func_name: "process_ca" }.into()) }
+                  _msg_tree_id: &TreeID, _packets: &Vec<Packet>, trace_header: &mut TraceHeader) -> Result<(), Error> { Err(MessageError::Process { func_name: "process_ca" }.into()) }
 }
 impl fmt::Display for Message {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
@@ -221,9 +228,16 @@ impl Message for DiscoverMsg {
     fn get_msg_type(&self) -> MsgType { self.get_header().msg_type }
     fn get_tree_id(&self) -> Option<&TreeID> { Some(&self.payload.tree_id) }
     fn is_blocking(&self) -> bool { false }
+    fn serialize(&self) -> String { ::serde_json::to_string(self).unwrap() }
+    fn get_application_msg(&self) -> Option<&ApplicationMsg> { None }
+    fn get_discover_msg(&self) -> Option<&DiscoverMsg> { Some(self) }
+    fn get_discoverd_msg(&self) -> Option<&DiscoverDMsg> { None }
+    fn get_manifest_msg(&self) -> Option<&ManifestMsg> { None }
+    fn get_stack_tree_msg(&self) -> Option<&StackTreeMsg> { None }
+    fn get_stack_treed_msg(&self) -> Option<&StackTreeDMsg> { None }
 	fn process_ca(&mut self, cell_agent: &mut CellAgent, _index: TableIndex, port_no: PortNo,
-                  _msg_tree_id: &TreeID, _packets: &Vec<Packet>) -> Result<(), Error> {
-        cell_agent.process_discover_msg(self, port_no)
+                  _msg_tree_id: &TreeID, _packets: &Vec<Packet>, trace_header: &mut TraceHeader) -> Result<(), Error> {
+        cell_agent.process_discover_msg(self, port_no, trace_header)
 	}
 }
 impl fmt::Display for DiscoverMsg {
@@ -293,9 +307,16 @@ impl Message for DiscoverDMsg {
     fn get_msg_type(&self) -> MsgType { self.get_header().msg_type }
     fn get_tree_id(&self) -> Option<&TreeID> { Some(&self.payload.get_tree_id()) }
     fn is_blocking(&self) -> bool { true }
+    fn serialize(&self) -> String { ::serde_json::to_string(self).unwrap() }
+    fn get_application_msg(&self) -> Option<&ApplicationMsg> { None }
+    fn get_discover_msg(&self) -> Option<&DiscoverMsg> { None }
+    fn get_discoverd_msg(&self) -> Option<&DiscoverDMsg> { Some(self) }
+    fn get_manifest_msg(&self) -> Option<&ManifestMsg> { None }
+    fn get_stack_tree_msg(&self) -> Option<&StackTreeMsg> { None }
+    fn get_stack_treed_msg(&self) -> Option<&StackTreeDMsg> { None }
 	fn process_ca(&mut self, cell_agent: &mut CellAgent, _index: TableIndex, port_no: PortNo,
-                  _msg_tree_id: &TreeID, _packets: &Vec<Packet>) -> Result<(), Error> {
-        cell_agent.process_discover_d_msg(&self, port_no)
+                  _msg_tree_id: &TreeID, _packets: &Vec<Packet>, trace_header: &mut TraceHeader) -> Result<(), Error> {
+        cell_agent.process_discover_d_msg(&self, port_no, trace_header)
     }
 }
 impl fmt::Display for DiscoverDMsg {
@@ -350,9 +371,17 @@ impl Message for StackTreeMsg {
     fn get_msg_type(&self) -> MsgType { self.header.msg_type }
     fn get_tree_id(&self) -> Option<&TreeID> { Some(&self.payload.get_new_tree_id()) }
     fn is_blocking(&self) -> bool { true }
+    fn serialize(&self) -> String { ::serde_json::to_string(self).unwrap() }
+    fn get_application_msg(&self) -> Option<&ApplicationMsg> { None }
+    fn get_discover_msg(&self) -> Option<&DiscoverMsg> { None }
+    fn get_discoverd_msg(&self) -> Option<&DiscoverDMsg> { None }
+    fn get_manifest_msg(&self) -> Option<&ManifestMsg> { None }
+    fn get_stack_tree_msg(&self) -> Option<&StackTreeMsg> { Some(self) }
+    fn get_stack_treed_msg(&self) -> Option<&StackTreeDMsg> { None }
 	fn process_ca(&mut self, cell_agent: &mut CellAgent, _index: TableIndex, port_no: PortNo,
-                  msg_tree_id: &TreeID, _packets: &Vec<Packet>) -> Result<(), Error> {
-        cell_agent.process_stack_tree_msg(&self, port_no, msg_tree_id)
+                  msg_tree_id: &TreeID, _packets: &Vec<Packet>, trace_header: &mut TraceHeader) -> Result<(), Error> {
+        cell_agent.process_stack_tree_msg(&self, port_no,
+                                          msg_tree_id, trace_header)
 	}
 }
 impl fmt::Display for StackTreeMsg {
@@ -408,9 +437,16 @@ impl Message for StackTreeDMsg {
     fn get_msg_type(&self) -> MsgType { self.header.msg_type }
     fn get_tree_id(&self) -> Option<&TreeID> { Some(self.payload.get_tree_id()) }
     fn is_blocking(&self) -> bool { true }
+    fn serialize(&self) -> String { ::serde_json::to_string(self).unwrap() }
+    fn get_application_msg(&self) -> Option<&ApplicationMsg> { None }
+    fn get_discover_msg(&self) -> Option<&DiscoverMsg> { None }
+    fn get_discoverd_msg(&self) -> Option<&DiscoverDMsg> { None }
+    fn get_manifest_msg(&self) -> Option<&ManifestMsg> { None }
+    fn get_stack_tree_msg(&self) -> Option<&StackTreeMsg> { None }
+    fn get_stack_treed_msg(&self) -> Option<&StackTreeDMsg> { Some(self) }
     fn process_ca(&mut self, cell_agent: &mut CellAgent, _index: TableIndex, port_no: PortNo,
-                  _msg_tree_id: &TreeID, _packets: &Vec<Packet>) -> Result<(), Error> {
-        cell_agent.process_stack_tree_d_msg(&self, port_no)
+                  _msg_tree_id: &TreeID, _packets: &Vec<Packet>, trace_header: &mut TraceHeader) -> Result<(), Error> {
+        cell_agent.process_stack_tree_d_msg(&self, port_no, trace_header)
     }
 }
 impl fmt::Display for StackTreeDMsg {
@@ -458,9 +494,17 @@ impl Message for ManifestMsg {
     fn get_msg_type(&self) -> MsgType { self.get_header().msg_type }
     fn get_tree_id(&self) -> Option<&TreeID> { Some(&self.payload.get_deploy_tree_id()) }
     fn is_blocking(&self) -> bool { false }
+    fn serialize(&self) -> String { ::serde_json::to_string(self).unwrap() }
+    fn get_application_msg(&self) -> Option<&ApplicationMsg> { None }
+    fn get_discover_msg(&self) -> Option<&DiscoverMsg> { None }
+    fn get_discoverd_msg(&self) -> Option<&DiscoverDMsg> { None }
+    fn get_manifest_msg(&self) -> Option<&ManifestMsg> { Some(self) }
+    fn get_stack_tree_msg(&self) -> Option<&StackTreeMsg> { None }
+    fn get_stack_treed_msg(&self) -> Option<&StackTreeDMsg> { None }
 	fn process_ca(&mut self, cell_agent: &mut CellAgent, index: TableIndex, port_no: PortNo,
-                  msg_tree_id: &TreeID, packets: &Vec<Packet>) -> Result<(), Error> {
-        cell_agent.process_manifest_msg(&self, index, port_no, msg_tree_id, packets)
+                  msg_tree_id: &TreeID, packets: &Vec<Packet>, trace_header: &mut TraceHeader) -> Result<(), Error> {
+        cell_agent.process_manifest_msg(&self, index, port_no,
+                                        msg_tree_id, packets, trace_header)
 	}
 }
 impl fmt::Display for ManifestMsg {
@@ -512,9 +556,17 @@ impl Message for ApplicationMsg {
     fn get_msg_type(&self) -> MsgType { self.get_header().msg_type }
     fn get_tree_id(&self) -> Option<&TreeID> { Some(&self.payload.get_tree_id()) }
     fn is_blocking(&self) -> bool { false }
+    fn serialize(&self) -> String { ::serde_json::to_string(self).unwrap() }
+    fn get_application_msg(&self) -> Option<&ApplicationMsg> { Some(self) }
+    fn get_discover_msg(&self) -> Option<&DiscoverMsg> { None }
+    fn get_discoverd_msg(&self) -> Option<&DiscoverDMsg> { None }
+    fn get_manifest_msg(&self) -> Option<&ManifestMsg> { None }
+    fn get_stack_tree_msg(&self) -> Option<&StackTreeMsg> { None }
+    fn get_stack_treed_msg(&self) -> Option<&StackTreeDMsg> { None }
     fn process_ca(&mut self, cell_agent: &mut CellAgent, index: TableIndex, port_no: PortNo,
-                  msg_tree_id: &TreeID, packets: &Vec<Packet>) -> Result<(), Error> {
-        cell_agent.process_application_msg(self, index, port_no, msg_tree_id, packets)
+                  msg_tree_id: &TreeID, packets: &Vec<Packet>, trace_header: &mut TraceHeader) -> Result<(), Error> {
+        cell_agent.process_application_msg(self, index, port_no,
+                                           msg_tree_id, packets, trace_header)
     }
 }
 impl fmt::Display for ApplicationMsg {
@@ -562,6 +614,13 @@ impl Message for TreeNameMsg {
     fn get_payload(&self) -> &MsgPayload { &self.payload }
     fn get_msg_type(&self) -> MsgType { self.get_header().msg_type }
     fn is_blocking(&self) -> bool { false }
+    fn serialize(&self) -> String { ::serde_json::to_string(self).unwrap() }
+    fn get_application_msg(&self) -> Option<&ApplicationMsg> { None }
+    fn get_discover_msg(&self) -> Option<&DiscoverMsg> { None }
+    fn get_discoverd_msg(&self) -> Option<&DiscoverDMsg> { None }
+    fn get_manifest_msg(&self) -> Option<&ManifestMsg> { None }
+    fn get_stack_tree_msg(&self) -> Option<&StackTreeMsg> { None }
+    fn get_stack_treed_msg(&self) -> Option<&StackTreeDMsg> { None }
 }
 impl fmt::Display for TreeNameMsg {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
