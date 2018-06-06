@@ -13,6 +13,7 @@ mod blueprint;
 mod cellagent;
 mod config;
 mod container;
+mod dal;
 mod datacenter;
 mod ecargs;
 mod errors;

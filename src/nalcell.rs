@@ -4,12 +4,13 @@ use std::sync::mpsc::channel;
 use std::thread;
 
 use cellagent::{CellAgent};
+use dal;
 use config::{MAX_PORTS, CellNo, CellType, PortNo};
 use message_types::{CaToPe, PeFromCa, PeToCa, CaFromPe, PortToPe, PeFromPort, PeToPort,PortFromPe};
 use name::{CellID};
 use packet_engine::{PacketEngine};
 use port::{Port};
-use utility::{append2file, PortNumber, S, TraceHeader, TraceType};
+use utility::{PortNumber, S, TraceHeader, TraceType};
 use vm::VirtualMachine;
 
 const MODULE: &'static str = "nalcell.rs";
@@ -86,7 +87,7 @@ impl NalCell {
             cell_id: &'a CellID, comment: &'a str }
         let trace = TraceRecord { trace_header: trace_header.next(TraceType::Trace), module: MODULE,
             function: f, cell_id: &ca.get_id(), comment: "starting cell agent"};
-        append2file(&trace).expect("append2file error in NalCell start_cell");
+        let _ = dal::add_to_trace(&trace, f);
         thread::spawn( move || {
             let trace_header = TraceHeader::new();
             let _ = ca.initialize(ca_from_pe, trace_header).map_err(|e| ::utility::write_err("nalcell", e));
@@ -102,7 +103,7 @@ impl NalCell {
             cell_id: &'a CellID, comment: &'a str }
         let trace = TraceRecord { trace_header: trace_header.next(TraceType::Trace), module: MODULE,
             function: f, cell_id: &pe.get_id(), comment: "starting packet engine"};
-        append2file(&trace).expect("append2file error in NalCell start_cell");
+        let _ = dal::add_to_trace(&trace, f);
         thread::spawn( move || {
             let trace_header = TraceHeader::new();
             let _ = pe.start_threads(pe_from_ca, pe_from_ports, trace_header).map_err(|e| ::utility::write_err("nalcell", e));
@@ -130,7 +131,7 @@ impl NalCell {
 		for port in &mut self.ports.iter_mut() {
             /*{   // Debug print
                 println!("NalCell {}: {} port {} is connected {}", self.id, f, *port.get_port_no(), port.is_connected());
-                ::utility::append2file(::serde_json::to_string(&(self.id.clone(), f, *port.get_port_no(), port.is_connected()))?)?;
+                ::utility::add_to_trace(::serde_json::to_string(&(self.id.clone(), f, *port.get_port_no(), port.is_connected()))?)?;
             }*/
 			if !port.is_connected() && !(want_boundary_port ^ port.is_border()) && (port.get_port_no().v != 0 as u8) {
 				let port_no = port.get_port_no();

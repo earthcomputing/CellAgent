@@ -7,12 +7,13 @@ use serde;
 use serde_json;
 
 use cellagent::{CellAgent};
+use dal;
 use config::{CellNo, MsgID, PathLength, PortNo, TableIndex};
 use gvm_equation::{GvmEquation, GvmEqn};
 use name::{CellID, SenderID, TreeID};
 use packet::{Packet, Packetizer, Serializer};
 use uptree_spec::{AllowedTree, Manifest};
-use utility::{S, Path, TraceHeader};
+use utility::{S, Path, TraceHeader, TraceType};
 
 static MESSAGE_COUNT: AtomicUsize = ATOMIC_USIZE_INIT;
 pub fn get_next_count() -> MsgID { MsgID(MESSAGE_COUNT.fetch_add(1, Ordering::SeqCst) as u64) }
@@ -160,6 +161,8 @@ pub trait Message {
 	}
 	fn process_ca(&mut self, _cell_agent: &mut CellAgent, _index: TableIndex, _port_no: PortNo,
                   _msg_tree_id: &TreeID, _packets: &Vec<Packet>, trace_header: &mut TraceHeader) -> Result<(), Error> { Err(MessageError::Process { func_name: "process_ca" }.into()) }
+    fn trace_msg(&self, trace_header: &mut TraceHeader, trace_type: TraceType,
+                 module: &str, function: &str, cell_id: &CellID);
 }
 impl fmt::Display for Message {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
@@ -239,6 +242,17 @@ impl Message for DiscoverMsg {
                   _msg_tree_id: &TreeID, _packets: &Vec<Packet>, trace_header: &mut TraceHeader) -> Result<(), Error> {
         cell_agent.process_discover_msg(self, port_no, trace_header)
 	}
+    fn trace_msg(&self, trace_header: &mut TraceHeader, trace_type: TraceType,
+                 module: &str, function: &str, cell_id: &CellID) {
+        #[derive(Serialize)]
+        struct TraceRecord<'a> {
+            trace_header: TraceHeader, module: &'a str, function: &'a str,
+            cell_id: &'a CellID, msg: &'a DiscoverMsg
+        };
+        let trace = TraceRecord { trace_header: trace_header.next(trace_type),
+            module, function, cell_id, msg: self };
+        let _ = dal::add_to_trace(&trace, "DiscoverMsg");
+    }
 }
 impl fmt::Display for DiscoverMsg {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
@@ -318,6 +332,17 @@ impl Message for DiscoverDMsg {
                   _msg_tree_id: &TreeID, _packets: &Vec<Packet>, trace_header: &mut TraceHeader) -> Result<(), Error> {
         cell_agent.process_discover_d_msg(&self, port_no, trace_header)
     }
+    fn trace_msg(&self, trace_header: &mut TraceHeader, trace_type: TraceType,
+                 module: &str, function: &str, cell_id: &CellID) {
+        #[derive(Serialize)]
+        struct TraceRecord<'a> {
+            trace_header: TraceHeader, module: &'a str, function: &'a str,
+            cell_id: &'a CellID, msg: &'a DiscoverDMsg
+        };
+        let trace = TraceRecord { trace_header: trace_header.next(trace_type),
+            module, function, cell_id, msg: self };
+        let _ = dal::add_to_trace(&trace, "DiscoverDMsg");
+    }
 }
 impl fmt::Display for DiscoverDMsg {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
@@ -383,6 +408,17 @@ impl Message for StackTreeMsg {
         cell_agent.process_stack_tree_msg(&self, port_no,
                                           msg_tree_id, trace_header)
 	}
+    fn trace_msg(&self, trace_header: &mut TraceHeader, trace_type: TraceType,
+                 module: &str, function: &str, cell_id: &CellID) {
+        #[derive(Serialize)]
+        struct TraceRecord<'a> {
+            trace_header: TraceHeader, module: &'a str, function: &'a str,
+            cell_id: &'a CellID, msg: &'a StackTreeMsg
+        };
+        let trace = TraceRecord { trace_header: trace_header.next(trace_type),
+            module, function, cell_id, msg: self };
+        let _ = dal::add_to_trace(&trace, "StackTreeMsg");
+    }
 }
 impl fmt::Display for StackTreeMsg {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
@@ -448,6 +484,17 @@ impl Message for StackTreeDMsg {
                   _msg_tree_id: &TreeID, _packets: &Vec<Packet>, trace_header: &mut TraceHeader) -> Result<(), Error> {
         cell_agent.process_stack_tree_d_msg(&self, port_no, trace_header)
     }
+    fn trace_msg(&self, trace_header: &mut TraceHeader, trace_type: TraceType,
+                 module: &str, function: &str, cell_id: &CellID) {
+        #[derive(Serialize)]
+        struct TraceRecord<'a> {
+            trace_header: TraceHeader, module: &'a str, function: &'a str,
+            cell_id: &'a CellID, msg: &'a StackTreeDMsg
+        };
+        let trace = TraceRecord { trace_header: trace_header.next(trace_type),
+            module, function, cell_id, msg: self };
+        let _ = dal::add_to_trace(&trace, "StackTreeDMsg");
+    }
 }
 impl fmt::Display for StackTreeDMsg {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
@@ -506,6 +553,17 @@ impl Message for ManifestMsg {
         cell_agent.process_manifest_msg(&self, index, port_no,
                                         msg_tree_id, packets, trace_header)
 	}
+    fn trace_msg(&self, trace_header: &mut TraceHeader, trace_type: TraceType,
+                 module: &str, function: &str, cell_id: &CellID) {
+        #[derive(Serialize)]
+        struct TraceRecord<'a> {
+            trace_header: TraceHeader, module: &'a str, function: &'a str,
+            cell_id: &'a CellID, msg: &'a ManifestMsg
+        };
+        let trace = TraceRecord { trace_header: trace_header.next(trace_type),
+            module, function, cell_id, msg: self };
+        let _ = dal::add_to_trace(&trace, "ManifestMsg");
+    }
 }
 impl fmt::Display for ManifestMsg {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
@@ -568,6 +626,17 @@ impl Message for ApplicationMsg {
         cell_agent.process_application_msg(self, index, port_no,
                                            msg_tree_id, packets, trace_header)
     }
+    fn trace_msg(&self, trace_header: &mut TraceHeader, trace_type: TraceType,
+                 module: &str, function: &str, cell_id: &CellID) {
+        #[derive(Serialize)]
+        struct TraceRecord<'a> {
+            trace_header: TraceHeader, module: &'a str, function: &'a str,
+            cell_id: &'a CellID, msg: &'a ApplicationMsg
+        };
+        let trace = TraceRecord { trace_header: trace_header.next(trace_type),
+            module, function, cell_id, msg: self };
+        let _ = dal::add_to_trace(&trace, "ApplicationMsg");
+    }
 }
 impl fmt::Display for ApplicationMsg {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
@@ -621,6 +690,17 @@ impl Message for TreeNameMsg {
     fn get_manifest_msg(&self) -> Option<&ManifestMsg> { None }
     fn get_stack_tree_msg(&self) -> Option<&StackTreeMsg> { None }
     fn get_stack_treed_msg(&self) -> Option<&StackTreeDMsg> { None }
+    fn trace_msg(&self, trace_header: &mut TraceHeader, trace_type: TraceType,
+                 module: &str, function: &str, cell_id: &CellID) {
+        #[derive(Serialize)]
+        struct TraceRecord<'a> {
+            trace_header: TraceHeader, module: &'a str, function: &'a str,
+            msg: &'a TreeNameMsg
+        };
+        let trace = TraceRecord { trace_header: trace_header.next(trace_type),
+            module, function, msg: self };
+        let _ = dal::add_to_trace(&trace, "TreeNameMsg");
+    }
 }
 impl fmt::Display for TreeNameMsg {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
