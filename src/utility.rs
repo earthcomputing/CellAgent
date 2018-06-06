@@ -2,10 +2,7 @@ use std::fmt;
 use std::collections::{HashSet};
 use std::thread::ThreadId;
 
-use serde::Serialize;
-use serde_json;
-
-use config::{MAX_PORTS, OUTPUT_FILE_NAME, MaskValue, PortNo};
+use config::{MAX_PORTS, MaskValue, PortNo};
 /*
 pub fn get_first_arg(a: Vec<String>) -> Option<i32> {
 	if a.len() != 2 {
@@ -110,20 +107,6 @@ impl Path {
 }
 impl fmt::Display for Path {
 	fn fmt(&self, f:&mut fmt::Formatter) -> fmt::Result { write!(f, "{}", self.port_number) }
-}
-use std::fs::{File, OpenOptions};
-use std::io::Write;
-pub fn append2file<T: Serialize>(obj: &T) -> Result<(), Error> {
-	let mut file_handle = match OpenOptions::new().append(true).open(OUTPUT_FILE_NAME) {
-		Ok(f) => Ok(f),
-		Err(_) => {
-			println!("Writing output to {}", OUTPUT_FILE_NAME);
-			File::create(OUTPUT_FILE_NAME)
-		}
-	}?;
-    let line = serde_json::to_string(obj).context(UtilityError::Chain { func_name: "append2file", comment: S("")})?;
-	file_handle.write(&(line + "\n").into_bytes()).context(UtilityError::Chain { func_name: "append2file", comment: S("")})?;
-	Ok(())
 }
 use std::thread;
 #[derive(Debug, Copy, Clone, Serialize)]
