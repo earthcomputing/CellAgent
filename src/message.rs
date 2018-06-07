@@ -401,7 +401,7 @@ impl StackTreeMsgPayload {
 impl MsgPayload for StackTreeMsgPayload {}
 impl fmt::Display for StackTreeMsgPayload {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "Tree {} stacked on tree {} with GVM {}", self.new_tree_id, self.parent_tree_id, self.gvm_eqn)
+        write!(f, "Tree {} stacked on tree {} {}", self.new_tree_id, self.parent_tree_id, self.gvm_eqn)
     }
 }
 #[derive(Debug, Clone, Serialize, Deserialize)]
