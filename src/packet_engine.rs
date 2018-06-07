@@ -10,7 +10,7 @@ use dal;
 use message::MsgType;
 use message_types::{PeFromCa, PeToCa, PeToPort, PeFromPort, CaToPePacket, PortToPePacket, PeToPortPacket, PeToCaPacket,
     PeToPe, PeFromPe};
-use name::{Name, CellID, TreeID};
+use name::{Name, CellID};
 use packet::{Packet};
 use routing_table::{RoutingTable};
 use routing_table_entry::{RoutingTableEntry};
@@ -47,11 +47,8 @@ impl PacketEngine {
 	fn listen_ca(&self, pe_from_ca: PeFromCa, pe_to_pe: PeToPe, mut outer_trace_header: TraceHeader)
             -> Result<(), Error> {
         let f = "listen_ca";
-        #[derive(Serialize)]
-        struct TraceRecord<'a> { trace_header: TraceHeader, module: &'a str, function: &'a str,
-            cell_id: &'a CellID, comment: &'a str}
-        let trace = TraceRecord { trace_header: outer_trace_header.next(TraceType::Trace),
-            module: MODULE, function: f, cell_id: &self.cell_id, comment: "Starting listen CA"};
+        let trace = json!({ "trace_header": outer_trace_header.next(TraceType::Trace),
+            "module": MODULE, "function": f, "cell_id": &self.cell_id, "comment": "Starting listen CA"});
         let _ = dal::add_to_trace(&trace, f);
         let mut pe = self.clone();
         ::std::thread::spawn( move || -> Result<(), Error> {
@@ -66,11 +63,8 @@ impl PacketEngine {
     fn listen_port(&self, pe_from_ports: PeFromPort, pe_from_pe: PeFromPe, mut outer_trace_header: TraceHeader)
             -> Result<(),Error> {
         let f = "listen_port";
-        #[derive(Serialize)]
-        struct TraceRecord<'a> { trace_header: TraceHeader, module: &'a str, function: &'a str,
-            cell_id: &'a CellID, comment: &'a str}
-        let trace = TraceRecord { trace_header: outer_trace_header.next(TraceType::Trace),
-            module: MODULE, function: f, cell_id: &self.cell_id, comment: "Starting listen ports"};
+        let trace = json!({ "trace_header": outer_trace_header.next(TraceType::Trace),
+            "module": MODULE, "function": f, "cell_id": &self.cell_id, "comment": "Starting listen ports"});
         let _ = dal::add_to_trace(&trace, f);
         let mut pe = self.clone();
         ::std::thread::spawn( move || -> Result<(), Error> {
@@ -99,11 +93,9 @@ impl PacketEngine {
                         let tree_id = packet.get_tree_id();
                         match msg_type {
                             MsgType::DiscoverD => {
-                                #[derive(Serialize)]
-                                struct TraceRecord<'a> { trace_header: TraceHeader, module: &'a str, function: &'a str,
-                                    cell_id: &'a CellID, tree_id: &'a TreeID, msg_type: &'a MsgType }
-                                let trace = TraceRecord { trace_header: trace_header.next(TraceType::Trace),
-                                    module: MODULE, function: f, cell_id: &self.cell_id, tree_id: &tree_id, msg_type: &msg_type };
+                               let trace = json!({ "trace_header": trace_header.next(TraceType::Trace),
+                                    "module": MODULE, "function": f, "cell_id": &self.cell_id,
+                                    "tree_id": &tree_id, "msg_type": &msg_type });
                                 if tree_id.is_name("C:2") {
                                     let _ = dal::add_to_trace(&trace, f);
                                     println!("PacketEngine {}: got from ca {} {}", self.cell_id, msg_type, tree_id);
@@ -153,13 +145,9 @@ impl PacketEngine {
         if false {   // Debug print
             let msg_type = MsgType::msg_type(&packet);
             let tree_id = packet.get_tree_id();
-            #[derive(Serialize)]
-            struct TraceRecord<'a> { trace_header: TraceHeader, module: &'a str, function: &'a str,
-                cell_id: &'a CellID, tree_id: &'a TreeID, msg_type: &'a MsgType, port_no: &'a PortNo,
-                entry: &'a RoutingTableEntry }
-            let trace = TraceRecord { trace_header: trace_header.next(TraceType::Trace),
-                module: MODULE, function: f, cell_id: &self.cell_id, tree_id: &tree_id,
-                msg_type: &msg_type, port_no: &port_no, entry: &entry };
+            let trace = json!({ "trace_header": trace_header.next(TraceType::Trace),
+                "module": MODULE, "function": f, "cell_id": &self.cell_id,
+                "tree_id": &tree_id, "msg_type": &msg_type, "port_no": &port_no, "entry": &entry });
              match msg_type {
                 MsgType::Discover => (),
                 MsgType::DiscoverD => if tree_id.is_name("C:2") {
@@ -208,12 +196,9 @@ impl PacketEngine {
                         if false {   // Debug print
                             let msg_type = MsgType::msg_type(&packet);
                             let tree_id = packet.get_tree_id();
-                            #[derive(Serialize)]
-                            struct TraceRecord<'a> { trace_header: TraceHeader, module: &'a str, function: &'a str,
-                                cell_id: &'a CellID, tree_id: &'a TreeID, msg_type: &'a MsgType, parent_port: &'a PortNo}
-                            let trace = TraceRecord { trace_header: trace_header.next(TraceType::Trace),
-                                module: MODULE, function: f, cell_id: &self.cell_id, tree_id: &tree_id,
-                                msg_type: &msg_type, parent_port: &parent };
+                            let trace = json!({ "trace_header": trace_header.next(TraceType::Trace),
+                                "module": MODULE, "function": f, "cell_id": &self.cell_id,
+                                "tree_id": &tree_id, "msg_type": &msg_type, "parent_port": &parent });
                             match msg_type {
                                 MsgType::Discover => (),
                                 _ => {
@@ -238,12 +223,9 @@ impl PacketEngine {
             if false {   // Debug print
                 let msg_type = MsgType::msg_type(&packet);
                 let tree_id = packet.get_tree_id();
-                #[derive(Serialize)]
-                struct TraceRecord<'a> { trace_header: TraceHeader, module: &'a str, function: &'a str,
-                    cell_id: &'a CellID, tree_id: &'a TreeID, msg_type: &'a MsgType, port_nos: &'a Vec<PortNo>}
-                let trace = TraceRecord { trace_header: trace_header.next(TraceType::Trace),
-                    module: MODULE, function: f, cell_id: &self.cell_id, tree_id: &tree_id,
-                    msg_type: &msg_type, port_nos: &port_nos };
+                let trace = json!({ "trace_header": trace_header.next(TraceType::Trace),
+                    "module": MODULE, "function": f, "cell_id": &self.cell_id,
+                    "tree_id": &tree_id, "msg_type": &msg_type, "port_nos": &port_nos });
                 match msg_type {
                     MsgType::Discover => (),
                     MsgType::DiscoverD => if tree_id.is_name("C:2") {

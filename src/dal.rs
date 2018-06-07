@@ -4,13 +4,13 @@
 use std::fs::{File, OpenOptions};
 use std::io::Write;
 
-use serde::Serialize;
 use serde_json;
+use serde_json::Value;
 
 use config::{OUTPUT_FILE_NAME};
 use utility::S;
 
-pub fn add_to_trace<T: Serialize>(obj: &T, comment: &str) -> Result<(), Error> {
+pub fn add_to_trace(obj: &Value, comment: &str) -> Result<(), Error> {
     let mut file_handle = match OpenOptions::new().append(true).open(OUTPUT_FILE_NAME) {
         Ok(f) => Ok(f),
         Err(_) => {
