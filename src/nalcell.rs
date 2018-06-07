@@ -82,11 +82,8 @@ impl NalCell {
     fn start_cell(cell_agent: &CellAgent, ca_from_pe: CaFromPe, trace_header: &mut TraceHeader) {
         let f = "start_cell";
         let mut ca = cell_agent.clone();
-        #[derive(Debug, Serialize)]
-        struct TraceRecord<'a> { trace_header: TraceHeader, module: &'a str, function: &'a str,
-            cell_id: &'a CellID, comment: &'a str }
-        let trace = TraceRecord { trace_header: trace_header.next(TraceType::Trace), module: MODULE,
-            function: f, cell_id: &ca.get_id(), comment: "starting cell agent"};
+        let trace = json!({ "trace_header": trace_header.next(TraceType::Trace),
+            "module": MODULE, "function": f, "cell_id": &ca.get_id(), "comment": "starting cell agent"});
         let _ = dal::add_to_trace(&trace, f);
         thread::spawn( move || {
             let trace_header = TraceHeader::new();
@@ -98,11 +95,8 @@ impl NalCell {
                            pe_from_ports: PeFromPort, trace_header: &mut TraceHeader) {
         let f = "start_packet_engine";
         let pe = packet_engine.clone();
-        #[derive(Debug, Serialize)]
-        struct TraceRecord<'a> { trace_header: TraceHeader, module: &'a str, function: &'a str,
-            cell_id: &'a CellID, comment: &'a str }
-        let trace = TraceRecord { trace_header: trace_header.next(TraceType::Trace), module: MODULE,
-            function: f, cell_id: &pe.get_id(), comment: "starting packet engine"};
+        let trace = json!({ "trace_header": trace_header.next(TraceType::Trace),
+            "module": MODULE, "function": f, "cell_id": &pe.get_id(), "comment": "starting packet engine"});
         let _ = dal::add_to_trace(&trace, f);
         thread::spawn( move || {
             let trace_header = TraceHeader::new();

@@ -7,13 +7,12 @@ use serde;
 use serde_json;
 
 use cellagent::{CellAgent};
-use dal;
 use config::{CellNo, MsgID, PathLength, PortNo, TableIndex};
 use gvm_equation::{GvmEquation, GvmEqn};
 use name::{CellID, SenderID, TreeID};
 use packet::{Packet, Packetizer, Serializer};
 use uptree_spec::{AllowedTree, Manifest};
-use utility::{S, Path, TraceHeader, TraceType};
+use utility::{S, Path, TraceHeader};
 
 static MESSAGE_COUNT: AtomicUsize = ATOMIC_USIZE_INIT;
 pub fn get_next_count() -> MsgID { MsgID(MESSAGE_COUNT.fetch_add(1, Ordering::SeqCst) as u64) }
@@ -143,14 +142,7 @@ pub trait Message {
 	}
 	fn is_leafward(&self) -> bool { !self.is_rootward() }
     fn is_blocking(&self) -> bool;
-    fn serialize(&self) -> String;
-    // A kludge used to get the actual message type when all I have is the message trait
-    fn get_application_msg(&self) -> Option<&ApplicationMsg>;
-    fn get_discover_msg(&self)    -> Option<&DiscoverMsg>;
-    fn get_discoverd_msg(&self)   -> Option<&DiscoverDMsg>;
-    fn get_manifest_msg(&self)    -> Option<&ManifestMsg>;
-    fn get_stack_tree_msg(&self)  -> Option<&StackTreeMsg>;
-    fn get_stack_treed_msg(&self) -> Option<&StackTreeDMsg>;
+    fn value(&self) -> serde_json::Value;
 //	fn get_count(&self) -> MsgID { self.get_header().get_count() }
     fn to_packets(&self, tree_id: &TreeID) -> Result<Vec<Packet>, Error>
 			where Self:std::marker::Sized + serde::Serialize {
@@ -160,9 +152,7 @@ pub trait Message {
 		Ok(packets)
 	}
 	fn process_ca(&mut self, _cell_agent: &mut CellAgent, _index: TableIndex, _port_no: PortNo,
-                  _msg_tree_id: &TreeID, _packets: &Vec<Packet>, trace_header: &mut TraceHeader) -> Result<(), Error> { Err(MessageError::Process { func_name: "process_ca" }.into()) }
-    fn trace_msg(&self, trace_header: &mut TraceHeader, trace_type: TraceType,
-                 module: &str, function: &str, cell_id: &CellID);
+                  _msg_tree_id: &TreeID, _packets: &Vec<Packet>, _trace_header: &mut TraceHeader) -> Result<(), Error> { Err(MessageError::Process { func_name: "process_ca" }.into()) }
 }
 impl fmt::Display for Message {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
@@ -231,28 +221,16 @@ impl Message for DiscoverMsg {
     fn get_msg_type(&self) -> MsgType { self.get_header().msg_type }
     fn get_tree_id(&self) -> Option<&TreeID> { Some(&self.payload.tree_id) }
     fn is_blocking(&self) -> bool { false }
-    fn serialize(&self) -> String { ::serde_json::to_string(self).unwrap() }
-    fn get_application_msg(&self) -> Option<&ApplicationMsg> { None }
-    fn get_discover_msg(&self) -> Option<&DiscoverMsg> { Some(self) }
-    fn get_discoverd_msg(&self) -> Option<&DiscoverDMsg> { None }
-    fn get_manifest_msg(&self) -> Option<&ManifestMsg> { None }
-    fn get_stack_tree_msg(&self) -> Option<&StackTreeMsg> { None }
-    fn get_stack_treed_msg(&self) -> Option<&StackTreeDMsg> { None }
+    fn value(&self) -> serde_json::Value {
+        match serde_json::to_value(self) {
+            Ok(v) => v,
+            Err(_) => panic!("I don't know how to handle errors in msg.value()")
+        }
+    }
 	fn process_ca(&mut self, cell_agent: &mut CellAgent, _index: TableIndex, port_no: PortNo,
                   _msg_tree_id: &TreeID, _packets: &Vec<Packet>, trace_header: &mut TraceHeader) -> Result<(), Error> {
         cell_agent.process_discover_msg(self, port_no, trace_header)
 	}
-    fn trace_msg(&self, trace_header: &mut TraceHeader, trace_type: TraceType,
-                 module: &str, function: &str, cell_id: &CellID) {
-        #[derive(Serialize)]
-        struct TraceRecord<'a> {
-            trace_header: TraceHeader, module: &'a str, function: &'a str,
-            cell_id: &'a CellID, msg: &'a DiscoverMsg
-        };
-        let trace = TraceRecord { trace_header: trace_header.next(trace_type),
-            module, function, cell_id, msg: self };
-        let _ = dal::add_to_trace(&trace, "DiscoverMsg");
-    }
 }
 impl fmt::Display for DiscoverMsg {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
@@ -321,27 +299,15 @@ impl Message for DiscoverDMsg {
     fn get_msg_type(&self) -> MsgType { self.get_header().msg_type }
     fn get_tree_id(&self) -> Option<&TreeID> { Some(&self.payload.get_tree_id()) }
     fn is_blocking(&self) -> bool { true }
-    fn serialize(&self) -> String { ::serde_json::to_string(self).unwrap() }
-    fn get_application_msg(&self) -> Option<&ApplicationMsg> { None }
-    fn get_discover_msg(&self) -> Option<&DiscoverMsg> { None }
-    fn get_discoverd_msg(&self) -> Option<&DiscoverDMsg> { Some(self) }
-    fn get_manifest_msg(&self) -> Option<&ManifestMsg> { None }
-    fn get_stack_tree_msg(&self) -> Option<&StackTreeMsg> { None }
-    fn get_stack_treed_msg(&self) -> Option<&StackTreeDMsg> { None }
+    fn value(&self) -> serde_json::Value {
+        match serde_json::to_value(self) {
+            Ok(v) => v,
+            Err(_) => panic!("I don't know how to handle errors in msg.value()")
+        }
+    }
 	fn process_ca(&mut self, cell_agent: &mut CellAgent, _index: TableIndex, port_no: PortNo,
                   _msg_tree_id: &TreeID, _packets: &Vec<Packet>, trace_header: &mut TraceHeader) -> Result<(), Error> {
         cell_agent.process_discover_d_msg(&self, port_no, trace_header)
-    }
-    fn trace_msg(&self, trace_header: &mut TraceHeader, trace_type: TraceType,
-                 module: &str, function: &str, cell_id: &CellID) {
-        #[derive(Serialize)]
-        struct TraceRecord<'a> {
-            trace_header: TraceHeader, module: &'a str, function: &'a str,
-            cell_id: &'a CellID, msg: &'a DiscoverDMsg
-        };
-        let trace = TraceRecord { trace_header: trace_header.next(trace_type),
-            module, function, cell_id, msg: self };
-        let _ = dal::add_to_trace(&trace, "DiscoverDMsg");
     }
 }
 impl fmt::Display for DiscoverDMsg {
@@ -396,29 +362,17 @@ impl Message for StackTreeMsg {
     fn get_msg_type(&self) -> MsgType { self.header.msg_type }
     fn get_tree_id(&self) -> Option<&TreeID> { Some(&self.payload.get_new_tree_id()) }
     fn is_blocking(&self) -> bool { true }
-    fn serialize(&self) -> String { ::serde_json::to_string(self).unwrap() }
-    fn get_application_msg(&self) -> Option<&ApplicationMsg> { None }
-    fn get_discover_msg(&self) -> Option<&DiscoverMsg> { None }
-    fn get_discoverd_msg(&self) -> Option<&DiscoverDMsg> { None }
-    fn get_manifest_msg(&self) -> Option<&ManifestMsg> { None }
-    fn get_stack_tree_msg(&self) -> Option<&StackTreeMsg> { Some(self) }
-    fn get_stack_treed_msg(&self) -> Option<&StackTreeDMsg> { None }
+    fn value(&self) -> serde_json::Value {
+        match serde_json::to_value(self) {
+            Ok(v) => v,
+            Err(_) => panic!("I don't know how to handle errors in msg.value()")
+        }
+    }
 	fn process_ca(&mut self, cell_agent: &mut CellAgent, _index: TableIndex, port_no: PortNo,
                   msg_tree_id: &TreeID, _packets: &Vec<Packet>, trace_header: &mut TraceHeader) -> Result<(), Error> {
         cell_agent.process_stack_tree_msg(&self, port_no,
                                           msg_tree_id, trace_header)
 	}
-    fn trace_msg(&self, trace_header: &mut TraceHeader, trace_type: TraceType,
-                 module: &str, function: &str, cell_id: &CellID) {
-        #[derive(Serialize)]
-        struct TraceRecord<'a> {
-            trace_header: TraceHeader, module: &'a str, function: &'a str,
-            cell_id: &'a CellID, msg: &'a StackTreeMsg
-        };
-        let trace = TraceRecord { trace_header: trace_header.next(trace_type),
-            module, function, cell_id, msg: self };
-        let _ = dal::add_to_trace(&trace, "StackTreeMsg");
-    }
 }
 impl fmt::Display for StackTreeMsg {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
@@ -456,9 +410,10 @@ pub struct StackTreeDMsg {
     payload: StackTreeMsgDPayload
 }
 impl StackTreeDMsg {
-    pub fn new(sender_id: &SenderID, tree_id: &TreeID, index: TableIndex,) -> StackTreeDMsg {
+    pub fn new(sender_id: &SenderID, tree_id: &TreeID, index: TableIndex, fwd_index: TableIndex)
+            -> StackTreeDMsg {
         let header = MsgHeader::new(sender_id,MsgType::StackTreeD, MsgDirection::Leafward);
-        let payload = StackTreeMsgDPayload::new(tree_id, index);
+        let payload = StackTreeMsgDPayload::new(tree_id, index, fwd_index);
         StackTreeDMsg { header, payload}
     }
 //    fn update_payload(&self, payload: StackTreeMsgDPayload) -> StackTreeDMsg {
@@ -473,27 +428,15 @@ impl Message for StackTreeDMsg {
     fn get_msg_type(&self) -> MsgType { self.header.msg_type }
     fn get_tree_id(&self) -> Option<&TreeID> { Some(self.payload.get_tree_id()) }
     fn is_blocking(&self) -> bool { true }
-    fn serialize(&self) -> String { ::serde_json::to_string(self).unwrap() }
-    fn get_application_msg(&self) -> Option<&ApplicationMsg> { None }
-    fn get_discover_msg(&self) -> Option<&DiscoverMsg> { None }
-    fn get_discoverd_msg(&self) -> Option<&DiscoverDMsg> { None }
-    fn get_manifest_msg(&self) -> Option<&ManifestMsg> { None }
-    fn get_stack_tree_msg(&self) -> Option<&StackTreeMsg> { None }
-    fn get_stack_treed_msg(&self) -> Option<&StackTreeDMsg> { Some(self) }
+    fn value(&self) -> serde_json::Value {
+        match serde_json::to_value(self) {
+            Ok(v) => v,
+            Err(_) => panic!("I don't know how to handle errors in msg.value()")
+        }
+    }
     fn process_ca(&mut self, cell_agent: &mut CellAgent, _index: TableIndex, port_no: PortNo,
                   _msg_tree_id: &TreeID, _packets: &Vec<Packet>, trace_header: &mut TraceHeader) -> Result<(), Error> {
         cell_agent.process_stack_tree_d_msg(&self, port_no, trace_header)
-    }
-    fn trace_msg(&self, trace_header: &mut TraceHeader, trace_type: TraceType,
-                 module: &str, function: &str, cell_id: &CellID) {
-        #[derive(Serialize)]
-        struct TraceRecord<'a> {
-            trace_header: TraceHeader, module: &'a str, function: &'a str,
-            cell_id: &'a CellID, msg: &'a StackTreeDMsg
-        };
-        let trace = TraceRecord { trace_header: trace_header.next(trace_type),
-            module, function, cell_id, msg: self };
-        let _ = dal::add_to_trace(&trace, "StackTreeDMsg");
     }
 }
 impl fmt::Display for StackTreeDMsg {
@@ -506,13 +449,15 @@ impl fmt::Display for StackTreeDMsg {
 pub struct StackTreeMsgDPayload {
     tree_id: TreeID,
     index: TableIndex,
+    fwd_index: TableIndex
 }
 impl StackTreeMsgDPayload {
-    fn new(tree_id: &TreeID, index: TableIndex) -> StackTreeMsgDPayload {
-        StackTreeMsgDPayload { tree_id: tree_id.to_owned(), index }
+    fn new(tree_id: &TreeID, index: TableIndex, fwd_index: TableIndex) -> StackTreeMsgDPayload {
+        StackTreeMsgDPayload { tree_id: tree_id.to_owned(), index, fwd_index }
     }
     pub fn get_tree_id(&self) -> &TreeID { &self.tree_id }
     pub fn get_table_index(&self) -> TableIndex { self.index }
+    pub fn get_fwd_index(&self) -> TableIndex { self.fwd_index }
 }
 impl MsgPayload for StackTreeMsgDPayload {}
 impl fmt::Display for StackTreeMsgDPayload {
@@ -541,29 +486,17 @@ impl Message for ManifestMsg {
     fn get_msg_type(&self) -> MsgType { self.get_header().msg_type }
     fn get_tree_id(&self) -> Option<&TreeID> { Some(&self.payload.get_deploy_tree_id()) }
     fn is_blocking(&self) -> bool { false }
-    fn serialize(&self) -> String { ::serde_json::to_string(self).unwrap() }
-    fn get_application_msg(&self) -> Option<&ApplicationMsg> { None }
-    fn get_discover_msg(&self) -> Option<&DiscoverMsg> { None }
-    fn get_discoverd_msg(&self) -> Option<&DiscoverDMsg> { None }
-    fn get_manifest_msg(&self) -> Option<&ManifestMsg> { Some(self) }
-    fn get_stack_tree_msg(&self) -> Option<&StackTreeMsg> { None }
-    fn get_stack_treed_msg(&self) -> Option<&StackTreeDMsg> { None }
+    fn value(&self) -> serde_json::Value {
+        match serde_json::to_value(self) {
+            Ok(v) => v,
+            Err(_) => panic!("I don't know how to handle errors in msg.value()")
+        }
+    }
 	fn process_ca(&mut self, cell_agent: &mut CellAgent, index: TableIndex, port_no: PortNo,
                   msg_tree_id: &TreeID, packets: &Vec<Packet>, trace_header: &mut TraceHeader) -> Result<(), Error> {
         cell_agent.process_manifest_msg(&self, index, port_no,
                                         msg_tree_id, packets, trace_header)
 	}
-    fn trace_msg(&self, trace_header: &mut TraceHeader, trace_type: TraceType,
-                 module: &str, function: &str, cell_id: &CellID) {
-        #[derive(Serialize)]
-        struct TraceRecord<'a> {
-            trace_header: TraceHeader, module: &'a str, function: &'a str,
-            cell_id: &'a CellID, msg: &'a ManifestMsg
-        };
-        let trace = TraceRecord { trace_header: trace_header.next(trace_type),
-            module, function, cell_id, msg: self };
-        let _ = dal::add_to_trace(&trace, "ManifestMsg");
-    }
 }
 impl fmt::Display for ManifestMsg {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
@@ -614,28 +547,16 @@ impl Message for ApplicationMsg {
     fn get_msg_type(&self) -> MsgType { self.get_header().msg_type }
     fn get_tree_id(&self) -> Option<&TreeID> { Some(&self.payload.get_tree_id()) }
     fn is_blocking(&self) -> bool { false }
-    fn serialize(&self) -> String { ::serde_json::to_string(self).unwrap() }
-    fn get_application_msg(&self) -> Option<&ApplicationMsg> { Some(self) }
-    fn get_discover_msg(&self) -> Option<&DiscoverMsg> { None }
-    fn get_discoverd_msg(&self) -> Option<&DiscoverDMsg> { None }
-    fn get_manifest_msg(&self) -> Option<&ManifestMsg> { None }
-    fn get_stack_tree_msg(&self) -> Option<&StackTreeMsg> { None }
-    fn get_stack_treed_msg(&self) -> Option<&StackTreeDMsg> { None }
+    fn value(&self) -> serde_json::Value {
+        match serde_json::to_value(self) {
+            Ok(v) => v,
+            Err(_) => panic!("I don't know how to handle errors in msg.value()")
+        }
+    }
     fn process_ca(&mut self, cell_agent: &mut CellAgent, index: TableIndex, port_no: PortNo,
                   msg_tree_id: &TreeID, packets: &Vec<Packet>, trace_header: &mut TraceHeader) -> Result<(), Error> {
         cell_agent.process_application_msg(self, index, port_no,
                                            msg_tree_id, packets, trace_header)
-    }
-    fn trace_msg(&self, trace_header: &mut TraceHeader, trace_type: TraceType,
-                 module: &str, function: &str, cell_id: &CellID) {
-        #[derive(Serialize)]
-        struct TraceRecord<'a> {
-            trace_header: TraceHeader, module: &'a str, function: &'a str,
-            cell_id: &'a CellID, msg: &'a ApplicationMsg
-        };
-        let trace = TraceRecord { trace_header: trace_header.next(trace_type),
-            module, function, cell_id, msg: self };
-        let _ = dal::add_to_trace(&trace, "ApplicationMsg");
     }
 }
 impl fmt::Display for ApplicationMsg {
@@ -683,23 +604,11 @@ impl Message for TreeNameMsg {
     fn get_payload(&self) -> &MsgPayload { &self.payload }
     fn get_msg_type(&self) -> MsgType { self.get_header().msg_type }
     fn is_blocking(&self) -> bool { false }
-    fn serialize(&self) -> String { ::serde_json::to_string(self).unwrap() }
-    fn get_application_msg(&self) -> Option<&ApplicationMsg> { None }
-    fn get_discover_msg(&self) -> Option<&DiscoverMsg> { None }
-    fn get_discoverd_msg(&self) -> Option<&DiscoverDMsg> { None }
-    fn get_manifest_msg(&self) -> Option<&ManifestMsg> { None }
-    fn get_stack_tree_msg(&self) -> Option<&StackTreeMsg> { None }
-    fn get_stack_treed_msg(&self) -> Option<&StackTreeDMsg> { None }
-    fn trace_msg(&self, trace_header: &mut TraceHeader, trace_type: TraceType,
-                 module: &str, function: &str, cell_id: &CellID) {
-        #[derive(Serialize)]
-        struct TraceRecord<'a> {
-            trace_header: TraceHeader, module: &'a str, function: &'a str,
-            msg: &'a TreeNameMsg
-        };
-        let trace = TraceRecord { trace_header: trace_header.next(trace_type),
-            module, function, msg: self };
-        let _ = dal::add_to_trace(&trace, "TreeNameMsg");
+    fn value(&self) -> serde_json::Value {
+        match serde_json::to_value(self) {
+            Ok(v) => v,
+            Err(_) => panic!("I don't know how to handle errors in msg.value()")
+        }
     }
 }
 impl fmt::Display for TreeNameMsg {

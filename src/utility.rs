@@ -2,6 +2,9 @@ use std::fmt;
 use std::collections::{HashSet};
 use std::thread::ThreadId;
 
+use serde_json;
+use serde_json::{Value};
+
 use config::{MAX_PORTS, MaskValue, PortNo};
 /*
 pub fn get_first_arg(a: Vec<String>) -> Option<i32> {
@@ -160,6 +163,10 @@ pub fn write_err(caller: &str, e: Error) {
 		let _ = writeln!(stderr, "---> Backtrace available: uncomment line in utility.rs containing --->");
 		// let _ = writeln!(stderr, "Backtrace: {:?}", backtrace);
 	}
+}
+pub fn string_to_object(string: &str) -> Result<Value, Error> {
+    let v = serde_json::from_str(string)?;
+    Ok(v)
 }
 // There are so many places in my code where it's more convenient
 // to provide &str but I need String that I made the following
