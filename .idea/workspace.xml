@@ -2,15 +2,8 @@
 <project version="4">
   <component name="ChangeListManager">
     <list default="true" id="eee480a2-146d-44ab-9647-cef5ea39b250" name="Default" comment="">
-      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/cellagent.rs" beforeDir="false" afterPath="$PROJECT_DIR$/src/cellagent.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/dal.rs" beforeDir="false" afterPath="$PROJECT_DIR$/src/dal.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main.rs" beforeDir="false" afterPath="$PROJECT_DIR$/src/main.rs" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/message.rs" beforeDir="false" afterPath="$PROJECT_DIR$/src/message.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/nalcell.rs" beforeDir="false" afterPath="$PROJECT_DIR$/src/nalcell.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/packet_engine.rs" beforeDir="false" afterPath="$PROJECT_DIR$/src/packet_engine.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/routing_table_entry.rs" beforeDir="false" afterPath="$PROJECT_DIR$/src/routing_table_entry.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/utility.rs" beforeDir="false" afterPath="$PROJECT_DIR$/src/utility.rs" afterDir="false" />
     </list>
     <ignored path="$PROJECT_DIR$/target/" />
     <ignored path="$PROJECT_DIR$/out/" />
@@ -29,8 +22,8 @@
       <file leaf-file-name="cellagent.rs" pinned="false" current-in-tab="true">
         <entry file="file://$PROJECT_DIR$/src/cellagent.rs">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="270">
-              <caret line="677" column="32" selection-start-line="677" selection-start-column="32" selection-end-line="677" selection-end-column="32" />
+            <state relative-caret-position="482">
+              <caret line="1206" column="14" selection-start-line="1206" selection-start-column="14" selection-end-line="1206" selection-end-column="14" />
             </state>
           </provider>
         </entry>
@@ -75,8 +68,8 @@
       <file leaf-file-name="dal.rs" pinned="false" current-in-tab="false">
         <entry file="file://$PROJECT_DIR$/src/dal.rs">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="90">
-              <caret line="6" selection-start-line="6" selection-end-line="6" selection-end-column="15" />
+            <state relative-caret-position="360">
+              <caret line="24" column="9" lean-forward="true" selection-start-line="24" selection-start-column="9" selection-end-line="24" selection-end-column="9" />
             </state>
           </provider>
         </entry>
@@ -111,8 +104,8 @@
       <file leaf-file-name="message.rs" pinned="false" current-in-tab="false">
         <entry file="file://$PROJECT_DIR$/src/message.rs">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="180">
-              <caret line="12" column="45" lean-forward="true" selection-start-line="12" selection-start-column="45" selection-end-line="12" selection-end-column="45" />
+            <state relative-caret-position="213">
+              <caret line="611" column="5" lean-forward="true" selection-start-line="611" selection-start-column="5" selection-end-line="611" selection-end-column="5" />
               <folding>
                 <element signature="e#33264#33265#0" expanded="true" />
                 <element signature="e#33325#33326#0" expanded="true" />
@@ -190,20 +183,12 @@
   </component>
   <component name="FindInProjectRecents">
     <findStrings>
-      <find>C:1: forward_saved</find>
-      <find>C:1</find>
-      <find>&quot;b</find>
-      <find>C:1:</find>
-      <find>C:6:</find>
-      <find>got msg Hello from Master</find>
-      <find>may_send</find>
       <find>tree_id</find>
       <find>running NocAgent</find>
       <find>got msg Repl</find>
       <find>got msg Reply</find>
       <find>unblock</find>
       <find>got msg Hello From Maste</find>
-      <find>Reply</find>
       <find>create_from_string</find>
       <find>2c8b871d</find>
       <find>?</find>
@@ -219,7 +204,15 @@
       <find>forward_stack_tree</find>
       <find>if false</find>
       <find>msg.value()</find>
+      <find>stacked on</find>
+      <find>: Por</find>
+      <find>: Port</find>
+      <find>fwd</find>
+      <find>Hello From Master</find>
+      <find>Hello From Maste</find>
+      <find>Reply</find>
       <find>if true</find>
+      <find>Hello</find>
     </findStrings>
     <replaceStrings>
       <replace>Arc::</replace>
@@ -259,10 +252,10 @@
         <option value="$PROJECT_DIR$/src/routing_table_entry.rs" />
         <option value="$PROJECT_DIR$/src/utility.rs" />
         <option value="$PROJECT_DIR$/src/main.rs" />
-        <option value="$PROJECT_DIR$/src/message.rs" />
         <option value="$PROJECT_DIR$/src/nalcell.rs" />
         <option value="$PROJECT_DIR$/src/packet_engine.rs" />
         <option value="$PROJECT_DIR$/src/dal.rs" />
+        <option value="$PROJECT_DIR$/src/message.rs" />
         <option value="$PROJECT_DIR$/src/cellagent.rs" />
       </list>
     </option>
@@ -802,17 +795,6 @@
         </state>
       </provider>
     </entry>
-    <entry file="file://$PROJECT_DIR$/src/message.rs">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="180">
-          <caret line="12" column="45" lean-forward="true" selection-start-line="12" selection-start-column="45" selection-end-line="12" selection-end-column="45" />
-          <folding>
-            <element signature="e#33264#33265#0" expanded="true" />
-            <element signature="e#33325#33326#0" expanded="true" />
-          </folding>
-        </state>
-      </provider>
-    </entry>
     <entry file="file://$PROJECT_DIR$/src/nalcell.rs">
       <provider selected="true" editor-type-id="text-editor">
         <state relative-caret-position="171">
@@ -829,15 +811,26 @@
     </entry>
     <entry file="file://$PROJECT_DIR$/src/dal.rs">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="90">
-          <caret line="6" selection-start-line="6" selection-end-line="6" selection-end-column="15" />
+        <state relative-caret-position="360">
+          <caret line="24" column="9" lean-forward="true" selection-start-line="24" selection-start-column="9" selection-end-line="24" selection-end-column="9" />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/src/message.rs">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="213">
+          <caret line="611" column="5" lean-forward="true" selection-start-line="611" selection-start-column="5" selection-end-line="611" selection-end-column="5" />
+          <folding>
+            <element signature="e#33264#33265#0" expanded="true" />
+            <element signature="e#33325#33326#0" expanded="true" />
+          </folding>
         </state>
       </provider>
     </entry>
     <entry file="file://$PROJECT_DIR$/src/cellagent.rs">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="270">
-          <caret line="677" column="32" selection-start-line="677" selection-start-column="32" selection-end-line="677" selection-end-column="32" />
+        <state relative-caret-position="482">
+          <caret line="1206" column="14" selection-start-line="1206" selection-start-column="14" selection-end-line="1206" selection-end-column="14" />
         </state>
       </provider>
     </entry>
