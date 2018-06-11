@@ -41,8 +41,8 @@ pub struct NalCell {
 }
 
 impl NalCell {
-	pub fn new(cell_no: CellNo, nports: PortNo,
-               cell_type: CellType, config: CellConfig) -> Result<NalCell, Error> {
+	pub fn new(cell_no: CellNo, nports: PortNo, cell_type: CellType,
+               config: CellConfig, mut trace_header: TraceHeader) -> Result<NalCell, Error> {
 		if nports.v > MAX_PORTS.v { return Err(NalcellError::NumberPorts { nports, func_name: "new", max_ports: MAX_PORTS }.into()) }
 		let cell_id = CellID::new(cell_no).context(NalcellError::Chain { func_name: "new", comment: S("cell_id")})?;
 		let (ca_to_pe, pe_from_ca): (CaToPe, PeFromCa) = channel();
@@ -69,38 +69,39 @@ impl NalCell {
 			let port = Port::new(&cell_id, port_number, is_border_port, is_connected,port_to_pe.clone()).context(NalcellError::Chain { func_name: "new", comment: S("port")})?;
 			ports.push(port);
 		}
-        let ref mut trace_header = TraceHeader::new();
 		let boxed_ports: Box<[Port]> = ports.into_boxed_slice();
 		let cell_agent = CellAgent::new(&cell_id, cell_type, config, nports, ca_to_pe).context(NalcellError::Chain { func_name: "new", comment: S("cell agent create")})?;
-        NalCell::start_cell(&cell_agent, ca_from_pe, trace_header);
+        NalCell::start_cell(&cell_agent, ca_from_pe, trace_header.fork_trace());
 		let packet_engine = PacketEngine::new(&cell_id, pe_to_ca, pe_to_ports, boundary_port_nos).context(NalcellError::Chain { func_name: "new", comment: S("packet engine create")})?;
-		NalCell::start_packet_engine(&packet_engine, pe_from_ca, pe_from_ports, trace_header);
+		NalCell::start_packet_engine(&packet_engine, pe_from_ca, pe_from_ports, trace_header.fork_trace());
 		Ok(NalCell { id: cell_id, cell_no, cell_type, config,
 				ports: boxed_ports, cell_agent, vms: Vec::new(),
 				packet_engine, ports_from_pe })
 	}
-    fn start_cell(cell_agent: &CellAgent, ca_from_pe: CaFromPe, trace_header: &mut TraceHeader) {
+    fn start_cell(cell_agent: &CellAgent, ca_from_pe: CaFromPe, mut outer_trace_header: TraceHeader) {
         let f = "start_cell";
         let mut ca = cell_agent.clone();
-        let trace = json!({ "trace_header": trace_header.next(TraceType::Trace),
+        outer_trace_header.next(TraceType::Trace);
+        let trace = json!({ "trace_header": outer_trace_header,
             "module": MODULE, "function": f, "cell_id": &ca.get_id(), "comment": "starting cell agent"});
         let _ = dal::add_to_trace(&trace, f);
         thread::spawn( move || {
-            let trace_header = TraceHeader::new();
-            let _ = ca.initialize(ca_from_pe, trace_header).map_err(|e| ::utility::write_err("nalcell", e));
+            let inner_trace_header = TraceHeader::new(outer_trace_header.get_event_id());
+            let _ = ca.initialize(ca_from_pe, inner_trace_header).map_err(|e| ::utility::write_err("nalcell", e));
             // Don't automatically restart cell agent if it crashes
         });
     }
     fn start_packet_engine(packet_engine: &PacketEngine, pe_from_ca: PeFromCa,
-                           pe_from_ports: PeFromPort, trace_header: &mut TraceHeader) {
+                           pe_from_ports: PeFromPort, mut outer_trace_header: TraceHeader) {
         let f = "start_packet_engine";
         let pe = packet_engine.clone();
-        let trace = json!({ "trace_header": trace_header.next(TraceType::Trace),
+        outer_trace_header.next(TraceType::Trace);
+        let trace = json!({ "trace_header": outer_trace_header,
             "module": MODULE, "function": f, "cell_id": &pe.get_id(), "comment": "starting packet engine"});
         let _ = dal::add_to_trace(&trace, f);
         thread::spawn( move || {
-            let trace_header = TraceHeader::new();
-            let _ = pe.start_threads(pe_from_ca, pe_from_ports, trace_header).map_err(|e| ::utility::write_err("nalcell", e));
+            let inner_trace_header = TraceHeader::new(outer_trace_header.get_event_id());
+            let _ = pe.start_threads(pe_from_ca, pe_from_ports, inner_trace_header).map_err(|e| ::utility::write_err("nalcell", e));
             // Don't automatically restart packet engine if it crashes
         });
     }
