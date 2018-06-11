@@ -112,21 +112,46 @@ impl fmt::Display for Path {
 	fn fmt(&self, f:&mut fmt::Formatter) -> fmt::Result { write!(f, "{}", self.port_number) }
 }
 use std::thread;
-#[derive(Debug, Copy, Clone, Serialize)]
+/*
+    Trace Schema
+THDR - "trace_header":{"thread_id":[0-9]*,"event_id":[[0-9]*]*,"trace_type":["Trace","Debug"]},
+CELLID - "cell_id":{"name":"C:[0-9]*","uuid":{"uuid":\[[0-9]*,0\]}},
+FCN - "module":"[^"]*","function":"[^"]*",
+COMMENT - "comment":"[^"]*"
+VMID - "vm_id":{"name":"VM:C:[0-9]*+vm[0-9]*","uuid":{"uuid":[[0-9]*,0]}},
+SENDER - "sender_id":{"name":"Sender:C:[0-9]*+VM:C:[0-9]*+vm[0-9]*","uuid":{"uuid":[[0-9]*,0]}},
+PORT - "port_no":{"v":[0-9]*},"is_border":[a-z]*
+
+{THDR,FCN,CELLID,COMMENT}
+{THDR,FCN,CELLID,PORT}
+{THDR,FCN,CELLID,VMID,SENDER,COMMENT}
+{THDR,FCN,COMMENT}
+
+*/
+#[derive(Debug, Clone, Serialize)]
 pub struct TraceHeader {
     thread_id: u64,
-    event_id: u64,
+    event_id: Vec<u64>,
     trace_type: TraceType,
 }
 impl TraceHeader {
-    pub fn new() -> TraceHeader {
+    pub fn new(event_id: Vec<u64>) -> TraceHeader {
         let thread_id = TraceHeader::parse(thread::current().id());
-        TraceHeader { thread_id, event_id: 0, trace_type: TraceType::Trace }
+        TraceHeader { thread_id, event_id, trace_type: TraceType::Trace }
     }
-    pub fn next(&mut self, trace_type: TraceType) -> TraceHeader {
-        self.event_id = self.event_id + 1;
-        TraceHeader { thread_id: self.thread_id, event_id: self.event_id, trace_type }
+    pub fn next(&mut self, trace_type: TraceType) {
+        let last = self.event_id.len() - 1;
+        self.trace_type = trace_type;
+        self.event_id[last] = self.event_id[last] + 1;
     }
+    pub fn fork_trace(&mut self) -> TraceHeader {
+        let last = self.event_id.len() - 1;
+        self.event_id[last] = self.event_id[last] + 1;
+        let mut event_id = self.event_id.clone();
+        event_id.push(0);
+        TraceHeader { thread_id: self.thread_id, event_id, trace_type: self.trace_type }
+    }
+    pub fn get_event_id(&self) -> Vec<u64> { self.event_id.clone() }
     fn parse(thread_id: ThreadId) -> u64 {
         let as_string = format!("{:?}",::std::thread::current().id());
         let r: Vec<&str> = as_string.split('(').collect();
@@ -136,7 +161,7 @@ impl TraceHeader {
 }
 impl fmt::Display for TraceHeader {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "Thread id {}, Event id {}", self.thread_id, self.event_id) }
+        write!(f, "Thread id {}, Event id {:?}", self.thread_id, self.event_id) }
 }
 #[derive(Debug, Copy, Clone, Serialize)]
 pub enum TraceType {

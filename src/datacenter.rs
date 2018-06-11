@@ -11,6 +11,7 @@ use message_types::{LinkToPort, PortFromLink, PortToLink, LinkFromPort,
 	PortToNoc, PortFromNoc};
 use link::{Link};
 use nalcell::{CellConfig, NalCell};
+use utility::{TraceHeader};
 
 #[derive(Debug)]
 pub struct Datacenter {
@@ -26,13 +27,18 @@ impl Datacenter {
 		if *ncells < 1  { return Err(DatacenterError::Cells{ ncells, func_name: f }.into()); }
 		if edge_list.len() < *ncells - 1 { return Err(DatacenterError::Edges { nlinks: LinkNo(CellNo(edge_list.len())), func_name: f }.into() ); }
 		let border_cells = blueprint.get_border_cells();
+        let mut trace_header = TraceHeader::new(vec![0]);
 		for cell in border_cells {
-			let cell = NalCell::new(cell.get_cell_no(), cell.get_nports(), CellType::Border, CellConfig::Large)?;
+			let cell = NalCell::new(cell.get_cell_no(), cell.get_nports(),
+                                    CellType::Border,CellConfig::Large,
+                                    trace_header.fork_trace())?;
 			self.cells.push(cell);
 		}
 		let interior_cells = blueprint.get_interior_cells();
 		for cell in interior_cells {
-			let cell = NalCell::new(cell.get_cell_no(), cell.get_nports(), CellType::Interior, CellConfig::Large)?;
+			let cell = NalCell::new(cell.get_cell_no(), cell.get_nports(),
+                                    CellType::Interior,CellConfig::Large,
+                                    trace_header.fork_trace())?;
 			self.cells.push(cell);
 		}
 		self.cells.sort_by(|a, b| (*a.get_no()).cmp(&*b.get_no())); // Sort to conform to edge list
