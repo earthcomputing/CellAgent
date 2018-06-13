@@ -47,10 +47,12 @@ impl PacketEngine {
 	fn listen_ca(&self, pe_from_ca: PeFromCa, pe_to_pe: PeToPe, mut outer_trace_header: TraceHeader)
             -> Result<(), Error> {
         let f = "listen_ca";
-        outer_trace_header.next(TraceType::Trace);
-        let trace = json!({ "trace_header": outer_trace_header,
+        {
+            outer_trace_header.next(TraceType::Trace);
+            let trace = json!({ "trace_header": outer_trace_header,
             "module": MODULE, "function": f, "cell_id": &self.cell_id, "comment": "Starting listen CA"});
-        let _ = dal::add_to_trace(&trace, f);
+            let _ = dal::add_to_trace(&trace, f);
+        }
         let mut pe = self.clone();
         ::std::thread::spawn( move || -> Result<(), Error> {
             let ref mut inner_trace_header = TraceHeader::new(outer_trace_header.get_event_id());
@@ -64,10 +66,12 @@ impl PacketEngine {
     fn listen_port(&self, pe_from_ports: PeFromPort, pe_from_pe: PeFromPe, mut outer_trace_header: TraceHeader)
             -> Result<(),Error> {
         let f = "listen_port";
-        outer_trace_header.next(TraceType::Trace);
-        let trace = json!({ "trace_header": outer_trace_header,
+        {
+            outer_trace_header.next(TraceType::Trace);
+            let trace = json!({ "trace_header": outer_trace_header,
             "module": MODULE, "function": f, "cell_id": &self.cell_id, "comment": "Starting listen ports"});
-        let _ = dal::add_to_trace(&trace, f);
+            let _ = dal::add_to_trace(&trace, f);
+        }
         let mut pe = self.clone();
         ::std::thread::spawn( move || -> Result<(), Error> {
             let ref mut inner_trace_header = TraceHeader::new(outer_trace_header.get_event_id());
@@ -222,10 +226,10 @@ impl PacketEngine {
 					}
 				}
 			} 
-		} else {
+		} else {  // Leafward
 			let mask = user_mask.and(entry.get_mask());
 			let port_nos = mask.get_port_nos();
-            if false {   // Debug print
+            if true {   // Debug print
                 let msg_type = MsgType::msg_type(&packet);
                 let tree_id = packet.get_tree_id();
                 trace_header.next(TraceType::Debug);
