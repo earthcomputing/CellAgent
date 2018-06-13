@@ -113,7 +113,7 @@ impl fmt::Display for Path {
 }
 use std::thread;
 /*
-    Trace Schema
+
 THDR - "trace_header":{"thread_id":[0-9]*,"event_id":[[0-9]*]*,"trace_type":["Trace","Debug"]},
 CELLID - "cell_id":{"name":"C:[0-9]*","uuid":{"uuid":\[[0-9]*,0\]}},
 FCN - "module":"[^"]*","function":"[^"]*",

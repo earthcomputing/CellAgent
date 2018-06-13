@@ -7,11 +7,14 @@ use failure::{Error};
 
 use blueprint::{Blueprint};
 use config::{MIN_BOUNDARY_CELLS, CellNo, CellType, Edge, LinkNo};
+use dal;
 use message_types::{LinkToPort, PortFromLink, PortToLink, LinkFromPort,
 	PortToNoc, PortFromNoc};
 use link::{Link};
 use nalcell::{CellConfig, NalCell};
-use utility::{TraceHeader};
+use utility::{TraceHeader, TraceType};
+
+const MODULE: &'static str = "datacenter.rs";
 
 #[derive(Debug)]
 pub struct Datacenter {
@@ -29,6 +32,12 @@ impl Datacenter {
 		let border_cells = blueprint.get_border_cells();
         let mut trace_header = TraceHeader::new(vec![0]);
 		for cell in border_cells {
+            {
+                trace_header.next(TraceType::Trace);
+                let trace = json!({ "trace_header": trace_header, "module": MODULE, "function": f,
+                   "cell_number": cell.get_cell_no(), "comment": "Starting border cell"});
+                let _ = dal::add_to_trace(&trace, f);
+            }
 			let cell = NalCell::new(cell.get_cell_no(), cell.get_nports(),
                                     CellType::Border,CellConfig::Large,
                                     trace_header.fork_trace())?;
@@ -36,6 +45,12 @@ impl Datacenter {
 		}
 		let interior_cells = blueprint.get_interior_cells();
 		for cell in interior_cells {
+            {
+                trace_header.next(TraceType::Trace);
+                let trace = json!({ "trace_header": trace_header, "module": MODULE, "function": f,
+                   "cell_number": cell.get_cell_no(), "comment": "Starting interior cell"});
+                let _ = dal::add_to_trace(&trace, f);
+            }
 			let cell = NalCell::new(cell.get_cell_no(), cell.get_nports(),
                                     CellType::Interior,CellConfig::Large,
                                     trace_header.fork_trace())?;

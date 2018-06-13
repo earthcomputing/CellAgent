@@ -10,6 +10,7 @@ use serde_json::Value;
 use config::{OUTPUT_FILE_NAME};
 use utility::S;
 
+const FOR_EVAL: bool = true;
 pub fn add_to_trace(obj: &Value, comment: &str) -> Result<(), Error> {
     let mut file_handle = match OpenOptions::new().append(true).open(OUTPUT_FILE_NAME) {
         Ok(f) => Ok(f),
@@ -18,7 +19,12 @@ pub fn add_to_trace(obj: &Value, comment: &str) -> Result<(), Error> {
             File::create(OUTPUT_FILE_NAME)
         }
     }?;
-    let line = serde_json::to_string(obj).context(DalError::Chain { func_name: "add_to_trace", comment: S(comment) })?;
+    let line = if FOR_EVAL {
+        serde_json::to_string(obj).context(DalError::Chain { func_name: "add_to_trace", comment: S(comment) })?
+    } else {
+        format!("{:?}", obj)
+    };
+    //let line = serde_json::to_string(obj).context(DalError::Chain { func_name: "add_to_trace", comment: S(comment) })?;
     file_handle.write(&(line + "\n").into_bytes()).context(DalError::Chain { func_name: "add_to_trace", comment: S("Write") })?;
     Ok(())
 }
