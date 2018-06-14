@@ -13,8 +13,8 @@ const DEFAULT_INDICES: OtherIndices = [TableIndex(0); MAX_PORTS.v as usize];
 #[derive(Debug, Copy, Clone, Serialize, Deserialize)]
 pub struct RoutingTableEntry {
 	index: TableIndex,
-	uuid: Uuid,
-	may_send: bool, // TODO: Not needed here because I moved check to CellAgent
+	tree_uuid: Uuid,
+	may_send: bool, // TODO: Move this from here to Tree
 	inuse: bool,
 	parent: PortNo,
 	mask: Mask,
@@ -23,7 +23,7 @@ pub struct RoutingTableEntry {
 impl RoutingTableEntry {
 	pub fn new(index: TableIndex, tree_id: &TreeID, inuse: bool, parent: PortNumber, mask: Mask, 
 			may_send: bool, other_indices: [TableIndex; MAX_PORTS.v as usize]) -> RoutingTableEntry {
-		RoutingTableEntry { index, uuid: tree_id.get_uuid(), parent: parent.get_port_no(),
+		RoutingTableEntry { index, tree_uuid: tree_id.get_uuid(), parent: parent.get_port_no(),
 			may_send, inuse, mask, other_indices }
 	}
 	pub fn default(index: TableIndex) -> Result<RoutingTableEntry, Error> {
@@ -40,8 +40,8 @@ impl RoutingTableEntry {
 //        self.may_send || self.may_receive()
 //    }
 	pub fn get_index(&self) -> TableIndex { self.index }
-	pub fn get_uuid(&self) -> Uuid { self.uuid }
-	pub fn set_uuid(&mut self, uuid: &Uuid) { self.uuid = *uuid; }
+	pub fn get_uuid(&self) -> Uuid { self.tree_uuid }
+	pub fn set_uuid(&mut self, uuid: &Uuid) { self.tree_uuid = *uuid; }
 	pub fn or_with_mask(&mut self, mask: Mask) { self.mask = self.mask.or(mask); }
 	pub fn and_with_mask(&mut self, mask: Mask) { self.mask = self.mask.and(mask); }
 	pub fn set_inuse(&mut self) { self.inuse = true; }
@@ -52,7 +52,7 @@ impl RoutingTableEntry {
 	pub fn get_other_indices(&self) -> [TableIndex; MAX_PORTS.v as usize] { self.other_indices }
 	pub fn set_other_indices(&mut self, other_indices: [TableIndex;8]) { self.other_indices = other_indices }
 	pub fn set_tree_id(&mut self, tree_id: &TreeID) {
-		self.uuid = tree_id.get_uuid();
+		self.tree_uuid = tree_id.get_uuid();
 	}
 //	pub fn get_other_index(&self, port_number: PortNumber) -> TableIndex {
 //		let port_no = port_number.get_port_no().v as usize;
@@ -84,13 +84,13 @@ impl RoutingTableEntry {
 impl fmt::Display for RoutingTableEntry {
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result { 
 		let mut s = format!("{:6}", self.index.0);
-		let mut uuid = self.uuid.to_string();
+		let mut uuid = self.tree_uuid.to_string();
 		uuid.truncate(8);
 		s = s + &format!(" {:8?}", uuid);
-		if self.inuse { s = s + &format!("  Yes  ") }
-		else          { s = s + &format!("  No   ") }
-		if self.may_send { s = s + &format!("  Yes ") }
-		else             { s = s + &format!("  No  ") }
+		if self.inuse { s = s + &format!("  Yes  "); }
+		else          { s = s + &format!("  No   "); }
+		if self.may_send { s = s + &format!("  Yes "); }
+		else             { s = s + &format!("  No  "); }
 		s = s + &format!("{:7}", self.parent.v);
 		s = s + &format!("{}", self.mask);
 		let mut other_indices = Vec::new();

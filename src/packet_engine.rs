@@ -100,9 +100,8 @@ impl PacketEngine {
                         match msg_type {
                             MsgType::DiscoverD => {
                                 trace_header.next(TraceType::Debug);
-                                let trace = json!({ "trace_header": trace_header,
-                                    "module": MODULE, "function": f, "cell_id": &self.cell_id,
-                                    "tree_id": &tree_id, "msg_type": &msg_type });
+                                let trace = json!({ "trace_header": trace_header, "module": MODULE, "function": f,
+                                    "cell_id": &self.cell_id, "tree_id": &tree_id, "msg_type": &msg_type });
                                 if tree_id.is_name("C:2") {
                                     let _ = dal::add_to_trace(&trace, f);
                                     println!("PacketEngine {}: got from ca {} {}", self.cell_id, msg_type, tree_id);
@@ -132,9 +131,15 @@ impl PacketEngine {
         let f = "listen_port_loop";
 		loop {
 			match pe_from_ports.recv().context(PacketEngineError::Chain { func_name: f, comment: S("receive")})? {
-				PortToPePacket::Packet((port_no, my_index, packet))  => self.process_packet(port_no, my_index, packet, pe_from_pe, trace_header).context(PacketEngineError::Chain { func_name: "listen_port", comment: S("process_packet ") + self.cell_id.get_name()})?,
-				PortToPePacket::Status((port_no, is_border, status)) => self.pe_to_ca.send(PeToCaPacket::Status((port_no, is_border, status))).context(PacketEngineError::Chain { func_name: "listen_port", comment: S("send status to ca ") + self.cell_id.get_name()})?,
-				PortToPePacket::Tcp((port_no, tcp_msg))              => self.pe_to_ca.send(PeToCaPacket::Tcp((port_no, tcp_msg))).context(PacketEngineError::Chain { func_name: "listen_port", comment: S("send tcp msg to ca ") + self.cell_id.get_name()})?,
+				PortToPePacket::Packet((port_no, my_index, packet))  => {
+                    self.process_packet(port_no, my_index, packet, pe_from_pe, trace_header).context(PacketEngineError::Chain { func_name: "listen_port", comment: S("process_packet ") + self.cell_id.get_name()})?
+                },
+				PortToPePacket::Status((port_no, is_border, status)) => {
+                    self.pe_to_ca.send(PeToCaPacket::Status((port_no, is_border, status))).context(PacketEngineError::Chain { func_name: "listen_port", comment: S("send status to ca ") + self.cell_id.get_name()})?
+                },
+				PortToPePacket::Tcp((port_no, tcp_msg)) => {
+                    self.pe_to_ca.send(PeToCaPacket::Tcp((port_no, tcp_msg))).context(PacketEngineError::Chain { func_name: "listen_port", comment: S("send tcp msg to ca ") + self.cell_id.get_name()})?
+                },
 			};
 		}		
 	}
