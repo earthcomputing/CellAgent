@@ -1288,16 +1288,6 @@ impl CellAgent {
             Some(traph) => traph.get_table_index(&tree_uuid).context(CellagentError::Chain { func_name: f, comment: S("")})?,
             None => return Err(CellagentError::NoTraph { cell_id: self.cell_id.clone(), func_name: f, tree_uuid }.into())
         };
-        {/*
-            let msg_type = ::message::MsgType::msg_type(&packets[0]);
-            let locked = self.tree_id_map.lock().unwrap();
-            let tree_id = locked.get(&tree_uuid).unwrap();
-            match msg_type {
-                MsgType::Application | MsgType::Manifest | MsgType::StackTree  => println!("Cellagent {}: {} sending {} on tree {} with index {} and mask {}", self.cell_id, f, msg_type, tree_id, *index, user_mask),
-                _ => ()
-
-            }
-        */}
         self.send_packets_by_index(index, user_mask, packets)
     }
     // Used for forwarding saved messages on the branch of a new addition to a stacked tree

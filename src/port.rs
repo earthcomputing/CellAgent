@@ -10,7 +10,7 @@ use message_types::{PortToLink, PortFromLink, PortToPe, PortFromPe, LinkToPortPa
 use name::{Name, PortID, CellID};
 use utility::{PortNumber, S, write_err};
 
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, Serialize)]
 pub enum PortStatus {
 	Connected,
 	Disconnected,

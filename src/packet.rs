@@ -65,7 +65,7 @@ impl Clone for Packet {
 	fn clone(&self) -> Packet { *self }
 }
 const PACKET_HEADER_SIZE: usize = 8 + 16 + 2 + 1 + 5; // Last value is padding
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, Serialize)]
 pub struct PacketHeader {
 	msg_id: MsgID,	// Unique identifier of this message
 	uuid: Uuid,     // Tree identifier 16 bytes
@@ -78,8 +78,8 @@ pub struct PacketHeader {
 					// xxxx xx1x => Is last packet
 					// xxxx x0xx => Is not blocking
                     // xxxx x1xx => Is blocking
-					// xx00 xxxx => EC Protocol to VirtualMachine
-					// xx01 xxxx => Legacy Protocol to VirtualMachine
+					// xxx0 xxxx => EC Protocol to VirtualMachine
+					// xxx1 xxxx => Legacy Protocol to VirtualMachine
 }
 #[deny(unused_must_use)]
 impl PacketHeader {
@@ -131,7 +131,7 @@ impl Payload {
 		let no_data_bytes = data_bytes.len();
 		let mut bytes = [0; PAYLOAD_MAX];
 		for i in 0..no_data_bytes { bytes[i] = data_bytes[i]; }
-		Payload { bytes: bytes }
+		Payload { bytes }
 	}
 	fn get_bytes(&self) -> Vec<u8> { self.bytes.iter().cloned().collect() }
 }

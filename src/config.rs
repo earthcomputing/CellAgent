@@ -22,7 +22,7 @@ impl Deref for MaskValue { type Target = u16; fn deref(&self) -> &Self::Target {
 #[derive(Debug, Copy, Clone, Hash, Eq, PartialEq, Serialize, Deserialize)]
 pub struct MsgID(pub u64);
 impl Deref for MsgID { type Target = u64; fn deref(&self) -> &Self::Target { &self.0 } }
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, Serialize)]
 pub struct PacketNo(pub u16);
 impl Deref for PacketNo { type Target = u16; fn deref(&self) -> &Self::Target { &self.0 } }
 #[derive(Debug, Copy, Clone, Hash, Serialize, Deserialize)]
