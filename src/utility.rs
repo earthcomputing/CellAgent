@@ -133,11 +133,15 @@ pub struct TraceHeader {
     thread_id: u64,
     event_id: Vec<u64>,
     trace_type: TraceType,
+    module: &'static str,
+    function: &'static str,
+    format: &'static str
 }
 impl TraceHeader {
-    pub fn new(event_id: Vec<u64>) -> TraceHeader {
+    pub fn new() -> TraceHeader {
         let thread_id = TraceHeader::parse(thread::current().id());
-        TraceHeader { thread_id, event_id, trace_type: TraceType::Trace }
+        TraceHeader { thread_id, event_id: vec![0], trace_type: TraceType::Trace,
+            module: "", function: "", format: "" }
     }
     pub fn next(&mut self, trace_type: TraceType) {
         let last = self.event_id.len() - 1;
@@ -149,7 +153,14 @@ impl TraceHeader {
         self.event_id[last] = self.event_id[last] + 1;
         let mut event_id = self.event_id.clone();
         event_id.push(0);
-        TraceHeader { thread_id: self.thread_id, event_id, trace_type: self.trace_type }
+        let thread_id = TraceHeader::parse(thread::current().id());
+        TraceHeader { thread_id, event_id, trace_type: self.trace_type,
+            module: self.module, function: self.function, format: self.format}
+    }
+    pub fn update(&mut self, params: &TraceHeaderParams) {
+        self.module   = params.get_module();
+        self.function = params.get_function();
+        self.format   = params.get_format();
     }
     pub fn get_event_id(&self) -> Vec<u64> { self.event_id.clone() }
     fn parse(thread_id: ThreadId) -> u64 {
@@ -158,6 +169,16 @@ impl TraceHeader {
         let n_as_str: Vec<&str> = r[1].split(')').collect();
         n_as_str[0].parse().expect(&format!("Problem parsing ThreadId {:?}", thread_id))
     }
+}
+pub struct TraceHeaderParams {
+    pub module:   &'static str,
+    pub function: &'static str,
+    pub format:   &'static str
+}
+impl TraceHeaderParams {
+    pub fn get_module(&self)   -> &'static str { self.module }
+    pub fn get_function(&self) -> &'static str { self.function }
+    pub fn get_format(&self)   -> &'static str { self.format }
 }
 impl fmt::Display for TraceHeader {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {

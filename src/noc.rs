@@ -111,6 +111,7 @@ impl Noc {
                  &allowed_trees, vec![&service], vec![&up_tree]).context(NocError::Chain { func_name: "create_noc", comment: S("NocMaster")})?;
         let manifest = Manifest::new("NocMaster", CellConfig::Large, &noc_master_deploy_tree, &allowed_trees,
                   vec![&vm_spec], vec![&up_tree]).context(NocError::Chain { func_name: "create_noc", comment: S("NocMaster")})?;
+        println!("---> {}", manifest);
         let manifest_ser = serde_json::to_string(&manifest).context(NocError::Chain { func_name: "create_noc", comment: S("") })?;
         let mut params = HashMap::new();
         let deployment_tree_name = noc_master_deploy_tree.get_name();

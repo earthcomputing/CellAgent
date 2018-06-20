@@ -10,10 +10,11 @@ use message_types::{CaToPe, PeFromCa, PeToCa, CaFromPe, PortToPe, PeFromPort, Pe
 use name::{CellID};
 use packet_engine::{PacketEngine};
 use port::{Port};
-use utility::{PortNumber, S, TraceHeader, TraceType};
+use utility::{PortNumber, S, TraceHeader, TraceHeaderParams, TraceType};
 use vm::VirtualMachine;
 
 const MODULE: &'static str = "nalcell.rs";
+
 #[derive(Debug, Copy, Clone, Hash, Serialize, Deserialize)]
 pub enum CellConfig { Small, Medium, Large }
 impl fmt::Display for CellConfig { 
@@ -54,10 +55,9 @@ impl NalCell {
 		let mut ports_from_pe = HashMap::new(); // So I can remove the item
 		let mut boundary_port_nos = HashSet::new();
         {
-            trace_header.next(TraceType::Trace);
-            let trace = json!({ "trace_header": trace_header, "module": MODULE, "function": f,
-                   "cell_number": cell_no, "comment": "Setting up ports"});
-            let _ = dal::add_to_trace(&trace, f);
+            let ref trace_params = TraceHeaderParams { module: MODULE, function: f, format: "nalcell_port_setup" };
+            let trace = json!({ "cell_number": cell_no });
+            let _ = dal::add_to_trace(&mut trace_header, TraceType::Trace, trace_params, &trace, f);
         }
 		for i in 0..nports.v + 1 {
 			let is_border_port = match cell_type {
@@ -89,14 +89,13 @@ impl NalCell {
         let f = "start_cell";
         let mut ca = cell_agent.clone();
         {
-            outer_trace_header.next(TraceType::Trace);
-            let trace = json!({ "trace_header": outer_trace_header,
-            "module": MODULE, "function": f, "cell_id": &ca.get_id(), "comment": "starting cell agent"});
-            let _ = dal::add_to_trace(&trace, f);
+            let ref trace_params = TraceHeaderParams { module: MODULE, function: f, format: "nalcell_start_ca" };
+            let trace = json!({  "cell_id": &ca.get_id() });
+            let _ = dal::add_to_trace(outer_trace_header, TraceType::Trace, trace_params, &trace, f);
         }
-        let event_id = outer_trace_header.get_event_id();
+		let mut outer_trace_header_clone = outer_trace_header.clone();
         thread::spawn( move || {
-            let inner_trace_header = TraceHeader::new(event_id);
+            let inner_trace_header = outer_trace_header_clone.fork_trace();
             let _ = ca.initialize(ca_from_pe, inner_trace_header).map_err(|e| ::utility::write_err("nalcell", e));
             // Don't automatically restart cell agent if it crashes
         });
@@ -106,19 +105,18 @@ impl NalCell {
         let f = "start_packet_engine";
         let pe = packet_engine.clone();
         {
-            outer_trace_header.next(TraceType::Trace);
-            let trace = json!({ "trace_header": outer_trace_header,
-            "module": MODULE, "function": f, "cell_id": &pe.get_id(), "comment": "starting packet engine"});
-            let _ = dal::add_to_trace(&trace, f);
+            let ref trace_params = TraceHeaderParams { module: MODULE, function: f, format: "nalcell_start_pe" };
+            let trace = json!({ "cell_id": &pe.get_id() });
+            let _ = dal::add_to_trace(outer_trace_header, TraceType::Trace, trace_params, &trace, f);
         }
-        let event_id = outer_trace_header.get_event_id();
+        let mut outer_trace_header_clone = outer_trace_header.clone();
         thread::spawn( move || {
-            let inner_trace_header = TraceHeader::new(event_id);
+            let inner_trace_header = outer_trace_header_clone.fork_trace();
             let _ = pe.start_threads(pe_from_ca, pe_from_ports, inner_trace_header).map_err(|e| ::utility::write_err("nalcell", e));
             // Don't automatically restart packet engine if it crashes
         });
     }
-//	pub fn get_id(&self) -> &CellID { &self.id }
+	pub fn get_id(&self) -> &CellID { &self.id }
 	pub fn get_no(&self) -> CellNo { self.cell_no }
 //	pub fn get_cell_agent(&self) -> &CellAgent { &self.cell_agent }
 	pub fn is_border(&self) -> bool {
@@ -137,10 +135,6 @@ impl NalCell {
 			-> Result<(&mut Port, PortFromPe), Error> {
         let f = "Nalcell::get_free_port_mut";
 		for port in &mut self.ports.iter_mut() {
-            /*{   // Debug print
-                println!("NalCell {}: {} port {} is connected {}", self.id, f, *port.get_port_no(), port.is_connected());
-                ::utility::add_to_trace(::serde_json::to_string(&(self.id.clone(), f, *port.get_port_no(), port.is_connected()))?)?;
-            }*/
 			if !port.is_connected() && !(want_boundary_port ^ port.is_border()) && (port.get_port_no().v != 0 as u8) {
 				let port_no = port.get_port_no();
 				match self.ports_from_pe.remove(&port_no) { // Remove avoids a borrowed context error

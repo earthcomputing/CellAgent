@@ -1,6 +1,7 @@
 use std::fmt;
 use std::marker::Sized;
 
+use serde_json::Value;
 //use uuid::Uuid;
 
 use config::{SEPARATOR, CellNo};
@@ -30,7 +31,7 @@ pub trait Name: Sized {
 	}
 	fn is_name(&self, name: &str) -> bool { self.get_name() == name }
 }
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize, Schema)]
 pub struct CellID { name: NameType, uuid: Uuid }
 impl CellID {
 	pub fn new(CellNo(n): CellNo) -> Result<CellID, NameError> {
