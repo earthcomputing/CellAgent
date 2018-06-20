@@ -3,7 +3,9 @@ use std::fmt;
 use std::collections::hash_map::DefaultHasher;
 use std::hash::{Hash, Hasher};
 
-#[derive(Copy, Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+use serde_json::Value;
+
+#[derive(Copy, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct Uuid {
     uuid: (u64, u64)
 }
@@ -19,4 +21,7 @@ impl fmt::Display for Uuid {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "{:08.x}", self.uuid.0)
     }
+}
+impl fmt::Debug for Uuid {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result { write!(f, "{:08.x}", self.uuid.0) }
 }

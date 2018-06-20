@@ -12,7 +12,7 @@ use message_types::{LinkToPort, PortFromLink, PortToLink, LinkFromPort,
 	PortToNoc, PortFromNoc};
 use link::{Link};
 use nalcell::{CellConfig, NalCell};
-use utility::{TraceHeader, TraceType};
+use utility::{TraceHeader, TraceHeaderParams, TraceType};
 
 const MODULE: &'static str = "datacenter.rs";
 
@@ -30,13 +30,12 @@ impl Datacenter {
 		if *ncells < 1  { return Err(DatacenterError::Cells{ ncells, func_name: f }.into()); }
 		if edge_list.len() < *ncells - 1 { return Err(DatacenterError::Edges { nlinks: LinkNo(CellNo(edge_list.len())), func_name: f }.into() ); }
 		let border_cells = blueprint.get_border_cells();
-        let mut trace_header = TraceHeader::new(vec![0]);
+        let mut trace_header = TraceHeader::new();
 		for cell in border_cells {
             {
-                trace_header.next(TraceType::Trace);
-                let trace = json!({ "trace_header": trace_header, "module": MODULE, "function": f,
-                   "cell_number": cell.get_cell_no(), "comment": "Starting border cell"});
-                let _ = dal::add_to_trace(&trace, f);
+                let ref trace_params = TraceHeaderParams { module: MODULE, function: f, format: "border_cell_start" };
+                let trace = json!({ "cell_number": cell.get_cell_no() });
+                let _ = dal::add_to_trace( &mut trace_header, TraceType::Trace, trace_params,&trace, f);
             }
 			let cell = NalCell::new(cell.get_cell_no(), cell.get_nports(),
                                     CellType::Border,CellConfig::Large,
@@ -46,10 +45,9 @@ impl Datacenter {
 		let interior_cells = blueprint.get_interior_cells();
 		for cell in interior_cells {
             {
-                trace_header.next(TraceType::Trace);
-                let trace = json!({ "trace_header": trace_header, "module": MODULE, "function": f,
-                   "cell_number": cell.get_cell_no(), "comment": "Starting interior cell"});
-                let _ = dal::add_to_trace(&trace, f);
+                let ref trace_params = TraceHeaderParams { module: MODULE, function: f, format: "interior_cell_start" };
+                let trace = json!({"cell_number": cell.get_cell_no() });
+                let _ = dal::add_to_trace(&mut trace_header, TraceType::Trace, trace_params, &trace, f);
             }
 			let cell = NalCell::new(cell.get_cell_no(), cell.get_nports(),
                                     CellType::Interior,CellConfig::Large,
@@ -62,25 +60,32 @@ impl Datacenter {
 			if *(edge.v.0) == *(edge.v.1) { return Err(DatacenterError::Wire { edge: edge.clone(), func_name: f }.into()); }
 			if (*(edge.v.0) > ncells.0) | (*(edge.v.1) >= ncells.0) { return Err(DatacenterError::Wire { edge: edge.clone(), func_name: f }.into()); }
 			let split = self.cells.split_at_mut(max(*(edge.v.0),*(edge.v.1)));
-			let cell = match split.0.get_mut(*(edge.v.0)) {
+			let left_cell = match split.0.get_mut(*(edge.v.0)) {
 				Some(c) => c,
 				None => return Err(DatacenterError::Wire { edge: edge.clone(), func_name: f }.into())
 
 			};
-			let (left,left_from_pe) = cell.get_free_ec_port_mut()?;
-			let cell = match split.1.first_mut() {
+            let left_cell_id = left_cell.get_id().clone(); // For Trace
+			let (left_port,left_from_pe) = left_cell.get_free_ec_port_mut()?;
+			let rite_cell = match split.1.first_mut() {
 				Some(c) => c,
 				None => return Err(DatacenterError::Wire { edge: edge.clone(), func_name: f }.into())
 			};
-			let (rite, rite_from_pe) = cell.get_free_ec_port_mut()?;
-			//println!("Datacenter: edge {:?} {} {}", edge, *left.get_id(), *rite.get_id());
+            let rite_cell_id = rite_cell.get_id().clone(); // For Trace
+			let (rite_port, rite_from_pe) = rite_cell.get_free_ec_port_mut()?;
+			//println!("Datacenter: edge {:?} {} {}", edge, *left_port.get_id(), *rite_port.get_id());
 			let (link_to_left, left_from_link): (LinkToPort, PortFromLink) = channel();
 			let (link_to_rite, rite_from_link): (LinkToPort, PortFromLink) = channel();
 			let (left_to_link, link_from_left): (PortToLink, LinkFromPort) = channel();
 			let (rite_to_link, link_from_rite): (PortToLink, LinkFromPort) = channel();
-			left.link_channel(left_to_link, left_from_link, left_from_pe);
-			rite.link_channel(rite_to_link, rite_from_link, rite_from_pe);
-			let link = Link::new(&left.get_id(), &rite.get_id())?;
+			left_port.link_channel(left_to_link, left_from_link, left_from_pe);
+			rite_port.link_channel(rite_to_link, rite_from_link, rite_from_pe);
+			let link = Link::new(&left_port.get_id(), &rite_port.get_id())?;
+            {
+                let ref trace_params = TraceHeaderParams { module: MODULE, function: f, format: "connect_link" };
+                let trace = json!({ "left_cell": left_cell_id, "rite_cell": rite_cell_id, "left_port": left_port.get_port_no(), "rite_port": rite_port.get_port_no(), "link_id": link.get_id() });
+                let _ = dal::add_to_trace(&mut trace_header, TraceType::Trace, trace_params, &trace, f);
+            }
 			let mut handle_pair = link.start_threads(link_to_left, link_from_left, link_to_rite, link_from_rite)?;
 			link_handles.append(&mut handle_pair);
 			self.links.push(link); 

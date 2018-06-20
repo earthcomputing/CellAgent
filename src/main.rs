@@ -3,6 +3,7 @@
 extern crate eval;
 #[macro_use] extern crate failure;
 extern crate rand;
+#[macro_use] extern crate schema_derive;
 extern crate serde;
 #[macro_use] extern crate serde_derive;
 #[macro_use] extern crate serde_json;
@@ -54,7 +55,7 @@ use message_types::{OutsideFromNoc, OutsideToNoc, NocFromOutside, NocToOutside};
 use nalcell::CellConfig;
 use noc::Noc;
 use uptree_spec::{AllowedTree, ContainerSpec, Manifest, UpTreeSpec, VmSpec};
-use utility::{S};
+use utility::{S};   use uuid_fake::Uuid;
 
 fn main() -> Result<(), Error> {
 	println!("Multicell Routing: Output to file {} (set in config.rs)", OUTPUT_FILE_NAME);

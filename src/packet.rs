@@ -81,7 +81,6 @@ pub struct PacketHeader {
 					// xxx0 xxxx => EC Protocol to VirtualMachine
 					// xxx1 xxxx => Legacy Protocol to VirtualMachine
 }
-#[deny(unused_must_use)]
 impl PacketHeader {
 	pub fn new(msg_id: MsgID, tree_id: &TreeID, size: PacketNo, direction: MsgDirection,
                is_last_packet: bool, is_blocking: bool) -> PacketHeader {

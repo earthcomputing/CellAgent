@@ -1,6 +1,28 @@
 use std::fmt;
 use std::ops::{Deref};
 
+pub struct DebugOptions {
+    pub ca_msg_recv: bool,
+    pub ca_msg_send: bool,
+    pub deploy:      bool,
+    pub pe_msg_recv: bool,
+    pub pe_msg_send: bool,
+    pub process_msg: bool,
+    pub saved_msgs:  bool,
+    pub stack_tree:  bool,
+    pub traph_state: bool,
+}
+pub const DEBUG_OPTIONS: DebugOptions = DebugOptions {
+    ca_msg_recv: true,
+    ca_msg_send: true,
+    deploy:      true,
+    pe_msg_recv: true,
+    pe_msg_send: true,
+    process_msg: true,
+    saved_msgs:  true,
+    stack_tree:  true,
+    traph_state: true,
+};
 // Size of various fields
 #[derive(Debug, Copy, Clone, Hash, Eq, PartialEq, Serialize, Deserialize)]
 pub struct CellNo(pub usize);

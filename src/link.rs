@@ -17,7 +17,7 @@ impl Link {
 		let id = LinkID::new(left_id, rite_id)?;
 		Ok(Link { id, is_broken: false, is_connected: true })
 	}
-//	pub fn get_id(&self) -> &LinkID { &self.id }
+	pub fn get_id(&self) -> &LinkID { &self.id }
 	pub fn start_threads(&self, 
 			link_to_left: LinkToPort, link_from_left: LinkFromPort,
 			link_to_rite: LinkToPort, link_from_rite: LinkFromPort ) 
