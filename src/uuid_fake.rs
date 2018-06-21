@@ -3,8 +3,6 @@ use std::fmt;
 use std::collections::hash_map::DefaultHasher;
 use std::hash::{Hash, Hasher};
 
-use serde_json::Value;
-
 #[derive(Copy, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct Uuid {
     uuid: (u64, u64)
