@@ -23,19 +23,18 @@ pub struct Datacenter {
 }
 impl Datacenter {
 	pub fn new() -> Datacenter { Datacenter { cells: Vec::new(), links: Vec::new() } }
-	pub fn initialize(&mut self, blueprint: &Blueprint) -> Result<Vec<JoinHandle<()>>, Error> {
+	pub fn initialize(&mut self, blueprint: &Blueprint, trace_header: &mut TraceHeader) -> Result<Vec<JoinHandle<()>>, Error> {
 		let f = "initialize";
 		let ncells = blueprint.get_ncells();
 		let edge_list = blueprint.get_edge_list();
 		if *ncells < 1  { return Err(DatacenterError::Cells{ ncells, func_name: f }.into()); }
 		if edge_list.len() < *ncells - 1 { return Err(DatacenterError::Edges { nlinks: LinkNo(CellNo(edge_list.len())), func_name: f }.into() ); }
 		let border_cells = blueprint.get_border_cells();
-        let mut trace_header = TraceHeader::new();
 		for cell in border_cells {
             {
                 let ref trace_params = TraceHeaderParams { module: MODULE, function: f, format: "border_cell_start" };
                 let trace = json!({ "cell_number": cell.get_cell_no() });
-                let _ = dal::add_to_trace( &mut trace_header, TraceType::Trace, trace_params,&trace, f);
+                let _ = dal::add_to_trace(trace_header, TraceType::Trace, trace_params,&trace, f);
             }
 			let cell = NalCell::new(cell.get_cell_no(), cell.get_nports(),
                                     CellType::Border,CellConfig::Large,
@@ -47,7 +46,7 @@ impl Datacenter {
             {
                 let ref trace_params = TraceHeaderParams { module: MODULE, function: f, format: "interior_cell_start" };
                 let trace = json!({"cell_number": cell.get_cell_no() });
-                let _ = dal::add_to_trace(&mut trace_header, TraceType::Trace, trace_params, &trace, f);
+                let _ = dal::add_to_trace(trace_header, TraceType::Trace, trace_params, &trace, f);
             }
 			let cell = NalCell::new(cell.get_cell_no(), cell.get_nports(),
                                     CellType::Interior,CellConfig::Large,
@@ -84,7 +83,7 @@ impl Datacenter {
             {
                 let ref trace_params = TraceHeaderParams { module: MODULE, function: f, format: "connect_link" };
                 let trace = json!({ "left_cell": left_cell_id, "rite_cell": rite_cell_id, "left_port": left_port.get_port_no(), "rite_port": rite_port.get_port_no(), "link_id": link.get_id() });
-                let _ = dal::add_to_trace(&mut trace_header, TraceType::Trace, trace_params, &trace, f);
+                let _ = dal::add_to_trace(trace_header, TraceType::Trace, trace_params, &trace, f);
             }
 			let mut handle_pair = link.start_threads(link_to_left, link_from_left, link_to_rite, link_from_rite)?;
 			link_handles.append(&mut handle_pair);

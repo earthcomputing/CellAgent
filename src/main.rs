@@ -1,8 +1,10 @@
 #![deny(unused_must_use)]
 #![recursion_limit="1024"]
+extern crate chrono;
 extern crate eval;
 #[macro_use] extern crate failure;
 extern crate rand;
+extern crate schema;
 #[macro_use] extern crate schema_derive;
 extern crate serde;
 #[macro_use] extern crate serde_derive;
@@ -47,7 +49,7 @@ use std::sync::mpsc::channel;
 use std::collections::HashMap;
 
 use blueprint::Blueprint;
-use config::{NCELLS, NPORTS, NLINKS, OUTPUT_FILE_NAME,
+use config::{NCELLS, NPORTS, NLINKS, OUTPUT_FILE_NAME, SCHEMA_VERSION,
              CellNo, Edge, PortNo};
 use ecargs::{ECArgs};
 use gvm_equation::{GvmEqn};
@@ -55,10 +57,18 @@ use message_types::{OutsideFromNoc, OutsideToNoc, NocFromOutside, NocToOutside};
 use nalcell::CellConfig;
 use noc::Noc;
 use uptree_spec::{AllowedTree, ContainerSpec, Manifest, UpTreeSpec, VmSpec};
-use utility::{S};   use uuid_fake::Uuid;
+use utility::{S, TraceHeader, TraceHeaderParams, TraceType};
 
+const MODULE: &'static str = "main.rs";
 fn main() -> Result<(), Error> {
+    let f = "main";
 	println!("Multicell Routing: Output to file {} (set in config.rs)", OUTPUT_FILE_NAME);
+    let mut trace_header = TraceHeader::new();
+    {
+        let ref trace_params = TraceHeaderParams { module: MODULE, function: f, format: "trace_schema" };
+        let trace = json!({ "schema_version": SCHEMA_VERSION });
+        //let _ = dal::add_to_trace( &mut trace_header, TraceType::Trace, trace_params,&trace, f);
+    }
     let _ = OpenOptions::new().write(true).truncate(true).open(OUTPUT_FILE_NAME);
     /* Doesn't work when debugging in Eclipse
 	let args: Vec<String> = env::args().collect();
@@ -88,7 +98,7 @@ fn main() -> Result<(), Error> {
 	let (outside_to_noc, noc_from_outside): (OutsideToNoc, NocFromOutside) = channel();
 	let (noc_to_outside, _outside_from_noc): (NocToOutside, OutsideFromNoc) = channel();
 	let mut noc = Noc::new(noc_to_outside)?;
-	let (dc, _) = noc.initialize(&blueprint, noc_from_outside).context(MainError::Chain { func_name: "run", comment: S("")})?;
+	let (dc, _) = noc.initialize(&blueprint, noc_from_outside, &mut trace_header).context(MainError::Chain { func_name: "run", comment: S("")})?;
 	loop {
 		stdout().write(b"Enter any character to print datacenter\n").context(MainError::Chain { func_name: "run", comment: S("")})?;
         let mut print_opt = String::new();
