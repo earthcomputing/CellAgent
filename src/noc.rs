@@ -1,19 +1,22 @@
 use std::thread::{JoinHandle, sleep, spawn};
 use std::sync::mpsc::channel;
 use std::collections::{HashMap, HashSet};
-use std::time;
+use std::time::{Duration};
 
 use serde_json;
 
 use blueprint::{Blueprint};
+use config::SCHEMA_VERSION;
+use dal;
 use datacenter::{Datacenter};
 use gvm_equation::{GvmEquation, GvmEqn, GvmVariable, GvmVariableType};
 use message::{MsgDirection, TcpMsgType, TreeNameMsg};
 use message_types::{NocToPort, NocFromPort, PortToNoc, PortFromNoc, NocFromOutside, NocToOutside};
 use nalcell::CellConfig;
 use uptree_spec::{AllowedTree, ContainerSpec, Manifest, UpTreeSpec, VmSpec};
-use utility::{S, write_err};
+use utility::{S, TraceHeader, TraceHeaderParams, TraceType, write_err};
 
+const MODULE: &'static str = "noc.rs";
 const NOC_MASTER_DEPLOY_TREE_NAME:  &'static str = "NocMasterDeploy";
 const NOC_AGENT_DEPLOY_TREE_NAME:   &'static str = "NocAgentDeploy";
 const NOC_CONTROL_TREE_NAME: &'static str = "NocMasterAgent";
@@ -28,23 +31,30 @@ impl Noc {
 	pub fn new(noc_to_outside: NocToOutside) -> Result<Noc, Error> {
 		Ok(Noc { allowed_trees: HashSet::new(), noc_to_outside })
 	}
-	pub fn initialize(&mut self, blueprint: &Blueprint, noc_from_outside: NocFromOutside) ->
+	pub fn initialize(&mut self, blueprint: &Blueprint, noc_from_outside: NocFromOutside, trace_header: &mut TraceHeader) ->
             Result<(Datacenter, Vec<JoinHandle<()>>), Error> {
+        let f = "initialize";
+        {
+            // For reasons I can't understand, the trace record doesn't show up when generated from main.
+            let ref trace_params = TraceHeaderParams { module: "main.rs", function: "MAIN", format: "trace_schema" };
+            let trace = json!({ "schema_version": SCHEMA_VERSION });
+            let _ = dal::add_to_trace( trace_header, TraceType::Trace, trace_params,&trace, f);
+        }
 		let (noc_to_port, port_from_noc): (NocToPort, NocFromPort) = channel();
 		let (port_to_noc, noc_from_port): (PortToNoc, PortFromNoc) = channel();
-		let (mut dc, mut join_handles) = self.build_datacenter(blueprint).context(NocError::Chain { func_name: "initialize", comment: S("")})?;
+		let (mut dc, mut join_handles) = self.build_datacenter(blueprint, trace_header).context(NocError::Chain { func_name: "initialize", comment: S("")})?;
 		dc.connect_to_noc(port_to_noc, port_from_noc).context(NocError::Chain { func_name: "initialize", comment: S("")})?;
         let join_outside = self.listen_outside(noc_from_outside, noc_to_port.clone())?;
         join_handles.push(join_outside);
         let join_port = self.listen_port(noc_to_port, noc_from_port)?;
         join_handles.push(join_port);
-		let nap = time::Duration::from_millis(1000);
+		let nap = Duration::from_millis(1000);
 		sleep(nap);
 		Ok((dc, join_handles))
 	}
-	fn build_datacenter(&self, blueprint: &Blueprint) -> Result<(Datacenter, Vec<JoinHandle<()>>), Error> {
+	fn build_datacenter(&self, blueprint: &Blueprint, trace_header: &mut TraceHeader) -> Result<(Datacenter, Vec<JoinHandle<()>>), Error> {
 		let mut dc = Datacenter::new();
-		let join_handles = dc.initialize(blueprint).context(NocError::Chain { func_name: "build_datacenter", comment: S("")})?;
+		let join_handles = dc.initialize(blueprint, trace_header).context(NocError::Chain { func_name: "build_datacenter", comment: S("")})?;
 		Ok((dc, join_handles))
 	}
 //	fn get_msg(&self, msg_type: MsgType, serialized_msg:String) -> Result<Box<Message>> {
@@ -111,7 +121,6 @@ impl Noc {
                  &allowed_trees, vec![&service], vec![&up_tree]).context(NocError::Chain { func_name: "create_noc", comment: S("NocMaster")})?;
         let manifest = Manifest::new("NocMaster", CellConfig::Large, &noc_master_deploy_tree, &allowed_trees,
                   vec![&vm_spec], vec![&up_tree]).context(NocError::Chain { func_name: "create_noc", comment: S("NocMaster")})?;
-        println!("---> {}", manifest);
         let manifest_ser = serde_json::to_string(&manifest).context(NocError::Chain { func_name: "create_noc", comment: S("") })?;
         let mut params = HashMap::new();
         let deployment_tree_name = noc_master_deploy_tree.get_name();

@@ -2,26 +2,30 @@ use std::fmt;
 use std::ops::{Deref};
 
 pub struct DebugOptions {
+    pub trace_all:   bool,
     pub ca_msg_recv: bool,
     pub ca_msg_send: bool,
     pub deploy:      bool,
-    pub pe_msg_recv: bool,
-    pub pe_msg_send: bool,
+    pub pe_pkt_recv: bool,
+    pub pe_pkt_send: bool,
     pub process_msg: bool,
+    pub process_pkt: bool,
     pub saved_msgs:  bool,
     pub stack_tree:  bool,
     pub traph_state: bool,
 }
 pub const DEBUG_OPTIONS: DebugOptions = DebugOptions {
-    ca_msg_recv: true,
-    ca_msg_send: true,
-    deploy:      true,
-    pe_msg_recv: true,
-    pe_msg_send: true,
-    process_msg: true,
-    saved_msgs:  true,
-    stack_tree:  true,
-    traph_state: true,
+    trace_all:   true,
+    ca_msg_recv: false,
+    ca_msg_send: false,
+    deploy:      false,
+    pe_pkt_recv: false,
+    pe_pkt_send: false,
+    process_msg: false,
+    process_pkt: false,
+    saved_msgs:  false,
+    stack_tree:  false,
+    traph_state: false,
 };
 // Size of various fields
 #[derive(Debug, Copy, Clone, Hash, Eq, PartialEq, Serialize, Deserialize)]
@@ -74,6 +78,8 @@ impl fmt::Display for CellType {
 		write!(f, "{}", s)
 	}	
 }
+pub const SCHEMA_VERSION: &'static str = "0.1";
+pub const REPO: &'static str = "CellAgent";
 // Default inputs
 pub const NCELLS: CellNo = CellNo(10);
 pub const NPORTS: PortNo =  PortNo { v: 6 };

@@ -4,11 +4,13 @@ version = "0.1.0"
 authors = ["alanhkarp <alanhkarp@gmail.com>"]
 
 [dependencies]
+chrono = { version = "0.4.3", features = ["serde"] }
 crossbeam = "0.2"
 eval = "^0.4.1"
 failure = "0.1.1"
 #failure_derive = "0.1.0"
 rand = "*" # Or a specific version
+schema = { path = "/Users/alan/Documents/Eclipse/schema" }
 schema_derive = { path = "/Users/alan/Documents/Eclipse/schema-derive" }
 serde = "1.0.27"
 serde_derive = "1.0.27"

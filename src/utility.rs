@@ -1,11 +1,10 @@
 use std::fmt;
 use std::collections::{HashSet};
 use std::thread::ThreadId;
-
 use serde_json;
 use serde_json::{Value};
 
-use config::{MAX_PORTS, MaskValue, PortNo};
+use config::{MAX_PORTS, REPO, MaskValue, PortNo};
 /*
 pub fn get_first_arg(a: Vec<String>) -> Option<i32> {
 	if a.len() != 2 {
@@ -30,7 +29,6 @@ pub const BASE_TENANT_MASK: Mask = Mask { mask: MaskValue(255) };   // All ports
 pub const DEFAULT_USER_MASK: Mask = Mask { mask: MaskValue(254) };  // All ports except port 0
 #[derive(Debug, Copy, Clone, Serialize, Deserialize)]
 pub struct Mask { mask: MaskValue }
-#[deny(unused_must_use)]
 impl Mask {
 	pub fn new(i: PortNumber) -> Mask {
 	    let mask = MaskValue((1 as u16).rotate_left(i.get_port_no().v as u32));
@@ -128,20 +126,24 @@ PORT - "port_no":{"v":[0-9]*},"is_border":[a-z]*
 {THDR,FCN,COMMENT}
 
 */
+use chrono::prelude::*;
 #[derive(Debug, Clone, Serialize)]
 pub struct TraceHeader {
+    epoch: i64,
     thread_id: u64,
     event_id: Vec<u64>,
     trace_type: TraceType,
     module: &'static str,
     function: &'static str,
-    format: &'static str
+    format: &'static str,
+    repo: &'static str,
 }
 impl TraceHeader {
     pub fn new() -> TraceHeader {
         let thread_id = TraceHeader::parse(thread::current().id());
-        TraceHeader { thread_id, event_id: vec![0], trace_type: TraceType::Trace,
-            module: "", function: "", format: "" }
+        TraceHeader { epoch: Local::now().timestamp(),
+            thread_id, event_id: vec![0], trace_type: TraceType::Trace,
+            module: "", function: "", format: "", repo: REPO }
     }
     pub fn next(&mut self, trace_type: TraceType) {
         let last = self.event_id.len() - 1;
@@ -154,13 +156,15 @@ impl TraceHeader {
         let mut event_id = self.event_id.clone();
         event_id.push(0);
         let thread_id = TraceHeader::parse(thread::current().id());
-        TraceHeader { thread_id, event_id, trace_type: self.trace_type,
-            module: self.module, function: self.function, format: self.format}
+        TraceHeader { epoch: Local::now().timestamp(),
+            thread_id, event_id, trace_type: self.trace_type,
+            module: self.module, function: self.function, format: self.format, repo: REPO }
     }
     pub fn update(&mut self, params: &TraceHeaderParams) {
         self.module   = params.get_module();
         self.function = params.get_function();
         self.format   = params.get_format();
+        self.epoch    = Local::now().timestamp();
     }
     pub fn get_event_id(&self) -> Vec<u64> { self.event_id.clone() }
     fn parse(thread_id: ThreadId) -> u64 {
