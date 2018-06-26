@@ -15,7 +15,8 @@ use gvm_equation::{GvmEquation, GvmEqn};
 use message::{Message, MsgDirection, MsgTreeMap, MsgType, TcpMsgType, ApplicationMsg,
               DiscoverMsg, DiscoverDMsg, ManifestMsg, StackTreeDMsg, StackTreeMsg,
               TreeNameMsg};
-use message_types::{CaToPe, CaFromPe, CaToVm, VmFromCa, VmToCa, CaFromVm, CaToPePacket, PeToCaPacket};
+use message_types::{CaToPe, CaFromPe, CaToCm, CaFromCm, CaToCmPacket, CmToCaPacket,
+                    CaToVm, VmFromCa, VmToCa, CaFromVm, CaToPePacket, PeToCaPacket};
 use nalcell::CellConfig;
 use name::{Name, CellID, SenderID, TreeID, UptreeID, VmID};
 use packet::{Packet, PacketAssembler, PacketAssemblers};
@@ -74,13 +75,15 @@ pub struct CellAgent {
     tree_vm_map: TreeVmMap,
     ca_to_vms: HashMap<VmID, CaToVm>,
     ca_to_pe: CaToPe,
+    ca_to_cm: CaToCm,
     vm_id_no: usize,
     up_tree_senders: HashMap<UptreeID, HashMap<String,TreeID>>,
     up_traphs_clist: HashMap<TreeID, TreeID>,
     packet_assemblers: PacketAssemblers,
 }
 impl CellAgent {
-    pub fn new(cell_id: &CellID, cell_type: CellType, config: CellConfig, no_ports: PortNo, ca_to_pe: CaToPe )
+    pub fn new(cell_id: &CellID, cell_type: CellType, config: CellConfig, no_ports: PortNo,
+               ca_to_cm: CaToCm, ca_to_pe: CaToPe )
                -> Result<CellAgent, Error> {
         let tenant_masks = vec![BASE_TENANT_MASK];
         let my_tree_id = TreeID::new(cell_id.get_name())?;
@@ -105,10 +108,10 @@ impl CellAgent {
             my_entry: RoutingTableEntry::default(TableIndex(0))?, base_tree_map,
             connected_tree_entry: Arc::new(Mutex::new(RoutingTableEntry::default(TableIndex(0))?)),
             tenant_masks, trees: Arc::new(Mutex::new(trees)), up_tree_senders: HashMap::new(),
-            up_traphs_clist: HashMap::new(), ca_to_pe, packet_assemblers: PacketAssemblers::new(),
+            up_traphs_clist: HashMap::new(), ca_to_pe, ca_to_cm, packet_assemblers: PacketAssemblers::new(),
         })
     }
-    pub fn initialize(&mut self, ca_from_pe: CaFromPe, mut trace_header: TraceHeader) -> Result<(), Error> {
+    pub fn initialize(&mut self, ca_from_pe: CaFromPe, ca_from_cm: CaFromCm, mut trace_header: TraceHeader) -> Result<(), Error> {
         // Set up predefined trees - Must be first two in this order
         let port_number_0 = PortNumber::new(PortNo{v:0}, self.no_ports).unwrap(); // No error possible for port 0
         let other_index = TableIndex(0);
@@ -152,7 +155,8 @@ impl CellAgent {
         self.my_entry = self.update_traph(&my_tree_id, port_number_0,
                                           traph::PortStatus::Parent, &gvm_equation,
                                           &mut HashSet::new(), other_index, hops, path, &mut trace_header)?;
-        self.listen_pe(ca_from_pe, &mut trace_header.fork_trace())?;
+        //self.listen_pe(ca_from_pe, &mut trace_header.fork_trace())?;
+        self.listen_cm(ca_from_cm, &mut trace_header.fork_trace())?;
         Ok(())
     }
     pub fn get_no_ports(&self) -> PortNo { self.no_ports }
@@ -417,7 +421,8 @@ impl CellAgent {
             }
             // Need traph even if cell only forwards on this tree
             self.trees.lock().unwrap().insert(entry.get_index(), base_tree_id.clone());
-            self.ca_to_pe.send(CaToPePacket::Entry(entry)).context(CellagentError::Chain { func_name: f, comment: S("") })?;
+            //self.ca_to_pe.send(CaToPePacket::Entry(entry)).context(CellagentError::Chain { func_name: f, comment: S("") })?;
+            self.ca_to_cm.send(CaToCmPacket::Entry(entry)).context(CellagentError::Chain { func_name: f, comment: S("") })?;
             // TODO: Need to update entries of stacked trees following a failover but not as base tree builds out
             //let entries = traph.update_stacked_entries(entry).context(CellagentError::Chain { func_name: f, comment: S("") })?;
             //for entry in entries {
@@ -521,7 +526,6 @@ impl CellAgent {
             let ref trace_params = TraceHeaderParams { module: MODULE, function: f, format: "ca_listen_vm" };
             let trace = json!({ "cell_id": &self.cell_id, "vm_id": &vm_id.clone(), "sender_id": &sender_id.clone() });
             let _ = dal::add_to_trace(outer_trace_header, TraceType::Debug, trace_params, &trace, f);
-            println!("CellAgent {}: listening to vm {} on tree {}", self.cell_id, vm_id, sender_id);
         }
         let mut ca = self.clone();
         let mut outer_trace_header_clone = outer_trace_header.clone();
@@ -630,7 +634,7 @@ impl CellAgent {
     }
     pub fn update_entry(&self, entry: RoutingTableEntry) -> Result<(), Error> {
         let f = "update_entry";
-        self.ca_to_pe.send(CaToPePacket::Entry(entry)).context(CellagentError::Chain { func_name: f, comment: S("")})?;
+        self.ca_to_cm.send(CaToCmPacket::Entry(entry)).context(CellagentError::Chain { func_name: f, comment: S("")})?;
         Ok(())
     }
     fn listen_pe(&mut self, ca_from_pe: CaFromPe, outer_trace_header: &mut TraceHeader) -> Result<(), Error>{
@@ -700,6 +704,96 @@ impl CellAgent {
                     }
                 },
                 PeToCaPacket::Tcp((port_no, (allowed_tree, msg_type, direction, serialized))) => {
+                    //println!("Cellagent {}: got {} TCP message", self.cell_id, msg_type);
+                    let port_number = PortNumber::new(port_no, self.no_ports).context(CellagentError::Chain { func_name: f, comment: S(self.cell_id.clone()) + " PortNumber" })?;
+                    let sender_id = match self.border_port_tree_id_map.get(&port_number).cloned() {
+                        Some(id) => id.0, // Get the SenderID
+                        None => return Err(CellagentError::Border { func_name: f, cell_id: self.cell_id.clone(), port_no: *port_no }.into())
+                    };
+                    let ref mut tree_map = match self.tree_name_map.get(&sender_id).cloned() {
+                        Some(map) => map,
+                        None => return Err(CellagentError::TreeNameMap { func_name: f, cell_id: self.cell_id.clone(),  sender_id: sender_id.clone()}.into())
+                    };
+                    let tree_map_updated = match msg_type {
+                        TcpMsgType::Application => self.tcp_application(&sender_id, &allowed_tree, &serialized, direction, tree_map, trace_header).context(CellagentError::Chain { func_name: f, comment: S("tcp_application")})?,
+                        TcpMsgType::DeleteTree  => self.tcp_delete_tree(&sender_id, &serialized, direction, tree_map, trace_header).context(CellagentError::Chain { func_name: f, comment: S("tcp_delete_tree")})?,
+                        TcpMsgType::Manifest    => self.tcp_manifest(&sender_id, &serialized, direction, tree_map, trace_header).context(CellagentError::Chain { func_name: f, comment: S("tcp_manifest")})?,
+                        TcpMsgType::Query       => self.tcp_query(&sender_id, &serialized, direction, tree_map, trace_header).context(CellagentError::Chain { func_name: f, comment: S("tcp_query")})?,
+                        TcpMsgType::StackTree   => self.tcp_stack_tree(&sender_id, &serialized, direction, tree_map, trace_header).context(CellagentError::Chain { func_name: f, comment: S("tcp_stack_tree")})?,
+                        TcpMsgType::TreeName    => self.tcp_tree_name(&sender_id, &serialized, direction, tree_map, trace_header).context(CellagentError::Chain { func_name: f, comment: S("tcp_tree_name")})?,
+                    };
+                    self.tree_name_map.insert(sender_id.clone(), tree_map_updated);
+                }
+            }
+        }
+    }
+    fn listen_cm(&mut self, ca_from_cm: CaFromCm, outer_trace_header: &mut TraceHeader) -> Result<(), Error>{
+        let f = "listen_cm";
+        let mut ca = self.clone();
+        {
+            let ref trace_params = TraceHeaderParams { module: MODULE, function: f, format: "ca_listen_pe" };
+            let trace = json!({ "cell_id": &self.cell_id });
+            let _ = dal::add_to_trace(outer_trace_header, TraceType::Debug, trace_params, &trace, f);
+        }
+        let mut outer_trace_header_clone = outer_trace_header.clone();
+        thread::spawn( move || {
+            let ref mut inner_trace_header = outer_trace_header_clone.fork_trace();
+            let _ = ca.listen_cm_loop(&ca_from_cm, inner_trace_header).map_err(|e| ::utility::write_err("cellagent", e));
+            let ref mut outer_trace_header = outer_trace_header_clone.fork_trace();
+            let _ = ca.listen_cm(ca_from_cm, outer_trace_header);
+        });
+        Ok(())
+    }
+    fn listen_cm_loop(&mut self, ca_from_cm: &CaFromCm, trace_header: &mut TraceHeader) -> Result<(), Error> {
+        let f = "listen_cm_loop";
+        loop {
+            //println!("CellAgent {}: waiting for status or packet", ca.cell_id);
+            match ca_from_cm.recv().context(CellagentError::Chain { func_name: f, comment: S(self.cell_id.clone())})? {
+                CmToCaPacket::Status((port_no, is_border, status)) => match status {
+                    port::PortStatus::Connected => self.port_connected(port_no, is_border, trace_header).context(CellagentError::Chain { func_name: f, comment: S(self.cell_id.clone()) +" port_connected"})?,
+                    port::PortStatus::Disconnected => self.port_disconnected(port_no).context(CellagentError::Chain { func_name: f, comment: S(self.cell_id.clone()) + " port_disconnected"})?
+                },
+                CmToCaPacket::Packet((port_no, index, packet)) => {
+                    // The index may be pointing to the control tree because the other cell didn't get the StackTree or StackTreeD message in time
+                    let msg_id = packet.get_header().get_msg_id();
+                    let mut packet_assembler = self.packet_assemblers.remove(&msg_id).unwrap_or(PacketAssembler::new(msg_id));
+                    let (last_packet, packets) = packet_assembler.add(packet);
+                    if last_packet {
+                        let mut msg = MsgType::get_msg(&packets).context(CellagentError::Chain { func_name: f, comment: S(self.cell_id.clone())})?;
+                        // Here's where I lock in the need for the tree_uuid in the packet header.  Can I avoid it?
+                        let msg_tree_id = {
+                            let locked = self.tree_id_map.lock().unwrap();
+                            // The index may be pointing to the control tree because the other cell didn't get the StackTree or StackTreeD message in time
+                            match locked.get(&packet.get_tree_uuid()).cloned() {
+                                Some(id) => id,
+                                None => self.get_tree_id(index).context(CellagentError::Chain { func_name: f, comment: S("") })?
+                            }
+                        };
+                        if DEBUG_OPTIONS.trace_all || DEBUG_OPTIONS.ca_msg_recv {   //Debug print
+                            let ref trace_params = TraceHeaderParams { module: MODULE, function: f, format: "ca_got_msg" };
+                            let trace = json!({ "cell_id": &self.cell_id, "msg": &msg.value() });
+                            if DEBUG_OPTIONS.ca_msg_recv {
+                                match msg.get_msg_type() {
+                                    MsgType::Discover => (),
+                                    MsgType::DiscoverD => {
+                                        if msg.get_tree_id().unwrap().is_name("C:2") {
+                                            println!("Cellagent {}: {} Port {} received {}", self.cell_id, f, *port_no, msg);
+                                        }
+                                    },
+                                    _ => {
+                                        println!("Cellagent {}: {} Port {} received {}", self.cell_id, f, *port_no, msg);
+                                    }
+                                }
+                            }
+                            let _ = dal::add_to_trace(trace_header, TraceType::Debug, trace_params, &trace, f);
+                        }
+                        msg.process_ca(self, index, port_no, &msg_tree_id, packets, trace_header).context(CellagentError::Chain { func_name: f, comment: S(self.cell_id.clone())})?;
+                    } else {
+                        let assembler = PacketAssembler::create(msg_id, packets);
+                        self.packet_assemblers.insert(msg_id, assembler);
+                    }
+                },
+                CmToCaPacket::Tcp((port_no, (allowed_tree, msg_type, direction, serialized))) => {
                     //println!("Cellagent {}: got {} TCP message", self.cell_id, msg_type);
                     let port_number = PortNumber::new(port_no, self.no_ports).context(CellagentError::Chain { func_name: f, comment: S(self.cell_id.clone()) + " PortNumber" })?;
                     let sender_id = match self.border_port_tree_id_map.get(&port_number).cloned() {
@@ -819,7 +913,7 @@ impl CellAgent {
                 println!("Cellagent {}: {} send unblock", self.cell_id, f);
             }
         }
-        self.ca_to_pe.send(CaToPePacket::Unblock)?;
+        self.ca_to_cm.send(CaToCmPacket::Unblock)?;
         Ok(())
     }
     pub fn process_manifest_msg(&mut self, msg: &ManifestMsg, _index: TableIndex, port_no: PortNo,
@@ -877,7 +971,7 @@ impl CellAgent {
                 let mut fwd_entry = entry.clone();
                 fwd_entry.set_table_index(fwd_index);
                 fwd_entry.set_mask(Mask::new(port_number));
-                self.ca_to_pe.send(CaToPePacket::Entry(fwd_entry))?;
+                self.ca_to_cm.send(CaToCmPacket::Entry(fwd_entry))?;
                 let mask = Mask::new(port_number);
                 let new_msg = StackTreeDMsg::new(sender_id, new_tree_id, entry.get_index(), fwd_index);
                 self.send_msg(self.get_connected_ports_tree_id(), &new_msg, mask, trace_header)?;
@@ -896,7 +990,7 @@ impl CellAgent {
                 if DEBUG_OPTIONS.process_msg { println!("Cellagent {}: {} tree {} save {} port {} msg {}", self.cell_id, f, msg_tree_id, save, *port_no, msg); }
             }
         }
-        self.ca_to_pe.send(CaToPePacket::Unblock)?;
+        self.ca_to_cm.send(CaToCmPacket::Unblock)?;
         Ok(())
 
     }
@@ -931,7 +1025,7 @@ impl CellAgent {
             let trace = json!({ "cell_id": &self.cell_id });
             let _ = dal::add_to_trace(trace_header, TraceType::Debug, trace_params, &trace, f);
         }
-        self.ca_to_pe.send(CaToPePacket::Unblock)?;
+        self.ca_to_cm.send(CaToCmPacket::Unblock)?;
         Ok(())
     }
     fn may_send(&self, tree_id: &TreeID, trace_header: &mut TraceHeader) -> Result<bool, Error> {
@@ -1115,7 +1209,7 @@ impl CellAgent {
             self.border_port_tree_id_map.insert(port_number, (sender_id.clone(), new_tree_id.clone()));
             let tree_name_msg = TreeNameMsg::new(&sender_id, &base_tree.get_name());
             let serialized = serde_json::to_string(&tree_name_msg).context(CellagentError::Chain { func_name: "port_connected", comment: S(self.cell_id.clone()) })?;
-            self.ca_to_pe.send(CaToPePacket::Tcp((port_number, (base_tree, TcpMsgType::TreeName, MsgDirection::Rootward, serialized)))).context(CellagentError::Chain { func_name: "port_connected", comment: S(self.cell_id.clone()) })?;
+            self.ca_to_cm.send(CaToCmPacket::Tcp((port_number, (base_tree, TcpMsgType::TreeName, MsgDirection::Rootward, serialized)))).context(CellagentError::Chain { func_name: "port_connected", comment: S(self.cell_id.clone()) + "border" })?;
             Ok(())
         } else {
             let port_no_mask = Mask::new(PortNumber::new(port_no, self.no_ports).context(CellagentError::Chain { func_name: "port_connected", comment: S(self.cell_id.clone()) })?);
@@ -1126,8 +1220,8 @@ impl CellAgent {
             let sender_id = SenderID::new(&self.cell_id, "CellAgent")?;
             let discover_msg = DiscoverMsg::new(&sender_id, &self.my_tree_id, my_table_index, &self.cell_id, hops, path);
             //println!("CellAgent {}: sending packet {} on port {} {} ", self.cell_id, packets[0].get_count(), port_no, discover_msg);
-            let entry = CaToPePacket::Entry(*self.connected_tree_entry.lock().unwrap());
-            self.ca_to_pe.send(entry).context(CellagentError::Chain { func_name: f, comment: S(self.cell_id.clone()) })?;
+            let entry = CaToCmPacket::Entry(*self.connected_tree_entry.lock().unwrap());
+            self.ca_to_cm.send(entry).context(CellagentError::Chain { func_name: f, comment: S(self.cell_id.clone()) + "interior"})?;
             self.send_msg(&self.connected_tree_id, &discover_msg, port_no_mask, trace_header).context(CellagentError::Chain { func_name: "port_connected", comment: S(self.cell_id.clone()) })?;
             self.forward_discover(port_no_mask).context(CellagentError::Chain { func_name: f, comment: S(self.cell_id.clone()) })?;
             Ok(())
@@ -1137,8 +1231,8 @@ impl CellAgent {
         //println!("Cell Agent {} got disconnected on port {}", self.cell_id, port_no);
         let port_no_mask = Mask::new(PortNumber::new(port_no, self.no_ports)?);
         self.connected_tree_entry.lock().unwrap().and_with_mask(port_no_mask.not());
-        let entry = CaToPePacket::Entry(*self.connected_tree_entry.lock().unwrap());
-        self.ca_to_pe.send(entry)?;
+        let entry = CaToCmPacket::Entry(*self.connected_tree_entry.lock().unwrap());
+        self.ca_to_cm.send(entry)?;
         Ok(())
     }
     fn forward_discover(&mut self, mask: Mask) -> Result<(), Error> {
@@ -1213,10 +1307,11 @@ impl CellAgent {
         let f = "send_msg";
         if DEBUG_OPTIONS.trace_all || DEBUG_OPTIONS.ca_msg_send {  // Debug print
             let mask = self.get_mask(tree_id, trace_header)?;
-            let ports = Mask::get_port_nos(&user_mask.and(mask));
+            let port_mask = user_mask.and(mask);
+            let ports = Mask::get_port_nos(&port_mask);
             let msg_type = msg.get_msg_type();
             let ref trace_params = TraceHeaderParams { module: MODULE, function: f, format: "ca_send_msg" };
-            let trace = json!({ "cell_id": &self.cell_id, "tree_id": &tree_id, "port_nos": &mask.get_port_nos(), "msg": msg.value() });
+            let trace = json!({ "cell_id": &self.cell_id, "tree_id": &tree_id, "port_nos": &ports, "msg": msg.value() });
             if DEBUG_OPTIONS.ca_msg_send {
                 match msg_type {
                     MsgType::Discover => (),
@@ -1255,8 +1350,8 @@ impl CellAgent {
     // NB: I tried using map instead of a loop, but the #^@$ing thing didn't do anything because of lazy evaluation
     fn send_packets_by_index(&self, index: TableIndex, user_mask: Mask, packets: &Vec<Packet>) -> Result<(), Error> {
         for packet in packets.iter() {
-            let msg = CaToPePacket::Packet((index, user_mask, *packet));
-            self.ca_to_pe.send(msg)?;
+            let msg = CaToCmPacket::Packet((index, user_mask, *packet));
+            self.ca_to_cm.send(msg)?;
             //if ::message::MsgType::is_type(packet, "Manifest") { println!("CellAgent {}: sent packet {} on tree {} to packet engine with index {}", self.cell_id, packet.get_count(), tree_uuid, *index); }
         }
         Ok(())

@@ -18,7 +18,17 @@ pub type PeFromPe = mpsc::Receiver<PeToPePacket>;
 pub enum CaToPePacket { Entry(RoutingTableEntry), Packet((TableIndex, Mask, Packet)), Tcp((PortNumber, TCP)),  Unblock }
 pub type CaToPe = mpsc::Sender<CaToPePacket>;
 pub type PeFromCa = mpsc::Receiver<CaToPePacket>;
-//pub type CaPeError = mpsc::SendError<CaToPePacket>;
+pub type CaPeError = mpsc::SendError<CaToPePacket>;
+// CellAgent to Cmodel
+pub enum CaToCmPacket { Entry(RoutingTableEntry), Packet((TableIndex, Mask, Packet)), Tcp((PortNumber, TCP)),  Unblock }
+pub type CaToCm = mpsc::Sender<CaToCmPacket>;
+pub type CmFromCa = mpsc::Receiver<CaToCmPacket>;
+pub type CaCmError = mpsc::SendError<CaToCmPacket>;
+// Cmodel to PacketEngine
+pub enum CmToPePacket { Entry(RoutingTableEntry), Packet((TableIndex, Mask, Packet)), Tcp((PortNumber, TCP)),  Unblock }
+pub type CmToPe = mpsc::Sender<CmToPePacket>;
+pub type PeFromCm = mpsc::Receiver<CmToPePacket>;
+pub type CmPeError = mpsc::SendError<CmToPePacket>;
 // PacketEngine to Port
 pub enum PeToPortPacket { Packet((TableIndex, Packet)), Tcp(TCP) }
 pub type PeToPort = mpsc::Sender<PeToPortPacket>;
@@ -44,6 +54,16 @@ pub enum PeToCaPacket { Status((PortNo, bool, PortStatus)), Packet((PortNo, Tabl
 pub type PeToCa = mpsc::Sender<PeToCaPacket>;
 pub type CaFromPe = mpsc::Receiver<PeToCaPacket>;
 //pub type PeCaError = mpsc::SendError<PeToCaPacket>;
+// PacketEngine to Cmodel
+pub enum PeToCmPacket { Status((PortNo, bool, PortStatus)), Packet((PortNo, TableIndex, Packet)), Tcp((PortNo, TCP)) }
+pub type PeToCm = mpsc::Sender<PeToCmPacket>;
+pub type CmFromPe = mpsc::Receiver<PeToCmPacket>;
+pub type PeCmError = mpsc::SendError<PeToCmPacket>;
+// Cmodel to CellAgent
+pub enum CmToCaPacket { Status((PortNo, bool, PortStatus)), Packet((PortNo, TableIndex, Packet)), Tcp((PortNo, TCP)) }
+pub type CmToCa = mpsc::Sender<CmToCaPacket>;
+pub type CaFromCm = mpsc::Receiver<CmToCaPacket>;
+pub type CmCaError = mpsc::SendError<CmToCaPacket>;
 // Port to Noc World
 pub type PortToNocMsg = TCP;
 pub type PortToNoc = mpsc::Sender<PortToNocMsg>;
