@@ -4,9 +4,13 @@ use std::sync::mpsc::channel;
 use std::thread;
 
 use cellagent::{CellAgent};
+use cmodel::{Cmodel};
 use dal;
 use config::{MAX_PORTS, CellNo, CellType, PortNo};
-use message_types::{CaToPe, PeFromCa, PeToCa, CaFromPe, PortToPe, PeFromPort, PeToPort,PortFromPe};
+use message_types::{PortToPe, PeFromPort, PeToPort,PortFromPe,
+                    CaToPe, PeFromCa, PeToCa, CaFromPe,
+                    CaToCm, CmFromCa, CmToCa, CaFromCm,
+                    CmToPe, PeFromCm, PeToCm, CmFromPe};
 use name::{CellID};
 use packet_engine::{PacketEngine};
 use port::{Port};
@@ -49,6 +53,10 @@ impl NalCell {
 		let cell_id = CellID::new(cell_no).context(NalcellError::Chain { func_name: "new", comment: S("cell_id")})?;
 		let (ca_to_pe, pe_from_ca): (CaToPe, PeFromCa) = channel();
 		let (pe_to_ca, ca_from_pe): (PeToCa, CaFromPe) = channel();
+        let (ca_to_cm, cm_from_ca): (CaToCm, CmFromCa) = channel();
+        let (cm_to_ca, ca_from_cm): (CmToCa, CaFromCm) = channel();
+        let (cm_to_pe, pe_from_cm): (CmToPe, PeFromCm) = channel();
+        let (pe_to_cm, cm_from_pe): (PeToCm, CmFromPe) = channel();
 		let (port_to_pe, pe_from_ports): (PortToPe, PeFromPort) = channel();
 		let mut ports = Vec::new();
 		let mut pe_to_ports = Vec::new();
@@ -77,15 +85,17 @@ impl NalCell {
 			ports.push(port);
 		}
 		let boxed_ports: Box<[Port]> = ports.into_boxed_slice();
-		let cell_agent = CellAgent::new(&cell_id, cell_type, config, nports, ca_to_pe).context(NalcellError::Chain { func_name: "new", comment: S("cell agent create")})?;
-        NalCell::start_cell(&cell_agent, ca_from_pe, &mut trace_header);
-		let packet_engine = PacketEngine::new(&cell_id, pe_to_ca, pe_to_ports, boundary_port_nos).context(NalcellError::Chain { func_name: "new", comment: S("packet engine create")})?;
-		NalCell::start_packet_engine(&packet_engine, pe_from_ca, pe_from_ports, &mut trace_header);
+		let cell_agent = CellAgent::new(&cell_id, cell_type, config, nports, ca_to_cm, ca_to_pe).context(NalcellError::Chain { func_name: "new", comment: S("cell agent create")})?;
+        NalCell::start_cell(&cell_agent, ca_from_pe, ca_from_cm, &mut trace_header);
+        let cmodel = Cmodel::new(&cell_id);
+        NalCell::start_cmodel(&cmodel, cm_from_ca, cm_to_pe, cm_from_pe, cm_to_ca, &mut trace_header);
+		let packet_engine = PacketEngine::new(&cell_id, pe_to_ca, pe_to_cm, pe_to_ports, boundary_port_nos).context(NalcellError::Chain { func_name: "new", comment: S("packet engine create")})?;
+		NalCell::start_packet_engine(&packet_engine, pe_from_ca, pe_from_cm, pe_from_ports, &mut trace_header);
 		Ok(NalCell { id: cell_id, cell_no, cell_type, config,
 				ports: boxed_ports, cell_agent, vms: Vec::new(),
 				packet_engine, ports_from_pe })
 	}
-    fn start_cell(cell_agent: &CellAgent, ca_from_pe: CaFromPe, outer_trace_header: &mut TraceHeader) {
+    fn start_cell(cell_agent: &CellAgent, ca_from_pe: CaFromPe, ca_from_cm: CaFromCm, outer_trace_header: &mut TraceHeader) {
         let f = "start_cell";
         let mut ca = cell_agent.clone();
         {
@@ -96,11 +106,21 @@ impl NalCell {
 		let mut outer_trace_header_clone = outer_trace_header.clone();
         thread::spawn( move || {
             let inner_trace_header = outer_trace_header_clone.fork_trace();
-            let _ = ca.initialize(ca_from_pe, inner_trace_header).map_err(|e| ::utility::write_err("nalcell", e));
+            let _ = ca.initialize(ca_from_pe, ca_from_cm, inner_trace_header).map_err(|e| ::utility::write_err("nalcell", e));
             // Don't automatically restart cell agent if it crashes
         });
     }
-    fn start_packet_engine(packet_engine: &PacketEngine, pe_from_ca: PeFromCa,
+    fn start_cmodel(cmodel: &Cmodel, cm_from_ca: CmFromCa, cm_to_pe: CmToPe, cm_from_pe: CmFromPe, cm_to_ca: CmToCa,
+                    outer_trace_header: &mut TraceHeader) {
+        let cm = cmodel.clone();
+        let mut outer_trace_header_clone = outer_trace_header.clone();
+        thread::spawn( move || {
+            let inner_trace_header = outer_trace_header_clone.fork_trace();
+            let _ = cm.initialize(cm_from_ca, cm_to_pe, cm_from_pe, cm_to_ca, inner_trace_header);
+            // Don't automatically restart cmodel if it crashes
+        });
+    }
+    fn start_packet_engine(packet_engine: &PacketEngine, pe_from_ca: PeFromCa, pe_from_cm: PeFromCm,
                            pe_from_ports: PeFromPort, outer_trace_header: &mut TraceHeader) {
         let f = "start_packet_engine";
         let pe = packet_engine.clone();
@@ -112,7 +132,7 @@ impl NalCell {
         let mut outer_trace_header_clone = outer_trace_header.clone();
         thread::spawn( move || {
             let inner_trace_header = outer_trace_header_clone.fork_trace();
-            let _ = pe.start_threads(pe_from_ca, pe_from_ports, inner_trace_header).map_err(|e| ::utility::write_err("nalcell", e));
+            let _ = pe.initialize(pe_from_ca, pe_from_cm, pe_from_ports, inner_trace_header).map_err(|e| ::utility::write_err("nalcell", e));
             // Don't automatically restart packet engine if it crashes
         });
     }

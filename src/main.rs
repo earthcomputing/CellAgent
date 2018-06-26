@@ -4,8 +4,6 @@ extern crate chrono;
 extern crate eval;
 #[macro_use] extern crate failure;
 extern crate rand;
-extern crate schema;
-#[macro_use] extern crate schema_derive;
 extern crate serde;
 #[macro_use] extern crate serde_derive;
 #[macro_use] extern crate serde_json;
@@ -14,6 +12,7 @@ extern crate uuid;
 
 mod blueprint;
 mod cellagent;
+mod cmodel;
 mod config;
 mod container;
 mod dal;
@@ -64,7 +63,7 @@ fn main() -> Result<(), Error> {
     let f = "main";
 	println!("Multicell Routing: Output to file {} (set in config.rs)", OUTPUT_FILE_NAME);
     let mut trace_header = TraceHeader::new();
-    {
+    {   // Can't get records from main() to show up in trace file
         let ref trace_params = TraceHeaderParams { module: MODULE, function: f, format: "trace_schema" };
         let trace = json!({ "schema_version": SCHEMA_VERSION });
         //let _ = dal::add_to_trace( &mut trace_header, TraceType::Trace, trace_params,&trace, f);
@@ -85,6 +84,7 @@ fn main() -> Result<(), Error> {
 	let (ncells, nports) = ecargs.get_args();
 	println!("\nMain: {} ports for each of {} cells", *nports, *ncells);
 	//let edges = vec![(0,1),(1,2),(2,3),(3,4),(5,6),(6,7),(7,8),(8,9),(0,5),(1,6),(2,7),(3,8),(4,9)];
+    //let edges= vec![is2e(0,1), is2e(0,2), is2e(1,2)];
 	let edges = vec![is2e(0,1),is2e(1,2),is2e(1,6),is2e(3,4),is2e(5,6),is2e(6,7),is2e(7,8),is2e(8,9),is2e(0,5),is2e(2,3),is2e(2,7),is2e(3,8),is2e(4,9)];
 	let mut exceptions = HashMap::new();
 	exceptions.insert(CellNo(5), PortNo{v:4});

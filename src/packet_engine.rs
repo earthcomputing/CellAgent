@@ -8,8 +8,9 @@ use std::collections::HashSet;
 use config::{DEBUG_OPTIONS, PortNo, TableIndex};
 use dal;
 use message::MsgType;
-use message_types::{PeFromCa, PeToCa, PeToPort, PeFromPort, CaToPePacket, PortToPePacket, PeToPortPacket, PeToCaPacket,
-    PeToPe, PeFromPe};
+use message_types::{PeFromCa, PeToCa, PeFromCm, PeToCm,
+                    PeToPort, PeFromPort, CaToPePacket, PortToPePacket, PeToPortPacket, PeToCaPacket,
+                    PeToPe, PeFromPe, CmToPePacket, PeToCmPacket};
 use name::{Name, CellID};
 use packet::{Packet};
 use routing_table::{RoutingTable};
@@ -26,20 +27,22 @@ pub struct PacketEngine {
 	boundary_port_nos: HashSet<PortNo>,
 	routing_table: Arc<Mutex<RoutingTable>>,
 	pe_to_ca: PeToCa,
+    pe_to_cm: PeToCm,
 	pe_to_ports: Vec<PeToPort>,
 }
 
 impl PacketEngine {
-	pub fn new(cell_id: &CellID, packet_pe_to_ca: PeToCa, pe_to_ports: Vec<PeToPort>, 
+	pub fn new(cell_id: &CellID, pe_to_ca: PeToCa, pe_to_cm: PeToCm, pe_to_ports: Vec<PeToPort>,
 			boundary_port_nos: HashSet<PortNo>) -> Result<PacketEngine, Error> {
 		let routing_table = Arc::new(Mutex::new(RoutingTable::new(cell_id.clone()).context(PacketEngineError::Chain { func_name: "new", comment: S(cell_id.get_name())})?));
 		Ok(PacketEngine { cell_id: cell_id.clone(), routing_table, boundary_port_nos,
-            pe_to_ca: packet_pe_to_ca, pe_to_ports })
+            pe_to_ca, pe_to_cm, pe_to_ports })
 	}
-	pub fn start_threads(&self, pe_from_ca: PeFromCa,
-                         pe_from_ports: PeFromPort, mut trace_header: TraceHeader) -> Result<(), Error> {
+	pub fn initialize(&self, pe_from_ca: PeFromCa, pe_from_cm: PeFromCm,
+                      pe_from_ports: PeFromPort, mut trace_header: TraceHeader) -> Result<(), Error> {
         let (pe_to_pe, pe_from_pe): (PeToPe, PeFromPe) = channel();
-        self.listen_ca(pe_from_ca, pe_to_pe, trace_header.fork_trace())?;
+        //self.listen_ca(pe_from_ca, pe_to_pe, trace_header.fork_trace())?;
+        self.listen_cm(pe_from_cm, pe_to_pe, trace_header.fork_trace())?;
         self.listen_port(pe_from_ports, pe_from_pe, trace_header.fork_trace())?;
         Ok(())
 	}
@@ -62,6 +65,17 @@ impl PacketEngine {
         });
         Ok(())
     }
+    fn listen_cm(&self, pe_from_cm: PeFromCm, pe_to_pe: PeToPe, mut outer_trace_header: TraceHeader) -> Result<(), Error> {
+        let f = "listen_cm";
+        let mut pe = self.clone();
+        let mut outer_trace_header_clone = outer_trace_header.clone();
+        ::std::thread::spawn( move ||  {
+            let ref mut inner_trace_header = outer_trace_header_clone.fork_trace();
+            let _ = pe.listen_cm_loop(&pe_from_cm, &pe_to_pe, inner_trace_header).map_err(|e| write_err("packet_engine", e));
+            let _ = pe.listen_cm(pe_from_cm, pe_to_pe, outer_trace_header);
+        });
+        Ok(())
+    }
     // TODO: One thread for all ports; should be a different thread for each port
     fn listen_port(&self, pe_from_ports: PeFromPort, pe_from_pe: PeFromPe, mut outer_trace_header: TraceHeader)
             -> Result<(),Error> {
@@ -73,15 +87,42 @@ impl PacketEngine {
         }
         let mut pe = self.clone();
         let mut outer_trace_header_clone = outer_trace_header.clone();
-        ::std::thread::spawn( move || -> Result<(), Error> {
+        ::std::thread::spawn( move || {
             let ref mut inner_trace_header = outer_trace_header_clone.fork_trace();
             let _ = pe.listen_port_loop(&pe_from_ports, &pe_from_pe, inner_trace_header).map_err(|e| write_err("packet_engine", e));
             let _ = pe.listen_port(pe_from_ports, pe_from_pe, outer_trace_header);
-            Ok(())
         });
         Ok(())
     }
 	//pub fn get_table(&self) -> &Arc<Mutex<RoutingTable>> { &self.routing_table }
+    fn listen_cm_loop(&mut self, pe_from_cm: &PeFromCm, pe_to_pe: &PeToPe, trace_header: &mut TraceHeader)
+                      -> Result<(), Error> {
+        let f = "listen_ca_loop";
+        loop {
+            match pe_from_cm.recv().context(PacketEngineError::Chain { func_name: f, comment: S("recv entry from cm") + self.cell_id.get_name()})? {
+                CmToPePacket::Entry(entry) => {
+                    self.routing_table.lock().unwrap().set_entry(entry)
+                },
+                CmToPePacket::Packet((index, user_mask, packet)) => {
+                    let locked = self.routing_table.lock().unwrap();	// Hold lock until forwarding is done
+                    let entry = locked.get_entry(index).context(PacketEngineError::Chain { func_name: "listen_ca", comment: S(self.cell_id.get_name())})?;
+                    let port_no = PortNo{v:0};
+                    self.forward(port_no, entry, user_mask, packet, trace_header).context(PacketEngineError::Chain { func_name:"listen_ca", comment: S(self.cell_id.get_name())})?;
+                },
+                CmToPePacket::Tcp((port_number, msg)) => {
+                    let port_no = port_number.get_port_no();
+                    match self.pe_to_ports.get(*port_no as usize) {
+                        Some(sender) => sender.send(PeToPortPacket::Tcp(msg)).context(PacketEngineError::Chain { func_name: "listen_ca", comment: S("send TCP to port ") + self.cell_id.get_name() })?,
+                        _ => return Err(PacketEngineError::Sender { func_name: f, cell_id: self.cell_id.clone(), port_no: *port_no }.into())
+                    }
+                },
+                CmToPePacket::Unblock => {
+                    //println!("PacketEngine {}: {} send unblock", self.cell_id, f);
+                    pe_to_pe.send(S("Unblock"))?;
+                }
+            };
+        }
+    }
 	fn listen_ca_loop(&mut self, pe_from_ca: &PeFromCa, pe_to_pe: &PeToPe, trace_header: &mut TraceHeader)
             -> Result<(), Error> {
         let f = "listen_ca_loop";
@@ -136,10 +177,10 @@ impl PacketEngine {
                     self.process_packet(port_no, my_index, packet, pe_from_pe, trace_header).context(PacketEngineError::Chain { func_name: "listen_port", comment: S("process_packet ") + self.cell_id.get_name()})?
                 },
 				PortToPePacket::Status((port_no, is_border, status)) => {
-                    self.pe_to_ca.send(PeToCaPacket::Status((port_no, is_border, status))).context(PacketEngineError::Chain { func_name: "listen_port", comment: S("send status to ca ") + self.cell_id.get_name()})?
+                    self.pe_to_cm.send(PeToCmPacket::Status((port_no, is_border, status))).context(PacketEngineError::Chain { func_name: "listen_port", comment: S("send status to ca ") + self.cell_id.get_name()})?
                 },
 				PortToPePacket::Tcp((port_no, tcp_msg)) => {
-                    self.pe_to_ca.send(PeToCaPacket::Tcp((port_no, tcp_msg))).context(PacketEngineError::Chain { func_name: "listen_port", comment: S("send tcp msg to ca ") + self.cell_id.get_name()})?
+                    self.pe_to_cm.send(PeToCmPacket::Tcp((port_no, tcp_msg))).context(PacketEngineError::Chain { func_name: "listen_port", comment: S("send tcp msg to ca ") + self.cell_id.get_name()})?
                 },
 			};
 		}		
@@ -202,7 +243,7 @@ impl PacketEngine {
 			let parent = entry.get_parent();
 			if let Some(other_index) = other_indices.get(parent.v as usize) {
 				if parent.v == 0 {
-					self.pe_to_ca.send(PeToCaPacket::Packet((recv_port_no, entry.get_index(), packet)))?;
+					self.pe_to_cm.send(PeToCmPacket::Packet((recv_port_no, entry.get_index(), packet)))?;
 				} else {
 					if let Some(sender) = self.pe_to_ports.get(parent.v as usize) {
 						sender.send(PeToPortPacket::Packet((*other_index, packet))).context(PacketEngineError::Chain { func_name: f, comment: S(self.cell_id.clone())})?;
@@ -224,7 +265,7 @@ impl PacketEngine {
                         }
 						let is_up = entry.get_mask().and(user_mask).equal(Mask::port0());
 						if is_up { // Send to cell agent, too
-							self.pe_to_ca.send(PeToCaPacket::Packet((recv_port_no, entry.get_index(), packet))).context(PacketEngineError::Chain { func_name: "forward", comment: S("rootcast packet to ca ") + self.cell_id.get_name()})?;
+							self.pe_to_cm.send(PeToCmPacket::Packet((recv_port_no, entry.get_index(), packet))).context(PacketEngineError::Chain { func_name: "forward", comment: S("rootcast packet to ca ") + self.cell_id.get_name()})?;
 						}
 					} else {
 						return Err(PacketEngineError::Sender { cell_id: self.cell_id.clone(), func_name: "forward rootward", port_no: *parent }.into());
@@ -255,7 +296,7 @@ impl PacketEngine {
 			for port_no in port_nos.iter() {
 				if let Some(other_index) = other_indices.get(port_no.v as usize).cloned() {
 					if port_no.v as usize == 0 {
-						self.pe_to_ca.send(PeToCaPacket::Packet((recv_port_no, entry.get_index(), packet))).context(PacketEngineError::Chain { func_name: f, comment: S("leafcast packet to ca ") + self.cell_id.get_name()})?;
+						self.pe_to_cm.send(PeToCmPacket::Packet((recv_port_no, entry.get_index(), packet))).context(PacketEngineError::Chain { func_name: f, comment: S("leafcast packet to ca ") + self.cell_id.get_name()})?;
 					} else {
 						match self.pe_to_ports.get(port_no.v as usize) {
 							Some(s) => s.send(PeToPortPacket::Packet((other_index, packet))).context(PacketEngineError::Chain { func_name: f, comment: S("send packet leafward ") + self.cell_id.get_name()})?,
