@@ -533,7 +533,7 @@ pub struct ApplicationMsg {
     payload: ApplicationMsgPayload
 }
 impl ApplicationMsg {
-    pub fn new(sender_id: &SenderID, tree_id: &TreeID, direction: MsgDirection, body: &String) -> ApplicationMsg {
+    pub fn new(sender_id: &SenderID, tree_id: &TreeID, direction: MsgDirection, body: &str) -> ApplicationMsg {
         let header = MsgHeader::new(sender_id,MsgType::Application, direction);
         let payload = ApplicationMsgPayload::new(tree_id, body);
         ApplicationMsg { header, payload }
@@ -568,20 +568,24 @@ impl fmt::Display for ApplicationMsg {
 #[derive(Debug, Clone, Hash, Serialize, Deserialize)]
 pub struct ApplicationMsgPayload {
     tree_id: TreeID,
-    body: String,
+    body: Vec<u8>,
 }
 impl ApplicationMsgPayload {
     fn new(tree_id: &TreeID, body: &str) -> ApplicationMsgPayload {
-        ApplicationMsgPayload { tree_id: tree_id.clone(), body: S(body) }
+        ApplicationMsgPayload { tree_id: tree_id.clone(), body: S(body).into_bytes() }
     }
-    pub fn get_body(&self) -> &String { &self.body }
+    pub fn get_body(&self) -> &Vec<u8> { &self.body }
     pub fn get_tree_id(&self) -> &TreeID { &self.tree_id }
 }
 impl MsgPayload for ApplicationMsgPayload {}
 impl fmt::Display for ApplicationMsgPayload {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        let s = format!("Application message {}", self.body);
-        write!(f, "{}", s)
+        if let Ok(body) = ::std::str::from_utf8(&self.body) {
+            let s = format!("Application message {}", body);
+            write!(f, "{}", s)
+        } else {
+            write!(f, "Error converting application message body from bytes to string")
+        }
     }
 }
 #[derive(Debug, Clone, Serialize, Deserialize)]

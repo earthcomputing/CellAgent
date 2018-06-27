@@ -16,7 +16,7 @@ use utility::{TraceHeader, TraceHeaderParams, TraceType};
 
 const MODULE: &'static str = "datacenter.rs";
 
-#[derive()]
+#[derive(Debug)]
 pub struct Datacenter {
 	cells: Vec<NalCell>,
 	links: Vec<Link>,

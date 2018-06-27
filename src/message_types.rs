@@ -8,7 +8,7 @@ use port::{PortStatus};
 use uptree_spec::AllowedTree;
 use utility::{Mask, PortNumber};
 
-pub type TCP = (AllowedTree, TcpMsgType, MsgDirection, String);
+pub type TCP = (AllowedTree, TcpMsgType, MsgDirection, Vec<u8>);
 // PacketEngine to PacketEngine to unblock
 pub type PeToPePacket = String;
 pub type PeToPe = mpsc::Sender<PeToPePacket>;
@@ -85,12 +85,12 @@ pub type NocToOutside = mpsc::Sender<NocToOutsideMsg>;
 pub type OutsideFromNoc = mpsc::Receiver<NocToOutsideMsg>;
 //pub type NocOutsideError = mpsc::SendError<NocToOutsideMsg>;
 // Cell agent to VM
-pub type CaToVmMsg = String;
+pub type CaToVmMsg = Vec<u8>;
 pub type CaToVm = mpsc::Sender<CaToVmMsg>;
 pub type VmFromCa = mpsc::Receiver<CaToVmMsg>;
 //pub type CaVmError = mpsc::SendError<CaToVmMsg>;
 // VM to Cell agent
-pub type VmToCaMsg = (AllowedTree, TcpMsgType, MsgDirection, String);
+pub type VmToCaMsg = (AllowedTree, TcpMsgType, MsgDirection, Vec<u8>);
 pub type VmToCa = mpsc::Sender<VmToCaMsg>;
 pub type CaFromVm = mpsc::Receiver<VmToCaMsg>;
 //pub type VmCaError = mpsc::SendError<VmToCaMsg>;
@@ -105,12 +105,12 @@ pub type CaFromVm = mpsc::Receiver<VmToCaMsg>;
 //pub type VmFromTree = mpsc::Receiver<TreeToVmMsg>;
 //pub type TreeVmError = mpsc::SendError<TreeToVmMsg>;
 // Vm to Container
-pub type VmToContainerMsg = String;
+pub type VmToContainerMsg = Vec<u8>;
 pub type VmToContainer = mpsc::Sender<VmToContainerMsg>;
 pub type ContainerFromVm = mpsc::Receiver<VmToContainerMsg>;
 //pub type VmContainerError = mpsc::SendError<VmToContainerMsg>;
 // Container to VM
-pub type ContainerToVmMsg = (AllowedTree, TcpMsgType, MsgDirection, String);
+pub type ContainerToVmMsg = (AllowedTree, TcpMsgType, MsgDirection, Vec<u8>);
 pub type ContainerToVm = mpsc::Sender<ContainerToVmMsg>;
 pub type VmFromContainer = mpsc::Receiver<ContainerToVmMsg>;
 //pub type ContainerVmError = mpsc::SendError<ContainerToVmMsg>;
