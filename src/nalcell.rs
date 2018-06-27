@@ -32,7 +32,7 @@ impl fmt::Display for CellConfig {
 	}
 }
 
-#[derive()]
+#[derive(Debug)]
 pub struct NalCell {
 	id: CellID,
 	cell_type: CellType,
