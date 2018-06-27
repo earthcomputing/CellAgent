@@ -32,7 +32,7 @@ impl fmt::Display for CellConfig {
 	}
 }
 
-#[derive(Debug)]
+#[derive()]
 pub struct NalCell {
 	id: CellID,
 	cell_type: CellType,
@@ -169,7 +169,7 @@ impl NalCell {
 		Err(NalcellError::NoFreePorts{ cell_id: self.id.clone(), func_name: f }.into())
 	}
 }
-impl fmt::Display for NalCell { 
+impl fmt::Display for NalCell {
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
 		let mut s = String::new();
 		match self.cell_type {
