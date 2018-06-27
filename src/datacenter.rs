@@ -16,7 +16,7 @@ use utility::{TraceHeader, TraceHeaderParams, TraceType};
 
 const MODULE: &'static str = "datacenter.rs";
 
-#[derive(Debug)]
+#[derive()]
 pub struct Datacenter {
 	cells: Vec<NalCell>,
 	links: Vec<Link>,
@@ -112,7 +112,7 @@ impl Datacenter {
 		}
 	}
 }
-impl fmt::Display for Datacenter { 
+impl fmt::Display for Datacenter {
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
 		let mut s = format!("Links");
 		for l in &self.links {
