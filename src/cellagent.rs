@@ -9,7 +9,7 @@ use serde;
 use serde_json;
 
 use config::{CONNECTED_PORTS_TREE_NAME, CONTROL_TREE_NAME, MAX_ENTRIES, MAX_PORTS,
-             CellNo, CellType, DEBUG_OPTIONS, PathLength, PortNo, TableIndex};
+             ByteArray, CellNo, CellType, DEBUG_OPTIONS, PathLength, PortNo, TableIndex};
 use dal;
 use gvm_equation::{GvmEquation, GvmEqn};
 use message::{Message, MsgDirection, MsgTreeMap, MsgType, TcpMsgType, ApplicationMsg,
@@ -1213,7 +1213,8 @@ impl CellAgent {
             self.border_port_tree_id_map.insert(port_number, (sender_id.clone(), new_tree_id.clone()));
             let tree_name_msg = TreeNameMsg::new(&sender_id, &base_tree.get_name());
             let serialized = serde_json::to_string(&tree_name_msg).context(CellagentError::Chain { func_name: "port_connected", comment: S(self.cell_id.clone()) })?;
-            self.ca_to_cm.send(CaToCmPacket::Tcp((port_number, (base_tree, TcpMsgType::TreeName, MsgDirection::Rootward, serialized.into_bytes())))).context(CellagentError::Chain { func_name: "port_connected", comment: S(self.cell_id.clone()) + "border" })?;
+            let bytes = ByteArray(serialized.into_bytes());
+            self.ca_to_cm.send(CaToCmPacket::Tcp((port_number, (base_tree, TcpMsgType::TreeName, MsgDirection::Rootward, bytes)))).context(CellagentError::Chain { func_name: "port_connected", comment: S(self.cell_id.clone()) + "border" })?;
             Ok(())
         } else {
             let port_no_mask = Mask::new(PortNumber::new(port_no, self.no_ports).context(CellagentError::Chain { func_name: "port_connected", comment: S(self.cell_id.clone()) })?);

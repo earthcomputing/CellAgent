@@ -1,5 +1,6 @@
 use std::fmt;
 
+use config::ByteArray;
 use name::{ContainerID, UptreeID};
 use message::{MsgDirection, TcpMsgType};
 use message_types::{ContainerToVm, ContainerFromVm};
@@ -58,7 +59,8 @@ impl NocMaster {
         self.listen_vm(container_from_vm)?;
         let msg = S("Hello From Master");
         println!("Service {} sending {}", self.container_id, msg);
-        self.container_to_vm.send((AllowedTree::new("NocMasterAgent"), TcpMsgType::Application, MsgDirection::Leafward, msg.into_bytes()))?;
+        let bytes = ByteArray(msg.into_bytes());
+        self.container_to_vm.send((AllowedTree::new("NocMasterAgent"), TcpMsgType::Application, MsgDirection::Leafward, bytes))?;
         Ok(())
     }
     fn listen_vm(&self, container_from_vm: ContainerFromVm) -> Result<(), Error> {
@@ -121,7 +123,8 @@ impl NocAgent {
             println!("NocAgent on container {} got msg {}", self.container_id, ::std::str::from_utf8(&msg)?);
             let msg = format!("Reply from {}", self.container_id);
             //println!("Service {} sending {}", self.container_id, msg);
-            self.container_to_vm.send((AllowedTree::new("NocAgentMaster"), TcpMsgType::Application, MsgDirection::Rootward, msg.into_bytes()))?;
+            let bytes = ByteArray(msg.into_bytes());
+            self.container_to_vm.send((AllowedTree::new("NocAgentMaster"), TcpMsgType::Application, MsgDirection::Rootward, bytes))?;
         }
     }
 }

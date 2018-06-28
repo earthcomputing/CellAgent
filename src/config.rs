@@ -28,6 +28,9 @@ pub const DEBUG_OPTIONS: DebugOptions = DebugOptions {
     traph_state: false,
 };
 // Size of various fields
+#[derive(Debug, Clone, Hash, Eq, PartialEq, Serialize, Deserialize)]
+pub struct ByteArray(pub Vec<u8>);
+impl Deref for ByteArray { type Target = Vec<u8>; fn deref(&self) -> &Self::Target { &self.0 } }
 #[derive(Debug, Copy, Clone, Hash, Eq, PartialEq, Serialize, Deserialize)]
 pub struct CellNo(pub usize);
 impl Deref for CellNo { type Target = usize; fn deref(&self) -> &Self::Target { &self.0 } }
