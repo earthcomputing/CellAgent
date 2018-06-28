@@ -7,7 +7,7 @@ use serde;
 use serde_json;
 
 use cellagent::{CellAgent};
-use config::{CellNo, MsgID, PathLength, PortNo, TableIndex};
+use config::{ByteArray, CellNo, MsgID, PathLength, PortNo, TableIndex};
 use gvm_equation::{GvmEquation, GvmEqn};
 use name::{CellID, SenderID, TreeID};
 use packet::{Packet, Packetizer, Serializer};
@@ -568,13 +568,13 @@ impl fmt::Display for ApplicationMsg {
 #[derive(Debug, Clone, Hash, Serialize, Deserialize)]
 pub struct ApplicationMsgPayload {
     tree_id: TreeID,
-    body: Vec<u8>,
+    body: ByteArray,
 }
 impl ApplicationMsgPayload {
     fn new(tree_id: &TreeID, body: &str) -> ApplicationMsgPayload {
-        ApplicationMsgPayload { tree_id: tree_id.clone(), body: S(body).into_bytes() }
+        ApplicationMsgPayload { tree_id: tree_id.clone(), body: ByteArray(S(body).into_bytes()) }
     }
-    pub fn get_body(&self) -> &Vec<u8> { &self.body }
+    pub fn get_body(&self) -> &ByteArray { &self.body }
     pub fn get_tree_id(&self) -> &TreeID { &self.tree_id }
 }
 impl MsgPayload for ApplicationMsgPayload {}

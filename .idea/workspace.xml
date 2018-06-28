@@ -2,15 +2,12 @@
 <project version="4">
   <component name="ChangeListManager">
     <list default="true" id="eee480a2-146d-44ab-9647-cef5ea39b250" name="Default" comment="">
-      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/cellagent.rs" beforeDir="false" afterPath="$PROJECT_DIR$/src/cellagent.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/datacenter.rs" beforeDir="false" afterPath="$PROJECT_DIR$/src/datacenter.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/config.rs" beforeDir="false" afterPath="$PROJECT_DIR$/src/config.rs" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/message.rs" beforeDir="false" afterPath="$PROJECT_DIR$/src/message.rs" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/message_types.rs" beforeDir="false" afterPath="$PROJECT_DIR$/src/message_types.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/nalcell.rs" beforeDir="false" afterPath="$PROJECT_DIR$/src/nalcell.rs" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/noc.rs" beforeDir="false" afterPath="$PROJECT_DIR$/src/noc.rs" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/service.rs" beforeDir="false" afterPath="$PROJECT_DIR$/src/service.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/vm.rs" beforeDir="false" afterPath="$PROJECT_DIR$/src/vm.rs" afterDir="false" />
     </list>
     <ignored path="$PROJECT_DIR$/target/" />
     <ignored path="$PROJECT_DIR$/out/" />
@@ -29,12 +26,10 @@
       <file leaf-file-name="cellagent.rs" pinned="false" current-in-tab="false">
         <entry file="file://$PROJECT_DIR$/src/cellagent.rs">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="186">
-              <caret line="1215" column="144" selection-start-line="1215" selection-start-column="144" selection-end-line="1215" selection-end-column="144" />
+            <state relative-caret-position="177">
+              <caret line="1215" column="59" selection-start-line="1215" selection-start-column="59" selection-end-line="1215" selection-end-column="59" />
               <folding>
-                <element signature="e#13467#14062#0" />
-                <element signature="e#89389#89906#0" />
-                <element signature="e#90400#91681#0" />
+                <element signature="e#92292#92963#0" />
                 <element signature="n#!!block;n#CellagentError#0" />
               </folding>
             </state>
@@ -46,15 +41,6 @@
           <provider selected="true" editor-type-id="text-editor">
             <state relative-caret-position="45">
               <caret line="3" lean-forward="true" selection-start-line="3" selection-end-line="3" />
-            </state>
-          </provider>
-        </entry>
-      </file>
-      <file leaf-file-name="Cargo.toml" pinned="false" current-in-tab="false">
-        <entry file="file://$PROJECT_DIR$/Cargo.toml">
-          <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="210">
-              <caret line="14" column="16" selection-start-line="14" selection-start-column="16" selection-end-line="14" selection-end-column="16" />
             </state>
           </provider>
         </entry>
@@ -73,9 +59,6 @@
           <provider selected="true" editor-type-id="text-editor">
             <state relative-caret-position="165">
               <caret line="11" column="44" lean-forward="true" selection-start-line="11" selection-start-column="44" selection-end-line="11" selection-end-column="44" />
-              <folding>
-                <element signature="e#396#397#0" expanded="true" />
-              </folding>
             </state>
           </provider>
         </entry>
@@ -92,13 +75,13 @@
       <file leaf-file-name="message_types.rs" pinned="false" current-in-tab="false">
         <entry file="file://$PROJECT_DIR$/src/message_types.rs">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="338">
-              <caret line="112" column="74" selection-start-line="112" selection-start-column="74" selection-end-line="112" selection-end-column="74" />
+            <state relative-caret-position="201">
+              <caret line="87" column="30" selection-start-line="87" selection-start-column="30" selection-end-line="87" selection-end-column="30" />
             </state>
           </provider>
         </entry>
       </file>
-      <file leaf-file-name="vm.rs" pinned="false" current-in-tab="true">
+      <file leaf-file-name="vm.rs" pinned="false" current-in-tab="false">
         <entry file="file://$PROJECT_DIR$/src/vm.rs">
           <provider selected="true" editor-type-id="text-editor">
             <state relative-caret-position="120">
@@ -110,7 +93,7 @@
       <file leaf-file-name="message.rs" pinned="false" current-in-tab="false">
         <entry file="file://$PROJECT_DIR$/src/message.rs">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="334">
+            <state relative-caret-position="441">
               <caret line="583" column="60" selection-start-line="583" selection-start-column="60" selection-end-line="583" selection-end-column="60" />
               <folding>
                 <element signature="e#27055#27056#0" expanded="true" />
@@ -123,8 +106,8 @@
       <file leaf-file-name="packet.rs" pinned="false" current-in-tab="false">
         <entry file="file://$PROJECT_DIR$/src/packet.rs">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="499">
-              <caret line="88" column="59" selection-start-line="88" selection-start-column="59" selection-end-line="88" selection-end-column="59" />
+            <state relative-caret-position="353">
+              <caret line="160" column="25" selection-start-line="160" selection-start-column="25" selection-end-line="160" selection-end-column="25" />
             </state>
           </provider>
         </entry>
@@ -141,17 +124,17 @@
       <file leaf-file-name="noc.rs" pinned="false" current-in-tab="false">
         <entry file="file://$PROJECT_DIR$/src/noc.rs">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="1123">
-              <caret line="223" column="126" selection-start-line="223" selection-start-column="126" selection-end-line="223" selection-end-column="126" />
+            <state relative-caret-position="172">
+              <caret line="182" column="42" selection-start-line="182" selection-start-column="42" selection-end-line="182" selection-end-column="42" />
             </state>
           </provider>
         </entry>
       </file>
-      <file leaf-file-name="service.rs" pinned="false" current-in-tab="false">
+      <file leaf-file-name="service.rs" pinned="false" current-in-tab="true">
         <entry file="file://$PROJECT_DIR$/src/service.rs">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="343">
-              <caret line="77" column="103" selection-start-line="77" selection-start-column="103" selection-end-line="77" selection-end-column="103" />
+            <state relative-caret-position="106">
+              <caret line="113" column="55" selection-start-line="113" selection-start-column="55" selection-end-line="113" selection-end-column="55" />
             </state>
           </provider>
         </entry>
@@ -165,11 +148,20 @@
           </provider>
         </entry>
       </file>
+      <file leaf-file-name="routing_table_entry.rs" pinned="false" current-in-tab="false">
+        <entry file="file://$PROJECT_DIR$/src/routing_table_entry.rs">
+          <provider selected="true" editor-type-id="text-editor">
+            <state relative-caret-position="207">
+              <caret line="17" column="16" lean-forward="true" selection-start-line="17" selection-start-column="16" selection-end-line="17" selection-end-column="16" />
+            </state>
+          </provider>
+        </entry>
+      </file>
       <file leaf-file-name="config.rs" pinned="false" current-in-tab="false">
         <entry file="file://$PROJECT_DIR$/src/config.rs">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="193">
-              <caret line="24" column="23" selection-start-line="24" selection-start-column="23" selection-end-line="24" selection-end-column="23" />
+            <state relative-caret-position="299">
+              <caret line="34" column="29" selection-start-line="34" selection-start-column="29" selection-end-line="34" selection-end-column="29" />
             </state>
           </provider>
         </entry>
@@ -185,7 +177,6 @@
   </component>
   <component name="FindInProjectRecents">
     <findStrings>
-      <find>used</find>
       <find>port_st</find>
       <find>PortSt</find>
       <find>allow</find>
@@ -215,6 +206,7 @@
       <find>Reply</find>
       <find>where</find>
       <find>Rep</find>
+      <find>Vec</find>
     </findStrings>
     <replaceStrings>
       <replace>Arc::</replace>
@@ -254,17 +246,17 @@
         <option value="$PROJECT_DIR$/src/utility.rs" />
         <option value="$PROJECT_DIR$/Cargo.toml" />
         <option value="$PROJECT_DIR$/src/main.rs" />
-        <option value="$PROJECT_DIR$/src/config.rs" />
         <option value="$PROJECT_DIR$/src/packet_engine.rs" />
         <option value="$PROJECT_DIR$/src/cmodel.rs" />
         <option value="$PROJECT_DIR$/src/datacenter.rs" />
         <option value="$PROJECT_DIR$/src/nalcell.rs" />
+        <option value="$PROJECT_DIR$/src/vm.rs" />
+        <option value="$PROJECT_DIR$/src/config.rs" />
+        <option value="$PROJECT_DIR$/src/message_types.rs" />
         <option value="$PROJECT_DIR$/src/message.rs" />
         <option value="$PROJECT_DIR$/src/cellagent.rs" />
         <option value="$PROJECT_DIR$/src/noc.rs" />
-        <option value="$PROJECT_DIR$/src/message_types.rs" />
         <option value="$PROJECT_DIR$/src/service.rs" />
-        <option value="$PROJECT_DIR$/src/vm.rs" />
       </list>
     </option>
   </component>
@@ -416,6 +408,7 @@
   </component>
   <component name="ToolWindowManager">
     <frame x="272" y="-912" width="1398" height="877" extended-state="0" />
+    <editor active="true" />
     <layout>
       <window_info anchor="right" id="Palette" order="3" />
       <window_info anchor="bottom" id="TODO" order="6" />
@@ -538,9 +531,7 @@
         <state relative-caret-position="15">
           <caret line="14" column="58" lean-forward="true" selection-start-line="14" selection-start-column="58" selection-end-line="14" selection-end-column="58" />
           <folding>
-            <element signature="e#13467#14062#0" />
-            <element signature="e#89389#89906#0" />
-            <element signature="e#90400#91681#0" />
+            <element signature="e#92292#92963#0" />
             <element signature="n#!!block;n#CellagentError#0" />
           </folding>
         </state>
@@ -550,9 +541,6 @@
       <provider selected="true" editor-type-id="text-editor">
         <state relative-caret-position="323">
           <caret line="45" column="97" selection-start-line="45" selection-start-column="97" selection-end-line="45" selection-end-column="97" />
-          <folding>
-            <element signature="e#396#397#0" expanded="true" />
-          </folding>
         </state>
       </provider>
     </entry>
@@ -663,8 +651,8 @@
     </entry>
     <entry file="file://$PROJECT_DIR$/src/routing_table_entry.rs">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="222">
-          <caret line="18" column="19" selection-start-line="18" selection-start-column="19" selection-end-line="18" selection-end-column="19" />
+        <state relative-caret-position="207">
+          <caret line="17" column="16" lean-forward="true" selection-start-line="17" selection-start-column="16" selection-end-line="17" selection-end-column="16" />
         </state>
       </provider>
     </entry>
@@ -672,10 +660,6 @@
       <provider selected="true" editor-type-id="text-editor">
         <state relative-caret-position="330">
           <caret line="22" selection-start-line="22" selection-end-line="22" />
-          <folding>
-            <element signature="e#676#677#0" expanded="true" />
-            <element signature="e#724#725#0" expanded="true" />
-          </folding>
         </state>
       </provider>
     </entry>
@@ -714,13 +698,6 @@
         </state>
       </provider>
     </entry>
-    <entry file="file://$PROJECT_DIR$/src/config.rs">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="193">
-          <caret line="24" column="23" selection-start-line="24" selection-start-column="23" selection-end-line="24" selection-end-column="23" />
-        </state>
-      </provider>
-    </entry>
     <entry file="file://$PROJECT_DIR$/src/blueprint.rs">
       <provider selected="true" editor-type-id="text-editor">
         <state relative-caret-position="45">
@@ -739,9 +716,6 @@
       <provider selected="true" editor-type-id="text-editor">
         <state relative-caret-position="165">
           <caret line="11" column="44" lean-forward="true" selection-start-line="11" selection-start-column="44" selection-end-line="11" selection-end-column="44" />
-          <folding>
-            <element signature="e#396#397#0" expanded="true" />
-          </folding>
         </state>
       </provider>
     </entry>
@@ -761,14 +735,28 @@
     </entry>
     <entry file="file://$PROJECT_DIR$/src/packet.rs">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="499">
-          <caret line="88" column="59" selection-start-line="88" selection-start-column="59" selection-end-line="88" selection-end-column="59" />
+        <state relative-caret-position="353">
+          <caret line="160" column="25" selection-start-line="160" selection-start-column="25" selection-end-line="160" selection-end-column="25" />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/src/vm.rs">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="120">
+          <caret line="58" column="30" selection-start-line="58" selection-start-column="30" selection-end-line="58" selection-end-column="30" />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/src/message_types.rs">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="201">
+          <caret line="87" column="30" selection-start-line="87" selection-start-column="30" selection-end-line="87" selection-end-column="30" />
         </state>
       </provider>
     </entry>
     <entry file="file://$PROJECT_DIR$/src/message.rs">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="334">
+        <state relative-caret-position="441">
           <caret line="583" column="60" selection-start-line="583" selection-start-column="60" selection-end-line="583" selection-end-column="60" />
           <folding>
             <element signature="e#27055#27056#0" expanded="true" />
@@ -779,42 +767,33 @@
     </entry>
     <entry file="file://$PROJECT_DIR$/src/cellagent.rs">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="186">
-          <caret line="1215" column="144" selection-start-line="1215" selection-start-column="144" selection-end-line="1215" selection-end-column="144" />
+        <state relative-caret-position="177">
+          <caret line="1215" column="59" selection-start-line="1215" selection-start-column="59" selection-end-line="1215" selection-end-column="59" />
           <folding>
-            <element signature="e#13467#14062#0" />
-            <element signature="e#89389#89906#0" />
-            <element signature="e#90400#91681#0" />
+            <element signature="e#92292#92963#0" />
             <element signature="n#!!block;n#CellagentError#0" />
           </folding>
         </state>
       </provider>
     </entry>
-    <entry file="file://$PROJECT_DIR$/src/noc.rs">
+    <entry file="file://$PROJECT_DIR$/src/config.rs">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="1123">
-          <caret line="223" column="126" selection-start-line="223" selection-start-column="126" selection-end-line="223" selection-end-column="126" />
+        <state relative-caret-position="299">
+          <caret line="34" column="29" selection-start-line="34" selection-start-column="29" selection-end-line="34" selection-end-column="29" />
         </state>
       </provider>
     </entry>
-    <entry file="file://$PROJECT_DIR$/src/message_types.rs">
+    <entry file="file://$PROJECT_DIR$/src/noc.rs">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="338">
-          <caret line="112" column="74" selection-start-line="112" selection-start-column="74" selection-end-line="112" selection-end-column="74" />
+        <state relative-caret-position="172">
+          <caret line="182" column="42" selection-start-line="182" selection-start-column="42" selection-end-line="182" selection-end-column="42" />
         </state>
       </provider>
     </entry>
     <entry file="file://$PROJECT_DIR$/src/service.rs">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="343">
-          <caret line="77" column="103" selection-start-line="77" selection-start-column="103" selection-end-line="77" selection-end-column="103" />
-        </state>
-      </provider>
-    </entry>
-    <entry file="file://$PROJECT_DIR$/src/vm.rs">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="120">
-          <caret line="58" column="30" selection-start-line="58" selection-start-column="30" selection-end-line="58" selection-end-column="30" />
+        <state relative-caret-position="106">
+          <caret line="113" column="55" selection-start-line="113" selection-start-column="55" selection-end-line="113" selection-end-column="55" />
         </state>
       </provider>
     </entry>
