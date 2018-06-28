@@ -97,7 +97,7 @@ impl PacketEngine {
 	//pub fn get_table(&self) -> &Arc<Mutex<RoutingTable>> { &self.routing_table }
     fn listen_cm_loop(&mut self, pe_from_cm: &PeFromCm, pe_to_pe: &PeToPe, trace_header: &mut TraceHeader)
                       -> Result<(), Error> {
-        let f = "listen_ca_loop";
+        let f = "listen_cm_loop";
         loop {
             match pe_from_cm.recv().context(PacketEngineError::Chain { func_name: f, comment: S("recv entry from cm") + self.cell_id.get_name()})? {
                 CmToPePacket::Entry(entry) => {
@@ -107,6 +107,23 @@ impl PacketEngine {
                     let locked = self.routing_table.lock().unwrap();	// Hold lock until forwarding is done
                     let entry = locked.get_entry(index).context(PacketEngineError::Chain { func_name: "listen_ca", comment: S(self.cell_id.get_name())})?;
                     let port_no = PortNo{v:0};
+                    if DEBUG_OPTIONS.trace_all || DEBUG_OPTIONS.pe_pkt_recv {  // Debug print
+                        let msg_type = MsgType::msg_type(&packet);
+                        let tree_id = packet.get_tree_id();
+                        let ref trace_params = TraceHeaderParams { module: MODULE, function: f, format: "pe_packet_from_cm" };
+                        let trace = json!({ "cell_id": &self.cell_id, "tree_id": &tree_id, "msg_type": &msg_type });
+                        if DEBUG_OPTIONS.pe_pkt_recv {
+                            match msg_type {
+                                MsgType::DiscoverD => {
+                                    if tree_id.is_name("C:2") {
+                                        println!("PacketEngine {}: got from ca {} {}", self.cell_id, msg_type, tree_id);
+                                    }
+                                },
+                                _ => (),
+                            }
+                        }
+                        let _ = dal::add_to_trace(trace_header, TraceType::Debug, trace_params, &trace, f);
+                    }
                     self.forward(port_no, entry, user_mask, packet, trace_header).context(PacketEngineError::Chain { func_name:"listen_ca", comment: S(self.cell_id.get_name())})?;
                 },
                 CmToPePacket::Tcp((port_number, msg)) => {
@@ -243,6 +260,22 @@ impl PacketEngine {
 			let parent = entry.get_parent();
 			if let Some(other_index) = other_indices.get(parent.v as usize) {
 				if parent.v == 0 {
+                    if DEBUG_OPTIONS.trace_all || DEBUG_OPTIONS.pe_pkt_send {   // Debug print
+                        let msg_type = MsgType::msg_type(&packet);
+                        let tree_id = packet.get_tree_id();
+                        let ref trace_params = TraceHeaderParams { module: MODULE, function: f, format: "pe_forward_to_cm" };
+                        let trace = json!({ "cell_id": &self.cell_id, "tree_id": &tree_id, "msg_type": &msg_type, "parent_port": &parent });
+                        if DEBUG_OPTIONS.pe_pkt_send {
+                            match msg_type {
+                                MsgType::Discover => (),
+                                _ => {
+                                    let _ = dal::add_to_trace(trace_header, TraceType::Debug, trace_params, &trace, f);
+                                    println!("PacketEngine {}: {} [{}] {} {}", self.cell_id, f, parent.v, msg_type, tree_id);
+                                },
+
+                            }
+                        }
+                    }
 					self.pe_to_cm.send(PeToCmPacket::Packet((recv_port_no, entry.get_index(), packet)))?;
 				} else {
 					if let Some(sender) = self.pe_to_ports.get(parent.v as usize) {

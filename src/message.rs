@@ -31,8 +31,9 @@ pub enum MsgType {
 }
 impl MsgType {
     pub fn get_msg(packets: &Vec<Packet>) -> Result<Box<Message>, Error> {
-        let serialized = Packetizer::unpacketize(packets).context(MessageError::Chain { func_name: "get_msg", comment: S("unpacketize")})?;
+        let bytes = Packetizer::unpacketize(packets).context(MessageError::Chain { func_name: "get_msg", comment: S("unpacketize")})?;
         //println!("Message get_msg: serialized {}, packets {:?}", serialized, packets);
+        let serialized = ::std::str::from_utf8(&bytes)?;
 		let type_msg = serde_json::from_str::<TypePlusMsg>(&serialized).context(MessageError::Chain { func_name: "get_msg", comment: S("deserialize MsgType")})?;
 		let msg_type = type_msg.get_type();
 		let serialized_msg = type_msg.get_serialized_msg();		
@@ -46,6 +47,21 @@ impl MsgType {
 			MsgType::TreeName    => Box::new(serde_json::from_str::<TreeNameMsg>(&serialized_msg).context(MessageError::Chain { func_name: "get_msg", comment: S("TreeNameMsg")})?),
 		})		
 	}
+    pub fn msg_from_bytes(bytes: &ByteArray) -> Result<Box<Message>, Error> {
+        let serialized = ::std::str::from_utf8(bytes)?;
+        let type_msg = serde_json::from_str::<TypePlusMsg>(serialized).context(MessageError::Chain { func_name: "get_msg", comment: S("deserialize MsgType")})?;
+        let msg_type = type_msg.get_type();
+        let serialized_msg = type_msg.get_serialized_msg();
+        Ok(match msg_type {
+            MsgType::Application => Box::new(serde_json::from_str::<ApplicationMsg>(&serialized_msg).context(MessageError::Chain { func_name: "get_msg", comment: S("DiscoverMsg")})?),
+            MsgType::Discover    => Box::new(serde_json::from_str::<DiscoverMsg>(&serialized_msg).context(MessageError::Chain { func_name: "get_msg", comment: S("DiscoverMsg")})?),
+            MsgType::DiscoverD   => Box::new(serde_json::from_str::<DiscoverDMsg>(&serialized_msg).context(MessageError::Chain { func_name: "get_msg", comment: S("DiscoverDMsg")})?),
+            MsgType::Manifest    => Box::new(serde_json::from_str::<ManifestMsg>(&serialized_msg).context(MessageError::Chain { func_name: "get_msg", comment: S("ManifestMsg")})?),
+            MsgType::StackTree   => Box::new(serde_json::from_str::<StackTreeMsg>(&serialized_msg).context(MessageError::Chain { func_name: "get_msg", comment: S("StackTreeMsg")})?),
+            MsgType::StackTreeD  => Box::new(serde_json::from_str::<StackTreeDMsg>(&serialized_msg).context(MessageError::Chain { func_name: "get_msg", comment: S("StackTreeDMsg")})?),
+            MsgType::TreeName    => Box::new(serde_json::from_str::<TreeNameMsg>(&serialized_msg).context(MessageError::Chain { func_name: "get_msg", comment: S("TreeNameMsg")})?),
+        })
+    }
 	// A hack for printing debug output only for a specific message type
 	pub fn is_type(packet: &Packet, type_of_msg: MsgType) -> bool {
 		match format!("{}", packet).find(&(S(type_of_msg) + "\\")) {
@@ -144,15 +160,19 @@ pub trait Message {
     fn is_blocking(&self) -> bool;
     fn value(&self) -> serde_json::Value;
 //	fn get_count(&self) -> MsgID { self.get_header().get_count() }
+    fn to_bytes(&self) -> Result<ByteArray, Error> where Self: serde::Serialize + Sized {
+        let bytes = Serializer::serialize(self).context(MessageError::Chain { func_name: "to_packets", comment: S("")})?;
+        Ok(ByteArray(*bytes))
+    }
     fn to_packets(&self, tree_id: &TreeID) -> Result<Vec<Packet>, Error>
 			where Self:std::marker::Sized + serde::Serialize {
 		let bytes = Serializer::serialize(self).context(MessageError::Chain { func_name: "to_packets", comment: S("")})?;
 		let direction = self.get_header().get_direction();
-		let packets = Packetizer::packetize(tree_id, &bytes, direction, self.is_blocking());
+		let packets = Packetizer::packetize(tree_id, &ByteArray(*bytes), direction, self.is_blocking());
 		Ok(packets)
 	}
 	fn process_ca(&mut self, _cell_agent: &mut CellAgent, _index: TableIndex, _port_no: PortNo,
-                  _msg_tree_id: &TreeID, _packets: &Vec<Packet>, _trace_header: &mut TraceHeader) -> Result<(), Error> { Err(MessageError::Process { func_name: "process_ca" }.into()) }
+                  _msg_tree_id: &TreeID, _trace_header: &mut TraceHeader) -> Result<(), Error> { Err(MessageError::Process { func_name: "process_ca" }.into()) }
 }
 impl fmt::Display for Message {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
@@ -228,7 +248,7 @@ impl Message for DiscoverMsg {
         }
     }
 	fn process_ca(&mut self, cell_agent: &mut CellAgent, _index: TableIndex, port_no: PortNo,
-                  _msg_tree_id: &TreeID, _packets: &Vec<Packet>, trace_header: &mut TraceHeader) -> Result<(), Error> {
+                  _msg_tree_id: &TreeID, trace_header: &mut TraceHeader) -> Result<(), Error> {
         cell_agent.process_discover_msg(self, port_no, trace_header)
 	}
 }
@@ -306,7 +326,7 @@ impl Message for DiscoverDMsg {
         }
     }
 	fn process_ca(&mut self, cell_agent: &mut CellAgent, _index: TableIndex, port_no: PortNo,
-                  _msg_tree_id: &TreeID, _packets: &Vec<Packet>, trace_header: &mut TraceHeader) -> Result<(), Error> {
+                  _msg_tree_id: &TreeID, trace_header: &mut TraceHeader) -> Result<(), Error> {
         cell_agent.process_discover_d_msg(&self, port_no, trace_header)
     }
 }
@@ -369,7 +389,7 @@ impl Message for StackTreeMsg {
         }
     }
 	fn process_ca(&mut self, cell_agent: &mut CellAgent, _index: TableIndex, port_no: PortNo,
-                  msg_tree_id: &TreeID, _packets: &Vec<Packet>, trace_header: &mut TraceHeader) -> Result<(), Error> {
+                  msg_tree_id: &TreeID, trace_header: &mut TraceHeader) -> Result<(), Error> {
         cell_agent.process_stack_tree_msg(&self, port_no,
                                           msg_tree_id, trace_header)
 	}
@@ -435,7 +455,7 @@ impl Message for StackTreeDMsg {
         }
     }
     fn process_ca(&mut self, cell_agent: &mut CellAgent, _index: TableIndex, port_no: PortNo,
-                  _msg_tree_id: &TreeID, _packets: &Vec<Packet>, trace_header: &mut TraceHeader) -> Result<(), Error> {
+                  _msg_tree_id: &TreeID, trace_header: &mut TraceHeader) -> Result<(), Error> {
         cell_agent.process_stack_tree_d_msg(&self, port_no, trace_header)
     }
 }
@@ -493,9 +513,8 @@ impl Message for ManifestMsg {
         }
     }
 	fn process_ca(&mut self, cell_agent: &mut CellAgent, index: TableIndex, port_no: PortNo,
-                  msg_tree_id: &TreeID, packets: &Vec<Packet>, trace_header: &mut TraceHeader) -> Result<(), Error> {
-        cell_agent.process_manifest_msg(&self, index, port_no,
-                                        msg_tree_id, packets, trace_header)
+                  msg_tree_id: &TreeID, trace_header: &mut TraceHeader) -> Result<(), Error> {
+        cell_agent.process_manifest_msg(&self, index, port_no, msg_tree_id, trace_header)
 	}
 }
 impl fmt::Display for ManifestMsg {
@@ -554,9 +573,8 @@ impl Message for ApplicationMsg {
         }
     }
     fn process_ca(&mut self, cell_agent: &mut CellAgent, index: TableIndex, port_no: PortNo,
-                  msg_tree_id: &TreeID, packets: &Vec<Packet>, trace_header: &mut TraceHeader) -> Result<(), Error> {
-        cell_agent.process_application_msg(self, index, port_no,
-                                           msg_tree_id, packets, trace_header)
+                  msg_tree_id: &TreeID, trace_header: &mut TraceHeader) -> Result<(), Error> {
+        cell_agent.process_application_msg(self, index, port_no,  msg_tree_id, trace_header)
     }
 }
 impl fmt::Display for ApplicationMsg {

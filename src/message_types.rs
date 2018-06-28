@@ -3,12 +3,15 @@ use routing_table_entry::{RoutingTableEntry};
 
 use config::{ByteArray, PortNo, TableIndex};
 use message::{MsgDirection, TcpMsgType};
+use name::TreeID;
 use packet::{Packet};
 use port::{PortStatus};
 use uptree_spec::AllowedTree;
 use utility::{Mask, PortNumber};
+use uuid_fake::Uuid;
 
 pub type TCP = (AllowedTree, TcpMsgType, MsgDirection, ByteArray);
+pub type CATOCM = (TableIndex, TreeID, Mask, MsgDirection, bool, ByteArray);
 // PacketEngine to PacketEngine to unblock
 pub type PeToPePacket = String;
 pub type PeToPe = mpsc::Sender<PeToPePacket>;
@@ -21,9 +24,14 @@ pub type PeFromCa = mpsc::Receiver<CaToPePacket>;
 pub type CaPeError = mpsc::SendError<CaToPePacket>;
 // CellAgent to Cmodel
 pub enum CaToCmPacket { Entry(RoutingTableEntry), Packet((TableIndex, Mask, Packet)), Tcp((PortNumber, TCP)),  Unblock }
-pub type CaToCm = mpsc::Sender<CaToCmPacket>;
-pub type CmFromCa = mpsc::Receiver<CaToCmPacket>;
-pub type CaCmError = mpsc::SendError<CaToCmPacket>;
+pub type CaToCmX = mpsc::Sender<CaToCmPacket>;
+pub type CmFromCaX = mpsc::Receiver<CaToCmPacket>;
+pub type CaCmErrorX = mpsc::SendError<CaToCmPacket>;
+// CellAgent to Cmodel (index, tree_uuid, user_mask, direction, is_blocking, bytes)
+pub enum CaToCmBytes { Entry(RoutingTableEntry), Bytes(CATOCM), Tcp((PortNumber, TCP)),  Unblock }
+pub type CaToCm = mpsc::Sender<CaToCmBytes>;
+pub type CmFromCa = mpsc::Receiver<CaToCmBytes>;
+pub type CaCmError = mpsc::SendError<CaToCmBytes>;
 // Cmodel to PacketEngine
 pub enum CmToPePacket { Entry(RoutingTableEntry), Packet((TableIndex, Mask, Packet)), Tcp((PortNumber, TCP)),  Unblock }
 pub type CmToPe = mpsc::Sender<CmToPePacket>;
@@ -61,9 +69,14 @@ pub type CmFromPe = mpsc::Receiver<PeToCmPacket>;
 pub type PeCmError = mpsc::SendError<PeToCmPacket>;
 // Cmodel to CellAgent
 pub enum CmToCaPacket { Status((PortNo, bool, PortStatus)), Packet((PortNo, TableIndex, Packet)), Tcp((PortNo, TCP)) }
-pub type CmToCa = mpsc::Sender<CmToCaPacket>;
-pub type CaFromCm = mpsc::Receiver<CmToCaPacket>;
-pub type CmCaError = mpsc::SendError<CmToCaPacket>;
+pub type CmToCaX = mpsc::Sender<CmToCaPacket>;
+pub type CaFromCmX = mpsc::Receiver<CmToCaPacket>;
+pub type CmCaErrorX = mpsc::SendError<CmToCaPacket>;
+// Cmodel to CellAgent
+pub enum CmToCaBytes { Status((PortNo, bool, PortStatus)), Bytes((PortNo, TableIndex, ByteArray)), Tcp((PortNo, TCP)) }
+pub type CmToCa = mpsc::Sender<CmToCaBytes>;
+pub type CaFromCm = mpsc::Receiver<CmToCaBytes>;
+pub type CmCaError = mpsc::SendError<CmToCaBytes>;
 // Port to Noc World
 pub type PortToNocMsg = TCP;
 pub type PortToNoc = mpsc::Sender<PortToNocMsg>;

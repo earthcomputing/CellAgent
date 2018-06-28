@@ -10,7 +10,7 @@ use serde_json;
 //use uuid::Uuid;
 
 use config::{PACKET_MIN, PACKET_MAX, PAYLOAD_DEFAULT_ELEMENT, 
-	MsgID, PacketNo};
+	ByteArray, MsgID, PacketNo};
 use message::{Message, MsgDirection, MsgType, TypePlusMsg};
 use name::{Name, TreeID};
 use utility::S;
@@ -163,7 +163,7 @@ impl Serializer {
 }
 pub struct Packetizer {}
 impl Packetizer {
-	pub fn packetize(tree_id: &TreeID, msg_bytes: &Box<Vec<u8>>, direction: MsgDirection, is_blocking: bool)
+	pub fn packetize(tree_id: &TreeID, msg_bytes: &ByteArray, direction: MsgDirection, is_blocking: bool)
 			-> Vec<Packet> {
 		let payload_size = Packetizer::packet_payload_size(msg_bytes.len());
 		let num_packets = (msg_bytes.len() + payload_size - 1)/ payload_size; // Poor man's ceiling
@@ -191,7 +191,7 @@ impl Packetizer {
 		}
 		packets
 	}
-	pub fn unpacketize(packets: &Vec<Packet>) -> Result<String, Error> {
+	pub fn unpacketize(packets: &Vec<Packet>) -> Result<ByteArray, Error> {
 		let mut all_bytes = Vec::new();
 		for packet in packets {
 			let header = packet.get_header();
@@ -204,7 +204,8 @@ impl Packetizer {
 			};
 			all_bytes.extend_from_slice(&bytes);
 		}
-		Ok(str::from_utf8(&all_bytes).context(PacketError::Chain { func_name: "unpacketize", comment: S("")})?.to_string())
+		Ok(ByteArray(all_bytes))
+		//Ok(str::from_utf8(&all_bytes).context(PacketError::Chain { func_name: "unpacketize", comment: S("")})?.to_string())
 	}
 	fn packet_payload_size(len: usize) -> usize {
 		match len-1 { 
