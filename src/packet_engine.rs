@@ -8,8 +8,8 @@ use std::collections::HashSet;
 use config::{DEBUG_OPTIONS, PortNo, TableIndex};
 use dal;
 use message::MsgType;
-use message_types::{PeFromCa, PeToCa, PeFromCm, PeToCm,
-                    PeToPort, PeFromPort, CaToPePacket, PortToPePacket, PeToPortPacket, PeToCaPacket,
+use message_types::{PeFromCm, PeToCm,
+                    PeToPort, PeFromPort, PortToPePacket, PeToPortPacket,
                     PeToPe, PeFromPe, CmToPePacket, PeToCmPacket};
 use name::{Name, CellID};
 use packet::{Packet};
@@ -26,45 +26,26 @@ pub struct PacketEngine {
 	cell_id: CellID,
 	boundary_port_nos: HashSet<PortNo>,
 	routing_table: Arc<Mutex<RoutingTable>>,
-	pe_to_ca: PeToCa,
     pe_to_cm: PeToCm,
 	pe_to_ports: Vec<PeToPort>,
 }
 
 impl PacketEngine {
-	pub fn new(cell_id: &CellID, pe_to_ca: PeToCa, pe_to_cm: PeToCm, pe_to_ports: Vec<PeToPort>,
+	pub fn new(cell_id: &CellID, pe_to_cm: PeToCm, pe_to_ports: Vec<PeToPort>,
 			boundary_port_nos: HashSet<PortNo>) -> Result<PacketEngine, Error> {
 		let routing_table = Arc::new(Mutex::new(RoutingTable::new(cell_id.clone()).context(PacketEngineError::Chain { func_name: "new", comment: S(cell_id.get_name())})?));
 		Ok(PacketEngine { cell_id: cell_id.clone(), routing_table, boundary_port_nos,
-            pe_to_ca, pe_to_cm, pe_to_ports })
+            pe_to_cm, pe_to_ports })
 	}
-	pub fn initialize(&self, pe_from_ca: PeFromCa, pe_from_cm: PeFromCm,
+	pub fn initialize(&self, pe_from_cm: PeFromCm,
                       pe_from_ports: PeFromPort, mut trace_header: TraceHeader) -> Result<(), Error> {
         let (pe_to_pe, pe_from_pe): (PeToPe, PeFromPe) = channel();
-        //self.listen_ca(pe_from_ca, pe_to_pe, trace_header.fork_trace())?;
+        //self.listen_cm(pe_from_cm, pe_to_pe, trace_header.fork_trace())?;
         self.listen_cm(pe_from_cm, pe_to_pe, trace_header.fork_trace())?;
         self.listen_port(pe_from_ports, pe_from_pe, trace_header.fork_trace())?;
         Ok(())
 	}
     pub fn get_id(&self) -> CellID { self.cell_id.clone() }
-	fn listen_ca(&self, pe_from_ca: PeFromCa, pe_to_pe: PeToPe, mut outer_trace_header: TraceHeader)
-            -> Result<(), Error> {
-        let f = "listen_ca";
-        {
-            let ref trace_params = TraceHeaderParams { module: MODULE, function: f, format: "pe_listen_ca" };
-            let trace = json!({ "cell_id": &self.cell_id });
-            let _ = dal::add_to_trace(&mut outer_trace_header, TraceType::Debug, trace_params, &trace, f);
-        }
-        let mut pe = self.clone();
-        let mut outer_trace_header_clone = outer_trace_header.clone();
-        ::std::thread::spawn( move || -> Result<(), Error> {
-            let ref mut inner_trace_header = outer_trace_header_clone.fork_trace();
-            let _ = pe.listen_ca_loop(&pe_from_ca, &pe_to_pe, inner_trace_header).map_err(|e| write_err("packet_engine", e));
-            let _ = pe.listen_ca(pe_from_ca, pe_to_pe, outer_trace_header);
-            Ok(())
-        });
-        Ok(())
-    }
     fn listen_cm(&self, pe_from_cm: PeFromCm, pe_to_pe: PeToPe, mut outer_trace_header: TraceHeader) -> Result<(), Error> {
         let f = "listen_cm";
         let mut pe = self.clone();
@@ -105,7 +86,7 @@ impl PacketEngine {
                 },
                 CmToPePacket::Packet((index, user_mask, packet)) => {
                     let locked = self.routing_table.lock().unwrap();	// Hold lock until forwarding is done
-                    let entry = locked.get_entry(index).context(PacketEngineError::Chain { func_name: "listen_ca", comment: S(self.cell_id.get_name())})?;
+                    let entry = locked.get_entry(index).context(PacketEngineError::Chain { func_name: f, comment: S(self.cell_id.get_name())})?;
                     let port_no = PortNo{v:0};
                     if DEBUG_OPTIONS.trace_all || DEBUG_OPTIONS.pe_pkt_recv {  // Debug print
                         let msg_type = MsgType::msg_type(&packet);
@@ -124,12 +105,12 @@ impl PacketEngine {
                         }
                         let _ = dal::add_to_trace(trace_header, TraceType::Debug, trace_params, &trace, f);
                     }
-                    self.forward(port_no, entry, user_mask, packet, trace_header).context(PacketEngineError::Chain { func_name:"listen_ca", comment: S(self.cell_id.get_name())})?;
+                    self.forward(port_no, entry, user_mask, packet, trace_header).context(PacketEngineError::Chain { func_name: f, comment: S(self.cell_id.get_name())})?;
                 },
                 CmToPePacket::Tcp((port_number, msg)) => {
                     let port_no = port_number.get_port_no();
                     match self.pe_to_ports.get(*port_no as usize) {
-                        Some(sender) => sender.send(PeToPortPacket::Tcp(msg)).context(PacketEngineError::Chain { func_name: "listen_ca", comment: S("send TCP to port ") + self.cell_id.get_name() })?,
+                        Some(sender) => sender.send(PeToPortPacket::Tcp(msg)).context(PacketEngineError::Chain { func_name: f, comment: S("send TCP to port ") + self.cell_id.get_name() })?,
                         _ => return Err(PacketEngineError::Sender { func_name: f, cell_id: self.cell_id.clone(), port_no: *port_no }.into())
                     }
                 },
@@ -140,51 +121,6 @@ impl PacketEngine {
             };
         }
     }
-	fn listen_ca_loop(&mut self, pe_from_ca: &PeFromCa, pe_to_pe: &PeToPe, trace_header: &mut TraceHeader)
-            -> Result<(), Error> {
-        let f = "listen_ca_loop";
-		loop {
-			match pe_from_ca.recv().context(PacketEngineError::Chain { func_name: f, comment: S("recv entry from ca") + self.cell_id.get_name()})? {
-				CaToPePacket::Entry(entry) => {
-					self.routing_table.lock().unwrap().set_entry(entry)
-				},
-				CaToPePacket::Packet((index, user_mask, packet)) => {
-					let locked = self.routing_table.lock().unwrap();	// Hold lock until forwarding is done
-					let entry = locked.get_entry(index).context(PacketEngineError::Chain { func_name: "listen_ca", comment: S(self.cell_id.get_name())})?;
-					let port_no = PortNo{v:0};
-                    if DEBUG_OPTIONS.trace_all || DEBUG_OPTIONS.pe_pkt_recv {  // Debug print
-                        let msg_type = MsgType::msg_type(&packet);
-                        let tree_id = packet.get_tree_id();
-                        let ref trace_params = TraceHeaderParams { module: MODULE, function: f, format: "pe_packet_from_ca" };
-                        let trace = json!({ "cell_id": &self.cell_id, "tree_id": &tree_id, "msg_type": &msg_type });
-                        if DEBUG_OPTIONS.pe_pkt_recv {
-                            match msg_type {
-                                MsgType::DiscoverD => {
-                                    if tree_id.is_name("C:2") {
-                                        println!("PacketEngine {}: got from ca {} {}", self.cell_id, msg_type, tree_id);
-                                    }
-                                },
-                                _ => (),
-                            }
-                        }
-                        let _ = dal::add_to_trace(trace_header, TraceType::Debug, trace_params, &trace, f);
-                    }
- 					self.forward(port_no, entry, user_mask, packet, trace_header).context(PacketEngineError::Chain { func_name:"listen_ca", comment: S(self.cell_id.get_name())})?;
-				},
-				CaToPePacket::Tcp((port_number, msg)) => {
-                    let port_no = port_number.get_port_no();
-                    match self.pe_to_ports.get(*port_no as usize) {
-                        Some(sender) => sender.send(PeToPortPacket::Tcp(msg)).context(PacketEngineError::Chain { func_name: "listen_ca", comment: S("send TCP to port ") + self.cell_id.get_name() })?,
-                        _ => return Err(PacketEngineError::Sender { func_name: f, cell_id: self.cell_id.clone(), port_no: *port_no }.into())
-                    }
-                },
-                CaToPePacket::Unblock => {
-                    //println!("PacketEngine {}: {} send unblock", self.cell_id, f);
-                    pe_to_pe.send(S("Unblock"))?;
-                }
-			}; 
-		}
-	}
 	fn listen_port_loop(&mut self, pe_from_ports: &PeFromPort, pe_from_pe: &PeFromPe,
                         trace_header: &mut TraceHeader) -> Result<(), Error> {
         let f = "listen_port_loop";
@@ -208,7 +144,7 @@ impl PacketEngine {
         //println!("PacketEngine {}: received on port {} my index {} {}", self.cell_id, port_no.v, *my_index, packet);
         // TODO: Make sure I don't have a race condition because I'm dropping the lock on the routing table
         // Potential hazard here; CA may have sent a routing table update.  I can't just hold the lock on the table
-        // when I block waiting for a tree update because of a deadlock with listen_ca_loop.
+        // when I block waiting for a tree update because of a deadlock with listen_cm_loop.
         let entry = {
             let locked = self.routing_table.lock().unwrap();
             locked.get_entry(my_index).context(PacketEngineError::Chain { func_name: "process_packet", comment: S("not border port ") + self.cell_id.get_name() })?

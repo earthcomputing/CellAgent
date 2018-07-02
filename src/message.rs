@@ -30,6 +30,7 @@ pub enum MsgType {
 	TreeName,
 }
 impl MsgType {
+    // Used for debug hack in packet_engine
     pub fn get_msg(packets: &Vec<Packet>) -> Result<Box<Message>, Error> {
         let bytes = Packetizer::unpacketize(packets).context(MessageError::Chain { func_name: "get_msg", comment: S("unpacketize")})?;
         //println!("Message get_msg: serialized {}, packets {:?}", serialized, packets);
@@ -409,8 +410,8 @@ pub struct StackTreeMsgPayload {
 }
 impl StackTreeMsgPayload {
     fn new(new_tree_id: &TreeID, parent_tree_id: &TreeID, index: TableIndex, gvm_eqn: &GvmEquation) -> StackTreeMsgPayload {
-        StackTreeMsgPayload { new_tree_id: new_tree_id.to_owned(), parent_tree_id: parent_tree_id.to_owned(),
-            index, gvm_eqn: gvm_eqn.to_owned() }
+        StackTreeMsgPayload { new_tree_id: new_tree_id.clone(), parent_tree_id: parent_tree_id.clone(),
+            index, gvm_eqn: gvm_eqn.clone() }
     }
     pub fn get_new_tree_id(&self) -> &TreeID { &self.new_tree_id }
     pub fn get_parent_tree_id(&self) -> &TreeID { &self.parent_tree_id }
@@ -473,7 +474,7 @@ pub struct StackTreeMsgDPayload {
 }
 impl StackTreeMsgDPayload {
     fn new(tree_id: &TreeID, index: TableIndex, fwd_index: TableIndex) -> StackTreeMsgDPayload {
-        StackTreeMsgDPayload { tree_id: tree_id.to_owned(), index, fwd_index }
+        StackTreeMsgDPayload { tree_id: tree_id.clone(), index, fwd_index }
     }
     pub fn get_tree_id(&self) -> &TreeID { &self.tree_id }
     pub fn get_table_index(&self) -> TableIndex { self.index }
@@ -494,7 +495,7 @@ impl ManifestMsg {
 	pub fn new(sender_id: &SenderID, deploy_tree_id: &TreeID, tree_map: &MsgTreeMap, manifest: &Manifest) -> ManifestMsg {
 		// Note that direction is leafward so cell agent will get the message
 		let mut header = MsgHeader::new(sender_id, MsgType::Manifest, MsgDirection::Leafward);
-        header.set_tree_map(tree_map.to_owned());
+        header.set_tree_map(tree_map.clone());
 		let payload = ManifestMsgPayload::new(deploy_tree_id, &manifest);
 		ManifestMsg { header, payload }
 	}
@@ -532,8 +533,8 @@ pub struct ManifestMsgPayload {
 impl ManifestMsgPayload {
 	fn new(deploy_tree_id: &TreeID, manifest: &Manifest) -> ManifestMsgPayload {
         let tree_name = manifest.get_deployment_tree();
-		ManifestMsgPayload { deploy_tree_id: deploy_tree_id.to_owned(), tree_name: tree_name.to_owned(),
-            manifest: manifest.to_owned() }
+		ManifestMsgPayload { deploy_tree_id: deploy_tree_id.clone(), tree_name: tree_name.clone(),
+            manifest: manifest.clone() }
 	}
 	pub fn get_manifest(&self) -> &Manifest { &self.manifest }
 //	pub fn get_tree_name(&self) -> String { S(self.tree_name.get_name()) }
