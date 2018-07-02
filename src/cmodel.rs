@@ -1,15 +1,16 @@
 use std::fmt;
 use std::thread::JoinHandle;
 
-use config::{ByteArray, DEBUG_OPTIONS, PortNo, TableIndex};
+use failure::{Error, ResultExt};
+
+use config::{DEBUG_OPTIONS, PortNo, TableIndex};
 use dal;
-use message::{MsgDirection, MsgType};
+use message::MsgType;
 use message_types::{CaToCmBytes, CmToCa, CmFromCa, CmToPe, CmFromPe, PeToCmPacket,
-                    CmToCaPacket, CmToPePacket, CmToCaBytes};
-use name::{Name, CellID, TreeID};
+                    CmToPePacket, CmToCaBytes};
+use name::{Name, CellID};
 use packet::{Packet, PacketAssembler, PacketAssemblers, Packetizer};
-use utility::{Mask, TraceHeader, TraceHeaderParams, TraceType, write_err};
-use uuid_fake::Uuid;
+use utility::{S, TraceHeader, TraceHeaderParams, TraceType, write_err};
 
 const MODULE: &'static str = "cmodel.rs";
 #[derive(Debug, Clone)]
@@ -86,7 +87,7 @@ impl Cmodel {
     fn listen_pe_loop(&mut self, cm_from_pe: &CmFromPe, cm_to_ca: &CmToCa, trace_header: &mut TraceHeader) -> Result<(), Error> {
         loop {
             match cm_from_pe.recv()? {
-                PeToCmPacket::Status((port_no,bool, PortStatus)) => cm_to_ca.send(CmToCaBytes::Status((port_no,bool, PortStatus)))?,
+                PeToCmPacket::Status((port_no,bool, port_status)) => cm_to_ca.send(CmToCaBytes::Status((port_no,bool, port_status)))?,
                 PeToCmPacket::Packet((port_no, index, packet)) => self.process_packet(cm_to_ca, port_no, index, packet, trace_header)?,
                 PeToCmPacket::Tcp((port_no, tcp_msg)) => cm_to_ca.send(CmToCaBytes::Tcp((port_no, tcp_msg)))?
             };
@@ -99,7 +100,7 @@ impl Cmodel {
         let mut packet_assembler = self.packet_assemblers.remove(&msg_id).unwrap_or(PacketAssembler::new(msg_id));
         let (last_packet, packets) = packet_assembler.add(packet);
         if last_packet {
-            let bytes = Packetizer::unpacketize(packets)?;
+            let bytes = Packetizer::unpacketize(packets).context(CmodelError::Chain { func_name: f, comment: S("") })?;
             if DEBUG_OPTIONS.trace_all || DEBUG_OPTIONS.cm_from_ca {   //Debug print
                 let msg = MsgType::msg_from_bytes(&bytes)?;
                 let ref trace_params = TraceHeaderParams { module: MODULE, function: f, format: "cm_bytes_to_ca" };
@@ -131,7 +132,6 @@ impl fmt::Display for Cmodel {
     }
 }
 // Errors
-use failure::{Error};
 #[derive(Debug, Fail)]
 pub enum CmodelError {
     #[fail(display = "NameError::Chain {} {}", func_name, comment)]
