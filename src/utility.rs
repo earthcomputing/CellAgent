@@ -4,6 +4,8 @@ use std::thread::ThreadId;
 use serde_json;
 use serde_json::{Value};
 
+use time;
+
 use config::{MAX_PORTS, REPO, MaskValue, PortNo};
 /*
 pub fn get_first_arg(a: Vec<String>) -> Option<i32> {
@@ -129,7 +131,7 @@ PORT - "port_no":{"v":[0-9]*},"is_border":[a-z]*
 use chrono::prelude::*;
 #[derive(Debug, Clone, Serialize)]
 pub struct TraceHeader {
-    epoch: i64,
+    epoch: u64,
     thread_id: u64,
     event_id: Vec<u64>,
     trace_type: TraceType,
@@ -141,7 +143,8 @@ pub struct TraceHeader {
 impl TraceHeader {
     pub fn new() -> TraceHeader {
         let thread_id = TraceHeader::parse(thread::current().id());
-        TraceHeader { epoch: Local::now().timestamp(),
+        let epoch = timestamp();
+        TraceHeader { epoch,
             thread_id, event_id: vec![0], trace_type: TraceType::Trace,
             module: "", function: "", format: "", repo: REPO }
     }
@@ -156,7 +159,7 @@ impl TraceHeader {
         let mut event_id = self.event_id.clone();
         event_id.push(0);
         let thread_id = TraceHeader::parse(thread::current().id());
-        TraceHeader { epoch: Local::now().timestamp(),
+        TraceHeader { epoch: timestamp(),
             thread_id, event_id, trace_type: self.trace_type,
             module: self.module, function: self.function, format: self.format, repo: REPO }
     }
@@ -164,7 +167,7 @@ impl TraceHeader {
         self.module   = params.get_module();
         self.function = params.get_function();
         self.format   = params.get_format();
-        self.epoch    = Local::now().timestamp();
+        self.epoch    = timestamp();
     }
     pub fn get_event_id(&self) -> Vec<u64> { self.event_id.clone() }
     fn parse(thread_id: ThreadId) -> u64 {
@@ -173,6 +176,11 @@ impl TraceHeader {
         let n_as_str: Vec<&str> = r[1].split(')').collect();
         n_as_str[0].parse().expect(&format!("Problem parsing ThreadId {:?}", thread_id))
     }
+}
+fn timestamp() -> u64 {
+    let timespec = time::get_time();
+    let t = timespec.sec as f64 + (timespec.nsec as f64/1000./1000./1000.);
+    (t*1000.0*1000.0) as u64
 }
 pub struct TraceHeaderParams {
     pub module:   &'static str,
