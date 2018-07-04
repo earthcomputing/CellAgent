@@ -661,15 +661,22 @@ impl CellAgent {
                     port::PortStatus::Connected => self.port_connected(port_no, is_border, trace_header).context(CellagentError::Chain { func_name: f, comment: S(self.cell_id.clone()) +" port_connected"})?,
                     port::PortStatus::Disconnected => self.port_disconnected(port_no).context(CellagentError::Chain { func_name: f, comment: S(self.cell_id.clone()) + " port_disconnected"})?
                 },
-                CmToCaBytes::Bytes((port_no, index, bytes)) => {
+                CmToCaBytes::Bytes((port_no, index, uuid, bytes)) => {
                     // The index may be pointing to the control tree because the other cell didn't get the StackTree or StackTreeD message in time
                     let mut msg = MsgType::msg_from_bytes(&bytes).context(CellagentError::Chain { func_name: f, comment: S(self.cell_id.clone())})?;
                         // Here's where I lock in the need for the tree_uuid in the packet header.  Can I avoid it?
-                    let msg_tree_id = {
-                        let locked = self.trees.lock().unwrap();
-                        match locked.get(&index).cloned() {
+                    //let msg_tree_id = {
+                    //    let locked = self.trees.lock().unwrap();
+                    //    match locked.get(&index).cloned() {
+                    //        Some(id) => id,
+                    //        None => return Err(CellagentError::TreeIndex { func_name: f, cell_id: self.cell_id.clone(), index }.into())
+                    //    }
+                    //};
+                    let msg_tree_id = {  // Use control tree if uuid not found
+                        let locked = self.tree_id_map.lock().unwrap();
+                        match  locked.get(&uuid).cloned() {
                             Some(id) => id,
-                            None => return Err(CellagentError::TreeIndex { func_name: f, cell_id: self.cell_id.clone(), index }.into())
+                            None => self.control_tree_id.clone()
                         }
                     };
                     if DEBUG_OPTIONS.trace_all || DEBUG_OPTIONS.ca_msg_recv {   //Debug print
@@ -679,7 +686,7 @@ impl CellAgent {
                             match msg.get_msg_type() {
                                 MsgType::Discover => (),
                                 MsgType::DiscoverD => {
-                                    if msg.get_tree_id().unwrap().is_name("C:2") {
+                                    if msg.get_tree_id().unwrap().is_name("Tree:C:2") {
                                         println!("Cellagent {}: {} Port {} received {}", self.cell_id, f, *port_no, msg);
                                     }
                                 },
@@ -804,11 +811,11 @@ impl CellAgent {
         let mask = Mask::new(PortNumber::new(port_no, self.no_ports)?);
         let tree_id = payload.get_tree_id();
         self.forward_stacked_trees(tree_id, mask, trace_header)?;
-        if DEBUG_OPTIONS.trace_all || DEBUG_OPTIONS.process_msg && tree_id.is_name("C:2") {   // Debug
+        if DEBUG_OPTIONS.trace_all || DEBUG_OPTIONS.process_msg && tree_id.is_name("Tree:C:2") {   // Debug
             let ref trace_params = TraceHeaderParams { module: MODULE, function: f, format: "ca_process_discover_d_msg" };
             let trace = json!({ "cell_id": &self.cell_id, "tree_id": tree_id, "port_no": port_no, "msg": msg.value() });
             let _ = dal::add_to_trace(trace_header, TraceType::Debug, trace_params, &trace, f);
-            if DEBUG_OPTIONS.process_msg && tree_id.is_name("C:2") {
+            if DEBUG_OPTIONS.process_msg && tree_id.is_name("Tree:C:2") {
                 println!("Cellagent {}: {} tree_id {}, add child on port {} {}", self.cell_id, f, tree_id, port_number, msg);
                 println!("Cellagent {}: {} send unblock", self.cell_id, f);
             }
@@ -870,7 +877,7 @@ impl CellAgent {
                 let fwd_index = self.use_index()?;
                 let mut fwd_entry = entry.clone();
                 fwd_entry.set_table_index(fwd_index);
-                fwd_entry.set_mask(Mask::new(port_number));
+                //fwd_entry.set_mask(Mask::new(port_number));
                 self.ca_to_cm.send(CaToCmBytes::Entry(fwd_entry))?;
                 let mask = Mask::new(port_number);
                 let new_msg = StackTreeDMsg::new(sender_id, new_tree_id, entry.get_index(), fwd_index);
@@ -1155,7 +1162,7 @@ impl CellAgent {
         let trees = traph.get_stacked_trees();
         let locked = trees.lock().unwrap();
         //println!("Cellagent {}: {} locked {:?}", self.cell_id, f, locked.keys());
-        //if tree_id.is_name("C:2") { println!("Cellagent {}: {} forwarding {} on tree {}", self.cell_id, f, locked.len(), tree_id); }
+        //if tree_id.is_name("Tree:C:2") { println!("Cellagent {}: {} forwarding {} on tree {}", self.cell_id, f, locked.len(), tree_id); }
         for tree in locked.values() {
             self.forward_stack_tree(tree.get_tree_id(), mask, trace_header)?; // Forward stack tree messages on tree
             let stacked_tree_ids = tree.get_stacked_tree_ids();
@@ -1245,7 +1252,7 @@ impl CellAgent {
                     MsgType::Discover => (),
                     MsgType::DiscoverD => {
                         match msg.get_tree_id() {
-                            Some(tree_id) => if tree_id.is_name("C:2") {
+                            Some(tree_id) => if tree_id.is_name("Tree:C:2") {
                                 println!("Cellagent {}: {} send on ports {:?} msg {}", self.cell_id, f, ports, msg);
                             },
                             None => ()
@@ -1329,5 +1336,7 @@ pub enum CellagentError {
     #[fail(display = "CellAgentError::Tree {}: TreeID {} does not exist on cell {}", func_name, tree_uuid, cell_id)]
     Tree { func_name: &'static str, cell_id: CellID, tree_uuid: Uuid },
     #[fail(display = "CellAgentError::TreeIndex {}: No tree associated with index {:?} on cell {}", func_name, index, cell_id)]
-    TreeIndex { func_name: &'static str, index: TableIndex, cell_id: CellID }
+    TreeIndex { func_name: &'static str, index: TableIndex, cell_id: CellID },
+    #[fail(display = "CellAgentError::TreeUuid {}: No tree associated with uuid {:?} on cell {}", func_name, uuid, cell_id)]
+    TreeUuid { func_name: &'static str, uuid: Uuid, cell_id: CellID },
 }

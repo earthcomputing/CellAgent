@@ -85,8 +85,9 @@ impl PacketEngine {
                     self.routing_table.lock().unwrap().set_entry(entry)
                 },
                 CmToPePacket::Packet((index, user_mask, packet)) => {
+                    let uuid = packet.get_tree_uuid();
                     let locked = self.routing_table.lock().unwrap();	// Hold lock until forwarding is done
-                    let entry = locked.get_entry(index).context(PacketEngineError::Chain { func_name: f, comment: S(self.cell_id.get_name())})?;
+                    let entry = locked.get_entry(index, uuid).context(PacketEngineError::Chain { func_name: f, comment: S(self.cell_id.get_name())})?;
                     let port_no = PortNo{v:0};
                     if DEBUG_OPTIONS.trace_all || DEBUG_OPTIONS.pe_pkt_recv {  // Debug print
                         let msg_type = MsgType::msg_type(&packet);
@@ -96,8 +97,8 @@ impl PacketEngine {
                         if DEBUG_OPTIONS.pe_pkt_recv {
                             match msg_type {
                                 MsgType::DiscoverD => {
-                                    if tree_id.is_name("C:2") {
-                                        println!("PacketEngine {}: got from ca {} {}", self.cell_id, msg_type, tree_id);
+                                    if tree_id.is_name("Tree:C:2") {
+                                        println!("PacketEngine {}: got from cm {} {}", self.cell_id, msg_type, tree_id);
                                     }
                                 },
                                 _ => (),
@@ -145,19 +146,29 @@ impl PacketEngine {
         // TODO: Make sure I don't have a race condition because I'm dropping the lock on the routing table
         // Potential hazard here; CA may have sent a routing table update.  I can't just hold the lock on the table
         // when I block waiting for a tree update because of a deadlock with listen_cm_loop.
+        let uuid = packet.get_tree_uuid();
         let entry = {
             let locked = self.routing_table.lock().unwrap();
-            locked.get_entry(my_index).context(PacketEngineError::Chain { func_name: "process_packet", comment: S("not border port ") + self.cell_id.get_name() })?
+            match locked.get_entry(my_index, uuid) {
+                Ok(e) => e,
+                Err(_) => { // Send to Cell agent if tree not recognized
+                    self.pe_to_cm.send(PeToCmPacket::Packet((port_no, TableIndex(0), packet))).context(PacketEngineError::Chain { func_name: "forward", comment: S("rootcast packet to ca ") + self.cell_id.get_name()})?;
+                    return Ok(())
+                }
+            }
         };
-        if DEBUG_OPTIONS.trace_all || DEBUG_OPTIONS.process_pkt {   // Debug print
+        if DEBUG_OPTIONS.trace_all || DEBUG_OPTIONS.pe_process_pkt {   // Debug print
             let msg_type = MsgType::msg_type(&packet);
+            if msg_type == MsgType::Manifest {
+                println!("PacketEngine {}: processing ManifestMsg", self.cell_id);
+            }
             let tree_id = packet.get_tree_id();
             let ref trace_params = TraceHeaderParams { module: MODULE, function: f, format: "pe_process_packet" };
             let trace = json!({ "cell_id": &self.cell_id, "tree_id": &tree_id, "msg_type": &msg_type, "port_no": &port_no, "entry": &entry });
-            if DEBUG_OPTIONS.process_pkt {
+            if DEBUG_OPTIONS.pe_process_pkt {
                 match msg_type {
                     MsgType::Discover => (),
-                    MsgType::DiscoverD => if tree_id.is_name("C:2") {
+                    MsgType::DiscoverD => if tree_id.is_name("Tree:C:2") {
                         println!("PacketEngine {}: got from {} {} {}", self.cell_id, port_no.v, msg_type, tree_id);
                     }
                     _ => {
@@ -198,6 +209,9 @@ impl PacketEngine {
 				if parent.v == 0 {
                     if DEBUG_OPTIONS.trace_all || DEBUG_OPTIONS.pe_pkt_send {   // Debug print
                         let msg_type = MsgType::msg_type(&packet);
+                        if msg_type == MsgType::Manifest {
+                            println!("PacketEngine {} forwrding manifest rootward", self.cell_id);
+                        }
                         let tree_id = packet.get_tree_id();
                         let ref trace_params = TraceHeaderParams { module: MODULE, function: f, format: "pe_forward_to_cm" };
                         let trace = json!({ "cell_id": &self.cell_id, "tree_id": &tree_id, "msg_type": &msg_type, "parent_port": &parent });
@@ -218,6 +232,9 @@ impl PacketEngine {
 						sender.send(PeToPortPacket::Packet((*other_index, packet))).context(PacketEngineError::Chain { func_name: f, comment: S(self.cell_id.clone())})?;
                         if DEBUG_OPTIONS.trace_all || DEBUG_OPTIONS.pe_pkt_send {   // Debug print
                             let msg_type = MsgType::msg_type(&packet);
+                            if msg_type == MsgType::Manifest {
+                                println!("PacketEngine {} forwarding manifest leafward", self.cell_id);
+                            }
                             let tree_id = packet.get_tree_id();
                             let ref trace_params = TraceHeaderParams { module: MODULE, function: f, format: "pe_forward_rootward" };
                             let trace = json!({ "cell_id": &self.cell_id, "tree_id": &tree_id, "msg_type": &msg_type, "parent_port": &parent });
@@ -250,9 +267,12 @@ impl PacketEngine {
                 let ref trace_params = TraceHeaderParams { module: MODULE, function: f, format: "pe_forward_leafward" };
                 let trace = json!({ "cell_id": &self.cell_id, "tree_id": &tree_id, "msg_type": &msg_type, "port_nos": &port_nos });
                 if DEBUG_OPTIONS.pe_pkt_send {
+                    if msg_type == MsgType::Manifest {
+                        println!("PacketEngine {} forwarding manifest leafward mask {} entry {}", self.cell_id, mask, entry);
+                    }
                     match msg_type {
                         MsgType::Discover => (),
-                        MsgType::DiscoverD => if tree_id.is_name("C:2") {
+                        MsgType::DiscoverD => if tree_id.is_name("Tree:C:2") {
                             println!("PacketEngine {}: {} on {:?} {} {}", self.cell_id, f, port_nos, msg_type, tree_id);
                         }
                         _ => {
@@ -262,6 +282,7 @@ impl PacketEngine {
                 }
                 let _ = dal::add_to_trace(trace_header, TraceType::Debug, trace_params, &trace, f);
             }
+            let msg_type = MsgType::Manifest;
 			for port_no in port_nos.iter() {
 				if let Some(other_index) = other_indices.get(port_no.v as usize).cloned() {
 					if port_no.v as usize == 0 {

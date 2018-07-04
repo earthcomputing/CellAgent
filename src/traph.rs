@@ -144,7 +144,6 @@ impl Traph {
 			_ => ()
 		};
 		table_entry.add_other_index(port_number, other_index);
-		table_entry.add_children(children);
 		table_entry.set_inuse();
 		table_entry.set_tree_id(tree_id);
 		tree.set_table_entry(table_entry);

@@ -62,7 +62,7 @@ impl Cmodel {
                             match msg.get_msg_type() {
                                 MsgType::Discover => (),
                                 MsgType::DiscoverD => {
-                                    if msg.get_tree_id().unwrap().is_name("C:2") {
+                                    if msg.get_tree_id().unwrap().is_name("Tree:C:2") {
                                         println!("Cmodel {}: {} received {}", self.cell_id, f, msg);
                                     }
                                 },
@@ -100,6 +100,7 @@ impl Cmodel {
         let mut packet_assembler = self.packet_assemblers.remove(&msg_id).unwrap_or(PacketAssembler::new(msg_id));
         let (last_packet, packets) = packet_assembler.add(packet);
         if last_packet {
+            let uuid = packet.get_tree_uuid();
             let bytes = Packetizer::unpacketize(packets).context(CmodelError::Chain { func_name: f, comment: S("") })?;
             if DEBUG_OPTIONS.trace_all || DEBUG_OPTIONS.cm_from_ca {   //Debug print
                 let msg = MsgType::msg_from_bytes(&bytes)?;
@@ -109,7 +110,7 @@ impl Cmodel {
                     match msg.get_msg_type() {
                         MsgType::Discover => (),
                         MsgType::DiscoverD => {
-                            if msg.get_tree_id().unwrap().is_name("C:2") {
+                            if msg.get_tree_id().unwrap().is_name("Tree:C:2") {
                                 println!("Cmodel {}: {} received {}", self.cell_id, f, msg);
                             }
                         },
@@ -120,7 +121,7 @@ impl Cmodel {
                 }
                 let _ = dal::add_to_trace(trace_header, TraceType::Debug, trace_params, &trace, f);
             }
-            cm_to_ca.send(CmToCaBytes::Bytes((port_no, index, bytes)))?;
+            cm_to_ca.send(CmToCaBytes::Bytes((port_no, index, uuid, bytes)))?;
         }
         Ok(())
     }

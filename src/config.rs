@@ -2,38 +2,38 @@ use std::fmt;
 use std::ops::{Deref};
 
 pub struct DebugOptions {
-    pub trace_all:   bool,
-    pub ca_msg_recv: bool,
-    pub ca_msg_send: bool,
-    pub cm_from_ca:  bool,
-    pub cm_to_ca:    bool,
-    pub cm_from_pe:  bool,
-    pub cm_to_pe:    bool,
-    pub deploy:      bool,
-    pub pe_pkt_recv: bool,
-    pub pe_pkt_send: bool,
-    pub process_msg: bool,
-    pub process_pkt: bool,
-    pub saved_msgs:  bool,
-    pub stack_tree:  bool,
-    pub traph_state: bool,
+    pub trace_all:      bool,
+    pub ca_msg_recv:    bool,
+    pub ca_msg_send:    bool,
+    pub cm_from_ca:     bool,
+    pub cm_to_ca:       bool,
+    pub cm_from_pe:     bool,
+    pub cm_to_pe:       bool,
+    pub deploy:         bool,
+    pub pe_pkt_recv:    bool,
+    pub pe_pkt_send:    bool,
+    pub process_msg:    bool,
+    pub pe_process_pkt: bool,
+    pub saved_msgs:     bool,
+    pub stack_tree:     bool,
+    pub traph_state:    bool,
 }
 pub const DEBUG_OPTIONS: DebugOptions = DebugOptions {
     trace_all:   true,
-    ca_msg_recv: false,
-    ca_msg_send: false,
-    cm_from_ca:  false,
-    cm_to_ca:    false,
-    cm_from_pe:  false,
-    cm_to_pe:    false,
-    deploy:      false,
-    pe_pkt_recv: false,
-    pe_pkt_send: false,
-    process_msg: false,
-    process_pkt: false,
-    saved_msgs:  false,
-    stack_tree:  false,
-    traph_state: false,
+    ca_msg_recv:    false,
+    ca_msg_send:    false,
+    cm_from_ca:     false,
+    cm_to_ca:       false,
+    cm_from_pe:     false,
+    cm_to_pe:       false,
+    deploy:         false,
+    pe_pkt_recv:    false,
+    pe_pkt_send:    false,
+    process_msg:    false,
+    pe_process_pkt: false,
+    saved_msgs:     false,
+    stack_tree:     false,
+    traph_state:    false,
 };
 // Size of various fields
 #[derive(Debug, Clone, Hash, Eq, PartialEq, Serialize, Deserialize)]
@@ -95,6 +95,14 @@ pub const REPO: &'static str = "CellAgent";
 pub const NCELLS: CellNo = CellNo(10);
 pub const NPORTS: PortNo =  PortNo { v: 6 };
 pub const NLINKS: LinkNo = LinkNo(CellNo(40));
+// Connections
+pub fn get_edges() -> Vec<Edge> {
+    if NCELLS == CellNo(3) { vec![is2e(0,1), is2e(0,2), is2e(1,2)] }
+    else if NCELLS == CellNo(4) { vec![is2e(0,1), is2e(0,2), is2e(0,3), is2e(1,2), is2e(1,3), is2e(2,3)] }
+    else if NCELLS == CellNo(10) { vec![is2e(0,1),is2e(1,2),is2e(1,6),is2e(3,4),is2e(5,6),is2e(6,7),is2e(7,8),is2e(8,9),is2e(0,5),is2e(2,3),is2e(2,7),is2e(3,8),is2e(4,9)] }
+    else { panic!("Invalid number of cells"); }
+}
+fn is2e(i: usize, j: usize) -> Edge { Edge { v: (CellNo(i),CellNo(j)) } }
 // Size limits
 pub const MAX_ENTRIES: TableIndex    = TableIndex(64);  // Max number of active trees
 pub const MAX_PORTS: PortNo          = PortNo { v: 8 }; 	// Limit on number of ports per cell
