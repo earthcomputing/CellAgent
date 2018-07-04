@@ -8,6 +8,7 @@ use packet::{Packet};
 use port::{PortStatus};
 use uptree_spec::AllowedTree;
 use utility::{Mask, PortNumber};
+use uuid_fake::Uuid;
 
 pub type TCP = (AllowedTree, TcpMsgType, MsgDirection, ByteArray);
 pub type CATOCM = (TableIndex, TreeID, Mask, MsgDirection, bool, ByteArray);
@@ -57,7 +58,7 @@ pub type CmToCaX = mpsc::Sender<CmToCaPacket>;
 pub type CaFromCmX = mpsc::Receiver<CmToCaPacket>;
 pub type CmCaErrorX = mpsc::SendError<CmToCaPacket>;
 // Cmodel to CellAgent
-pub enum CmToCaBytes { Status((PortNo, bool, PortStatus)), Bytes((PortNo, TableIndex, ByteArray)), Tcp((PortNo, TCP)) }
+pub enum CmToCaBytes { Status((PortNo, bool, PortStatus)), Bytes((PortNo, TableIndex, Uuid, ByteArray)), Tcp((PortNo, TCP)) }
 pub type CmToCa = mpsc::Sender<CmToCaBytes>;
 pub type CaFromCm = mpsc::Receiver<CmToCaBytes>;
 pub type CmCaError = mpsc::SendError<CmToCaBytes>;

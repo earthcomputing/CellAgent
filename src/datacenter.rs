@@ -56,19 +56,19 @@ impl Datacenter {
 		self.cells.sort_by(|a, b| (*a.get_no()).cmp(&*b.get_no())); // Sort to conform to edge list
 		let mut link_handles = Vec::new();
 		for edge in edge_list {
-			if *(edge.v.0) == *(edge.v.1) { return Err(DatacenterError::Wire { edge: edge.clone(), func_name: f }.into()); }
-			if (*(edge.v.0) > ncells.0) | (*(edge.v.1) >= ncells.0) { return Err(DatacenterError::Wire { edge: edge.clone(), func_name: f }.into()); }
+			if *(edge.v.0) == *(edge.v.1) { return Err(DatacenterError::Wire { edge: edge.clone(), func_name: f, comment: "equal test" }.into()); }
+			if (*(edge.v.0) > ncells.0) | (*(edge.v.1) >= ncells.0) { return Err(DatacenterError::Wire { edge: edge.clone(), func_name: f, comment: "greater than test" }.into()); }
 			let split = self.cells.split_at_mut(max(*(edge.v.0),*(edge.v.1)));
 			let left_cell = match split.0.get_mut(*(edge.v.0)) {
 				Some(c) => c,
-				None => return Err(DatacenterError::Wire { edge: edge.clone(), func_name: f }.into())
+				None => return Err(DatacenterError::Wire { edge: edge.clone(), func_name: f, comment: "split left" }.into())
 
 			};
             let left_cell_id = left_cell.get_id().clone(); // For Trace
 			let (left_port,left_from_pe) = left_cell.get_free_ec_port_mut()?;
 			let rite_cell = match split.1.first_mut() {
 				Some(c) => c,
-				None => return Err(DatacenterError::Wire { edge: edge.clone(), func_name: f }.into())
+				None => return Err(DatacenterError::Wire { edge: edge.clone(), func_name: f, comment: "split rite" }.into())
 			};
             let rite_cell_id = rite_cell.get_id().clone(); // For Trace
 			let (rite_port, rite_from_pe) = rite_cell.get_free_ec_port_mut()?;
@@ -134,6 +134,6 @@ pub enum DatacenterError {
     Cells { ncells: CellNo, func_name: &'static str },
     #[fail(display = "DatacenterError::Edges {}: {:?} is not enough links to connect all cells", func_name, nlinks)]
     Edges { nlinks: LinkNo, func_name: &'static str },
-    #[fail(display = "DatacenterError::Wire {}: {:?} is not a valid edge", func_name, edge)]
-    Wire { edge: Edge, func_name: &'static str }
+    #[fail(display = "DatacenterError::Wire {}: {:?} is not a valid edge at {}", func_name, edge, comment)]
+    Wire { edge: Edge, func_name: &'static str, comment: &'static str }
 }

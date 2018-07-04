@@ -49,7 +49,7 @@ use std::collections::HashMap;
 
 use blueprint::Blueprint;
 use config::{NCELLS, NPORTS, NLINKS, OUTPUT_FILE_NAME, SCHEMA_VERSION,
-             CellNo, Edge, PortNo};
+             get_edges, CellNo, Edge, PortNo};
 use ecargs::{ECArgs};
 use gvm_equation::{GvmEqn};
 use message_types::{OutsideFromNoc, OutsideToNoc, NocFromOutside, NocToOutside};
@@ -83,9 +83,7 @@ fn main() -> Result<(), Error> {
 	};
 	let (ncells, nports) = ecargs.get_args();
 	println!("\nMain: {} ports for each of {} cells", *nports, *ncells);
-	//let edges = vec![(0,1),(1,2),(2,3),(3,4),(5,6),(6,7),(7,8),(8,9),(0,5),(1,6),(2,7),(3,8),(4,9)];
-    //let edges= vec![is2e(0,1), is2e(0,2), is2e(1,2)];
-	let edges = vec![is2e(0,1),is2e(1,2),is2e(1,6),is2e(3,4),is2e(5,6),is2e(6,7),is2e(7,8),is2e(8,9),is2e(0,5),is2e(2,3),is2e(2,7),is2e(3,8),is2e(4,9)];
+    let edges = get_edges();
 	let mut exceptions = HashMap::new();
 	exceptions.insert(CellNo(5), PortNo{v:4});
 	exceptions.insert(CellNo(2), PortNo{v:8});
@@ -114,7 +112,6 @@ fn main() -> Result<(), Error> {
 		outside_to_noc.send(manifest).context(MainError::Chain { func_name: "run", comment: S("")})?;
 	}
 }
-fn is2e(i: usize, j: usize) -> Edge { Edge { v: (CellNo(i),CellNo(j)) } }
 fn deployment_demo() -> Result<(), Error> {
 	let mut eqns = HashSet::new();
 	eqns.insert(GvmEqn::Recv("true"));
