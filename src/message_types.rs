@@ -1,7 +1,7 @@
 use std::sync::mpsc;
 use routing_table_entry::{RoutingTableEntry};
 
-use config::{ByteArray, PortNo, TableIndex};
+use config::{ByteArray, PortNo};
 use message::{MsgDirection, TcpMsgType};
 use name::TreeID;
 use packet::{Packet};
@@ -11,7 +11,7 @@ use utility::{Mask, PortNumber};
 use uuid_fake::Uuid;
 
 pub type TCP = (AllowedTree, TcpMsgType, MsgDirection, ByteArray);
-pub type CATOCM = (TableIndex, TreeID, Mask, MsgDirection, bool, ByteArray);
+pub type CATOCM = (TreeID, Mask, MsgDirection, bool, ByteArray);
 // PacketEngine to PacketEngine to unblock
 pub type PeToPePacket = String;
 pub type PeToPe = mpsc::Sender<PeToPePacket>;
@@ -23,42 +23,42 @@ pub type CaToCm = mpsc::Sender<CaToCmBytes>;
 pub type CmFromCa = mpsc::Receiver<CaToCmBytes>;
 //pub type CaCmError = mpsc::SendError<CaToCmBytes>;
 // Cmodel to PacketEngine
-pub enum CmToPePacket { Entry(RoutingTableEntry), Packet((TableIndex, Mask, Packet)), Tcp((PortNumber, TCP)),  Unblock }
+pub enum CmToPePacket { Entry(RoutingTableEntry), Packet((Mask, Packet)), Tcp((PortNumber, TCP)),  Unblock }
 pub type CmToPe = mpsc::Sender<CmToPePacket>;
 pub type PeFromCm = mpsc::Receiver<CmToPePacket>;
 //pub type CmPeError = mpsc::SendError<CmToPePacket>;
 // PacketEngine to Port
-pub enum PeToPortPacket { Packet((TableIndex, Packet)), Tcp(TCP) }
+pub enum PeToPortPacket { Packet((Packet)), Tcp(TCP) }
 pub type PeToPort = mpsc::Sender<PeToPortPacket>;
 pub type PortFromPe = mpsc::Receiver<PeToPortPacket>;
 //pub type PePortError = mpsc::SendError<PeToPortPacket>;
 // PacketEngine to Port, Port to Link
-pub type PortToLinkPacket = (TableIndex, Packet);
+pub type PortToLinkPacket = (Packet);
 pub type PortToLink = mpsc::Sender<PortToLinkPacket>;
 pub type LinkFromPort = mpsc::Receiver<PortToLinkPacket>;
 //pub type PortLinkError = mpsc::SendError<PortToLinkPacket>;
 // Link to Port
-pub enum LinkToPortPacket { Status(PortStatus), Packet((TableIndex, Packet)) }
+pub enum LinkToPortPacket { Status(PortStatus), Packet((Packet)) }
 pub type LinkToPort = mpsc::Sender<LinkToPortPacket>;
 pub type PortFromLink = mpsc::Receiver<LinkToPortPacket>;
 //pub type LinkPortError = mpsc::SendError<LinkToPortPacket>;
 // Port to PacketEngine
-pub enum PortToPePacket { Status((PortNo, bool, PortStatus)), Packet((PortNo, TableIndex, Packet)), Tcp((PortNo, TCP)) }
+pub enum PortToPePacket { Status((PortNo, bool, PortStatus)), Packet((PortNo, Packet)), Tcp((PortNo, TCP)) }
 pub type PortToPe = mpsc::Sender<PortToPePacket>;
 pub type PeFromPort = mpsc::Receiver<PortToPePacket>;
 //pub type PortPeError = mpsc::SendError<PortToPePacket>;
 // PacketEngine to Cmodel
-pub enum PeToCmPacket { Status((PortNo, bool, PortStatus)), Packet((PortNo, TableIndex, Packet)), Tcp((PortNo, TCP)) }
+pub enum PeToCmPacket { Status((PortNo, bool, PortStatus)), Packet((PortNo, Packet)), Tcp((PortNo, TCP)) }
 pub type PeToCm = mpsc::Sender<PeToCmPacket>;
 pub type CmFromPe = mpsc::Receiver<PeToCmPacket>;
 pub type PeCmError = mpsc::SendError<PeToCmPacket>;
 // Cmodel to CellAgent
-pub enum CmToCaPacket { Status((PortNo, bool, PortStatus)), Packet((PortNo, TableIndex, Packet)), Tcp((PortNo, TCP)) }
+pub enum CmToCaPacket { Status((PortNo, bool, PortStatus)), Packet((PortNo, Packet)), Tcp((PortNo, TCP)) }
 pub type CmToCaX = mpsc::Sender<CmToCaPacket>;
 pub type CaFromCmX = mpsc::Receiver<CmToCaPacket>;
 pub type CmCaErrorX = mpsc::SendError<CmToCaPacket>;
 // Cmodel to CellAgent
-pub enum CmToCaBytes { Status((PortNo, bool, PortStatus)), Bytes((PortNo, TableIndex, Uuid, ByteArray)), Tcp((PortNo, TCP)) }
+pub enum CmToCaBytes { Status((PortNo, bool, PortStatus)), Bytes((PortNo, Uuid, ByteArray)), Tcp((PortNo, TCP)) }
 pub type CmToCa = mpsc::Sender<CmToCaBytes>;
 pub type CaFromCm = mpsc::Receiver<CmToCaBytes>;
 pub type CmCaError = mpsc::SendError<CmToCaBytes>;

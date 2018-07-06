@@ -5,7 +5,7 @@ use std::collections::HashSet;
 
 //use uuid::Uuid;
 
-use config::{DEBUG_OPTIONS, PortNo, TableIndex};
+use config::{DEBUG_OPTIONS, MAX_PORTS, PortNo};
 use dal;
 use message::MsgType;
 use message_types::{PeFromCm, PeToCm,
@@ -84,10 +84,10 @@ impl PacketEngine {
                 CmToPePacket::Entry(entry) => {
                     self.routing_table.lock().unwrap().set_entry(entry)
                 },
-                CmToPePacket::Packet((index, user_mask, packet)) => {
+                CmToPePacket::Packet((user_mask, packet)) => {
                     let uuid = packet.get_tree_uuid();
                     let locked = self.routing_table.lock().unwrap();	// Hold lock until forwarding is done
-                    let entry = locked.get_entry(index, uuid).context(PacketEngineError::Chain { func_name: f, comment: S(self.cell_id.get_name())})?;
+                    let entry = locked.get_entry(uuid).context(PacketEngineError::Chain { func_name: f, comment: S(self.cell_id.get_name())})?;
                     let port_no = PortNo{v:0};
                     if DEBUG_OPTIONS.trace_all || DEBUG_OPTIONS.pe_pkt_recv {  // Debug print
                         let msg_type = MsgType::msg_type(&packet);
@@ -127,8 +127,8 @@ impl PacketEngine {
         let f = "listen_port_loop";
 		loop {
 			match pe_from_ports.recv().context(PacketEngineError::Chain { func_name: f, comment: S("receive")})? {
-				PortToPePacket::Packet((port_no, my_index, packet))  => {
-                    self.process_packet(port_no, my_index, packet, pe_from_pe, trace_header).context(PacketEngineError::Chain { func_name: "listen_port", comment: S("process_packet ") + self.cell_id.get_name()})?
+				PortToPePacket::Packet((port_no, packet))  => {
+                    self.process_packet(port_no, packet, pe_from_pe, trace_header).context(PacketEngineError::Chain { func_name: "listen_port", comment: S("process_packet ") + self.cell_id.get_name()})?
                 },
 				PortToPePacket::Status((port_no, is_border, status)) => {
                     self.pe_to_cm.send(PeToCmPacket::Status((port_no, is_border, status))).context(PacketEngineError::Chain { func_name: "listen_port", comment: S("send status to ca ") + self.cell_id.get_name()})?
@@ -139,7 +139,7 @@ impl PacketEngine {
 			};
 		}		
 	}
-	fn process_packet(&mut self, port_no: PortNo, my_index: TableIndex,
+	fn process_packet(&mut self, port_no: PortNo,
                       packet: Packet, pe_from_pe: &PeFromPe, trace_header: &mut TraceHeader) -> Result<(), Error> {
         let f = "process_packet";
         //println!("PacketEngine {}: received on port {} my index {} {}", self.cell_id, port_no.v, *my_index, packet);
@@ -149,10 +149,10 @@ impl PacketEngine {
         let uuid = packet.get_tree_uuid();
         let entry = {
             let locked = self.routing_table.lock().unwrap();
-            match locked.get_entry(my_index, uuid) {
+            match locked.get_entry(uuid) {
                 Ok(e) => e,
                 Err(_) => { // Send to Cell agent if tree not recognized
-                    self.pe_to_cm.send(PeToCmPacket::Packet((port_no, TableIndex(0), packet))).context(PacketEngineError::Chain { func_name: "forward", comment: S("rootcast packet to ca ") + self.cell_id.get_name()})?;
+                    self.pe_to_cm.send(PeToCmPacket::Packet((port_no, packet))).context(PacketEngineError::Chain { func_name: "forward", comment: S("rootcast packet to ca ") + self.cell_id.get_name()})?;
                     return Ok(())
                 }
             }
@@ -179,15 +179,13 @@ impl PacketEngine {
             let _ = dal::add_to_trace(trace_header, TraceType::Debug, trace_params, &trace, f);
         }
         if entry.is_in_use() {
-            // The control tree is special since each cell has a different uuid
-            if (*entry.get_index() == 0) || (entry.get_uuid() == packet.get_header().get_uuid()) {
+            if entry.get_uuid() == packet.get_header().get_uuid() {
                 let mask = entry.get_mask();
-                let other_indices = entry.get_other_indices();
-                PortNumber::new(port_no, PortNo { v: other_indices.len() as u8 }).context(PacketEngineError::Chain { func_name: "process_packet", comment: S("port number ") + self.cell_id.get_name() })?; // Verify that port_no is valid
+                PortNumber::new(port_no, MAX_PORTS).context(PacketEngineError::Chain { func_name: "process_packet", comment: S("port number ") + self.cell_id.get_name() })?; // Verify that port_no is valid
                 self.forward(port_no, entry, mask, packet, trace_header).context(PacketEngineError::Chain { func_name: "process_packet", comment: S("forward ") + self.cell_id.get_name() })?;
             } else {
                 let msg_type = MsgType::msg_type(&packet);
-                return Err(PacketEngineError::Uuid { cell_id: self.cell_id.clone(), func_name: f, msg_type, index: *entry.get_index(), packet_uuid: packet.get_tree_uuid(), table_uuid: entry.get_uuid() }.into());
+                return Err(PacketEngineError::Uuid { cell_id: self.cell_id.clone(), func_name: f, msg_type, packet_uuid: packet.get_tree_uuid(), table_uuid: entry.get_uuid() }.into());
             }
             // TODO: Fix to block only the parent port of the specific tree
             // Wait for permission to proceed if packet is from a port and will result in a tree update
@@ -202,15 +200,13 @@ impl PacketEngine {
         let f = "forward";
 		let header = packet.get_header();
 		//println!("PacketEngine {}: forward packet {}, mask {}, entry {}", self.cell_id, packet.get_count(), mask, entry);
-		let other_indices = entry.get_other_indices();
 		if header.is_rootcast() {
 			let parent = entry.get_parent();
-			if let Some(other_index) = other_indices.get(parent.v as usize) {
 				if parent.v == 0 {
                     if DEBUG_OPTIONS.trace_all || DEBUG_OPTIONS.pe_pkt_send {   // Debug print
                         let msg_type = MsgType::msg_type(&packet);
                         if msg_type == MsgType::Manifest {
-                            println!("PacketEngine {} forwrding manifest rootward", self.cell_id);
+                            println!("PacketEngine {} forwarding manifest rootward", self.cell_id);
                         }
                         let tree_id = packet.get_tree_id();
                         let ref trace_params = TraceHeaderParams { module: MODULE, function: f, format: "pe_forward_to_cm" };
@@ -226,10 +222,10 @@ impl PacketEngine {
                             }
                         }
                     }
-					self.pe_to_cm.send(PeToCmPacket::Packet((recv_port_no, entry.get_index(), packet)))?;
+					self.pe_to_cm.send(PeToCmPacket::Packet((recv_port_no, packet)))?;
 				} else {
 					if let Some(sender) = self.pe_to_ports.get(parent.v as usize) {
-						sender.send(PeToPortPacket::Packet((*other_index, packet))).context(PacketEngineError::Chain { func_name: f, comment: S(self.cell_id.clone())})?;
+						sender.send(PeToPortPacket::Packet(packet)).context(PacketEngineError::Chain { func_name: f, comment: S(self.cell_id.clone())})?;
                         if DEBUG_OPTIONS.trace_all || DEBUG_OPTIONS.pe_pkt_send {   // Debug print
                             let msg_type = MsgType::msg_type(&packet);
                             if msg_type == MsgType::Manifest {
@@ -251,13 +247,13 @@ impl PacketEngine {
                         }
 						let is_up = entry.get_mask().and(user_mask).equal(Mask::port0());
 						if is_up { // Send to cell agent, too
-							self.pe_to_cm.send(PeToCmPacket::Packet((recv_port_no, entry.get_index(), packet))).context(PacketEngineError::Chain { func_name: "forward", comment: S("rootcast packet to ca ") + self.cell_id.get_name()})?;
+							self.pe_to_cm.send(PeToCmPacket::Packet((recv_port_no, packet))).context(PacketEngineError::Chain { func_name: "forward", comment: S("rootcast packet to ca ") + self.cell_id.get_name()})?;
 						}
 					} else {
 						return Err(PacketEngineError::Sender { cell_id: self.cell_id.clone(), func_name: "forward rootward", port_no: *parent }.into());
 					}
 				}
-			} 
+
 		} else {  // Leafward
 			let mask = user_mask.and(entry.get_mask());
 			let port_nos = mask.get_port_nos();
@@ -284,16 +280,14 @@ impl PacketEngine {
             }
             let msg_type = MsgType::Manifest;
 			for port_no in port_nos.iter() {
-				if let Some(other_index) = other_indices.get(port_no.v as usize).cloned() {
 					if port_no.v as usize == 0 {
-						self.pe_to_cm.send(PeToCmPacket::Packet((recv_port_no, entry.get_index(), packet))).context(PacketEngineError::Chain { func_name: f, comment: S("leafcast packet to ca ") + self.cell_id.get_name()})?;
+						self.pe_to_cm.send(PeToCmPacket::Packet((recv_port_no, packet))).context(PacketEngineError::Chain { func_name: f, comment: S("leafcast packet to ca ") + self.cell_id.get_name()})?;
 					} else {
 						match self.pe_to_ports.get(port_no.v as usize) {
-							Some(s) => s.send(PeToPortPacket::Packet((other_index, packet))).context(PacketEngineError::Chain { func_name: f, comment: S("send packet leafward ") + self.cell_id.get_name()})?,
+							Some(s) => s.send(PeToPortPacket::Packet(packet)).context(PacketEngineError::Chain { func_name: f, comment: S("send packet leafward ") + self.cell_id.get_name()})?,
 							None => return Err(PacketEngineError::Sender { cell_id: self.cell_id.clone(), func_name: "forward leaf", port_no: **port_no }.into())
 						};
 					}
-				}
 			}
 		}
 		Ok(())
@@ -313,6 +307,6 @@ pub enum PacketEngineError {
 	Chain { func_name: &'static str, comment: String },
 	#[fail(display = "PacketEngineError::Sender {}: No sender for port {:?} on cell {}", func_name, port_no, cell_id)]
 	Sender { func_name: &'static str, cell_id: CellID, port_no: u8 },
-    #[fail(display = "PacketEngineError::Uuid {}: CellID {}: type {} index {} entry uuid {}, packet uuid {}", func_name, cell_id, msg_type, index, table_uuid, packet_uuid)]
-    Uuid { func_name: &'static str, cell_id: CellID, msg_type: MsgType, index: u32, table_uuid: Uuid, packet_uuid: Uuid }
+    #[fail(display = "PacketEngineError::Uuid {}: CellID {}: type {} entry uuid {}, packet uuid {}", func_name, cell_id, msg_type, table_uuid, packet_uuid)]
+    Uuid { func_name: &'static str, cell_id: CellID, msg_type: MsgType, table_uuid: Uuid, packet_uuid: Uuid }
 }

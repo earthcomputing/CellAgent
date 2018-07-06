@@ -106,9 +106,9 @@ impl Port {
 					};
 					self.port_to_pe.send(PortToPePacket::Status((self.port_number.get_port_no(), self.is_border, status))).context(PortError::Chain { func_name: "listen_pe_for_outside", comment: S(self.id.get_name()) + " send status to pe"})?;
 				}
-				LinkToPortPacket::Packet((my_index, packet)) => {
+				LinkToPortPacket::Packet(packet) => {
 					//println!("Port {}: got from link {} {}", self.id, *my_index, packet);
-					self.port_to_pe.send(PortToPePacket::Packet((self.port_number.get_port_no(), my_index, packet))).context(PortError::Chain { func_name: "listen_pe_for_outside", comment: S(self.id.get_name()) + " send packet to pe"})?;
+					self.port_to_pe.send(PortToPePacket::Packet((self.port_number.get_port_no(), packet))).context(PortError::Chain { func_name: "listen_pe_for_outside", comment: S(self.id.get_name()) + " send packet to pe"})?;
 					//println!("Port {}: sent from link to pe {}", self.id, packet);
 				}
 			}

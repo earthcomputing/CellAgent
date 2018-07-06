@@ -3,7 +3,7 @@ use std::thread::JoinHandle;
 
 use failure::{Error, ResultExt};
 
-use config::{DEBUG_OPTIONS, PortNo, TableIndex};
+use config::{DEBUG_OPTIONS, PortNo};
 use dal;
 use message::MsgType;
 use message_types::{CaToCmBytes, CmToCa, CmFromCa, CmToPe, CmFromPe, PeToCmPacket,
@@ -53,7 +53,7 @@ impl Cmodel {
         loop {
             match cm_from_ca.recv()? {
                 CaToCmBytes::Entry(entry) => cm_to_pe.send(CmToPePacket::Entry(entry)),
-                CaToCmBytes::Bytes((index, tree_id, user_mask, direction, is_blocking, bytes)) => {
+                CaToCmBytes::Bytes((tree_id, user_mask, direction, is_blocking, bytes)) => {
                     if DEBUG_OPTIONS.trace_all || DEBUG_OPTIONS.cm_from_ca {   //Debug print
                         let msg = MsgType::msg_from_bytes(&bytes)?;
                         let ref trace_params = TraceHeaderParams { module: MODULE, function: f, format: "cm_bytes_from_ca" };
@@ -75,7 +75,7 @@ impl Cmodel {
                     }
                     let packets = Packetizer::packetize(&tree_id, &bytes, direction, is_blocking);
                     for packet in packets {
-                        cm_to_pe.send(CmToPePacket::Packet((index, user_mask, packet)))?;
+                        cm_to_pe.send(CmToPePacket::Packet((user_mask, packet)))?;
                     }
                     Ok(())
                 },
@@ -88,12 +88,12 @@ impl Cmodel {
         loop {
             match cm_from_pe.recv()? {
                 PeToCmPacket::Status((port_no,bool, port_status)) => cm_to_ca.send(CmToCaBytes::Status((port_no,bool, port_status)))?,
-                PeToCmPacket::Packet((port_no, index, packet)) => self.process_packet(cm_to_ca, port_no, index, packet, trace_header)?,
+                PeToCmPacket::Packet((port_no, packet)) => self.process_packet(cm_to_ca, port_no, packet, trace_header)?,
                 PeToCmPacket::Tcp((port_no, tcp_msg)) => cm_to_ca.send(CmToCaBytes::Tcp((port_no, tcp_msg)))?
             };
         }
     }
-    fn process_packet(&mut self, cm_to_ca: &CmToCa, port_no: PortNo, index: TableIndex, packet: Packet,
+    fn process_packet(&mut self, cm_to_ca: &CmToCa, port_no: PortNo, packet: Packet,
                       trace_header: &mut TraceHeader) -> Result<(), Error> {
         let f = "process_packet";
         let msg_id = packet.get_header().get_msg_id();
@@ -121,7 +121,7 @@ impl Cmodel {
                 }
                 let _ = dal::add_to_trace(trace_header, TraceType::Debug, trace_params, &trace, f);
             }
-            cm_to_ca.send(CmToCaBytes::Bytes((port_no, index, uuid, bytes)))?;
+            cm_to_ca.send(CmToCaBytes::Bytes((port_no, uuid, bytes)))?;
         }
         Ok(())
     }
