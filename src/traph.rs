@@ -11,7 +11,7 @@ use name::{Name, CellID, TreeID};
 use routing_table_entry::{RoutingTableEntry};
 use traph_element::TraphElement;
 use tree::Tree;
-use utility::{Path, PortNumber, S};
+use utility::{Mask, Path, PortNumber, S};
 use uuid_fake::Uuid;
 
 type StackedTrees = HashMap<Uuid, Tree>;
@@ -40,14 +40,6 @@ impl Traph {
 		Ok(Traph { cell_id: cell_id.clone(), black_tree_id: black_tree_id.clone(),
 				stacked_trees, elements })
 	}
-	//pub fn get_black_tree_id(&self) -> &TreeID { &self.black_tree_id }
-    pub fn get_table_entry(&self, stacked_trees_locked: &MutexGuard<StackedTrees>, tree_uuid: &Uuid)
-                           -> Result<RoutingTableEntry, TraphError> {
-        match stacked_trees_locked.get(tree_uuid) {
-            Some(tree) => Ok(tree.get_table_entry()),
-            None => Err(TraphError::Tree { cell_id: self.cell_id.clone(), func_name: "get_table_entry", tree_uuid: tree_uuid.clone() }.into())
-        }
-    }
     pub fn get_tree(&self, tree_uuid: &Uuid) -> Result<Tree, Error> {
         let locked = self.stacked_trees.lock().unwrap();
         match locked.get(tree_uuid).cloned() {
@@ -138,6 +130,8 @@ impl Traph {
 			},
 			_ => ()
 		};
+        let mask = Mask::make(children);
+        table_entry.set_mask(mask);
 		table_entry.set_inuse();
 		table_entry.set_tree_id(tree_id);
 		tree.set_table_entry(table_entry);
@@ -203,7 +197,7 @@ impl fmt::Display for Traph {
 		for tree in locked.values() {
 			s = s + &format!("\n  {}", tree);
 		}
-		s = s + &format!("\nPort Other Connected Broken Status Hops Path");
+		s = s + &format!("\n Port Connected Broken Status Hops Path");
 		// Can't replace with map() because s gets moved into closure 
 		for element in self.elements.iter() { 
 			if element.is_connected() { s = s + &format!("\n{}",element); } 
