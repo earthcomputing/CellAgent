@@ -1,6 +1,6 @@
 use std::fmt;
 
-use config::{CellNo, PathLength, PortNo, TableIndex};
+use config::{CellNo, PathLength, PortNo};
 use traph::{PortStatus};
 use utility::{Path, PortNumber};
 
@@ -9,20 +9,19 @@ pub struct TraphElement {
 	port_no: PortNo,
 	is_connected: bool,
 	is_broken: bool,
-	other_index: TableIndex,
 	status: PortStatus,
 	hops: PathLength,
 	path: Option<Path> 
 }
 impl TraphElement {
-	pub fn new(is_connected: bool, port_no: PortNo, other_index: TableIndex, 
+	pub fn new(is_connected: bool, port_no: PortNo,
 			status: PortStatus, hops: PathLength, path: Option<Path>) -> TraphElement {
-		TraphElement { port_no,  other_index, is_connected, is_broken: false, status,
+		TraphElement { port_no,  is_connected, is_broken: false, status,
 			hops, path }
 	}
 	pub fn default(port_number: PortNumber) -> TraphElement {
 		let port_no = port_number.get_port_no();
-		TraphElement::new(false, port_no, TableIndex(0), PortStatus::Pruned, 
+		TraphElement::new(false, port_no, PortStatus::Pruned,
 					PathLength(CellNo(0)), None)
 	}
 //	pub fn get_port_no(&self) -> PortNo { self.port_no }
@@ -38,8 +37,8 @@ impl TraphElement {
 }
 impl fmt::Display for TraphElement {
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-		let mut s = format!("{:4} {:5} {:9} {:6} {:6} {:4}", 
-			self.port_no.v, self.other_index.0, self.is_connected, self.is_broken, self.status, (self.hops.0).0);
+		let mut s = format!("{:5} {:9} {:6} {:6} {:4}",
+			self.port_no.v, self.is_connected, self.is_broken, self.status, (self.hops.0).0);
 		match self.path {
 			Some(p) => s = s + &format!(" {:4}", p.get_port_no().v),
 			None    => s = s + &format!(" None")

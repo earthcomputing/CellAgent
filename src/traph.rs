@@ -5,7 +5,7 @@ use std::sync::{Arc, Mutex, MutexGuard};
 use serde_json;
 //use uuid::Uuid;
 
-use config::{MAX_PORTS, PathLength, PortNo, TableIndex};
+use config::{MAX_PORTS, PathLength, PortNo};
 use gvm_equation::{GvmEquation, GvmVariable, GvmVariableType};
 use name::{Name, CellID, TreeID};
 use routing_table_entry::{RoutingTableEntry};
@@ -24,13 +24,13 @@ pub struct Traph {
 	elements: Vec<TraphElement>,
 }
 impl Traph {
-	pub fn new(cell_id: &CellID, black_tree_id: &TreeID, index: TableIndex, gvm_eqn: &GvmEquation) -> Result<Traph, Error> {
+	pub fn new(cell_id: &CellID, black_tree_id: &TreeID, gvm_eqn: &GvmEquation) -> Result<Traph, Error> {
 		let mut elements = Vec::new();
 		for i in 1..MAX_PORTS.v {
 			let port_number = PortNumber::new(PortNo{v:i as u8}, MAX_PORTS).context(TraphError::Chain { func_name: "new", comment: S("")})?;
 			elements.push(TraphElement::default(port_number));
 		}
-		let entry = RoutingTableEntry::default(index).context(TraphError::Chain { func_name: "new", comment: S("")})?;
+		let entry = RoutingTableEntry::default().context(TraphError::Chain { func_name: "new", comment: S("")})?;
 		let black_tree = Tree::new(black_tree_id, black_tree_id, black_tree_id, gvm_eqn, entry);
 		let stacked_trees = Arc::new(Mutex::new(HashMap::new()));
 		{
@@ -118,13 +118,8 @@ impl Traph {
 //		}
 //		i
 //	}
-	pub fn get_table_index(&self, tree_uuid: &Uuid) -> Result<TableIndex, Error> {
-		let locked = self.stacked_trees.lock().unwrap(); 
-		let table_entry = self.get_table_entry(&locked, tree_uuid).context(TraphError::Chain { func_name: "get_table_index", comment: S("")})?;
-		Ok(table_entry.get_index())
-	}
-	pub fn new_element(&mut self, tree_id: &TreeID, port_number: PortNumber, port_status: PortStatus, 
-			other_index: TableIndex, children: &HashSet<PortNumber>, hops: PathLength, path: Option<Path>) 
+	pub fn new_element(&mut self, tree_id: &TreeID, port_number: PortNumber, port_status: PortStatus,
+			children: &HashSet<PortNumber>, hops: PathLength, path: Option<Path>)
 			-> Result<RoutingTableEntry, TraphError> {
 		let port_no = port_number.get_port_no();
 		let mut stacked_trees = self.stacked_trees.lock().unwrap();
@@ -143,12 +138,11 @@ impl Traph {
 			},
 			_ => ()
 		};
-		table_entry.add_other_index(port_number, other_index);
 		table_entry.set_inuse();
 		table_entry.set_tree_id(tree_id);
 		tree.set_table_entry(table_entry);
 		stacked_trees.insert(tree_id.get_uuid(), tree);
-		let element = TraphElement::new(true, port_no, other_index, port_status, hops, path);
+		let element = TraphElement::new(true, port_no, port_status, hops, path);
 		self.elements[*port_no as usize] = element;
 		Ok(table_entry)
 	}

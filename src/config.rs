@@ -69,9 +69,9 @@ impl fmt::Display for PathLength { fn fmt(&self, f: &mut fmt::Formatter) -> fmt:
 #[derive(Debug, Copy, Clone, Hash, Eq, PartialEq, Ord, PartialOrd, Serialize, Deserialize)]
 pub struct PortNo { pub v: u8 }
 impl Deref for PortNo { type Target = u8; fn deref(&self) -> &Self::Target { &self.v } }
-#[derive(Debug, Copy, Clone, Hash, Eq, PartialEq, Serialize, Deserialize)]
-pub struct TableIndex(pub u32);
-impl Deref for TableIndex { type Target = u32; fn deref(&self) -> &Self::Target { &self.0 } }
+//#[derive(Debug, Copy, Clone, Hash, Eq, PartialEq, Serialize, Deserialize)]
+//pub struct TableIndex(pub u32);
+//impl Deref for TableIndex { type Target = u32; fn deref(&self) -> &Self::Target { &self.0 } }
 #[derive(Debug, Copy, Clone)]
 pub struct VmNo(pub usize);
 // Cell types
@@ -104,7 +104,7 @@ pub fn get_edges() -> Vec<Edge> {
 }
 fn is2e(i: usize, j: usize) -> Edge { Edge { v: (CellNo(i),CellNo(j)) } }
 // Size limits
-pub const MAX_ENTRIES: TableIndex    = TableIndex(64);  // Max number of active trees
+//pub const MAX_ENTRIES: TableIndex    = TableIndex(64);  // Max number of active trees
 pub const MAX_PORTS: PortNo          = PortNo { v: 8 }; 	// Limit on number of ports per cell
 //pub const MAX_CHARS: usize         = 128; // Longest valid name
 pub const MIN_BOUNDARY_CELLS: CellNo = CellNo(1);   // Minimum acceptable number of border cells
