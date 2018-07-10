@@ -46,8 +46,8 @@ impl PacketEngine {
         Ok(())
 	}
     pub fn get_id(&self) -> CellID { self.cell_id.clone() }
-    fn listen_cm(&self, pe_from_cm: PeFromCm, pe_to_pe: PeToPe, mut outer_trace_header: TraceHeader) -> Result<(), Error> {
-        let f = "listen_cm";
+    fn listen_cm(&self, pe_from_cm: PeFromCm, pe_to_pe: PeToPe, outer_trace_header: TraceHeader) -> Result<(), Error> {
+        let _f = "listen_cm";
         let mut pe = self.clone();
         let mut outer_trace_header_clone = outer_trace_header.clone();
         ::std::thread::spawn( move ||  {
@@ -278,7 +278,6 @@ impl PacketEngine {
                 }
                 let _ = dal::add_to_trace(trace_header, TraceType::Debug, trace_params, &trace, f);
             }
-            let msg_type = MsgType::Manifest;
 			for port_no in port_nos.iter() {
 					if port_no.v as usize == 0 {
 						self.pe_to_cm.send(PeToCmPacket::Packet((recv_port_no, packet))).context(PacketEngineError::Chain { func_name: f, comment: S("leafcast packet to ca ") + self.cell_id.get_name()})?;
