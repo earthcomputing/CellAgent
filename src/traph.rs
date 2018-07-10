@@ -1,6 +1,6 @@
 use std::fmt;
 use std::collections::{HashMap, HashSet};
-use std::sync::{Arc, Mutex, MutexGuard};
+use std::sync::{Arc, Mutex};
 
 use serde_json;
 //use uuid::Uuid;
@@ -11,7 +11,7 @@ use name::{Name, CellID, TreeID};
 use routing_table_entry::{RoutingTableEntry};
 use traph_element::TraphElement;
 use tree::Tree;
-use utility::{Mask, Path, PortNumber, S};
+use utility::{Path, PortNumber, S};
 use uuid_fake::Uuid;
 
 type StackedTrees = HashMap<Uuid, Tree>;
@@ -130,8 +130,7 @@ impl Traph {
 			},
 			_ => ()
 		};
-        let mask = Mask::make(children);
-        table_entry.set_mask(mask);
+        table_entry.add_children(children);
 		table_entry.set_inuse();
 		table_entry.set_tree_id(tree_id);
 		tree.set_table_entry(table_entry);

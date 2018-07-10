@@ -740,7 +740,7 @@ impl CellAgent {
             eqns.insert(GvmEqn::Xtnd("true"));
             eqns.insert(GvmEqn::Save("false"));
             let gvm_equation = GvmEquation::new(eqns, Vec::new());
-            let entry = self.update_traph(new_tree_id, port_number, status, &gvm_equation,
+            let _ = self.update_traph(new_tree_id, port_number, status, &gvm_equation,
                                         children, hops, Some(path), trace_header).context(CellagentError::Chain { func_name: "process_ca", comment: S("DiscoverMsg")})?;
             if exists { return Ok(()); } // Don't forward if traph exists for this tree - Simple quenching
             self.update_base_tree_map(new_tree_id, new_tree_id, trace_header);
@@ -768,8 +768,8 @@ impl CellAgent {
         let f = "process_discoverd_msg";
         let payload = msg.get_payload();
         let tree_id = payload.get_tree_id();
-        let mut children = HashSet::new();
         let port_number = PortNumber::new(port_no, MAX_PORTS).context(CellagentError::Chain { func_name: "process_ca", comment: S("DiscoverDMsg")})?;
+        let mut children = HashSet::new();
         children.insert(port_number);
         let mut eqns = HashSet::new();
         eqns.insert(GvmEqn::Recv("true"));

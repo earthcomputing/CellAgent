@@ -85,7 +85,7 @@ fn main() -> Result<(), Error> {
 	println!("\nMain: {} ports for each of {} cells", *nports, *ncells);
     let edges = get_edges();
 	let mut exceptions = HashMap::new();
-	exceptions.insert(CellNo(5), PortNo{v:4});
+	exceptions.insert(CellNo(5), PortNo{v:5});
 	exceptions.insert(CellNo(2), PortNo{v:8});
 	let mut border = HashMap::new();
 	border.insert(CellNo(2), vec![PortNo{v:2}]);

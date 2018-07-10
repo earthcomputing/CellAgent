@@ -11,11 +11,12 @@ use uuid_fake::Uuid;
 pub struct RoutingTable {
 	id: CellID,
 	entries: HashMap<Uuid, RoutingTableEntry>,
+    order: Vec<Uuid>, // So I can print out the entries in the order they were created for debugging
 	connected_ports: Vec<u8>
 }
 impl RoutingTable {
 	pub fn new(id: CellID) -> Result<RoutingTable, Error> {
-		Ok(RoutingTable { id, entries: HashMap::new(), connected_ports: Vec::new() })
+		Ok(RoutingTable { id, entries: HashMap::new(), connected_ports: Vec::new(), order: Vec::new() })
 	}
 	pub fn get_entry(&self, uuid: Uuid) -> Result<RoutingTableEntry, RoutingTableError> {
 		let f = "get_entry";
@@ -28,6 +29,8 @@ impl RoutingTable {
 	}
 	pub fn set_entry(&mut self, entry: RoutingTableEntry) {
         let f = "set_entry";
+        let uuid = entry.get_uuid();
+        if !self.entries.contains_key(&uuid) { self.order.push(uuid); }
         self.entries.insert(entry.get_uuid(), entry);
 		if false { println!("Routing Table {}: cell {} uuid {}, mask {}", f, self.id, entry.get_uuid(), entry.get_mask()); }
 	}
@@ -36,7 +39,8 @@ impl fmt::Display for RoutingTable {
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result { 
 		let mut s = format!("\nRouting Table");
 		s = s + &format!("\n Tree UUID  In Use Send? Parent Mask ");
-		for entry in self.entries.values() {
+		for key in &self.order {
+            let entry = self.entries.get(key).unwrap();
 			if entry.is_in_use() { s = s + &format!("\n{}", entry); }
 		}
 		write!(f, "{}", s) 
