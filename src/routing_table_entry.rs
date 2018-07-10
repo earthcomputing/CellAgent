@@ -22,7 +22,7 @@ impl RoutingTableEntry {
 			may_send, inuse, mask }
 	}
 	pub fn default() -> Result<RoutingTableEntry, Error> {
-		let port_number = PortNumber::new(PortNo{v:0}, MAX_PORTS).context(RoutingTableEntryError::Chain { func_name: "default", comment: S("")})?;
+		let port_number = PortNumber::new(PortNo(0), MAX_PORTS).context(RoutingTableEntryError::Chain { func_name: "default", comment: S("")})?;
 		let tree_id = TreeID::new("default").context(RoutingTableEntryError::Chain { func_name: "default", comment: S("")})?;
 		Ok(RoutingTableEntry::new(&tree_id, false, port_number, Mask::empty(), true))
 	}
@@ -71,7 +71,7 @@ impl fmt::Display for RoutingTableEntry {
 		else          { s = s + &format!("  No   "); }
 		if self.may_send { s = s + &format!("  Yes "); }
 		else             { s = s + &format!("  No  "); }
-		s = s + &format!("{:7}", self.parent.v);
+		s = s + &format!("{:7}", self.parent.0);
 		s = s + &format!("{}", self.mask);
 		write!(f, "{}", s)
 	}

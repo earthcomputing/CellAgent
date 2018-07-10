@@ -103,7 +103,7 @@ impl CellAgent {
     }
     pub fn initialize(&mut self, ca_from_cm: CaFromCm, mut trace_header: TraceHeader) -> Result<(), Error> {
         // Set up predefined trees - Must be first two in this order
-        let port_number_0 = PortNumber::new(PortNo{v:0}, self.no_ports).unwrap(); // No error possible for port 0
+        let port_number_0 = PortNumber::new(PortNo(0), self.no_ports).unwrap(); // No error possible for port 0
         let hops = PathLength(CellNo(0));
         let path = None;
         let control_tree_id = self.control_tree_id.clone();
@@ -832,7 +832,7 @@ impl CellAgent {
         //println!("Message Cell {}: StackTreeMsg on port {} index {} for tree {}", ca.get_id(), *port_no, *other_index, self.payload.get_new_tree_id());
         let sender_id = header.get_sender_id();
         let gvm_eqn = payload.get_gvm_eqn();
-        if let Some(mut entry) = self.stack_tree(sender_id, new_tree_id, parent_tree_id, gvm_eqn, trace_header)? {
+        if let Some(entry) = self.stack_tree(sender_id, new_tree_id, parent_tree_id, gvm_eqn, trace_header)? {
             let port_number = PortNumber::new(port_no, self.get_no_ports())?;
             let mut traph = self.get_traph(new_tree_id, trace_header)?;
             // Update StackTreeMsg and forward

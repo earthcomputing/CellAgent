@@ -26,8 +26,8 @@ pub struct Traph {
 impl Traph {
 	pub fn new(cell_id: &CellID, black_tree_id: &TreeID, gvm_eqn: &GvmEquation) -> Result<Traph, Error> {
 		let mut elements = Vec::new();
-		for i in 1..MAX_PORTS.v {
-			let port_number = PortNumber::new(PortNo{v:i as u8}, MAX_PORTS).context(TraphError::Chain { func_name: "new", comment: S("")})?;
+		for i in 1..*MAX_PORTS {
+			let port_number = PortNumber::new(PortNo(i as u8), MAX_PORTS).context(TraphError::Chain { func_name: "new", comment: S("")})?;
 			elements.push(TraphElement::default(port_number));
 		}
 		let entry = RoutingTableEntry::default().context(TraphError::Chain { func_name: "new", comment: S("")})?;
@@ -79,7 +79,7 @@ impl Traph {
     }
 	pub fn get_port_status(&self, port_number: PortNumber) -> PortStatus {
 		let port_no = port_number.get_port_no();
-		match self.elements.get(port_no.v as usize) {
+		match self.elements.get((*port_no) as usize) {
 			Some(e) => e.get_status(),
 			None => PortStatus::Pruned
 		}

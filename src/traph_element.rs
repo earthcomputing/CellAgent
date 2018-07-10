@@ -38,9 +38,9 @@ impl TraphElement {
 impl fmt::Display for TraphElement {
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
 		let mut s = format!("{:5} {:9} {:6} {:6} {:4}",
-			self.port_no.v, self.is_connected, self.is_broken, self.status, (self.hops.0).0);
+							(*self.port_no), self.is_connected, self.is_broken, self.status, (self.hops.0).0);
 		match self.path {
-			Some(p) => s = s + &format!(" {:4}", p.get_port_no().v),
+			Some(p) => s = s + &format!(" {:4}", (*p.get_port_no())),
 			None    => s = s + &format!(" None")
 		}
 		write!(f, "{}", s)

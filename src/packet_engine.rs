@@ -88,7 +88,7 @@ impl PacketEngine {
                     let uuid = packet.get_tree_uuid();
                     let locked = self.routing_table.lock().unwrap();	// Hold lock until forwarding is done
                     let entry = locked.get_entry(uuid).context(PacketEngineError::Chain { func_name: f, comment: S(self.cell_id.get_name())})?;
-                    let port_no = PortNo{v:0};
+                    let port_no = PortNo(0);
                     if DEBUG_OPTIONS.trace_all || DEBUG_OPTIONS.pe_pkt_recv {  // Debug print
                         let msg_type = MsgType::msg_type(&packet);
                         let tree_id = packet.get_tree_id();
@@ -169,10 +169,10 @@ impl PacketEngine {
                 match msg_type {
                     MsgType::Discover => (),
                     MsgType::DiscoverD => if tree_id.is_name("Tree:C:2") {
-                        println!("PacketEngine {}: got from {} {} {}", self.cell_id, port_no.v, msg_type, tree_id);
+                        println!("PacketEngine {}: got from {} {} {}", self.cell_id, *port_no, msg_type, tree_id);
                     }
                     _ => {
-                        println!("PacketEngine {}: got from {} {} {} {}", self.cell_id, port_no.v, msg_type, tree_id, entry);
+                        println!("PacketEngine {}: got from {} {} {} {}", self.cell_id, *port_no, msg_type, tree_id, entry);
                     },
                 }
             }
@@ -181,6 +181,7 @@ impl PacketEngine {
         if entry.is_in_use() {
             if entry.get_uuid() == packet.get_uuid() {
                 let mask = entry.get_mask();
+                // Next line verifies that port_no is valid
                 PortNumber::new(port_no, MAX_PORTS).context(PacketEngineError::Chain { func_name: "process_packet", comment: S("port number ") + self.cell_id.get_name() })?; // Verify that port_no is valid
                 self.forward(port_no, entry, mask, packet, trace_header).context(PacketEngineError::Chain { func_name: "process_packet", comment: S("forward ") + self.cell_id.get_name() })?;
             } else {
@@ -201,7 +202,7 @@ impl PacketEngine {
 		//println!("PacketEngine {}: forward packet {}, mask {}, entry {}", self.cell_id, packet.get_count(), mask, entry);
 		if packet.is_rootcast() {
 			let parent = entry.get_parent();
-				if parent.v == 0 {
+				if *parent == 0 {
                     if DEBUG_OPTIONS.trace_all || DEBUG_OPTIONS.pe_pkt_send {   // Debug print
                         let msg_type = MsgType::msg_type(&packet);
                         if msg_type == MsgType::Manifest {
@@ -215,7 +216,7 @@ impl PacketEngine {
                                 MsgType::Discover => (),
                                 _ => {
                                     let _ = dal::add_to_trace(trace_header, TraceType::Debug, trace_params, &trace, f);
-                                    println!("PacketEngine {}: {} [{}] {} {}", self.cell_id, f, parent.v, msg_type, tree_id);
+                                    println!("PacketEngine {}: {} [{}] {} {}", self.cell_id, f, *parent, msg_type, tree_id);
                                 },
 
                             }
@@ -223,7 +224,7 @@ impl PacketEngine {
                     }
 					self.pe_to_cm.send(PeToCmPacket::Packet((recv_port_no, packet)))?;
 				} else {
-					if let Some(sender) = self.pe_to_ports.get(parent.v as usize) {
+					if let Some(sender) = self.pe_to_ports.get((*parent) as usize) {
 						sender.send(PeToPortPacket::Packet(packet)).context(PacketEngineError::Chain { func_name: f, comment: S(self.cell_id.clone())})?;
                         if DEBUG_OPTIONS.trace_all || DEBUG_OPTIONS.pe_pkt_send {   // Debug print
                             let msg_type = MsgType::msg_type(&packet);
@@ -238,7 +239,7 @@ impl PacketEngine {
                                     MsgType::Discover => (),
                                     _ => {
                                         let _ = dal::add_to_trace(trace_header, TraceType::Debug, trace_params, &trace, f);
-                                        println!("PacketEngine {}: {} [{}] {} {}", self.cell_id, f, parent.v, msg_type, tree_id);
+                                        println!("PacketEngine {}: {} [{}] {} {}", self.cell_id, f, *parent, msg_type, tree_id);
                                     },
 
                                 }
@@ -277,16 +278,16 @@ impl PacketEngine {
                 }
                 let _ = dal::add_to_trace(trace_header, TraceType::Debug, trace_params, &trace, f);
             }
-			for port_no in port_nos.iter() {
-					if port_no.v as usize == 0 {
-						self.pe_to_cm.send(PeToCmPacket::Packet((recv_port_no, packet))).context(PacketEngineError::Chain { func_name: f, comment: S("leafcast packet to ca ") + self.cell_id.get_name()})?;
-					} else {
-						match self.pe_to_ports.get(port_no.v as usize) {
-							Some(s) => s.send(PeToPortPacket::Packet(packet)).context(PacketEngineError::Chain { func_name: f, comment: S("send packet leafward ") + self.cell_id.get_name()})?,
-							None => return Err(PacketEngineError::Sender { cell_id: self.cell_id.clone(), func_name: "forward leaf", port_no: **port_no }.into())
-						};
-					}
-			}
+			for port_no in port_nos.iter().cloned() {
+                if (*port_no) as usize == 0 {
+                    self.pe_to_cm.send(PeToCmPacket::Packet((recv_port_no, packet))).context(PacketEngineError::Chain { func_name: f, comment: S("leafcast packet to ca ") + self.cell_id.get_name() })?;
+                } else {
+                    match self.pe_to_ports.get(*port_no as usize) {
+                        Some(s) => s.send(PeToPortPacket::Packet(packet)).context(PacketEngineError::Chain { func_name: f, comment: S("send packet leafward ") + self.cell_id.get_name() })?,
+                        None => return Err(PacketEngineError::Sender { cell_id: self.cell_id.clone(), func_name: "forward leaf", port_no: *port_no }.into())
+                    };
+                }
+            }
 		}
 		Ok(())
 	}
