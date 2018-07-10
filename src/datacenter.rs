@@ -56,11 +56,11 @@ impl Datacenter {
 		self.cells.sort_by(|a, b| (*a.get_no()).cmp(&*b.get_no())); // Sort to conform to edge list
 		let mut link_handles = Vec::new();
 		for edge in edge_list {
-            if (*(edge.v.0) > ncells.0) | (*(edge.v.1) >= ncells.0) { return Err(DatacenterError::Wire { edge: edge.clone(), func_name: f, comment: "greater than ncells test" }.into()); }
-			let (e0, e1) = if *(edge.v.0) >= *(edge.v.1) {
-                (*(edge.v.1), *(edge.v.0))
+            if (*(edge.0) > ncells.0) | (*(edge.1) >= ncells.0) { return Err(DatacenterError::Wire { edge: edge.clone(), func_name: f, comment: "greater than ncells test" }.into()); }
+			let (e0, e1) = if *(edge.0) >= *(edge.1) {
+                (*(edge.1), *(edge.0))
             } else {
-                (*(edge.v.0), *(edge.v.1))
+                (*(edge.0), *(edge.1))
             };
 			let split = self.cells.split_at_mut(max(e0,e1));
 			let left_cell = match split.0.get_mut(e0) {

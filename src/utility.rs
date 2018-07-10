@@ -33,13 +33,13 @@ pub const DEFAULT_USER_MASK: Mask = Mask { mask: MaskValue(254) };  // All ports
 pub struct Mask { mask: MaskValue }
 impl Mask {
 	pub fn new(i: PortNumber) -> Mask {
-	    let mask = MaskValue((1 as u16).rotate_left(i.get_port_no().v as u32));
+	    let mask = MaskValue((1 as u16).rotate_left((*i.get_port_no()) as u32));
         Mask { mask }
 	}
 	pub fn port0() -> Mask { Mask { mask: MaskValue(1) } }
 	pub fn empty() -> Mask { Mask { mask: MaskValue(0) } }
 	pub fn all_but_zero(no_ports: PortNo) -> Mask { 
-		Mask { mask: MaskValue((2 as u16).pow(no_ports.v as u32)-2) }
+		Mask { mask: MaskValue((2 as u16).pow((*no_ports) as u32)-2) }
 	}
 	pub fn equal(&self, other: Mask) -> bool { *self.mask == *other.mask }
 	//pub fn get_as_value(&self) -> MaskValue { self.mask }
@@ -67,13 +67,13 @@ impl Mask {
 	}
 	pub fn get_port_nos(&self) -> Vec<PortNo> {
 		let mut port_nos = Vec::new();
-		for i in 0..MAX_PORTS.v {
-			let port_number = match PortNumber::new(PortNo{v:i}, MAX_PORTS) {
+		for i in 0..*MAX_PORTS {
+			let port_number = match PortNumber::new(PortNo(i), MAX_PORTS) {
 				Ok(n) => n,
 				Err(_) => panic!("Mask get_port_no cannont generate an error")
 			};
 			let test = Mask::new(port_number);
-			if *test.mask & *self.mask != 0 { port_nos.push(PortNo{v:i}) }
+			if *test.mask & *self.mask != 0 { port_nos.push(PortNo(i)) }
 		}
 		port_nos
 	}
@@ -87,17 +87,17 @@ impl fmt::Display for Mask {
 pub struct PortNumber { pub port_no: PortNo }
 impl PortNumber {
 	pub fn new(no: PortNo, no_ports: PortNo) -> Result<PortNumber, UtilityError> {
-		if no.v > no_ports.v {
+		if *no > *no_ports {
 			Err(UtilityError::PortNumber{ port_no: no, func_name: "PortNumber::new", max: no_ports }.into())
 		} else {
 			Ok(PortNumber { port_no: (no as PortNo) })
 		}
 	}
-	pub fn new0() -> PortNumber { PortNumber { port_no: (PortNo{v:0}) } }
+	pub fn new0() -> PortNumber { PortNumber { port_no: (PortNo(0)) } }
 	pub fn get_port_no(&self) -> PortNo { self.port_no }
 }
 impl fmt::Display for PortNumber {
-	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result { write!(f, "{}", self.port_no.v) }
+	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result { write!(f, "{}", *self.port_no) }
 }
 #[derive(Debug, Copy, Clone, Hash, Serialize, Deserialize)]
 pub struct Path { port_number: PortNumber }
@@ -128,7 +128,6 @@ PORT - "port_no":{"v":[0-9]*},"is_border":[a-z]*
 {THDR,FCN,COMMENT}
 
 */
-use chrono::prelude::*;
 #[derive(Debug, Clone, Serialize)]
 pub struct TraceHeader {
     epoch: u64,

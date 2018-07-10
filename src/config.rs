@@ -49,7 +49,7 @@ impl Deref for ContainerNo { type Target = usize; fn deref(&self) -> &Self::Targ
 pub struct DatacenterNo(pub u16);
 impl Deref for DatacenterNo { type Target = u16; fn deref(&self) -> &Self::Target { &self.0 } }
 #[derive(Debug, Copy, Clone, Serialize, Deserialize)]
-pub struct Edge { pub v: (CellNo, CellNo) }
+pub struct Edge(pub CellNo, pub CellNo);
 #[derive(Debug, Copy, Clone)]
 pub struct LinkNo(pub CellNo);
 impl Deref for LinkNo { type Target = CellNo; fn deref(&self) -> &Self::Target { &self.0 } }
@@ -67,8 +67,8 @@ pub struct PathLength(pub CellNo);
 impl Deref for PathLength { type Target = CellNo; fn deref(&self) -> &Self::Target { &self.0 } }
 impl fmt::Display for PathLength { fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result { write!(f, "{}", *self.0)} }
 #[derive(Debug, Copy, Clone, Hash, Eq, PartialEq, Ord, PartialOrd, Serialize, Deserialize)]
-pub struct PortNo { pub v: u8 }
-impl Deref for PortNo { type Target = u8; fn deref(&self) -> &Self::Target { &self.v } }
+pub struct PortNo(pub u8);
+impl Deref for PortNo { type Target = u8; fn deref(&self) -> &Self::Target { &self.0 } }
 //#[derive(Debug, Copy, Clone, Hash, Eq, PartialEq, Serialize, Deserialize)]
 //pub struct TableIndex(pub u32);
 //impl Deref for TableIndex { type Target = u32; fn deref(&self) -> &Self::Target { &self.0 } }
@@ -93,7 +93,7 @@ pub const SCHEMA_VERSION: &'static str = "0.1";
 pub const REPO: &'static str = "CellAgent";
 // Default inputs
 pub const NCELLS: CellNo = CellNo(10);
-pub const NPORTS: PortNo =  PortNo { v: 6 };
+pub const NPORTS: PortNo =  PortNo(6);
 pub const NLINKS: LinkNo = LinkNo(CellNo(40));
 // Connections
 pub fn get_edges() -> Vec<Edge> {
@@ -114,10 +114,10 @@ pub fn get_edges() -> Vec<Edge> {
     }
     else { panic!("Invalid number of cells"); }
 }
-fn is2e(i: usize, j: usize) -> Edge { Edge { v: (CellNo(i),CellNo(j)) } }
+fn is2e(i: usize, j: usize) -> Edge { Edge(CellNo(i),CellNo(j)) }
 // Size limits
 //pub const MAX_ENTRIES: TableIndex    = TableIndex(64);  // Max number of active trees
-pub const MAX_PORTS: PortNo          = PortNo { v: 8 }; 	// Limit on number of ports per cell
+pub const MAX_PORTS: PortNo          = PortNo(8); 	// Limit on number of ports per cell
 //pub const MAX_CHARS: usize         = 128; // Longest valid name
 pub const MIN_BOUNDARY_CELLS: CellNo = CellNo(1);   // Minimum acceptable number of border cells
 //pub const MAX_PACKETS: PacketNo    = 255;  // Maximum number of packets collected before processing

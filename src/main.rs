@@ -49,14 +49,14 @@ use std::collections::HashMap;
 
 use blueprint::Blueprint;
 use config::{NCELLS, NPORTS, NLINKS, OUTPUT_FILE_NAME, SCHEMA_VERSION,
-             get_edges, CellNo, Edge, PortNo};
+             get_edges, CellNo, PortNo};
 use ecargs::{ECArgs};
 use gvm_equation::{GvmEqn};
 use message_types::{OutsideFromNoc, OutsideToNoc, NocFromOutside, NocToOutside};
 use nalcell::CellConfig;
 use noc::Noc;
 use uptree_spec::{AllowedTree, ContainerSpec, Manifest, UpTreeSpec, VmSpec};
-use utility::{S, TraceHeader, TraceHeaderParams, TraceType};
+use utility::{S, TraceHeader, TraceHeaderParams};
 
 const MODULE: &'static str = "main.rs";
 fn main() -> Result<(), Error> {
@@ -85,11 +85,11 @@ fn main() -> Result<(), Error> {
 	println!("\nMain: {} ports for each of {} cells", *nports, *ncells);
     let edges = get_edges();
 	let mut exceptions = HashMap::new();
-	exceptions.insert(CellNo(5), PortNo{v:5});
-	exceptions.insert(CellNo(2), PortNo{v:8});
+	exceptions.insert(CellNo(5), PortNo(5));
+	exceptions.insert(CellNo(2), PortNo(8));
 	let mut border = HashMap::new();
-	border.insert(CellNo(2), vec![PortNo{v:2}]);
-	border.insert(CellNo(7), vec![PortNo{v:2}]);
+	border.insert(CellNo(2), vec![PortNo(2)]);
+	border.insert(CellNo(7), vec![PortNo(2)]);
 	let blueprint = Blueprint::new(ncells, nports, edges, exceptions, border).context(MainError::Chain { func_name: "run", comment: S("")})?;
 	println!("{}", blueprint);
 //	deployment_demo()?; 	// Demonstrate features of deployment spec

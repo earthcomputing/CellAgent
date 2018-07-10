@@ -48,7 +48,7 @@ impl NalCell {
 	pub fn new(cell_no: CellNo, nports: PortNo, cell_type: CellType,
                config: CellConfig, mut trace_header: TraceHeader) -> Result<NalCell, Error> {
         let f = "new";
-		if nports.v > MAX_PORTS.v { return Err(NalcellError::NumberPorts { nports, func_name: "new", max_ports: MAX_PORTS }.into()) }
+		if *nports > *MAX_PORTS { return Err(NalcellError::NumberPorts { nports, func_name: "new", max_ports: MAX_PORTS }.into()) }
 		let cell_id = CellID::new(cell_no).context(NalcellError::Chain { func_name: "new", comment: S("cell_id")})?;
         let (ca_to_cm, cm_from_ca): (CaToCm, CmFromCa) = channel();
         let (cm_to_ca, ca_from_cm): (CmToCa, CaFromCm) = channel();
@@ -64,20 +64,20 @@ impl NalCell {
             let trace = json!({ "cell_number": cell_no });
             let _ = dal::add_to_trace(&mut trace_header, TraceType::Trace, trace_params, &trace, f);
         }
-		for i in 0..nports.v + 1 {
+		for i in 0..*nports + 1 {
 			let is_border_port = match cell_type {
 				CellType::Border => {
 					let is_border_port = i == 2;
-					if is_border_port { boundary_port_nos.insert(PortNo{v:i}); }
+					if is_border_port { boundary_port_nos.insert(PortNo(i)); }
 					is_border_port					
 				}
 				CellType::Interior => false
 			};
 			let (pe_to_port, port_from_pe): (PeToPort, PortFromPe) = channel();
 			pe_to_ports.push(pe_to_port);
-			ports_from_pe.insert(PortNo{v:i}, port_from_pe);
+			ports_from_pe.insert(PortNo(i), port_from_pe);
 			let is_connected = if i == 0 { true } else { false };
-			let port_number = PortNumber::new(PortNo{v:i}, nports).context(NalcellError::Chain { func_name: "new", comment: S("port number")})?;
+			let port_number = PortNumber::new(PortNo(i), nports).context(NalcellError::Chain { func_name: "new", comment: S("port number")})?;
 			let port = Port::new(&cell_id, port_number, is_border_port, is_connected,port_to_pe.clone()).context(NalcellError::Chain { func_name: "new", comment: S("port")})?;
 			ports.push(port);
 		}
@@ -152,7 +152,7 @@ impl NalCell {
 			-> Result<(&mut Port, PortFromPe), Error> {
         let f = "Nalcell::get_free_port_mut";
 		for port in &mut self.ports.iter_mut() {
-			if !port.is_connected() && !(want_boundary_port ^ port.is_border()) && (port.get_port_no().v != 0 as u8) {
+			if !port.is_connected() && !(want_boundary_port ^ port.is_border()) && (*(port.get_port_no()) != 0 as u8) {
 				let port_no = port.get_port_no();
 				match self.ports_from_pe.remove(&port_no) { // Remove avoids a borrowed context error
 					Some(recvr) => {
