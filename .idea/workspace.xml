@@ -2,10 +2,7 @@
 <project version="4">
   <component name="ChangeListManager">
     <list default="true" id="eee480a2-146d-44ab-9647-cef5ea39b250" name="Default" comment="">
-      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/cmodel.rs" beforeDir="false" afterPath="$PROJECT_DIR$/src/cmodel.rs" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/packet.rs" beforeDir="false" afterPath="$PROJECT_DIR$/src/packet.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/packet_engine.rs" beforeDir="false" afterPath="$PROJECT_DIR$/src/packet_engine.rs" afterDir="false" />
     </list>
     <ignored path="$PROJECT_DIR$/target/" />
     <ignored path="$PROJECT_DIR$/out/" />
@@ -109,11 +106,11 @@
       <file leaf-file-name="packet.rs" pinned="false" current-in-tab="true">
         <entry file="file://$PROJECT_DIR$/src/packet.rs">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="322">
-              <caret line="246" selection-start-line="246" selection-end-line="246" />
+            <state relative-caret-position="251">
+              <caret line="52" column="68" lean-forward="true" selection-start-line="52" selection-start-column="68" selection-end-line="52" selection-end-column="68" />
               <folding>
-                <element signature="e#8537#8538#0" expanded="true" />
-                <element signature="e#8590#8591#0" expanded="true" />
+                <element signature="e#8875#8876#0" expanded="true" />
+                <element signature="e#8928#8929#0" expanded="true" />
               </folding>
             </state>
           </provider>
@@ -406,6 +403,7 @@
   </component>
   <component name="ToolWindowManager">
     <frame x="320" y="-947" width="1346" height="877" extended-state="0" />
+    <editor active="true" />
     <layout>
       <window_info anchor="right" id="Palette" order="3" />
       <window_info anchor="bottom" id="TODO" order="6" />
@@ -781,11 +779,11 @@
     </entry>
     <entry file="file://$PROJECT_DIR$/src/packet.rs">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="322">
-          <caret line="246" selection-start-line="246" selection-end-line="246" />
+        <state relative-caret-position="251">
+          <caret line="52" column="68" lean-forward="true" selection-start-line="52" selection-start-column="68" selection-end-line="52" selection-end-column="68" />
           <folding>
-            <element signature="e#8537#8538#0" expanded="true" />
-            <element signature="e#8590#8591#0" expanded="true" />
+            <element signature="e#8875#8876#0" expanded="true" />
+            <element signature="e#8928#8929#0" expanded="true" />
           </folding>
         </state>
       </provider>

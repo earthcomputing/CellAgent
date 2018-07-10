@@ -31,30 +31,26 @@ pub struct Packet {
 }
 #[deny(unused_must_use)]
 impl Packet {
-	fn new(msg_id: MsgID, tree_id: &TreeID, size: PacketNo, direction: MsgDirection,
+    fn new(msg_id: MsgID, tree_id: &TreeID, size: PacketNo, direction: MsgDirection,
            is_last_packet: bool, is_blocking: bool, data_bytes: Vec<u8>) -> Packet {
         let header = PacketHeader::new(tree_id);
         let payload = Payload::new(msg_id, size, direction, is_last_packet, is_blocking, data_bytes);
-		Packet { header, payload, packet_count: Packet::get_next_count() }
-	}
+        Packet { header, payload, packet_count: Packet::get_next_count() }
+    }
     pub fn get_uuid(&self) -> Uuid { self.header.get_uuid() }
-	pub fn get_next_count() -> usize { PACKET_COUNT.fetch_add(1, Ordering::SeqCst) } 
-	pub fn get_count(&self) -> usize { self.packet_count }  // For debugging
-	pub fn get_header(&self) -> PacketHeader { self.header }
-	pub fn get_payload(&self) -> Payload { self.payload }
-	pub fn get_tree_uuid(&self) -> Uuid { self.header.get_uuid() }
+    pub fn get_next_count() -> usize { PACKET_COUNT.fetch_add(1, Ordering::SeqCst) }
+    pub fn get_count(&self) -> usize { self.packet_count }
+    // For debugging
+    pub fn get_header(&self) -> PacketHeader { self.header }
+    pub fn get_payload(&self) -> Payload { self.payload }
+    pub fn get_tree_uuid(&self) -> Uuid { self.header.get_uuid() }
     pub fn is_blocking(&self) -> bool { self.payload.is_blocking() }
     pub fn is_last_packet(&self) -> bool { self.payload.is_last_packet() }
     pub fn get_bytes(&self) -> Vec<u8> { self.payload.bytes.iter().cloned().collect() }
     pub fn get_msg_id(&self) -> MsgID { self.payload.get_msg_id() }
     pub fn get_size(&self) -> PacketNo { self.payload.get_size() }
-    pub fn is_leafcast(&self) -> bool {
-        match self.payload.get_direction() {
-            MsgDirection::Leafward => true,
-            _ => false
-        }
-    }
-    pub fn is_rootcast(&self) -> bool { !self.is_leafcast() }
+    pub fn is_leafcast(&self) -> bool { self.payload.is_leafcast() }
+    pub fn is_rootcast(&self) -> bool { self.payload.is_rootcast() }
     fn set_direction(&mut self, direction: MsgDirection) { self.payload.set_direction(direction) }
     // Debug hack to get tree_id out of packets.  Assumes msg is one packet
     pub fn get_tree_id(self) -> TreeID {
@@ -87,7 +83,6 @@ pub struct PacketHeader {
 impl PacketHeader {
 	pub fn new(tree_id: &TreeID) -> PacketHeader {
 		// Assertion fails if I forgot to change PACKET_HEADER_SIZE when I changed PacketHeader struct
-        assert_eq!(PACKET_HEADER_SIZE, mem::size_of::<PacketHeader>());
         PacketHeader { uuid: tree_id.get_uuid() }
 	}
 	fn get_uuid(&self) -> Uuid { self.uuid }
@@ -115,9 +110,9 @@ impl Payload {
 	pub fn new(msg_id: MsgID, size: PacketNo, direction: MsgDirection,
                is_last: bool, is_blocking: bool, data_bytes: Vec<u8>) -> Payload {
 		let no_data_bytes = data_bytes.len();
-		let mut bytes: [u8; PAYLOAD_MAX] = [0; PAYLOAD_MAX];
+        let mut bytes = [0 as u8; PAYLOAD_MAX];
         for i in 0..data_bytes.len() { bytes[i] = data_bytes[i]; }
-		Payload { msg_id, size, is_last, is_blocking, direction, bytes }
+        Payload { msg_id, size, is_last, is_blocking, direction, bytes}
 	}
 	fn get_bytes(&self) -> Vec<u8> { self.bytes.iter().cloned().collect() }
     fn get_msg_id(&self) -> MsgID { self.msg_id }
@@ -129,7 +124,12 @@ impl Payload {
             _ => false
         }
     }
-    fn is_rootcast(&self) -> bool { !self.is_leafcast() }
+    fn is_rootcast(&self) -> bool {
+        match self.direction {
+            MsgDirection::Rootward => true,
+            _ => false
+        }
+    }
     fn is_last_packet(&self) -> bool { self.is_last }
     fn is_blocking(&self) -> bool { self.is_blocking }
 
