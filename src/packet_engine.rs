@@ -179,7 +179,7 @@ impl PacketEngine {
             let _ = dal::add_to_trace(trace_header, TraceType::Debug, trace_params, &trace, f);
         }
         if entry.is_in_use() {
-            if entry.get_uuid() == packet.get_header().get_uuid() {
+            if entry.get_uuid() == packet.get_uuid() {
                 let mask = entry.get_mask();
                 PortNumber::new(port_no, MAX_PORTS).context(PacketEngineError::Chain { func_name: "process_packet", comment: S("port number ") + self.cell_id.get_name() })?; // Verify that port_no is valid
                 self.forward(port_no, entry, mask, packet, trace_header).context(PacketEngineError::Chain { func_name: "process_packet", comment: S("forward ") + self.cell_id.get_name() })?;
@@ -198,9 +198,8 @@ impl PacketEngine {
 	fn forward(&self, recv_port_no: PortNo, entry: RoutingTableEntry, user_mask: Mask,
                packet: Packet, trace_header: &mut TraceHeader) -> Result<(), Error>{
         let f = "forward";
-		let header = packet.get_header();
 		//println!("PacketEngine {}: forward packet {}, mask {}, entry {}", self.cell_id, packet.get_count(), mask, entry);
-		if header.is_rootcast() {
+		if packet.is_rootcast() {
 			let parent = entry.get_parent();
 				if parent.v == 0 {
                     if DEBUG_OPTIONS.trace_all || DEBUG_OPTIONS.pe_pkt_send {   // Debug print

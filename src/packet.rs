@@ -31,16 +31,31 @@ pub struct Packet {
 }
 #[deny(unused_must_use)]
 impl Packet {
-	fn new(header: PacketHeader, payload: Payload) -> Packet {
+	fn new(msg_id: MsgID, tree_id: &TreeID, size: PacketNo, direction: MsgDirection,
+           is_last_packet: bool, is_blocking: bool, data_bytes: Vec<u8>) -> Packet {
+        let header = PacketHeader::new(tree_id);
+        let payload = Payload::new(msg_id, size, direction, is_last_packet, is_blocking, data_bytes);
 		Packet { header, payload, packet_count: Packet::get_next_count() }
 	}
+    pub fn get_uuid(&self) -> Uuid { self.header.get_uuid() }
 	pub fn get_next_count() -> usize { PACKET_COUNT.fetch_add(1, Ordering::SeqCst) } 
 	pub fn get_count(&self) -> usize { self.packet_count }  // For debugging
 	pub fn get_header(&self) -> PacketHeader { self.header }
 	pub fn get_payload(&self) -> Payload { self.payload }
 	pub fn get_tree_uuid(&self) -> Uuid { self.header.get_uuid() }
-    pub fn is_blocking(&self) -> bool { self.header.is_blocking() }
-    pub fn is_last_packet(&self) -> bool { self.header.is_last_packet() }
+    pub fn is_blocking(&self) -> bool { self.payload.is_blocking() }
+    pub fn is_last_packet(&self) -> bool { self.payload.is_last_packet() }
+    pub fn get_bytes(&self) -> Vec<u8> { self.payload.bytes.iter().cloned().collect() }
+    pub fn get_msg_id(&self) -> MsgID { self.payload.get_msg_id() }
+    pub fn get_size(&self) -> PacketNo { self.payload.get_size() }
+    pub fn is_leafcast(&self) -> bool {
+        match self.payload.get_direction() {
+            MsgDirection::Leafward => true,
+            _ => false
+        }
+    }
+    pub fn is_rootcast(&self) -> bool { !self.is_leafcast() }
+    fn set_direction(&mut self, direction: MsgDirection) { self.payload.set_direction(direction) }
     // Debug hack to get tree_id out of packets.  Assumes msg is one packet
     pub fn get_tree_id(self) -> TreeID {
         let msg = MsgType::get_msg(&vec![self]).unwrap();
@@ -51,9 +66,9 @@ impl Packet {
 }
 impl fmt::Display for Packet {
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result { 
-		let bytes = self.get_payload().get_bytes();
-		let len = if self.get_header().is_last_packet() {
-			*self.get_header().get_size() as usize
+		let bytes = self.payload.get_bytes();
+		let len = if self.payload.is_last_packet() {
+			*self.payload.get_size() as usize
 		} else {
 			bytes.len()
 		};
@@ -64,79 +79,71 @@ impl fmt::Display for Packet {
 impl Clone for Packet {
 	fn clone(&self) -> Packet { *self }
 }
-const PACKET_HEADER_SIZE: usize = 8 + 16 + 2 + 1 + 5; // Last value is padding
+const PACKET_HEADER_SIZE: usize = 16; // Last value is padding
 #[derive(Debug, Copy, Clone, Serialize)]
 pub struct PacketHeader {
-	msg_id: MsgID,	// Unique identifier of this message
-	uuid: Uuid,     // Tree identifier 16 bytes
-	size: PacketNo,	// Number of packets remaining in message if not last packet
-					// Number of bytes in last packet if last packet, 0 => Error
-	flags: u8,    	// Various flags
-					// xxxx xxx0 => rootcast
-					// xxxx xxx1 => leafcast
-					// xxxx xx0x => Not last packet
-					// xxxx xx1x => Is last packet
-					// xxxx x0xx => Is not blocking
-                    // xxxx x1xx => Is blocking
-					// xxx0 xxxx => EC Protocol to VirtualMachine
-					// xxx1 xxxx => Legacy Protocol to VirtualMachine
+    uuid: Uuid,     // Tree identifier 16 bytes
 }
 impl PacketHeader {
-	pub fn new(msg_id: MsgID, tree_id: &TreeID, size: PacketNo, direction: MsgDirection,
-               is_last_packet: bool, is_blocking: bool) -> PacketHeader {
+	pub fn new(tree_id: &TreeID) -> PacketHeader {
 		// Assertion fails if I forgot to change PACKET_HEADER_SIZE when I changed PacketHeader struct
-		assert_eq!(PACKET_HEADER_SIZE, mem::size_of::<PacketHeader>());
-		let mut flags = if is_last_packet { 2 } else { 0 };
-        if is_blocking { flags = flags | 4; }
-        let mut ph = PacketHeader { msg_id, uuid: tree_id.get_uuid(), size, flags };
-		ph.set_direction(direction);
-		ph
+        assert_eq!(PACKET_HEADER_SIZE, mem::size_of::<PacketHeader>());
+        PacketHeader { uuid: tree_id.get_uuid() }
 	}
-	pub fn get_msg_id(&self) -> MsgID { self.msg_id }
-	pub fn get_uuid(&self) -> Uuid { self.uuid }
+	fn get_uuid(&self) -> Uuid { self.uuid }
 //	pub fn set_uuid(&mut self, new_uuid: Uuid) { self.uuid = new_uuid; }
-	pub fn get_size(&self) -> PacketNo { self.size }
-	pub fn is_leafcast(&self) -> bool { (self.flags & 1) == 1 }
-	pub fn is_rootcast(&self) -> bool { !self.is_leafcast() }
-	pub fn is_last_packet(&self) -> bool { (self.flags & 2) == 2 }
-    pub fn is_blocking(&self) -> bool { (self.flags & 4) == 4 }
-	fn set_direction(&mut self, direction: MsgDirection) {
-		match direction {
-			MsgDirection::Leafward => self.flags = self.flags | 1,
-			MsgDirection::Rootward => self.flags = self.flags & 254
-		}
-	}
 }
 impl fmt::Display for PacketHeader { 
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result { 
 		let mut uuid = self.uuid.to_string();
 		uuid.truncate(8);
-		let mut s = format!("Message ID {}", *self.msg_id);
-		s = s + &format!(", UUID {}", self.uuid );
-		if self.is_rootcast() { s = s + " Rootward"; }
-		else                  { s = s + " Leafward"; }
-		if self.is_last_packet() { s = s + ", Last packet"; }
-		else                     { s = s + ", Not last packet"; }
-		s = s + &format!(", Size {}", *self.size);
-		write!(f, "{}", s) 
+		let s = &format!(", UUID {}", self.uuid );
+		write!(f, "{}", s)
 	}
 }
 #[derive(Copy)]
 pub struct Payload {
+    msg_id: MsgID,	// Unique identifier of this message
+    size: PacketNo,	// Number of packets remaining in message if not last packet
+                    // Number of bytes in last packet if last packet, 0 => Error
+    is_last: bool,
+    is_blocking: bool,
+    direction: MsgDirection,
 	bytes: [u8; PAYLOAD_MAX],
 }
 impl Payload {
-	pub fn new(data_bytes: Vec<u8>) -> Payload {
+	pub fn new(msg_id: MsgID, size: PacketNo, direction: MsgDirection,
+               is_last: bool, is_blocking: bool, data_bytes: Vec<u8>) -> Payload {
 		let no_data_bytes = data_bytes.len();
-		let mut bytes = [0; PAYLOAD_MAX];
-		for i in 0..no_data_bytes { bytes[i] = data_bytes[i]; }
-		Payload { bytes }
+		let mut bytes: [u8; PAYLOAD_MAX] = [0; PAYLOAD_MAX];
+        for i in 0..data_bytes.len() { bytes[i] = data_bytes[i]; }
+		Payload { msg_id, size, is_last, is_blocking, direction, bytes }
 	}
 	fn get_bytes(&self) -> Vec<u8> { self.bytes.iter().cloned().collect() }
+    fn get_msg_id(&self) -> MsgID { self.msg_id }
+    fn get_size(&self) -> PacketNo { self.size }
+    fn get_direction(&self) -> MsgDirection { self.direction }
+    fn is_leafcast(&self) -> bool {
+        match self.direction {
+            MsgDirection::Leafward => true,
+            _ => false
+        }
+    }
+    fn is_rootcast(&self) -> bool { !self.is_leafcast() }
+    fn is_last_packet(&self) -> bool { self.is_last }
+    fn is_blocking(&self) -> bool { self.is_blocking }
+
+    fn set_direction(&mut self, direction: MsgDirection) { self.direction = direction }
 }
 impl fmt::Display for Payload {
-	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result { 
-		let s = &format!("{:?}", &self.bytes[0..10]); 
+	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        let mut s = format!("Message ID {}", *self.msg_id);
+        if self.is_rootcast() { s = s + " Rootward"; }
+        else                  { s = s + " Leafward"; }
+        if self.is_last_packet() { s = s + ", Last packet"; }
+        else                     { s = s + ", Not last packet"; }
+        s = s + &format!(", Size {}", *self.size);
+		let s = &format!("{:?}", &self.bytes[0..10]);
 		write!(f, "{}", s)
 	} 	
 }
@@ -176,16 +183,14 @@ impl Packetizer {
 			} else {
 				(num_packets - i, false)
 			};
-			let packet_header = PacketHeader::new(msg_id, tree_id, PacketNo(size as u16), direction,
-                                                  is_last_packet, is_blocking);
 			// Not a very Rusty way to put bytes into payload
 			let mut packet_bytes = vec![PAYLOAD_DEFAULT_ELEMENT; payload_size];
 			for j in 0..payload_size {
 				if i*payload_size + j == msg_bytes.len() { break; }
 				packet_bytes[j] = msg_bytes[i*payload_size + j];
 			}
-			let payload = Payload::new(packet_bytes);
-			let packet = Packet::new(packet_header, payload);
+			let packet = Packet::new(msg_id, tree_id, PacketNo(size as u16), direction,
+                                     is_last_packet, is_blocking, packet_bytes);
 			//println!("Packet: packet {} for msg {}", packet.get_packet_count(), msg.get_count());
 			packets.push(packet); 
 		}
@@ -194,11 +199,10 @@ impl Packetizer {
 	pub fn unpacketize(packets: &Vec<Packet>) -> Result<ByteArray, Error> {
 		let mut all_bytes = Vec::new();
 		for packet in packets {
-			let header = packet.get_header();
-			let is_last_packet = header.is_last_packet();
-			let last_packet_size = *header.get_size() as usize;
+			let is_last_packet = packet.is_last_packet();
+			let last_packet_size = *packet.get_size() as usize;
 			let payload = packet.get_payload();
-			let mut bytes = payload.get_bytes();
+			let mut bytes = packet.get_bytes();
 			if is_last_packet {
 				bytes.truncate(last_packet_size)
 			};
@@ -240,8 +244,7 @@ impl PacketAssembler {
 */
 	pub fn add(&mut self, packet: Packet) -> (bool, &Vec<Packet>) { 
 		self.packets.push(packet); 
-		let header = packet.get_header();
-		(header.is_last_packet(), &self.packets)
+		(packet.is_last_packet(), &self.packets)
 	}
 }
 // Errors

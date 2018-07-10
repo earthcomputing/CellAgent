@@ -96,7 +96,7 @@ impl Cmodel {
     fn process_packet(&mut self, cm_to_ca: &CmToCa, port_no: PortNo, packet: Packet,
                       trace_header: &mut TraceHeader) -> Result<(), Error> {
         let f = "process_packet";
-        let msg_id = packet.get_header().get_msg_id();
+        let msg_id = packet.get_msg_id();
         let mut packet_assembler = self.packet_assemblers.remove(&msg_id).unwrap_or(PacketAssembler::new(msg_id));
         let (last_packet, packets) = packet_assembler.add(packet);
         if last_packet {
