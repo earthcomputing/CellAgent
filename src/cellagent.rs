@@ -8,7 +8,7 @@ use std::collections::hash_map::Entry;
 use serde;
 use serde_json;
 
-use config::{CONNECTED_PORTS_TREE_NAME, CONTROL_TREE_NAME, MAX_PORTS,
+use config::{CONNECTED_PORTS_TREE_NAME, CONTINUE_ON_ERROR, CONTROL_TREE_NAME, MAX_PORTS,
              ByteArray, CellNo, CellType, DEBUG_OPTIONS, PathLength, PortNo};
 use dal;
 use gvm_equation::{GvmEquation, GvmEqn};
@@ -511,7 +511,8 @@ impl CellAgent {
             let ref mut inner_trace_header = outer_trace_header_clone.fork_trace();
             let _ = ca.listen_uptree_loop(&sender_id.clone(), &vm_id, &ca_from_vm, inner_trace_header).map_err(|e| ::utility::write_err("cellagent", e));
             let ref mut outer_trace_header = outer_trace_header_clone.fork_trace();
-            let _ = ca.listen_uptree(sender_id, vm_id, trees, ca_from_vm, outer_trace_header);
+            println!("Cellagent {}: Back from listen_uptree_loop", ca.cell_id);
+            if CONTINUE_ON_ERROR { let _ = ca.listen_uptree(sender_id, vm_id, trees, ca_from_vm, outer_trace_header); }
         });
     }
     fn listen_uptree_loop(&mut self, sender_id: &SenderID, _vm_id: &VmID, ca_from_vm: &CaFromVm, trace_header: &mut TraceHeader) -> Result<(), Error> {
@@ -624,7 +625,8 @@ impl CellAgent {
             let ref mut inner_trace_header = outer_trace_header_clone.fork_trace();
             let _ = ca.listen_cm_loop(&ca_from_cm, inner_trace_header).map_err(|e| ::utility::write_err("cellagent", e));
             let ref mut outer_trace_header = outer_trace_header_clone.fork_trace();
-            let _ = ca.listen_cm(ca_from_cm, outer_trace_header);
+            println!("Cellagent {}: Back from listen_cm_loop", ca.cell_id);
+            if CONTINUE_ON_ERROR { let _ = ca.listen_cm(ca_from_cm, outer_trace_header); }
         });
         Ok(())
     }
