@@ -5,7 +5,7 @@ use std::collections::HashSet;
 
 //use uuid::Uuid;
 
-use config::{DEBUG_OPTIONS, MAX_PORTS, PortNo};
+use config::{CONTINUE_ON_ERROR, DEBUG_OPTIONS, MAX_PORTS, PortNo};
 use dal;
 use message::MsgType;
 use message_types::{PeFromCm, PeToCm,
@@ -53,7 +53,7 @@ impl PacketEngine {
         ::std::thread::spawn( move ||  {
             let ref mut inner_trace_header = outer_trace_header_clone.fork_trace();
             let _ = pe.listen_cm_loop(&pe_from_cm, &pe_to_pe, inner_trace_header).map_err(|e| write_err("packet_engine", e));
-            let _ = pe.listen_cm(pe_from_cm, pe_to_pe, outer_trace_header);
+            if CONTINUE_ON_ERROR { let _ = pe.listen_cm(pe_from_cm, pe_to_pe, outer_trace_header); }
         });
         Ok(())
     }
@@ -71,7 +71,7 @@ impl PacketEngine {
         ::std::thread::spawn( move || {
             let ref mut inner_trace_header = outer_trace_header_clone.fork_trace();
             let _ = pe.listen_port_loop(&pe_from_ports, &pe_from_pe, inner_trace_header).map_err(|e| write_err("packet_engine", e));
-            let _ = pe.listen_port(pe_from_ports, pe_from_pe, outer_trace_header);
+            if CONTINUE_ON_ERROR { let _ = pe.listen_port(pe_from_ports, pe_from_pe, outer_trace_header); }
         });
         Ok(())
     }

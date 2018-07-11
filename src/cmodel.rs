@@ -3,7 +3,7 @@ use std::thread::JoinHandle;
 
 use failure::{Error, ResultExt};
 
-use config::{DEBUG_OPTIONS, PortNo};
+use config::{CONTINUE_ON_ERROR, DEBUG_OPTIONS, PortNo};
 use dal;
 use message::MsgType;
 use message_types::{CaToCmBytes, CmToCa, CmFromCa, CmToPe, CmFromPe, PeToCmPacket,
@@ -24,27 +24,25 @@ impl Cmodel {
     }
     pub fn initialize(&self, cm_from_ca: CmFromCa, cm_to_pe: CmToPe, cm_from_pe: CmFromPe, cm_to_ca: CmToCa,
                       mut trace_header: TraceHeader) -> Result<(), Error> {
-        self.listen_ca(cm_from_ca, cm_to_pe, &mut trace_header)?;
-        self.listen_pe(cm_from_pe, cm_to_ca, &mut trace_header)?;
+        self.listen_ca(cm_from_ca, cm_to_pe, trace_header.fork_trace())?;
+        self.listen_pe(cm_from_pe, cm_to_ca, trace_header.fork_trace())?;
         Ok(())
     }
-    fn listen_ca(&self, cm_from_ca: CmFromCa, cm_to_pe: CmToPe, outer_trace_header: &mut TraceHeader) -> Result<JoinHandle<()>, Error> {
+    fn listen_ca(&self, cm_from_ca: CmFromCa, cm_to_pe: CmToPe, mut outer_trace_header: TraceHeader) -> Result<JoinHandle<()>, Error> {
         let cmodel = self.clone();
-        let mut outer_trace_header_clone = outer_trace_header.clone();
         let join_handle = ::std::thread::spawn( move || {
-            let ref mut inner_trace_header = outer_trace_header_clone.fork_trace();
+            let ref mut inner_trace_header = outer_trace_header.fork_trace();
             let _ = cmodel.listen_ca_loop(&cm_from_ca, &cm_to_pe, inner_trace_header).map_err(|e| write_err("cmodel listen_ca", e.into()));
-            //let _ = cmodel.listen_ca(cm_from_ca, cm_to_pe);
+            if CONTINUE_ON_ERROR { let _ = cmodel.listen_ca(cm_from_ca, cm_to_pe, outer_trace_header); }
         });
         Ok(join_handle)
     }
-    fn listen_pe(&self, cm_from_pe: CmFromPe, cm_to_ca: CmToCa, outer_trace_header: &mut TraceHeader) -> Result<JoinHandle<()>, Error> {
+    fn listen_pe(&self, cm_from_pe: CmFromPe, cm_to_ca: CmToCa, mut outer_trace_header: TraceHeader) -> Result<JoinHandle<()>, Error> {
         let mut cmodel = self.clone();
-        let mut outer_trace_header_clone = outer_trace_header.clone();
         let join_handle = ::std::thread::spawn( move || {
-            let ref mut inner_trace_header = outer_trace_header_clone.fork_trace();
+            let ref mut inner_trace_header = outer_trace_header.fork_trace();
             let _ = cmodel.listen_pe_loop(&cm_from_pe, &cm_to_ca, inner_trace_header).map_err(|e| write_err("cmodel listen_pe", e.into()));;
-            //let _ = cmodel.listen_pe(cm_from_pe, cm_to_ca);
+            if CONTINUE_ON_ERROR { let _ = cmodel.listen_pe(cm_from_pe, cm_to_ca, outer_trace_header); }
         });
         Ok(join_handle)
     }
