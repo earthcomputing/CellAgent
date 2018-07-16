@@ -3,6 +3,9 @@ use std::fmt;
 use std::collections::hash_map::DefaultHasher;
 use std::hash::{Hash, Hasher};
 
+use uuid;
+
+/*
 #[derive(Copy, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct Uuid {
     uuid: (u64, u64)
@@ -22,4 +25,19 @@ impl fmt::Display for Uuid {
 }
 impl fmt::Debug for Uuid {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result { write!(f, "{:08.x}", self.uuid.0) }
+}
+*/
+
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub struct Uuid {
+    codes: u8,          // In case we want to encode stuff in the UUID
+    uuid: uuid::Uuid
+}
+impl Uuid {
+    pub fn new_v4(_value: &str) -> Uuid {
+        Uuid { codes: 0, uuid: uuid::Uuid::new_v4() }
+    }
+}
+impl fmt::Display for Uuid {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result { write!(f, "{}", self.uuid) }
 }
