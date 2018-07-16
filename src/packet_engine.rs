@@ -199,8 +199,8 @@ impl PacketEngine {
 	fn forward(&self, recv_port_no: PortNo, entry: RoutingTableEntry, user_mask: Mask,
                packet: Packet, trace_header: &mut TraceHeader) -> Result<(), Error>{
         let f = "forward";
-		//println!("PacketEngine {}: forward packet {}, mask {}, entry {}", self.cell_id, packet.get_count(), mask, entry);
-		if packet.is_rootcast() {
+        let is_leafcast = recv_port_no == entry.get_parent();
+		if !is_leafcast { //packet.is_rootcast() {
 			let parent = entry.get_parent();
 				if *parent == 0 {
                     if DEBUG_OPTIONS.trace_all || DEBUG_OPTIONS.pe_pkt_send {   // Debug print
