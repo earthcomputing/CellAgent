@@ -159,7 +159,7 @@ impl PacketEngine {
         };
         if DEBUG_OPTIONS.trace_all || DEBUG_OPTIONS.pe_process_pkt {   // Debug print
             let msg_type = MsgType::msg_type(&packet);
-            if msg_type == MsgType::Manifest {
+            if DEBUG_OPTIONS.pe_process_pkt && msg_type == MsgType::Manifest {
                 println!("PacketEngine {}: processing ManifestMsg", self.cell_id);
             }
             let tree_id = packet.get_tree_id();

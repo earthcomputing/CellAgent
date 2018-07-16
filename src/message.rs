@@ -355,16 +355,13 @@ pub struct StackTreeMsg {
 	payload: StackTreeMsgPayload
 }
 impl StackTreeMsg {
-	pub fn new(sender_id: &SenderID, new_tree_id: &TreeID, parent_tree_id: &TreeID, direction: MsgDirection, gvm_eqn: &GvmEquation) -> StackTreeMsg {
+	pub fn new(sender_id: &SenderID, new_tree_name: &AllowedTree, new_tree_id: &TreeID, parent_tree_id: &TreeID,
+               direction: MsgDirection, gvm_eqn: &GvmEquation) -> StackTreeMsg {
 		let header = MsgHeader::new( sender_id,MsgType::StackTree, direction);
-		let payload = StackTreeMsgPayload::new(new_tree_id, parent_tree_id, gvm_eqn);
+		let payload = StackTreeMsgPayload::new(new_tree_name, new_tree_id, parent_tree_id, gvm_eqn);
 		StackTreeMsg { header, payload}
 	}
-//    fn update_payload(&self, payload: StackTreeMsgPayload) -> StackTreeMsg {
-//        StackTreeMsg { header: self.header.clone(), payload }
-//}
     pub fn get_payload(&self) -> &StackTreeMsgPayload { &self.payload }
-//    pub fn get_tree_id(&self) -> &TreeID { self.payload.get_parent_tree_id() }
 }
 impl Message for StackTreeMsg {
 	fn get_header(&self) -> &MsgHeader { &self.header }
@@ -392,15 +389,17 @@ impl fmt::Display for StackTreeMsg {
 }
 #[derive(Debug, Clone, Hash, Serialize, Deserialize)]
 pub struct StackTreeMsgPayload {
+    allowed_tree: AllowedTree,
     new_tree_id: TreeID,
     parent_tree_id: TreeID,
     gvm_eqn: GvmEquation
 }
 impl StackTreeMsgPayload {
-    fn new(new_tree_id: &TreeID, parent_tree_id: &TreeID, gvm_eqn: &GvmEquation) -> StackTreeMsgPayload {
-        StackTreeMsgPayload { new_tree_id: new_tree_id.clone(), parent_tree_id: parent_tree_id.clone(),
-            gvm_eqn: gvm_eqn.clone() }
+    fn new(allowed_tree: &AllowedTree, new_tree_id: &TreeID, parent_tree_id: &TreeID, gvm_eqn: &GvmEquation) -> StackTreeMsgPayload {
+        StackTreeMsgPayload { allowed_tree: allowed_tree.clone(), new_tree_id: new_tree_id.clone(),
+            parent_tree_id: parent_tree_id.clone(), gvm_eqn: gvm_eqn.clone() }
     }
+    pub fn get_allowed_tree(&self) -> &AllowedTree { &self.allowed_tree }
     pub fn get_new_tree_id(&self) -> &TreeID { &self.new_tree_id }
     pub fn get_parent_tree_id(&self) -> &TreeID { &self.parent_tree_id }
     pub fn get_gvm_eqn(&self) -> &GvmEquation { &self.gvm_eqn }
