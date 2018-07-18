@@ -8,8 +8,8 @@ use std::collections::hash_map::Entry;
 use serde;
 use serde_json;
 
-use config::{CONNECTED_PORTS_TREE_NAME, CONTINUE_ON_ERROR, CONTROL_TREE_NAME, MAX_PORTS,
-             ByteArray, CellNo, CellType, DEBUG_OPTIONS, PathLength, PortNo};
+use config::{CONNECTED_PORTS_TREE_NAME, CONTINUE_ON_ERROR, CONTROL_TREE_NAME, DEBUG_OPTIONS, MAX_PORTS,
+             ByteArray, CellNo, CellType, PathLength, PortNo};
 use dal;
 use gvm_equation::{GvmEquation, GvmEqn};
 use message::{Message, MsgDirection, MsgTreeMap, MsgType, TcpMsgType, ApplicationMsg,
@@ -512,7 +512,6 @@ impl CellAgent {
             let ref mut inner_trace_header = outer_trace_header_clone.fork_trace();
             let _ = ca.listen_uptree_loop(&sender_id.clone(), &vm_id, &ca_from_vm, inner_trace_header).map_err(|e| ::utility::write_err("cellagent", e));
             let ref mut outer_trace_header = outer_trace_header_clone.fork_trace();
-            println!("Cellagent {}: Back from listen_uptree_loop", ca.cell_id);
             if CONTINUE_ON_ERROR { let _ = ca.listen_uptree(sender_id, vm_id, trees, ca_from_vm, outer_trace_header); }
         });
     }
@@ -856,7 +855,6 @@ impl CellAgent {
             //println!("Cellagent {}: StackTree {} parent tree {}", self.cell_id, new_tree_id, parent_tree_id);
             let base_tree_id = self.get_base_tree_id(parent_tree_id, trace_header).context(CellagentError::Chain { func_name: f, comment: S("") })?;
             self.update_base_tree_map(parent_tree_id, &base_tree_id, trace_header);
-            let gvm_eqn = payload.get_gvm_eqn();
             let save = self.gvm_eval_save(&parent_tree_id, gvm_eqn, trace_header).context(CellagentError::Chain { func_name: f, comment: S(self.cell_id.clone()) })?;
             if save { self.add_saved_stack_tree(parent_tree_id, msg, trace_header); }
             if DEBUG_OPTIONS.trace_all || DEBUG_OPTIONS.process_msg {   // Debug
@@ -874,7 +872,7 @@ impl CellAgent {
                                     trace_header: &mut TraceHeader) -> Result<(), Error> {
         let f = "process_stack_treed_msg";
         let payload = msg.get_payload();
-        let port_number =PortNumber::new(port_no, self.no_ports)?;
+        let port_number = PortNumber::new(port_no, self.no_ports)?;
         let tree_id = payload.get_tree_id();
         let tree_uuid = tree_id.get_uuid();
         let mut traph = self.get_traph(tree_id, trace_header)?;
@@ -1006,7 +1004,8 @@ impl CellAgent {
         let parent_mask = parent_entry.get_mask().and(DEFAULT_USER_MASK);  // Excludes port 0
         let traph = self.get_traph(&parent_tree_id, trace_header).context(CellagentError::Chain { func_name: f, comment: S("")})?;
         let variables = traph.get_params(gvm_eqn.get_variables())?;
-        if gvm_eqn.eval_xtnd(&variables)? {
+        let gvm_xtnd = gvm_eqn.eval_xtnd(&variables)?;
+        if gvm_xtnd {
             self.send_msg(&self.connected_tree_id, &stack_tree_msg, parent_mask, trace_header)?;
             self.add_saved_stack_tree(my_tree_id, &stack_tree_msg, trace_header);
         }
