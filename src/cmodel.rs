@@ -71,7 +71,7 @@ impl Cmodel {
                         }
                         let _ = dal::add_to_trace(trace_header, TraceType::Debug, trace_params, &trace, f);
                     }
-                    let packets = Packetizer::packetize(&tree_id, &bytes, direction, is_blocking);
+                    let packets = Packetizer::packetize(&tree_id, &bytes, is_blocking);
                     for packet in packets {
                         cm_to_pe.send(CmToPePacket::Packet((user_mask, packet)))?;
                     }

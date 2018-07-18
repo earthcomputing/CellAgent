@@ -6,7 +6,7 @@ use serde_json::Value;
 
 use config::{SEPARATOR, CellNo};
 use utility::{PortNumber, S};
-use uuid_fake::Uuid;
+use uuid_ec::Uuid;
 
 // Using String means names are not Copy
 type NameType = String;

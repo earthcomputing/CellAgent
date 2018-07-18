@@ -16,7 +16,7 @@ use packet::{Packet};
 use routing_table::{RoutingTable};
 use routing_table_entry::{RoutingTableEntry};
 use utility::{Mask, PortNumber, S, TraceHeader, TraceHeaderParams, TraceType, write_err};
-use uuid_fake::Uuid;
+use uuid_ec::Uuid;
 
 // TODO: Figure out how to packet engine gets trace messagesto the DAL
 
