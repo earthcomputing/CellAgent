@@ -5,7 +5,7 @@ use std::collections::HashSet;
 use config::{MAX_PORTS, PortNo};
 use name::{Name, TreeID};
 use utility::{Mask, PortNumber, S};
-use uuid_fake::Uuid;
+use uuid_ec::Uuid;
 
 #[derive(Debug, Copy, Clone, Serialize, Deserialize)]
 pub struct RoutingTableEntry {

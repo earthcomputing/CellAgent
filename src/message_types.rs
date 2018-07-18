@@ -8,7 +8,7 @@ use packet::{Packet};
 use port::{PortStatus};
 use uptree_spec::AllowedTree;
 use utility::{Mask, PortNumber};
-use uuid_fake::Uuid;
+use uuid_ec::Uuid;
 
 pub type TCP = (AllowedTree, TcpMsgType, MsgDirection, ByteArray);
 pub type CATOCM = (TreeID, Mask, MsgDirection, bool, ByteArray);

@@ -29,7 +29,7 @@ use uptree_spec::{AllowedTree, Manifest};
 use utility::{BASE_TENANT_MASK, DEFAULT_USER_MASK, Mask, Path,
               PortNumber, S, TraceHeader, TraceHeaderParams, TraceType, UtilityError};
 //use uuid::Uuid;
-use uuid_fake::Uuid;
+use uuid_ec::Uuid;
 use vm::VirtualMachine;
 
 use failure::{Error, ResultExt};

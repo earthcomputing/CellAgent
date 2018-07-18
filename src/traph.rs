@@ -12,7 +12,7 @@ use routing_table_entry::{RoutingTableEntry};
 use traph_element::TraphElement;
 use tree::Tree;
 use utility::{Path, PortNumber, S};
-use uuid_fake::Uuid;
+use uuid_ec::Uuid;
 
 type StackedTrees = HashMap<Uuid, Tree>;
 

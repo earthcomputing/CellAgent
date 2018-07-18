@@ -169,7 +169,7 @@ pub trait Message {
 			where Self:std::marker::Sized + serde::Serialize {
 		let bytes = Serializer::serialize(self).context(MessageError::Chain { func_name: "to_packets", comment: S("")})?;
 		let direction = self.get_header().get_direction();
-		let packets = Packetizer::packetize(tree_id, &ByteArray(*bytes), direction, self.is_blocking());
+		let packets = Packetizer::packetize(tree_id, &ByteArray(*bytes), self.is_blocking());
 		Ok(packets)
 	}
 	fn process_ca(&mut self, _cell_agent: &mut CellAgent, _port_no: PortNo,

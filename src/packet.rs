@@ -7,14 +7,13 @@ use std::str;
 use rand;
 use serde;
 use serde_json;
-//use uuid::Uuid;
 
 use config::{PACKET_MIN, PACKET_MAX, PAYLOAD_DEFAULT_ELEMENT, 
 	ByteArray, MsgID, PacketNo};
-use message::{Message, MsgDirection, MsgType, TypePlusMsg};
+use message::{Message, MsgType, TypePlusMsg};
 use name::{Name, TreeID};
 use utility::S;
-use uuid_fake::Uuid;
+use uuid_ec::Uuid;
  
 //const LARGEST_MSG: usize = std::u32::MAX as usize;
 const PAYLOAD_MIN: usize = PACKET_MAX - PACKET_HEADER_SIZE;
@@ -29,12 +28,11 @@ pub struct Packet {
 	payload: Payload,
 	packet_count: usize
 }
-#[deny(unused_must_use)]
 impl Packet {
-    fn new(msg_id: MsgID, tree_id: &TreeID, size: PacketNo, direction: MsgDirection,
+    fn new(msg_id: MsgID, tree_id: &TreeID, size: PacketNo,
            is_last_packet: bool, is_blocking: bool, data_bytes: Vec<u8>) -> Packet {
         let header = PacketHeader::new(tree_id);
-        let payload = Payload::new(msg_id, size, direction, is_last_packet, is_blocking, data_bytes);
+        let payload = Payload::new(msg_id, size, is_last_packet, is_blocking, data_bytes);
         Packet { header, payload, packet_count: Packet::get_next_count() }
     }
     pub fn get_uuid(&self) -> Uuid { self.header.get_uuid() }
@@ -49,9 +47,6 @@ impl Packet {
     pub fn get_bytes(&self) -> Vec<u8> { self.payload.bytes.iter().cloned().collect() }
     pub fn get_msg_id(&self) -> MsgID { self.payload.get_msg_id() }
     pub fn get_size(&self) -> PacketNo { self.payload.get_size() }
-    pub fn is_leafcast(&self) -> bool { self.payload.is_leafcast() }
-    pub fn is_rootcast(&self) -> bool { self.payload.is_rootcast() }
-    fn set_direction(&mut self, direction: MsgDirection) { self.payload.set_direction(direction) }
     // Debug hack to get tree_id out of packets.  Assumes msg is one packet
     pub fn get_tree_id(self) -> TreeID {
         let msg = MsgType::get_msg(&vec![self]).unwrap();
@@ -103,43 +98,25 @@ pub struct Payload {
                     // Number of bytes in last packet if last packet, 0 => Error
     is_last: bool,
     is_blocking: bool,
-    direction: MsgDirection,
 	bytes: [u8; PAYLOAD_MAX],
 }
 impl Payload {
-	pub fn new(msg_id: MsgID, size: PacketNo, direction: MsgDirection,
+	pub fn new(msg_id: MsgID, size: PacketNo,
                is_last: bool, is_blocking: bool, data_bytes: Vec<u8>) -> Payload {
 		let no_data_bytes = data_bytes.len();
         let mut bytes = [0 as u8; PAYLOAD_MAX];
         for i in 0..data_bytes.len() { bytes[i] = data_bytes[i]; }
-        Payload { msg_id, size, is_last, is_blocking, direction, bytes}
+        Payload { msg_id, size, is_last, is_blocking, bytes}
 	}
 	fn get_bytes(&self) -> Vec<u8> { self.bytes.iter().cloned().collect() }
     fn get_msg_id(&self) -> MsgID { self.msg_id }
     fn get_size(&self) -> PacketNo { self.size }
-    fn get_direction(&self) -> MsgDirection { self.direction }
-    fn is_leafcast(&self) -> bool {
-        match self.direction {
-            MsgDirection::Leafward => true,
-            _ => false
-        }
-    }
-    fn is_rootcast(&self) -> bool {
-        match self.direction {
-            MsgDirection::Rootward => true,
-            _ => false
-        }
-    }
     fn is_last_packet(&self) -> bool { self.is_last }
     fn is_blocking(&self) -> bool { self.is_blocking }
-
-    fn set_direction(&mut self, direction: MsgDirection) { self.direction = direction }
 }
 impl fmt::Display for Payload {
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let mut s = format!("Message ID {}", *self.msg_id);
-        if self.is_rootcast() { s = s + " Rootward"; }
-        else                  { s = s + " Leafward"; }
         if self.is_last_packet() { s = s + ", Last packet"; }
         else                     { s = s + ", Not last packet"; }
         s = s + &format!(", Size {}", *self.size);
@@ -170,7 +147,7 @@ impl Serializer {
 }
 pub struct Packetizer {}
 impl Packetizer {
-	pub fn packetize(tree_id: &TreeID, msg_bytes: &ByteArray, direction: MsgDirection, is_blocking: bool)
+	pub fn packetize(tree_id: &TreeID, msg_bytes: &ByteArray, is_blocking: bool)
 			-> Vec<Packet> {
 		let payload_size = Packetizer::packet_payload_size(msg_bytes.len());
 		let num_packets = (msg_bytes.len() + payload_size - 1)/ payload_size; // Poor man's ceiling
@@ -189,7 +166,7 @@ impl Packetizer {
 				if i*payload_size + j == msg_bytes.len() { break; }
 				packet_bytes[j] = msg_bytes[i*payload_size + j];
 			}
-			let packet = Packet::new(msg_id, tree_id, PacketNo(size as u16), direction,
+			let packet = Packet::new(msg_id, tree_id, PacketNo(size as u16),
                                      is_last_packet, is_blocking, packet_bytes);
 			//println!("Packet: packet {} for msg {}", packet.get_packet_count(), msg.get_count());
 			packets.push(packet); 

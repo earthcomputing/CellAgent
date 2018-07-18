@@ -5,7 +5,7 @@ use std::fmt;
 use gvm_equation::GvmEquation;
 use name::{Name, TreeID};
 use routing_table_entry::RoutingTableEntry;
-use uuid_fake::Uuid;
+use uuid_ec::Uuid;
 
 #[derive(Debug, Clone)]
 pub struct Tree {
