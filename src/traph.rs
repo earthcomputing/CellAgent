@@ -171,6 +171,7 @@ impl Traph {
         //println!("Traph Cell {}: {} stacking tree number {}", self.cell_id, f, locked.len());
 	}
 	pub fn get_params(&self, vars: &Vec<GvmVariable>) -> Result<Vec<GvmVariable>, Error> {
+        let f = "get_params";
 		let mut variables = Vec::new();
 		for var in vars {
 			match var.get_var_name().as_ref() {
@@ -181,7 +182,7 @@ impl Traph {
                     updated.set_value(str_hops);
 					variables.push(updated);
 				},
-				_ => ()
+				_ => return Err(TraphError::Gvm { func_name: f, var_name: var.get_var_name().clone() }.into())
 			}
 		}
 		Ok(variables)
@@ -223,8 +224,10 @@ impl fmt::Display for PortStatus {
 use failure::{Error, ResultExt};
 #[derive(Debug, Fail)]
 pub enum TraphError {
-	#[fail(display = "TraphError::Chain {} {}", func_name, comment)]
+	#[fail(display = "TraphError::Chain {}: {}", func_name, comment)]
 	Chain { func_name: &'static str, comment: String },
+    #[fail(display = "TraphError::Gvm {}: var_name {} not implemented", func_name, var_name)]
+    Gvm { func_name: &'static str, var_name: String },
 	#[fail(display = "TraphError::ParentElement {}: No parent element for tree {} on cell {}", func_name, tree_id, cell_id)]
 	ParentElement { func_name: &'static str, cell_id: CellID, tree_id: TreeID },
     #[fail(display = "TraphError::Tree {}: No tree with UUID {} on cell {}", func_name, tree_uuid, cell_id)]

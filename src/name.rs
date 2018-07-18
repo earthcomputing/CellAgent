@@ -62,11 +62,10 @@ impl fmt::Display for PortID { fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Res
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct TreeID { name: NameType, uuid: Uuid}
 impl<'a> TreeID {
-	pub fn new(n: &str) -> Result<TreeID, Error> {
-		let name = S("Tree:") + n;
+	pub fn new(name: &str) -> Result<TreeID, Error> {
 		match name.find(' ') {
-			None => Ok(TreeID { name: name.clone(), uuid: Uuid::new_v4(&name) }),
-			Some(_) => Err(NameError::Format { name, func_name: "TreeID::new" }.into())
+			None => Ok(TreeID { name: S(name), uuid: Uuid::new_v4(name) }),
+			Some(_) => Err(NameError::Format { name: S(name), func_name: "TreeID::new" }.into())
 		}
 	}
 }

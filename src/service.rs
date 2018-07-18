@@ -55,6 +55,7 @@ impl NocMaster {
     }
     //fn get_container_id(&self) -> &ContainerID { &self.container_id }
     pub fn initialize(&self, _: &UptreeID, container_from_vm: ContainerFromVm) -> Result<(), Error> {
+        let f = "initialize";
         println!("Service {} running NocMaster", self.container_id);
         self.listen_vm(container_from_vm)?;
         let msg = S("Hello From Master");
@@ -74,7 +75,7 @@ impl NocMaster {
         Ok(())
     }
     fn listen_vm_loop(&self, container_from_vm: &ContainerFromVm) -> Result<(), Error> {
-        //println!("NocMaster on container {} waiting for msg from VM", self.container_id);
+        let f = "listen_vm_loop";
         loop {
             let msg = container_from_vm.recv().context("NocMaster container_from_vm").context(ServiceError::Chain { func_name: "listen_vm_loop", comment: S("NocMaster from vm")})?;
             println!("NocMaster on container {} got msg {}", self.container_id, ::std::str::from_utf8(&msg)?);

@@ -30,27 +30,27 @@ impl Datacenter {
 		if *ncells < 1  { return Err(DatacenterError::Cells{ ncells, func_name: f }.into()); }
 		if edge_list.len() < *ncells - 1 { return Err(DatacenterError::Edges { nlinks: LinkNo(CellNo(edge_list.len())), func_name: f }.into() ); }
 		let border_cells = blueprint.get_border_cells();
-		for cell in border_cells {
-            {
-                let ref trace_params = TraceHeaderParams { module: MODULE, function: f, format: "border_cell_start" };
-                let trace = json!({ "cell_number": cell.get_cell_no() });
-                let _ = dal::add_to_trace(trace_header, TraceType::Trace, trace_params,&trace, f);
-            }
-			let cell = NalCell::new(cell.get_cell_no(), cell.get_nports(),
+		for border_cell in border_cells {
+			let cell = NalCell::new(border_cell.get_cell_no(), border_cell.get_nports(),
                                     CellType::Border,CellConfig::Large,
                                     trace_header.fork_trace())?;
+            {
+                let ref trace_params = TraceHeaderParams { module: MODULE, function: f, format: "border_cell_start" };
+                let trace = json!({ "cell_number": border_cell.get_cell_no() });
+                let _ = dal::add_to_trace(trace_header, TraceType::Trace, trace_params,&trace, f);
+            }
 			self.cells.push(cell);
 		}
 		let interior_cells = blueprint.get_interior_cells();
-		for cell in interior_cells {
-            {
-                let ref trace_params = TraceHeaderParams { module: MODULE, function: f, format: "interior_cell_start" };
-                let trace = json!({"cell_number": cell.get_cell_no() });
-                let _ = dal::add_to_trace(trace_header, TraceType::Trace, trace_params, &trace, f);
-            }
-			let cell = NalCell::new(cell.get_cell_no(), cell.get_nports(),
+		for interior_cell in interior_cells {
+			let cell = NalCell::new(interior_cell.get_cell_no(), interior_cell.get_nports(),
                                     CellType::Interior,CellConfig::Large,
                                     trace_header.fork_trace())?;
+            {
+                let ref trace_params = TraceHeaderParams { module: MODULE, function: f, format: "interior_cell_start" };
+                let trace = json!({"cell_number": interior_cell.get_cell_no() });
+                let _ = dal::add_to_trace(trace_header, TraceType::Trace, trace_params, &trace, f);
+            }
 			self.cells.push(cell);
 		}
 		self.cells.sort_by(|a, b| (*a.get_no()).cmp(&*b.get_no())); // Sort to conform to edge list
