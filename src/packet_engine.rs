@@ -92,8 +92,9 @@ impl PacketEngine {
                     if DEBUG_OPTIONS.trace_all || DEBUG_OPTIONS.pe_pkt_recv {  // Debug print
                         let msg_type = MsgType::msg_type(&packet);
                         let tree_id = packet.get_tree_id();
+                        let packet_type = packet.get_packet_type();
                         let ref trace_params = TraceHeaderParams { module: MODULE, function: f, format: "pe_packet_from_cm" };
-                        let trace = json!({ "cell_id": &self.cell_id, "tree_id": &tree_id, "msg_type": &msg_type });
+                        let trace = json!({ "cell_id": &self.cell_id, "tree_id": &tree_id, "packet_type": packet_type, "msg_type": &msg_type });
                         if DEBUG_OPTIONS.pe_pkt_recv {
                             match msg_type {
                                 MsgType::DiscoverD => {
@@ -163,8 +164,10 @@ impl PacketEngine {
                 println!("PacketEngine {}: processing ManifestMsg", self.cell_id);
             }
             let tree_id = packet.get_tree_id();
+            let packet_type = packet.get_packet_type();
             let ref trace_params = TraceHeaderParams { module: MODULE, function: f, format: "pe_process_packet" };
-            let trace = json!({ "cell_id": &self.cell_id, "tree_id": &tree_id, "msg_type": &msg_type, "port_no": &port_no, "entry": &entry });
+            let trace = json!({ "cell_id": &self.cell_id, "tree_id": &tree_id, "packet_type": packet_type,
+                "msg_type": &msg_type, "port_no": &port_no, "entry": &entry });
             if DEBUG_OPTIONS.pe_process_pkt {
                 match msg_type {
                     MsgType::Discover => (),
