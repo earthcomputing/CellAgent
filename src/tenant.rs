@@ -12,7 +12,6 @@ pub struct Tenant {
 	children: HashMap<TenantID,Box<Tenant>>,
 }
 /*
-#[deny(unused_must_use)]
 impl Tenant {
 	pub fn new(id: &'static str, n: CellNo, parent_id: Option<TenantID>) -> Result<Tenant, Error> {
 		let name = match parent_id {

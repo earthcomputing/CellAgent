@@ -13,7 +13,7 @@ use config::{PACKET_MIN, PACKET_MAX, PAYLOAD_DEFAULT_ELEMENT,
 use message::{Message, MsgType, TypePlusMsg};
 use name::{Name, TreeID};
 use utility::S;
-use uuid_ec::Uuid;
+use uuid_ec::{Uuid, PacketState};
  
 //const LARGEST_MSG: usize = std::u32::MAX as usize;
 const PAYLOAD_MIN: usize = PACKET_MAX - PACKET_HEADER_SIZE;
@@ -42,6 +42,7 @@ impl Packet {
     pub fn get_header(&self) -> PacketHeader { self.header }
     pub fn get_payload(&self) -> Payload { self.payload }
     pub fn get_tree_uuid(&self) -> Uuid { self.header.get_uuid() }
+	pub fn get_packet_type(&self) -> PacketState { self.get_uuid().get_state() }
     pub fn is_blocking(&self) -> bool { self.payload.is_blocking() }
     pub fn is_last_packet(&self) -> bool { self.payload.is_last_packet() }
     pub fn get_bytes(&self) -> Vec<u8> { self.payload.bytes.iter().cloned().collect() }
