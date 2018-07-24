@@ -37,14 +37,14 @@ impl Uuid {
         bytes[0] = code | (bytes[0] & REVERSE); // Make sure to keep direction when changing code
         self.uuid = uuid::Uuid::from_uuid_bytes(bytes);
     }
-    pub fn get_state(&self) -> PacketState {
+    pub fn get_ait_state(&self) -> AitState {
         match self.get_code() & !REVERSE {  // !REVERSE strips direction from test
-            TICK   => PacketState::Tick,
-            TOCK   => PacketState::Tock,
-            TACK   => PacketState::Tack,
-            TECK   => PacketState::Teck,
-            AIT    => PacketState::Ait,
-            NORMAL => PacketState::Normal,
+            TICK   => AitState::Tick,
+            TOCK   => AitState::Tock,
+            TACK   => AitState::Tack,
+            TECK   => AitState::Teck,
+            AIT    => AitState::Ait,
+            NORMAL => AitState::Normal,
             _ => {
                 panic!("Uuid {} is in an invalid state", self)
             }
@@ -57,49 +57,49 @@ impl Uuid {
             _ => panic!("0xC0 & code is not 0 or 1")
         }
     }
-    pub fn make_normal(&mut self) -> PacketState {
+    pub fn make_normal(&mut self) -> AitState {
         let mut bytes = *self.uuid.as_bytes();
         bytes[0] = NORMAL;
         self.uuid = uuid::Uuid::from_uuid_bytes(bytes);
-        PacketState::Normal
+        AitState::Normal
     }
-    pub fn make_ait(&mut self) -> PacketState {
+    pub fn make_ait(&mut self) -> AitState {
         self.set_code(AIT);
-        PacketState::Ait
+        AitState::Ait
     }
     pub fn time_reverse(&mut self) {
         let code = self.get_code();
         self.set_code(code ^ REVERSE);
     }
-/*
-    pub fn next(&mut self) -> Result<PacketState, Error> {
+    pub fn next(&mut self) -> Result<AitState, Error> {
         match self.get_direction() {
             TimeDirection::Forward => self.next_state(),
             TimeDirection::Reverse => self.previous_state()
         }
     }
-    fn next_state(&mut self) -> Result<PacketState, Error> {
+    fn next_state(&mut self) -> Result<AitState, Error> {
         let f = "next_state";
-        Ok(match self.code & 0x7F {
-            0 => { self.code = 1; PacketState::Tock },
-            1 => { self.code = 0; PacketState::Tick },
-            2 => { self.code = 1; PacketState::Tack },
-            3 => { self.code = 2; PacketState::Teck },
-            4 => { self.code = 3; PacketState::Ait  },
-            _ => return Err(UuidError::Code { func_name: f, code: self.get_state() }.into())
+        Ok(match self.get_code() & !REVERSE {
+            TICK => { self.set_code(TOCK); AitState::Tock },
+            TOCK => { self.set_code(TICK); AitState::Tick },
+            TACK => { self.set_code(TOCK); AitState::Tock },
+            TECK => { self.set_code(TACK); AitState::Tack },
+            AIT  => { self.set_code(TACK); AitState::Ait  },
+            NORMAL => AitState::Normal,
+            _ => return Err(UuidError::Code { func_name: f, code: self.get_ait_state() }.into())
         })
     }
-    fn previous_state(&mut self) -> Result<PacketState, Error> {
+    fn previous_state(&mut self) -> Result<AitState, Error> {
         let f = "previous_stat";
-        Ok(match self.code & 0x7f {
-            0 => { self.code = 1; PacketState::Tock },
-            1 => { self.code = 2; PacketState::Tick },
-            2 => { self.code = 3; PacketState::Tack },
-            3 => { self.code = 4; PacketState::Teck },
-            _ => return Err(UuidError::Code { func_name: f, code: self.get_state() }.into())
+        Ok(match self.get_code() & !REVERSE {
+            TICK => { self.set_code(TOCK); AitState::Tock },
+            TOCK => { self.set_code(TACK); AitState::Tack },
+            TACK => { self.set_code(TECK); AitState::Teck },
+            TECK => { self.set_code(AIT);  AitState::Teck },
+            NORMAL => AitState::Normal,
+            _ => return Err(UuidError::Code { func_name: f, code: self.get_ait_state() }.into())
         })
     }
-*/
 }
 impl fmt::Display for Uuid {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
@@ -108,22 +108,22 @@ impl fmt::Display for Uuid {
 }
 impl fmt::Debug for Uuid {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{} {}", self.get_state(), self.uuid)
+        write!(f, "{} {}", self.get_ait_state(), self.uuid)
     }
 }
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
-pub enum PacketState {
+pub enum AitState {
     Normal, Ait, Teck, Tack, Tock, Tick
 }
-impl fmt::Display for PacketState {
+impl fmt::Display for AitState {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let s = match self {
-            &PacketState::Normal => "Normal",
-            &PacketState::Ait    => "AIT",
-            &PacketState::Teck   => "TECK",
-            &PacketState::Tack   => "TACK",
-            &PacketState::Tock   => "TOCK",
-            &PacketState::Tick   => "TICK",
+            &AitState::Normal => "Normal",
+            &AitState::Ait    => "AIT",
+            &AitState::Teck   => "TECK",
+            &AitState::Tack   => "TACK",
+            &AitState::Tock   => "TOCK",
+            &AitState::Tick   => "TICK",
         };
         write!(f, "{}", s)
     }
@@ -148,5 +148,5 @@ pub enum UuidError {
     #[fail(display = "UuidError::Chain {} {}", func_name, comment)]
     Chain { func_name: &'static str, comment: String },
     #[fail(display = "UuidError::Code: Can't do {} from state {}", func_name, code)]
-    Code { func_name: &'static str, code: PacketState }
+    Code { func_name: &'static str, code: AitState }
 }

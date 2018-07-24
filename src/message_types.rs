@@ -11,7 +11,7 @@ use utility::{Mask, PortNumber};
 use uuid_ec::Uuid;
 
 pub type TCP = (AllowedTree, TcpMsgType, MsgDirection, ByteArray);
-pub type CATOCM = (TreeID, Mask, MsgDirection, bool, ByteArray);
+pub type CATOCM = (TreeID, bool, Mask, MsgDirection, bool, ByteArray);
 // PacketEngine to PacketEngine to unblock
 pub type PeToPePacket = String;
 pub type PeToPe = mpsc::Sender<PeToPePacket>;
