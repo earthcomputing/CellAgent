@@ -13,7 +13,7 @@ use config::{PACKET_MIN, PACKET_MAX, PAYLOAD_DEFAULT_ELEMENT,
 use message::{Message, MsgType, TypePlusMsg};
 use name::{Name, TreeID};
 use utility::S;
-use uuid_ec::{Uuid, PacketState};
+use uuid_ec::{Uuid, AitState};
  
 //const LARGEST_MSG: usize = std::u32::MAX as usize;
 const PAYLOAD_MIN: usize = PACKET_MAX - PACKET_HEADER_SIZE;
@@ -29,20 +29,26 @@ pub struct Packet {
 	packet_count: usize
 }
 impl Packet {
-    fn new(msg_id: MsgID, tree_id: &TreeID, size: PacketNo,
+    fn new(msg_id: MsgID, uuid: &Uuid, size: PacketNo,
            is_last_packet: bool, is_blocking: bool, data_bytes: Vec<u8>) -> Packet {
-        let header = PacketHeader::new(tree_id);
+        let header = PacketHeader::new(uuid);
         let payload = Payload::new(msg_id, size, is_last_packet, is_blocking, data_bytes);
         Packet { header, payload, packet_count: Packet::get_next_count() }
     }
     pub fn get_uuid(&self) -> Uuid { self.header.get_uuid() }
+    pub fn get_ait_state(&self) -> AitState { self.get_uuid().get_ait_state() }
+    pub fn next_ait_state(&mut self) -> Result<(), Error> {
+        let mut uuid = self.header.get_uuid();
+        uuid.next()?;
+        self.header = PacketHeader::new(&uuid);
+        Ok(())
+    }
     pub fn get_next_count() -> usize { PACKET_COUNT.fetch_add(1, Ordering::SeqCst) }
     pub fn get_count(&self) -> usize { self.packet_count }
     // For debugging
     pub fn get_header(&self) -> PacketHeader { self.header }
     pub fn get_payload(&self) -> Payload { self.payload }
     pub fn get_tree_uuid(&self) -> Uuid { self.header.get_uuid() }
-	pub fn get_packet_type(&self) -> PacketState { self.get_uuid().get_state() }
     pub fn is_blocking(&self) -> bool { self.payload.is_blocking() }
     pub fn is_last_packet(&self) -> bool { self.payload.is_last_packet() }
     pub fn get_bytes(&self) -> Vec<u8> { self.payload.bytes.iter().cloned().collect() }
@@ -77,12 +83,11 @@ pub struct PacketHeader {
     uuid: Uuid,     // Tree identifier 16 bytes
 }
 impl PacketHeader {
-	pub fn new(tree_id: &TreeID) -> PacketHeader {
-		// Assertion fails if I forgot to change PACKET_HEADER_SIZE when I changed PacketHeader struct
-        PacketHeader { uuid: tree_id.get_uuid() }
+	pub fn new(uuid: &Uuid) -> PacketHeader {
+        PacketHeader { uuid: uuid.clone() }
 	}
 	fn get_uuid(&self) -> Uuid { self.uuid }
-//	pub fn set_uuid(&mut self, new_uuid: Uuid) { self.uuid = new_uuid; }
+	fn set_uuid(&mut self, new_uuid: Uuid) { self.uuid = new_uuid; }
 }
 impl fmt::Display for PacketHeader { 
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result { 
@@ -148,7 +153,7 @@ impl Serializer {
 }
 pub struct Packetizer {}
 impl Packetizer {
-	pub fn packetize(tree_id: &TreeID, msg_bytes: &ByteArray, is_blocking: bool)
+	pub fn packetize(uuid: &Uuid, msg_bytes: &ByteArray, is_blocking: bool)
 			-> Vec<Packet> {
 		let payload_size = Packetizer::packet_payload_size(msg_bytes.len());
 		let num_packets = (msg_bytes.len() + payload_size - 1)/ payload_size; // Poor man's ceiling
@@ -167,7 +172,7 @@ impl Packetizer {
 				if i*payload_size + j == msg_bytes.len() { break; }
 				packet_bytes[j] = msg_bytes[i*payload_size + j];
 			}
-			let packet = Packet::new(msg_id, tree_id, PacketNo(size as u16),
+			let packet = Packet::new(msg_id, uuid, PacketNo(size as u16),
                                      is_last_packet, is_blocking, packet_bytes);
 			//println!("Packet: packet {} for msg {}", packet.get_packet_count(), msg.get_count());
 			packets.push(packet); 
