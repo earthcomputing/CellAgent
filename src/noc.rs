@@ -156,8 +156,8 @@ impl Noc {
         params.insert(S("new_tree_name"), S(noc_master_deploy_tree.get_name()));
         params.insert(S("parent_tree_name"), S(tree_name));
         let mut eqns = HashSet::new();
+        eqns.insert(GvmEqn::Send("hops == 0"));
         eqns.insert(GvmEqn::Recv("hops == 0"));
-        eqns.insert(GvmEqn::Send("true"));
         eqns.insert(GvmEqn::Xtnd("false"));
         eqns.insert(GvmEqn::Save("false"));
         let gvm_eqn = GvmEquation::new(eqns, vec![GvmVariable::new(GvmVariableType::PathLength, "hops")]);
@@ -178,8 +178,8 @@ impl Noc {
         params.insert(S("new_tree_name"), S(NOC_AGENT_DEPLOY_TREE_NAME));
         params.insert(S("parent_tree_name"), S(tree_name));
         let mut eqns = HashSet::new();
+        eqns.insert(GvmEqn::Send("hops == 0"));
         eqns.insert(GvmEqn::Recv("hops > 0"));
-        eqns.insert(GvmEqn::Send("true"));
         eqns.insert(GvmEqn::Xtnd("true"));
         eqns.insert(GvmEqn::Save("true"));
         let gvm_eqn = GvmEquation::new(eqns, vec![GvmVariable::new(GvmVariableType::PathLength, "hops")]);
@@ -198,8 +198,8 @@ impl Noc {
         params.insert(S("new_tree_name"), S(NOC_CONTROL_TREE_NAME));
         params.insert( S("parent_tree_name"), S(tree_name));
         let mut eqns = HashSet::new();
-        eqns.insert(GvmEqn::Recv("true"));
         eqns.insert(GvmEqn::Send("hops == 0"));
+        eqns.insert(GvmEqn::Recv("hops > 0"));
         eqns.insert(GvmEqn::Xtnd("true"));
         eqns.insert(GvmEqn::Save("true"));
         let gvm_eqn = GvmEquation::new(eqns, vec![GvmVariable::new(GvmVariableType::PathLength, "hops")]);
@@ -218,8 +218,8 @@ impl Noc {
         params.insert(S("new_tree_name"), S(NOC_LISTEN_TREE_NAME));
         params.insert( S("parent_tree_name"), S(tree_name));
         let mut eqns = HashSet::new();
+        eqns.insert(GvmEqn::Send("hops > 0"));
         eqns.insert(GvmEqn::Recv("hops == 0"));
-        eqns.insert(GvmEqn::Send("true"));
         eqns.insert(GvmEqn::Xtnd("true"));
         eqns.insert(GvmEqn::Save("true"));
         let gvm_eqn = GvmEquation::new(eqns, vec![GvmVariable::new(GvmVariableType::PathLength, "hops")]);
