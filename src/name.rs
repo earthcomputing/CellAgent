@@ -10,14 +10,14 @@ type NameType = String;
 pub trait Name: Sized {
 	fn get_name(&self) -> &str;
 	fn get_uuid(&self) -> Uuid;
-	fn create_from_string(&self, n: String) -> Self;
+	fn create_from_string(&self, n: &str) -> Self;
 	// Default implementations
 	fn stringify(&self) -> String { self.get_name().to_string() }
 	fn name_from_str(&self, s: &str) -> Result<Self, Error> {
 		// Names may not contain blanks
 		match s.find(' ') {
 			Some(_) => Err(NameError::Format { name: s.to_string(), func_name: "from_str" }.into()),
-			None => Ok(self.create_from_string(s.to_string()))
+			None => Ok(self.create_from_string(s))
 		}
 	}
 	fn add_component(&self, s: &str) -> Result<Self, Error> {
@@ -39,7 +39,7 @@ impl CellID {
 impl Name for CellID {
 	fn get_name(&self) -> &str { &self.name }
 	fn get_uuid(&self) -> Uuid { self.uuid }
-	fn create_from_string(&self, name: String) -> CellID { CellID { name: name.clone(), uuid: Uuid::new() } }
+	fn create_from_string(&self, name: &str) -> CellID { CellID { name: S(name), uuid: Uuid::new() } }
 }
 impl fmt::Display for CellID { fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result { self.name.fmt(f) } }
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -53,7 +53,7 @@ impl PortID {
 impl Name for PortID {
 	fn get_name(&self) -> &str { &self.name }
 	fn get_uuid(&self) -> Uuid { self.uuid }
-	fn create_from_string(&self, name: String) -> PortID { PortID { name: name.clone(), uuid: Uuid::new() } }
+	fn create_from_string(&self, name: &str) -> PortID { PortID { name: S(name), uuid: Uuid::new() } }
 }
 impl fmt::Display for PortID { fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result { self.name.fmt(f) } }
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -61,7 +61,7 @@ pub struct TreeID { name: NameType, uuid: Uuid}
 impl<'a> TreeID {
 	pub fn new(name: &str) -> Result<TreeID, Error> {
 		match name.find(' ') {
-			None => Ok(TreeID { name: S(name), uuid: Uuid::new() }),
+			None => Ok(TreeID { name: S(name), uuid: Uuid::new_tree_uuid() }),
 			Some(_) => Err(NameError::Format { name: S(name), func_name: "TreeID::new" }.into())
 		}
 	}
@@ -69,7 +69,7 @@ impl<'a> TreeID {
 impl Name for TreeID {
 	fn get_name(&self) -> &str { &self.name }
 	fn get_uuid(&self) -> Uuid { self.uuid }
-	fn create_from_string(&self, name: String) -> TreeID { TreeID { name: name.clone(), uuid: Uuid::new() } }
+	fn create_from_string(&self, name: &str) -> TreeID { TreeID { name: S(name), uuid: Uuid::new_tree_uuid() } }
 }
 impl fmt::Display for TreeID { fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result { self.name.fmt(f) } }
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -86,7 +86,7 @@ impl<'a> UptreeID {
 impl Name for UptreeID {
 	fn get_name(&self) -> &str { &self.name }
 	fn get_uuid(&self) -> Uuid { self.uuid }
-	fn create_from_string(&self, name: String) -> UptreeID { UptreeID { name: name.clone(), uuid: Uuid::new() } }
+	fn create_from_string(&self, name: &str) -> UptreeID { UptreeID { name: S(name), uuid: Uuid::new() } }
 }
 impl fmt::Display for UptreeID { fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result { self.name.fmt(f) } }
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -105,7 +105,7 @@ impl TenantID {
 impl Name for TenantID {
 	fn get_name(&self) -> &str { &self.name }
 	fn get_uuid(&self) -> Uuid { self.uuid }
-	fn create_from_string(&self, name: String) -> TenantID { TenantID { name: name.clone(), uuid: Uuid::new() } }
+	fn create_from_string(&self, name: &str) -> TenantID { TenantID { name: S(name), uuid: Uuid::new() } }
 }
 impl fmt::Display for TenantID { fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result { self.name.fmt(f) } }
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize)]
@@ -119,7 +119,7 @@ impl LinkID {
 impl Name for LinkID {
 	fn get_name(&self) -> &str { &self.name }
 	fn get_uuid(&self) -> Uuid { self.uuid }
-	fn create_from_string(&self, name: String) -> LinkID { LinkID { name: name.clone(), uuid: Uuid::new() } }
+	fn create_from_string(&self, name: &str) -> LinkID { LinkID { name: S(name), uuid: Uuid::new() } }
 }
 impl fmt::Display for LinkID { fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result { self.name.fmt(f) } }
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -133,7 +133,7 @@ impl VmID {
 impl Name for VmID {
 	fn get_name(&self) -> &str { &self.name }
 	fn get_uuid(&self) -> Uuid { self.uuid }
-	fn create_from_string(&self, name: String) -> VmID { VmID { name: name.clone(), uuid: Uuid::new() } }
+	fn create_from_string(&self, name: &str) -> VmID { VmID { name: S(name), uuid: Uuid::new() } }
 }
 impl fmt::Display for VmID { fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result { self.name.fmt(f) } }
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -147,7 +147,7 @@ impl SenderID {
 impl Name for SenderID {
 	fn get_name(&self) -> &str { &self.name }
 	fn get_uuid(&self) -> Uuid { self.uuid }
-	fn create_from_string(&self, name: String) -> SenderID { SenderID { name: name.clone(), uuid: Uuid::new() } }
+	fn create_from_string(&self, name: &str) -> SenderID { SenderID { name: S(name), uuid: Uuid::new() } }
 }
 impl fmt::Display for SenderID { fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result { self.name.fmt(f) } }
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -164,7 +164,7 @@ impl ContainerID {
 impl Name for ContainerID {
 	fn get_name(&self) -> &str { &self.name }
 	fn get_uuid(&self) -> Uuid { self.uuid }
-	fn create_from_string(&self, name: String) -> ContainerID { ContainerID { name: name.clone(), uuid: Uuid::new() } }
+	fn create_from_string(&self, name: &str) -> ContainerID { ContainerID { name: S(name), uuid: Uuid::new() } }
 }
 impl fmt::Display for ContainerID { fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result { self.name.fmt(f) } }
 // Errors
