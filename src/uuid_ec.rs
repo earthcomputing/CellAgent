@@ -17,6 +17,9 @@ pub struct Uuid {
 }
 impl Uuid {
     pub fn new() -> Uuid {
+        Uuid { uuid: uuid::Uuid::new_v4() }
+    }
+    pub fn new_tree_uuid() -> Uuid {
         let mut uuid = Uuid { uuid: uuid::Uuid::new_v4() };
         uuid.make_normal();
         uuid
@@ -42,7 +45,9 @@ impl Uuid {
             TECK   => PacketState::Teck,
             AIT    => PacketState::Ait,
             NORMAL => PacketState::Normal,
-            _ => panic!("Uuid {} is in an invalid state", self)
+            _ => {
+                panic!("Uuid {} is in an invalid state", self)
+            }
         }
     }
     pub fn get_direction(&self) -> TimeDirection {
@@ -53,7 +58,9 @@ impl Uuid {
         }
     }
     pub fn make_normal(&mut self) -> PacketState {
-        self.set_code(NORMAL);
+        let mut bytes = *self.uuid.as_bytes();
+        bytes[0] = NORMAL;
+        self.uuid = uuid::Uuid::from_uuid_bytes(bytes);
         PacketState::Normal
     }
     pub fn make_ait(&mut self) -> PacketState {
@@ -96,7 +103,7 @@ impl Uuid {
 }
 impl fmt::Display for Uuid {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{} in time {} {}", self.get_direction(), self.get_state(), self.uuid )
+        write!(f, "{} in time {}", self.get_direction(), self.uuid )
     }
 }
 impl fmt::Debug for Uuid {
