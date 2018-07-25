@@ -218,9 +218,9 @@ pub struct DiscoverMsg {
 	payload: DiscoverPayload
 }
 impl DiscoverMsg {
-	pub fn new(sender_id: &SenderID, is_ait: bool, tree_id: &TreeID, sending_cell_id: &CellID,
+	pub fn new(sender_id: &SenderID, tree_id: &TreeID, sending_cell_id: &CellID,
 			hops: PathLength, path: Path) -> DiscoverMsg {
-		let header = MsgHeader::new(sender_id, is_ait,MsgType::Discover, MsgDirection::Leafward);
+		let header = MsgHeader::new(sender_id, true,MsgType::Discover, MsgDirection::Leafward);
 		//println!("DiscoverMsg: msg_count {}", header.get_count());
 		let payload = DiscoverPayload::new(tree_id, &sending_cell_id, hops, path);
 		DiscoverMsg { header, payload }
@@ -304,10 +304,10 @@ pub struct DiscoverDMsg {
 	payload: DiscoverDPayload
 }
 impl DiscoverDMsg {
-	pub fn new(sender_id: &SenderID, is_ait: bool, tree_id: &TreeID) -> DiscoverDMsg {
+	pub fn new(sender_id: &SenderID, tree_id: &TreeID) -> DiscoverDMsg {
 		// Note that direction is leafward so we can use the connected ports tree
 		// If we send rootward, then the first recipient forwards the DiscoverD
-		let header = MsgHeader::new(sender_id, is_ait,MsgType::DiscoverD, MsgDirection::Leafward);
+		let header = MsgHeader::new(sender_id, true,MsgType::DiscoverD, MsgDirection::Leafward);
 		let payload = DiscoverDPayload::new(tree_id);
 		DiscoverDMsg { header, payload }
 	}
@@ -358,9 +358,9 @@ pub struct StackTreeMsg {
 	payload: StackTreeMsgPayload
 }
 impl StackTreeMsg {
-	pub fn new(sender_id: &SenderID, is_ait: bool, new_tree_name: &AllowedTree, new_tree_id: &TreeID, parent_tree_id: &TreeID,
+	pub fn new(sender_id: &SenderID, new_tree_name: &AllowedTree, new_tree_id: &TreeID, parent_tree_id: &TreeID,
                direction: MsgDirection, gvm_eqn: &GvmEquation) -> StackTreeMsg {
-		let header = MsgHeader::new( sender_id, is_ait,MsgType::StackTree, direction);
+		let header = MsgHeader::new( sender_id, true,MsgType::StackTree, direction);
 		let payload = StackTreeMsgPayload::new(new_tree_name, new_tree_id, parent_tree_id, gvm_eqn);
 		StackTreeMsg { header, payload}
 	}
@@ -419,8 +419,8 @@ pub struct StackTreeDMsg {
     payload: StackTreeMsgDPayload
 }
 impl StackTreeDMsg {
-    pub fn new(sender_id: &SenderID, is_ait: bool, tree_id: &TreeID) -> StackTreeDMsg {
-        let header = MsgHeader::new(sender_id, is_ait,MsgType::StackTreeD, MsgDirection::Leafward);
+    pub fn new(sender_id: &SenderID, tree_id: &TreeID) -> StackTreeDMsg {
+        let header = MsgHeader::new(sender_id, true,MsgType::StackTreeD, MsgDirection::Leafward);
         let payload = StackTreeMsgDPayload::new(tree_id);
         StackTreeDMsg { header, payload}
     }

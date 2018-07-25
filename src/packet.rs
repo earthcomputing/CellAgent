@@ -37,11 +37,11 @@ impl Packet {
     }
     pub fn get_uuid(&self) -> Uuid { self.header.get_uuid() }
     pub fn get_ait_state(&self) -> AitState { self.get_uuid().get_ait_state() }
-    pub fn next_ait_state(&mut self) -> Result<(), Error> {
+    pub fn next_ait_state(&mut self) -> Result<AitState, Error> {
         let mut uuid = self.header.get_uuid();
         uuid.next()?;
         self.header = PacketHeader::new(&uuid);
-        Ok(())
+        Ok(uuid.get_ait_state())
     }
     pub fn get_next_count() -> usize { PACKET_COUNT.fetch_add(1, Ordering::SeqCst) }
     pub fn get_count(&self) -> usize { self.packet_count }

@@ -99,16 +99,20 @@ impl PacketEngine {
                                 let msg_type = MsgType::msg_type(&packet);
                                 let tree_id = packet.get_tree_id();
                                 let ref trace_params = TraceHeaderParams { module: MODULE, function: f, format: "pe_forward_leafward" };
-                                let trace = json!({ "cell_id": &self.cell_id, "tree_id": &tree_id, "msg_type": &msg_type, "port_nos": &port_nos });
+                                let trace = json!({ "cell_id": &self.cell_id, "tree_id": &tree_id,
+                                    "ait_state": packet.get_ait_state(), "msg_type": &msg_type, "port_nos": &port_nos });
                                 if DEBUG_OPTIONS.pe_pkt_send {
-                                    if msg_type == MsgType::Manifest {
-                                        println!("PacketEngine {} forwarding manifest leafward mask {} entry {}", self.cell_id, mask, entry);
-                                    }
                                     match msg_type {
                                         MsgType::Discover => (),
                                         MsgType::DiscoverD => if tree_id.is_name("Tree:C:2") {
                                             println!("PacketEngine {}: {} on {:?} {} {}", self.cell_id, f, port_nos, msg_type, tree_id);
-                                        }
+                                        },
+                                        MsgType::Manifest => {
+                                            println!("PacketEngine {} forwarding manifest leafward mask {} entry {}", self.cell_id, mask, entry);
+                                        },
+                                        MsgType::StackTree => {
+                                            println!("Packetengine {}: {} AIT state {}", self.cell_id, f, packet.get_ait_state());
+                                        },
                                         _ => {
                                             println!("PacketEngine {}: {} on {:?} {} {}", self.cell_id, f, port_nos, msg_type, tree_id);
                                         }
@@ -135,7 +139,7 @@ impl PacketEngine {
                                     match msg_type {
                                         MsgType::DiscoverD => {
                                             if tree_id.is_name("Tree:C:2") {
-                                                println!("PacketEngine {}: got from cm {} {}", self.cell_id, msg_type, tree_id);
+                                                println!("PacketEngine {}: {} got from cm {} {}", self.cell_id, f, msg_type, tree_id);
                                             }
                                         },
                                         _ => (),
@@ -187,8 +191,16 @@ impl PacketEngine {
         // when I block waiting for a tree update because of a deadlock with listen_cm_loop.
         match packet.get_ait_state() {
             AitState::Ait => return Err(PacketEngineError::Ait { func_name: f, ait_state: AitState::Ait }.into()), // Error, should never get from port
-            AitState::Tick => self.pe_to_cm.send(PeToCmPacket::Packet((port_no, packet))).context(PacketEngineError::Chain { func_name: "forward", comment: S("rootcast packet to ca ") + self.cell_id.get_name() })?, // Send to CM
-            AitState::Tock | AitState::Tack | AitState::Teck => { // Update and send back on same port
+            AitState::Tock => { // Send to CM and transition to ENTL
+                packet.next_ait_state()?;
+                self.pe_to_cm.send(PeToCmPacket::Packet((port_no, packet))).context(PacketEngineError::Chain { func_name: "forward", comment: S("rootcast packet to ca ") + self.cell_id.get_name() })?;
+                match self.pe_to_ports.get(*port_no as usize) {
+                    Some(s) => s.send(PeToPortPacket::Packet(packet)).context(PacketEngineError::Chain { func_name: f, comment: S("send packet leafward ") + self.cell_id.get_name() })?,
+                    None => return Err(PacketEngineError::Sender { cell_id: self.cell_id.clone(), func_name: "forward leaf", port_no: *port_no }.into())
+                };
+            },
+            AitState::Tick => (), // Inform CM of success and enter ENTL
+            AitState::Tack | AitState::Teck => { // Update and send back on same port
                 packet.next_ait_state()?;
                 match self.pe_to_ports.get(*port_no as usize) {
                     Some(s) => s.send(PeToPortPacket::Packet(packet)).context(PacketEngineError::Chain { func_name: f, comment: S("send packet leafward ") + self.cell_id.get_name() })?,
@@ -210,14 +222,11 @@ impl PacketEngine {
                 };
                 if DEBUG_OPTIONS.trace_all || DEBUG_OPTIONS.pe_process_pkt {   // Debug print
                     let msg_type = MsgType::msg_type(&packet);
-                    if DEBUG_OPTIONS.pe_process_pkt && msg_type == MsgType::Manifest {
-                        println!("PacketEngine {}: processing ManifestMsg", self.cell_id);
-                    }
                     let tree_id = packet.get_tree_id();
                     let ait_state = packet.get_ait_state();
                     let ref trace_params = TraceHeaderParams { module: MODULE, function: f, format: "pe_process_packet" };
                     let trace = json!({ "cell_id": &self.cell_id, "tree_id": &tree_id, "ait_state": ait_state,
-                "msg_type": &msg_type, "port_no": &port_no, "entry": &entry });
+                        "msg_type": &msg_type, "port_no": &port_no, "entry": &entry });
                     if DEBUG_OPTIONS.pe_process_pkt {
                         match msg_type {
                             MsgType::Discover => (),
