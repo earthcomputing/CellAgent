@@ -19,7 +19,7 @@ pub struct DebugOptions {
     pub traph_state:    bool,
 }
 pub const DEBUG_OPTIONS: DebugOptions = DebugOptions {
-    trace_all:   true,
+    trace_all:      true,
     ca_msg_recv:    false,
     ca_msg_send:    false,
     cm_from_ca:     false,

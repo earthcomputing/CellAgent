@@ -748,7 +748,7 @@ impl CellAgent {
             self.update_base_tree_map(new_tree_id, new_tree_id, trace_header);
             let sender_id = SenderID::new(&self.get_id(), "CellAgent")?;
             // Send DiscoverD to sender
-            let discoverd_msg = DiscoverDMsg::new(&sender_id, false, new_tree_id);
+            let discoverd_msg = DiscoverDMsg::new(&sender_id, new_tree_id);
             let mask = Mask::new(port_number);
             // Forward Discover on all except port_no with updated hops and path
             self.send_msg(&self.get_connected_ports_tree_id(), &discoverd_msg, mask, trace_header).context(CellagentError::Chain { func_name: "process_ca", comment: S("DiscoverMsg")})?;
@@ -848,7 +848,7 @@ impl CellAgent {
                 //fwd_entry.set_mask(Mask::new(port_number));
                 self.ca_to_cm.send(CaToCmBytes::Entry(fwd_entry))?;
                 let mask = Mask::new(port_number);
-                let new_msg = StackTreeDMsg::new(sender_id, false, new_tree_id);
+                let new_msg = StackTreeDMsg::new(sender_id, new_tree_id);
                 self.send_msg(self.get_connected_ports_tree_id(), &new_msg, mask, trace_header)?;
             }
             let parent_tree_id = payload.get_parent_tree_id();
@@ -988,7 +988,7 @@ impl CellAgent {
             None => return Err(CellagentError::StackTree { func_name: f, cell_id: self.cell_id.clone(), tree_id: new_tree_id.clone() }.into())
         };
         let allowed_tree = AllowedTree::new(&new_tree_name);
-        let stack_tree_msg = StackTreeMsg::new(sender_id, true, &allowed_tree, new_tree_id, parent_tree_id, direction, gvm_eqn);
+        let stack_tree_msg = StackTreeMsg::new(sender_id, &allowed_tree, new_tree_id, parent_tree_id, direction, gvm_eqn);
         if DEBUG_OPTIONS.trace_all || DEBUG_OPTIONS.process_msg {   // Debug
             let ref trace_params = TraceHeaderParams { module: MODULE, function: f, format: "ca_got_stack_tree_tcp_msg" };
             let trace = json!({ "cell_id": &self.cell_id, "new_tree_id": new_tree_id, "entry": entry, "msg": stack_tree_msg.value() });
@@ -1092,7 +1092,7 @@ impl CellAgent {
             self.connected_tree_entry.lock().unwrap().or_with_mask(port_no_mask);
             let hops = PathLength(CellNo(1));
             let sender_id = SenderID::new(&self.cell_id, "CellAgent")?;
-            let discover_msg = DiscoverMsg::new(&sender_id, false, &self.my_tree_id, &self.cell_id, hops, path);
+            let discover_msg = DiscoverMsg::new(&sender_id, &self.my_tree_id, &self.cell_id, hops, path);
             //println!("CellAgent {}: sending packet {} on port {} {} ", self.cell_id, packets[0].get_count(), port_no, discover_msg);
             let entry = CaToCmBytes::Entry(*self.connected_tree_entry.lock().unwrap());
             self.ca_to_cm.send(entry).context(CellagentError::Chain { func_name: f, comment: S(self.cell_id.clone()) + "interior"})?;

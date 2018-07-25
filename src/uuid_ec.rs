@@ -84,7 +84,7 @@ impl Uuid {
             TOCK => { self.set_code(TICK); AitState::Tick },
             TACK => { self.set_code(TOCK); AitState::Tock },
             TECK => { self.set_code(TACK); AitState::Tack },
-            AIT  => { self.set_code(TACK); AitState::Ait  },
+            AIT  => { self.set_code(TECK); AitState::Teck },
             NORMAL => AitState::Normal,
             _ => return Err(UuidError::Code { func_name: f, code: self.get_ait_state() }.into())
         })
