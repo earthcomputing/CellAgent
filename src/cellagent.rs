@@ -639,17 +639,9 @@ impl CellAgent {
                     port::PortStatus::Connected => self.port_connected(port_no, is_border, trace_header).context(CellagentError::Chain { func_name: f, comment: S(self.cell_id.clone()) +" port_connected"})?,
                     port::PortStatus::Disconnected => self.port_disconnected(port_no).context(CellagentError::Chain { func_name: f, comment: S(self.cell_id.clone()) + " port_disconnected"})?
                 },
-                CmToCaBytes::Bytes((port_no, uuid, bytes)) => {
+                CmToCaBytes::Bytes((port_no, is_ait, uuid, bytes)) => {
                     // The index may be pointing to the control tree because the other cell didn't get the StackTree or StackTreeD message in time
                     let mut msg = MsgType::msg_from_bytes(&bytes).context(CellagentError::Chain { func_name: f, comment: S(self.cell_id.clone())})?;
-                        // Here's where I lock in the need for the tree_uuid in the packet header.  Can I avoid it?
-                    //let msg_tree_id = {
-                    //    let locked = self.trees.lock().unwrap();
-                    //    match locked.get(&index).cloned() {
-                    //        Some(id) => id,
-                    //        None => return Err(CellagentError::TreeIndex { func_name: f, cell_id: self.cell_id.clone(), index }.into())
-                    //    }
-                    //};
                     let msg_tree_id = {  // Use control tree if uuid not found
                         let locked = self.tree_id_map.lock().unwrap();
                         match  locked.get(&uuid).cloned() {
@@ -675,7 +667,7 @@ impl CellAgent {
                         }
                         let _ = dal::add_to_trace(trace_header, TraceType::Debug, trace_params, &trace, f);
                     }
-                    msg.process_ca(self, port_no, &msg_tree_id, trace_header).context(CellagentError::Chain { func_name: f, comment: S(self.cell_id.clone())})?;
+                    msg.process_ca(self, port_no, &msg_tree_id, is_ait, trace_header).context(CellagentError::Chain { func_name: f, comment: S(self.cell_id.clone())})?;
                 },
                 CmToCaBytes::Tcp((port_no, (allowed_tree, msg_type, direction, bytes))) => {
                     //println!("Cellagent {}: got {} TCP message", self.cell_id, msg_type);
@@ -702,9 +694,8 @@ impl CellAgent {
             }
         }
     }
-    pub fn process_application_msg(&mut self, msg: &ApplicationMsg,
-            port_no: PortNo, msg_tree_id: &TreeID, trace_header: &mut TraceHeader)
-            -> Result<(), Error> {
+    pub fn process_application_msg(&mut self, msg: &ApplicationMsg, port_no: PortNo, msg_tree_id: &TreeID, is_ait: bool,
+                                   trace_header: &mut TraceHeader) -> Result<(), Error> {
         let f = "process_application_msg";
         let senders = self.get_vm_senders(&msg.get_tree_id().clone()).context(CellagentError::Chain { func_name: f, comment: S("") })?;
         for sender in senders {
@@ -1234,10 +1225,10 @@ impl CellAgent {
         let direction = msg.get_header().get_direction();
         let is_blocking = msg.is_blocking();
         let bytes = msg.to_bytes()?;
-        self.send_bytes(tree_id, msg.is_ait(), direction, is_blocking, user_mask, bytes, trace_header)?;
+        self.send_bytes(tree_id, msg.is_ait(), is_blocking, user_mask, bytes, trace_header)?;
         Ok(())
     }
-    fn send_bytes(&self, tree_id: &TreeID, is_ait: bool, direction: MsgDirection, is_blocking: bool, user_mask: Mask,
+    fn send_bytes(&self, tree_id: &TreeID, is_ait: bool, is_blocking: bool, user_mask: Mask,
                   bytes: ByteArray, trace_header: &mut TraceHeader) -> Result<(), Error> {
         let f = "send_bytes";
         let tree_uuid = tree_id.get_uuid();
@@ -1245,7 +1236,7 @@ impl CellAgent {
             Some(id) => id,
             None => return Err(CellagentError::Tree { func_name: f, cell_id: self.cell_id.clone(), tree_uuid }.into())
         };
-        let msg = CaToCmBytes::Bytes((tree_id.clone(), is_ait, user_mask, direction, is_blocking, bytes));
+        let msg = CaToCmBytes::Bytes((tree_id.clone(), is_ait, user_mask, is_blocking, bytes));
         self.ca_to_cm.send(msg)?;
         Ok(())
     }

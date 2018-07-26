@@ -56,7 +56,7 @@ use message_types::{OutsideFromNoc, OutsideToNoc, NocFromOutside, NocToOutside};
 use nalcell::CellConfig;
 use noc::Noc;
 use uptree_spec::{AllowedTree, ContainerSpec, Manifest, UpTreeSpec, VmSpec};
-use utility::{S, TraceHeader, TraceHeaderParams};
+use utility::{S, TraceHeader, TraceHeaderParams, TraceType};
 
 const MODULE: &'static str = "main.rs";
 fn main() -> Result<(), Error> {
@@ -66,7 +66,7 @@ fn main() -> Result<(), Error> {
     {   // Can't get records from main() to show up in trace file
         let ref trace_params = TraceHeaderParams { module: MODULE, function: f, format: "trace_schema" };
         let trace = json!({ "schema_version": SCHEMA_VERSION });
-        //let _ = dal::add_to_trace( &mut trace_header, TraceType::Trace, trace_params,&trace, f);
+        let _ = dal::add_to_trace( &mut trace_header, TraceType::Trace, trace_params,&trace, f);
     }
     let _ = OpenOptions::new().write(true).truncate(true).open(OUTPUT_FILE_NAME);
     /* Doesn't work when debugging in Eclipse
@@ -92,7 +92,7 @@ fn main() -> Result<(), Error> {
 	border.insert(CellNo(7), vec![PortNo(2)]);
 	let blueprint = Blueprint::new(ncells, nports, edges, exceptions, border).context(MainError::Chain { func_name: "run", comment: S("")})?;
 	println!("{}", blueprint);
-//	deployment_demo()?; 	// Demonstrate features of deployment spec
+	if false { deployment_demo()?; } 	// Demonstrate features of deployment spec
 	let (outside_to_noc, noc_from_outside): (OutsideToNoc, NocFromOutside) = channel();
 	let (noc_to_outside, _outside_from_noc): (NocToOutside, OutsideFromNoc) = channel();
 	let mut noc = Noc::new(noc_to_outside)?;
