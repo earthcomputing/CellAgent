@@ -37,6 +37,9 @@ impl Uuid {
         bytes[0] = code | (bytes[0] & REVERSE); // Make sure to keep direction when changing code
         self.uuid = uuid::Uuid::from_uuid_bytes(bytes);
     }
+    pub fn is_ait(&self) -> bool {
+        self.get_ait_state() == AitState::Ait
+    }
     pub fn get_ait_state(&self) -> AitState {
         match self.get_code() & !REVERSE {  // !REVERSE strips direction from test
             TICK   => AitState::Tick,
@@ -142,7 +145,7 @@ impl fmt::Display for TimeDirection {
     }
 }
 // Errors
-use failure::{Error, Fail, ResultExt};
+use failure::{Error};
 #[derive(Debug, Fail)]
 pub enum UuidError {
     #[fail(display = "UuidError::Chain {} {}", func_name, comment)]

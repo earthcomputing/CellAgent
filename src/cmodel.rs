@@ -51,7 +51,7 @@ impl Cmodel {
         loop {
             match cm_from_ca.recv()? {
                 CaToCmBytes::Entry(entry) => cm_to_pe.send(CmToPePacket::Entry(entry)),
-                CaToCmBytes::Bytes((tree_id, is_ait, user_mask, direction, is_blocking, bytes)) => {
+                CaToCmBytes::Bytes((tree_id, is_ait, user_mask, is_blocking, bytes)) => {
                     if DEBUG_OPTIONS.trace_all || DEBUG_OPTIONS.cm_from_ca {   //Debug print
                         let msg = MsgType::msg_from_bytes(&bytes)?;
                         let ref trace_params = TraceHeaderParams { module: MODULE, function: f, format: "cm_bytes_from_ca" };
@@ -121,7 +121,8 @@ impl Cmodel {
                 }
                 let _ = dal::add_to_trace(trace_header, TraceType::Debug, trace_params, &trace, f);
             }
-            cm_to_ca.send(CmToCaBytes::Bytes((port_no, uuid, bytes)))?;
+            let is_ait = packets[0].is_ait();
+            cm_to_ca.send(CmToCaBytes::Bytes((port_no, is_ait, uuid, bytes)))?;
         }
         Ok(())
     }

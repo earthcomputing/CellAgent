@@ -1,5 +1,4 @@
 use std::fmt;
-use std::mem;
 use std::collections::HashMap;
 use std::sync::atomic::{ATOMIC_USIZE_INIT, AtomicUsize, Ordering};
 use std::str;
@@ -11,7 +10,7 @@ use serde_json;
 use config::{PACKET_MIN, PACKET_MAX, PAYLOAD_DEFAULT_ELEMENT, 
 	ByteArray, MsgID, PacketNo};
 use message::{Message, MsgType, TypePlusMsg};
-use name::{Name, TreeID};
+use name::{TreeID};
 use utility::S;
 use uuid_ec::{Uuid, AitState};
  
@@ -36,6 +35,8 @@ impl Packet {
         Packet { header, payload, packet_count: Packet::get_next_count() }
     }
     pub fn get_uuid(&self) -> Uuid { self.header.get_uuid() }
+	pub fn make_ait(&mut self) { self.header.make_ait() }
+    pub fn is_ait(&self) -> bool { self.header.get_uuid().is_ait() }
     pub fn get_ait_state(&self) -> AitState { self.get_uuid().get_ait_state() }
     pub fn next_ait_state(&mut self) -> Result<AitState, Error> {
         let mut uuid = self.header.get_uuid();
@@ -44,10 +45,9 @@ impl Packet {
         Ok(uuid.get_ait_state())
     }
     pub fn get_next_count() -> usize { PACKET_COUNT.fetch_add(1, Ordering::SeqCst) }
-    pub fn get_count(&self) -> usize { self.packet_count }
+    //pub fn get_count(&self) -> usize { self.packet_count }
     // For debugging
-    pub fn get_header(&self) -> PacketHeader { self.header }
-    pub fn get_payload(&self) -> Payload { self.payload }
+    //pub fn get_header(&self) -> PacketHeader { self.header }
     pub fn get_tree_uuid(&self) -> Uuid { self.header.get_uuid() }
     pub fn is_blocking(&self) -> bool { self.payload.is_blocking() }
     pub fn is_last_packet(&self) -> bool { self.payload.is_last_packet() }
@@ -87,7 +87,7 @@ impl PacketHeader {
         PacketHeader { uuid: uuid.clone() }
 	}
 	fn get_uuid(&self) -> Uuid { self.uuid }
-	fn set_uuid(&mut self, new_uuid: Uuid) { self.uuid = new_uuid; }
+    fn make_ait(&mut self) { self.uuid.make_ait(); }
 }
 impl fmt::Display for PacketHeader { 
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result { 
@@ -109,7 +109,6 @@ pub struct Payload {
 impl Payload {
 	pub fn new(msg_id: MsgID, size: PacketNo,
                is_last: bool, is_blocking: bool, data_bytes: Vec<u8>) -> Payload {
-		let no_data_bytes = data_bytes.len();
         let mut bytes = [0 as u8; PAYLOAD_MAX];
         for i in 0..data_bytes.len() { bytes[i] = data_bytes[i]; }
         Payload { msg_id, size, is_last, is_blocking, bytes}
@@ -126,7 +125,7 @@ impl fmt::Display for Payload {
         if self.is_last_packet() { s = s + ", Last packet"; }
         else                     { s = s + ", Not last packet"; }
         s = s + &format!(", Size {}", *self.size);
-		let s = &format!("{:?}", &self.bytes[0..10]);
+		s = s + &format!("{:?}", &self.bytes[0..10]);
 		write!(f, "{}", s)
 	} 	
 }
@@ -184,7 +183,6 @@ impl Packetizer {
 		for packet in packets {
 			let is_last_packet = packet.is_last_packet();
 			let last_packet_size = *packet.get_size() as usize;
-			let payload = packet.get_payload();
 			let mut bytes = packet.get_bytes();
 			if is_last_packet {
 				bytes.truncate(last_packet_size)
@@ -211,9 +209,9 @@ impl PacketAssembler {
 	pub fn new(msg_id: MsgID) -> PacketAssembler {
 		PacketAssembler { msg_id, packets: Vec::new() }
 	}
-	pub fn create(msg_id: MsgID, packets: &Vec<Packet>) -> PacketAssembler {
-		PacketAssembler { msg_id, packets: packets.clone() }
-	}
+//	pub fn create(msg_id: MsgID, packets: &Vec<Packet>) -> PacketAssembler {
+//		PacketAssembler { msg_id, packets: packets.clone() }
+//	}
 /*
 	pub fn get_msg_id(&self) -> MsgID { self.msg_id }
 	pub fn get_packets(&self) -> &Vec<Packet> { &self.packets }

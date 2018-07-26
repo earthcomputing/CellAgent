@@ -173,8 +173,8 @@ pub trait Message {
 		let packets = Packetizer::packetize(&tree_id.get_uuid(), &ByteArray(*bytes), self.is_blocking());
 		Ok(packets)
 	}
-	fn process_ca(&mut self, _cell_agent: &mut CellAgent, _port_no: PortNo,
-                  _msg_tree_id: &TreeID, _trace_header: &mut TraceHeader) -> Result<(), Error> { Err(MessageError::Process { func_name: "process_ca" }.into()) }
+	fn process_ca(&mut self, _cell_agent: &mut CellAgent, _port_no: PortNo, _msg_tree_id: &TreeID, is_ait: bool,
+                  trace_header: &mut TraceHeader) -> Result<(), Error> { Err(MessageError::Process { func_name: "process_ca" }.into()) }
 }
 impl fmt::Display for Message {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
@@ -250,8 +250,8 @@ impl Message for DiscoverMsg {
             Err(_) => panic!("I don't know how to handle errors in msg.value()")
         }
     }
-	fn process_ca(&mut self, cell_agent: &mut CellAgent, port_no: PortNo,
-                  _msg_tree_id: &TreeID, trace_header: &mut TraceHeader) -> Result<(), Error> {
+	fn process_ca(&mut self, cell_agent: &mut CellAgent, port_no: PortNo, msg_tree_id: &TreeID, is_ait: bool,
+                  trace_header: &mut TraceHeader) -> Result<(), Error> {
         cell_agent.process_discover_msg(self, port_no, trace_header)
 	}
 }
@@ -325,8 +325,8 @@ impl Message for DiscoverDMsg {
             Err(_) => panic!("I don't know how to handle errors in msg.value()")
         }
     }
-	fn process_ca(&mut self, cell_agent: &mut CellAgent, port_no: PortNo,
-                  _msg_tree_id: &TreeID, trace_header: &mut TraceHeader) -> Result<(), Error> {
+	fn process_ca(&mut self, cell_agent: &mut CellAgent, port_no: PortNo, _msg_tree_id: &TreeID, is_ait: bool,
+                  trace_header: &mut TraceHeader) -> Result<(), Error> {
         cell_agent.process_discover_d_msg(&self, port_no, trace_header)
     }
 }
@@ -378,8 +378,8 @@ impl Message for StackTreeMsg {
             Err(_) => panic!("I don't know how to handle errors in msg.value()")
         }
     }
-	fn process_ca(&mut self, cell_agent: &mut CellAgent, port_no: PortNo,
-                  msg_tree_id: &TreeID, trace_header: &mut TraceHeader) -> Result<(), Error> {
+	fn process_ca(&mut self, cell_agent: &mut CellAgent, port_no: PortNo, msg_tree_id: &TreeID, is_ait: bool,
+                  trace_header: &mut TraceHeader) -> Result<(), Error> {
         cell_agent.process_stack_tree_msg(&self, port_no,
                                           msg_tree_id, trace_header)
 	}
@@ -442,8 +442,8 @@ impl Message for StackTreeDMsg {
             Err(_) => panic!("I don't know how to handle errors in msg.value()")
         }
     }
-    fn process_ca(&mut self, cell_agent: &mut CellAgent, port_no: PortNo,
-                  _msg_tree_id: &TreeID, trace_header: &mut TraceHeader) -> Result<(), Error> {
+    fn process_ca(&mut self, cell_agent: &mut CellAgent, port_no: PortNo,_msg_tree_id: &TreeID, is_ait: bool,
+                  trace_header: &mut TraceHeader) -> Result<(), Error> {
         cell_agent.process_stack_tree_d_msg(&self, port_no, trace_header)
     }
 }
@@ -496,8 +496,8 @@ impl Message for ManifestMsg {
             Err(_) => panic!("I don't know how to handle errors in msg.value()")
         }
     }
-	fn process_ca(&mut self, cell_agent: &mut CellAgent, port_no: PortNo,
-                  msg_tree_id: &TreeID, trace_header: &mut TraceHeader) -> Result<(), Error> {
+	fn process_ca(&mut self, cell_agent: &mut CellAgent, port_no: PortNo, msg_tree_id: &TreeID, is_ait: bool,
+                  trace_header: &mut TraceHeader) -> Result<(), Error> {
         cell_agent.process_manifest_msg(&self, port_no, msg_tree_id, trace_header)
 	}
 }
@@ -556,9 +556,9 @@ impl Message for ApplicationMsg {
             Err(_) => panic!("I don't know how to handle errors in msg.value()")
         }
     }
-    fn process_ca(&mut self, cell_agent: &mut CellAgent, port_no: PortNo,
-                  msg_tree_id: &TreeID, trace_header: &mut TraceHeader) -> Result<(), Error> {
-        cell_agent.process_application_msg(self, port_no,  msg_tree_id, trace_header)
+    fn process_ca(&mut self, cell_agent: &mut CellAgent, port_no: PortNo, msg_tree_id: &TreeID, is_ait: bool,
+                  trace_header: &mut TraceHeader) -> Result<(), Error> {
+        cell_agent.process_application_msg(self, port_no,  msg_tree_id, is_ait, trace_header)
     }
 }
 impl fmt::Display for ApplicationMsg {

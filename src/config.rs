@@ -101,7 +101,6 @@ pub fn get_edges() -> Vec<Edge> {
     if NCELLS == CellNo(3) { vec![is2e(0,1), is2e(0,2), is2e(1,2)] }
     else if NCELLS == CellNo(4) { vec![is2e(0,1), is2e(0,2), is2e(0,3), is2e(1,2), is2e(1,3), is2e(2,3)] }
     else if NCELLS == CellNo(10) { vec![is2e(0,1),is2e(1,2),is2e(1,6),is2e(3,4),is2e(5,6),is2e(6,7),is2e(7,8),is2e(8,9),is2e(0,5),is2e(2,3),is2e(2,7),is2e(3,8),is2e(4,9)] }
-//  Need to make sure first item is less than the second for each edge
     else if NCELLS == CellNo(47) {
         // blueprint-baran-decentralized.gv
         vec![

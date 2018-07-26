@@ -11,7 +11,8 @@ use utility::{Mask, PortNumber};
 use uuid_ec::Uuid;
 
 pub type TCP = (AllowedTree, TcpMsgType, MsgDirection, ByteArray);
-pub type CATOCM = (TreeID, bool, Mask, MsgDirection, bool, ByteArray);
+pub type CATOCM = (TreeID, bool, Mask, bool, ByteArray); // tree_id, is_ait, user_mask, is_blocking, bytes
+pub type CMTOCA = (PortNo, bool, Uuid, ByteArray); // port_no, is_ait, tree_uuid, bytes
 // PacketEngine to PacketEngine to unblock
 pub type PeToPePacket = String;
 pub type PeToPe = mpsc::Sender<PeToPePacket>;
@@ -53,12 +54,7 @@ pub type PeToCm = mpsc::Sender<PeToCmPacket>;
 pub type CmFromPe = mpsc::Receiver<PeToCmPacket>;
 pub type PeCmError = mpsc::SendError<PeToCmPacket>;
 // Cmodel to CellAgent
-pub enum CmToCaPacket { Status((PortNo, bool, PortStatus)), Packet((PortNo, Packet)), Tcp((PortNo, TCP)) }
-pub type CmToCaX = mpsc::Sender<CmToCaPacket>;
-pub type CaFromCmX = mpsc::Receiver<CmToCaPacket>;
-pub type CmCaErrorX = mpsc::SendError<CmToCaPacket>;
-// Cmodel to CellAgent
-pub enum CmToCaBytes { Status((PortNo, bool, PortStatus)), Bytes((PortNo, Uuid, ByteArray)), Tcp((PortNo, TCP)) }
+pub enum CmToCaBytes { Status((PortNo, bool, PortStatus)), Bytes((PortNo, bool, Uuid, ByteArray)), Tcp((PortNo, TCP)) }
 pub type CmToCa = mpsc::Sender<CmToCaBytes>;
 pub type CaFromCm = mpsc::Receiver<CmToCaBytes>;
 pub type CmCaError = mpsc::SendError<CmToCaBytes>;
