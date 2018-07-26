@@ -54,6 +54,7 @@ pub struct CellAgent {
     cell_id: CellID,
     cell_type: CellType,
     config: CellConfig,
+    cell_info: CellInfo,
     no_ports: PortNo,
     my_tree_id: TreeID,
     control_tree_id: TreeID,
@@ -97,7 +98,7 @@ impl CellAgent {
             saved_stack: Arc::new(Mutex::new(HashMap::new())),
             my_entry: RoutingTableEntry::default()?, base_tree_map,
             connected_tree_entry: Arc::new(Mutex::new(RoutingTableEntry::default()?)),
-            tenant_masks, up_tree_senders: HashMap::new(),
+            tenant_masks, up_tree_senders: HashMap::new(), cell_info: CellInfo::new(),
             up_traphs_clist: HashMap::new(), ca_to_cm,
         })
     }
@@ -149,6 +150,7 @@ impl CellAgent {
     }
     pub fn get_no_ports(&self) -> PortNo { self.no_ports }
     pub fn get_id(&self) -> CellID { self.cell_id.clone() }
+    pub fn get_cell_info(&self) -> CellInfo { self.cell_info }
 //    pub fn get_traphs(&self) -> &Arc<Mutex<Traphs>> { &self.traphs }
 //    pub fn get_tree_name_map(&self) -> &TreeNameMap { &self.tree_name_map }
     pub fn get_vm_senders(&self, tree_id: &TreeID) -> Result<Vec<CaToVm>, Error> {
@@ -525,7 +527,7 @@ impl CellAgent {
                  Some(map) => map,
                  None => return Err(CellagentError::TreeNameMap { func_name: f, cell_id: self.cell_id.clone(), sender_id: sender_id.clone() }.into())
              };
-             let (allowed_tree, msg_type, direction, bytes) = ca_from_vm.recv()?;
+             let (is_ait, allowed_tree, msg_type, direction, bytes) = ca_from_vm.recv()?;
              let serialized = ::std::str::from_utf8(&bytes)?;
              if DEBUG_OPTIONS.trace_all || DEBUG_OPTIONS.ca_msg_recv { // Debug print
                  let ref trace_params = TraceHeaderParams { module: MODULE, function: f, format: "ca_got_from_uptree" };
@@ -536,7 +538,7 @@ impl CellAgent {
                  if DEBUG_OPTIONS.ca_msg_recv { println!("CellAgent {}: got msg {} {} {} {}", self.cell_id, allowed_tree, msg_type, direction, &serialized); }
              }
              let tree_map_updated = match msg_type {
-                 TcpMsgType::Application => self.tcp_application(&sender_id, &allowed_tree, serialized, direction, &tree_map, trace_header).context(CellagentError::Chain { func_name: f, comment: S("tcp_application") })?,
+                 TcpMsgType::Application => self.tcp_application(&sender_id, is_ait, &allowed_tree, serialized, direction, &tree_map, trace_header).context(CellagentError::Chain { func_name: f, comment: S("tcp_application") })?,
                  TcpMsgType::DeleteTree => self.tcp_delete_tree(&sender_id, serialized, direction, &tree_map, trace_header).context(CellagentError::Chain { func_name: f, comment: S("tcp_delete_tree") })?,
                  TcpMsgType::Manifest => self.tcp_manifest(&sender_id, serialized, direction, &tree_map, trace_header).context(CellagentError::Chain { func_name: f, comment: S("tcp_manifest") })?,
                  TcpMsgType::Query => self.tcp_query(&sender_id, serialized, direction, &tree_map, trace_header).context(CellagentError::Chain { func_name: f, comment: S("tcp_query") })?,
@@ -672,7 +674,7 @@ impl CellAgent {
                     }
                     msg.process_ca(self, port_no, &msg_tree_id, is_ait, trace_header).context(CellagentError::Chain { func_name: f, comment: S(self.cell_id.clone())})?;
                 },
-                CmToCaBytes::Tcp((port_no, (allowed_tree, msg_type, direction, bytes))) => {
+                CmToCaBytes::Tcp((port_no, (is_ait, allowed_tree, msg_type, direction, bytes))) => {
                     //println!("Cellagent {}: got {} TCP message", self.cell_id, msg_type);
                     let port_number = PortNumber::new(port_no, self.no_ports).context(CellagentError::Chain { func_name: f, comment: S(self.cell_id.clone()) + " PortNumber" })?;
                     let sender_id = match self.border_port_tree_id_map.get(&port_number).cloned() {
@@ -685,7 +687,7 @@ impl CellAgent {
                     };
                     let serialized = ::std::str::from_utf8(&bytes)?;
                     let tree_map_updated = match msg_type {
-                        TcpMsgType::Application => self.tcp_application(&sender_id, &allowed_tree, &serialized, direction, tree_map, trace_header).context(CellagentError::Chain { func_name: f, comment: S("tcp_application")})?,
+                        TcpMsgType::Application => self.tcp_application(&sender_id, is_ait, &allowed_tree, &serialized, direction, tree_map, trace_header).context(CellagentError::Chain { func_name: f, comment: S("tcp_application")})?,
                         TcpMsgType::DeleteTree  => self.tcp_delete_tree(&sender_id, &serialized, direction, tree_map, trace_header).context(CellagentError::Chain { func_name: f, comment: S("tcp_delete_tree")})?,
                         TcpMsgType::Manifest    => self.tcp_manifest(&sender_id, &serialized, direction, tree_map, trace_header).context(CellagentError::Chain { func_name: f, comment: S("tcp_manifest")})?,
                         TcpMsgType::Query       => self.tcp_query(&sender_id, &serialized, direction, tree_map, trace_header).context(CellagentError::Chain { func_name: f, comment: S("tcp_query")})?,
@@ -702,7 +704,7 @@ impl CellAgent {
         let f = "process_application_msg";
         let senders = self.get_vm_senders(&msg.get_tree_id().clone()).context(CellagentError::Chain { func_name: f, comment: S("") })?;
         for sender in senders {
-            sender.send(msg.get_payload().get_body().clone()).context(CellagentError::Chain { func_name: f, comment: S("") })?;
+            sender.send((is_ait, msg.get_payload().get_body().clone())).context(CellagentError::Chain { func_name: f, comment: S("") })?;
         }
         let tree_id = msg.get_tree_id();
         let user_mask = self.get_mask(&tree_id, trace_header)?;
@@ -897,7 +899,7 @@ impl CellAgent {
         let entry = self.get_tree_entry(tree_id, trace_header)?;
         Ok(entry.may_send())
     }
-    fn tcp_application(&mut self, sender_id: &SenderID, allowed_tree: &AllowedTree, serialized: &str,
+    fn tcp_application(&mut self, sender_id: &SenderID, is_ait: bool, allowed_tree: &AllowedTree, serialized: &str,
             direction: MsgDirection, tree_map: &MsgTreeMap, trace_header: &mut TraceHeader) -> Result<MsgTreeMap, Error> {
         let f = "tcp_application";
         let tree_id = match tree_map.get(allowed_tree.get_name()) {
@@ -1078,7 +1080,7 @@ impl CellAgent {
             let tree_name_msg = TreeNameMsg::new(&sender_id, &base_tree.get_name());
             let serialized = serde_json::to_string(&tree_name_msg).context(CellagentError::Chain { func_name: "port_connected", comment: S(self.cell_id.clone()) })?;
             let bytes = ByteArray(serialized.into_bytes());
-            self.ca_to_cm.send(CaToCmBytes::Tcp((port_number, (base_tree, TcpMsgType::TreeName, MsgDirection::Rootward, bytes)))).context(CellagentError::Chain { func_name: "port_connected", comment: S(self.cell_id.clone()) + "border" })?;
+            self.ca_to_cm.send(CaToCmBytes::Tcp((port_number, (false, base_tree, TcpMsgType::TreeName, MsgDirection::Rootward, bytes)))).context(CellagentError::Chain { func_name: "port_connected", comment: S(self.cell_id.clone()) + "border" })?;
             Ok(())
         } else {
             let port_no_mask = Mask::new(PortNumber::new(port_no, self.no_ports).context(CellagentError::Chain { func_name: "port_connected", comment: S(self.cell_id.clone()) })?);
@@ -1246,11 +1248,25 @@ impl CellAgent {
 }
 impl fmt::Display for CellAgent {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        let mut s = format!("Cell Agent");
+        let mut s = format!("Cell Agent {}", self.cell_info);
         for (_, traph) in self.traphs.lock().unwrap().iter() {
             s = s + &format!("\n{}", traph);
         }
         write!(f, "{}", s) }
+}
+#[derive(Debug, Copy, Clone, Serialize, Deserialize)]
+pub struct CellInfo {   // Any data the cell agent wants to expose to applications
+    external_id: Uuid   // An externally visible identifier so applications can talk about individual cells
+}
+impl CellInfo {
+    fn new() -> CellInfo {
+        CellInfo { external_id: Uuid::new() }
+    }
+}
+impl fmt::Display for CellInfo {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "External ID {}", self.external_id)
+    }
 }
 // Errors
 #[derive(Debug, Fail)]
@@ -1273,8 +1289,6 @@ pub enum CellagentError {
     NoTraph { cell_id: CellID, func_name: &'static str, tree_uuid: Uuid },
 //    #[fail(display = "CellagentError::SavedMsgType {}: Message type {} does not support saving", func_name, msg_type)]
 //    SavedMsgType { func_name: &'static str, msg_type: MsgType },
-    #[fail(display = "CellAgentError::Size {}: No more room in routing table for cell {}", func_name, cell_id)]
-    Size { cell_id: CellID, func_name: &'static str },
     #[fail(display = "CellAgentError::StackTree {}: Problem stacking tree {} on cell {}", func_name, tree_id, cell_id)]
     StackTree { func_name: &'static str, tree_id: TreeID, cell_id: CellID },
     #[fail(display = "CellagentError::TcpMessageType {}: Unsupported request {:?} from border port on cell {}", func_name, msg, cell_id)]

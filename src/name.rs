@@ -61,7 +61,7 @@ pub struct TreeID { name: NameType, uuid: Uuid}
 impl<'a> TreeID {
 	pub fn new(name: &str) -> Result<TreeID, Error> {
 		match name.find(' ') {
-			None => Ok(TreeID { name: S(name), uuid: Uuid::new_tree_uuid() }),
+			None => Ok(TreeID { name: S(name), uuid: Uuid::new() }),
 			Some(_) => Err(NameError::Format { name: S(name), func_name: "TreeID::new" }.into())
 		}
 	}
@@ -69,7 +69,7 @@ impl<'a> TreeID {
 impl Name for TreeID {
 	fn get_name(&self) -> &str { &self.name }
 	fn get_uuid(&self) -> Uuid { self.uuid }
-	fn create_from_string(&self, name: &str) -> TreeID { TreeID { name: S(name), uuid: Uuid::new_tree_uuid() } }
+	fn create_from_string(&self, name: &str) -> TreeID { TreeID { name: S(name), uuid: Uuid::new() } }
 }
 impl fmt::Display for TreeID { fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result { self.name.fmt(f) } }
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]

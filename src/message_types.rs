@@ -10,9 +10,11 @@ use uptree_spec::AllowedTree;
 use utility::{Mask, PortNumber};
 use uuid_ec::Uuid;
 
-pub type TCP = (AllowedTree, TcpMsgType, MsgDirection, ByteArray);
-pub type CATOCM = (TreeID, bool, Mask, bool, ByteArray); // tree_id, is_ait, user_mask, is_blocking, bytes
-pub type CMTOCA = (PortNo, bool, Uuid, ByteArray); // port_no, is_ait, tree_uuid, bytes
+type ISAIT = bool;
+type ISBLOCKING = bool;
+pub type TCP = (ISAIT, AllowedTree, TcpMsgType, MsgDirection, ByteArray);
+pub type CATOCM = (TreeID, ISAIT, Mask, ISBLOCKING, ByteArray);
+pub type CMTOCA = (PortNo, ISAIT, Uuid, ByteArray); // port_no, is_ait, tree_uuid, bytes
 // PacketEngine to PacketEngine to unblock
 pub type PeToPePacket = String;
 pub type PeToPe = mpsc::Sender<PeToPePacket>;
@@ -79,12 +81,12 @@ pub type NocToOutside = mpsc::Sender<NocToOutsideMsg>;
 pub type OutsideFromNoc = mpsc::Receiver<NocToOutsideMsg>;
 //pub type NocOutsideError = mpsc::SendError<NocToOutsideMsg>;
 // Cell agent to VM
-pub type CaToVmMsg = ByteArray;
+pub type CaToVmMsg = (ISAIT, ByteArray);
 pub type CaToVm = mpsc::Sender<CaToVmMsg>;
 pub type VmFromCa = mpsc::Receiver<CaToVmMsg>;
 //pub type CaVmError = mpsc::SendError<CaToVmMsg>;
 // VM to Cell agent
-pub type VmToCaMsg = (AllowedTree, TcpMsgType, MsgDirection, ByteArray);
+pub type VmToCaMsg = (ISAIT, AllowedTree, TcpMsgType, MsgDirection, ByteArray);
 pub type VmToCa = mpsc::Sender<VmToCaMsg>;
 pub type CaFromVm = mpsc::Receiver<VmToCaMsg>;
 //pub type VmCaError = mpsc::SendError<VmToCaMsg>;
@@ -99,12 +101,12 @@ pub type CaFromVm = mpsc::Receiver<VmToCaMsg>;
 //pub type VmFromTree = mpsc::Receiver<TreeToVmMsg>;
 //pub type TreeVmError = mpsc::SendError<TreeToVmMsg>;
 // Vm to Container
-pub type VmToContainerMsg = ByteArray;
+pub type VmToContainerMsg = (ISAIT, ByteArray);
 pub type VmToContainer = mpsc::Sender<VmToContainerMsg>;
 pub type ContainerFromVm = mpsc::Receiver<VmToContainerMsg>;
 //pub type VmContainerError = mpsc::SendError<VmToContainerMsg>;
 // Container to VM
-pub type ContainerToVmMsg = (AllowedTree, TcpMsgType, MsgDirection, ByteArray);
+pub type ContainerToVmMsg = (ISAIT, AllowedTree, TcpMsgType, MsgDirection, ByteArray);
 pub type ContainerToVm = mpsc::Sender<ContainerToVmMsg>;
 pub type VmFromContainer = mpsc::Receiver<ContainerToVmMsg>;
 //pub type ContainerVmError = mpsc::SendError<ContainerToVmMsg>;

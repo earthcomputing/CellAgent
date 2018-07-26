@@ -17,9 +17,6 @@ pub struct Uuid {
 }
 impl Uuid {
     pub fn new() -> Uuid {
-        Uuid { uuid: uuid::Uuid::new_v4() }
-    }
-    pub fn new_tree_uuid() -> Uuid {
         let mut uuid = Uuid { uuid: uuid::Uuid::new_v4() };
         uuid.make_normal();
         uuid
@@ -41,16 +38,15 @@ impl Uuid {
         self.get_ait_state() == AitState::Ait
     }
     pub fn get_ait_state(&self) -> AitState {
-        match self.get_code() & !REVERSE {  // !REVERSE strips direction from test
-            TICK   => AitState::Tick,
-            TOCK   => AitState::Tock,
-            TACK   => AitState::Tack,
-            TECK   => AitState::Teck,
-            AIT    => AitState::Ait,
-            NORMAL => AitState::Normal,
-            _ => {
-                panic!("Uuid {} is in an invalid state", self)
-            }
+        let f = "get_ait_state";
+        let is_forward = self.is_forward();
+        match self.get_code() {
+            TICK   if is_forward  => AitState::Tick,
+            TOCK   if is_forward  => AitState::Tock,
+            TACK   if is_forward  => AitState::Tack,
+            TECK   if is_forward  => AitState::Teck,
+            AIT    if is_forward  => AitState::Ait,
+            _                     => AitState::Normal, // Bad uuid codes are treated as normal
         }
     }
     pub fn get_direction(&self) -> TimeDirection {
@@ -60,6 +56,13 @@ impl Uuid {
             _ => panic!("0xC0 & code is not 0 or 1")
         }
     }
+    fn is_forward(&self) -> bool {
+        match self.get_direction() {
+            TimeDirection::Forward => true,
+            TimeDirection::Reverse => false
+        }
+    }
+    fn is_reverse(&self) -> bool { !self.is_forward() }
     pub fn make_normal(&mut self) -> AitState {
         let mut bytes = *self.uuid.as_bytes();
         bytes[0] = NORMAL;
@@ -89,7 +92,7 @@ impl Uuid {
             TECK => { self.set_code(TACK); AitState::Tack },
             AIT  => { self.set_code(TECK); AitState::Teck },
             NORMAL => AitState::Normal,
-            _ => return Err(UuidError::Code { func_name: f, code: self.get_ait_state() }.into())
+            _ => return Err(UuidError::AitState { func_name: f, ait_state: self.get_ait_state() }.into())
         })
     }
     fn previous_state(&mut self) -> Result<AitState, Error> {
@@ -100,13 +103,14 @@ impl Uuid {
             TACK => { self.set_code(TECK); AitState::Teck },
             TECK => { self.set_code(AIT);  AitState::Teck },
             NORMAL => AitState::Normal,
-            _ => return Err(UuidError::Code { func_name: f, code: self.get_ait_state() }.into())
+            _ => return Err(UuidError::AitState { func_name: f, ait_state: self.get_ait_state() }.into())
         })
     }
 }
 impl fmt::Display for Uuid {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{} in time {}", self.get_direction(), self.uuid )
+        if self.is_ait() { write!(f, "{} in time {}", self.get_direction(), self.uuid ) }
+        else             { write!(f, "{}", self.uuid) }
     }
 }
 impl fmt::Debug for Uuid {
@@ -145,11 +149,13 @@ impl fmt::Display for TimeDirection {
     }
 }
 // Errors
-use failure::{Error};
+use failure::{Error,};
 #[derive(Debug, Fail)]
 pub enum UuidError {
-    #[fail(display = "UuidError::Chain {} {}", func_name, comment)]
+    #[fail(display = "UuidError::Chain {}: {}", func_name, comment)]
     Chain { func_name: &'static str, comment: String },
-    #[fail(display = "UuidError::Code: Can't do {} from state {}", func_name, code)]
-    Code { func_name: &'static str, code: AitState }
+    #[fail(display = "UuidError::AitState: Can't do {} from state {}", func_name, ait_state)]
+    AitState { func_name: &'static str, ait_state: AitState },
+    #[fail(display = "UuidError::Code {}: {} is an invalid UUID code", func_name, code)]
+    Code { func_name: &'static str, code: u8 }
 }
