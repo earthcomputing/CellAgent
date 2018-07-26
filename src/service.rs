@@ -61,7 +61,8 @@ impl NocMaster {
         let msg = S("Hello From Master");
         println!("Service {} sending {}", self.container_id, msg);
         let bytes = ByteArray(msg.into_bytes());
-        self.container_to_vm.send((AllowedTree::new("NocMasterAgent"), TcpMsgType::Application, MsgDirection::Leafward, bytes))?;
+        let is_ait = false;
+        self.container_to_vm.send((is_ait, AllowedTree::new("NocMasterAgent"), TcpMsgType::Application, MsgDirection::Leafward, bytes))?;
         Ok(())
     }
     fn listen_vm(&self, container_from_vm: ContainerFromVm) -> Result<(), Error> {
@@ -77,7 +78,7 @@ impl NocMaster {
     fn listen_vm_loop(&self, container_from_vm: &ContainerFromVm) -> Result<(), Error> {
         let f = "listen_vm_loop";
         loop {
-            let msg = container_from_vm.recv().context("NocMaster container_from_vm").context(ServiceError::Chain { func_name: "listen_vm_loop", comment: S("NocMaster from vm")})?;
+            let (is_ait, msg) = container_from_vm.recv().context("NocMaster container_from_vm").context(ServiceError::Chain { func_name: "listen_vm_loop", comment: S("NocMaster from vm")})?;
             println!("NocMaster on container {} got msg {}", self.container_id, ::std::str::from_utf8(&msg)?);
         }
     }
@@ -120,12 +121,13 @@ impl NocAgent {
     fn listen_vm_loop(&self, container_from_vm: &ContainerFromVm) -> Result<(), Error> {
         let f = "listen_vm_loop";
         loop {
-            let msg = container_from_vm.recv().context(ServiceError::Chain { func_name: f, comment: S("Agent recv from vm") })?;
+            let (is_ait, msg) = container_from_vm.recv().context(ServiceError::Chain { func_name: f, comment: S("Agent recv from vm") })?;
             println!("NocAgent on container {} got msg {}", self.container_id, ::std::str::from_utf8(&msg)?);
             let msg = format!("Reply from {}", self.container_id);
             //println!("Service {} sending {}", self.container_id, msg);
             let bytes = ByteArray(msg.into_bytes());
-            self.container_to_vm.send((AllowedTree::new("NocAgentMaster"), TcpMsgType::Application, MsgDirection::Rootward, bytes))?;
+            let is_ait = false;
+            self.container_to_vm.send((is_ait, AllowedTree::new("NocAgentMaster"), TcpMsgType::Application, MsgDirection::Rootward, bytes))?;
         }
     }
 }

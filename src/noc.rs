@@ -72,7 +72,7 @@ impl Noc {
     }
 	fn listen_port_loop(&mut self, noc_to_port: &NocToPort, noc_from_port: &NocFromPort) -> Result<(), Error> {
 		loop {
-			let (_, msg_type, _, bytes) = noc_from_port.recv().context(NocError::Chain { func_name: "listen_port", comment: S("")})?;
+			let (_is_ait, _, msg_type, _, bytes) = noc_from_port.recv().context(NocError::Chain { func_name: "listen_port", comment: S("")})?;
             let serialized = ::std::str::from_utf8(&bytes)?;
             match msg_type {
                 TcpMsgType::TreeName => {
@@ -105,6 +105,7 @@ impl Noc {
     }
 	// Sets up the NOC Master and NOC Agent services on up trees
 	fn create_noc(&mut self, tree_name: &String, noc_to_port: &NocToPort) -> Result<(), Error> {
+        let is_ait = false;
         // Stack the trees needed to deploy the master and agent and for them to talk master->agent and agent->master
         let noc_master_deploy_tree = AllowedTree::new(NOC_MASTER_DEPLOY_TREE_NAME);
         Noc::noc_master_deploy_tree(&noc_master_deploy_tree, tree_name, noc_to_port).context(NocError::Chain { func_name: "create_noc", comment: S("noc master deploy")})?;
@@ -130,7 +131,7 @@ impl Noc {
         let manifest_msg = serde_json::to_string(&params).context(NocError::Chain { func_name: "create_noc", comment: S("NocMaster")})?;
         println!("Noc: deploy {} on tree {}", manifest.get_id(), noc_master_deploy_tree);
         let bytes = ByteArray(manifest_msg.into_bytes());
-        noc_to_port.send((noc_master_deploy_tree.clone(), TcpMsgType::Manifest, MsgDirection::Leafward, bytes)).context(NocError::Chain { func_name: "create_noc", comment: S("NocMaster")})?;
+        noc_to_port.send((is_ait, noc_master_deploy_tree.clone(), TcpMsgType::Manifest, MsgDirection::Leafward, bytes)).context(NocError::Chain { func_name: "create_noc", comment: S("NocMaster")})?;
         // Deploy NocAgent
         let up_tree = UpTreeSpec::new("NocAgent", vec![0]).context(NocError::Chain { func_name: "create_noc", comment: S("NocAgent") })?;
         let service = ContainerSpec::new("NocAgent", "NocAgent", vec![], &allowed_trees).context(NocError::Chain { func_name: "create_noc", comment: S("NocAgent") })?;
@@ -146,11 +147,12 @@ impl Noc {
         let manifest_msg = serde_json::to_string(&params).context(NocError::Chain { func_name: "create_noc", comment: S("NocAgent")})?;
         println!("Noc: deploy {} on tree {}", manifest.get_id(), noc_master_deploy_tree);
         let bytes = ByteArray(manifest_msg.into_bytes());
-        noc_to_port.send((noc_agent_deploy_tree.clone(), TcpMsgType::Manifest, MsgDirection::Leafward, bytes)).context(NocError::Chain { func_name: "create_noc", comment: S("NocAgent")})?;
+        noc_to_port.send((is_ait, noc_agent_deploy_tree.clone(), TcpMsgType::Manifest, MsgDirection::Leafward, bytes)).context(NocError::Chain { func_name: "create_noc", comment: S("NocAgent")})?;
         Ok(())
 	}
     // Because of packet forwarding, this tree gets stacked on all cells even though only one of them can receive the deployment message
     fn noc_master_deploy_tree(noc_master_deploy_tree: &AllowedTree, tree_name: &String, noc_to_port: &NocToPort) -> Result<(), Error> {
+        let is_ait = false;
         // Tree for deploying the NocMaster, which only runs on the border cell connected to this instance of Noc
         let mut params = HashMap::new();
         params.insert(S("new_tree_name"), S(noc_master_deploy_tree.get_name()));
@@ -167,12 +169,13 @@ impl Noc {
         println!("Noc: stack {} on tree {}", NOC_MASTER_DEPLOY_TREE_NAME, tree_name);
         let bytes = ByteArray(stack_tree_msg.into_bytes());
 
-        noc_to_port.send((noc_master_deploy_tree.clone(), TcpMsgType::StackTree, MsgDirection::Leafward, bytes)).context(NocError::Chain { func_name: "noc_master_deploy_tree", comment: S("")})?;
+        noc_to_port.send((is_ait, noc_master_deploy_tree.clone(), TcpMsgType::StackTree, MsgDirection::Leafward, bytes)).context(NocError::Chain { func_name: "noc_master_deploy_tree", comment: S("")})?;
         Ok(())
     }
     // For the reasons given in the comments to the following two functions, the agent does not run
     // on the same cell as the master
     fn noc_agent_deploy_tree(noc_agent_deploy_tree: &AllowedTree, tree_name: &String, noc_to_port: &NocToPort) -> Result<(), Error> {
+        let is_ait = false;
         // Stack a tree for deploying the NocAgents, which run on all cells, including the one running the NocMaster
         let mut params = HashMap::new();
         params.insert(S("new_tree_name"), S(NOC_AGENT_DEPLOY_TREE_NAME));
@@ -188,12 +191,13 @@ impl Noc {
         let stack_tree_msg = serde_json::to_string(&params).context(NocError::Chain { func_name: "noc_agent_deploy_tree", comment: S("")})?;
         println!("Noc: stack {} on tree {}", NOC_AGENT_DEPLOY_TREE_NAME, tree_name);
         let bytes = ByteArray(stack_tree_msg.into_bytes());
-        noc_to_port.send((noc_agent_deploy_tree.clone(), TcpMsgType::StackTree, MsgDirection::Leafward, bytes)).context(NocError::Chain { func_name: "noc_agent_deploy_tree", comment: S("")})?;
+        noc_to_port.send((is_ait, noc_agent_deploy_tree.clone(), TcpMsgType::StackTree, MsgDirection::Leafward, bytes)).context(NocError::Chain { func_name: "noc_agent_deploy_tree", comment: S("")})?;
         Ok(())
     }
     // I need a more comprehensive GVM to express the fact that the agent running on the same cell as the master
     // can receive messages from the master
     fn noc_master_agent_tree(noc_master_agent: &AllowedTree, tree_name: &String, noc_to_port: &NocToPort) -> Result<(), Error> {
+        let is_ait = false;
         let mut params = HashMap::new();
         params.insert(S("new_tree_name"), S(NOC_CONTROL_TREE_NAME));
         params.insert( S("parent_tree_name"), S(tree_name));
@@ -208,12 +212,13 @@ impl Noc {
         let stack_tree_msg = serde_json::to_string(&params).context(NocError::Chain { func_name: "noc_master_tree", comment: S("")})?;
         println!("Noc: stack {} on tree {}", NOC_CONTROL_TREE_NAME, tree_name);
         let bytes = ByteArray(stack_tree_msg.into_bytes());
-        noc_to_port.send((noc_master_agent.clone(), TcpMsgType::StackTree, MsgDirection::Leafward, bytes)).context(NocError::Chain { func_name: "noc_master_tree", comment: S("")})?;
+        noc_to_port.send((is_ait, noc_master_agent.clone(), TcpMsgType::StackTree, MsgDirection::Leafward, bytes)).context(NocError::Chain { func_name: "noc_master_tree", comment: S("")})?;
         Ok(())
     }
     // I need a more comprehensive GVM to express the fact that the agent running on the same cell as the master
     // can send messages to the master
     fn noc_agent_master_tree(noc_agent_master: &AllowedTree, tree_name: &String, noc_to_port: &NocToPort) -> Result<(), Error> {
+        let is_ait = false;
         let mut params = HashMap::new();
         params.insert(S("new_tree_name"), S(NOC_LISTEN_TREE_NAME));
         params.insert( S("parent_tree_name"), S(tree_name));
@@ -228,7 +233,7 @@ impl Noc {
         let stack_tree_msg = serde_json::to_string(&params).context(NocError::Chain { func_name: "noc_master_tree", comment: S("")})?;
         println!("Noc: stack {} on tree {}", NOC_LISTEN_TREE_NAME, tree_name);
         let bytes = ByteArray(stack_tree_msg.into_bytes());
-        noc_to_port.send((noc_agent_master.clone(), TcpMsgType::StackTree, MsgDirection::Leafward, bytes)).context(NocError::Chain { func_name: "noc_master_tree", comment: S("")})?;
+        noc_to_port.send((is_ait, noc_agent_master.clone(), TcpMsgType::StackTree, MsgDirection::Leafward, bytes)).context(NocError::Chain { func_name: "noc_master_tree", comment: S("")})?;
         Ok(())
     }
 }
