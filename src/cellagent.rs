@@ -435,6 +435,9 @@ impl CellAgent {
                 None => return Err(CellagentError::TreeMap { cell_id: self.cell_id.clone(), func_name: f, tree_name: allowed_tree.clone() }.into())
             };
         }
+        // TODO: The next line breaks confinement by giving every application permission to send on the black tree
+        tree_map.insert(S("Base"), self.my_tree_id.clone()); // <--- Breaks confinement
+        // TODO: End of confinement breaking code
         for vm_spec in manifest.get_vms() {
             let (vm_to_ca, ca_from_vm): (VmToCa, CaFromVm) = channel();
             let (ca_to_vm, vm_from_ca): (CaToVm, VmFromCa) = channel();
