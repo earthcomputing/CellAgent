@@ -9,7 +9,9 @@ crossbeam = "0.2"
 eval = "^0.4.1"
 failure = "0.1.1"
 #failure_derive = "0.1.0"
+kafka = "0.7"
 rand = "*" # Or a specific version
+rdkafka = "0.17.0"
 #schema = { path = "/Users/alan/Documents/Eclipse/schema" }
 #schema_derive = { path = "/Users/alan/Documents/Eclipse/schema-derive" }
 serde = "1.0.27"
@@ -17,9 +19,3 @@ serde_derive = "1.0.27"
 serde_json = "1.0.9"
 time = "0.1"
 uuid = { version = "0.6.1", features = ["serde", "v4"] }
-
-#[dependencies.failure]
-#git = "https://github.com/withoutboats/failure.git"
-#[dependencies.failure_derive]
-#git = "https://github.com/withoutboats/failure_derive.git"
-
