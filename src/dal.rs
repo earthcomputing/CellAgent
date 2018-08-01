@@ -3,16 +3,21 @@
 
 use std::fs::{File, OpenOptions};
 use std::io::Write;
+use std::time::Duration;
 
+use kafka::producer::{Producer, Record, RequiredAcks};
 use serde_json;
 use serde_json::{Value};
 
-use config::{OUTPUT_FILE_NAME};
+use config::{KAFKA_SERVER, OUTPUT_FILE_NAME};
 use utility::{S, TraceHeader, TraceHeaderParams, TraceType};
 
 const FOR_EVAL: bool = true;
-pub fn add_to_trace(trace_header: &mut TraceHeader, trace_type: TraceType,
+
+pub fn add_to_trace(producer: &mut Producer, trace_header: &mut TraceHeader, trace_type: TraceType,
                     trace_params: &TraceHeaderParams, trace_body: &Value, caller: &str) -> Result<(), Error> {
+    let f = "add_to_trace";
+    //let mut buf = String::with_capacity(2);
     let mut file_handle = match OpenOptions::new().append(true).open(OUTPUT_FILE_NAME) {
         Ok(f) => Ok(f),
         Err(_) => {
@@ -28,8 +33,27 @@ pub fn add_to_trace(trace_header: &mut TraceHeader, trace_type: TraceType,
     } else {
         format!("{:?}", &trace_record)
     };
-    file_handle.write(&(line + "\n").into_bytes()).context(DalError::Chain { func_name: "add_to_trace", comment: S("Write record") })?;
-    Ok(())
+    file_handle.write(&(line.clone() + "\n").into_bytes()).context(DalError::Chain { func_name: "add_to_trace", comment: S("Write record") })?;
+    match producer.send(&Record { topic: "CellAgent", partition: 0, key: (), value: line }) {
+       Ok(_) => Ok(()),
+        Err(e) => {
+            println!("{}", e);
+            Err(DalError::Kafka { func_name: f, kafka_error: S(e) }.into())
+        }
+   }
+}
+pub fn make_kafka_producer(_requester: &str) -> Result<Producer, Error> {
+    let f = "make_kafka_producer";
+    match Producer::from_hosts(vec!(KAFKA_SERVER.to_owned()))
+            .with_ack_timeout(Duration::from_secs(1))
+            .with_required_acks(RequiredAcks::One)
+            .create() {
+        Ok(p) => Ok(p),
+        Err(e) => {
+            println!("Error creating Kafka producer");
+            Err(DalError::Kafka { func_name: f, kafka_error: S(e) }.into())
+        }
+    }
 }
 #[derive(Debug, Clone, Serialize)]
 struct TraceRecord<'a> {
@@ -42,4 +66,6 @@ use failure::{Error, ResultExt};
 pub enum DalError {
     #[fail(display = "DalError::Chain {} {}", func_name, comment)]
     Chain { func_name: &'static str, comment: String },
+    #[fail(display = "DalError::Kafka {}: Error {} producing trace record", func_name, kafka_error)]
+    Kafka { func_name: &'static str, kafka_error: String }
 }

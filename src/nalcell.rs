@@ -3,6 +3,8 @@ use std::collections::{HashMap, HashSet};
 use std::sync::mpsc::channel;
 use std::thread;
 
+use kafka::producer::Producer;
+
 use cellagent::{CellAgent};
 use cmodel::{Cmodel};
 use dal;
@@ -46,7 +48,7 @@ pub struct NalCell {
 
 impl NalCell {
 	pub fn new(cell_no: CellNo, nports: PortNo, cell_type: CellType,
-               config: CellConfig, mut trace_header: TraceHeader) -> Result<NalCell, Error> {
+               config: CellConfig, producer: &mut Producer, mut trace_header: TraceHeader) -> Result<NalCell, Error> {
         let f = "new";
 		if *nports > *MAX_PORTS { return Err(NalcellError::NumberPorts { nports, func_name: "new", max_ports: MAX_PORTS }.into()) }
 		let cell_id = CellID::new(cell_no).context(NalcellError::Chain { func_name: "new", comment: S("cell_id")})?;
@@ -62,7 +64,7 @@ impl NalCell {
         {
             let ref trace_params = TraceHeaderParams { module: MODULE, function: f, format: "nalcell_port_setup" };
             let trace = json!({ "cell_number": cell_no });
-            let _ = dal::add_to_trace(&mut trace_header, TraceType::Trace, trace_params, &trace, f);
+            let _ = dal::add_to_trace(producer, &mut trace_header, TraceType::Trace, trace_params, &trace, f);
         }
 		for i in 0..*nports + 1 {
 			let is_border_port = match cell_type {
@@ -83,53 +85,57 @@ impl NalCell {
 		}
 		let boxed_ports: Box<[Port]> = ports.into_boxed_slice();
 		let cell_agent = CellAgent::new(&cell_id, cell_type, config, nports, ca_to_cm).context(NalcellError::Chain { func_name: "new", comment: S("cell agent create")})?;
-        NalCell::start_cell(&cell_agent, ca_from_cm, &mut trace_header);
+        NalCell::start_cell(&cell_agent, ca_from_cm, producer, &mut trace_header);
         let cmodel = Cmodel::new(&cell_id);
         NalCell::start_cmodel(&cmodel, cm_from_ca, cm_to_pe, cm_from_pe, cm_to_ca, &mut trace_header);
 		let packet_engine = PacketEngine::new(&cell_id, pe_to_cm, pe_to_ports, boundary_port_nos).context(NalcellError::Chain { func_name: "new", comment: S("packet engine create")})?;
-		NalCell::start_packet_engine(&packet_engine, pe_from_cm, pe_from_ports, &mut trace_header);
+		NalCell::start_packet_engine(&packet_engine, pe_from_cm, pe_from_ports, producer, &mut trace_header);
 		Ok(NalCell { id: cell_id, cell_no, cell_type, config,
 				ports: boxed_ports, cell_agent, vms: Vec::new(),
 				packet_engine, ports_from_pe })
 	}
-    fn start_cell(cell_agent: &CellAgent, ca_from_cm: CaFromCm, outer_trace_header: &mut TraceHeader) {
+    fn start_cell(cell_agent: &CellAgent, ca_from_cm: CaFromCm, producer: &mut Producer, outer_trace_header: &mut TraceHeader) {
         let f = "start_cell";
         let mut ca = cell_agent.clone();
         {
             let ref trace_params = TraceHeaderParams { module: MODULE, function: f, format: "nalcell_start_ca" };
             let trace = json!({  "cell_id": &ca.get_id() });
-            let _ = dal::add_to_trace(outer_trace_header, TraceType::Trace, trace_params, &trace, f);
+            let _ = dal::add_to_trace(producer, outer_trace_header, TraceType::Trace, trace_params, &trace, f);
         }
 		let mut outer_trace_header_clone = outer_trace_header.clone();
         thread::spawn( move || {
+            let ref mut producer = dal::make_kafka_producer(f).expect("Kafka error");
             let inner_trace_header = outer_trace_header_clone.fork_trace();
-            let _ = ca.initialize(ca_from_cm, inner_trace_header).map_err(|e| ::utility::write_err("nalcell", e));
+            let _ = ca.initialize(ca_from_cm, producer, inner_trace_header).map_err(|e| ::utility::write_err("nalcell", e));
             // Don't automatically restart cell agent if it crashes
         });
     }
     fn start_cmodel(cmodel: &Cmodel, cm_from_ca: CmFromCa, cm_to_pe: CmToPe, cm_from_pe: CmFromPe, cm_to_ca: CmToCa,
                     outer_trace_header: &mut TraceHeader) {
+        let f = "start_cmodel";
         let cm = cmodel.clone();
         let mut outer_trace_header_clone = outer_trace_header.clone();
         thread::spawn( move || {
+            let ref mut producer = dal::make_kafka_producer(f).expect("Kafka error");
             let inner_trace_header = outer_trace_header_clone.fork_trace();
-            let _ = cm.initialize(cm_from_ca, cm_to_pe, cm_from_pe, cm_to_ca, inner_trace_header);
+            let _ = cm.initialize(cm_from_ca, cm_to_pe, cm_from_pe, cm_to_ca, producer, inner_trace_header);
             // Don't automatically restart cmodel if it crashes
         });
     }
-    fn start_packet_engine(packet_engine: &PacketEngine, pe_from_cm: PeFromCm,
-                           pe_from_ports: PeFromPort, outer_trace_header: &mut TraceHeader) {
+    fn start_packet_engine(packet_engine: &PacketEngine, pe_from_cm: PeFromCm, pe_from_ports: PeFromPort,
+                           producer: &mut Producer, outer_trace_header: &mut TraceHeader) {
         let f = "start_packet_engine";
         let pe = packet_engine.clone();
         {
             let ref trace_params = TraceHeaderParams { module: MODULE, function: f, format: "nalcell_start_pe" };
             let trace = json!({ "cell_id": &pe.get_id() });
-            let _ = dal::add_to_trace(outer_trace_header, TraceType::Trace, trace_params, &trace, f);
+            let _ = dal::add_to_trace(producer, outer_trace_header, TraceType::Trace, trace_params, &trace, f);
         }
         let mut outer_trace_header_clone = outer_trace_header.clone();
         thread::spawn( move || {
+            let ref mut producer = dal::make_kafka_producer(f).expect("Kafka error");
             let inner_trace_header = outer_trace_header_clone.fork_trace();
-            let _ = pe.initialize(pe_from_cm, pe_from_ports, inner_trace_header).map_err(|e| ::utility::write_err("nalcell", e));
+            let _ = pe.initialize(pe_from_cm, pe_from_ports, producer, inner_trace_header).map_err(|e| ::utility::write_err("nalcell", e));
             // Don't automatically restart packet engine if it crashes
         });
     }

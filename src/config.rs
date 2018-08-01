@@ -135,3 +135,4 @@ pub const CONNECTED_PORTS_TREE_NAME: &'static str = "Connected";
 //pub const BASE_TREE_NAME: &'static str = "Base";
 // Place to write output data
 pub const OUTPUT_FILE_NAME: &'static str = "/Users/alan/Documents/multicell-trace.json";
+pub const KAFKA_SERVER: &'static str = "172.16.1.86:9092";
