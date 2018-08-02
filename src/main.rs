@@ -3,18 +3,15 @@
 extern crate chrono;
 extern crate eval;
 #[macro_use] extern crate failure;
+extern crate futures;
 extern crate kafka;
 extern crate rand;
+extern crate rdkafka;
 extern crate serde;
 #[macro_use] extern crate serde_derive;
 #[macro_use] extern crate serde_json;
 extern crate time;
 extern crate uuid;
-
-extern crate rdkafka;
-use rdkafka::config::ClientConfig;
-use rdkafka::producer::{FutureProducer, FutureRecord};
-use rdkafka::message::OwnedHeaders;
 
 mod blueprint;
 mod cellagent;
@@ -48,16 +45,14 @@ mod uuid_ec;
 mod vm;
 
 use std::io::{stdin, stdout, Read, Write};
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::fs::{File, OpenOptions};
 use std::sync::mpsc::channel;
-use std::collections::HashMap;
-use std::time::Duration;
 
-use kafka::producer::{Producer, Record, RequiredAcks};
+use kafka::producer::{Record, RequiredAcks};
 
 use blueprint::Blueprint;
-use config::{KAFKA_SERVER, NCELLS, NPORTS, NLINKS, OUTPUT_FILE_NAME, SCHEMA_VERSION,
+use config::{NCELLS, NPORTS, NLINKS, OUTPUT_FILE_NAME, SCHEMA_VERSION,
              get_edges, CellNo, PortNo};
 use ecargs::{ECArgs};
 use gvm_equation::{GvmEqn};
@@ -70,7 +65,7 @@ use utility::{S, TraceHeader, TraceHeaderParams, TraceType};
 const MODULE: &'static str = "main.rs";
 fn main() -> Result<(), Error> {
     let f = "main";
-	println!("Multicell Routing: Output to file {} (set in config.rs)", OUTPUT_FILE_NAME);
+    println!("Multicell Routing: Output to file {} (set in config.rs)", OUTPUT_FILE_NAME);
     let mut producer = ::dal::make_kafka_producer("main")?;
     match producer.send(&Record { topic: "CellAgent", partition: 0, key: (), value: S("From main") }) {
         Ok(_) => println!("Wrote to Kafka"),

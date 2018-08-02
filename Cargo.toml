@@ -9,6 +9,7 @@ crossbeam = "0.2"
 eval = "^0.4.1"
 failure = "0.1.1"
 #failure_derive = "0.1.0"
+futures = "0.1.23"
 kafka = "0.7"
 rand = "*" # Or a specific version
 rdkafka = "0.17.0"

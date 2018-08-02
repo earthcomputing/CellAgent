@@ -5,14 +5,21 @@ use std::fs::{File, OpenOptions};
 use std::io::Write;
 use std::time::Duration;
 
+use futures::*;
+use rdkafka::config::ClientConfig;
+use rdkafka::producer::{FutureProducer, FutureRecord};
+use rdkafka::message::OwnedHeaders;
+
 use kafka::producer::{Producer, Record, RequiredAcks};
 use serde_json;
 use serde_json::{Value};
 
-use config::{KAFKA_SERVER, OUTPUT_FILE_NAME};
+use config::{KAFKA_SERVER, OUTPUT_FILE_NAME, SIMPLE_KAFKA};
 use utility::{S, TraceHeader, TraceHeaderParams, TraceType};
 
 const FOR_EVAL: bool = true;
+
+static mut PRODUCER_RD: Option<FutureProducer> = None;
 
 pub fn add_to_trace(producer: &mut Producer, trace_header: &mut TraceHeader, trace_type: TraceType,
                     trace_params: &TraceHeaderParams, trace_body: &Value, caller: &str) -> Result<(), Error> {
@@ -34,13 +41,34 @@ pub fn add_to_trace(producer: &mut Producer, trace_header: &mut TraceHeader, tra
         format!("{:?}", &trace_record)
     };
     file_handle.write(&(line.clone() + "\n").into_bytes()).context(DalError::Chain { func_name: "add_to_trace", comment: S("Write record") })?;
-    match producer.send(&Record { topic: "CellAgent", partition: 0, key: (), value: line }) {
-       Ok(_) => Ok(()),
-        Err(e) => {
-            println!("{}", e);
-            Err(DalError::Kafka { func_name: f, kafka_error: S(e) }.into())
+    if SIMPLE_KAFKA {
+        match producer.send(&Record { topic: "CellAgent", partition: 0, key: (), value: line }) {
+            Ok(_) => (),
+            Err(e) => {
+                println!("{}", e);
+                return Err(DalError::Kafka { func_name: f, kafka_error: S(e) }.into())
+            }
         }
-   }
+    } else {
+        unsafe {
+            match PRODUCER_RD.clone() {
+                Some(p) => p,
+                None => {
+                    PRODUCER_RD = Some(ClientConfig::new()
+                        .set("bootstrap.servers", KAFKA_SERVER)
+                        .set("message.timeout.ms", "5000")
+                        .create()
+                        .expect("Producer creation error"));
+                    PRODUCER_RD.clone().unwrap()
+                }
+            }.send(
+                FutureRecord::to("CellAgent")
+                    .payload(&line)
+                    .key(&format!("{:?}", trace_header.get_event_id())),
+                0);
+        }
+    }
+    Ok(())
 }
 pub fn make_kafka_producer(_requester: &str) -> Result<Producer, Error> {
     let f = "make_kafka_producer";
