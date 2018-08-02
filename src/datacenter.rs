@@ -3,9 +3,6 @@ use std::cmp::max;
 use std::sync::mpsc::channel;
 use std::thread::{JoinHandle};
 
-use failure::{Error};
-use kafka::producer::Producer;
-
 use blueprint::{Blueprint};
 use config::{MIN_BOUNDARY_CELLS, CellNo, CellType, Edge, LinkNo};
 use dal;
@@ -24,7 +21,7 @@ pub struct Datacenter {
 }
 impl Datacenter {
 	pub fn new() -> Datacenter { Datacenter { cells: Vec::new(), links: Vec::new() } }
-	pub fn initialize(&mut self, blueprint: &Blueprint, producer: &mut Producer, trace_header: &mut TraceHeader)
+	pub fn initialize(&mut self, blueprint: &Blueprint, trace_header: &mut TraceHeader)
             -> Result<Vec<JoinHandle<()>>, Error> {
 		let f = "initialize";
 		let ncells = blueprint.get_ncells();
@@ -35,11 +32,11 @@ impl Datacenter {
 		for border_cell in border_cells {
 			let cell = NalCell::new(border_cell.get_cell_no(), border_cell.get_nports(),
                                     CellType::Border,CellConfig::Large,
-                                    producer, trace_header.fork_trace())?;
+                                    trace_header.fork_trace())?;
             {
                 let ref trace_params = TraceHeaderParams { module: MODULE, function: f, format: "border_cell_start" };
                 let trace = json!({ "cell_number": border_cell.get_cell_no() });
-                let _ = dal::add_to_trace(producer, trace_header, TraceType::Trace, trace_params,&trace, f);
+                let _ = dal::add_to_trace(trace_header, TraceType::Trace, trace_params,&trace, f);
             }
 			self.cells.push(cell);
 		}
@@ -47,11 +44,11 @@ impl Datacenter {
 		for interior_cell in interior_cells {
 			let cell = NalCell::new(interior_cell.get_cell_no(), interior_cell.get_nports(),
                                     CellType::Interior,CellConfig::Large,
-                                    producer, trace_header.fork_trace())?;
+                                    trace_header.fork_trace())?;
             {
                 let ref trace_params = TraceHeaderParams { module: MODULE, function: f, format: "interior_cell_start" };
                 let trace = json!({"cell_number": interior_cell.get_cell_no() });
-                let _ = dal::add_to_trace(producer, trace_header, TraceType::Trace, trace_params, &trace, f);
+                let _ = dal::add_to_trace(trace_header, TraceType::Trace, trace_params, &trace, f);
             }
 			self.cells.push(cell);
 		}
@@ -89,7 +86,7 @@ impl Datacenter {
             {
                 let ref trace_params = TraceHeaderParams { module: MODULE, function: f, format: "connect_link" };
                 let trace = json!({ "left_cell": left_cell_id, "rite_cell": rite_cell_id, "left_port": left_port.get_port_no(), "rite_port": rite_port.get_port_no(), "link_id": link.get_id() });
-                let _ = dal::add_to_trace(producer, trace_header, TraceType::Trace, trace_params, &trace, f);
+                let _ = dal::add_to_trace(trace_header, TraceType::Trace, trace_params, &trace, f);
             }
 			let mut handle_pair = link.start_threads(link_to_left, link_from_left, link_to_rite, link_from_rite)?;
 			link_handles.append(&mut handle_pair);
@@ -132,6 +129,7 @@ impl fmt::Display for Datacenter {
 	}
 }
 // Errors
+use failure::{Error};
 #[derive(Debug, Fail)]
 pub enum DatacenterError {
     #[fail(display = "DatacenterError::Boundary {}: No boundary cells found", func_name)]

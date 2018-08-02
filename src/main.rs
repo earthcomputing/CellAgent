@@ -4,7 +4,6 @@ extern crate chrono;
 extern crate eval;
 #[macro_use] extern crate failure;
 extern crate futures;
-extern crate kafka;
 extern crate rand;
 extern crate rdkafka;
 extern crate serde;
@@ -49,8 +48,6 @@ use std::collections::{HashMap, HashSet};
 use std::fs::{File, OpenOptions};
 use std::sync::mpsc::channel;
 
-use kafka::producer::{Record, RequiredAcks};
-
 use blueprint::Blueprint;
 use config::{NCELLS, NPORTS, NLINKS, OUTPUT_FILE_NAME, SCHEMA_VERSION,
              get_edges, CellNo, PortNo};
@@ -66,16 +63,11 @@ const MODULE: &'static str = "main.rs";
 fn main() -> Result<(), Error> {
     let f = "main";
     println!("Multicell Routing: Output to file {} (set in config.rs)", OUTPUT_FILE_NAME);
-    let mut producer = ::dal::make_kafka_producer("main")?;
-    match producer.send(&Record { topic: "CellAgent", partition: 0, key: (), value: S("From main") }) {
-        Ok(_) => println!("Wrote to Kafka"),
-        Err(e) => println!("Error {} writing to Kafka", e)
-    }
     let mut trace_header = TraceHeader::new();
     {   // Can't get records from main() to show up in trace file
         let ref trace_params = TraceHeaderParams { module: MODULE, function: f, format: "trace_schema" };
         let trace = json!({ "schema_version": SCHEMA_VERSION });
-        let _ = dal::add_to_trace( &mut producer, &mut trace_header, TraceType::Trace, trace_params,&trace, f);
+        let _ = dal::add_to_trace( &mut trace_header, TraceType::Trace, trace_params,&trace, f);
     }
     let _ = OpenOptions::new().write(true).truncate(true).open(OUTPUT_FILE_NAME);
     /* Doesn't work when debugging in Eclipse
@@ -105,7 +97,7 @@ fn main() -> Result<(), Error> {
 	let (outside_to_noc, noc_from_outside): (OutsideToNoc, NocFromOutside) = channel();
 	let (noc_to_outside, _outside_from_noc): (NocToOutside, OutsideFromNoc) = channel();
 	let mut noc = Noc::new(noc_to_outside)?;
-	let (dc, _) = noc.initialize(&blueprint, noc_from_outside, &mut producer, &mut trace_header).context(MainError::Chain { func_name: "run", comment: S("")})?;
+	let (dc, _) = noc.initialize(&blueprint, noc_from_outside, &mut trace_header).context(MainError::Chain { func_name: "run", comment: S("")})?;
 	loop {
 		stdout().write(b"Enter any character to print datacenter\n").context(MainError::Chain { func_name: "run", comment: S("")})?;
         let mut print_opt = String::new();

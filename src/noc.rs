@@ -3,7 +3,6 @@ use std::sync::mpsc::channel;
 use std::collections::{HashMap, HashSet};
 use std::time::{Duration};
 
-use kafka::producer::Producer;
 use serde_json;
 
 use blueprint::{Blueprint};
@@ -33,18 +32,18 @@ impl Noc {
 		Ok(Noc { allowed_trees: HashSet::new(), noc_to_outside })
 	}
 	pub fn initialize(&mut self, blueprint: &Blueprint, noc_from_outside: NocFromOutside,
-                      producer: &mut Producer, trace_header: &mut TraceHeader) ->
+                      trace_header: &mut TraceHeader) ->
             Result<(Datacenter, Vec<JoinHandle<()>>), Error> {
         let f = "initialize";
         {
             // For reasons I can't understand, the trace record doesn't show up when generated from main.
             let ref trace_params = TraceHeaderParams { module: "main.rs", function: "MAIN", format: "trace_schema" };
             let trace = json!({ "schema_version": SCHEMA_VERSION });
-            let _ = dal::add_to_trace(producer, trace_header, TraceType::Trace, trace_params,&trace, f);
+            let _ = dal::add_to_trace(trace_header, TraceType::Trace, trace_params,&trace, f);
         }
 		let (noc_to_port, port_from_noc): (NocToPort, NocFromPort) = channel();
 		let (port_to_noc, noc_from_port): (PortToNoc, PortFromNoc) = channel();
-		let (mut dc, mut join_handles) = self.build_datacenter(blueprint, producer, trace_header).context(NocError::Chain { func_name: "initialize", comment: S("")})?;
+		let (mut dc, mut join_handles) = self.build_datacenter(blueprint, trace_header).context(NocError::Chain { func_name: "initialize", comment: S("")})?;
 		dc.connect_to_noc(port_to_noc, port_from_noc).context(NocError::Chain { func_name: "initialize", comment: S("")})?;
         let join_outside = self.listen_outside(noc_from_outside, noc_to_port.clone())?;
         join_handles.push(join_outside);
@@ -54,9 +53,9 @@ impl Noc {
 		sleep(nap);
 		Ok((dc, join_handles))
 	}
-	fn build_datacenter(&self, blueprint: &Blueprint, producer: &mut Producer, trace_header: &mut TraceHeader) -> Result<(Datacenter, Vec<JoinHandle<()>>), Error> {
+	fn build_datacenter(&self, blueprint: &Blueprint, trace_header: &mut TraceHeader) -> Result<(Datacenter, Vec<JoinHandle<()>>), Error> {
 		let mut dc = Datacenter::new();
-		let join_handles = dc.initialize(blueprint, producer, trace_header).context(NocError::Chain { func_name: "build_datacenter", comment: S("")})?;
+		let join_handles = dc.initialize(blueprint, trace_header).context(NocError::Chain { func_name: "build_datacenter", comment: S("")})?;
 		Ok((dc, join_handles))
 	}
 //	fn get_msg(&self, msg_type: MsgType, serialized_msg:String) -> Result<Box<Message>> {
@@ -70,15 +69,14 @@ impl Noc {
         let mut noc = self.clone();
         let mut outer_trace_header_clone = outer_trace_header.clone();
         let join_port = spawn( move ||  {
-            let ref mut producer = dal::make_kafka_producer(f).expect("Kafka error");
             let ref mut inner_trace_header= outer_trace_header_clone.fork_trace();
-            let _ = noc.listen_port_loop(&noc_to_port, &noc_from_port, producer, inner_trace_header).map_err(|e| write_err("port", e));
+            let _ = noc.listen_port_loop(&noc_to_port, &noc_from_port, inner_trace_header).map_err(|e| write_err("port", e));
             let _ = noc.listen_port(noc_to_port, noc_from_port, inner_trace_header);
         });
         Ok(join_port)
     }
 	fn listen_port_loop(&mut self, noc_to_port: &NocToPort, noc_from_port: &NocFromPort,
-            producer: &mut Producer, trace_header: &mut TraceHeader) -> Result<(), Error> {
+            trace_header: &mut TraceHeader) -> Result<(), Error> {
         let f = "listen_port_loop";
 		loop {
 			let (is_ait, allowed_tree, msg_type, direction, bytes) = noc_from_port.recv().context(NocError::Chain { func_name: "listen_port", comment: S("")})?;
@@ -90,7 +88,7 @@ impl Noc {
                     {
                         let ref trace_params = TraceHeaderParams { module: "main.rs", function: f, format: "noc_from_ca" };
                         let trace = json!({ "msg_type": msg_type, "tree_name": tree_name });
-                        let _ = dal::add_to_trace(producer, trace_header, TraceType::Trace, trace_params,&trace, f);
+                        let _ = dal::add_to_trace(trace_header, TraceType::Trace, trace_params,&trace, f);
                     }
                     self.allowed_trees.insert(AllowedTree::new(tree_name));
                     // If this is the first tree, set up NocMaster and NocAgent
