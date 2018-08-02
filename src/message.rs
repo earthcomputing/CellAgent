@@ -3,7 +3,6 @@ use std::fmt;
 use std::collections::{HashMap, HashSet};
 use std::sync::atomic::{ATOMIC_USIZE_INIT, AtomicUsize, Ordering};
 
-use kafka::producer::Producer;
 use serde;
 use serde_json;
 
@@ -175,7 +174,7 @@ pub trait Message {
 		Ok(packets)
 	}
 	fn process_ca(&mut self, _cell_agent: &mut CellAgent, _port_no: PortNo, _msg_tree_id: &TreeID, is_ait: bool,
-                  producer: &mut Producer, trace_header: &mut TraceHeader) -> Result<(), Error> { Err(MessageError::Process { func_name: "process_ca" }.into()) }
+                  trace_header: &mut TraceHeader) -> Result<(), Error> { Err(MessageError::Process { func_name: "process_ca" }.into()) }
 }
 impl fmt::Display for Message {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
@@ -252,8 +251,8 @@ impl Message for DiscoverMsg {
         }
     }
 	fn process_ca(&mut self, cell_agent: &mut CellAgent, port_no: PortNo, msg_tree_id: &TreeID, is_ait: bool,
-                  producer: &mut Producer, trace_header: &mut TraceHeader) -> Result<(), Error> {
-        cell_agent.process_discover_msg(self, port_no, producer, trace_header)
+                  trace_header: &mut TraceHeader) -> Result<(), Error> {
+        cell_agent.process_discover_msg(self, port_no, trace_header)
 	}
 }
 impl fmt::Display for DiscoverMsg {
@@ -327,8 +326,8 @@ impl Message for DiscoverDMsg {
         }
     }
 	fn process_ca(&mut self, cell_agent: &mut CellAgent, port_no: PortNo, _msg_tree_id: &TreeID, is_ait: bool,
-                  producer: &mut Producer, trace_header: &mut TraceHeader) -> Result<(), Error> {
-        cell_agent.process_discover_d_msg(&self, port_no, producer, trace_header)
+                  trace_header: &mut TraceHeader) -> Result<(), Error> {
+        cell_agent.process_discover_d_msg(&self, port_no, trace_header)
     }
 }
 impl fmt::Display for DiscoverDMsg {
@@ -380,9 +379,8 @@ impl Message for StackTreeMsg {
         }
     }
 	fn process_ca(&mut self, cell_agent: &mut CellAgent, port_no: PortNo, msg_tree_id: &TreeID, is_ait: bool,
-                  producer: &mut Producer, trace_header: &mut TraceHeader) -> Result<(), Error> {
-        cell_agent.process_stack_tree_msg(&self, port_no,
-                                          msg_tree_id, producer, trace_header)
+                  trace_header: &mut TraceHeader) -> Result<(), Error> {
+        cell_agent.process_stack_tree_msg(&self, port_no, msg_tree_id, trace_header)
 	}
 }
 impl fmt::Display for StackTreeMsg {
@@ -444,8 +442,8 @@ impl Message for StackTreeDMsg {
         }
     }
     fn process_ca(&mut self, cell_agent: &mut CellAgent, port_no: PortNo,_msg_tree_id: &TreeID, is_ait: bool,
-                  producer: &mut Producer, trace_header: &mut TraceHeader) -> Result<(), Error> {
-        cell_agent.process_stack_tree_d_msg(&self, port_no, producer, trace_header)
+                  trace_header: &mut TraceHeader) -> Result<(), Error> {
+        cell_agent.process_stack_tree_d_msg(&self, port_no, trace_header)
     }
 }
 impl fmt::Display for StackTreeDMsg {
@@ -498,8 +496,8 @@ impl Message for ManifestMsg {
         }
     }
 	fn process_ca(&mut self, cell_agent: &mut CellAgent, port_no: PortNo, msg_tree_id: &TreeID, is_ait: bool,
-                  producer: &mut Producer, trace_header: &mut TraceHeader) -> Result<(), Error> {
-        cell_agent.process_manifest_msg(&self, port_no, msg_tree_id, producer, trace_header)
+                  trace_header: &mut TraceHeader) -> Result<(), Error> {
+        cell_agent.process_manifest_msg(&self, port_no, msg_tree_id, trace_header)
 	}
 }
 impl fmt::Display for ManifestMsg {
@@ -558,8 +556,8 @@ impl Message for ApplicationMsg {
         }
     }
     fn process_ca(&mut self, cell_agent: &mut CellAgent, port_no: PortNo, msg_tree_id: &TreeID, is_ait: bool,
-                  producer: &mut Producer, trace_header: &mut TraceHeader) -> Result<(), Error> {
-        cell_agent.process_application_msg(self, port_no,  msg_tree_id, is_ait, producer, trace_header)
+                  trace_header: &mut TraceHeader) -> Result<(), Error> {
+        cell_agent.process_application_msg(self, port_no,  msg_tree_id, is_ait, trace_header)
     }
 }
 impl fmt::Display for ApplicationMsg {

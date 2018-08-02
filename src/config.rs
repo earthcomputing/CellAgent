@@ -36,7 +36,6 @@ pub const DEBUG_OPTIONS: DebugOptions = DebugOptions {
     traph_state:    false,
 };
 pub const CONTINUE_ON_ERROR: bool = false;
-pub const SIMPLE_KAFKA: bool = false;
 // Size of various fields
 #[derive(Debug, Clone, Hash, Eq, PartialEq, Serialize, Deserialize)]
 pub struct ByteArray(pub Vec<u8>);

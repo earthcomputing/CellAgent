@@ -2,7 +2,6 @@ use std::fmt;
 use std::thread::JoinHandle;
 
 use failure::{Error, ResultExt};
-use kafka::producer::Producer;
 
 use config::{CONTINUE_ON_ERROR, DEBUG_OPTIONS, PortNo};
 use dal;
@@ -24,7 +23,7 @@ impl Cmodel {
         Cmodel { cell_id: cell_id.clone(), packet_assemblers: PacketAssemblers::new() }
     }
     pub fn initialize(&self, cm_from_ca: CmFromCa, cm_to_pe: CmToPe, cm_from_pe: CmFromPe, cm_to_ca: CmToCa,
-                      producer: &mut Producer, mut trace_header: TraceHeader) -> Result<(), Error> {
+                      mut trace_header: TraceHeader) -> Result<(), Error> {
         self.listen_ca(cm_from_ca, cm_to_pe, trace_header.fork_trace())?;
         self.listen_pe(cm_from_pe, cm_to_ca, trace_header.fork_trace())?;
         Ok(())
@@ -34,9 +33,8 @@ impl Cmodel {
         let f = "listen_ca";
         let cmodel = self.clone();
         let join_handle = ::std::thread::spawn( move || {
-            let ref mut producer = dal::make_kafka_producer(f).expect("Kafka error");
             let ref mut inner_trace_header = outer_trace_header.fork_trace();
-            let _ = cmodel.listen_ca_loop(&cm_from_ca, &cm_to_pe, producer, inner_trace_header).map_err(|e| write_err("cmodel listen_ca", e.into()));
+            let _ = cmodel.listen_ca_loop(&cm_from_ca, &cm_to_pe, inner_trace_header).map_err(|e| write_err("cmodel listen_ca", e.into()));
             if CONTINUE_ON_ERROR { let _ = cmodel.listen_ca(cm_from_ca, cm_to_pe, outer_trace_header); }
         });
         Ok(join_handle)
@@ -45,15 +43,14 @@ impl Cmodel {
         let f = "listen_pe";
         let mut cmodel = self.clone();
         let join_handle = ::std::thread::spawn( move || {
-            let ref mut producer = dal::make_kafka_producer(f).expect("Kafka error");
             let ref mut inner_trace_header = outer_trace_header.fork_trace();
-            let _ = cmodel.listen_pe_loop(&cm_from_pe, &cm_to_ca, producer, inner_trace_header).map_err(|e| write_err("cmodel listen_pe", e.into()));;
+            let _ = cmodel.listen_pe_loop(&cm_from_pe, &cm_to_ca, inner_trace_header).map_err(|e| write_err("cmodel listen_pe", e.into()));;
             if CONTINUE_ON_ERROR { let _ = cmodel.listen_pe(cm_from_pe, cm_to_ca, outer_trace_header); }
         });
         Ok(join_handle)
     }
     fn listen_ca_loop(&self, cm_from_ca: &CmFromCa, cm_to_pe: &CmToPe,
-                      producer: &mut Producer, trace_header: &mut TraceHeader) -> Result<(), Error> {
+                      trace_header: &mut TraceHeader) -> Result<(), Error> {
         let f = "listen_ca_loop";
         loop {
             match cm_from_ca.recv()? {
@@ -76,7 +73,7 @@ impl Cmodel {
                                 }
                             }
                         }
-                        let _ = dal::add_to_trace(producer, trace_header, TraceType::Debug, trace_params, &trace, f);
+                        let _ = dal::add_to_trace(trace_header, TraceType::Debug, trace_params, &trace, f);
                     }
                     let mut uuid = tree_id.get_uuid();
                     if is_ait { uuid.make_ait(); }
@@ -92,17 +89,17 @@ impl Cmodel {
         }
     }
     fn listen_pe_loop(&mut self, cm_from_pe: &CmFromPe, cm_to_ca: &CmToCa,
-                      producer: &mut Producer, trace_header: &mut TraceHeader) -> Result<(), Error> {
+                      trace_header: &mut TraceHeader) -> Result<(), Error> {
         loop {
             match cm_from_pe.recv()? {
                 PeToCmPacket::Status((port_no,bool, port_status)) => cm_to_ca.send(CmToCaBytes::Status((port_no,bool, port_status)))?,
-                PeToCmPacket::Packet((port_no, packet)) => self.process_packet(cm_to_ca, port_no, packet, producer, trace_header)?,
+                PeToCmPacket::Packet((port_no, packet)) => self.process_packet(cm_to_ca, port_no, packet, trace_header)?,
                 PeToCmPacket::Tcp((port_no, tcp_msg)) => cm_to_ca.send(CmToCaBytes::Tcp((port_no, tcp_msg)))?
             };
         }
     }
     fn process_packet(&mut self, cm_to_ca: &CmToCa, port_no: PortNo, packet: Packet,
-                      producer: &mut Producer, trace_header: &mut TraceHeader) -> Result<(), Error> {
+                      trace_header: &mut TraceHeader) -> Result<(), Error> {
         let f = "process_packet";
         let msg_id = packet.get_msg_id();
         let mut packet_assembler = self.packet_assemblers.remove(&msg_id).unwrap_or(PacketAssembler::new(msg_id));
@@ -127,7 +124,7 @@ impl Cmodel {
                         }
                     }
                 }
-                let _ = dal::add_to_trace(producer, trace_header, TraceType::Debug, trace_params, &trace, f);
+                let _ = dal::add_to_trace(trace_header, TraceType::Debug, trace_params, &trace, f);
             }
             let is_ait = packets[0].is_ait();
             cm_to_ca.send(CmToCaBytes::Bytes((port_no, is_ait, uuid, bytes)))?;
