@@ -3,7 +3,6 @@
 extern crate chrono;
 extern crate eval;
 #[macro_use] extern crate failure;
-extern crate futures;
 extern crate rand;
 extern crate rdkafka;
 extern crate serde;

@@ -1,6 +1,7 @@
 // A deterministic UUID to make debugging easier
 use std::fmt;
 
+use utility::PortNumber;
 use uuid;
 
 const NORMAL:   u8 = 0b01000000;  // Used for all Name UUIDs, including TreeIDs used for normal packets
@@ -11,7 +12,12 @@ const TOCK:     u8 = 0b00000001;
 const TICK:     u8 = 0b00000000;
 const FORWARD:  u8 = 0b00000000;  // Denotes forward direction in time for AIT transfer
 const REVERSE:  u8 = 0b10000000;  // Denotes time reversal for AIT transfer
-#[derive(Copy, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+
+const AIT_BYTE: usize = 0;
+const PORT_NO_BYTE: usize = 1;
+
+type Bytes = [u8; 16];
+#[derive(Copy, Clone, Hash, Eq, Serialize, Deserialize)]
 pub struct Uuid {
     uuid: uuid::Uuid
 }
@@ -26,27 +32,34 @@ impl Uuid {
         uuid.make_ait();
         uuid
     }
+    fn get_bytes(&self) -> Bytes { *self.uuid.as_bytes() }
+    fn set_bytes(&mut self, bytes: Bytes) { self.uuid = uuid::Uuid::from_uuid_bytes(bytes); }
+    fn mask_special_bytes(&self) -> Bytes {
+        let mut bytes = self.clone().get_bytes();
+        bytes[AIT_BYTE] = 0;
+        bytes[PORT_NO_BYTE] = 0;
+        bytes
+    }
     fn get_code(&self) -> u8 {
-        *self.uuid.as_bytes().get(0).unwrap()
+        *self.uuid.as_bytes().get(AIT_BYTE).unwrap()
     }
     fn set_code(&mut self, code: u8) {
-        let mut bytes = *self.uuid.as_bytes();
-        bytes[0] = code | (bytes[0] & REVERSE); // Make sure to keep direction when changing code
-        self.uuid = uuid::Uuid::from_uuid_bytes(bytes);
+        let mut bytes = self.get_bytes();
+        bytes[AIT_BYTE] = code | (bytes[AIT_BYTE] & REVERSE); // Make sure to keep direction when changing code
+        self.set_bytes(bytes);
     }
     pub fn is_ait(&self) -> bool {
         self.get_ait_state() == AitState::Ait
     }
     pub fn get_ait_state(&self) -> AitState {
         let f = "get_ait_state";
-        let is_forward = self.is_forward();
         match self.get_code() {
-            TICK   if is_forward  => AitState::Tick,
-            TOCK   if is_forward  => AitState::Tock,
-            TACK   if is_forward  => AitState::Tack,
-            TECK   if is_forward  => AitState::Teck,
-            AIT    if is_forward  => AitState::Ait,
-            _                     => AitState::Normal, // Bad uuid codes are treated as normal
+            TICK => AitState::Tick,
+            TOCK => AitState::Tock,
+            TACK => AitState::Tack,
+            TECK => AitState::Teck,
+            AIT  => AitState::Ait,
+            _    => AitState::Normal, // Bad uuid codes are treated as normal
         }
     }
     pub fn get_direction(&self) -> TimeDirection {
@@ -64,14 +77,26 @@ impl Uuid {
     }
     fn is_reverse(&self) -> bool { !self.is_forward() }
     pub fn make_normal(&mut self) -> AitState {
-        let mut bytes = *self.uuid.as_bytes();
-        bytes[0] = NORMAL;
-        self.uuid = uuid::Uuid::from_uuid_bytes(bytes);
+        let mut bytes = self.get_bytes();
+        bytes[AIT_BYTE] = NORMAL;
+        bytes[PORT_NO_BYTE] = 0; // Used to code root port number in TreeID
+        self.set_bytes(bytes);
         AitState::Normal
     }
     pub fn make_ait(&mut self) -> AitState {
         self.set_code(AIT);
         AitState::Ait
+    }
+    pub fn add_port_no(&mut self, port_number: &PortNumber) {
+        let port_no = port_number.get_port_no();
+        let mut bytes = self.get_bytes();
+        bytes[PORT_NO_BYTE] = *port_no;
+        self.set_bytes(bytes);
+    }
+    pub fn remove_port_no(&mut self) {
+        let mut bytes = self.get_bytes();
+        bytes[PORT_NO_BYTE] = 0;
+        self.set_bytes(bytes);
     }
     pub fn time_reverse(&mut self) {
         let code = self.get_code();
@@ -116,6 +141,11 @@ impl fmt::Display for Uuid {
 impl fmt::Debug for Uuid {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "{} {}", self.get_ait_state(), self.uuid)
+    }
+}
+impl PartialEq for Uuid {
+    fn eq(&self, other: &Uuid) -> bool {
+        self.uuid == other.uuid //self.mask_special_bytes() == other.mask_special_bytes()
     }
 }
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]

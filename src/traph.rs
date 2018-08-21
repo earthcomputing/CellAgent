@@ -20,6 +20,7 @@ type StackedTrees = HashMap<Uuid, Tree>;
 pub struct Traph {
 	cell_id: CellID, // For debugging
 	black_tree_id: TreeID,
+    root_tree_ids: Vec<TreeID>,
 	stacked_trees: Arc<Mutex<StackedTrees>>,
 	elements: Vec<TraphElement>,
 }
@@ -38,7 +39,7 @@ impl Traph {
 			locked.insert(black_tree_id.get_uuid(), black_tree);
 		}
 		Ok(Traph { cell_id: cell_id.clone(), black_tree_id: black_tree_id.clone(),
-				stacked_trees, elements })
+				   root_tree_ids: Vec::new(), stacked_trees, elements })
 	}
     pub fn get_tree(&self, tree_uuid: &Uuid) -> Result<Tree, Error> {
         let locked = self.stacked_trees.lock().unwrap();
@@ -47,6 +48,10 @@ impl Traph {
             None => Err(TraphError::Tree { cell_id: self.cell_id.clone(), func_name: "get_tree_entry", tree_uuid: *tree_uuid }.into())
         }
     }
+    pub fn add_root_tree_id(&mut self, root_tree_id: &TreeID) {
+        self.root_tree_ids.push(root_tree_id.clone());
+    }
+    pub fn get_root_tree_ids(&self) -> &Vec<TreeID> { &self.root_tree_ids }
 //    pub fn get_tree_parent_id(&self, tree_id: &TreeID) -> Result<TreeID, Error> {
 //        let tree = self.get_tree(&tree_id.get_uuid())?;
 //        Ok(tree.get_parent_tree_id().clone())
@@ -56,10 +61,11 @@ impl Traph {
         Ok(tree.get_table_entry())
 	}
     pub fn set_tree_entry(&mut self, tree_uuid: &Uuid, entry: RoutingTableEntry) -> Result<(), Error> {
+        let f = "set_tree_entry";
         let mut locked = self.stacked_trees.lock().unwrap();
         match locked.get_mut(tree_uuid) {
             Some(tree) => Ok(tree.set_table_entry(entry)),
-            None => Err(TraphError::Tree { cell_id: self.cell_id.clone(), func_name: "set_tree_entry", tree_uuid: *tree_uuid }.into())
+            None => Err(TraphError::Tree { cell_id: self.cell_id.clone(), func_name: f, tree_uuid: *tree_uuid }.into())
         }
     }
 //	pub fn get_black_tree_entry(&self) -> Result<RoutingTableEntry, Error> {
@@ -85,16 +91,18 @@ impl Traph {
 		}
 	}
 	pub fn get_parent_element(&self) -> Result<&TraphElement, TraphError> {
+		let f = "get_parent_element";
 		for element in &self.elements {
 			match element.get_status() {
 				PortStatus::Parent => return Ok(element),
 				_ => ()
 			}
 		}
-		Err(TraphError::ParentElement { cell_id: self.cell_id.clone(), func_name: "get_parent_element", tree_id: self.black_tree_id.clone() }.into())
+		Err(TraphError::ParentElement { cell_id: self.cell_id.clone(), func_name: f, tree_id: self.black_tree_id.clone() }.into())
 	}
 	pub fn get_hops(&self) -> Result<PathLength, Error> {
-		let element = self.get_parent_element().context(TraphError::Chain { func_name: "get_hops", comment: S("")})?;
+        let f = "get_hops";
+		let element = self.get_parent_element().context(TraphError::Chain { func_name: f, comment: S("")})?;
 		return Ok(element.get_hops()); 
 	}
 //	pub fn is_leaf(&self) -> bool {
@@ -113,12 +121,13 @@ impl Traph {
 	pub fn new_element(&mut self, tree_id: &TreeID, port_number: PortNumber, port_status: PortStatus,
 			children: &HashSet<PortNumber>, hops: PathLength, path: Option<Path>)
 			-> Result<RoutingTableEntry, TraphError> {
+        let f = "new_element";
 		let port_no = port_number.get_port_no();
 		let mut stacked_trees = self.stacked_trees.lock().unwrap();
 		// I get lifetime errors if I put this block in a function
 		let mut tree = match stacked_trees.get(&tree_id.get_uuid()).cloned() {
 			Some(tree) => tree,
-			None => return Err(TraphError::Tree { cell_id: self.cell_id.clone(), func_name: "new_element", tree_uuid: tree_id.get_uuid() }.into())
+			None => return Err(TraphError::Tree { cell_id: self.cell_id.clone(), func_name: f, tree_uuid: tree_id.get_uuid() }.into())
 		};
 		let mut table_entry = tree.get_table_entry();
 		match port_status {
@@ -136,7 +145,7 @@ impl Traph {
 		tree.set_table_entry(table_entry);
 		stacked_trees.insert(tree_id.get_uuid(), tree);
 		let element = TraphElement::new(true, port_no, port_status, hops, path);
-		self.elements[*port_no as usize] = element;
+		self.elements[*port_no as usize] = element; // Cannot fail because self.elements has MAX_PORTS elements
 		Ok(table_entry)
 	}
     /*
