@@ -37,13 +37,14 @@ pub fn add_to_trace(trace_header: &mut TraceHeader, trace_type: TraceType,
     };
     file_handle.write(&(line.clone() + "\n").into_bytes()).context(DalError::Chain { func_name: "add_to_trace", comment: S("Write record") })?;
     unsafe {
+        // Using unwrap_or_else is somewhat more compact, but I get synchronous writes for some reason
         match PRODUCER_RD.clone() {
             Some(p) => p,
             None => {
                 PRODUCER_RD = match ClientConfig::new()
-                    .set("bootstrap.servers", KAFKA_SERVER)
-                    .set("message.timeout.ms", "5000")
-                    .create() {
+                        .set("bootstrap.servers", KAFKA_SERVER)
+                        .set("message.timeout.ms", "5000")
+                        .create() {
                     Ok(p_rd) => Some(p_rd),
                     Err(e) => return Err(DalError::Kafka { func_name: f, kafka_error: S(e) }.into())
                 };
@@ -51,8 +52,8 @@ pub fn add_to_trace(trace_header: &mut TraceHeader, trace_type: TraceType,
             }
         }.send(
             FutureRecord::to("CellAgent")
-                .payload(&line)
-                .key(&format!("{:?}", trace_header.get_event_id())),
+                        .payload(&line)
+                        .key(&format!("{:?}", trace_header.get_event_id())),
             0);
     }
     Ok(())

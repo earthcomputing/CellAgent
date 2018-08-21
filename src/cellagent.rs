@@ -13,7 +13,7 @@ use config::{CONNECTED_PORTS_TREE_NAME, CONTINUE_ON_ERROR, CONTROL_TREE_NAME, DE
 use dal;
 use gvm_equation::{GvmEquation, GvmEqn};
 use message::{Message, MsgDirection, MsgTreeMap, MsgType, TcpMsgType, ApplicationMsg,
-              DiscoverMsg, DiscoverDMsg, ManifestMsg, StackTreeDMsg, StackTreeMsg,
+              DiscoverMsg, DiscoverDMsg, FailoverMsg, ManifestMsg, StackTreeDMsg, StackTreeMsg,
               TreeNameMsg};
 use message_types::{CaToCm, CaFromCm,
                     CaToVm, VmFromCa, VmToCa, CaFromVm,
@@ -749,7 +749,7 @@ impl CellAgent {
             self.update_base_tree_map(new_tree_id, new_tree_id, trace_header);
             let sender_id = SenderID::new(&self.get_id(), "CellAgent")?;
             // Send DiscoverD to sender
-            let discoverd_msg = DiscoverDMsg::new(&sender_id, new_tree_id);
+            let discoverd_msg = DiscoverDMsg::new(&sender_id, new_tree_id, path);
             let mask = Mask::new(port_number);
             // Forward Discover on all except port_no with updated hops and path
             self.send_msg(&self.get_connected_ports_tree_id(), &discoverd_msg, mask, trace_header).context(CellagentError::Chain { func_name: "process_ca", comment: S("DiscoverMsg")})?;
@@ -797,6 +797,10 @@ impl CellAgent {
             }
         }
         self.ca_to_cm.send(CaToCmBytes::Unblock)?;
+        Ok(())
+    }
+    pub fn process_failover_msg(&mut self, msg: &FailoverMsg, port_no: PortNo, trace_header: &mut TraceHeader)
+                                -> Result<(), Error> {
         Ok(())
     }
     pub fn process_manifest_msg(&mut self, msg: &ManifestMsg, port_no: PortNo, msg_tree_id: &TreeID,

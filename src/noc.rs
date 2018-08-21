@@ -41,6 +41,12 @@ impl Noc {
             let trace = json!({ "schema_version": SCHEMA_VERSION });
             let _ = dal::add_to_trace(trace_header, TraceType::Trace, trace_params,&trace, f);
         }
+        {
+            let edge_list = blueprint.get_edge_list();
+            let ref trace_params = TraceHeaderParams{ module: "noc.rs", function: f, format: "edge_list" };
+            let trace = json!({"edge_list": edge_list});
+            let _ = dal::add_to_trace(trace_header, TraceType::Trace, trace_params,&trace, f);
+        }
 		let (noc_to_port, port_from_noc): (NocToPort, NocFromPort) = channel();
 		let (port_to_noc, noc_from_port): (PortToNoc, PortFromNoc) = channel();
 		let (mut dc, mut join_handles) = self.build_datacenter(blueprint, trace_header).context(NocError::Chain { func_name: "initialize", comment: S("")})?;
