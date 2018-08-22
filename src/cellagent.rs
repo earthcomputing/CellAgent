@@ -405,6 +405,19 @@ impl CellAgent {
             }
             // Need traph even if cell only forwards on this tree
             self.ca_to_cm.send(CaToCmBytes::Entry(entry)).context(CellagentError::Chain { func_name: f, comment: S("") })?;
+            let port_tree_id = base_tree_id.with_root_port_number(&port_number);
+            if port_tree_id.get_uuid().has_port_no() { // Skip pseudo-trees control and connected
+                traph.add_port_tree_id(&port_tree_id);
+                let first_port_tree_id: &TreeID = traph.get_port_tree_ids().get(0).unwrap(); // See previous line
+                let mut port_tree_entry = entry;
+                port_tree_entry.set_tree_id(&first_port_tree_id);
+                self.ca_to_cm.send(CaToCmBytes::Entry(port_tree_entry)).context(CellagentError::Chain { func_name: f, comment: S("") })?;
+                if port_tree_id != *first_port_tree_id {
+                    let mut default_entry = RoutingTableEntry::default()?;
+                    default_entry.set_tree_id(&port_tree_id);
+                    self.ca_to_cm.send(CaToCmBytes::Entry(default_entry)).context(CellagentError::Chain { func_name: f, comment: S("") })?;
+                }
+            }
             // TODO: Need to update entries of stacked trees following a failover but not as base tree builds out
             //let entries = traph.update_stacked_entries(entry).context(CellagentError::Chain { func_name: f, comment: S("") })?;
             //for entry in entries {
@@ -584,7 +597,7 @@ impl CellAgent {
         let mut traph = self.get_traph(&parent_tree_id, trace_header).context(CellagentError::Chain { func_name: f, comment: S("")})?;
         if traph.has_tree(new_tree_id) { return Ok(None); } // Check for redundant StackTreeMsg
         let parent_entry = self.get_tree_entry(&parent_tree_id, trace_header).context(CellagentError::Chain { func_name: "stack_tree", comment: S("")})?;
-        let mut entry = parent_entry.clone();
+        let mut entry = parent_entry; // RoutingTableEntry is Copy
         entry.set_mask(Mask::empty());
         entry.set_uuid(&new_tree_id.get_uuid());
         let params = traph.get_params(gvm_eqn.get_variables()).context(CellagentError::Chain { func_name: "stack_tree", comment: S("")})?;
@@ -600,7 +613,7 @@ impl CellAgent {
         traph.stack_tree(tree);
         self.tree_map.lock().unwrap().insert(new_tree_id.get_uuid(), base_tree_id.get_uuid());
         self.tree_id_map.lock().unwrap().insert(new_tree_id.get_uuid(), new_tree_id.clone());
-        self.update_entry(entry).context(CellagentError::Chain { func_name: f, comment: S("")})?;
+        self.update_entry(entry, new_tree_id, &traph).context(CellagentError::Chain { func_name: f, comment: S("")})?;
         if DEBUG_OPTIONS.trace_all || DEBUG_OPTIONS.stack_tree { // Debug print
             let keys: Vec<TreeID> = self.base_tree_map.iter().map(|(k,_)| k.clone()).collect();
             let values: Vec<TreeID> = self.base_tree_map.iter().map(|(_,v)| v.clone()).collect();
@@ -616,9 +629,19 @@ impl CellAgent {
         }
         Ok(Some(entry))
     }
-    pub fn update_entry(&self, entry: RoutingTableEntry) -> Result<(), Error> {
+    pub fn update_entry(&self, entry: RoutingTableEntry, tree_id: &TreeID, traph: &Traph) -> Result<(), Error> {
         let f = "update_entry";
         self.ca_to_cm.send(CaToCmBytes::Entry(entry)).context(CellagentError::Chain { func_name: f, comment: S("")})?;
+        let mut entry_uuid = entry.get_uuid();
+        let mut default_entry = RoutingTableEntry::default()?;
+        for port_tree_id in traph.get_port_tree_ids() {
+            let mut uuid = port_tree_id.get_uuid();
+            let port_no = uuid.get_port_no();
+            let port_number = PortNumber::new(port_no, self.no_ports)?;
+            entry_uuid.set_port_no(&port_number);
+            default_entry.set_uuid(&entry_uuid);
+            self.ca_to_cm.send(CaToCmBytes::Entry(default_entry)).context(CellagentError::Chain { func_name: f, comment: S("")})?;
+        }
         Ok(())
     }
     fn listen_cm(&mut self, ca_from_cm: CaFromCm, outer_trace_header: &mut TraceHeader) -> Result<(), Error>{
@@ -751,7 +774,6 @@ impl CellAgent {
             // Send DiscoverD to sender
             let discoverd_msg = DiscoverDMsg::new(&sender_id, new_tree_id, path);
             let mask = Mask::new(port_number);
-            // Forward Discover on all except port_no with updated hops and path
             self.send_msg(&self.get_connected_ports_tree_id(), &discoverd_msg, mask, trace_header).context(CellagentError::Chain { func_name: "process_ca", comment: S("DiscoverMsg")})?;
             if DEBUG_OPTIONS.trace_all || DEBUG_OPTIONS.process_msg {   // Debug
                 let ref trace_params = TraceHeaderParams { module: MODULE, function: f, format: "ca_process_discover_msg" };
@@ -760,6 +782,7 @@ impl CellAgent {
                 if DEBUG_OPTIONS.process_msg { println!("Cellagent {}: {} tree_id {}, port_number {} {}", self.cell_id, f, new_tree_id, port_number, msg);  }
             }
         }
+        // Forward Discover on all except port_no with updated hops and path
         let updated_msg = msg.update(&self.get_id());
         let user_mask = DEFAULT_USER_MASK.all_but_port(PortNumber::new(port_no, self.get_no_ports()).context(CellagentError::Chain { func_name: "process_ca", comment: S("DiscoverMsg")})?);
         self.send_msg(&self.get_connected_ports_tree_id(), &updated_msg, user_mask, trace_header).context(CellagentError::Chain {func_name: "process_ca", comment: S("DiscoverMsg")})?;
@@ -844,21 +867,16 @@ impl CellAgent {
             let mut traph = self.get_traph(new_tree_id, trace_header)?;
             // Update StackTreeMsg and forward
             traph.set_tree_entry(&new_tree_id.get_uuid(), entry)?;
-            self.update_entry(entry).context(CellagentError::Chain { func_name: f, comment: S("") })?;
             let parent_entry = self.get_tree_entry(parent_tree_id, trace_header)?;
             let parent_mask = parent_entry.get_mask().and(DEFAULT_USER_MASK);  // Excludes port 0
             self.send_msg(&self.connected_tree_id, msg, parent_mask, trace_header)?; // Send to children of parent tree
-            // Send StackTreeDMsg only if can receive on this tree
-            if entry.may_receive() {
-                let mut fwd_entry = entry.clone();
-                //fwd_entry.set_mask(Mask::new(port_number));
-                self.ca_to_cm.send(CaToCmBytes::Entry(fwd_entry))?;
-                let mask = Mask::new(port_number);
-                let new_msg = StackTreeDMsg::new(sender_id, new_tree_id);
-                self.send_msg(self.get_connected_ports_tree_id(), &new_msg, mask, trace_header)?;
-            }
+            let mut fwd_entry = entry;
+            self.ca_to_cm.send(CaToCmBytes::Entry(fwd_entry))?;
+            // Send StackTreeDMsg
+            let mask = Mask::new(port_number);
+            let new_msg = StackTreeDMsg::new(sender_id, new_tree_id);
+            self.send_msg(self.get_connected_ports_tree_id(), &new_msg, mask, trace_header)?;
             let parent_tree_id = payload.get_parent_tree_id();
-            //println!("Cellagent {}: StackTree {} parent tree {}", self.cell_id, new_tree_id, parent_tree_id);
             let base_tree_id = self.get_base_tree_id(parent_tree_id, trace_header).context(CellagentError::Chain { func_name: f, comment: S("") })?;
             self.update_base_tree_map(parent_tree_id, &base_tree_id, trace_header);
             let save = self.gvm_eval_save(&parent_tree_id, gvm_eqn, trace_header).context(CellagentError::Chain { func_name: f, comment: S(self.cell_id.clone()) })?;
@@ -887,7 +905,7 @@ impl CellAgent {
         let mask = entry.get_mask().or(user_mask);
         entry.set_mask(mask);
         traph.set_tree_entry(&tree_uuid, entry)?;
-        self.update_entry(entry).context(CellagentError::Chain { func_name: f, comment: S(self.cell_id.clone()) })?;
+        self.update_entry(entry, tree_id, &traph).context(CellagentError::Chain { func_name: f, comment: S(self.cell_id.clone()) })?;
         //if !entry.may_receive() {
         //    let sender_id = msg.get_header().get_sender_id();
         //    let new_tree_id = msg.get_payload().get_tree_id();

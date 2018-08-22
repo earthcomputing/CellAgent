@@ -48,10 +48,11 @@ impl Traph {
             None => Err(TraphError::Tree { cell_id: self.cell_id.clone(), func_name: "get_tree_entry", tree_uuid: *tree_uuid }.into())
         }
     }
-    pub fn add_root_tree_id(&mut self, root_tree_id: &TreeID) {
-        self.root_tree_ids.push(root_tree_id.clone());
+    pub fn add_port_tree_id(&mut self, port_tree_id: &TreeID) {
+        let _f = "add_port_tree_id";
+        self.root_tree_ids.push(port_tree_id.clone());
     }
-    pub fn get_root_tree_ids(&self) -> &Vec<TreeID> { &self.root_tree_ids }
+    pub fn get_port_tree_ids(&self) -> &Vec<TreeID> { &self.root_tree_ids }
 //    pub fn get_tree_parent_id(&self, tree_id: &TreeID) -> Result<TreeID, Error> {
 //        let tree = self.get_tree(&tree_id.get_uuid())?;
 //        Ok(tree.get_parent_tree_id().clone())
@@ -174,10 +175,7 @@ impl Traph {
 	}
     */
 	pub fn stack_tree(&mut self, tree: Tree) {
-//		let f = "stack_tree";
-        let mut locked = self.stacked_trees.lock().unwrap();
-		locked.insert(tree.get_uuid(), tree);
-        //println!("Traph Cell {}: {} stacking tree number {}", self.cell_id, f, locked.len());
+        self.stacked_trees.lock().unwrap().insert(tree.get_uuid(), tree);
 	}
 	pub fn get_params(&self, vars: &Vec<GvmVariable>) -> Result<Vec<GvmVariable>, Error> {
         let f = "get_params";
