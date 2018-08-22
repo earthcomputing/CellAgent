@@ -3,7 +3,7 @@ use std::collections::HashMap;
 
 use failure::{Error};
 
-use name::{CellID};
+use name::{Name, CellID};
 use routing_table_entry::{RoutingTableEntry};
 use uuid_ec::Uuid;
 
@@ -30,9 +30,8 @@ impl RoutingTable {
 	pub fn set_entry(&mut self, entry: RoutingTableEntry) {
         let f = "set_entry";
         let uuid = entry.get_uuid();
-        if !self.entries.contains_key(&uuid) { self.order.push(uuid); }
-        self.entries.insert(entry.get_uuid(), entry);
-		if false { println!("Routing Table {}: cell {} uuid {}, mask {}", f, self.id, entry.get_uuid(), entry.get_mask()); }
+        if !self.entries.contains_key(&uuid) { self.order.push(uuid); } // So I can print entries in order
+        self.entries.insert(uuid, entry);
 	}
 }
 impl fmt::Display for RoutingTable {
@@ -41,7 +40,7 @@ impl fmt::Display for RoutingTable {
 		s = s + &format!("\n Tree UUID  In Use Send? Parent Mask ");
 		for key in &self.order {
             let entry = self.entries.get(key).unwrap();
-			if entry.is_in_use() { s = s + &format!("\n{}", entry); }
+			s = s + &format!("\n{}", entry);
 		}
 		write!(f, "{}", s) 
 	}	

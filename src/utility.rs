@@ -29,7 +29,7 @@ pub fn chars_to_string(chars: &[char]) -> String {
 */
 pub const BASE_TENANT_MASK: Mask = Mask { mask: MaskValue(255) };   // All ports
 pub const DEFAULT_USER_MASK: Mask = Mask { mask: MaskValue(254) };  // All ports except port 0
-#[derive(Debug, Copy, Clone, Serialize, Deserialize)]
+#[derive(Debug, Copy, Clone, Eq, PartialEq, Serialize, Deserialize)]
 pub struct Mask { mask: MaskValue }
 impl Mask {
 	pub fn new(i: PortNumber) -> Mask {

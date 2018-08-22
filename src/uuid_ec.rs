@@ -1,8 +1,10 @@
 // A deterministic UUID to make debugging easier
 use std::fmt;
 
-use utility::PortNumber;
 use uuid;
+
+use config::PortNo;
+use utility::PortNumber;
 
 const NORMAL:   u8 = 0b01000000;  // Used for all Name UUIDs, including TreeIDs used for normal packets
 const AIT:      u8 = 0b00000100;
@@ -87,11 +89,19 @@ impl Uuid {
         self.set_code(AIT);
         AitState::Ait
     }
-    pub fn add_port_no(&mut self, port_number: &PortNumber) {
+    pub fn set_port_no(&mut self, port_number: &PortNumber) {
         let port_no = port_number.get_port_no();
         let mut bytes = self.get_bytes();
         bytes[PORT_NO_BYTE] = *port_no;
         self.set_bytes(bytes);
+    }
+    pub fn get_port_no(&self) -> PortNo {
+        let bytes = self.get_bytes();
+        PortNo(bytes[PORT_NO_BYTE])
+    }
+    pub fn has_port_no(&self) -> bool {
+        let bytes = self.get_bytes();
+        bytes[PORT_NO_BYTE] != 0
     }
     pub fn remove_port_no(&mut self) {
         let mut bytes = self.get_bytes();

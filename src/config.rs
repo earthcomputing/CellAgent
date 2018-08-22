@@ -54,7 +54,7 @@ pub struct Edge(pub CellNo, pub CellNo);
 #[derive(Debug, Copy, Clone)]
 pub struct LinkNo(pub CellNo);
 impl Deref for LinkNo { type Target = CellNo; fn deref(&self) -> &Self::Target { &self.0 } }
-#[derive(Debug, Copy, Clone, Serialize, Deserialize)]
+#[derive(Debug, Copy, Clone, Eq, PartialEq, Serialize, Deserialize)]
 pub struct MaskValue(pub u16);
 impl Deref for MaskValue { type Target = u16; fn deref(&self) -> &Self::Target { &self.0 } }
 #[derive(Debug, Copy, Clone, Hash, Eq, PartialEq, Serialize, Deserialize)]

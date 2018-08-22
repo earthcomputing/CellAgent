@@ -65,12 +65,12 @@ impl<'a> TreeID {
 			Some(_) => Err(NameError::Format { name: S(name), func_name: "TreeID::new" }.into())
 		}
 	}
-	pub fn with_root_port_no(&self, port_number: &PortNumber) -> TreeID {
-        let mut uuid = self.uuid.clone();
-        uuid.add_port_no(port_number);
+	pub fn with_root_port_number(&self, port_number: &PortNumber) -> TreeID {
+        let mut uuid = self.uuid;
+        uuid.set_port_no(port_number);
         TreeID { name: S(self.get_name()), uuid }
     }
-    pub fn without_root_port_no(&self) -> TreeID {
+    pub fn without_root_port_number(&self) -> TreeID {
         let mut uuid = self.uuid.clone();
         uuid.remove_port_no();
         TreeID { name: S(self.get_name()), uuid }
