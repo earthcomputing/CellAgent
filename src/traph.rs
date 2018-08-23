@@ -20,7 +20,7 @@ type StackedTrees = HashMap<Uuid, Tree>;
 pub struct Traph {
 	cell_id: CellID, // For debugging
 	black_tree_id: TreeID,
-    root_tree_ids: Vec<TreeID>,
+    port_tree_ids: Vec<TreeID>,
 	stacked_trees: Arc<Mutex<StackedTrees>>,
 	elements: Vec<TraphElement>,
 }
@@ -39,7 +39,7 @@ impl Traph {
 			locked.insert(black_tree_id.get_uuid(), black_tree);
 		}
 		Ok(Traph { cell_id: cell_id.clone(), black_tree_id: black_tree_id.clone(),
-				   root_tree_ids: Vec::new(), stacked_trees, elements })
+				   port_tree_ids: Vec::new(), stacked_trees, elements })
 	}
     pub fn get_tree(&self, tree_uuid: &Uuid) -> Result<Tree, Error> {
         let locked = self.stacked_trees.lock().unwrap();
@@ -50,9 +50,9 @@ impl Traph {
     }
     pub fn add_port_tree_id(&mut self, port_tree_id: &TreeID) {
         let _f = "add_port_tree_id";
-        self.root_tree_ids.push(port_tree_id.clone());
+        self.port_tree_ids.push(port_tree_id.clone());
     }
-    pub fn get_port_tree_ids(&self) -> &Vec<TreeID> { &self.root_tree_ids }
+    pub fn get_port_tree_ids(&self) -> &Vec<TreeID> { &self.port_tree_ids }
 //    pub fn get_tree_parent_id(&self, tree_id: &TreeID) -> Result<TreeID, Error> {
 //        let tree = self.get_tree(&tree_id.get_uuid())?;
 //        Ok(tree.get_parent_tree_id().clone())

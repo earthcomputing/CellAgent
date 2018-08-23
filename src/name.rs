@@ -1,7 +1,7 @@
 use std::fmt;
 use std::marker::Sized;
 
-use config::{SEPARATOR, CellNo};
+use config::{SEPARATOR, CellNo, PortNo};
 use utility::{PortNumber, S};
 use uuid_ec::Uuid;
 
@@ -67,13 +67,17 @@ impl<'a> TreeID {
 	}
 	pub fn with_root_port_number(&self, port_number: &PortNumber) -> TreeID {
         let mut uuid = self.uuid;
-        uuid.set_port_no(port_number);
+        uuid.set_port_number(port_number);
         TreeID { name: S(self.get_name()), uuid }
     }
     pub fn without_root_port_number(&self) -> TreeID {
         let mut uuid = self.uuid.clone();
         uuid.remove_port_no();
         TreeID { name: S(self.get_name()), uuid }
+    }
+    pub fn get_port_no(&self) -> PortNo { self.uuid.get_port_no() }
+    pub fn transfer_port_number(&mut self, other: &TreeID) {
+        self.uuid.set_port_no(other.get_port_no());
     }
 }
 impl Name for TreeID {

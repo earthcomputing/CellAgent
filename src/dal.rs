@@ -14,11 +14,17 @@ use utility::{S, TraceHeader, TraceHeaderParams, TraceType};
 
 const FOR_EVAL: bool = true;
 
-static mut PRODUCER_RD: Option<FutureProducer> = None;
+lazy_static! {
+    static ref PRODUCER_RD: FutureProducer = ClientConfig::new()
+                        .set("bootstrap.servers", KAFKA_SERVER)
+                        .set("message.timeout.ms", "5000")
+                        .create()
+                        .expect("Dal: Problem setting up Kafka");
+}
 
 pub fn add_to_trace(trace_header: &mut TraceHeader, trace_type: TraceType,
                     trace_params: &TraceHeaderParams, trace_body: &Value, caller: &str) -> Result<(), Error> {
-    let f = "add_to_trace";
+    let _f = "add_to_trace";
     //let mut buf = String::with_capacity(2);
     let mut file_handle = match OpenOptions::new().append(true).open(OUTPUT_FILE_NAME) {
         Ok(f) => Ok(f),
@@ -36,26 +42,10 @@ pub fn add_to_trace(trace_header: &mut TraceHeader, trace_type: TraceType,
         format!("{:?}", &trace_record)
     };
     file_handle.write(&(line.clone() + "\n").into_bytes()).context(DalError::Chain { func_name: "add_to_trace", comment: S("Write record") })?;
-    unsafe {
-        // Using unwrap_or_else is somewhat more compact, but I get synchronous writes for some reason
-        match PRODUCER_RD.clone() {
-            Some(p) => p,
-            None => {
-                PRODUCER_RD = match ClientConfig::new()
-                        .set("bootstrap.servers", KAFKA_SERVER)
-                        .set("message.timeout.ms", "5000")
-                        .create() {
-                    Ok(p_rd) => Some(p_rd),
-                    Err(e) => return Err(DalError::Kafka { func_name: f, kafka_error: S(e) }.into())
-                };
-                PRODUCER_RD.clone().unwrap()
-            }
-        }.send(
-            FutureRecord::to("CellAgent")
-                        .payload(&line)
-                        .key(&format!("{:?}", trace_header.get_event_id())),
-            0);
-    }
+    PRODUCER_RD.send(FutureRecord::to("CellAgent")
+            .payload(&line)
+            .key(&format!("{:?}", trace_header.get_event_id())),
+        0);
     Ok(())
 }
 #[derive(Debug, Clone, Serialize)]

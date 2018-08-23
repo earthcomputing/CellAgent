@@ -89,8 +89,11 @@ impl Uuid {
         self.set_code(AIT);
         AitState::Ait
     }
-    pub fn set_port_no(&mut self, port_number: &PortNumber) {
+    pub fn set_port_number(&mut self, port_number: &PortNumber) {
         let port_no = port_number.get_port_no();
+        self.set_port_no(port_no);
+    }
+    pub fn set_port_no(&mut self, port_no: PortNo) {
         let mut bytes = self.get_bytes();
         bytes[PORT_NO_BYTE] = *port_no;
         self.set_bytes(bytes);
