@@ -11,7 +11,7 @@ pub struct TraphElement {
 	is_broken: bool,
 	status: PortStatus,
 	hops: PathLength,
-	path: Option<Path> 
+	path: Option<Path>
 }
 impl TraphElement {
 	pub fn new(is_connected: bool, port_no: PortNo,
@@ -39,10 +39,10 @@ impl fmt::Display for TraphElement {
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
 		let mut s = format!("{:5} {:9} {:6} {:6} {:4}",
 							(*self.port_no), self.is_connected, self.is_broken, self.status, (self.hops.0).0);
-		match self.path {
-			Some(p) => s = s + &format!(" {:4}", (*p.get_port_no())),
-			None    => s = s + &format!(" None")
-		}
+        s = s + &match self.path {
+            Some(p) => format!(" {:4}", (*p.get_port_no())),
+            None => format!(" None")
+        };
 		write!(f, "{}", s)
 	}
 }

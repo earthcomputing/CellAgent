@@ -106,6 +106,7 @@ impl Path {
 		let port_number = PortNumber::new(port_no, no_ports).context(UtilityError::Chain { func_name: "Path::new", comment: S("")})?;
 		Ok(Path { port_number })
 	}
+    pub fn get_port_number(&self) -> PortNumber { self.port_number }
 	pub fn get_port_no(&self) -> PortNo { self.port_number.get_port_no() }
 }
 impl fmt::Display for Path {
