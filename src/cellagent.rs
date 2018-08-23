@@ -323,9 +323,22 @@ impl CellAgent {
         }
     }
     pub fn get_connected_ports_tree_id(&self) -> &TreeID { &self.connected_tree_id }
-//    pub fn get_control_tree_id(&self) -> &TreeID { &self.control_tree_id }
-    pub fn exists(&self, tree_id: &TreeID) -> bool {
+    //pub fn get_control_tree_id(&self) -> &TreeID { &self.control_tree_id }
+    // These functions specifies the Discover quenching algorithms
+    pub fn exists_simple(&self, tree_id: &TreeID) -> bool {
         (*self.traphs.lock().unwrap()).contains_key(&tree_id.get_uuid())
+    }
+    pub fn exists_root_port(&self, tree_id: &TreeID, path: Path) -> bool {
+        let locked = self.traphs.lock().unwrap();
+        match locked.get(&tree_id.get_uuid()) {
+            Some(traph) => {
+                for port_tree_id in traph.get_port_tree_ids() {
+                    if port_tree_id.get_uuid().get_port_no() == path.get_port_no() { return true }
+                }
+                false
+            },
+            None => false
+        }
     }
     /*
     fn is_on_tree(&self, tree_id: &TreeID) -> bool {
@@ -761,7 +774,7 @@ impl CellAgent {
         { // Limit scope of immutable borrow of self on the next line
             let new_tree_id = payload.get_tree_id();
             let children = &mut HashSet::new();
-            let exists = self.exists(new_tree_id);  // Have I seen this tree before?
+            let exists = self.exists_root_port(new_tree_id, path);  // Have I seen this tree before?
             //if exists { println!("Cell {}: new_tree_id {} seen before on port {}", ca.get_id(), new_tree_id, *port_no); } else { println!("Cell {}: new_tree_id {} not seen before on port {}", ca.get_id(), new_tree_id, *port_no); }
             let status = if exists { traph::PortStatus::Pruned } else { traph::PortStatus::Parent };
             let mut eqns = HashSet::new();
