@@ -8,8 +8,8 @@ use std::collections::hash_map::Entry;
 use serde;
 use serde_json;
 
-use config::{CONNECTED_PORTS_TREE_NAME, CONTINUE_ON_ERROR, CONTROL_TREE_NAME, DEBUG_OPTIONS,
-             ByteArray, CellNo, CellType, PathLength, PortNo};
+use config::{CONNECTED_PORTS_TREE_NAME, CONTINUE_ON_ERROR, CONTROL_TREE_NAME, DEBUG_OPTIONS, QUENCH,
+             ByteArray, CellNo, CellType, Exists, PathLength, PortNo};
 use dal;
 use gvm_equation::{GvmEquation, GvmEqn};
 use message::{Message, MsgDirection, MsgTreeMap, MsgType, TcpMsgType, ApplicationMsg,
@@ -324,19 +324,18 @@ impl CellAgent {
     }
     pub fn get_connected_ports_tree_id(&self) -> &TreeID { &self.connected_tree_id }
     //pub fn get_control_tree_id(&self) -> &TreeID { &self.control_tree_id }
-    // These functions specifies the Discover quenching algorithms
+    // These functions specify the Discover quenching algorithms
     pub fn exists_simple(&self, tree_id: &TreeID) -> bool {
         (*self.traphs.lock().unwrap()).contains_key(&tree_id.get_uuid())
     }
     pub fn exists_root_port(&self, tree_id: &TreeID, path: Path) -> bool {
-        let locked = self.traphs.lock().unwrap();
-        match locked.get(&tree_id.get_uuid()) {
+        match self.traphs.lock().unwrap().get(&tree_id.get_uuid()) {
             Some(traph) => {
-                for port_tree_id in traph.get_port_tree_ids() {
-                    if port_tree_id.get_uuid().get_port_no() == path.get_port_no() { return true }
-                }
-                false
-            },
+                let port_no = path.get_port_no();
+                traph.get_port_tree_ids()
+                    .iter()
+                    .map(|port_tree_id| -> bool { port_tree_id.get_port_no() == port_no })
+                    .fold(false, |matched, b: bool | matched || b) },
             None => false
         }
     }
@@ -431,6 +430,11 @@ impl CellAgent {
                         let mut default_entry = RoutingTableEntry::default()?;
                         default_entry.set_tree_id(&port_tree_id);
                         self.ca_to_cm.send(CaToCmBytes::Entry(default_entry)).context(CellagentError::Chain { func_name: f, comment: S("") })?;
+                    }
+                    // TODO: Need to update stacked tree ids to get port tree ids
+                    let mut locked = traph.get_stacked_trees().lock().unwrap();
+                    for tree in locked.values() {
+                        let stacked_tree_ids = tree.get_stacked_tree_ids();
                     }
                 },
                 None => ()
@@ -630,7 +634,7 @@ impl CellAgent {
         traph.stack_tree(tree);
         self.tree_map.lock().unwrap().insert(new_tree_id.get_uuid(), base_tree_id.get_uuid());
         self.tree_id_map.lock().unwrap().insert(new_tree_id.get_uuid(), new_tree_id.clone());
-        self.update_entry(entry, new_tree_id, &traph).context(CellagentError::Chain { func_name: f, comment: S("")})?;
+        self.update_entry(entry, &base_tree_id, &traph).context(CellagentError::Chain { func_name: f, comment: S("")})?;
         if DEBUG_OPTIONS.trace_all || DEBUG_OPTIONS.stack_tree { // Debug print
             let keys: Vec<TreeID> = self.base_tree_map.iter().map(|(k,_)| k.clone()).collect();
             let values: Vec<TreeID> = self.base_tree_map.iter().map(|(_,v)| v.clone()).collect();
@@ -646,18 +650,23 @@ impl CellAgent {
         }
         Ok(Some(entry))
     }
-    pub fn update_entry(&self, entry: RoutingTableEntry, tree_id: &TreeID, traph: &Traph) -> Result<(), Error> {
+    pub fn update_entry(&self, entry: RoutingTableEntry, base_tree_id: &TreeID, traph: &Traph) -> Result<(), Error> {
         let f = "update_entry";
         self.ca_to_cm.send(CaToCmBytes::Entry(entry)).context(CellagentError::Chain { func_name: f, comment: S("")})?;
-        let mut entry_uuid = entry.get_uuid();
-        let mut default_entry = RoutingTableEntry::default()?;
-        for port_tree_id in traph.get_port_tree_ids() {
-            let mut uuid = port_tree_id.get_uuid();
-            let port_no = uuid.get_port_no();
-            let port_number = PortNumber::new(port_no, self.no_ports)?;
-            entry_uuid.set_port_no(&port_number);
-            default_entry.set_uuid(&entry_uuid);
-            self.ca_to_cm.send(CaToCmBytes::Entry(default_entry)).context(CellagentError::Chain { func_name: f, comment: S("")})?;
+        if let Some(first_port_tree_id) = traph.get_port_tree_ids().get(0) {
+            let mut stacked_port_tree_id = base_tree_id.clone();
+            stacked_port_tree_id.transfer_port_number(first_port_tree_id);
+            let mut port_tree_entry = entry;
+            port_tree_entry.set_tree_id(&stacked_port_tree_id);
+            self.ca_to_cm.send(CaToCmBytes::Entry(port_tree_entry)).context(CellagentError::Chain { func_name: f, comment: S("") })?;
+            for port_tree_id in traph.get_port_tree_ids() {
+                if *port_tree_id != *first_port_tree_id {
+                    let mut default_entry = RoutingTableEntry::default()?;
+                    stacked_port_tree_id.transfer_port_number(port_tree_id);
+                    default_entry.set_tree_id(&stacked_port_tree_id);
+                    self.ca_to_cm.send(CaToCmBytes::Entry(default_entry)).context(CellagentError::Chain { func_name: f, comment: S("") })?;
+                }
+            }
         }
         Ok(())
     }
@@ -774,8 +783,10 @@ impl CellAgent {
         { // Limit scope of immutable borrow of self on the next line
             let new_tree_id = payload.get_tree_id();
             let children = &mut HashSet::new();
-            let exists = self.exists_root_port(new_tree_id, path);  // Have I seen this tree before?
-            //if exists { println!("Cell {}: new_tree_id {} seen before on port {}", ca.get_id(), new_tree_id, *port_no); } else { println!("Cell {}: new_tree_id {} not seen before on port {}", ca.get_id(), new_tree_id, *port_no); }
+            let exists = match QUENCH {
+                Exists::Simple   => self.exists_simple(new_tree_id),
+                Exists::RootPort => self.exists_root_port(new_tree_id, path)
+            };
             let status = if exists { traph::PortStatus::Pruned } else { traph::PortStatus::Parent };
             let mut eqns = HashSet::new();
             eqns.insert(GvmEqn::Recv("true"));

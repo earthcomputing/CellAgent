@@ -3,6 +3,7 @@
 extern crate chrono;
 extern crate eval;
 #[macro_use] extern crate failure;
+#[macro_use] extern crate lazy_static;
 extern crate rand;
 extern crate rdkafka;
 extern crate serde;
@@ -48,7 +49,7 @@ use std::fs::{File, OpenOptions};
 use std::sync::mpsc::channel;
 
 use blueprint::Blueprint;
-use config::{NCELLS, NPORTS, NLINKS, OUTPUT_FILE_NAME, SCHEMA_VERSION,
+use config::{NCELLS, NPORTS, NLINKS, OUTPUT_FILE_NAME, QUENCH, SCHEMA_VERSION,
              get_edges, CellNo, PortNo};
 use ecargs::{ECArgs};
 use gvm_equation::{GvmEqn};
@@ -62,6 +63,7 @@ const MODULE: &'static str = "main.rs";
 fn main() -> Result<(), Error> {
     let f = "main";
     println!("Multicell Routing: Output to file {} (set in config.rs)", OUTPUT_FILE_NAME);
+    println!("Quenching: {:?}", QUENCH);
     let mut trace_header = TraceHeader::new();
     {   // Can't get records from main() to show up in trace file
         let ref trace_params = TraceHeaderParams { module: MODULE, function: f, format: "trace_schema" };

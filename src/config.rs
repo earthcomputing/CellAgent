@@ -36,6 +36,9 @@ pub const DEBUG_OPTIONS: DebugOptions = DebugOptions {
     traph_state:    false,
 };
 pub const CONTINUE_ON_ERROR: bool = false;
+#[derive(Debug, Copy, Clone)]
+pub enum Exists { Simple, RootPort }
+pub const QUENCH: Exists = Exists::RootPort;
 // Size of various fields
 #[derive(Debug, Clone, Hash, Eq, PartialEq, Serialize, Deserialize)]
 pub struct ByteArray(pub Vec<u8>);

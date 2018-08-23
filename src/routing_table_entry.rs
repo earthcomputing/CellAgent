@@ -2,7 +2,7 @@ use std::fmt;
 use std::collections::HashSet;
 //use uuid::Uuid;
 
-use config::{MAX_PORTS, PortNo};
+use config::{PortNo};
 use name::{Name, TreeID};
 use utility::{Mask, PortNumber, S};
 use uuid_ec::Uuid;
@@ -28,7 +28,7 @@ impl RoutingTableEntry {
 	}
 	pub fn is_in_use(&self) -> bool { self.inuse }
 	pub fn may_send(&self) -> bool { self.may_send }
-    pub fn may_receive(&self) -> bool { !self.mask.and(Mask::port0()).equal(Mask::empty()) }
+//    pub fn may_receive(&self) -> bool { !self.mask.and(Mask::port0()).equal(Mask::empty()) }
 	pub fn enable_send(&mut self) { self.may_send = true; }
 	pub fn disable_send(&mut self) { self.may_send = false; }
 //	pub fn is_on_tree(&self) -> bool {

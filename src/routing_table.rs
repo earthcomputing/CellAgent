@@ -3,7 +3,7 @@ use std::collections::HashMap;
 
 use failure::{Error};
 
-use name::{Name, CellID};
+use name::{CellID};
 use routing_table_entry::{RoutingTableEntry};
 use uuid_ec::Uuid;
 
@@ -28,7 +28,7 @@ impl RoutingTable {
         Ok(entry)
 	}
 	pub fn set_entry(&mut self, entry: RoutingTableEntry) {
-        let f = "set_entry";
+        let _f = "set_entry";
         let uuid = entry.get_uuid();
         if !self.entries.contains_key(&uuid) { self.order.push(uuid); } // So I can print entries in order
         self.entries.insert(uuid, entry);
@@ -48,8 +48,8 @@ impl fmt::Display for RoutingTable {
 // Errors
 #[derive(Debug, Fail)]
 pub enum RoutingTableError {
-	#[fail(display = "RoutingTableError::Chain {} {}", func_name, comment)]
-	Chain { func_name: &'static str, comment: String },
+	//#[fail(display = "RoutingTableError::Chain {} {}", func_name, comment)]
+	//Chain { func_name: &'static str, comment: String },
     #[fail(display = "RoutingTableError::Uuid {}: {:?} is not a valid routing table uuid on cell {}", func_name, uuid, cell_id)]
     Uuid { func_name: &'static str, uuid: Uuid, cell_id: CellID}
 }
