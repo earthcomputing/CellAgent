@@ -8,6 +8,7 @@ use serde_json;
 use config::{MAX_PORTS, PathLength, PortNo};
 use gvm_equation::{GvmEquation, GvmVariable, GvmVariableType};
 use name::{Name, CellID, TreeID};
+use port_tree::PortTree;
 use routing_table_entry::{RoutingTableEntry};
 use traph_element::TraphElement;
 use tree::Tree;
@@ -20,7 +21,7 @@ type StackedTrees = HashMap<Uuid, Tree>;
 pub struct Traph {
 	cell_id: CellID, // For debugging
 	black_tree_id: TreeID,
-    port_tree_ids: Vec<TreeID>,
+    port_trees: Vec<PortTree>,
 	stacked_trees: Arc<Mutex<StackedTrees>>,
 	elements: Vec<TraphElement>,
 }
@@ -39,7 +40,7 @@ impl Traph {
 			locked.insert(black_tree_id.get_uuid(), black_tree);
 		}
 		Ok(Traph { cell_id: cell_id.clone(), black_tree_id: black_tree_id.clone(),
-				   port_tree_ids: Vec::new(), stacked_trees, elements })
+				   port_trees: Vec::new(), stacked_trees, elements })
 	}
     pub fn get_tree(&self, tree_uuid: &Uuid) -> Result<Tree, Error> {
         let locked = self.stacked_trees.lock().unwrap();
@@ -48,11 +49,11 @@ impl Traph {
             None => Err(TraphError::Tree { cell_id: self.cell_id.clone(), func_name: "get_tree_entry", tree_uuid: *tree_uuid }.into())
         }
     }
-    pub fn add_port_tree_id(&mut self, port_tree_id: &TreeID) {
+    pub fn add_port_tree_id(&mut self, port_tree: &PortTree) {
         let _f = "add_port_tree_id";
-        self.port_tree_ids.push(port_tree_id.clone());
+        self.port_trees.push(port_tree.clone());
     }
-    pub fn get_port_tree_ids(&self) -> &Vec<TreeID> { &self.port_tree_ids }
+    pub fn get_port_trees(&self) -> &Vec<PortTree> { &self.port_trees }
 //    pub fn get_tree_parent_id(&self, tree_id: &TreeID) -> Result<TreeID, Error> {
 //        let tree = self.get_tree(&tree_id.get_uuid())?;
 //        Ok(tree.get_parent_tree_id().clone())

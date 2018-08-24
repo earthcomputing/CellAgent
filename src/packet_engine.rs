@@ -46,7 +46,7 @@ impl PacketEngine {
     pub fn get_id(&self) -> CellID { self.cell_id.clone() }
     fn listen_cm(&self, pe_from_cm: PeFromCm, pe_to_pe: PeToPe,
                  outer_trace_header: TraceHeader) -> Result<(), Error> {
-        let f = "listen_cm";
+        let _f = "listen_cm";
         let mut pe = self.clone();
         let mut outer_trace_header_clone = outer_trace_header.clone();
         ::std::thread::spawn( move ||  {
