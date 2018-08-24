@@ -31,6 +31,7 @@ mod noc;
 mod packet;
 mod packet_engine;
 mod port;
+mod port_tree;
 mod routing_table;
 mod routing_table_entry;
 mod service;
@@ -63,7 +64,7 @@ const MODULE: &'static str = "main.rs";
 fn main() -> Result<(), Error> {
     let f = "main";
     println!("Multicell Routing: Output to file {} (set in config.rs)", OUTPUT_FILE_NAME);
-    println!("Quenching: {:?}", QUENCH);
+    println!("{:?} Quenching of Discover messages", QUENCH);
     let mut trace_header = TraceHeader::new();
     {   // Can't get records from main() to show up in trace file
         let ref trace_params = TraceHeaderParams { module: MODULE, function: f, format: "trace_schema" };

@@ -30,7 +30,7 @@ impl Cmodel {
     }
     fn listen_ca(&self, cm_from_ca: CmFromCa, cm_to_pe: CmToPe,
                  mut outer_trace_header: TraceHeader) -> Result<JoinHandle<()>, Error> {
-        let f = "listen_ca";
+        let _f = "listen_ca";
         let cmodel = self.clone();
         let join_handle = ::std::thread::spawn( move || {
             let ref mut inner_trace_header = outer_trace_header.fork_trace();
@@ -40,7 +40,7 @@ impl Cmodel {
         Ok(join_handle)
     }
     fn listen_pe(&self, cm_from_pe: CmFromPe, cm_to_ca: CmToCa, mut outer_trace_header: TraceHeader) -> Result<JoinHandle<()>, Error> {
-        let f = "listen_pe";
+        let _f = "listen_pe";
         let mut cmodel = self.clone();
         let join_handle = ::std::thread::spawn( move || {
             let ref mut inner_trace_header = outer_trace_header.fork_trace();
