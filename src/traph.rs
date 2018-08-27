@@ -205,6 +205,9 @@ impl fmt::Display for Traph {
 		for tree in locked.values() {
 			s = s + &format!("\n  {}", tree);
 		}
+        for port_tree in &self.port_trees {
+            s = s + &format!("\n  {}", port_tree);
+        }
 		s = s + &format!("\n Port Connected Broken Status Hops Path");
 		// Can't replace with map() because s gets moved into closure 
 		for element in self.elements.iter() { 

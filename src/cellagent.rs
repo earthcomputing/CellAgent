@@ -421,24 +421,29 @@ impl CellAgent {
             match path { // Skip if no path info
                 Some(path) => {
                     let root_port_number = path.get_port_number();
-                    let port_tree = PortTree::new(base_tree_id, &root_port_number,
-                                                  &port_number.get_port_no(), &hops);
+                    let mut port_tree = PortTree::new(base_tree_id, &root_port_number,
+                                                      &port_number.get_port_no(), &hops);
                     let port_tree_id = port_tree.get_port_tree_id();
                     traph.add_port_tree_id(&port_tree);
-                    let first_port_tree = traph.get_port_trees().get(0).unwrap(); // See previous line
-                    let first_port_tree_id = first_port_tree.get_port_tree_id();
-                    let mut port_tree_entry = entry;
-                    port_tree_entry.set_tree_id(&first_port_tree_id);
-                    self.ca_to_cm.send(CaToCmBytes::Entry(port_tree_entry)).context(CellagentError::Chain { func_name: f, comment: S("") })?;
-                    if *port_tree_id != *first_port_tree_id {
+                    let first_port_tree_id = traph.get_port_trees().get(0).unwrap().get_port_tree_id(); // See previous line
+                    let new_entry = if *port_tree_id != *first_port_tree_id {
+                        let mut new_entry = entry;
+                        new_entry.set_tree_id(&first_port_tree_id);
+                        new_entry
+                    } else {
                         let mut default_entry = RoutingTableEntry::default()?;
                         default_entry.set_tree_id(&port_tree_id);
-                        self.ca_to_cm.send(CaToCmBytes::Entry(default_entry)).context(CellagentError::Chain { func_name: f, comment: S("") })?;
-                    }
+                        default_entry
+                    };
+                    self.ca_to_cm.send(CaToCmBytes::Entry(new_entry)).context(CellagentError::Chain { func_name: f, comment: S("") })?;
                     // TODO: Need to update stacked tree ids to get port tree ids
-                    let mut locked = traph.get_stacked_trees().lock().unwrap();
-                    for tree in locked.values() {
-                        let stacked_tree_ids = tree.get_stacked_tree_ids();
+                    let locked = traph.get_stacked_trees().lock().unwrap();
+                    let stacked_tree_ids = locked.values();
+                    for stacked_tree in stacked_tree_ids {
+                        let mut entry = stacked_tree.get_table_entry();
+                        let stacked_port_tree_id = stacked_tree.get_tree_id().with_root_port_number(&root_port_number);
+                        entry.set_tree_id(&stacked_port_tree_id);
+                        self.ca_to_cm.send(CaToCmBytes::Entry(entry)).context(CellagentError::Chain { func_name: f, comment: S("") })?;
                     }
                 },
                 None => ()
@@ -638,6 +643,7 @@ impl CellAgent {
         traph.stack_tree(tree);
         self.tree_map.lock().unwrap().insert(new_tree_id.get_uuid(), base_tree_id.get_uuid());
         self.tree_id_map.lock().unwrap().insert(new_tree_id.get_uuid(), new_tree_id.clone());
+        // TODO: Make sure that stacked tree entries for port trees get created
         self.update_entry(entry, &base_tree_id, &traph).context(CellagentError::Chain { func_name: f, comment: S("")})?;
         if DEBUG_OPTIONS.trace_all || DEBUG_OPTIONS.stack_tree { // Debug print
             let keys: Vec<TreeID> = self.base_tree_map.iter().map(|(k,_)| k.clone()).collect();
@@ -657,23 +663,6 @@ impl CellAgent {
     pub fn update_entry(&self, entry: RoutingTableEntry, base_tree_id: &TreeID, traph: &Traph) -> Result<(), Error> {
         let f = "update_entry";
         self.ca_to_cm.send(CaToCmBytes::Entry(entry)).context(CellagentError::Chain { func_name: f, comment: S("")})?;
-        if let Some(first_port_tree) = traph.get_port_trees().get(0) {
-            let first_port_tree_id = first_port_tree.get_port_tree_id();
-            let mut stacked_port_tree_id = base_tree_id.clone();
-            stacked_port_tree_id.transfer_port_number(first_port_tree_id);
-            let mut port_tree_entry = entry;
-            port_tree_entry.set_tree_id(&stacked_port_tree_id);
-            self.ca_to_cm.send(CaToCmBytes::Entry(port_tree_entry)).context(CellagentError::Chain { func_name: f, comment: S("") })?;
-            for port_tree in traph.get_port_trees() {
-                let port_tree_id = port_tree.get_port_tree_id();
-                if *port_tree_id != *first_port_tree_id {
-                    let mut default_entry = RoutingTableEntry::default()?;
-                    stacked_port_tree_id.transfer_port_number(port_tree_id);
-                    default_entry.set_tree_id(&stacked_port_tree_id);
-                    self.ca_to_cm.send(CaToCmBytes::Entry(default_entry)).context(CellagentError::Chain { func_name: f, comment: S("") })?;
-                }
-            }
-        }
         Ok(())
     }
     fn listen_cm(&mut self, ca_from_cm: CaFromCm, outer_trace_header: &mut TraceHeader) -> Result<(), Error>{
