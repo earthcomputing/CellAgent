@@ -3,6 +3,7 @@
 extern crate chrono;
 extern crate eval;
 #[macro_use] extern crate failure;
+extern crate internment;
 #[macro_use] extern crate lazy_static;
 extern crate rand;
 extern crate rdkafka;

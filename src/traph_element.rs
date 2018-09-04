@@ -24,16 +24,17 @@ impl TraphElement {
 		TraphElement::new(false, port_no, PortStatus::Pruned,
 					PathLength(CellNo(0)), None)
 	}
-//	pub fn get_port_no(&self) -> PortNo { self.port_no }
+	pub fn get_port_no(&self) -> PortNo { self.port_no }
 	pub fn get_hops(&self) -> PathLength { self.hops }
 	pub fn hops_plus_one(&self) -> PathLength { PathLength(CellNo((self.hops.0).0 + 1)) }
 	pub fn get_path(&self) -> Option<Path> { self.path }
 	pub fn get_status(&self) -> PortStatus { self.status }
-//	pub fn get_other_index(&self) -> TableIndex { self.other_index }
 	pub fn is_connected(&self) -> bool { self.is_connected }
+    pub fn is_broken(&self) -> bool { self.is_broken }
+	pub fn set_broken(&mut self) { self.is_broken = true; }
 //	pub fn set_connected(&mut self) { self.is_connected = true; }
 //	pub fn set_disconnected(&mut self) { self.is_connected = false; }
-//	pub fn set_status(&mut self, status: PortStatus) { self.status = status; }
+	pub fn set_status(&mut self, status: PortStatus) { self.status = status; }
 }
 impl fmt::Display for TraphElement {
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {

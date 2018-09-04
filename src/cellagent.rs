@@ -36,7 +36,7 @@ use vm::VirtualMachine;
 use failure::{Error, ResultExt};
 
 type BorderTreeIDMap = HashMap<PortNumber, (SenderID, TreeID)>;
-
+pub type PortsTried = HashMap<TreeID, HashSet<PortNo>>;
 pub type SavedDiscover = DiscoverMsg;
 // The following is a hack, because I can't get thread::spawn to accept Box<Message>
 pub type SavedMsg = (Option<ApplicationMsg>, Option<ManifestMsg>);
@@ -78,6 +78,7 @@ pub struct CellAgent {
     vm_id_no: usize,
     up_tree_senders: HashMap<UptreeID, HashMap<String,TreeID>>,
     up_traphs_clist: HashMap<TreeID, TreeID>,
+    tried_ports: PortsTried,
 }
 impl CellAgent {
     pub fn new(cell_id: &CellID, cell_type: CellType, config: CellConfig, no_ports: PortNo,
@@ -100,7 +101,7 @@ impl CellAgent {
             my_entry: RoutingTableEntry::default()?, base_tree_map,
             connected_tree_entry: Arc::new(Mutex::new(RoutingTableEntry::default()?)),
             tenant_masks, up_tree_senders: HashMap::new(), cell_info: CellInfo::new(),
-            up_traphs_clist: HashMap::new(), ca_to_cm,
+            up_traphs_clist: HashMap::new(), ca_to_cm, tried_ports: HashMap::new()
         })
     }
     pub fn initialize(&mut self, ca_from_cm: CaFromCm, mut trace_header: TraceHeader) -> Result<(), Error> {
@@ -150,6 +151,17 @@ impl CellAgent {
         Ok(())
     }
     pub fn get_no_ports(&self) -> PortNo { self.no_ports }
+    fn get_tried_ports(&mut self, tree_id: &TreeID) -> &HashSet<PortNo> {
+        self.tried_ports.entry(tree_id.clone()).or_insert(HashSet::new())
+    }
+    fn add_tried_port(&mut self, tree_id: &TreeID, port_no: PortNo) -> HashSet<PortNo> {
+        let tried = self.tried_ports.entry(tree_id.clone()).or_insert(HashSet::new());
+        tried.insert(port_no);
+        tried.clone() // self.tried_ports.entry() takes ownership, which doesn't get released without tried.clone()
+    }
+    fn clear_tried_ports(&mut self, tree_id: &TreeID) {
+        self.tried_ports.remove(tree_id);
+    }
     pub fn get_id(&self) -> CellID { self.cell_id.clone() }
 //    pub fn get_cell_info(&self) -> CellInfo { self.cell_info }
 //    pub fn get_traphs(&self) -> &Arc<Mutex<Traphs>> { &self.traphs }
@@ -381,7 +393,7 @@ impl CellAgent {
                 Entry::Vacant(v) => {
                     //println!("Cell {} 1: update tree ID map {} {}", self.cell_id, base_tree_id, base_tree_id.get_uuid());
                     self.tree_id_map.lock().unwrap().insert(base_tree_id.get_uuid(), base_tree_id.clone());
-                    let t = Traph::new(&self.cell_id, &base_tree_id, gvm_eqn).context(CellagentError::Chain { func_name: "update_traph", comment: S("") })?;
+                    let t = Traph::new(&self.cell_id, self.no_ports, &base_tree_id, gvm_eqn).context(CellagentError::Chain { func_name: "update_traph", comment: S("") })?;
                     v.insert(t)
                 }
             };
@@ -1152,15 +1164,43 @@ impl CellAgent {
             Ok(())
         }
     }
-    fn port_disconnected(&self, port_no: PortNo) -> Result<(), Error> {
-        //println!("Cell Agent {} got disconnected on port {}", self.cell_id, port_no);
-        let port_no_mask = Mask::new(PortNumber::new(port_no, self.no_ports)?);
+    fn port_disconnected(&mut self, port_no: PortNo) -> Result<(), Error> {
+        let _f = "port_disconnected";
+        let port_number = PortNumber::new(port_no, self.no_ports)?;
+        let port_no_mask = Mask::new(port_number);
         self.connected_tree_entry.lock().unwrap().and_with_mask(port_no_mask.not());
         let entry = CaToCmBytes::Entry(*self.connected_tree_entry.lock().unwrap());
         self.ca_to_cm.send(entry)?;
+        let rootward_traph = match self.traphs.lock().unwrap()
+                    .values_mut()
+                    .map(|traph| { traph.set_broken(port_number); traph })
+                    .filter(|traph| { traph.has_broken_parent() })
+                    .find(|broken_parent| broken_parent.is_one_hop())
+            {
+                Some(traph) => traph.clone(),
+                None => return Err(CellagentError::NoParentTraph { func_name: _f, cell_id: self.cell_id.clone(), port_no: *port_no }.into())
+            };
+        let rootward_tree_id = rootward_traph.get_base_tree_id();
+        let tried_ports = self.add_tried_port(&rootward_tree_id, port_no);
+        match self.find_new_parent(&rootward_traph, &tried_ports) {
+            Some(trial_parent_port) => {
+                println!("Cellagent {}: {} candidate parent for tree {} is {}", self.cell_id, _f, rootward_traph.get_base_tree_id(), *trial_parent_port);
+                self.add_tried_port(&rootward_tree_id, trial_parent_port);
+            },
+            None => println!("Cellagent {}: {} no candidate parent found for tree {}", self.cell_id, _f, rootward_traph.get_base_tree_id())
+        }
         Ok(())
     }
-    fn forward_discover(&mut self, mask: Mask, trace_header: &mut TraceHeader) -> Result<(), Error> {
+    fn find_new_parent(&mut self, traph: &Traph, tried_ports: &HashSet<PortNo>) -> Option<PortNo> {
+        self.pruned_links_first(&traph, &tried_ports)
+    }
+    fn pruned_links_first(&self, traph: &Traph, tried_ports: &HashSet<PortNo>) -> Option<PortNo> {
+        match traph.get_pruned_port(tried_ports) {
+            Some(p) => Some(p),
+            None => traph.get_child_port(tried_ports)
+        }
+    }
+    fn forward_discover(&self, mask: Mask, trace_header: &mut TraceHeader) -> Result<(), Error> {
         let saved = self.get_saved_discover();
         //if saved.len() > 0 { println!("Cell {}: forwarding {} discover msgs on ports {:?}", self.cell_id, saved.len(), mask.get_port_nos()); }
         for msg in saved.iter() {
@@ -1344,6 +1384,8 @@ pub enum CellagentError {
     MayNotSend { cell_id: CellID, func_name: &'static str, tree_id: TreeID },
     #[fail(display = "CellagentError::Message {}: Malformed request {:?} from border port on cell {}", func_name, msg, cell_id)]
     Message { func_name: &'static str, cell_id: CellID, msg: HashMap<String, String> },
+    #[fail(display = "CellAgentError::NoParentTraph {}: No one hop parent for port {} on cell {}", func_name, port_no, cell_id)]
+    NoParentTraph { cell_id: CellID, func_name: &'static str, port_no: u8 },
     #[fail(display = "CellAgentError::NoTraph {}: A Traph with TreeID {} does not exist on cell {}", func_name, tree_uuid, cell_id)]
     NoTraph { cell_id: CellID, func_name: &'static str, tree_uuid: Uuid },
 //    #[fail(display = "CellagentError::SavedMsgType {}: Message type {} does not support saving", func_name, msg_type)]
