@@ -2,12 +2,8 @@
 <project version="4">
   <component name="ChangeListManager">
     <list default="true" id="eee480a2-146d-44ab-9647-cef5ea39b250" name="Default" comment="">
-      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Cargo.toml" beforeDir="false" afterPath="$PROJECT_DIR$/Cargo.toml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/cellagent.rs" beforeDir="false" afterPath="$PROJECT_DIR$/src/cellagent.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main.rs" beforeDir="false" afterPath="$PROJECT_DIR$/src/main.rs" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/traph.rs" beforeDir="false" afterPath="$PROJECT_DIR$/src/traph.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/traph_element.rs" beforeDir="false" afterPath="$PROJECT_DIR$/src/traph_element.rs" afterDir="false" />
     </list>
     <ignored path="$PROJECT_DIR$/target/" />
     <ignored path="$PROJECT_DIR$/out/" />
@@ -35,14 +31,14 @@
       </usages-collector>
       <usages-collector id="statistics.file.extensions.edit">
         <counts>
-          <entry key="rs" value="37282" />
+          <entry key="rs" value="37637" />
           <entry key="toml" value="66" />
         </counts>
       </usages-collector>
       <usages-collector id="statistics.file.types.edit">
         <counts>
           <entry key="Android RenderScript" value="1" />
-          <entry key="Rust" value="37281" />
+          <entry key="Rust" value="37636" />
           <entry key="TOML file" value="66" />
         </counts>
       </usages-collector>
@@ -71,14 +67,12 @@
           </provider>
         </entry>
       </file>
-      <file pinned="false" current-in-tab="true">
+      <file pinned="false" current-in-tab="false">
         <entry file="file://$PROJECT_DIR$/src/cellagent.rs">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="292">
-              <caret line="1179" column="44" selection-start-line="1179" selection-start-column="44" selection-end-line="1179" selection-end-column="44" />
+            <state relative-caret-position="357">
+              <caret line="1173" column="65" lean-forward="true" selection-start-line="1173" selection-start-column="65" selection-end-line="1173" selection-end-column="65" />
               <folding>
-                <element signature="e#8104#8105#0" expanded="true" />
-                <element signature="e#8152#8153#0" expanded="true" />
                 <element signature="e#89058#89059#0" expanded="true" />
                 <element signature="e#89110#89111#0" expanded="true" />
               </folding>
@@ -185,11 +179,11 @@
           </provider>
         </entry>
       </file>
-      <file pinned="false" current-in-tab="false">
+      <file pinned="false" current-in-tab="true">
         <entry file="file://$PROJECT_DIR$/src/traph.rs">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="166">
-              <caret line="88" column="11" selection-start-line="88" selection-start-column="11" selection-end-line="88" selection-end-column="11" />
+            <state relative-caret-position="143">
+              <caret line="92" column="74" lean-forward="true" selection-start-line="92" selection-start-column="74" selection-end-line="92" selection-end-column="74" />
             </state>
           </provider>
         </entry>
@@ -291,10 +285,10 @@
         <option value="$PROJECT_DIR$/src/port_tree.rs" />
         <option value="$PROJECT_DIR$/src/config.rs" />
         <option value="$PROJECT_DIR$/src/traph_element.rs" />
-        <option value="$PROJECT_DIR$/src/traph.rs" />
         <option value="$PROJECT_DIR$/Cargo.toml" />
         <option value="$PROJECT_DIR$/src/main.rs" />
         <option value="$PROJECT_DIR$/src/name.rs" />
+        <option value="$PROJECT_DIR$/src/traph.rs" />
         <option value="$PROJECT_DIR$/src/cellagent.rs" />
       </list>
     </option>
@@ -439,7 +433,7 @@
     <frame x="255" y="-1020" width="1415" height="985" extended-state="0" />
     <editor active="true" />
     <layout>
-      <window_info content_ui="combo" id="Project" order="0" visible="true" weight="0.1179898" />
+      <window_info active="true" content_ui="combo" id="Project" order="0" visible="true" weight="0.1179898" />
       <window_info id="Image Layers" order="1" />
       <window_info id="Capture Tool" order="2" />
       <window_info id="Designer" order="3" />
@@ -447,7 +441,7 @@
       <window_info id="Favorites" order="5" side_tool="true" />
       <window_info anchor="bottom" id="Message" order="0" />
       <window_info anchor="bottom" id="Find" order="1" sideWeight="0.45447925" visible="true" weight="0.22988506" />
-      <window_info active="true" anchor="bottom" x="734" y="77" width="679" height="812" id="Run" internal_type="FLOATING" order="2" type="FLOATING" visible="true" weight="0.32941177" />
+      <window_info anchor="bottom" x="734" y="77" width="679" height="812" id="Run" internal_type="FLOATING" order="2" type="FLOATING" visible="true" weight="0.32941177" />
       <window_info anchor="bottom" id="Debug" order="3" weight="0.4" />
       <window_info anchor="bottom" id="Cvs" order="4" weight="0.25" />
       <window_info anchor="bottom" id="Inspection" order="5" weight="0.4" />
@@ -704,13 +698,6 @@
         </state>
       </provider>
     </entry>
-    <entry file="file://$PROJECT_DIR$/src/traph.rs">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="166">
-          <caret line="88" column="11" selection-start-line="88" selection-start-column="11" selection-end-line="88" selection-end-column="11" />
-        </state>
-      </provider>
-    </entry>
     <entry file="file://$PROJECT_DIR$/src/uuid_ec.rs">
       <provider selected="true" editor-type-id="text-editor">
         <state relative-caret-position="-262">
@@ -720,14 +707,19 @@
     </entry>
     <entry file="file://$PROJECT_DIR$/src/cellagent.rs">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="292">
-          <caret line="1179" column="44" selection-start-line="1179" selection-start-column="44" selection-end-line="1179" selection-end-column="44" />
+        <state relative-caret-position="357">
+          <caret line="1173" column="65" lean-forward="true" selection-start-line="1173" selection-start-column="65" selection-end-line="1173" selection-end-column="65" />
           <folding>
-            <element signature="e#8104#8105#0" expanded="true" />
-            <element signature="e#8152#8153#0" expanded="true" />
             <element signature="e#89058#89059#0" expanded="true" />
             <element signature="e#89110#89111#0" expanded="true" />
           </folding>
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/src/traph.rs">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="143">
+          <caret line="92" column="74" lean-forward="true" selection-start-line="92" selection-start-column="74" selection-end-line="92" selection-end-column="74" />
         </state>
       </provider>
     </entry>

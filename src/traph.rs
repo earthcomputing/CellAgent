@@ -24,6 +24,7 @@ pub struct Traph {
     port_trees: Vec<PortTree>,
 	stacked_trees: Arc<Mutex<StackedTrees>>,
 	elements: Vec<TraphElement>,
+    tried_ports: HashSet<PortNo>
 }
 impl Traph {
 	pub fn new(cell_id: &CellID, no_ports: PortNo, black_tree_id: &TreeID, gvm_eqn: &GvmEquation) -> Result<Traph, Error> {
@@ -40,7 +41,7 @@ impl Traph {
 			locked.insert(black_tree_id.get_uuid(), black_tree);
 		}
 		Ok(Traph { cell_id: cell_id.clone(), base_tree_id: black_tree_id.clone(),
-				   port_trees: Vec::new(), stacked_trees, elements })
+				   port_trees: Vec::new(), stacked_trees, elements, tried_ports: HashSet::new() })
 	}
     pub fn get_tree(&self, tree_uuid: &Uuid) -> Result<Tree, Error> {
         let locked = self.stacked_trees.lock().unwrap();
@@ -51,11 +52,11 @@ impl Traph {
     }
     pub fn get_base_tree_id(&self) -> &TreeID { &self.base_tree_id }
     pub fn get_elements(&self) -> &Vec<TraphElement> { &self.elements }
-    pub fn add_port_tree_id(&mut self, port_tree: &PortTree) {
-        let _f = "add_port_tree_id";
-        self.port_trees.push(port_tree.clone());
-    }
+    pub fn get_tried_ports(&self) -> &HashSet<PortNo> { &self.tried_ports }
+    pub fn add_port_tree_id(&mut self, port_tree: &PortTree) { self.port_trees.push(port_tree.clone()); }
     pub fn get_port_trees(&self) -> &Vec<PortTree> { &self.port_trees }
+    pub fn clear_tried_ports(&mut self) { self.tried_ports.clear() }
+    pub fn add_tried_port(&mut self, port_no: PortNo) { self.tried_ports.insert(port_no); }
 //    pub fn get_tree_parent_id(&self, tree_id: &TreeID) -> Result<TreeID, Error> {
 //        let tree = self.get_tree(&tree_id.get_uuid())?;
 //        Ok(tree.get_parent_tree_id().clone())
@@ -100,16 +101,16 @@ impl Traph {
             None => Err(TraphError::ParentElement { cell_id: self.cell_id.clone(), func_name: _f, tree_id: self.base_tree_id.clone() }.into())
         }
 	}
-    pub fn get_pruned_port(&self, ports_tried: &HashSet<PortNo>) -> Option<PortNo> {
-        self.get_trial_port(PortStatus::Pruned, ports_tried)
+    pub fn get_pruned_port(&self, port_no: PortNo) -> Option<PortNo> {
+        self.get_trial_port(PortStatus::Pruned, port_no)
     }
-    pub fn get_child_port(&self, ports_tried: &HashSet<PortNo>) -> Option<PortNo> {
-        self.get_trial_port(PortStatus::Child, ports_tried)
+    pub fn get_child_port(&self, port_no: PortNo) -> Option<PortNo> {
+        self.get_trial_port(PortStatus::Child, port_no)
     }
-    fn get_trial_port(&self, port_status: PortStatus, ports_tried: &HashSet<PortNo>) -> Option<PortNo> {
+    fn get_trial_port(&self, port_status: PortStatus, port_no: PortNo) -> Option<PortNo> {
         match self.elements.iter().find(|&element| {
             element.get_status() == port_status
-                && !ports_tried.contains(&element.get_port_no())
+                && !self.tried_ports.contains(&element.get_port_no())
                 && element.is_connected()
                 && !element.is_broken()
         }) {
