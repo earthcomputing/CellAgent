@@ -209,6 +209,9 @@ impl fmt::Display for TraceType {
         })
     }
 }
+pub fn print_vec<T: fmt::Display>(vector: &Vec<T>) {
+    for (count, v) in vector.iter().enumerate() { println!("{:3}: {}", count, v) }
+}
 pub fn write_err(caller: &str, e: Error) {
 	use ::std::io::Write;
 	let stderr = &mut ::std::io::stderr();

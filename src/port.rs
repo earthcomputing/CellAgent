@@ -10,6 +10,7 @@ use message_types::{PortToLink, PortFromLink, PortToPe, PortFromPe, LinkToPortPa
 use name::{Name, PortID, CellID};
 use utility::{PortNumber, S, write_err};
 
+// TODO: There is no distinction between a broken link and a disconnected one.  We may want to revisit.
 #[derive(Debug, Copy, Clone, Serialize)]
 pub enum PortStatus {
 	Connected,
@@ -22,7 +23,6 @@ pub struct Port {
 	port_number: PortNumber,
 	is_border: bool,
 	is_connected: Arc<AtomicBool>,
-	is_broken: Arc<AtomicBool>,
 	port_to_pe: PortToPe,
 }
 impl Port {
@@ -31,7 +31,6 @@ impl Port {
 		let port_id = PortID::new(cell_id, port_number).context(PortError::Chain { func_name: "new", comment: S(cell_id.get_name()) + &S(*port_number.get_port_no())})?;
 		Ok(Port{ id: port_id, port_number, is_border,
 			is_connected: Arc::new(AtomicBool::new(is_connected)), 
-			is_broken: Arc::new(AtomicBool::new(false)),
 			port_to_pe})
 	}
 	pub fn get_id(&self) -> &PortID { &self.id }
@@ -41,7 +40,6 @@ impl Port {
 	pub fn is_connected(&self) -> bool { self.is_connected.load(SeqCst) }
 	pub fn set_connected(&mut self) { self.is_connected.store(true, SeqCst); }
 	pub fn set_disconnected(&mut self) { self.is_connected.store(false, SeqCst); }
-	pub fn is_broken(&self) -> bool { self.is_broken.load(SeqCst) }
 	pub fn is_border(&self) -> bool { self.is_border }
 	pub fn noc_channel(&self, port_to_noc: PortToNoc,
 			port_from_noc: PortFromNoc, port_from_pe: PortFromPe) -> Result<JoinHandle<()>, Error> {
@@ -130,15 +128,12 @@ impl Port {
 impl fmt::Display for Port { 
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result { 
 		let is_connected = self.is_connected();
-		let is_broken = self.is_broken();
 		let mut s = format!("Port {} {}", self.port_number, self.id);
 		if self.is_border { s = s + " is boundary  port,"; }
 		else              { s = s + " is ECLP port,"; }
 		if is_connected   { s = s + " is connected"; }
 		else              { s = s + " is not connected"; }
-		if is_broken      { s = s + " and is broken"; }
-		else              { s = s + " and is not broken"; }
-		write!(f, "{}", s) 
+		write!(f, "{}", s)
 	}
 }
 // Errors

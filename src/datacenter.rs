@@ -10,6 +10,7 @@ use message_types::{LinkToPort, PortFromLink, PortToLink, LinkFromPort,
 	PortToNoc, PortFromNoc};
 use link::{Link};
 use nalcell::{CellConfig, NalCell};
+use name::{CellID, LinkID};
 use utility::{TraceHeader, TraceHeaderParams, TraceType};
 
 const MODULE: &'static str = "datacenter.rs";
@@ -82,7 +83,7 @@ impl Datacenter {
 			let (rite_to_link, link_from_rite): (PortToLink, LinkFromPort) = channel();
 			left_port.link_channel(left_to_link, left_from_link, left_from_pe);
 			rite_port.link_channel(rite_to_link, rite_from_link, rite_from_pe);
-			let link = Link::new(&left_port.get_id(), &rite_port.get_id())?;
+			let mut link = Link::new(&left_port.get_id(), &rite_port.get_id())?;
             {
                 let ref trace_params = TraceHeaderParams { module: MODULE, function: f, format: "connect_link" };
                 let trace = json!({ "left_cell": left_cell_id, "rite_cell": rite_cell_id, "left_port": left_port.get_port_no(), "rite_port": rite_port.get_port_no(), "link_id": link.get_id() });
@@ -94,7 +95,14 @@ impl Datacenter {
 		} 
 		Ok(link_handles)
 	}
-//	pub fn get_cells(&self) -> &Vec<NalCell> { &self.cells }
+    pub fn get_links(&self) -> &Vec<Link> { &self.links }
+    pub fn get_links_mut(&mut self) -> &mut Vec<Link> { &mut self.links }
+	pub fn get_cell_ids(&self) -> Vec<&CellID> {
+        self.cells.iter().map(|cell| cell.get_id()).collect::<Vec<_>>()
+    }
+	pub fn get_link_ids(&self) -> Vec<&LinkID> {
+        self.links.iter().map(|link| link.get_id()).collect::<Vec<_>>()
+    }
 	fn get_boundary_cells(&mut self) -> Vec<&mut NalCell> {
 		let mut boundary_cells = Vec::new();
 		for cell in &mut self.cells {

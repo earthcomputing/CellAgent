@@ -1165,7 +1165,10 @@ impl CellAgent {
                     .find(|broken_parent| broken_parent.is_one_hop())
             {
                 Some(traph) => traph.clone(),
-                None => return Err(CellagentError::NoParentTraph { func_name: _f, cell_id: self.cell_id.clone(), port_no: *port_no }.into())
+                None => { // It is possible that no trees cross the broken link in a given direction
+                    println!("Cellagent {}: {} no tree is one hop away on port {}", self.cell_id, _f, *port_no);
+                    return Ok(())
+                }
             };
         rootward_traph.add_tried_port(port_no);
         match self.find_new_parent(&rootward_traph, port_no) {
