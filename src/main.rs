@@ -53,13 +53,14 @@ use std::sync::mpsc::channel;
 use blueprint::Blueprint;
 use config::{NCELLS, NPORTS, NLINKS, OUTPUT_FILE_NAME, QUENCH, SCHEMA_VERSION,
              get_edges, CellNo, PortNo};
+use datacenter::Datacenter;
 use ecargs::{ECArgs};
 use gvm_equation::{GvmEqn};
 use message_types::{OutsideFromNoc, OutsideToNoc, NocFromOutside, NocToOutside};
 use nalcell::CellConfig;
 use noc::Noc;
 use uptree_spec::{AllowedTree, ContainerSpec, Manifest, UpTreeSpec, VmSpec};
-use utility::{S, TraceHeader, TraceHeaderParams, TraceType};
+use utility::{print_vec, S, TraceHeader, TraceHeaderParams, TraceType};
 
 const MODULE: &'static str = "main.rs";
 fn main() -> Result<(), Error> {
@@ -70,7 +71,7 @@ fn main() -> Result<(), Error> {
     {   // Can't get records from main() to show up in trace file
         let ref trace_params = TraceHeaderParams { module: MODULE, function: f, format: "trace_schema" };
         let trace = json!({ "schema_version": SCHEMA_VERSION });
-        let _ = dal::add_to_trace( &mut trace_header, TraceType::Trace, trace_params,&trace, f);
+        let _ = dal::add_to_trace(&mut trace_header, TraceType::Trace, trace_params, &trace, f);
     }
     let _ = OpenOptions::new().write(true).truncate(true).open(OUTPUT_FILE_NAME);
     /* Doesn't work when debugging in Eclipse
@@ -81,40 +82,76 @@ fn main() -> Result<(), Error> {
 		Err(err) => panic!("Argument Error: {}",err)
 	}; 
 */
-	let ecargs = match ECArgs::new(NCELLS, NPORTS, *NLINKS) {
-		Ok(a) => a,
-		Err(err) => panic!("Argument Error: {}", err)
-	};
-	let (ncells, nports) = ecargs.get_args();
-	println!("\nMain: {} ports for each of {} cells", *nports, *ncells);
+    let ecargs = match ECArgs::new(NCELLS, NPORTS, *NLINKS) {
+        Ok(a) => a,
+        Err(err) => panic!("Argument Error: {}", err)
+    };
+    let (ncells, nports) = ecargs.get_args();
+    println!("\nMain: {} ports for each of {} cells", *nports, *ncells);
     let edges = get_edges();
-	let mut exceptions = HashMap::new();
-	exceptions.insert(CellNo(5), PortNo(5));
-	exceptions.insert(CellNo(2), PortNo(8));
-	let mut border = HashMap::new();
-	border.insert(CellNo(2), vec![PortNo(2)]);
-	border.insert(CellNo(7), vec![PortNo(2)]);
-	let blueprint = Blueprint::new(ncells, nports, edges, exceptions, border).context(MainError::Chain { func_name: "run", comment: S("")})?;
-	println!("{}", blueprint);
-	if false { deployment_demo()?; } 	// Demonstrate features of deployment spec
-	let (outside_to_noc, noc_from_outside): (OutsideToNoc, NocFromOutside) = channel();
-	let (noc_to_outside, _outside_from_noc): (NocToOutside, OutsideFromNoc) = channel();
-	let mut noc = Noc::new(noc_to_outside)?;
-	let (dc, _) = noc.initialize(&blueprint, noc_from_outside, &mut trace_header).context(MainError::Chain { func_name: "run", comment: S("")})?;
-	loop {
-		stdout().write(b"Enter any character to print datacenter\n").context(MainError::Chain { func_name: "run", comment: S("")})?;
+    let mut exceptions = HashMap::new();
+    exceptions.insert(CellNo(5), PortNo(5));
+    exceptions.insert(CellNo(2), PortNo(8));
+    let mut border = HashMap::new();
+    border.insert(CellNo(2), vec![PortNo(2)]);
+    border.insert(CellNo(7), vec![PortNo(2)]);
+    let blueprint = Blueprint::new(ncells, nports, edges, exceptions, border).context(MainError::Chain { func_name: "run", comment: S("") })?;
+    println!("{}", blueprint);
+    if false { deployment_demo()?; }    // Demonstrate features of deployment spec
+    let (outside_to_noc, noc_from_outside): (OutsideToNoc, NocFromOutside) = channel();
+    let (noc_to_outside, _outside_from_noc): (NocToOutside, OutsideFromNoc) = channel();
+    let mut noc = Noc::new(noc_to_outside)?;
+    let (mut dc, _) = noc.initialize(&blueprint, noc_from_outside, &mut trace_header).context(MainError::Chain { func_name: "run", comment: S("") })?;
+    loop {
+        stdout().write(b"\nType:
+		    d to print datacenter
+		    c to print cells
+		    l to print links
+		    m to deploy an application
+		    x to exit program\n").context(MainError::Chain { func_name: "run", comment: S("") })?;
         let mut print_opt = String::new();
-        stdin().read_line(&mut print_opt).context(MainError::Chain { func_name: "run", comment: S("")})?;
-        //println!("main: print_opt {} {}", print_opt, print_opt.len());
-        if print_opt.len() > 1 { println!("{}", dc) };
-		stdout().write(b"Enter the name of a file containing a manifest\n").context(MainError::Chain { func_name: "run", comment: S("")})?;
-		let mut filename = String::new();
-		let _ = stdin().read_line(&mut filename).context(MainError::Chain { func_name: "run", comment: S("")})?;
-		let mut f = File::open(filename.trim()).context(MainError::Chain { func_name: "run", comment: S("")})?;
-		let mut manifest = String::new();
-		let _ = f.read_to_string(&mut manifest).context(MainError::Chain { func_name: "run", comment: S("")})?;
-		outside_to_noc.send(manifest).context(MainError::Chain { func_name: "run", comment: S("")})?;
-	}
+        stdin().read_line(&mut print_opt).context(MainError::Chain { func_name: "run", comment: S("") })?;
+        if print_opt.len() > 1 {
+            match print_opt.trim().as_ref() {
+                "d" => Ok(println!("{}", dc)),
+                "c" => Ok(print_vec(&dc.get_cell_ids())),
+                "l" => break_link(&mut dc),
+                "m" => deploy(outside_to_noc.clone()),
+                "x" => std::process::exit(0),
+                _   => Ok(println!("Invalid input {}", print_opt))
+            }?;
+        }
+    }
+}
+fn break_link(dc: &mut Datacenter) -> Result<(), Error> {
+    print_vec(&dc.get_link_ids());
+    stdout().write(b"Enter link to break or null\n").context(MainError::Chain { func_name: "run", comment: S("") })?;
+    let mut link_char = String::new();
+    stdin().read_line(&mut link_char).context(MainError::Chain { func_name: "run", comment: S("") })?;
+    let trimmed = link_char.trim();
+    if trimmed.len() > 0 {
+        if let Ok(link_no) = trimmed.parse::<u32>() {
+            let mut links = dc.get_links_mut();
+            if let Some(link_to_break) = links.get_mut(link_no as usize) {
+                stdout().write(format!("You selected link {}\n", link_to_break.get_id()).as_bytes())?;
+                link_to_break.break_link()?;
+            } else {
+                stdout().write(format!("{} is not a valid link index\n", link_no).as_bytes())?;
+            };
+        } else {
+            stdout().write(format!("{} is not a valid link index\n", trimmed).as_bytes())?;
+        }
+    } else { stdout().write(format!("{} is not a valid link index\n", trimmed).as_bytes())?; }
+    Ok(())
+}
+fn deploy(outside_to_noc: OutsideToNoc) -> Result<(), Error> {
+    stdout().write(b"Enter the name of a file containing a manifest\n").context(MainError::Chain { func_name: "run", comment: S("") })?;
+    let mut filename = String::new();
+    let _ = stdin().read_line(&mut filename).context(MainError::Chain { func_name: "run", comment: S("") })?;
+    let mut f = File::open(filename.trim()).context(MainError::Chain { func_name: "run", comment: S("") })?;
+    let mut manifest = String::new();
+    let _ = f.read_to_string(&mut manifest).context(MainError::Chain { func_name: "run", comment: S("") })?;
+    Ok(outside_to_noc.send(manifest)?)
 }
 fn deployment_demo() -> Result<(), Error> {
 	let mut eqns = HashSet::new();
