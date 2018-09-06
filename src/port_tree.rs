@@ -4,7 +4,7 @@ use config::{PathLength, PortNo};
 use name::{TreeID};
 use utility::{PortNumber};
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash)]
 pub struct PortTree {
     port_tree_id: TreeID,
     root_port_no: PortNo,

@@ -51,29 +51,29 @@ impl Cmodel {
     }
     fn listen_ca_loop(&self, cm_from_ca: &CmFromCa, cm_to_pe: &CmToPe,
                       trace_header: &mut TraceHeader) -> Result<(), Error> {
-        let f = "listen_ca_loop";
+        let _f = "listen_ca_loop";
         loop {
             match cm_from_ca.recv()? {
                 CaToCmBytes::Entry(entry) => cm_to_pe.send(CmToPePacket::Entry(entry)),
                 CaToCmBytes::Bytes((tree_id, is_ait, user_mask, is_blocking, bytes)) => {
                     if DEBUG_OPTIONS.trace_all || DEBUG_OPTIONS.cm_from_ca {   //Debug print
                         let msg = MsgType::msg_from_bytes(&bytes)?;
-                        let ref trace_params = TraceHeaderParams { module: MODULE, function: f, format: "cm_bytes_from_ca" };
+                        let ref trace_params = TraceHeaderParams { module: MODULE, function: _f, format: "cm_bytes_from_ca" };
                         let trace = json!({ "cell_id": &self.cell_id, "msg": &msg.value() });
                         if DEBUG_OPTIONS.cm_from_ca {
                             match msg.get_msg_type() {
                                 MsgType::Discover => (),
                                 MsgType::DiscoverD => {
                                     if msg.get_tree_id().unwrap().is_name("Tree:C:2") {
-                                        println!("Cmodel {}: {} received {}", self.cell_id, f, msg);
+                                        println!("Cmodel {}: {} received {}", self.cell_id, _f, msg);
                                     }
                                 },
                                 _ => {
-                                    println!("Cmodel {}: {} received {}", self.cell_id, f, msg);
+                                    println!("Cmodel {}: {} received {}", self.cell_id, _f, msg);
                                 }
                             }
                         }
-                        let _ = dal::add_to_trace(trace_header, TraceType::Debug, trace_params, &trace, f);
+                        let _ = dal::add_to_trace(trace_header, TraceType::Debug, trace_params, &trace, _f);
                     }
                     let mut uuid = tree_id.get_uuid();
                     if is_ait { uuid.make_ait(); }

@@ -33,37 +33,39 @@ pub enum MsgType {
 impl MsgType {
     // Used for debug hack in packet_engine
     pub fn get_msg(packets: &Vec<Packet>) -> Result<Box<dyn Message>, Error> {
-        let bytes = Packetizer::unpacketize(packets).context(MessageError::Chain { func_name: "get_msg", comment: S("unpacketize")})?;
+        let _f = "get_msg";
+        let bytes = Packetizer::unpacketize(packets).context(MessageError::Chain { func_name: _f, comment: S("unpacketize")})?;
         //println!("Message get_msg: serialized {}, packets {:?}", serialized, packets);
         let serialized = ::std::str::from_utf8(&bytes)?;
 		let type_msg = serde_json::from_str::<TypePlusMsg>(&serialized).context(MessageError::Chain { func_name: "get_msg", comment: S("deserialize MsgType")})?;
 		let msg_type = type_msg.get_type();
-		let serialized_msg = type_msg.get_serialized_msg();		
+		let serialized_msg = type_msg.get_serialized_msg();
 		Ok(match msg_type {
-            MsgType::Application => Box::new(serde_json::from_str::<ApplicationMsg>(&serialized_msg).context(MessageError::Chain { func_name: "get_msg", comment: S("DiscoverMsg")})?),
-			MsgType::Discover    => Box::new(serde_json::from_str::<DiscoverMsg>(&serialized_msg).context(MessageError::Chain { func_name: "get_msg", comment: S("DiscoverMsg")})?),
-            MsgType::DiscoverD   => Box::new(serde_json::from_str::<DiscoverDMsg>(&serialized_msg).context(MessageError::Chain { func_name: "get_msg", comment: S("DiscoverDMsg")})?),
-            MsgType::Failover    => Box::new(serde_json::from_str::<FailoverMsg>(&serialized_msg).context(MessageError::Chain { func_name: "get_msg", comment: S("DiscoverDMsg")})?),
-			MsgType::Manifest    => Box::new(serde_json::from_str::<ManifestMsg>(&serialized_msg).context(MessageError::Chain { func_name: "get_msg", comment: S("ManifestMsg")})?),
-            MsgType::StackTree   => Box::new(serde_json::from_str::<StackTreeMsg>(&serialized_msg).context(MessageError::Chain { func_name: "get_msg", comment: S("StackTreeMsg")})?),
-            MsgType::StackTreeD  => Box::new(serde_json::from_str::<StackTreeDMsg>(&serialized_msg).context(MessageError::Chain { func_name: "get_msg", comment: S("StackTreeDMsg")})?),
-			MsgType::TreeName    => Box::new(serde_json::from_str::<TreeNameMsg>(&serialized_msg).context(MessageError::Chain { func_name: "get_msg", comment: S("TreeNameMsg")})?),
+            MsgType::Application => Box::new(serde_json::from_str::<ApplicationMsg>(&serialized_msg).context(MessageError::Chain { func_name: _f, comment: S("DiscoverMsg")})?),
+			MsgType::Discover    => Box::new(serde_json::from_str::<DiscoverMsg>(&serialized_msg).context(MessageError::Chain { func_name: _f, comment: S("DiscoverMsg")})?),
+            MsgType::DiscoverD   => Box::new(serde_json::from_str::<DiscoverDMsg>(&serialized_msg).context(MessageError::Chain { func_name: _f, comment: S("DiscoverDMsg")})?),
+            MsgType::Failover    => Box::new(serde_json::from_str::<FailoverMsg>(&serialized_msg).context(MessageError::Chain { func_name: _f, comment: S("FailoverMsg")})?),
+			MsgType::Manifest    => Box::new(serde_json::from_str::<ManifestMsg>(&serialized_msg).context(MessageError::Chain { func_name: _f, comment: S("ManifestMsg")})?),
+            MsgType::StackTree   => Box::new(serde_json::from_str::<StackTreeMsg>(&serialized_msg).context(MessageError::Chain { func_name: _f, comment: S("StackTreeMsg")})?),
+            MsgType::StackTreeD  => Box::new(serde_json::from_str::<StackTreeDMsg>(&serialized_msg).context(MessageError::Chain { func_name: _f, comment: S("StackTreeDMsg")})?),
+			MsgType::TreeName    => Box::new(serde_json::from_str::<TreeNameMsg>(&serialized_msg).context(MessageError::Chain { func_name: _f, comment: S("TreeNameMsg")})?),
 		})		
 	}
     pub fn msg_from_bytes(bytes: &ByteArray) -> Result<Box<dyn Message>, Error> {
+        let _f = "msg_from_bytes";
         let serialized = ::std::str::from_utf8(bytes)?;
-        let type_msg = serde_json::from_str::<TypePlusMsg>(serialized).context(MessageError::Chain { func_name: "get_msg", comment: S("deserialize MsgType")})?;
+        let type_msg = serde_json::from_str::<TypePlusMsg>(serialized).context(MessageError::Chain { func_name: _f, comment: S("deserialize MsgType")})?;
         let msg_type = type_msg.get_type();
         let serialized_msg = type_msg.get_serialized_msg();
         Ok(match msg_type {
-            MsgType::Application => Box::new(serde_json::from_str::<ApplicationMsg>(&serialized_msg).context(MessageError::Chain { func_name: "get_msg", comment: S("DiscoverMsg")})?),
-            MsgType::Discover    => Box::new(serde_json::from_str::<DiscoverMsg>(&serialized_msg).context(MessageError::Chain { func_name: "get_msg", comment: S("DiscoverMsg")})?),
-            MsgType::DiscoverD   => Box::new(serde_json::from_str::<DiscoverDMsg>(&serialized_msg).context(MessageError::Chain { func_name: "get_msg", comment: S("DiscoverDMsg")})?),
-            MsgType::Failover   => Box::new(serde_json::from_str::<DiscoverDMsg>(&serialized_msg).context(MessageError::Chain { func_name: "get_msg", comment: S("DiscoverDMsg")})?),
-            MsgType::Manifest    => Box::new(serde_json::from_str::<ManifestMsg>(&serialized_msg).context(MessageError::Chain { func_name: "get_msg", comment: S("ManifestMsg")})?),
-            MsgType::StackTree   => Box::new(serde_json::from_str::<StackTreeMsg>(&serialized_msg).context(MessageError::Chain { func_name: "get_msg", comment: S("StackTreeMsg")})?),
-            MsgType::StackTreeD  => Box::new(serde_json::from_str::<StackTreeDMsg>(&serialized_msg).context(MessageError::Chain { func_name: "get_msg", comment: S("StackTreeDMsg")})?),
-            MsgType::TreeName    => Box::new(serde_json::from_str::<TreeNameMsg>(&serialized_msg).context(MessageError::Chain { func_name: "get_msg", comment: S("TreeNameMsg")})?),
+            MsgType::Application => Box::new(serde_json::from_str::<ApplicationMsg>(&serialized_msg).context(MessageError::Chain { func_name: _f, comment: S("DiscoverMsg")})?),
+            MsgType::Discover    => Box::new(serde_json::from_str::<DiscoverMsg>(&serialized_msg).context(MessageError::Chain { func_name: _f, comment: S("DiscoverMsg")})?),
+            MsgType::DiscoverD   => Box::new(serde_json::from_str::<DiscoverDMsg>(&serialized_msg).context(MessageError::Chain { func_name: _f, comment: S("DiscoverDMsg")})?),
+            MsgType::Failover    => Box::new(serde_json::from_str::<FailoverMsg>(&serialized_msg).context(MessageError::Chain { func_name: _f, comment: S("FailoverMsg")})?),
+            MsgType::Manifest    => Box::new(serde_json::from_str::<ManifestMsg>(&serialized_msg).context(MessageError::Chain { func_name: _f, comment: S("ManifestMsg")})?),
+            MsgType::StackTree   => Box::new(serde_json::from_str::<StackTreeMsg>(&serialized_msg).context(MessageError::Chain { func_name: _f, comment: S("StackTreeMsg")})?),
+            MsgType::StackTreeD  => Box::new(serde_json::from_str::<StackTreeDMsg>(&serialized_msg).context(MessageError::Chain { func_name: _f, comment: S("StackTreeDMsg")})?),
+            MsgType::TreeName    => Box::new(serde_json::from_str::<TreeNameMsg>(&serialized_msg).context(MessageError::Chain { func_name: _f, comment: S("TreeNameMsg")})?),
         })
     }
 	// A hack for printing debug output only for a specific message type
@@ -168,17 +170,21 @@ pub trait Message {
     fn value(&self) -> serde_json::Value;
 //	fn get_count(&self) -> MsgID { self.get_header().get_count() }
     fn to_bytes(&self) -> Result<ByteArray, Error> where Self: serde::Serialize + Sized {
-        let bytes = Serializer::serialize(self).context(MessageError::Chain { func_name: "to_packets", comment: S("")})?;
+        let _f = "to_bytes";
+        let bytes = Serializer::serialize(self).context(MessageError::Chain { func_name: _f, comment: S("")})?;
         Ok(ByteArray(*bytes))
     }
     fn to_packets(&self, tree_id: &TreeID) -> Result<Vec<Packet>, Error>
 			where Self:std::marker::Sized + serde::Serialize {
-		let bytes = Serializer::serialize(self).context(MessageError::Chain { func_name: "to_packets", comment: S("")})?;
+        let _f = "to_packets";
+		let bytes = Serializer::serialize(self).context(MessageError::Chain { func_name: _f, comment: S("")})?;
         let packets = Packetizer::packetize(&tree_id.get_uuid(), &ByteArray(*bytes), self.is_blocking());
 		Ok(packets)
 	}
 	fn process_ca(&mut self, _cell_agent: &mut CellAgent, _port_no: PortNo, _msg_tree_id: &TreeID, is_ait: bool,
-                  trace_header: &mut TraceHeader) -> Result<(), Error> { Err(MessageError::Process { func_name: "process_ca" }.into()) }
+                  trace_header: &mut TraceHeader) -> Result<(), Error> {
+        let _f = "process_ca";
+        Err(MessageError::Process { func_name: _f }.into()) }
 }
 impl fmt::Display for Message {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
@@ -325,6 +331,7 @@ impl Message for DiscoverDMsg {
     }
 	fn process_ca(&mut self, cell_agent: &mut CellAgent, port_no: PortNo, _msg_tree_id: &TreeID, is_ait: bool,
                   trace_header: &mut TraceHeader) -> Result<(), Error> {
+        let _f = "process_ca";
         cell_agent.process_discover_d_msg(&self, port_no, trace_header)
     }
 }
@@ -358,42 +365,52 @@ pub struct FailoverMsg {
     payload: FailoverMsgPayload
 }
 impl FailoverMsg {
-    pub fn new(sender_id: &SenderID, rw_tree_id: &TreeID) -> FailoverMsg {
+    pub fn new(sender_id: &SenderID, rw_tree_id: &TreeID, path: Path) -> FailoverMsg {
         // Note that direction is leafward so we can use the connected ports tree
         // If we send rootward, then the first recipient forwards the FailoverMsg
         let header = MsgHeader::new(sender_id, true,MsgType::Failover, MsgDirection::Leafward);
-        let payload = FailoverMsgPayload::new(rw_tree_id);
+        let payload = FailoverMsgPayload::new(rw_tree_id, path);
         FailoverMsg { header, payload }
     }
+    pub fn get_payload(&self) -> &FailoverMsgPayload { &self.payload }
 }
 impl Message for FailoverMsg {
     fn get_header(&self) -> &MsgHeader { &self.header }
     fn get_payload(&self) -> &MsgPayload { &self.payload }
     fn get_msg_type(&self) -> MsgType { self.get_header().msg_type }
-    fn get_tree_id(&self) -> Option<&TreeID> { Some(&self.payload.get_tree_id()) }
+    fn get_tree_id(&self) -> Option<&TreeID> { Some(&self.payload.get_rootward_tree_id()) }
     fn is_blocking(&self) -> bool { false }
     fn value(&self) -> serde_json::Value {
         serde_json::to_value(self).expect("I don't know how to handle errors in msg.value()")
     }
     fn process_ca(&mut self, cell_agent: &mut CellAgent, port_no: PortNo, _msg_tree_id: &TreeID, is_ait: bool,
                   trace_header: &mut TraceHeader) -> Result<(), Error> {
+        let _f = "process_ca";
         cell_agent.process_failover_msg(&self, port_no, trace_header)
+    }
+}
+impl fmt::Display for FailoverMsg {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        let s = format!("{}: {}", self.get_header(), self.get_payload());
+        write!(f, "{}", s)
     }
 }
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct FailoverMsgPayload {
-    rw_tree_id: TreeID
+    rw_tree_id: TreeID,
+    path: Path
 }
 impl FailoverMsgPayload {
-    fn new(rw_tree_id: &TreeID) -> FailoverMsgPayload {
-        FailoverMsgPayload { rw_tree_id: rw_tree_id.clone() }
+    fn new(rw_tree_id: &TreeID, path: Path) -> FailoverMsgPayload {
+        FailoverMsgPayload { rw_tree_id: rw_tree_id.clone(), path }
     }
-    fn get_tree_id(&self) -> &TreeID { &self.rw_tree_id }
+    pub fn get_rootward_tree_id(&self) -> &TreeID { &self.rw_tree_id }
+    pub fn get_path(&self) -> Path { self.path }
 }
 impl MsgPayload for FailoverMsgPayload {}
 impl fmt::Display for FailoverMsgPayload {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "Rootward Tree {}", self.rw_tree_id)
+        write!(f, "Rootward Tree {}, root port {}", self.rw_tree_id, self.path)
     }
 }
 #[derive(Debug, Clone, Serialize, Deserialize)]
