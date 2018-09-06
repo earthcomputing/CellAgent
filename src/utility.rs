@@ -99,13 +99,14 @@ impl PortNumber {
 impl fmt::Display for PortNumber {
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result { write!(f, "{}", *self.port_no) }
 }
-#[derive(Debug, Copy, Clone, Hash, Serialize, Deserialize)]
+#[derive(Debug, Copy, Clone, Eq, PartialEq, Hash, Serialize, Deserialize)]
 pub struct Path { port_number: PortNumber }
 impl Path {
 	pub fn new(port_no: PortNo, no_ports: PortNo) -> Result<Path, Error> {
 		let port_number = PortNumber::new(port_no, no_ports).context(UtilityError::Chain { func_name: "Path::new", comment: S("")})?;
 		Ok(Path { port_number })
 	}
+    pub fn new0() -> Path { Path { port_number: PortNumber::new0() } }
     pub fn get_port_number(&self) -> PortNumber { self.port_number }
 	pub fn get_port_no(&self) -> PortNo { self.port_number.get_port_no() }
 }

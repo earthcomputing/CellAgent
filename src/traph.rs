@@ -137,7 +137,7 @@ impl Traph {
 //		i
 //	}
 	pub fn new_element(&mut self, tree_id: &TreeID, port_number: PortNumber, port_status: PortStatus,
-			children: &HashSet<PortNumber>, hops: PathLength, path: Option<Path>)
+			children: &HashSet<PortNumber>, hops: PathLength, path: Path)
 			-> Result<RoutingTableEntry, TraphError> {
         let f = "new_element";
 		let port_no = port_number.get_port_no();

@@ -81,7 +81,7 @@ impl PacketEngine {
             -> Result<(), Error> {
         let f = "listen_cm_loop";
         loop {
-            match pe_from_cm.recv().context(PacketEngineError::Chain { func_name: f, comment: S("recv entry from cm") + self.cell_id.get_name()})? {
+            match pe_from_cm.recv().context(PacketEngineError::Chain { func_name: f, comment: S("recv entry from cm ") + self.cell_id.get_name()})? {
                 CmToPePacket::Entry(entry) => {
                     self.routing_table.lock().unwrap().set_entry(entry)
                 },
