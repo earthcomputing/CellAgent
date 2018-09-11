@@ -68,10 +68,7 @@ impl Mask {
 	pub fn get_port_nos(&self) -> Vec<PortNo> {
 		let mut port_nos = Vec::new();
 		for i in 0..*MAX_PORTS {
-			let port_number = match PortNumber::new(PortNo(i), MAX_PORTS) {
-				Ok(n) => n,
-				Err(_) => panic!("Mask get_port_no cannont generate an error")
-			};
+			let port_number = PortNo(i).make_port_number(MAX_PORTS).expect("Mask get_port_no cannont generate an error");
 			let test = Mask::new(port_number);
 			if *test.mask & *self.mask != 0 { port_nos.push(PortNo(i)) }
 		}
@@ -103,7 +100,7 @@ impl fmt::Display for PortNumber {
 pub struct Path { port_number: PortNumber }
 impl Path {
 	pub fn new(port_no: PortNo, no_ports: PortNo) -> Result<Path, Error> {
-		let port_number = PortNumber::new(port_no, no_ports).context(UtilityError::Chain { func_name: "Path::new", comment: S("")})?;
+		let port_number = port_no.make_port_number(no_ports).context(UtilityError::Chain { func_name: "Path::new", comment: S("")})?;
 		Ok(Path { port_number })
 	}
     pub fn new0() -> Path { Path { port_number: PortNumber::new0() } }

@@ -1,6 +1,9 @@
 use std::fmt;
 use std::ops::{Deref};
 
+use failure::Error;
+use utility::PortNumber;
+
 pub struct DebugOptions {
     pub trace_all:      bool,
     pub ca_msg_recv:    bool,
@@ -72,6 +75,11 @@ impl Deref for PathLength { type Target = CellNo; fn deref(&self) -> &Self::Targ
 impl fmt::Display for PathLength { fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result { write!(f, "{}", *self.0)} }
 #[derive(Debug, Copy, Clone, Hash, Eq, PartialEq, Ord, PartialOrd, Serialize, Deserialize)]
 pub struct PortNo(pub u8);
+impl PortNo {
+    pub fn make_port_number(self, no_ports: PortNo) -> Result<PortNumber, Error> {
+        Ok(PortNumber::new(self, no_ports)?)
+    }
+}
 impl Deref for PortNo { type Target = u8; fn deref(&self) -> &Self::Target { &self.0 } }
 //#[derive(Debug, Copy, Clone, Hash, Eq, PartialEq, Serialize, Deserialize)]
 //pub struct TableIndex(pub u32);

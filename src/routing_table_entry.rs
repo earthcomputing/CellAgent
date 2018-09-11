@@ -21,10 +21,10 @@ impl RoutingTableEntry {
 		RoutingTableEntry { tree_uuid: tree_id.get_uuid(), parent: parent.get_port_no(),
 			may_send, inuse, mask }
 	}
-	pub fn default() -> Result<RoutingTableEntry, Error> {
+	pub fn default() -> RoutingTableEntry {
 		let port_number = PortNumber::new0();
-		let tree_id = TreeID::new("default").context(RoutingTableEntryError::Chain { func_name: "default", comment: S("")})?;
-		Ok(RoutingTableEntry::new(&tree_id, false, port_number, Mask::empty(), true))
+		let tree_id = TreeID::new("default").expect("The string 'default' is always a valid tree name")
+;		RoutingTableEntry::new(&tree_id, false, port_number, Mask::empty(), true)
 	}
 	pub fn is_in_use(&self) -> bool { self.inuse }
 	pub fn may_send(&self) -> bool { self.may_send }
