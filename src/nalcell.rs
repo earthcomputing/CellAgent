@@ -13,7 +13,7 @@ use message_types::{PortToPe, PeFromPort, PeToPort,PortFromPe,
 use name::{CellID};
 use packet_engine::{PacketEngine};
 use port::{Port};
-use utility::{PortNumber, S, TraceHeader, TraceHeaderParams, TraceType};
+use utility::{S, TraceHeader, TraceHeaderParams, TraceType};
 use vm::VirtualMachine;
 
 const MODULE: &'static str = "nalcell.rs";
@@ -77,7 +77,7 @@ impl NalCell {
 			pe_to_ports.push(pe_to_port);
 			ports_from_pe.insert(PortNo(i), port_from_pe);
 			let is_connected = if i == 0 { true } else { false };
-			let port_number = PortNumber::new(PortNo(i), nports).context(NalcellError::Chain { func_name: "new", comment: S("port number")})?;
+			let port_number = PortNo(i).make_port_number(nports).context(NalcellError::Chain { func_name: "new", comment: S("port number")})?;
 			let port = Port::new(&cell_id, port_number, is_border_port, is_connected,port_to_pe.clone()).context(NalcellError::Chain { func_name: "new", comment: S("port")})?;
 			ports.push(port);
 		}

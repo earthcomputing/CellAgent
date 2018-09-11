@@ -35,7 +35,7 @@ impl Uuid {
         uuid
     }
     fn get_bytes(&self) -> Bytes { *self.uuid.as_bytes() }
-    fn set_bytes(&mut self, bytes: Bytes) { self.uuid = uuid::Uuid::from_uuid_bytes(bytes); }
+    fn set_bytes(&mut self, bytes: Bytes) { self.uuid = uuid::Uuid::from_bytes(bytes); }
     fn mask_special_bytes(&self) -> Bytes {
         let mut bytes = self.clone().get_bytes();
         bytes[AIT_BYTE] = 0;

@@ -13,7 +13,7 @@ use name::{Name, CellID};
 use packet::{Packet};
 use routing_table::{RoutingTable};
 use routing_table_entry::{RoutingTableEntry};
-use utility::{Mask, PortNumber, S, TraceHeader, TraceHeaderParams, TraceType, write_err};
+use utility::{Mask, S, TraceHeader, TraceHeaderParams, TraceType, write_err};
 use uuid_ec::{AitState, Uuid};
 
 // TODO: Figure out how to packet engine gets trace messagesto the DAL
@@ -246,7 +246,7 @@ impl PacketEngine {
                     if entry.get_uuid() == packet.get_uuid() {
                         let mask = entry.get_mask();
                         // Next line verifies that port_no is valid
-                        PortNumber::new(port_no, MAX_PORTS).context(PacketEngineError::Chain { func_name: "process_packet", comment: S("port number ") + self.cell_id.get_name() })?; // Verify that port_no is valid
+                        port_no.make_port_number(MAX_PORTS).context(PacketEngineError::Chain { func_name: "process_packet", comment: S("port number ") + self.cell_id.get_name() })?; // Verify that port_no is valid
                         self.forward(port_no, entry, mask, packet, trace_header).context(PacketEngineError::Chain { func_name: "process_packet", comment: S("forward ") + self.cell_id.get_name() })?;
                     } else {
                         let msg_type = MsgType::msg_type(&packet);
