@@ -64,7 +64,7 @@ impl Cmodel {
                             match msg.get_msg_type() {
                                 MsgType::Discover => (),
                                 MsgType::DiscoverD => {
-                                    if msg.get_tree_id().unwrap().is_name("Tree:C:2") {
+                                    if msg.get_tree_id().is_name("Tree:C:2") {
                                         println!("Cmodel {}: {} received {}", self.cell_id, _f, msg);
                                     }
                                 },
@@ -115,7 +115,7 @@ impl Cmodel {
                     match msg.get_msg_type() {
                         MsgType::Discover => (),
                         MsgType::DiscoverD => {
-                            if msg.get_tree_id().unwrap().is_name("Tree:C:2") {
+                            if msg.get_tree_id().is_name("Tree:C:2") {
                                 println!("Cmodel {}: {} received {}", self.cell_id, f, msg);
                             }
                         },

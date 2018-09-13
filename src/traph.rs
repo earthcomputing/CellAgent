@@ -104,6 +104,7 @@ impl Traph {
         self.get_trial_port(PortStatus::Child, port_no)
     }
     fn get_trial_port(&self, port_status: PortStatus, port_no: PortNo) -> Option<PortNo> {
+        let _f = "get_trial_port";
         match self.elements.iter().find(|&element| {
             element.get_status() == port_status
                 && !self.tried_ports.contains(&element.get_port_no())

@@ -25,6 +25,8 @@ pub enum MsgType {
 	Discover,
 	DiscoverD,
     Failover,
+    FailoverD,
+    Hello,
 	Manifest,
 	StackTree,
     StackTreeD,
@@ -45,6 +47,8 @@ impl MsgType {
 			MsgType::Discover    => Box::new(serde_json::from_str::<DiscoverMsg>(&serialized_msg).context(MessageError::Chain { func_name: _f, comment: S("DiscoverMsg")})?),
             MsgType::DiscoverD   => Box::new(serde_json::from_str::<DiscoverDMsg>(&serialized_msg).context(MessageError::Chain { func_name: _f, comment: S("DiscoverDMsg")})?),
             MsgType::Failover    => Box::new(serde_json::from_str::<FailoverMsg>(&serialized_msg).context(MessageError::Chain { func_name: _f, comment: S("FailoverMsg")})?),
+            MsgType::FailoverD   => Box::new(serde_json::from_str::<FailoverDMsg>(&serialized_msg).context(MessageError::Chain { func_name: _f, comment: S("FailDoverMsg")})?),
+            MsgType::Hello       => Box::new(serde_json::from_str::<HelloMsg>(&serialized_msg).context(MessageError::Chain { func_name: _f, comment: S("HelloMsg")})?),
 			MsgType::Manifest    => Box::new(serde_json::from_str::<ManifestMsg>(&serialized_msg).context(MessageError::Chain { func_name: _f, comment: S("ManifestMsg")})?),
             MsgType::StackTree   => Box::new(serde_json::from_str::<StackTreeMsg>(&serialized_msg).context(MessageError::Chain { func_name: _f, comment: S("StackTreeMsg")})?),
             MsgType::StackTreeD  => Box::new(serde_json::from_str::<StackTreeDMsg>(&serialized_msg).context(MessageError::Chain { func_name: _f, comment: S("StackTreeDMsg")})?),
@@ -62,6 +66,8 @@ impl MsgType {
             MsgType::Discover    => Box::new(serde_json::from_str::<DiscoverMsg>(&serialized_msg).context(MessageError::Chain { func_name: _f, comment: S("DiscoverMsg")})?),
             MsgType::DiscoverD   => Box::new(serde_json::from_str::<DiscoverDMsg>(&serialized_msg).context(MessageError::Chain { func_name: _f, comment: S("DiscoverDMsg")})?),
             MsgType::Failover    => Box::new(serde_json::from_str::<FailoverMsg>(&serialized_msg).context(MessageError::Chain { func_name: _f, comment: S("FailoverMsg")})?),
+            MsgType::FailoverD   => Box::new(serde_json::from_str::<HelloMsg>(&serialized_msg).context(MessageError::Chain { func_name: _f, comment: S("FailoverDMsg")})?),
+            MsgType::Hello       => Box::new(serde_json::from_str::<HelloMsg>(&serialized_msg).context(MessageError::Chain { func_name: _f, comment: S("HelloMsg")})?),
             MsgType::Manifest    => Box::new(serde_json::from_str::<ManifestMsg>(&serialized_msg).context(MessageError::Chain { func_name: _f, comment: S("ManifestMsg")})?),
             MsgType::StackTree   => Box::new(serde_json::from_str::<StackTreeMsg>(&serialized_msg).context(MessageError::Chain { func_name: _f, comment: S("StackTreeMsg")})?),
             MsgType::StackTreeD  => Box::new(serde_json::from_str::<StackTreeDMsg>(&serialized_msg).context(MessageError::Chain { func_name: _f, comment: S("StackTreeDMsg")})?),
@@ -81,6 +87,8 @@ impl MsgType {
         else if MsgType::is_type(packet, MsgType::Discover)    { MsgType::Discover }
         else if MsgType::is_type(packet, MsgType::DiscoverD)   { MsgType::DiscoverD }
         else if MsgType::is_type(packet, MsgType::Failover)    { MsgType::Failover }
+        else if MsgType::is_type(packet, MsgType::FailoverD)   { MsgType::FailoverD }
+        else if MsgType::is_type(packet, MsgType::Hello)       { MsgType::Hello }
         else if MsgType::is_type(packet, MsgType::Manifest)    { MsgType::Manifest }
         else if MsgType::is_type(packet, MsgType::StackTree)   { MsgType::StackTree }
         else if MsgType::is_type(packet, MsgType::StackTreeD)  { MsgType::StackTreeD }
@@ -95,6 +103,8 @@ impl fmt::Display for MsgType {
 			MsgType::Discover    => write!(f, "Discover"),
             MsgType::DiscoverD   => write!(f, "DiscoverD"),
             MsgType::Failover    => write!(f, "Failover"),
+            MsgType::FailoverD   => write!(f, "FailoverD"),
+            MsgType::Hello       => write!(f, "Hello"),
 			MsgType::Manifest    => write!(f, "Manifest"),
 			MsgType::StackTree   => write!(f, "StackTree"),
             MsgType::StackTreeD  => write!(f, "StackTreeD"),
@@ -157,7 +167,7 @@ pub trait Message {
 	fn get_header(&self) -> &MsgHeader;
     fn get_payload(&self) -> &MsgPayload;
     fn get_msg_type(&self) -> MsgType;
-    fn get_tree_id(&self) -> Option<&TreeID> { None }
+    fn get_tree_id(&self) -> TreeID { TreeID::default() }
 	fn is_rootward(&self) -> bool {
 		match self.get_header().get_direction() {
 			MsgDirection::Rootward => true,
@@ -252,7 +262,7 @@ impl Message for DiscoverMsg {
 	fn get_header(&self) -> &MsgHeader { &self.header }
     fn get_payload(&self) -> &MsgPayload { &self.payload }
     fn get_msg_type(&self) -> MsgType { self.get_header().msg_type }
-    fn get_tree_id(&self) -> Option<&TreeID> { Some(&self.payload.tree_id) }
+    fn get_tree_id(&self) -> TreeID { self.payload.tree_id.clone() }
     fn is_blocking(&self) -> bool { false }
     fn value(&self) -> serde_json::Value where Self: serde::Serialize {
         serde_json::to_value(self).expect("I don't know how to handle errors in msg.value()")
@@ -311,11 +321,11 @@ pub struct DiscoverDMsg {
 	payload: DiscoverDPayload
 }
 impl DiscoverDMsg {
-	pub fn new(sender_id: &SenderID, tree_id: &TreeID, path: Path) -> DiscoverDMsg {
+	pub fn new(sender_id: &SenderID, sending_cell_id: &CellID, tree_id: &TreeID, path: Path) -> DiscoverDMsg {
 		// Note that direction is leafward so we can use the connected ports tree
 		// If we send rootward, then the first recipient forwards the DiscoverD
 		let header = MsgHeader::new(sender_id, true,MsgType::DiscoverD, MsgDirection::Leafward);
-		let payload = DiscoverDPayload::new(tree_id, path);
+		let payload = DiscoverDPayload::new(sending_cell_id, tree_id, path);
 		DiscoverDMsg { header, payload }
 	}
     pub fn get_payload(&self) -> &DiscoverDPayload { &self.payload }
@@ -324,7 +334,7 @@ impl Message for DiscoverDMsg {
 	fn get_header(&self) -> &MsgHeader { &self.header }
     fn get_payload(&self) -> &MsgPayload { &self.payload }
     fn get_msg_type(&self) -> MsgType { self.get_header().msg_type }
-    fn get_tree_id(&self) -> Option<&TreeID> { Some(&self.payload.get_tree_id()) }
+    fn get_tree_id(&self) -> TreeID { self.payload.tree_id.clone() }
     fn is_blocking(&self) -> bool { true }
     fn value(&self) -> serde_json::Value {
         serde_json::to_value(self).expect("I don't know how to handle errors in msg.value()")
@@ -343,12 +353,13 @@ impl fmt::Display for DiscoverDMsg {
 }
 #[derive(Debug, Clone, Hash, Serialize, Deserialize)]
 pub struct DiscoverDPayload {
+    senging_cell_id: CellID,
 	tree_id: TreeID,
     path: Path
 }
 impl DiscoverDPayload {
-	fn new(tree_id: &TreeID, path: Path) -> DiscoverDPayload {
-		DiscoverDPayload { tree_id: tree_id.clone(), path }
+	fn new(sending_cell_id: &CellID, tree_id: &TreeID, path: Path) -> DiscoverDPayload {
+		DiscoverDPayload { senging_cell_id: sending_cell_id.clone(), tree_id: tree_id.clone(), path }
 	}
 	pub fn get_tree_id(&self) -> &TreeID { &self.tree_id }
     pub fn get_path(&self) -> Path { self.path }
@@ -378,7 +389,7 @@ impl Message for FailoverMsg {
     fn get_header(&self) -> &MsgHeader { &self.header }
     fn get_payload(&self) -> &MsgPayload { &self.payload }
     fn get_msg_type(&self) -> MsgType { self.get_header().msg_type }
-    fn get_tree_id(&self) -> Option<&TreeID> { Some(&self.payload.get_rootward_tree_id()) }
+    fn get_tree_id(&self) -> TreeID { self.payload.rw_tree_id.clone() }
     fn is_blocking(&self) -> bool { false }
     fn value(&self) -> serde_json::Value {
         serde_json::to_value(self).expect("I don't know how to handle errors in msg.value()")
@@ -414,6 +425,115 @@ impl fmt::Display for FailoverMsgPayload {
     }
 }
 #[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct FailoverDMsg {
+    header: MsgHeader,
+    payload: FailoverDMsgPayload
+}
+impl FailoverDMsg {
+    pub fn new(sender_id: &SenderID, port_tree_id: &TreeID, hops: PathLength, path: Path) -> FailoverDMsg {
+        // Note that direction is leafward so we can use the connected ports tree
+        // If we send rootward, then the first recipient forwards the FailoverMsg
+        let header = MsgHeader::new(sender_id, true,MsgType::FailoverD, MsgDirection::Leafward);
+        let payload = FailoverDMsgPayload::new(port_tree_id, hops, path);
+        FailoverDMsg { header, payload }
+    }
+    pub fn get_payload(&self) -> &FailoverDMsgPayload { &self.payload }
+}
+impl Message for FailoverDMsg {
+    fn get_header(&self) -> &MsgHeader { &self.header }
+    fn get_payload(&self) -> &MsgPayload { &self.payload }
+    fn get_msg_type(&self) -> MsgType { self.get_header().msg_type }
+    fn get_tree_id(&self) -> TreeID { self.payload.port_tree_id.clone() }
+    fn is_blocking(&self) -> bool { false }
+    fn value(&self) -> serde_json::Value {
+        serde_json::to_value(self).expect("I don't know how to handle errors in msg.value()")
+    }
+    fn process_ca(&mut self, cell_agent: &mut CellAgent, port_no: PortNo, _msg_tree_id: &TreeID, is_ait: bool,
+                  trace_header: &mut TraceHeader) -> Result<(), Error> {
+        let _f = "process_ca";
+        cell_agent.process_failover_d_msg(self, port_no, trace_header)
+    }
+}
+impl fmt::Display for FailoverDMsg {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        let s = format!("{}: {}", self.get_header(), self.get_payload());
+        write!(f, "{}", s)
+    }
+}
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct FailoverDMsgPayload {
+    port_tree_id: TreeID,
+    hops: PathLength,
+    path: Path
+}
+impl FailoverDMsgPayload {
+    fn new(port_tree_id: &TreeID, hops: PathLength, path: Path) -> FailoverDMsgPayload {
+        FailoverDMsgPayload { port_tree_id: port_tree_id.clone(), hops, path }
+    }
+    pub fn get_port_tree_id(&self) -> &TreeID { &self.port_tree_id }
+    pub fn get_hops(&self) -> &PathLength { &self.hops }
+    pub fn get_path(&self) -> &Path { &self.path }
+}
+impl MsgPayload for FailoverDMsgPayload {}
+impl fmt::Display for FailoverDMsgPayload {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "Port Tree {} hops {}", self.port_tree_id, self.hops)
+    }
+}
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct HelloMsg {
+    header: MsgHeader,
+    payload: HelloMsgPayload
+}
+impl HelloMsg {
+    pub fn new(sender_id: &SenderID, cell_id: &CellID, port_no: PortNo) -> HelloMsg {
+        // Note that direction is leafward so we can use the connected ports tree
+        // If we send rootward, then the first recipient forwards the FailoverMsg
+        let header = MsgHeader::new(sender_id, true,MsgType::Hello, MsgDirection::Leafward);
+        let payload = HelloMsgPayload::new(cell_id, port_no);
+        HelloMsg { header, payload }
+    }
+    pub fn get_payload(&self) -> &HelloMsgPayload { &self.payload }
+}
+impl Message for HelloMsg {
+    fn get_header(&self) -> &MsgHeader { &self.header }
+    fn get_payload(&self) -> &MsgPayload { &self.payload }
+    fn get_msg_type(&self) -> MsgType { self.header.msg_type }
+    fn is_blocking(&self) -> bool { false }
+    fn value(&self) -> serde_json::Value {
+        serde_json::to_value(self).expect("I don't know how to handle errors in msg.value()")
+    }
+    fn process_ca(&mut self, cell_agent: &mut CellAgent, port_no: PortNo, _msg_tree_id: &TreeID, is_ait: bool,
+                  trace_header: &mut TraceHeader) -> Result<(), Error> {
+        let _f = "process_ca";
+        cell_agent.process_hello_msg(self, port_no, trace_header)
+    }
+}
+impl fmt::Display for HelloMsg {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        let s = format!("{}: {}", self.get_header(), self.get_payload());
+        write!(f, "{}", s)
+    }
+}
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct HelloMsgPayload {
+    cell_id: CellID,
+    port_no: PortNo
+}
+impl HelloMsgPayload {
+    fn new(cell_id: &CellID, port_no: PortNo) -> HelloMsgPayload {
+        HelloMsgPayload { cell_id: cell_id.clone(), port_no }
+    }
+    pub fn get_cell_id(&self) -> &CellID { &self.cell_id }
+    pub fn get_port_no(&self) -> &PortNo { &self.port_no }
+}
+impl MsgPayload for HelloMsgPayload {}
+impl fmt::Display for HelloMsgPayload {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "Neigbor cell id {} neighbor port {}", self.cell_id, *self.port_no)
+    }
+}
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct StackTreeMsg {
 	header: MsgHeader,
 	payload: StackTreeMsgPayload
@@ -431,7 +551,6 @@ impl Message for StackTreeMsg {
 	fn get_header(&self) -> &MsgHeader { &self.header }
     fn get_payload(&self) -> &MsgPayload { &self.payload }
     fn get_msg_type(&self) -> MsgType { self.header.msg_type }
-    fn get_tree_id(&self) -> Option<&TreeID> { Some(&self.payload.get_new_tree_id()) }
     fn is_blocking(&self) -> bool { true }
     fn value(&self) -> serde_json::Value {
         serde_json::to_value(self).expect("I don't know how to handle errors in msg.value()")
@@ -491,7 +610,7 @@ impl Message for StackTreeDMsg {
     fn get_header(&self) -> &MsgHeader { &self.header }
     fn get_payload(&self) -> &MsgPayload { &self.payload }
     fn get_msg_type(&self) -> MsgType { self.header.msg_type }
-    fn get_tree_id(&self) -> Option<&TreeID> { Some(self.payload.get_tree_id()) }
+    fn get_tree_id(&self) -> TreeID { self.payload.tree_id.clone() }
     fn is_blocking(&self) -> bool { true }
     fn value(&self) -> serde_json::Value {
         serde_json::to_value(self).expect("I don't know how to handle errors in msg.value()")
@@ -542,7 +661,7 @@ impl Message for ManifestMsg {
 	fn get_header(&self) -> &MsgHeader { &self.header }
     fn get_payload(&self) -> &MsgPayload { &self.payload }
     fn get_msg_type(&self) -> MsgType { self.get_header().msg_type }
-    fn get_tree_id(&self) -> Option<&TreeID> { Some(&self.payload.get_deploy_tree_id()) }
+    fn get_tree_id(&self) -> TreeID { self.payload.deploy_tree_id.clone() }
     fn is_blocking(&self) -> bool { false }
     fn value(&self) -> serde_json::Value {
         serde_json::to_value(self).expect("I don't know how to handle errors in msg.value()")
@@ -599,7 +718,7 @@ impl Message for ApplicationMsg {
     fn get_header(&self) -> &MsgHeader { &self.header }
     fn get_payload(&self) -> &MsgPayload { &self.payload }
     fn get_msg_type(&self) -> MsgType { self.get_header().msg_type }
-    fn get_tree_id(&self) -> Option<&TreeID> { Some(&self.payload.get_tree_id()) }
+    fn get_tree_id(&self) -> TreeID { self.payload.tree_id.clone() }
     fn is_blocking(&self) -> bool { false }
     fn value(&self) -> serde_json::Value {
         serde_json::to_value(self).expect("I don't know how to handle errors in msg.value()")

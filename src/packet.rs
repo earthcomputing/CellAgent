@@ -57,7 +57,7 @@ impl Packet {
     // Debug hack to get tree_id out of packets.  Assumes msg is one packet
     pub fn get_tree_id(self) -> TreeID {
         let msg = MsgType::get_msg(&vec![self]).unwrap();
-        msg.get_tree_id().unwrap().clone()
+        msg.get_tree_id().clone()
     }
     //	pub fn get_payload_bytes(&self) -> Vec<u8> { self.get_payload().get_bytes() }
     //	pub fn get_payload_size(&self) -> usize { self.payload.get_no_bytes() }

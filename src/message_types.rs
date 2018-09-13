@@ -12,9 +12,10 @@ use uuid_ec::Uuid;
 
 type ISAIT = bool;
 type ISBLOCKING = bool;
-pub type TCP = (ISAIT, AllowedTree, TcpMsgType, MsgDirection, ByteArray);
-pub type CATOCM = (TreeID, ISAIT, Mask, ISBLOCKING, ByteArray);
+type CATOCM = (TreeID, ISAIT, Mask, ISBLOCKING, ByteArray);
 pub type CMTOCA = (PortNo, ISAIT, Uuid, ByteArray); // port_no, is_ait, tree_uuid, bytes
+pub type PACKET = Packet;
+pub type TCP = (ISAIT, AllowedTree, TcpMsgType, MsgDirection, ByteArray);
 // PacketEngine to PacketEngine to unblock
 pub type PeToPePacket = String;
 pub type PeToPe = mpsc::Sender<PeToPePacket>;
@@ -31,17 +32,17 @@ pub type CmToPe = mpsc::Sender<CmToPePacket>;
 pub type PeFromCm = mpsc::Receiver<CmToPePacket>;
 //pub type CmPeError = mpsc::SendError<CmToPePacket>;
 // PacketEngine to Port
-pub enum PeToPortPacket { Packet((Packet)), Tcp(TCP) }
+pub enum PeToPortPacket { Packet((PACKET)), Tcp(TCP) }
 pub type PeToPort = mpsc::Sender<PeToPortPacket>;
 pub type PortFromPe = mpsc::Receiver<PeToPortPacket>;
 //pub type PePortError = mpsc::SendError<PeToPortPacket>;
 // PacketEngine to Port, Port to Link
-pub type PortToLinkPacket = (Packet);
+pub type PortToLinkPacket = (PACKET);
 pub type PortToLink = mpsc::Sender<PortToLinkPacket>;
 pub type LinkFromPort = mpsc::Receiver<PortToLinkPacket>;
 //pub type PortLinkError = mpsc::SendError<PortToLinkPacket>;
 // Link to Port
-pub enum LinkToPortPacket { Status(PortStatus), Packet((Packet)) }
+pub enum LinkToPortPacket { Status(PortStatus), Packet((PACKET)) }
 pub type LinkToPort = mpsc::Sender<LinkToPortPacket>;
 pub type PortFromLink = mpsc::Receiver<LinkToPortPacket>;
 //pub type LinkPortError = mpsc::SendError<LinkToPortPacket>;
