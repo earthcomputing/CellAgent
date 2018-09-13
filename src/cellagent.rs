@@ -1193,14 +1193,14 @@ impl CellAgent {
             let sender_id = SenderID::new(&self.cell_id, "CellAgent")?;
             let port_no_mask = Mask::new(port_no.make_port_number(self.no_ports)?);
             self.connected_tree_entry.lock().unwrap().or_with_mask(port_no_mask); // Add to connected ports
+            let entry = CaToCmBytes::Entry(*self.connected_tree_entry.lock().unwrap());
+            self.ca_to_cm.send(entry).context(CellagentError::Chain { func_name: _f, comment: S(self.cell_id.clone()) + "interior"})?;
             let hello_msg = HelloMsg::new(&sender_id, &self.cell_id, port_no);
             self.send_msg(&self.connected_tree_id, &hello_msg, port_no_mask, trace_header)?;
             let path = Path::new(port_no, self.no_ports)?;
             let hops = PathLength(CellNo(1));
             let discover_msg = DiscoverMsg::new(&sender_id, &self.my_tree_id, &self.cell_id, hops, path);
             //println!("CellAgent {}: sending packet {} on port {} {} ", self.cell_id, packets[0].get_count(), port_no, discover_msg);
-            let entry = CaToCmBytes::Entry(*self.connected_tree_entry.lock().unwrap());
-            self.ca_to_cm.send(entry).context(CellagentError::Chain { func_name: _f, comment: S(self.cell_id.clone()) + "interior"})?;
             self.send_msg(&self.connected_tree_id, &discover_msg, port_no_mask, trace_header).context(CellagentError::Chain { func_name: _f, comment: S(self.cell_id.clone()) })?;
             self.forward_discover(port_no_mask, trace_header).context(CellagentError::Chain { func_name: _f, comment: S(self.cell_id.clone()) })?;
             Ok(())
