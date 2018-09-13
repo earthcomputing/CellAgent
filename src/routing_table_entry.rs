@@ -4,7 +4,7 @@ use std::collections::HashSet;
 
 use config::{PortNo};
 use name::{Name, TreeID};
-use utility::{Mask, PortNumber, S};
+use utility::{Mask, PortNumber};
 use uuid_ec::Uuid;
 
 #[derive(Debug, Copy, Clone, Serialize, Deserialize)]
@@ -77,9 +77,11 @@ impl fmt::Display for RoutingTableEntry {
 	}
 }
 // Errors
+/*
 use failure::{Error, ResultExt};
 #[derive(Debug, Fail)]
 pub enum RoutingTableEntryError {
     #[fail(display = "RoutingTableEntryError::Chain {} {}", func_name, comment)]
     Chain { func_name: &'static str, comment: String },
 }
+*/

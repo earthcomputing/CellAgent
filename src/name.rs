@@ -65,6 +65,9 @@ impl<'a> TreeID {
 			Some(_) => Err(NameError::Format { name: S(name), func_name: "TreeID::new" }.into())
 		}
 	}
+	pub fn default() -> TreeID {
+        TreeID { name: S("Default"), uuid: Uuid::new() }
+    }
 	pub fn with_root_port_number(&self, port_number: &PortNumber) -> TreeID {
         let mut uuid = self.uuid;
         uuid.set_port_number(port_number);
