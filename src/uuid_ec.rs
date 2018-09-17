@@ -89,6 +89,10 @@ impl Uuid {
         self.set_code(AIT);
         AitState::Ait
     }
+    pub fn make_tock(&mut self) -> AitState {
+        self.set_code(TOCK);
+        AitState::Tock
+    }
     pub fn set_port_number(&mut self, port_number: &PortNumber) {
         let port_no = port_number.get_port_no();
         self.set_port_no(port_no);
@@ -136,10 +140,10 @@ impl Uuid {
     fn previous_state(&mut self) -> Result<AitState, Error> {
         let f = "previous_stat";
         Ok(match self.get_code() & !REVERSE {
-            TICK => { self.set_code(TOCK); AitState::Tock },
+            TICK => { self.set_code(TOCK); self.time_reverse(); AitState::Tock },
             TOCK => { self.set_code(TACK); AitState::Tack },
             TACK => { self.set_code(TECK); AitState::Teck },
-            TECK => { self.set_code(AIT);  AitState::Teck },
+            TECK => { self.set_code(AIT);  AitState::Tick },
             NORMAL => AitState::Normal,
             _ => return Err(UuidError::AitState { func_name: f, ait_state: self.get_ait_state() }.into())
         })

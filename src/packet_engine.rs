@@ -194,12 +194,21 @@ impl PacketEngine {
             AitState::Ait => return Err(PacketEngineError::Ait { func_name: f, ait_state: AitState::Ait }.into()), // Error, should never get from port
             AitState::Tock => { // Send to CM and transition to ENTL
                 packet.next_ait_state()?;
-                match self.pe_to_ports.get(*port_no as usize) {
-                    Some(s) => s.send(PeToPortPacket::Packet(packet)).context(PacketEngineError::Chain { func_name: f, comment: S("send packet leafward ") + self.cell_id.get_name() })?,
+                let sender = match self.pe_to_ports.get(*port_no as usize) {
+                    Some(sender) => {
+                        sender.send(PeToPortPacket::Packet(packet)).context(PacketEngineError::Chain { func_name: f, comment: S("send packet leafward ") + self.cell_id.get_name() })?;
+                        sender
+                    },
                     None => return Err(PacketEngineError::Sender { cell_id: self.cell_id.clone(), func_name: "forward leaf", port_no: *port_no }.into())
                 };
                 packet.make_ait();
-                self.pe_to_cm.send(PeToCmPacket::Packet((port_no, packet))).context(PacketEngineError::Chain { func_name: "forward", comment: S("rootcast packet to ca ") + self.cell_id.get_name() })?;
+                // Time reverse on error sending to CM
+                self.pe_to_cm.send(PeToCmPacket::Packet((port_no, packet)))
+                    .or_else(|_| -> Result<(), Error> {
+                        packet.make_tock();
+                        packet.time_reverse();
+                        Ok(sender.send(PeToPortPacket::Packet(packet))?)
+                    })?;
             },
             AitState::Tick => (), // Inform CM of success and enter ENTL
             AitState::Tack | AitState::Teck => { // Update and send back on same port

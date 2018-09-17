@@ -884,16 +884,23 @@ impl CellAgent {
         let header = msg.get_header();
         let payload = msg.get_payload();
         let port_tree_id = payload.get_port_tree_id();
+        let tree_id = port_tree_id.without_root_port_number();
         let hops = *payload.get_hops();
         let path = *payload.get_path();
         let port_number = port_no.make_port_number(self.no_ports)?;
         let mut traph = self.get_traph(port_tree_id, trace_header)?;
-        let updated_entry = traph.update_element(port_tree_id, port_number,
+        let old_parent_entry = traph.get_tree_entry(&tree_id.get_uuid())?;
+        let old_parent = old_parent_entry.get_parent();
+        let mut updated_entry = traph.update_element(&tree_id, port_number,
                       traph::PortStatus::Parent, &HashSet::new(), hops, path).context(CellagentError::Chain { func_name: _f, comment: S("") })?;
-        println!("Cellagent {}: {} updated entry {}", self.cell_id, _f, updated_entry);
+        println!("Cellagent {}: {} old parent {} updated entry {}", self.cell_id, _f, *old_parent, updated_entry);
+        self.ca_to_cm.send(CaToCmBytes::Entry(updated_entry))?;
+        updated_entry.set_tree_id(port_tree_id);
+        println!("Cellagent {}: {} old parent {} updated entry {}", self.cell_id, _f, *old_parent, updated_entry);
+        self.ca_to_cm.send(CaToCmBytes::Entry(updated_entry))?;
         Ok(())
     }
-    pub fn process_hello_msg(&mut self, msg: &HelloMsg, port_no: PortNo, trace_header: &TraceHeader)
+    pub fn process_hello_msg(&mut self, msg: &HelloMsg, port_no: PortNo, trace_header: &mut TraceHeader)
             -> Result<(), Error> {
         let _f = "process_hello_msg";
         let header = msg.get_header();
@@ -901,6 +908,16 @@ impl CellAgent {
         let neighbor_cell_id = payload.get_cell_id();
         let neigbor_port_no = payload.get_port_no();
         self.neighbors.insert(port_no, (neighbor_cell_id.clone(), neigbor_port_no.clone()));
+        if DEBUG_OPTIONS.trace_all || DEBUG_OPTIONS.process_msg {   // Debug
+            let ref trace_params = TraceHeaderParams { module: MODULE, function: _f, format: "ca_process_hello_msg" };
+            let trace = json!({ "cell_id": &self.cell_id, "recv_port_no": port_no, "msg": msg.value() });
+            let _ = dal::add_to_trace(trace_header, TraceType::Debug, trace_params, &trace, _f);
+            if DEBUG_OPTIONS.process_msg {
+                let sending_cell = payload.get_cell_id();
+                let sending_port = payload.get_port_no();
+                println!("Cellagent {}: {} sending cell {} sending port {}", self.cell_id, _f, sending_cell, **sending_port);
+            }
+        }
         Ok(())
     }
     pub fn process_manifest_msg(&mut self, msg: &ManifestMsg, port_no: PortNo, msg_tree_id: &TreeID,
