@@ -66,7 +66,7 @@ impl MsgType {
             MsgType::Discover    => Box::new(serde_json::from_str::<DiscoverMsg>(&serialized_msg).context(MessageError::Chain { func_name: _f, comment: S("DiscoverMsg")})?),
             MsgType::DiscoverD   => Box::new(serde_json::from_str::<DiscoverDMsg>(&serialized_msg).context(MessageError::Chain { func_name: _f, comment: S("DiscoverDMsg")})?),
             MsgType::Failover    => Box::new(serde_json::from_str::<FailoverMsg>(&serialized_msg).context(MessageError::Chain { func_name: _f, comment: S("FailoverMsg")})?),
-            MsgType::FailoverD   => Box::new(serde_json::from_str::<HelloMsg>(&serialized_msg).context(MessageError::Chain { func_name: _f, comment: S("FailoverDMsg")})?),
+            MsgType::FailoverD   => Box::new(serde_json::from_str::<FailoverDMsg>(&serialized_msg).context(MessageError::Chain { func_name: _f, comment: S("FailoverDMsg")})?),
             MsgType::Hello       => Box::new(serde_json::from_str::<HelloMsg>(&serialized_msg).context(MessageError::Chain { func_name: _f, comment: S("HelloMsg")})?),
             MsgType::Manifest    => Box::new(serde_json::from_str::<ManifestMsg>(&serialized_msg).context(MessageError::Chain { func_name: _f, comment: S("ManifestMsg")})?),
             MsgType::StackTree   => Box::new(serde_json::from_str::<StackTreeMsg>(&serialized_msg).context(MessageError::Chain { func_name: _f, comment: S("StackTreeMsg")})?),

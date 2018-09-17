@@ -10,7 +10,7 @@
             "args": [],
             "cwd": "/Users/alan/Documents/Eclipse/multicell",
             //"preLaunchTask": "/Users/alan/.cargo/bin/cargo",
-            "sourceLanguages": ["rust"]
+            "sourceLanguages": ["rust"],    
         }
     ]
 }

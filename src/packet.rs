@@ -36,6 +36,7 @@ impl Packet {
     }
     pub fn get_uuid(&self) -> Uuid { self.header.get_uuid() }
 	pub fn make_ait(&mut self) { self.header.make_ait() }
+    pub fn make_tock(&mut self) { self.header.make_tock() }
     pub fn is_ait(&self) -> bool { self.header.get_uuid().is_ait() }
     pub fn get_ait_state(&self) -> AitState { self.get_uuid().get_ait_state() }
     pub fn next_ait_state(&mut self) -> Result<AitState, Error> {
@@ -43,6 +44,9 @@ impl Packet {
         uuid.next()?;
         self.header = PacketHeader::new(&uuid);
         Ok(uuid.get_ait_state())
+    }
+    pub fn time_reverse(&mut self) {
+        self.header.get_uuid().time_reverse();
     }
     pub fn get_next_count() -> usize { PACKET_COUNT.fetch_add(1, Ordering::SeqCst) }
     //pub fn get_count(&self) -> usize { self.packet_count }
@@ -88,6 +92,7 @@ impl PacketHeader {
 	}
 	fn get_uuid(&self) -> Uuid { self.uuid }
     fn make_ait(&mut self) { self.uuid.make_ait(); }
+    fn make_tock(&mut self) { self.uuid.make_tock(); }
 }
 impl fmt::Display for PacketHeader { 
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result { 
