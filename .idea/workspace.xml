@@ -2,13 +2,8 @@
 <project version="4">
   <component name="ChangeListManager">
     <list default="true" id="eee480a2-146d-44ab-9647-cef5ea39b250" name="Default" comment="">
-      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.vscode/launch.json" beforeDir="false" afterPath="$PROJECT_DIR$/.vscode/launch.json" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/cellagent.rs" beforeDir="false" afterPath="$PROJECT_DIR$/src/cellagent.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/message.rs" beforeDir="false" afterPath="$PROJECT_DIR$/src/message.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/packet.rs" beforeDir="false" afterPath="$PROJECT_DIR$/src/packet.rs" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/packet_engine.rs" beforeDir="false" afterPath="$PROJECT_DIR$/src/packet_engine.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/uuid_ec.rs" beforeDir="false" afterPath="$PROJECT_DIR$/src/uuid_ec.rs" afterDir="false" />
     </list>
     <ignored path="$PROJECT_DIR$/target/" />
     <ignored path="$PROJECT_DIR$/out/" />
@@ -37,26 +32,26 @@
       </usages-collector>
       <usages-collector id="statistics.file.extensions.edit">
         <counts>
-          <entry key="rs" value="52449" />
+          <entry key="rs" value="52771" />
           <entry key="toml" value="99" />
         </counts>
       </usages-collector>
       <usages-collector id="statistics.file.types.edit">
         <counts>
           <entry key="Android RenderScript" value="1" />
-          <entry key="Rust" value="52448" />
+          <entry key="Rust" value="52770" />
           <entry key="TOML file" value="99" />
         </counts>
       </usages-collector>
       <usages-collector id="statistics.file.types.open">
         <counts>
-          <entry key="Rust" value="113" />
+          <entry key="Rust" value="114" />
           <entry key="TOML file" value="4" />
         </counts>
       </usages-collector>
       <usages-collector id="statistics.file.extensions.open">
         <counts>
-          <entry key="rs" value="113" />
+          <entry key="rs" value="114" />
           <entry key="toml" value="4" />
         </counts>
       </usages-collector>
@@ -77,8 +72,8 @@
       <file pinned="false" current-in-tab="false">
         <entry file="file://$PROJECT_DIR$/src/traph.rs">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="86">
-              <caret line="135" column="11" selection-start-line="135" selection-start-column="11" selection-end-line="135" selection-end-column="11" />
+            <state relative-caret-position="186">
+              <caret line="163" column="11" selection-start-line="163" selection-start-column="11" selection-end-line="163" selection-end-column="11" />
             </state>
           </provider>
         </entry>
@@ -106,15 +101,6 @@
           <provider selected="true" editor-type-id="text-editor">
             <state relative-caret-position="152">
               <caret line="25" column="77" selection-start-line="25" selection-start-column="77" selection-end-line="25" selection-end-column="77" />
-            </state>
-          </provider>
-        </entry>
-      </file>
-      <file pinned="false" current-in-tab="false">
-        <entry file="file://$PROJECT_DIR$/src/config.rs">
-          <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="328">
-              <caret line="25" column="25" selection-start-line="25" selection-start-column="20" selection-end-line="25" selection-end-column="25" />
             </state>
           </provider>
         </entry>
@@ -155,17 +141,28 @@
           </provider>
         </entry>
       </file>
-      <file pinned="false" current-in-tab="true">
+      <file pinned="false" current-in-tab="false">
         <entry file="file://$PROJECT_DIR$/src/packet_engine.rs">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="-982">
-              <caret line="27" column="13" selection-start-line="27" selection-start-column="13" selection-end-line="27" selection-end-column="13" />
+            <state relative-caret-position="193">
+              <caret line="321" column="48" selection-start-line="321" selection-start-column="48" selection-end-line="321" selection-end-column="48" />
               <folding>
                 <element signature="e#5321#7230#0" />
                 <element signature="e#8026#9290#0" />
+                <element signature="e#14549#15821#0" />
+                <element signature="e#17543#18627#0" />
                 <element signature="e#19040#20194#0" />
                 <element signature="e#20959#22235#0" />
               </folding>
+            </state>
+          </provider>
+        </entry>
+      </file>
+      <file pinned="false" current-in-tab="false">
+        <entry file="file://$PROJECT_DIR$/src/traph_element.rs">
+          <provider selected="true" editor-type-id="text-editor">
+            <state relative-caret-position="240">
+              <caret line="16" column="11" selection-start-line="16" selection-start-column="11" selection-end-line="16" selection-end-column="11" />
             </state>
           </provider>
         </entry>
@@ -183,12 +180,13 @@
           </provider>
         </entry>
       </file>
-      <file pinned="false" current-in-tab="false">
+      <file pinned="false" current-in-tab="true">
         <entry file="file://$PROJECT_DIR$/src/cellagent.rs">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="314">
-              <caret line="899" selection-start-line="899" selection-end-line="899" />
+            <state relative-caret-position="334">
+              <caret line="869" column="90" selection-start-line="869" selection-start-column="90" selection-end-line="869" selection-end-column="90" />
               <folding>
+                <element signature="e#53403#54055#0" />
                 <element signature="e#93360#93361#0" expanded="true" />
                 <element signature="e#93412#93413#0" expanded="true" />
               </folding>
@@ -199,8 +197,8 @@
       <file pinned="false" current-in-tab="false">
         <entry file="file://$PROJECT_DIR$/src/message.rs">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="95">
-              <caret line="264" column="68" selection-start-line="264" selection-start-column="68" selection-end-line="264" selection-end-column="68" />
+            <state relative-caret-position="186">
+              <caret line="463" column="11" selection-start-line="463" selection-start-column="11" selection-end-line="463" selection-end-column="11" />
               <folding>
                 <element signature="e#17880#17881#0" expanded="true" />
                 <element signature="e#17923#17924#0" expanded="true" />
@@ -237,9 +235,6 @@
   </component>
   <component name="FindInProjectRecents">
     <findStrings>
-      <find>missing</find>
-      <find>miss</find>
-      <find>get_msg(</find>
       <find>fn get_msg</find>
       <find>&quot;get_msg&quot;</find>
       <find>NoFree</find>
@@ -267,6 +262,9 @@
       <find>705a</find>
       <find>2b99</find>
       <find>{:?}</find>
+      <find>6467</find>
+      <find>9370</find>
+      <find>4004fff0</find>
     </findStrings>
     <replaceStrings>
       <replace>Arc::</replace>
@@ -315,18 +313,18 @@
         <option value="$PROJECT_DIR$/src/noc.rs" />
         <option value="$PROJECT_DIR$/src/config.rs" />
         <option value="$PROJECT_DIR$/src/message.rs" />
-        <option value="$PROJECT_DIR$/src/cellagent.rs" />
         <option value="$PROJECT_DIR$/src/packet.rs" />
-        <option value="$PROJECT_DIR$/src/packet_engine.rs" />
         <option value="$PROJECT_DIR$/src/uuid_ec.rs" />
+        <option value="$PROJECT_DIR$/src/packet_engine.rs" />
+        <option value="$PROJECT_DIR$/src/cellagent.rs" />
       </list>
     </option>
   </component>
   <component name="ProjectFrameBounds">
-    <option name="x" value="252" />
-    <option name="y" value="-989" />
+    <option name="x" value="239" />
+    <option name="y" value="-963" />
     <option name="width" value="1415" />
-    <option name="height" value="957" />
+    <option name="height" value="963" />
   </component>
   <component name="ProjectView">
     <navigator proportions="" version="1">
@@ -358,7 +356,7 @@
   <component name="PropertiesComponent">
     <property name="SearchEverywhereHistoryKey" value="&#9;FILE&#9;file:///Users/alan/Documents/Eclipse/multicell/src/packet_engine.rs&#10;{&#9;null&#9;null" />
     <property name="ToolWindowCargo.ShowToolbar" value="false" />
-    <property name="com.android.tools.idea.instantapp.provision.ProvisionBeforeRunTaskProvider.myTimeStamp" value="1537205620576" />
+    <property name="com.android.tools.idea.instantapp.provision.ProvisionBeforeRunTaskProvider.myTimeStamp" value="1537223468289" />
     <property name="org.rust.cargo.project.model.PROJECT_DISCOVERY" value="true" />
     <property name="run.code.analysis.last.selected.profile" value="pProject Default" />
     <property name="settings.editor.selected.configurable" value="preferences.sourceCode.Rust" />
@@ -459,23 +457,23 @@
     </todo-panel>
   </component>
   <component name="ToolWindowManager">
-    <frame x="252" y="-989" width="1415" height="957" extended-state="0" />
+    <frame x="239" y="-963" width="1415" height="963" extended-state="0" />
     <editor active="true" />
     <layout>
-      <window_info active="true" content_ui="combo" id="Project" order="0" visible="true" weight="0.12308813" />
+      <window_info content_ui="combo" id="Project" order="0" visible="true" weight="0.12308813" />
       <window_info id="Image Layers" order="1" />
       <window_info id="Capture Tool" order="2" />
       <window_info id="Designer" order="3" />
       <window_info id="UI Designer" order="4" />
       <window_info id="Favorites" order="5" side_tool="true" />
       <window_info anchor="bottom" id="Message" order="0" />
-      <window_info anchor="bottom" id="Find" order="1" sideWeight="0.45302257" visible="true" weight="0.26603326" />
-      <window_info anchor="bottom" x="734" y="77" width="679" height="812" id="Run" internal_type="FLOATING" order="2" type="FLOATING" visible="true" weight="0.32941177" />
+      <window_info anchor="bottom" id="Find" order="1" sideWeight="0.45302257" visible="true" weight="0.26415095" />
+      <window_info active="true" anchor="bottom" x="734" y="77" width="679" height="812" id="Run" internal_type="FLOATING" order="2" type="FLOATING" visible="true" weight="0.32941177" />
       <window_info anchor="bottom" id="Debug" order="3" weight="0.4" />
       <window_info anchor="bottom" id="Cvs" order="4" weight="0.25" />
       <window_info anchor="bottom" id="Inspection" order="5" weight="0.4" />
       <window_info anchor="bottom" id="TODO" order="6" sideWeight="0.49817917" weight="0.32925338" />
-      <window_info anchor="bottom" id="Event Log" order="7" sideWeight="0.5469774" side_tool="true" visible="true" weight="0.26603326" />
+      <window_info anchor="bottom" id="Event Log" order="7" sideWeight="0.5469774" side_tool="true" visible="true" weight="0.26415095" />
       <window_info anchor="bottom" id="Messages" order="8" />
       <window_info anchor="bottom" id="Terminal" order="9" sideWeight="0.4968" weight="0.32942554" />
       <window_info anchor="bottom" id="Version Control" order="10" sideWeight="0.49461642" weight="0.18286446" />
@@ -628,13 +626,6 @@
         </state>
       </provider>
     </entry>
-    <entry file="file://$PROJECT_DIR$/src/traph_element.rs">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="495">
-          <caret line="33" column="19" selection-start-line="33" selection-start-column="19" selection-end-line="33" selection-end-column="19" />
-        </state>
-      </provider>
-    </entry>
     <entry file="file://$PROJECT_DIR$/src/link.rs">
       <provider selected="true" editor-type-id="text-editor">
         <state relative-caret-position="120">
@@ -733,43 +724,10 @@
         </state>
       </provider>
     </entry>
-    <entry file="file://$PROJECT_DIR$/src/message.rs">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="95">
-          <caret line="264" column="68" selection-start-line="264" selection-start-column="68" selection-end-line="264" selection-end-column="68" />
-          <folding>
-            <element signature="e#17880#17881#0" expanded="true" />
-            <element signature="e#17923#17924#0" expanded="true" />
-            <element signature="e#29694#29695#0" expanded="true" />
-            <element signature="e#29743#29744#0" expanded="true" />
-            <element signature="e#36210#36211#0" expanded="true" />
-            <element signature="e#36271#36272#0" expanded="true" />
-          </folding>
-        </state>
-      </provider>
-    </entry>
-    <entry file="file://$PROJECT_DIR$/src/traph.rs">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="86">
-          <caret line="135" column="11" selection-start-line="135" selection-start-column="11" selection-end-line="135" selection-end-column="11" />
-        </state>
-      </provider>
-    </entry>
     <entry file="file://$PROJECT_DIR$/src/port_tree.rs">
       <provider selected="true" editor-type-id="text-editor">
         <state relative-caret-position="105">
           <caret line="7" column="11" selection-start-line="7" selection-start-column="11" selection-end-line="7" selection-end-column="11" />
-        </state>
-      </provider>
-    </entry>
-    <entry file="file://$PROJECT_DIR$/src/cellagent.rs">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="314">
-          <caret line="899" selection-start-line="899" selection-end-line="899" />
-          <folding>
-            <element signature="e#93360#93361#0" expanded="true" />
-            <element signature="e#93412#93413#0" expanded="true" />
-          </folding>
         </state>
       </provider>
     </entry>
@@ -807,13 +765,56 @@
     </entry>
     <entry file="file://$PROJECT_DIR$/src/packet_engine.rs">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="-982">
-          <caret line="27" column="13" selection-start-line="27" selection-start-column="13" selection-end-line="27" selection-end-column="13" />
+        <state relative-caret-position="193">
+          <caret line="321" column="48" selection-start-line="321" selection-start-column="48" selection-end-line="321" selection-end-column="48" />
           <folding>
             <element signature="e#5321#7230#0" />
             <element signature="e#8026#9290#0" />
+            <element signature="e#14549#15821#0" />
+            <element signature="e#17543#18627#0" />
             <element signature="e#19040#20194#0" />
             <element signature="e#20959#22235#0" />
+          </folding>
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/src/message.rs">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="186">
+          <caret line="463" column="11" selection-start-line="463" selection-start-column="11" selection-end-line="463" selection-end-column="11" />
+          <folding>
+            <element signature="e#17880#17881#0" expanded="true" />
+            <element signature="e#17923#17924#0" expanded="true" />
+            <element signature="e#29694#29695#0" expanded="true" />
+            <element signature="e#29743#29744#0" expanded="true" />
+            <element signature="e#36210#36211#0" expanded="true" />
+            <element signature="e#36271#36272#0" expanded="true" />
+          </folding>
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/src/traph_element.rs">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="240">
+          <caret line="16" column="11" selection-start-line="16" selection-start-column="11" selection-end-line="16" selection-end-column="11" />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/src/traph.rs">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="186">
+          <caret line="163" column="11" selection-start-line="163" selection-start-column="11" selection-end-line="163" selection-end-column="11" />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/src/cellagent.rs">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="334">
+          <caret line="869" column="90" selection-start-line="869" selection-start-column="90" selection-end-line="869" selection-end-column="90" />
+          <folding>
+            <element signature="e#53403#54055#0" />
+            <element signature="e#93360#93361#0" expanded="true" />
+            <element signature="e#93412#93413#0" expanded="true" />
           </folding>
         </state>
       </provider>

@@ -319,7 +319,7 @@ impl PacketEngine {
                         }
                     }
                     let is_up = entry.get_mask().and(user_mask).equal(Mask::port0());
-                    if is_up { // Send to cell agent, too
+                    if is_up { // Send to cmodel, too
                         self.pe_to_cm.send(PeToCmPacket::Packet((recv_port_no, packet))).context(PacketEngineError::Chain { func_name: "forward", comment: S("rootcast packet to ca ") + self.cell_id.get_name() })?;
                     }
                 } else {
