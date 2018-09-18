@@ -376,11 +376,11 @@ pub struct FailoverMsg {
     payload: FailoverMsgPayload
 }
 impl FailoverMsg {
-    pub fn new(sender_id: &SenderID, rw_tree_id: &TreeID, path: Path) -> FailoverMsg {
+    pub fn new(sender_id: &SenderID, rw_tree_id: &TreeID, path: Path, broken_tree_ids: &HashSet<TreeID>) -> FailoverMsg {
         // Note that direction is leafward so we can use the connected ports tree
         // If we send rootward, then the first recipient forwards the FailoverMsg
         let header = MsgHeader::new(sender_id, true,MsgType::Failover, MsgDirection::Leafward);
-        let payload = FailoverMsgPayload::new(rw_tree_id, path);
+        let payload = FailoverMsgPayload::new(rw_tree_id, broken_tree_ids, path);
         FailoverMsg { header, payload }
     }
     pub fn get_payload(&self) -> &FailoverMsgPayload { &self.payload }
@@ -409,13 +409,15 @@ impl fmt::Display for FailoverMsg {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct FailoverMsgPayload {
     rw_tree_id: TreeID,
+    broken_tree_ids: HashSet<TreeID>,
     path: Path
 }
 impl FailoverMsgPayload {
-    fn new(rw_tree_id: &TreeID, path: Path) -> FailoverMsgPayload {
-        FailoverMsgPayload { rw_tree_id: rw_tree_id.clone(), path }
+    fn new(rw_tree_id: &TreeID, broken_tree_ids: &HashSet<TreeID>, path: Path) -> FailoverMsgPayload {
+        FailoverMsgPayload { rw_tree_id: rw_tree_id.clone(), broken_tree_ids: broken_tree_ids.clone(), path }
     }
     pub fn get_rootward_tree_id(&self) -> &TreeID { &self.rw_tree_id }
+    pub fn get_broken_tree_ids(&self) -> &HashSet<TreeID> { &self.broken_tree_ids }
     pub fn get_path(&self) -> Path { self.path }
 }
 impl MsgPayload for FailoverMsgPayload {}
@@ -430,11 +432,12 @@ pub struct FailoverDMsg {
     payload: FailoverDMsgPayload
 }
 impl FailoverDMsg {
-    pub fn new(sender_id: &SenderID, port_tree_id: &TreeID, hops: PathLength, path: Path) -> FailoverDMsg {
+    pub fn new(sender_id: &SenderID, port_tree_id: &TreeID, hops: PathLength,
+               broken_tree_ids: &HashSet<TreeID>, path: Path) -> FailoverDMsg {
         // Note that direction is leafward so we can use the connected ports tree
         // If we send rootward, then the first recipient forwards the FailoverMsg
         let header = MsgHeader::new(sender_id, true,MsgType::FailoverD, MsgDirection::Leafward);
-        let payload = FailoverDMsgPayload::new(port_tree_id, hops, path);
+        let payload = FailoverDMsgPayload::new(port_tree_id, hops, broken_tree_ids, path);
         FailoverDMsg { header, payload }
     }
     pub fn get_payload(&self) -> &FailoverDMsgPayload { &self.payload }
@@ -463,14 +466,16 @@ impl fmt::Display for FailoverDMsg {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct FailoverDMsgPayload {
     port_tree_id: TreeID,
+    broken_tree_ids: HashSet<TreeID>,
     hops: PathLength,
     path: Path
 }
 impl FailoverDMsgPayload {
-    fn new(port_tree_id: &TreeID, hops: PathLength, path: Path) -> FailoverDMsgPayload {
-        FailoverDMsgPayload { port_tree_id: port_tree_id.clone(), hops, path }
+    fn new(port_tree_id: &TreeID, hops: PathLength, broken_tree_ids: &HashSet<TreeID>, path: Path) -> FailoverDMsgPayload {
+        FailoverDMsgPayload { port_tree_id: port_tree_id.clone(), hops, broken_tree_ids: broken_tree_ids.clone(), path }
     }
     pub fn get_port_tree_id(&self) -> &TreeID { &self.port_tree_id }
+    pub fn get_broken_tree_ids(&self) -> &HashSet<TreeID> { &self.broken_tree_ids }
     pub fn get_hops(&self) -> &PathLength { &self.hops }
     pub fn get_path(&self) -> &Path { &self.path }
 }
