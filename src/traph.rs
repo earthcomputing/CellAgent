@@ -147,7 +147,6 @@ impl Traph {
             PortStatus::Child => {
                 let mut children = HashSet::new();
                 children.insert(port_number);
-                table_entry.add_children(&children)
             },
             _ => ()
         };
