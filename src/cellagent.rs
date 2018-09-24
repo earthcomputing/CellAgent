@@ -843,18 +843,16 @@ impl CellAgent {
     pub fn process_failover_msg(&mut self, msg: &FailoverMsg, port_no: PortNo, trace_header: &mut TraceHeader)
                                 -> Result<(), Error> {
         let _f = "process_failover_msg";
-        let header = msg.get_header();
         let payload = msg.get_payload();
         let rootward_port_tree_id = payload.get_rootward_tree_id();
         let rootward_tree_id= rootward_port_tree_id.without_root_port_number();
         let broken_path = payload.get_path();
-        let root_port_number = broken_path.get_port_number();
         let mut traph = self.get_traph(&rootward_tree_id, trace_header).context(CellagentError::Chain { func_name: _f, comment: S("") })?;
         let parent_element = traph.get_parent_element()?.clone();
         let parent_element_path = parent_element.get_path();
         let parent_element_hops = parent_element.get_hops();
         if parent_element_path != broken_path {
-            println!("Cellagent {}: {} Failover success for {}", self.cell_id, _f, rootward_tree_id);
+            println!("Cellagent {}: {} Failover success (parent) for {}", self.cell_id, _f, rootward_tree_id);
             let broken_tree_ids = payload.get_broken_tree_ids();
             let parent_port_no = parent_element.get_port_no();
             let parent_port_number = parent_port_no.make_port_number(self.no_ports)?;
@@ -903,6 +901,7 @@ impl CellAgent {
         updated_entry.set_tree_id(port_tree_id);
         println!("Cellagent {}: {} old parent {} updated entry {}", self.cell_id, _f, *old_parent, updated_entry);
         self.update_entry(updated_entry)?;
+        // TODO: Flood new hops update for healed trees
         Ok(())
     }
     pub fn process_hello_msg(&mut self, msg: &HelloMsg, port_no: PortNo, trace_header: &mut TraceHeader)
@@ -1272,7 +1271,7 @@ impl CellAgent {
         self.pruned_links_first(&traph, port_no)
     }
     fn pruned_links_first(&self, traph: &Traph, port_no: PortNo) -> Option<PortNo> {
-        traph.get_pruned_port(port_no).or(traph.get_child_port(port_no))
+        traph.get_pruned_port().or(traph.get_child_port())
     }
     fn forward_discover(&self, mask: Mask, trace_header: &mut TraceHeader) -> Result<(), Error> {
         let saved = self.get_saved_discover();

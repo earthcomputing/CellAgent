@@ -97,23 +97,22 @@ impl Traph {
         self.elements.iter().find(|&element| element.get_status() == PortStatus::Parent)
             .ok_or(TraphError::ParentElement { cell_id: self.cell_id.clone(), func_name: _f, tree_id: self.base_tree_id.clone() }.into())
 	}
-    pub fn get_pruned_port(&self, port_no: PortNo) -> Option<PortNo> {
-        self.get_trial_port(PortStatus::Pruned, port_no)
+    pub fn get_pruned_port(&self) -> Option<PortNo> {
+        self.get_trial_port(PortStatus::Pruned)
     }
-    pub fn get_child_port(&self, port_no: PortNo) -> Option<PortNo> {
-        self.get_trial_port(PortStatus::Child, port_no)
+    pub fn get_child_port(&self) -> Option<PortNo> {
+        self.get_trial_port(PortStatus::Child)
     }
-    fn get_trial_port(&self, port_status: PortStatus, port_no: PortNo) -> Option<PortNo> {
+    fn get_trial_port(&self, port_status: PortStatus) -> Option<PortNo> {
         let _f = "get_trial_port";
-        match self.elements.iter().find(|&element| {
-            element.get_status() == port_status
+        self.elements.iter()
+            .filter(|&element|
+                   element.get_status() == port_status
                 && !self.tried_ports.contains(&element.get_port_no())
                 && element.is_connected()
-                && !element.is_broken()
-        }) {
-            Some(element) => Some(element.get_port_no()),
-            None => None
-        }
+                && !element.is_broken())
+            .min_by(|x, y| x.get_hops().cmp(&*y.get_hops()))
+            .map(|element| element.get_port_no())
     }
 	pub fn get_hops(&self) -> Result<PathLength, Error> {
         let f = "get_hops";
