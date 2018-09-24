@@ -4,7 +4,8 @@
     <list default="true" id="eee480a2-146d-44ab-9647-cef5ea39b250" name="Default" comment="">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/cellagent.rs" beforeDir="false" afterPath="$PROJECT_DIR$/src/cellagent.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/message.rs" beforeDir="false" afterPath="$PROJECT_DIR$/src/message.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/config.rs" beforeDir="false" afterPath="$PROJECT_DIR$/src/config.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/traph.rs" beforeDir="false" afterPath="$PROJECT_DIR$/src/traph.rs" afterDir="false" />
     </list>
     <ignored path="$PROJECT_DIR$/target/" />
     <ignored path="$PROJECT_DIR$/out/" />
@@ -22,37 +23,37 @@
     <session id="-1501959268">
       <usages-collector id="statistics.lifecycle.project">
         <counts>
-          <entry key="project.closed" value="7" />
+          <entry key="project.closed" value="8" />
           <entry key="project.open.time.4" value="1" />
           <entry key="project.open.time.6" value="1" />
           <entry key="project.open.time.7" value="3" />
-          <entry key="project.open.time.8" value="1" />
+          <entry key="project.open.time.8" value="2" />
           <entry key="project.open.time.9" value="2" />
-          <entry key="project.opened" value="8" />
+          <entry key="project.opened" value="9" />
         </counts>
       </usages-collector>
       <usages-collector id="statistics.file.extensions.edit">
         <counts>
-          <entry key="rs" value="55156" />
+          <entry key="rs" value="56303" />
           <entry key="toml" value="99" />
         </counts>
       </usages-collector>
       <usages-collector id="statistics.file.types.edit">
         <counts>
           <entry key="Android RenderScript" value="1" />
-          <entry key="Rust" value="55155" />
+          <entry key="Rust" value="56302" />
           <entry key="TOML file" value="99" />
         </counts>
       </usages-collector>
       <usages-collector id="statistics.file.types.open">
         <counts>
-          <entry key="Rust" value="114" />
+          <entry key="Rust" value="115" />
           <entry key="TOML file" value="4" />
         </counts>
       </usages-collector>
       <usages-collector id="statistics.file.extensions.open">
         <counts>
-          <entry key="rs" value="114" />
+          <entry key="rs" value="115" />
           <entry key="toml" value="4" />
         </counts>
       </usages-collector>
@@ -62,19 +63,10 @@
   <component name="FileEditorManager">
     <leaf SIDE_TABS_SIZE_LIMIT_KEY="300">
       <file pinned="false" current-in-tab="false">
-        <entry file="file://$PROJECT_DIR$/src/nalcell.rs">
-          <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="1185">
-              <caret line="79" column="57" selection-start-line="79" selection-start-column="57" selection-end-line="79" selection-end-column="57" />
-            </state>
-          </provider>
-        </entry>
-      </file>
-      <file pinned="false" current-in-tab="false">
         <entry file="file://$PROJECT_DIR$/src/traph.rs">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="530">
-              <caret line="163" column="11" selection-start-line="163" selection-start-column="11" selection-end-line="163" selection-end-column="11" />
+            <state relative-caret-position="89">
+              <caret line="135" column="11" selection-start-line="135" selection-start-column="11" selection-end-line="135" selection-end-column="11" />
             </state>
           </provider>
         </entry>
@@ -127,7 +119,7 @@
       <file pinned="false" current-in-tab="false">
         <entry file="file://$PROJECT_DIR$/src/noc.rs">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="-1323">
+            <state relative-caret-position="540">
               <caret line="36" column="29" selection-start-line="36" selection-start-column="29" selection-end-line="36" selection-end-column="29" />
             </state>
           </provider>
@@ -180,16 +172,23 @@
       <file pinned="false" current-in-tab="true">
         <entry file="file://$PROJECT_DIR$/src/cellagent.rs">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="306">
-              <caret line="441" column="54" lean-forward="true" selection-start-line="441" selection-start-column="54" selection-end-line="441" selection-end-column="54" />
+            <state relative-caret-position="653">
+              <caret line="443" column="1" selection-start-line="443" selection-start-column="1" selection-end-line="443" selection-end-column="1" />
               <folding>
-                <element signature="e#19217#19690#0" />
-                <element signature="e#22468#22927#0" />
-                <element signature="e#48222#48757#0" />
-                <element signature="e#50098#50638#0" />
-                <element signature="e#93975#93976#0" expanded="true" />
-                <element signature="e#94027#94028#0" expanded="true" />
+                <element signature="e#19192#19665#0" />
+                <element signature="e#22443#22902#0" />
+                <element signature="e#94702#94703#0" expanded="true" />
+                <element signature="e#94754#94755#0" expanded="true" />
               </folding>
+            </state>
+          </provider>
+        </entry>
+      </file>
+      <file pinned="false" current-in-tab="false">
+        <entry file="file://$PROJECT_DIR$/src/config.rs">
+          <provider selected="true" editor-type-id="text-editor">
+            <state relative-caret-position="445">
+              <caret line="39" column="2" selection-start-line="39" selection-start-column="2" selection-end-line="39" selection-end-column="2" />
             </state>
           </provider>
         </entry>
@@ -197,14 +196,8 @@
       <file pinned="false" current-in-tab="false">
         <entry file="file://$PROJECT_DIR$/src/message.rs">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="177">
+            <state relative-caret-position="7080">
               <caret line="474" column="112" selection-start-line="474" selection-start-column="112" selection-end-line="474" selection-end-column="112" />
-              <folding>
-                <element signature="e#30063#30064#0" expanded="true" />
-                <element signature="e#30112#30113#0" expanded="true" />
-                <element signature="e#36551#36552#0" expanded="true" />
-                <element signature="e#36612#36613#0" expanded="true" />
-              </folding>
             </state>
           </provider>
         </entry>
@@ -229,27 +222,6 @@
   </component>
   <component name="FindInProjectRecents">
     <findStrings>
-      <find>02d9</find>
-      <find>a2ff</find>
-      <find>or_else</find>
-      <find>4e99</find>
-      <find>hops</find>
-      <find>fdee</find>
-      <find>b7e5</find>
-      <find>e940</find>
-      <find>262b</find>
-      <find>?</find>
-      <find>8bca</find>
-      <find>t{</find>
-      <find>ok_o</find>
-      <find>.filter</find>
-      <find>deprec</find>
-      <find>FailoverD</find>
-      <find>ok_or</find>
-      <find>Hello</find>
-      <find>::Ent</find>
-      <find>e50f</find>
-      <find>705a</find>
       <find>2b99</find>
       <find>{:?}</find>
       <find>6467</find>
@@ -259,6 +231,27 @@
       <find>8ba4</find>
       <find>094d</find>
       <find>e8eb</find>
+      <find>d25f</find>
+      <find>486b</find>
+      <find>c056</find>
+      <find>5d18</find>
+      <find>a214</find>
+      <find>7926</find>
+      <find>429a</find>
+      <find>7ca7</find>
+      <find>73bc</find>
+      <find>4dfd</find>
+      <find>7845</find>
+      <find>6a1b</find>
+      <find>c9cc</find>
+      <find>153e</find>
+      <find>7c71</find>
+      <find>1fe0</find>
+      <find>cb93</find>
+      <find>1c75</find>
+      <find>fc75</find>
+      <find>entry {</find>
+      <find>3ca9</find>
     </findStrings>
     <replaceStrings>
       <replace>Arc::</replace>
@@ -300,25 +293,25 @@
         <option value="$PROJECT_DIR$/src/nalcell.rs" />
         <option value="$PROJECT_DIR$/src/routing_table_entry.rs" />
         <option value="$PROJECT_DIR$/src/traph_element.rs" />
-        <option value="$PROJECT_DIR$/src/traph.rs" />
         <option value="$PROJECT_DIR$/src/message_types.rs" />
         <option value="$PROJECT_DIR$/src/name.rs" />
         <option value="$PROJECT_DIR$/src/cmodel.rs" />
         <option value="$PROJECT_DIR$/src/noc.rs" />
-        <option value="$PROJECT_DIR$/src/config.rs" />
         <option value="$PROJECT_DIR$/src/packet.rs" />
         <option value="$PROJECT_DIR$/src/uuid_ec.rs" />
         <option value="$PROJECT_DIR$/src/packet_engine.rs" />
         <option value="$PROJECT_DIR$/src/message.rs" />
+        <option value="$PROJECT_DIR$/src/config.rs" />
+        <option value="$PROJECT_DIR$/src/traph.rs" />
         <option value="$PROJECT_DIR$/src/cellagent.rs" />
       </list>
     </option>
   </component>
   <component name="ProjectFrameBounds">
-    <option name="x" value="239" />
-    <option name="y" value="-963" />
+    <option name="x" value="261" />
+    <option name="y" value="-1011" />
     <option name="width" value="1415" />
-    <option name="height" value="963" />
+    <option name="height" value="1011" />
   </component>
   <component name="ProjectView">
     <navigator proportions="" version="1">
@@ -326,7 +319,6 @@
       <foldersAlwaysOnTop value="true" />
     </navigator>
     <panes>
-      <pane id="AndroidView" />
       <pane id="Scope" />
       <pane id="ProjectPane">
         <subPane>
@@ -451,22 +443,22 @@
     </todo-panel>
   </component>
   <component name="ToolWindowManager">
-    <frame x="239" y="-963" width="1415" height="963" extended-state="0" />
+    <frame x="261" y="-1011" width="1415" height="1011" extended-state="0" />
     <layout>
-      <window_info content_ui="combo" id="Project" order="0" visible="true" weight="0.12454479" />
+      <window_info content_ui="combo" id="Project" order="0" visible="true" weight="0.12600146" />
       <window_info id="Image Layers" order="1" />
       <window_info id="Capture Tool" order="2" />
       <window_info id="Designer" order="3" />
       <window_info id="UI Designer" order="4" />
       <window_info id="Favorites" order="5" side_tool="true" />
       <window_info anchor="bottom" id="Message" order="0" />
-      <window_info anchor="bottom" id="Find" order="1" sideWeight="0.45302257" visible="true" weight="0.26415095" />
+      <window_info anchor="bottom" id="Find" order="1" sideWeight="0.45229426" visible="true" weight="0.26339287" />
       <window_info active="true" anchor="bottom" x="734" y="77" width="679" height="812" id="Run" internal_type="FLOATING" order="2" type="FLOATING" visible="true" weight="0.32941177" />
       <window_info anchor="bottom" id="Debug" order="3" weight="0.4" />
       <window_info anchor="bottom" id="Cvs" order="4" weight="0.25" />
       <window_info anchor="bottom" id="Inspection" order="5" weight="0.4" />
       <window_info anchor="bottom" id="TODO" order="6" sideWeight="0.49817917" weight="0.32925338" />
-      <window_info anchor="bottom" id="Event Log" order="7" sideWeight="0.5469774" side_tool="true" visible="true" weight="0.26415095" />
+      <window_info anchor="bottom" id="Event Log" order="7" sideWeight="0.54770577" side_tool="true" visible="true" weight="0.26339287" />
       <window_info anchor="bottom" id="Messages" order="8" />
       <window_info anchor="bottom" id="Terminal" order="9" sideWeight="0.4968" weight="0.32942554" />
       <window_info anchor="bottom" id="Version Control" order="10" sideWeight="0.49461642" weight="0.18286446" />
@@ -612,10 +604,6 @@
       <provider selected="true" editor-type-id="text-editor">
         <state relative-caret-position="215">
           <caret line="40" column="11" selection-start-line="40" selection-start-column="11" selection-end-line="40" selection-end-column="11" />
-          <folding>
-            <element signature="e#1888#1889#0" expanded="true" />
-            <element signature="e#1930#1931#0" expanded="true" />
-          </folding>
         </state>
       </provider>
     </entry>
@@ -654,9 +642,6 @@
       <provider selected="true" editor-type-id="text-editor">
         <state relative-caret-position="165">
           <caret line="67" column="32" selection-start-line="67" selection-start-column="32" selection-end-line="67" selection-end-column="32" />
-          <folding>
-            <element signature="e#2665#2666#0" expanded="true" />
-          </folding>
         </state>
       </provider>
     </entry>
@@ -664,13 +649,6 @@
       <provider selected="true" editor-type-id="text-editor">
         <state relative-caret-position="307">
           <caret line="117" column="48" selection-start-line="117" selection-start-column="48" selection-end-line="117" selection-end-column="48" />
-        </state>
-      </provider>
-    </entry>
-    <entry file="file://$PROJECT_DIR$/src/config.rs">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="328">
-          <caret line="25" column="25" selection-start-line="25" selection-start-column="20" selection-end-line="25" selection-end-column="25" />
         </state>
       </provider>
     </entry>
@@ -716,6 +694,13 @@
         </state>
       </provider>
     </entry>
+    <entry file="file://$PROJECT_DIR$/src/noc.rs">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="540">
+          <caret line="36" column="29" selection-start-line="36" selection-start-column="29" selection-end-line="36" selection-end-column="29" />
+        </state>
+      </provider>
+    </entry>
     <entry file="file://$PROJECT_DIR$/src/main.rs">
       <provider selected="true" editor-type-id="text-editor">
         <state relative-caret-position="195">
@@ -734,6 +719,13 @@
         </state>
       </provider>
     </entry>
+    <entry file="file://$PROJECT_DIR$/src/traph_element.rs">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="240">
+          <caret line="16" column="11" selection-start-line="16" selection-start-column="11" selection-end-line="16" selection-end-column="11" />
+        </state>
+      </provider>
+    </entry>
     <entry file="file://$PROJECT_DIR$/src/utility.rs">
       <provider selected="true" editor-type-id="text-editor">
         <state relative-caret-position="2610">
@@ -745,6 +737,13 @@
         </state>
       </provider>
     </entry>
+    <entry file="file://$PROJECT_DIR$/src/message.rs">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="7080">
+          <caret line="474" column="112" selection-start-line="474" selection-start-column="112" selection-end-line="474" selection-end-column="112" />
+        </state>
+      </provider>
+    </entry>
     <entry file="file://$PROJECT_DIR$/src/packet.rs">
       <provider selected="true" editor-type-id="text-editor">
         <state relative-caret-position="1335">
@@ -752,51 +751,29 @@
         </state>
       </provider>
     </entry>
-    <entry file="file://$PROJECT_DIR$/src/traph_element.rs">
+    <entry file="file://$PROJECT_DIR$/src/config.rs">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="240">
-          <caret line="16" column="11" selection-start-line="16" selection-start-column="11" selection-end-line="16" selection-end-column="11" />
+        <state relative-caret-position="445">
+          <caret line="39" column="2" selection-start-line="39" selection-start-column="2" selection-end-line="39" selection-end-column="2" />
         </state>
       </provider>
     </entry>
     <entry file="file://$PROJECT_DIR$/src/traph.rs">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="530">
-          <caret line="163" column="11" selection-start-line="163" selection-start-column="11" selection-end-line="163" selection-end-column="11" />
-        </state>
-      </provider>
-    </entry>
-    <entry file="file://$PROJECT_DIR$/src/message.rs">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="177">
-          <caret line="474" column="112" selection-start-line="474" selection-start-column="112" selection-end-line="474" selection-end-column="112" />
-          <folding>
-            <element signature="e#30063#30064#0" expanded="true" />
-            <element signature="e#30112#30113#0" expanded="true" />
-            <element signature="e#36551#36552#0" expanded="true" />
-            <element signature="e#36612#36613#0" expanded="true" />
-          </folding>
-        </state>
-      </provider>
-    </entry>
-    <entry file="file://$PROJECT_DIR$/src/noc.rs">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="-1323">
-          <caret line="36" column="29" selection-start-line="36" selection-start-column="29" selection-end-line="36" selection-end-column="29" />
+        <state relative-caret-position="89">
+          <caret line="135" column="11" selection-start-line="135" selection-start-column="11" selection-end-line="135" selection-end-column="11" />
         </state>
       </provider>
     </entry>
     <entry file="file://$PROJECT_DIR$/src/cellagent.rs">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="306">
-          <caret line="441" column="54" lean-forward="true" selection-start-line="441" selection-start-column="54" selection-end-line="441" selection-end-column="54" />
+        <state relative-caret-position="653">
+          <caret line="443" column="1" selection-start-line="443" selection-start-column="1" selection-end-line="443" selection-end-column="1" />
           <folding>
-            <element signature="e#19217#19690#0" />
-            <element signature="e#22468#22927#0" />
-            <element signature="e#48222#48757#0" />
-            <element signature="e#50098#50638#0" />
-            <element signature="e#93975#93976#0" expanded="true" />
-            <element signature="e#94027#94028#0" expanded="true" />
+            <element signature="e#19192#19665#0" />
+            <element signature="e#22443#22902#0" />
+            <element signature="e#94702#94703#0" expanded="true" />
+            <element signature="e#94754#94755#0" expanded="true" />
           </folding>
         </state>
       </provider>
