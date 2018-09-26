@@ -89,7 +89,6 @@ impl Traph {
         self.elements[*port_number.get_port_no() as usize].set_broken();
     }
 	pub fn get_port_status(&self, port_number: PortNumber) -> PortStatus {
-        let foo = self.get_parent_element();
         self.elements[*port_number.get_port_no() as usize].get_status()
 	}
 	pub fn get_parent_element(&self) -> Result<&TraphElement, TraphError> {
@@ -107,7 +106,7 @@ impl Traph {
         let _f = "get_trial_port";
         self.elements.iter()
             .filter(|&element|
-                   element.get_status() == port_status
+                   element.is_status(port_status)
                 && !self.tried_ports.contains(&element.get_port_no())
                 && element.is_connected()
                 && !element.is_broken())

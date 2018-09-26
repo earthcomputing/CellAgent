@@ -103,24 +103,17 @@ impl Datacenter {
 	pub fn get_link_ids(&self) -> Vec<&LinkID> {
         self.links.iter().map(|link| link.get_id()).collect::<Vec<_>>()
     }
-	fn get_boundary_cells(&mut self) -> Vec<&mut NalCell> {
-		let mut boundary_cells = Vec::new();
-		for cell in &mut self.cells {
-			if cell.is_border() { boundary_cells.push(cell); }
-		}
-		boundary_cells
-	}
-	pub fn connect_to_noc(&mut self, port_to_noc: PortToNoc, port_from_noc: PortFromNoc)  
+	pub fn connect_to_noc(&mut self, port_to_noc: PortToNoc, port_from_noc: PortFromNoc)
 			-> Result<(), Error> {
-		let mut boundary_cells = self.get_boundary_cells();
-		if boundary_cells.len() < *MIN_BOUNDARY_CELLS {
-			return Err(DatacenterError::Boundary { func_name: "connect_to_noc" }.into());
-		} else {
-			let (boundary_cell, _) = boundary_cells.split_at_mut(1);
-			let (port, port_from_pe) = boundary_cell[0].get_free_boundary_port_mut()?;
-			port.noc_channel(port_to_noc, port_from_noc, port_from_pe)?;
-			Ok(())
-		}
+        let _f = "connect_to_noc";
+        let (port, port_from_pe) = self.cells
+            .iter_mut()
+            .filter(|cell| cell.is_border())
+            .nth(0)
+            .ok_or_else(|| -> Error { DatacenterError::Boundary { func_name: _f }.into() })?
+            .get_free_boundary_port_mut()?;
+		port.noc_channel(port_to_noc, port_from_noc, port_from_pe)?;
+		Ok(())
 	}
 }
 impl fmt::Display for Datacenter {

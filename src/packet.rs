@@ -1,5 +1,6 @@
 use std::fmt;
 use std::collections::HashMap;
+use std::cmp::min;
 use std::sync::atomic::{ATOMIC_USIZE_INIT, AtomicUsize, Ordering};
 use std::str;
 
@@ -115,7 +116,7 @@ impl Payload {
 	pub fn new(msg_id: MsgID, size: PacketNo,
                is_last: bool, is_blocking: bool, data_bytes: Vec<u8>) -> Payload {
         let mut bytes = [0 as u8; PAYLOAD_MAX];
-        for i in 0..data_bytes.len() { bytes[i] = data_bytes[i]; }
+        for i in 0..min(data_bytes.len(), PAYLOAD_MAX) { bytes[i] = data_bytes[i]; }
         Payload { msg_id, size, is_last, is_blocking, bytes}
 	}
 	fn get_bytes(&self) -> Vec<u8> { self.bytes.iter().cloned().collect() }

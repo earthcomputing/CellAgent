@@ -1278,10 +1278,6 @@ impl CellAgent {
         //if saved.len() > 0 { println!("Cell {}: forwarding {} discover msgs on ports {:?}", self.cell_id, saved.len(), mask.get_port_nos()); }
         for msg in saved.iter() {
             self.send_msg(&self.connected_tree_id, msg, mask, trace_header)?;
-            {/*   // Debug print
-                let msg_type = MsgType::msg_type(&packets[0]);
-                println!("CellAgent {}: forward discover on ports {:?} {}", self.cell_id, mask.get_port_nos(), msg_type);
-            */}
         }
         Ok(())
     }
