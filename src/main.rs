@@ -62,14 +62,13 @@ use noc::Noc;
 use uptree_spec::{AllowedTree, ContainerSpec, Manifest, UpTreeSpec, VmSpec};
 use utility::{print_vec, S, TraceHeader, TraceHeaderParams, TraceType};
 
-const MODULE: &'static str = "main.rs";
 fn main() -> Result<(), Error> {
     let f = "main";
     println!("Multicell Routing: Output to file {} (set in config.rs)", OUTPUT_FILE_NAME);
     println!("{:?} Quenching of Discover messages", QUENCH);
     let mut trace_header = TraceHeader::new();
     {   // Can't get records from main() to show up in trace file
-        let ref trace_params = TraceHeaderParams { module: MODULE, function: f, format: "trace_schema" };
+        let ref trace_params = TraceHeaderParams { module: file!(), function: f, format: "trace_schema" };
         let trace = json!({ "schema_version": SCHEMA_VERSION });
         let _ = dal::add_to_trace(&mut trace_header, TraceType::Trace, trace_params, &trace, f);
     }

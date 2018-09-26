@@ -16,7 +16,6 @@ use nalcell::CellConfig;
 use uptree_spec::{AllowedTree, ContainerSpec, Manifest, UpTreeSpec, VmSpec};
 use utility::{S, TraceHeader, TraceHeaderParams, TraceType, write_err};
 
-const MODULE: &'static str = "noc.rs";
 const NOC_MASTER_DEPLOY_TREE_NAME:  &'static str = "NocMasterDeploy";
 const NOC_AGENT_DEPLOY_TREE_NAME:   &'static str = "NocAgentDeploy";
 const NOC_CONTROL_TREE_NAME: &'static str = "NocMasterAgent";
