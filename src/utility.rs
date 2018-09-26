@@ -63,13 +63,13 @@ impl Mask {
                 mask.or(Mask::new(*port_number)) )
 	}
 	pub fn get_port_nos(&self) -> Vec<PortNo> {
-		let mut port_nos = Vec::new();
-		for i in 0..*MAX_PORTS {
-			let port_number = PortNo(i).make_port_number(MAX_PORTS).expect("Mask get_port_no cannont generate an error");
-			let test = Mask::new(port_number);
-			if *test.mask & *self.mask != 0 { port_nos.push(PortNo(i)) }
-		}
-		port_nos
+        (0..*MAX_PORTS)
+            .map(|i| (i, PortNo(i).make_port_number(MAX_PORTS)
+                .expect("Mask make_port_number cannont generate an error")))
+            .map(|(i, port_number)| (i, Mask::new(port_number)))
+            .filter(|(i, test_mask)| *test_mask.mask & *self.mask != 0)
+            .map(|(i, _)| PortNo(i))
+            .collect::<Vec<_>>()
 	}
 }
 impl fmt::Display for Mask {
