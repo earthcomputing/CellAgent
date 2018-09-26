@@ -38,7 +38,6 @@ impl PacketEngine {
 	pub fn initialize(&self, pe_from_cm: PeFromCm, pe_from_ports: PeFromPort,
                       mut trace_header: TraceHeader) -> Result<(), Error> {
         let (pe_to_pe, pe_from_pe): (PeToPe, PeFromPe) = channel();
-        //self.listen_cm(pe_from_cm, pe_to_pe, trace_header.fork_trace())?;
         self.listen_cm(pe_from_cm, pe_to_pe, trace_header.fork_trace())?;
         self.listen_port(pe_from_ports, pe_from_pe, trace_header.fork_trace())?;
         Ok(())
@@ -122,6 +121,10 @@ impl PacketEngine {
                                 let _ = dal::add_to_trace(trace_header, TraceType::Debug, trace_params, &trace, f);
                             }
                             for port_no in port_nos.iter().cloned() {
+                                // I think the match version is clearer than the ok_or_else version
+                                //self.pe_to_ports.get(*port_no as usize)
+                                //    .ok_or_else(|| -> Error { PacketEngineError::Sender { cell_id: self.cell_id.clone(), func_name: "forward leaf", port_no: *port_no }.into() })?
+                                //    .send(PeToPortPacket::Packet(packet)).context(PacketEngineError::Chain { func_name: f, comment: S("send packet leafward ") + self.cell_id.get_name() })?;
                                 match self.pe_to_ports.get(*port_no as usize) {
                                     Some(s) => s.send(PeToPortPacket::Packet(packet)).context(PacketEngineError::Chain { func_name: f, comment: S("send packet leafward ") + self.cell_id.get_name() })?,
                                     None => return Err(PacketEngineError::Sender { cell_id: self.cell_id.clone(), func_name: "forward leaf", port_no: *port_no }.into())
@@ -194,13 +197,9 @@ impl PacketEngine {
             AitState::Ait => return Err(PacketEngineError::Ait { func_name: f, ait_state: AitState::Ait }.into()), // Error, should never get from port
             AitState::Tock => { // Send to CM and transition to ENTL
                 packet.next_ait_state()?;
-                let sender = match self.pe_to_ports.get(*port_no as usize) {
-                    Some(sender) => {
-                        sender.send(PeToPortPacket::Packet(packet)).context(PacketEngineError::Chain { func_name: f, comment: S("send packet leafward ") + self.cell_id.get_name() })?;
-                        sender
-                    },
-                    None => return Err(PacketEngineError::Sender { cell_id: self.cell_id.clone(), func_name: "forward leaf", port_no: *port_no }.into())
-                };
+                let sender = self.pe_to_ports.get(*port_no as usize)
+                    .ok_or_else(|| -> Error { PacketEngineError::Sender { cell_id: self.cell_id.clone(), func_name: "forward leaf", port_no: *port_no }.into() })?;
+                sender.send(PeToPortPacket::Packet(packet)).context(PacketEngineError::Chain { func_name: f, comment: S("send packet leafward ") + self.cell_id.get_name() })?;
                 packet.make_ait();
                 // Time reverse on error sending to CM
                 self.pe_to_cm.send(PeToCmPacket::Packet((port_no, packet)))
@@ -213,10 +212,9 @@ impl PacketEngine {
             AitState::Tick => (), // Inform CM of success and enter ENTL
             AitState::Tack | AitState::Teck => { // Update and send back on same port
                 packet.next_ait_state()?;
-                match self.pe_to_ports.get(*port_no as usize) {
-                    Some(s) => s.send(PeToPortPacket::Packet(packet)).context(PacketEngineError::Chain { func_name: f, comment: S("send packet leafward ") + self.cell_id.get_name() })?,
-                    None => return Err(PacketEngineError::Sender { cell_id: self.cell_id.clone(), func_name: "forward leaf", port_no: *port_no }.into())
-                };
+                let sender = self.pe_to_ports.get(*port_no as usize)
+                    .ok_or_else(|| -> Error { PacketEngineError::Sender { cell_id: self.cell_id.clone(), func_name: "forward leaf", port_no: *port_no }.into() })?;
+                sender.send(PeToPortPacket::Packet(packet)).context(PacketEngineError::Chain { func_name: f, comment: S("send packet leafward ") + self.cell_id.get_name() })?;
             },
             AitState::Normal => { // Forward packet
                 let mut uuid = packet.get_tree_uuid();
@@ -350,14 +348,14 @@ impl PacketEngine {
                 }
                 let _ = dal::add_to_trace(trace_header, TraceType::Debug, trace_params, &trace, f);
             }
+            // Only side effects so use explicit loop instead of map
 			for port_no in port_nos.iter().cloned() {
                 if *port_no == 0 {
                     self.pe_to_cm.send(PeToCmPacket::Packet((recv_port_no, packet))).context(PacketEngineError::Chain { func_name: f, comment: S("leafcast packet to ca ") + self.cell_id.get_name() })?;
                 } else {
-                    match self.pe_to_ports.get(*port_no as usize) {
-                        Some(s) => s.send(PeToPortPacket::Packet(packet)).context(PacketEngineError::Chain { func_name: f, comment: S("send packet leafward ") + self.cell_id.get_name() })?,
-                        None => return Err(PacketEngineError::Sender { cell_id: self.cell_id.clone(), func_name: "forward leaf", port_no: *port_no }.into())
-                    };
+                    self.pe_to_ports.get(*port_no as usize)
+                        .ok_or_else(|| -> Error { PacketEngineError::Sender { cell_id: self.cell_id.clone(), func_name: "forward leaf", port_no: *port_no }.into() })?
+                        .send(PeToPortPacket::Packet(packet)).context(PacketEngineError::Chain { func_name: f, comment: S("send packet leafward ") + self.cell_id.get_name() })?;
                 }
             }
 		}

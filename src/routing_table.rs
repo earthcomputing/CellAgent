@@ -18,14 +18,12 @@ impl RoutingTable {
 	pub fn new(id: CellID) -> Result<RoutingTable, Error> {
 		Ok(RoutingTable { id, entries: HashMap::new(), connected_ports: Vec::new(), order: Vec::new() })
 	}
-	pub fn get_entry(&self, uuid: Uuid) -> Result<RoutingTableEntry, RoutingTableError> {
+	pub fn get_entry(&self, uuid: Uuid) -> Result<RoutingTableEntry, Error> {
 		let f = "get_entry";
-        //println!("Routing Table {}: cell {} uuid {}", f, self.id, uuid);
-        let entry = match self.entries.get(&uuid) {
-            Some(e) => e.clone(),
-            None => return Err(RoutingTableError::Uuid { func_name: f, cell_id: self.id.clone(), uuid })
-        };
-        Ok(entry)
+		Ok(self.entries
+            .get(&uuid)
+            .ok_or_else(|| -> Error { RoutingTableError::Uuid { func_name: f, cell_id: self.id.clone(), uuid }.into() })?
+            .clone())
 	}
 	pub fn set_entry(&mut self, entry: RoutingTableEntry) {
         let _f = "set_entry";

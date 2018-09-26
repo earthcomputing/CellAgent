@@ -28,7 +28,7 @@ pub struct GvmEquation {
 // Sample GvmEquation: "hops < 7 || n_childen == 0",  associated variables vec!["hops", "n_children"]
 impl GvmEquation {
 	pub fn new(equations: HashSet<GvmEqn>, variables: Vec<GvmVariable>) -> GvmEquation {
-		let (mut recv, mut send, mut xtnd, mut save) = (S("false"), S("false"), S("false"), S("false")); 
+		let (mut recv, mut send, mut xtnd, mut save) = (S("false"), S("false"), S("false"), S("false"));
 		for eqn in equations.iter() {
 			match *eqn {
 				GvmEqn::Recv(s) => recv = S(s),

@@ -57,13 +57,10 @@ impl Mask {
 		self.and(port_mask.not())
 	}
 	pub fn make(port_numbers: &HashSet<PortNumber>) -> Mask {
-		let mut mask = Mask::empty();
-		// Using map() is more complicated because of try!
-		for port_number in port_numbers.iter() {
-			let port_mask = Mask::new(*port_number);
-			mask = mask.or(port_mask);
-		}
-		mask
+        port_numbers
+            .iter()
+            .fold(Mask::empty(), |mask, port_number|
+                mask.or(Mask::new(*port_number)) )
 	}
 	pub fn get_port_nos(&self) -> Vec<PortNo> {
 		let mut port_nos = Vec::new();

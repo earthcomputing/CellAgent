@@ -29,6 +29,7 @@ impl TraphElement {
 	pub fn hops_plus_one(&self) -> PathLength { PathLength(CellNo((self.hops.0).0 + 1)) }
 	pub fn get_path(&self) -> Path { self.path }
 	pub fn get_status(&self) -> PortStatus { self.status }
+	pub fn is_status(&self, status: PortStatus) -> bool { self.status == status }
 	pub fn is_connected(&self) -> bool { self.is_connected }
     pub fn is_broken(&self) -> bool { self.is_broken }
 	pub fn set_broken(&mut self) { self.is_broken = true; }

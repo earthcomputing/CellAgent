@@ -19,10 +19,9 @@ impl Blueprint {
 		let mut border_cells = 	Vec::new();
 		for no in 0..*ncells {
 			let cell_no = CellNo(no);
-			let nports = match exceptions.get(&cell_no) {
-				Some(p) => *p,
-				None => ports_per_cell
-			};
+			let nports = *exceptions
+                .get(&cell_no)
+                .unwrap_or(&ports_per_cell);
 			let port_list = (0..*nports as usize).map(|i| PortNo(i as u8)).collect();
 			match border_cell_map.get(&cell_no) {
 				Some(ports) => {

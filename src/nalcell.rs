@@ -151,20 +151,19 @@ impl NalCell {
 	}
 	pub fn get_free_port_mut(&mut self, want_boundary_port: bool) 
 			-> Result<(&mut Port, PortFromPe), Error> {
-        let f = "Nalcell::get_free_port_mut";
-		for port in &mut self.ports.iter_mut() {
-			if !port.is_connected() && !(want_boundary_port ^ port.is_border()) && (*(port.get_port_no()) != 0 as u8) {
-				let port_no = port.get_port_no();
-				match self.ports_from_pe.remove(&port_no) { // Remove avoids a borrowed context error
-					Some(recvr) => {
-						port.set_connected();
-						return Ok((port, recvr))
-					},
-					None => return Err(NalcellError::Channel { port_no, func_name: f }.into())
-				} 
-			}
-		}
-		Err(NalcellError::NoFreePorts{ cell_id: self.id.clone(), func_name: f }.into())
+        let _f = "get_free_port_mut";
+        let id = &self.id;
+		let port = self.ports
+            .iter_mut()
+            .filter(|port| !port.is_connected())
+            .filter(|port| !(want_boundary_port ^ port.is_border()))
+            .filter(|port| (*(port.get_port_no()) != 0 as u8))
+            .nth(0)
+            .ok_or_else(|| -> Error { NalcellError::NoFreePorts{ cell_id: id.clone(), func_name: _f }.into() })?;
+        port.set_connected();
+        let recvr = self.ports_from_pe.remove(&port.get_port_no())
+            .ok_or_else(|| -> Error { NalcellError::Channel { port_no: port.get_port_no(), func_name: _f }.into() })?;
+        Ok((port, recvr))
 	}
 }
 impl fmt::Display for NalCell {
