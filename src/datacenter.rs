@@ -13,8 +13,6 @@ use nalcell::{CellConfig, NalCell};
 use name::{CellID, LinkID};
 use utility::{TraceHeader, TraceHeaderParams, TraceType};
 
-const MODULE: &'static str = "datacenter.rs";
-
 #[derive(Debug)]
 pub struct Datacenter {
 	cells: Vec<NalCell>,
@@ -35,7 +33,7 @@ impl Datacenter {
                                     CellType::Border,CellConfig::Large,
                                     trace_header.fork_trace())?;
             {
-                let ref trace_params = TraceHeaderParams { module: MODULE, function: f, format: "border_cell_start" };
+                let ref trace_params = TraceHeaderParams { module: file!(), function: f, format: "border_cell_start" };
                 let trace = json!({ "cell_number": border_cell.get_cell_no() });
                 let _ = dal::add_to_trace(trace_header, TraceType::Trace, trace_params,&trace, f);
             }
@@ -47,7 +45,7 @@ impl Datacenter {
                                     CellType::Interior,CellConfig::Large,
                                     trace_header.fork_trace())?;
             {
-                let ref trace_params = TraceHeaderParams { module: MODULE, function: f, format: "interior_cell_start" };
+                let ref trace_params = TraceHeaderParams { module: file!(), function: f, format: "interior_cell_start" };
                 let trace = json!({"cell_number": interior_cell.get_cell_no() });
                 let _ = dal::add_to_trace(trace_header, TraceType::Trace, trace_params, &trace, f);
             }
@@ -85,7 +83,7 @@ impl Datacenter {
 			rite_port.link_channel(rite_to_link, rite_from_link, rite_from_pe);
 			let mut link = Link::new(&left_port.get_id(), &rite_port.get_id())?;
             {
-                let ref trace_params = TraceHeaderParams { module: MODULE, function: f, format: "connect_link" };
+                let ref trace_params = TraceHeaderParams { module: file!(), function: f, format: "connect_link" };
                 let trace = json!({ "left_cell": left_cell_id, "rite_cell": rite_cell_id, "left_port": left_port.get_port_no(), "rite_port": rite_port.get_port_no(), "link_id": link.get_id() });
                 let _ = dal::add_to_trace(trace_header, TraceType::Trace, trace_params, &trace, f);
             }
