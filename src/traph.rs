@@ -21,6 +21,7 @@ type StackedTrees = HashMap<Uuid, Tree>;
 pub struct Traph {
 	cell_id: CellID, // For debugging
     base_tree_id: TreeID,
+    port_tree: Option<PortTree>,
     port_trees: Vec<PortTree>,
 	stacked_trees: Arc<Mutex<StackedTrees>>,
 	elements: Vec<TraphElement>,
@@ -40,7 +41,7 @@ impl Traph {
 			let mut locked = stacked_trees.lock().unwrap();
 			locked.insert(black_tree_id.get_uuid(), black_tree);
 		}
-		Ok(Traph { cell_id: cell_id.clone(), base_tree_id: black_tree_id.clone(),
+		Ok(Traph { cell_id: cell_id.clone(), base_tree_id: black_tree_id.clone(), port_tree: None,
 				   port_trees: Vec::new(), stacked_trees, elements, tried_ports: HashSet::new() })
 	}
     pub fn get_tree(&self, tree_uuid: &Uuid) -> Result<Tree, Error> {
@@ -51,7 +52,12 @@ impl Traph {
     pub fn get_base_tree_id(&self) -> &TreeID { &self.base_tree_id }
     pub fn get_elements(&self) -> &Vec<TraphElement> { &self.elements }
     pub fn get_tried_ports(&self) -> &HashSet<PortNo> { &self.tried_ports }
-    pub fn add_port_tree_id(&mut self, port_tree: &PortTree) { self.port_trees.push(port_tree.clone()); }
+    pub fn add_port_tree_id(&mut self, port_tree: PortTree) -> PortTree {
+        if self.port_trees.len() == 0 { self.port_tree = Some(port_tree.clone()); }
+        self.port_trees.push(port_tree.clone());
+        self.port_trees[0].clone() // Guaranteed to have at least 1 element by line above
+    }
+    pub fn get_port_tree(&self) -> &Option<PortTree> { &self.port_tree }
     pub fn get_port_trees(&self) -> &Vec<PortTree> { &self.port_trees }
     pub fn clear_tried_ports(&mut self) { self.tried_ports.clear() }
     pub fn add_tried_port(&mut self, port_no: PortNo) { self.tried_ports.insert(port_no); }

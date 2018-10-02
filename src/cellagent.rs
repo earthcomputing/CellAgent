@@ -379,15 +379,12 @@ impl CellAgent {
         }
         let (entry, _is_new_port) = {
             let mut traphs = self.traphs.lock().unwrap();
-            let traph = match traphs.entry(base_tree_id.get_uuid()) { // Using entry voids lifetime problem
-                Entry::Occupied(t) => t.into_mut(),
-                Entry::Vacant(v) => {
-                    //println!("Cell {} 1: update tree ID map {} {}", self.cell_id, base_tree_id, base_tree_id.get_uuid());
+            let default = Traph::new(&self.cell_id, self.no_ports, &base_tree_id, gvm_eqn)?;
+            let traph = traphs.entry(base_tree_id.get_uuid())
+                .or_insert_with(|| {
                     self.tree_id_map.lock().unwrap().insert(base_tree_id.get_uuid(), base_tree_id.clone());
-                    let t = Traph::new(&self.cell_id, self.no_ports, &base_tree_id, gvm_eqn).context(CellagentError::Chain { func_name: "update_traph", comment: S("") })?;
-                    v.insert(t)
-                }
-            };
+                    default
+                });
             let (gvm_recv, gvm_send, _gvm_xtnd, _gvm_save) =  {
                     let variables = traph.get_params(gvm_eqn.get_variables()).context(CellagentError::Chain { func_name: "update_traph", comment: S("") })?;
                     let recv = gvm_eqn.eval_recv(&variables).context(CellagentError::Chain { func_name: _f, comment: S("eval_recv") })?;
@@ -425,9 +422,9 @@ impl CellAgent {
                 let root_port_number = path.get_port_number();
                 let mut port_tree = PortTree::new(base_tree_id, &root_port_number,
                                                   &port_number.get_port_no(), &hops);
-                traph.add_port_tree_id(&port_tree); // Makes unwrap() on next line safe
+                let first_port_tree = traph.add_port_tree_id(port_tree); // Makes unwrap() on next line safe
                 // The first port_tree entry is the one that denotes this branch
-                let first_port_tree_id = traph.get_port_trees()[0].get_port_tree_id();
+                let first_port_tree_id = first_port_tree.get_port_tree_id();
                 if traph.get_port_trees().len() == 1 {
                     let mut new_entry = entry;
                     new_entry.set_tree_id(&first_port_tree_id);
@@ -1236,10 +1233,11 @@ impl CellAgent {
             .values_mut()
             .map(|traph| { traph.set_broken(port_number); traph })
             .filter(|traph| { traph.has_broken_parent() })
-            .find(|broken_parent| {
+            .map(|broken_parent| {
                 broken_tree_ids.insert(broken_parent.get_base_tree_id().clone());
-                broken_parent.is_one_hop()
+                broken_parent
             })
+            .find(|broken_parent|  broken_parent.is_one_hop())
             {
                 Some(traph) => traph.clone(),
                 None => { // It is possible that no trees cross the broken link in a given direction
