@@ -32,8 +32,8 @@ pub const DEFAULT_USER_MASK: Mask = Mask { mask: MaskValue(254) };  // All ports
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Serialize, Deserialize)]
 pub struct Mask { mask: MaskValue }
 impl Mask {
-	pub fn new(i: PortNumber) -> Mask {
-	    let mask = MaskValue((1 as u16).rotate_left((*i.get_port_no()) as u32));
+	pub fn new(port_number: PortNumber) -> Mask {
+	    let mask = MaskValue((1 as u16).rotate_left((*port_number.get_port_no()) as u32));
         Mask { mask }
 	}
 	pub fn port0() -> Mask { Mask { mask: MaskValue(1) } }
@@ -64,11 +64,12 @@ impl Mask {
 	}
 	pub fn get_port_nos(&self) -> Vec<PortNo> {
         (0..*MAX_PORTS)
-            .map(|i| (i, PortNo(i).make_port_number(MAX_PORTS)
-                .expect("Mask make_port_number cannont generate an error")))
-            .map(|(i, port_number)| (i, Mask::new(port_number)))
-            .filter(|(i, test_mask)| *test_mask.mask & *self.mask != 0)
-            .map(|(i, _)| PortNo(i))
+            .map(|i| PortNo(i).make_port_number(MAX_PORTS)
+                .expect("Mask make_port_number cannont generate an error"))
+            .map(|port_number| Mask::new(port_number))
+            .enumerate()
+            .filter(|(_, test_mask)| *test_mask.mask & *self.mask != 0)
+            .map(|(i, _)| PortNo(i as u8))
             .collect::<Vec<_>>()
 	}
 }
