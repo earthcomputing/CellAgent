@@ -36,6 +36,7 @@ impl TraphElement {
 //	pub fn set_connected(&mut self) { self.is_connected = true; }
 //	pub fn set_disconnected(&mut self) { self.is_connected = false; }
 	pub fn set_status(&mut self, status: PortStatus) { self.status = status; }
+	pub fn is_on_broken_path(&self, broken_path: Path) -> bool { self.path == broken_path }
 }
 impl fmt::Display for TraphElement {
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {

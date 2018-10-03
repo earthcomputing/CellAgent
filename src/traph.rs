@@ -57,6 +57,13 @@ impl Traph {
         self.port_trees.push(port_tree.clone());
         self.port_trees[0].clone() // Guaranteed to have at least 1 element by line above
     }
+    pub fn get_element(&self, port_no: PortNo) -> Result<&TraphElement, Error> {
+        let _f = "get_element";
+        self.get_elements()
+            .iter()
+            .find(|element| element.get_port_no() == port_no)
+            .ok_or(TraphError::PortElement { func_name: _f, cell_id: self.cell_id.clone(), port_no: *port_no }.into())
+    }
     pub fn get_port_tree(&self) -> &Option<PortTree> { &self.port_tree }
     pub fn get_port_trees(&self) -> &Vec<PortTree> { &self.port_trees }
     pub fn clear_tried_ports(&mut self) { self.tried_ports.clear() }
@@ -97,27 +104,38 @@ impl Traph {
 	pub fn get_port_status(&self, port_number: PortNumber) -> PortStatus {
         self.elements[*port_number.get_port_no() as usize].get_status()
 	}
-	pub fn get_parent_element(&self) -> Result<&TraphElement, TraphError> {
-		let _f = "get_parent_element";
-        self.elements.iter().find(|&element| element.get_status() == PortStatus::Parent)
-            .ok_or(TraphError::ParentElement { cell_id: self.cell_id.clone(), func_name: _f, tree_id: self.base_tree_id.clone() }.into())
-	}
-    pub fn get_pruned_port(&self) -> Option<PortNo> {
-        self.get_trial_port(PortStatus::Pruned)
+    pub fn get_parent_port(&self) -> Result<PortNo, Error> { Ok(self.get_parent_element()?.get_port_no()) }
+    pub fn get_pruned_port(&self, broken_path: Path) -> Option<PortNo> {
+        self.get_trial_port(PortStatus::Pruned, broken_path)
     }
-    pub fn get_child_port(&self) -> Option<PortNo> {
-        self.get_trial_port(PortStatus::Child)
+    pub fn get_child_port(&self, broken_path: Path) -> Option<PortNo> {
+        self.get_trial_port(PortStatus::Child, broken_path)
     }
-    fn get_trial_port(&self, port_status: PortStatus) -> Option<PortNo> {
+    fn get_trial_port(&self, port_status: PortStatus, broken_path: Path) -> Option<PortNo> {
+        self.get_trial_element(port_status, broken_path)
+            .map(|element| element.get_port_no())
+    }
+    pub fn get_parent_element(&self) -> Result<TraphElement, TraphError> {
+        let _f = "get_parent_element";
+        Ok(self.elements.iter()
+            .find(|&element| element.get_status() == PortStatus::Parent)
+            .ok_or(TraphError::ParentElement { cell_id: self.cell_id.clone(), func_name: _f, tree_id: self.base_tree_id.clone() }.into())?
+            .clone())
+    }
+    pub fn get_pruned_element(&self, broken_path: Path) -> Option<TraphElement> { self.get_trial_element(PortStatus::Pruned, broken_path) }
+    pub fn get_child_element(&self, broken_path: Path) -> Option<TraphElement> { self.get_trial_element(PortStatus::Child, broken_path) }
+    fn get_trial_element(&self, port_status: PortStatus, broken_path: Path) -> Option<TraphElement> {
         let _f = "get_trial_port";
-        self.elements.iter()
+        self.elements
+            .iter()
             .filter(|&element|
                    element.is_status(port_status)
                 && !self.tried_ports.contains(&element.get_port_no())
-                && element.is_connected()
-                && !element.is_broken())
+                && !element.is_on_broken_path(broken_path)
+                && !element.is_broken()
+                && element.is_connected())
             .min_by(|x, y| x.get_hops().cmp(&*y.get_hops()))
-            .map(|element| element.get_port_no())
+            .map(|element| element.clone())
     }
 	pub fn get_hops(&self) -> Result<PathLength, Error> {
         let f = "get_hops";
@@ -288,6 +306,8 @@ pub enum TraphError {
     Gvm { func_name: &'static str, var_name: String },
 	#[fail(display = "TraphError::ParentElement {}: No parent element for tree {} on cell {}", func_name, tree_id, cell_id)]
 	ParentElement { func_name: &'static str, cell_id: CellID, tree_id: TreeID },
+    #[fail(display = "TraphError::PortElement {}: No element for port {} on cell {}", func_name, port_no, cell_id)]
+    PortElement { func_name: &'static str, cell_id: CellID, port_no: u8 },
     #[fail(display = "TraphError::Tree {}: No tree with UUID {} on cell {}", func_name, tree_uuid, cell_id)]
     Tree { func_name: &'static str, cell_id: CellID, tree_uuid: Uuid }
 }
