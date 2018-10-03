@@ -108,8 +108,16 @@ impl Traph {
     pub fn get_pruned_port(&self, broken_path: Path) -> Option<PortNo> {
         self.get_trial_port(PortStatus::Pruned, broken_path)
     }
-    pub fn get_child_port(&self, broken_path: Path) -> Option<PortNo> {
-        self.get_trial_port(PortStatus::Child, broken_path)
+    pub fn get_any_child_port(&self) -> Option<PortNo> {
+        self.get_any_child_element()
+            .map(|element| element.get_port_no())
+    }
+    pub fn get_any_child_element(&self) -> Option<TraphElement> {
+        // TODO: Change to pick child with pruned port with shortest path to root
+        self.elements
+            .iter()
+            .find(|element| element.is_status(PortStatus::Child))
+            .map(|element| element.clone())
     }
     fn get_trial_port(&self, port_status: PortStatus, broken_path: Path) -> Option<PortNo> {
         self.get_trial_element(port_status, broken_path)
@@ -123,17 +131,15 @@ impl Traph {
             .clone())
     }
     pub fn get_pruned_element(&self, broken_path: Path) -> Option<TraphElement> { self.get_trial_element(PortStatus::Pruned, broken_path) }
-    pub fn get_child_element(&self, broken_path: Path) -> Option<TraphElement> { self.get_trial_element(PortStatus::Child, broken_path) }
     fn get_trial_element(&self, port_status: PortStatus, broken_path: Path) -> Option<TraphElement> {
         let _f = "get_trial_port";
         self.elements
             .iter()
-            .filter(|&element|
-                   element.is_status(port_status)
-                && !self.tried_ports.contains(&element.get_port_no())
-                && !element.is_on_broken_path(broken_path)
-                && !element.is_broken()
-                && element.is_connected())
+            .filter(|&element| element.is_status(port_status))
+            .filter(|&element| !self.tried_ports.contains(&element.get_port_no()))
+            .filter(|&element| !element.is_on_broken_path(broken_path))
+            .filter(|&element| !element.is_broken())
+            .filter(|&element| element.is_connected())
             .min_by(|x, y| x.get_hops().cmp(&*y.get_hops()))
             .map(|element| element.clone())
     }

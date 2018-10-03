@@ -846,7 +846,7 @@ impl CellAgent {
         let mut traph = self.get_traph(&rootward_tree_id, trace_header).context(CellagentError::Chain { func_name: _f, comment: S("") })?;
         let parent_element = traph.get_parent_element()?;
         let trial_element = if parent_element.is_on_broken_path(broken_path) {
-            traph.get_pruned_element(broken_path)
+            traph.get_pruned_element(broken_path).or(traph.get_any_child_element())
         } else {
             Some(parent_element)
         };
@@ -1271,10 +1271,7 @@ impl CellAgent {
         Ok(())
     }
     fn find_new_parent(&mut self, traph: &Traph, broken_path: Path) -> Option<PortNo> {
-        self.pruned_links_first(&traph, broken_path)
-    }
-    fn pruned_links_first(&self, traph: &Traph, broken_path: Path) -> Option<PortNo> {
-        traph.get_pruned_port(broken_path).or(traph.get_child_port(broken_path))
+        traph.get_pruned_port(broken_path).or(traph.get_any_child_port())
     }
     fn forward_discover(&self, mask: Mask, trace_header: &mut TraceHeader) -> Result<(), Error> {
         //if saved.len() > 0 { println!("Cell {}: forwarding {} discover msgs on ports {:?}", self.cell_id, saved.len(), mask.get_port_nos()); }
