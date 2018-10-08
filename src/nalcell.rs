@@ -58,7 +58,7 @@ impl NalCell {
 		let mut ports_from_pe = HashMap::new(); // So I can remove the item
 		let mut boundary_port_nos = HashSet::new();
         {
-            let ref trace_params = TraceHeaderParams { module: file!(), function: f, format: "nalcell_port_setup" };
+            let ref trace_params = TraceHeaderParams { module: file!(), line_no: line!(), function: f, format: "nalcell_port_setup" };
             let trace = json!({ "cell_number": cell_no });
             let _ = dal::add_to_trace(&mut trace_header, TraceType::Trace, trace_params, &trace, f);
         }
@@ -94,7 +94,7 @@ impl NalCell {
         let f = "start_cell";
         let mut ca = cell_agent.clone();
         {
-            let ref trace_params = TraceHeaderParams { module: file!(), function: f, format: "nalcell_start_ca" };
+            let ref trace_params = TraceHeaderParams { module: file!(), line_no: line!(), function: f, format: "nalcell_start_ca" };
             let trace = json!({  "cell_id": &ca.get_id() });
             let _ = dal::add_to_trace(outer_trace_header, TraceType::Trace, trace_params, &trace, f);
         }
@@ -121,7 +121,7 @@ impl NalCell {
         let f = "start_packet_engine";
         let pe = packet_engine.clone();
         {
-            let ref trace_params = TraceHeaderParams { module: file!(), function: f, format: "nalcell_start_pe" };
+            let ref trace_params = TraceHeaderParams { module: file!(), line_no: line!(), function: f, format: "nalcell_start_pe" };
             let trace = json!({ "cell_id": &pe.get_id() });
             let _ = dal::add_to_trace(outer_trace_header, TraceType::Trace, trace_params, &trace, f);
         }

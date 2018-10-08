@@ -12,11 +12,11 @@ pub struct ECArgs {
 }
 impl ECArgs {
 	pub fn new(ncells: CellNo, nports: PortNo, nlinks: CellNo) -> Result<ECArgs, Error> {
-		if *nports < (*MAX_PORTS - 1) {
+		if *nports <= (*MAX_PORTS - 1) {
 			Ok(ECArgs { nports: nports as PortNo, ncells, nlinks: LinkNo(CellNo(*nlinks)) })
 		} else {
 			Err(EcargsError::NumberPorts { nports, func_name: "new", max: MAX_PORTS }.into())
-		}	
+		}
 	}
 //	pub fn get_nports(&self) -> u8 { return self.nports }
 //	pub fn get_ncells(&self) -> usize { return self.ncells }

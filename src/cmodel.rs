@@ -57,7 +57,7 @@ impl Cmodel {
                 CaToCmBytes::Bytes((tree_id, is_ait, user_mask, is_blocking, bytes)) => {
                     if DEBUG_OPTIONS.trace_all || DEBUG_OPTIONS.cm_from_ca {   //Debug print
                         let msg = MsgType::msg_from_bytes(&bytes)?;
-                        let ref trace_params = TraceHeaderParams { module: file!(), function: _f, format: "cm_bytes_from_ca" };
+                        let ref trace_params = TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "cm_bytes_from_ca" };
                         let trace = json!({ "cell_id": &self.cell_id, "msg": &msg.value() });
                         if DEBUG_OPTIONS.cm_from_ca {
                             match msg.get_msg_type() {
@@ -108,7 +108,7 @@ impl Cmodel {
             let bytes = Packetizer::unpacketize(packets).context(CmodelError::Chain { func_name: f, comment: S("") })?;
             if DEBUG_OPTIONS.trace_all || DEBUG_OPTIONS.cm_from_ca {   //Debug print
                 let msg = MsgType::msg_from_bytes(&bytes)?;
-                let ref trace_params = TraceHeaderParams { module: file!(), function: f, format: "cm_bytes_to_ca" };
+                let ref trace_params = TraceHeaderParams { module: file!(), line_no: line!(), function: f, format: "cm_bytes_to_ca" };
                 let trace = json!({ "cell_id": &self.cell_id, "msg": &msg.value() });
                 if DEBUG_OPTIONS.cm_from_ca {
                     match msg.get_msg_type() {
