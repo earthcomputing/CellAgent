@@ -6,7 +6,7 @@ use std::time::{Duration};
 use serde_json;
 
 use blueprint::{Blueprint};
-use config::{SCHEMA_VERSION, ByteArray};
+use config::{NCELLS, SCHEMA_VERSION, ByteArray, get_geometry};
 use dal;
 use datacenter::{Datacenter};
 use gvm_equation::{GvmEquation, GvmEqn, GvmVariable, GvmVariableType};
@@ -36,8 +36,8 @@ impl Noc {
         let f = "initialize";
         {
             // For reasons I can't understand, the trace record doesn't show up when generated from main.
-            let ref trace_params = TraceHeaderParams { module: "main.rs", function: "MAIN", format: "trace_schema" };
-            let trace = json!({ "schema_version": SCHEMA_VERSION });
+            let ref trace_params = TraceHeaderParams { module: "src/main.rs", line_no: line!(), function: "MAIN", format: "trace_schema" };
+            let trace = json!({ "schema_version": SCHEMA_VERSION, "ncells": NCELLS });
             let _ = dal::add_to_trace(trace_header, TraceType::Trace, trace_params,&trace, f);
         }
 		let (noc_to_port, port_from_noc): (NocToPort, NocFromPort) = channel();
@@ -85,7 +85,7 @@ impl Noc {
                     let msg = serde_json::from_str::<TreeNameMsg>(&serialized).context(NocError::Chain { func_name: "listen_port", comment: S("") })?;
                     let tree_name = msg.get_tree_name();
                     {
-                        let ref trace_params = TraceHeaderParams { module: "main.rs", function: f, format: "noc_from_ca" };
+                        let ref trace_params = TraceHeaderParams { module: "src/main.rs", line_no: line!(), function: f, format: "noc_from_ca" };
                         let trace = json!({ "msg_type": msg_type, "tree_name": tree_name });
                         let _ = dal::add_to_trace(trace_header, TraceType::Trace, trace_params,&trace, f);
                     }

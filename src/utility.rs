@@ -132,6 +132,7 @@ pub struct TraceHeader {
     event_id: Vec<u64>,
     trace_type: TraceType,
     module: &'static str,
+    line_no: u32,
     function: &'static str,
     format: &'static str,
     repo: &'static str,
@@ -142,7 +143,7 @@ impl TraceHeader {
         let epoch = timestamp();
         TraceHeader { epoch,
             thread_id, event_id: vec![0], trace_type: TraceType::Trace,
-            module: "", function: "", format: "", repo: REPO }
+            module: "", line_no: 0, function: "", format: "", repo: REPO }
     }
     pub fn next(&mut self, trace_type: TraceType) {
         let last = self.event_id.len() - 1;
@@ -157,10 +158,11 @@ impl TraceHeader {
         let thread_id = TraceHeader::parse(thread::current().id());
         TraceHeader { epoch: timestamp(),
             thread_id, event_id, trace_type: self.trace_type,
-            module: self.module, function: self.function, format: self.format, repo: REPO }
+            module: self.module, line_no: self.line_no, function: self.function, format: self.format, repo: REPO }
     }
     pub fn update(&mut self, params: &TraceHeaderParams) {
         self.module   = params.get_module();
+        self.line_no  = params.get_line_no();
         self.function = params.get_function();
         self.format   = params.get_format();
         self.epoch    = timestamp();
@@ -181,11 +183,13 @@ fn timestamp() -> u64 {
 pub struct TraceHeaderParams {
     pub module:   &'static str,
     pub function: &'static str,
+    pub line_no:  u32,
     pub format:   &'static str
 }
 impl TraceHeaderParams {
     pub fn get_module(&self)   -> &'static str { self.module }
     pub fn get_function(&self) -> &'static str { self.function }
+    pub fn get_line_no(&self)  -> u32          { self.line_no }
     pub fn get_format(&self)   -> &'static str { self.format }
 }
 impl fmt::Display for TraceHeader {
@@ -212,10 +216,10 @@ pub fn write_err(caller: &str, e: Error) {
 	use ::std::io::Write;
 	let stderr = &mut ::std::io::stderr();
 	let _ = writeln!(stderr, "*** {}: {}", caller, e);
-	for cause in e.causes() {
+	for cause in e.iter_chain() {
 		println!("*** Caused by {}", cause);
 	}
-	let fail: &Fail = e.cause();
+	let fail: &Fail = e.as_fail();
 	if let Some(_) = fail.cause().and_then(|cause| cause.backtrace()) {
 		let _ = writeln!(stderr, "---> Backtrace available: uncomment line in utility.rs containing --->");
 		// let _ = writeln!(stderr, "Backtrace: {:?}", backtrace);

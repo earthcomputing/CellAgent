@@ -4,7 +4,7 @@ use std::sync::mpsc::channel;
 use std::thread::{JoinHandle};
 
 use blueprint::{Blueprint};
-use config::{MIN_BOUNDARY_CELLS, CellNo, CellType, Edge, LinkNo};
+use config::{MIN_BOUNDARY_CELLS, CellNo, CellType, Edge, LinkNo, get_geometry};
 use dal;
 use message_types::{LinkToPort, PortFromLink, PortToLink, LinkFromPort,
 	PortToNoc, PortFromNoc};
@@ -23,34 +23,41 @@ impl Datacenter {
 	pub fn initialize(&mut self, blueprint: &Blueprint, trace_header: &mut TraceHeader)
             -> Result<Vec<JoinHandle<()>>, Error> {
 		let f = "initialize";
+        let geometry = get_geometry();  // A cheat used for visualization
 		let ncells = blueprint.get_ncells();
 		let edge_list = blueprint.get_edge_list();
 		if *ncells < 1  { return Err(DatacenterError::Cells{ ncells, func_name: f }.into()); }
 		if edge_list.len() < *ncells - 1 { return Err(DatacenterError::Edges { nlinks: LinkNo(CellNo(edge_list.len())), func_name: f }.into() ); }
-		let border_cells = blueprint.get_border_cells();
-		for border_cell in border_cells {
-			let cell = NalCell::new(border_cell.get_cell_no(), border_cell.get_nports(),
-                                    CellType::Border,CellConfig::Large,
-                                    trace_header.fork_trace())?;
-            {
-                let ref trace_params = TraceHeaderParams { module: file!(), function: f, format: "border_cell_start" };
-                let trace = json!({ "cell_number": border_cell.get_cell_no() });
-                let _ = dal::add_to_trace(trace_header, TraceType::Trace, trace_params,&trace, f);
-            }
-			self.cells.push(cell);
-		}
-		let interior_cells = blueprint.get_interior_cells();
-		for interior_cell in interior_cells {
-			let cell = NalCell::new(interior_cell.get_cell_no(), interior_cell.get_nports(),
-                                    CellType::Interior,CellConfig::Large,
-                                    trace_header.fork_trace())?;
-            {
-                let ref trace_params = TraceHeaderParams { module: file!(), function: f, format: "interior_cell_start" };
-                let trace = json!({"cell_number": interior_cell.get_cell_no() });
-                let _ = dal::add_to_trace(trace_header, TraceType::Trace, trace_params, &trace, f);
-            }
-			self.cells.push(cell);
-		}
+		self.cells.append(&mut blueprint.get_border_cells()
+            .iter()
+            .map(|border_cell| -> Result<NalCell, Error> {
+                {
+                    let ref trace_params = TraceHeaderParams { module: file!(), line_no: line!(), function: f, format: "border_cell_start" };
+                    let cell_no = border_cell.get_cell_no();
+                    let trace = json!({ "cell_number": cell_no, "location":  geometry.get(*cell_no)});
+                    let _ = dal::add_to_trace(trace_header, TraceType::Trace, trace_params,&trace, f);
+                }
+                NalCell::new(border_cell.get_cell_no(), border_cell.get_nports(),
+                                           CellType::Border,CellConfig::Large,
+                                           trace_header.fork_trace()) })
+            .filter(|cell| cell.is_ok())
+            .map(|cell| cell.unwrap())
+            .collect::<Vec<_>>());
+        self.cells.append(&mut blueprint.get_interior_cells()
+            .iter()
+            .map(|interior_cell| -> Result<NalCell, Error> {
+                {
+                    let ref trace_params = TraceHeaderParams { module: file!(), line_no: line!(), function: f, format: "interior_cell_start" };
+                    let cell_no = interior_cell.get_cell_no();
+                    let trace = json!({ "cell_number": cell_no, "location": geometry.get(*cell_no as usize) });
+                    let _ = dal::add_to_trace(trace_header, TraceType::Trace, trace_params,&trace, f);
+                }
+                NalCell::new(interior_cell.get_cell_no(), interior_cell.get_nports(),
+                             CellType::Interior,CellConfig::Large,
+                             trace_header.fork_trace()) })
+            .filter(|cell| cell.is_ok())
+            .map(|cell| cell.unwrap())
+            .collect::<Vec<_>>());
 		self.cells.sort_by(|a, b| (*a.get_no()).cmp(&*b.get_no())); // Sort to conform to edge list
 		let mut link_handles = Vec::new();
 		for edge in edge_list {
@@ -83,7 +90,7 @@ impl Datacenter {
 			rite_port.link_channel(rite_to_link, rite_from_link, rite_from_pe);
 			let mut link = Link::new(&left_port.get_id(), &rite_port.get_id())?;
             {
-                let ref trace_params = TraceHeaderParams { module: file!(), function: f, format: "connect_link" };
+                let ref trace_params = TraceHeaderParams { module: file!(), line_no: line!(), function: f, format: "connect_link" };
                 let trace = json!({ "left_cell": left_cell_id, "rite_cell": rite_cell_id, "left_port": left_port.get_port_no(), "rite_port": rite_port.get_port_no(), "link_id": link.get_id() });
                 let _ = dal::add_to_trace(trace_header, TraceType::Trace, trace_params, &trace, f);
             }

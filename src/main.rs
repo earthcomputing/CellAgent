@@ -3,6 +3,7 @@
 extern crate chrono;
 extern crate eval;
 #[macro_use] extern crate failure;
+extern crate indexmap;
 extern crate internment;
 #[macro_use] extern crate lazy_static;
 extern crate rand;
@@ -52,7 +53,7 @@ use std::sync::mpsc::channel;
 
 use blueprint::Blueprint;
 use config::{NCELLS, NPORTS, NLINKS, OUTPUT_FILE_NAME, QUENCH, SCHEMA_VERSION,
-             get_edges, CellNo, PortNo};
+             get_edges, get_geometry, CellNo, PortNo};
 use datacenter::Datacenter;
 use ecargs::{ECArgs};
 use gvm_equation::{GvmEqn};
@@ -68,8 +69,8 @@ fn main() -> Result<(), Error> {
     println!("{:?} Quenching of Discover messages", QUENCH);
     let mut trace_header = TraceHeader::new();
     {   // Can't get records from main() to show up in trace file
-        let ref trace_params = TraceHeaderParams { module: file!(), function: f, format: "trace_schema" };
-        let trace = json!({ "schema_version": SCHEMA_VERSION });
+        let ref trace_params = TraceHeaderParams { module: file!(), line_no: line!(), function: f, format: "trace_schema" };
+        let trace = json!({ "schema_version": SCHEMA_VERSION, "ncells": NCELLS });
         let _ = dal::add_to_trace(&mut trace_header, TraceType::Trace, trace_params, &trace, f);
     }
     let _ = OpenOptions::new().write(true).truncate(true).open(OUTPUT_FILE_NAME);
@@ -90,7 +91,7 @@ fn main() -> Result<(), Error> {
     let edges = get_edges();
     let mut exceptions = HashMap::new();
     exceptions.insert(CellNo(5), PortNo(5));
-    exceptions.insert(CellNo(2), PortNo(8));
+    exceptions.insert(CellNo(2), PortNo(6));
     let mut border = HashMap::new();
     border.insert(CellNo(2), vec![PortNo(2)]);
     border.insert(CellNo(7), vec![PortNo(2)]);

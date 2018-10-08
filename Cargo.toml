@@ -6,10 +6,12 @@ authors = ["Alan Karp <alan@earthcomputing.io>"]
 [dependencies]
 chrono = { version = "0.4.3", features = ["serde"] }
 crossbeam = "0.2"
+ditto = "0.2.0" # CRDT library
 eval = "^0.4.1"
 failure = "0.1.1"
 #failure_derive = "0.1.0"
 futures = "0.1.23"
+indexmap = "1.0.1" # HashMap and HashSet that preserve order
 internment = "0.3.6"
 lazy_static = "1.1.0"
 rand = "*" # Or a specific version
