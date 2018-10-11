@@ -4,7 +4,7 @@ use std::sync::mpsc::channel;
 use std::thread::{JoinHandle};
 
 use blueprint::{Blueprint};
-use config::{MIN_BOUNDARY_CELLS, CellNo, CellType, Edge, LinkNo, get_geometry};
+use config::{CellNo, CellType, Edge, LinkNo, get_geometry};
 use dal;
 use message_types::{LinkToPort, PortFromLink, PortToLink, LinkFromPort,
 	PortToNoc, PortFromNoc};

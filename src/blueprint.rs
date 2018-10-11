@@ -2,7 +2,7 @@ use std::fmt;
 use std::collections::{HashMap, HashSet};
 use std::iter::FromIterator;
 
-use config::{CellNo, Edge, PortNo};
+use config::{MIN_BORDER_CELLS, CellNo, Edge, PortNo};
 
 #[derive(Debug)]
 pub struct Blueprint {
@@ -14,7 +14,14 @@ impl Blueprint {
 	pub fn new(ncells: CellNo, ports_per_cell: PortNo, edges: Vec<Edge>,
 			exceptions: HashMap<CellNo, PortNo>, border_cell_map: HashMap<CellNo, Vec<PortNo>>) ->
              Result<Blueprint, BlueprintError> {
-		if border_cell_map.len() > *ncells { return Err(BlueprintError::CellCount{ func_name: "new", ncells: *ncells, num_border: border_cell_map.len() }) };
+        let _f = "new";
+        let num_border = border_cell_map.len();
+		if num_border > *ncells {
+            return Err(BlueprintError::CellCount{ func_name: _f, ncells: *ncells, num_border })
+        };
+        if num_border < *MIN_BORDER_CELLS {
+            return Err(BlueprintError::BorderCellCount { func_name: _f, num_border, num_reqd: *MIN_BORDER_CELLS})
+        }
 		let mut interior_cells = Vec::new();
 		let mut border_cells = 	Vec::new();
 		for no in 0..*ncells {
@@ -95,6 +102,8 @@ impl fmt::Display for InteriorCell {
 // Errors
 #[derive(Debug, Fail)]
 pub enum BlueprintError {
+    #[fail(display = "BlueprintError::BorderCellCount {}: Must have {} border cells but only {} in blueprint", func_name, num_border, num_reqd)]
+    BorderCellCount { func_name: &'static str, num_border: usize, num_reqd: usize},
     #[fail(display = "BlueprintError::CellCount {}: Invalid blueprint has more border cells {} than total cells {}", func_name, ncells, num_border)]
     CellCount { func_name: &'static str, ncells: usize, num_border: usize}
 }
