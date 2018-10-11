@@ -24,13 +24,13 @@ const NOC_LISTEN_TREE_NAME:  &'static str = "NocAgentMaster";
 #[derive(Debug, Clone)]
 pub struct Noc {
     allowed_trees: HashSet<AllowedTree>,
-	noc_to_outside: NocToOutside,
+    noc_to_outside: NocToOutside,
 }
 impl Noc {
-	pub fn new(noc_to_outside: NocToOutside) -> Result<Noc, Error> {
-		Ok(Noc { allowed_trees: HashSet::new(), noc_to_outside })
-	}
-	pub fn initialize(&mut self, blueprint: &Blueprint, noc_from_outside: NocFromOutside,
+    pub fn new(noc_to_outside: NocToOutside) -> Result<Noc, Error> {
+        Ok(Noc { allowed_trees: HashSet::new(), noc_to_outside })
+    }
+    pub fn initialize(&mut self, blueprint: &Blueprint, noc_from_outside: NocFromOutside,
                       trace_header: &mut TraceHeader) ->
             Result<(Datacenter, Vec<JoinHandle<()>>), Error> {
         let f = "initialize";
@@ -40,23 +40,23 @@ impl Noc {
             let trace = json!({ "schema_version": SCHEMA_VERSION, "ncells": NCELLS });
             let _ = dal::add_to_trace(trace_header, TraceType::Trace, trace_params,&trace, f);
         }
-		let (noc_to_port, port_from_noc): (NocToPort, NocFromPort) = channel();
-		let (port_to_noc, noc_from_port): (PortToNoc, PortFromNoc) = channel();
-		let (mut dc, mut join_handles) = self.build_datacenter(blueprint, trace_header).context(NocError::Chain { func_name: "initialize", comment: S("")})?;
-		dc.connect_to_noc(port_to_noc, port_from_noc).context(NocError::Chain { func_name: "initialize", comment: S("")})?;
+        let (noc_to_port, port_from_noc): (NocToPort, NocFromPort) = channel();
+        let (port_to_noc, noc_from_port): (PortToNoc, PortFromNoc) = channel();
+        let (mut dc, mut join_handles) = self.build_datacenter(blueprint, trace_header).context(NocError::Chain { func_name: "initialize", comment: S("")})?;
+        dc.connect_to_noc(port_to_noc, port_from_noc).context(NocError::Chain { func_name: "initialize", comment: S("")})?;
         let join_outside = self.listen_outside(noc_from_outside, noc_to_port.clone())?;
         join_handles.push(join_outside);
         let join_port = self.listen_port(noc_to_port, noc_from_port, trace_header)?;
         join_handles.push(join_port);
-		let nap = Duration::from_millis(1000);
-		sleep(nap);
-		Ok((dc, join_handles))
-	}
-	fn build_datacenter(&self, blueprint: &Blueprint, trace_header: &mut TraceHeader) -> Result<(Datacenter, Vec<JoinHandle<()>>), Error> {
-		let mut dc = Datacenter::new();
-		let join_handles = dc.initialize(blueprint, trace_header).context(NocError::Chain { func_name: "build_datacenter", comment: S("")})?;
-		Ok((dc, join_handles))
-	}
+        let nap = Duration::from_millis(1000);
+        sleep(nap);
+        Ok((dc, join_handles))
+    }
+    fn build_datacenter(&self, blueprint: &Blueprint, trace_header: &mut TraceHeader) -> Result<(Datacenter, Vec<JoinHandle<()>>), Error> {
+        let mut dc = Datacenter::new();
+        let join_handles = dc.initialize(blueprint, trace_header).context(NocError::Chain { func_name: "build_datacenter", comment: S("")})?;
+        Ok((dc, join_handles))
+    }
 //	fn get_msg(&self, msg_type: MsgType, serialized_msg:String) -> Result<Box<Message>> {
 //		Ok(match msg_type {
 //			_ => panic!("Noc doesn't recognize message type {}", msg_type)
@@ -74,11 +74,11 @@ impl Noc {
         });
         Ok(join_port)
     }
-	fn listen_port_loop(&mut self, noc_to_port: &NocToPort, noc_from_port: &NocFromPort,
+    fn listen_port_loop(&mut self, noc_to_port: &NocToPort, noc_from_port: &NocFromPort,
             trace_header: &mut TraceHeader) -> Result<(), Error> {
         let f = "listen_port_loop";
-		loop {
-			let (is_ait, allowed_tree, msg_type, direction, bytes) = noc_from_port.recv().context(NocError::Chain { func_name: "listen_port", comment: S("")})?;
+        loop {
+            let (is_ait, allowed_tree, msg_type, direction, bytes) = noc_from_port.recv().context(NocError::Chain { func_name: "listen_port", comment: S("")})?;
             let serialized = ::std::str::from_utf8(&bytes)?;
             match msg_type {
                 TcpMsgType::TreeName => {
@@ -97,8 +97,8 @@ impl Noc {
                 }
                 _ => write_err("Noc: listen_port: {}", NocError::MsgType { func_name: "listen_port", msg_type }.into())
             }
-		}
-	}
+        }
+    }
     fn listen_outside(&mut self, noc_from_outside: NocFromOutside, noc_to_port: NocToPort) -> Result<JoinHandle<()>,Error> {
         let mut noc = self.clone();
         let join_outside = spawn( move || {
@@ -114,8 +114,8 @@ impl Noc {
             println!("Noc: {}", manifest);
         }
     }
-	// Sets up the NOC Master and NOC Agent services on up trees
-	fn create_noc(&mut self, tree_name: &String, noc_to_port: &NocToPort) -> Result<(), Error> {
+    // Sets up the NOC Master and NOC Agent services on up trees
+    fn create_noc(&mut self, tree_name: &String, noc_to_port: &NocToPort) -> Result<(), Error> {
         let is_ait = false;
         // Stack the trees needed to deploy the master and agent and for them to talk master->agent and agent->master
         let noc_master_deploy_tree = AllowedTree::new(NOC_MASTER_DEPLOY_TREE_NAME);
@@ -160,7 +160,7 @@ impl Noc {
         let bytes = ByteArray(manifest_msg.into_bytes());
         noc_to_port.send((is_ait, noc_agent_deploy_tree.clone(), TcpMsgType::Manifest, MsgDirection::Leafward, bytes)).context(NocError::Chain { func_name: "create_noc", comment: S("NocAgent")})?;
         Ok(())
-	}
+    }
     // Because of packet forwarding, this tree gets stacked on all cells even though only one of them can receive the deployment message
     fn noc_master_deploy_tree(noc_master_deploy_tree: &AllowedTree, tree_name: &String, noc_to_port: &NocToPort) -> Result<(), Error> {
         let is_ait = false;
@@ -252,8 +252,8 @@ impl Noc {
 use failure::{Error, ResultExt};
 #[derive(Debug, Fail)]
 pub enum NocError {
-	#[fail(display = "NocError::Chain {} {}", func_name, comment)]
-	Chain { func_name: &'static str, comment: String },
+    #[fail(display = "NocError::Chain {} {}", func_name, comment)]
+    Chain { func_name: &'static str, comment: String },
 //    #[fail(display = "NocError::AllowedTree {}: {} is not an allowed tree", func_name, tree_name)]
 //    AllowedTree { func_name: &'static str, tree_name: String },
 //    #[fail(display = "NocError::Message {}: Message type {} is malformed {}", func_name, msg_type, message)]
