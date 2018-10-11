@@ -504,8 +504,8 @@ pub enum FailoverResponse {
 impl fmt::Display for FailoverResponse {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            Success => write!(f, "Success"),
-            Failure => write!(f, "Failure")
+            FailoverResponse::Success => write!(f, "Success"),
+            FailoverResponse::Failure => write!(f, "Failure")
         }
     }
 }

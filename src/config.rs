@@ -4,6 +4,34 @@ use std::ops::{Deref};
 use failure::Error;
 use utility::PortNumber;
 
+pub const SCHEMA_VERSION: &'static str = "0.1";
+pub const REPO: &'static str = "CellAgent";
+// Default inputs
+pub const MAX_PORTS: PortNo = PortNo(9); 	// Limit on number of ports per cell
+pub const NCELLS: CellNo    = CellNo(10);
+pub const NPORTS: PortNo    =  PortNo(8);
+pub const NLINKS: LinkNo    = LinkNo(CellNo(40));
+// Size limits
+//pub const MAX_ENTRIES: TableIndex    = TableIndex(64);  // Max number of active trees
+//pub const MAX_CHARS: usize         = 128; // Longest valid name
+pub const MIN_BORDER_CELLS: CellNo = CellNo(1);   // Minimum acceptable number of border cells
+//pub const MAX_PACKETS: PacketNo    = 255;  // Maximum number of packets collected before processing
+// Things used in constructing names
+pub const SEPARATOR: &'static str = "+"; // Separator for compound names
+// Packet sizes in bytes including header
+pub const PAYLOAD_DEFAULT_ELEMENT: u8 = 0;
+pub const PACKET_MIN: usize = 64;
+pub const PACKET_MAX: usize = 9000;
+// Size of chunk identifier
+//pub const CHUNK_ID_SIZE: u64 = 48;
+// Default names for up trees
+pub const CONTROL_TREE_NAME: &'static str = "Control";
+pub const CONNECTED_PORTS_TREE_NAME: &'static str = "Connected";
+//pub const BASE_TREE_NAME: &'static str = "Base";
+// Place to write output data
+pub const OUTPUT_FILE_NAME: &'static str = "/Users/alan/Documents/multicell-trace.json";
+pub const KAFKA_SERVER: &'static str = "172.16.1.102:9092";
+
 pub struct DebugOptions {
     pub trace_all:      bool,
     pub ca_msg_recv:    bool,
@@ -38,8 +66,8 @@ pub const DEBUG_OPTIONS: DebugOptions = DebugOptions {
     stack_tree:     false,
     traph_state:    false,
 };
-pub const CONTINUE_ON_ERROR: bool = false; // Don't close channel following an error
-pub const AUTO_BREAK: bool = false; // True when debugging broken link with VSCode
+pub const CONTINUE_ON_ERROR: bool = false; // Don't close channel following an error if true
+pub const AUTO_BREAK: usize = 1; // >0 when debugging broken link with VSCode
 #[derive(Debug, Copy, Clone)]
 pub enum Quench { Simple, RootPort }
 pub const QUENCH: Quench = Quench::RootPort;
@@ -102,13 +130,6 @@ impl fmt::Display for CellType {
         write!(f, "{}", s)
     }
 }
-pub const SCHEMA_VERSION: &'static str = "0.1";
-pub const REPO: &'static str = "CellAgent";
-// Default inputs
-pub const MAX_PORTS: PortNo = PortNo(9); 	// Limit on number of ports per cell
-pub const NCELLS: CellNo    = CellNo(10);
-pub const NPORTS: PortNo    =  PortNo(8);
-pub const NLINKS: LinkNo    = LinkNo(CellNo(40));
 // Connections
 pub fn get_edges() -> Vec<Edge> {
     match NCELLS {
@@ -146,23 +167,3 @@ pub fn get_geometry() -> Vec<(usize, usize)> {
     geometry
 }
 fn is2e(i: usize, j: usize) -> Edge { Edge(CellNo(i),CellNo(j)) }
-// Size limits
-//pub const MAX_ENTRIES: TableIndex    = TableIndex(64);  // Max number of active trees
-//pub const MAX_CHARS: usize         = 128; // Longest valid name
-pub const MIN_BOUNDARY_CELLS: CellNo = CellNo(1);   // Minimum acceptable number of border cells
-//pub const MAX_PACKETS: PacketNo    = 255;  // Maximum number of packets collected before processing
-// Things used in constructing names
-pub const SEPARATOR: &'static str = "+"; // Separator for compound names
-// Packet sizes in bytes including header
-pub const PAYLOAD_DEFAULT_ELEMENT: u8 = 0;
-pub const PACKET_MIN: usize = 64;
-pub const PACKET_MAX: usize = 9000;
-// Size of chunk identifier 
-//pub const CHUNK_ID_SIZE: u64 = 48;
-// Default names for up trees
-pub const CONTROL_TREE_NAME: &'static str = "Control";
-pub const CONNECTED_PORTS_TREE_NAME: &'static str = "Connected";
-//pub const BASE_TREE_NAME: &'static str = "Base";
-// Place to write output data
-pub const OUTPUT_FILE_NAME: &'static str = "/Users/alan/Documents/multicell-trace.json";
-pub const KAFKA_SERVER: &'static str = "172.16.1.77:9092";

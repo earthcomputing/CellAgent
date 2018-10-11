@@ -42,7 +42,7 @@ pub fn add_to_trace(trace_header: &mut TraceHeader, trace_type: TraceType,
         format!("{:?}", &trace_record)
     };
     file_handle.write(&(line.clone() + "\n").into_bytes()).context(DalError::Chain { func_name: "add_to_trace", comment: S("Write record") })?;
-    let _ = PRODUCER_RD.send(FutureRecord::to("CellAgent4")
+    let _ = PRODUCER_RD.send(FutureRecord::to("CellAgent")
             .payload(&line)
             .key(&format!("{:?}", trace_header.get_event_id())),
         0)

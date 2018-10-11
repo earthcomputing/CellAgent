@@ -105,8 +105,11 @@ fn main() -> Result<(), Error> {
     let (noc_to_outside, _outside_from_noc): (NocToOutside, OutsideFromNoc) = channel();
     let mut noc = Noc::new(noc_to_outside)?;
     let (mut dc, _) = noc.initialize(&blueprint, noc_from_outside, &mut trace_header).context(MainError::Chain { func_name: "run", comment: S("") })?;
-    println!("---> Automatically break link");
-    if AUTO_BREAK { break_link(&mut dc)?; }
+    if AUTO_BREAK > 0{
+        println!("---> Automatically break link");
+        println!("---> Automatically break link #1");
+        break_link(&mut dc)?;
+    }
     loop {
         stdout().write(b"\nType:
             d to print datacenter
@@ -129,32 +132,32 @@ fn main() -> Result<(), Error> {
     }
 }
 fn break_link(dc: &mut Datacenter) -> Result<(), Error> {
-    let sleep_time = std::time::Duration::from_secs(1);
-    thread::sleep(sleep_time);
-    println!("---> Automatically break link #1");
-    let links = dc.get_links_mut();
-    let link_to_break = links.get_mut(1).expect("Always have at least 2 links");
-    link_to_break.break_link()?;
-    /*
-    print_vec(&dc.get_link_ids());
-    stdout().write(b"Enter link to break or null\n").context(MainError::Chain { func_name: "run", comment: S("") })?;
-    let mut link_char = String::new();
-    stdin().read_line(&mut link_char).context(MainError::Chain { func_name: "run", comment: S("") })?;
-    let trimmed = link_char.trim();
-    if trimmed.len() > 0 {
-        if let Ok(link_no) = trimmed.parse::<u32>() {
-            let mut links = dc.get_links_mut();
-            if let Some(link_to_break) = links.get_mut(link_no as usize) {
-                stdout().write(format!("You selected link {}\n", link_to_break.get_id()).as_bytes())?;
-                link_to_break.break_link()?;
+    if AUTO_BREAK > 0 {
+        let sleep_time = std::time::Duration::from_secs(1);
+        thread::sleep(sleep_time);
+        let links = dc.get_links_mut();
+        let link_to_break = links.get_mut(AUTO_BREAK).expect("Always have at least 2 links");
+        link_to_break.break_link()?;
+    } else {
+        print_vec(&dc.get_link_ids());
+        stdout().write(b"Enter link to break or null\n").context(MainError::Chain { func_name: "run", comment: S("") })?;
+        let mut link_char = String::new();
+        stdin().read_line(&mut link_char).context(MainError::Chain { func_name: "run", comment: S("") })?;
+        let trimmed = link_char.trim();
+        if trimmed.len() > 0 {
+            if let Ok(link_no) = trimmed.parse::<u32>() {
+                let mut links = dc.get_links_mut();
+                if let Some(link_to_break) = links.get_mut(link_no as usize) {
+                    stdout().write(format!("You selected link {}\n", link_to_break.get_id()).as_bytes())?;
+                    link_to_break.break_link()?;
+                } else {
+                    stdout().write(format!("{} is not a valid link index\n", link_no).as_bytes())?;
+                };
             } else {
-                stdout().write(format!("{} is not a valid link index\n", link_no).as_bytes())?;
-            };
-        } else {
-            stdout().write(format!("{} is not a valid link index\n", trimmed).as_bytes())?;
-        }
-    } else { stdout().write(format!("{} is not a valid link index\n", trimmed).as_bytes())?; }
-    */
+                stdout().write(format!("{} is not a valid link index\n", trimmed).as_bytes())?;
+            }
+        } else { stdout().write(format!("{} is not a valid link index\n", trimmed).as_bytes())?; }
+    }
     Ok(())
 }
 fn deploy(outside_to_noc: OutsideToNoc) -> Result<(), Error> {

@@ -111,6 +111,16 @@ impl Traph {
             .ok_or(TraphError::ParentElement { cell_id: self.cell_id.clone(), func_name: _f, tree_id: self.base_tree_id.clone() }.into())
             .map(|element| element.clone())
     }
+    pub fn find_new_parent_port(&self, broken_path: Path) -> Option<PortNo> {
+        vec![
+            self.get_untried_parent_port(broken_path),
+            self.get_untried_pruned_port(broken_path),
+            self.get_untried_child_port()
+        ]
+            .into_iter()
+            .min_by(|x, y| x.cmp(y))
+            .unwrap_or(None)
+    }
     pub fn get_untried_parent_port(&self, broken_path: Path) -> Option<PortNo> {
         self.get_untried_parent_element(broken_path)
             .map(|element| element.get_port_no())
