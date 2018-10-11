@@ -20,27 +20,27 @@ use uuid_ec::{AitState, Uuid};
 
 #[derive(Debug, Clone)]
 pub struct PacketEngine {
-	cell_id: CellID,
-	boundary_port_nos: HashSet<PortNo>,
-	routing_table: Arc<Mutex<RoutingTable>>,
+    cell_id: CellID,
+    boundary_port_nos: HashSet<PortNo>,
+    routing_table: Arc<Mutex<RoutingTable>>,
     pe_to_cm: PeToCm,
-	pe_to_ports: Vec<PeToPort>,
+    pe_to_ports: Vec<PeToPort>,
 }
 
 impl PacketEngine {
-	pub fn new(cell_id: &CellID, pe_to_cm: PeToCm, pe_to_ports: Vec<PeToPort>,
-			boundary_port_nos: HashSet<PortNo>) -> Result<PacketEngine, Error> {
-		let routing_table = Arc::new(Mutex::new(RoutingTable::new(cell_id.clone()).context(PacketEngineError::Chain { func_name: "new", comment: S(cell_id.get_name())})?));
-		Ok(PacketEngine { cell_id: cell_id.clone(), routing_table, boundary_port_nos,
+    pub fn new(cell_id: &CellID, pe_to_cm: PeToCm, pe_to_ports: Vec<PeToPort>,
+            boundary_port_nos: HashSet<PortNo>) -> Result<PacketEngine, Error> {
+        let routing_table = Arc::new(Mutex::new(RoutingTable::new(cell_id.clone()).context(PacketEngineError::Chain { func_name: "new", comment: S(cell_id.get_name())})?));
+        Ok(PacketEngine { cell_id: cell_id.clone(), routing_table, boundary_port_nos,
             pe_to_cm, pe_to_ports })
-	}
-	pub fn initialize(&self, pe_from_cm: PeFromCm, pe_from_ports: PeFromPort,
+    }
+    pub fn initialize(&self, pe_from_cm: PeFromCm, pe_from_ports: PeFromPort,
                       mut trace_header: TraceHeader) -> Result<(), Error> {
         let (pe_to_pe, pe_from_pe): (PeToPe, PeFromPe) = channel();
         self.listen_cm(pe_from_cm, pe_to_pe, trace_header.fork_trace())?;
         self.listen_port(pe_from_ports, pe_from_pe, trace_header.fork_trace())?;
         Ok(())
-	}
+    }
     pub fn get_id(&self) -> CellID { self.cell_id.clone() }
     fn listen_cm(&self, pe_from_cm: PeFromCm, pe_to_pe: PeToPe,
                  outer_trace_header: TraceHeader) -> Result<(), Error> {
@@ -73,7 +73,7 @@ impl PacketEngine {
         });
         Ok(())
     }
-	//pub fn get_table(&self) -> &Arc<Mutex<RoutingTable>> { &self.routing_table }
+    //pub fn get_table(&self) -> &Arc<Mutex<RoutingTable>> { &self.routing_table }
     fn listen_cm_loop(&mut self, pe_from_cm: &PeFromCm, pe_to_pe: &PeToPe,
                       trace_header: &mut TraceHeader)
             -> Result<(), Error> {
@@ -168,24 +168,24 @@ impl PacketEngine {
             };
         }
     }
-	fn listen_port_loop(&mut self, pe_from_ports: &PeFromPort, pe_from_pe: &PeFromPe,
+    fn listen_port_loop(&mut self, pe_from_ports: &PeFromPort, pe_from_pe: &PeFromPe,
                         trace_header: &mut TraceHeader) -> Result<(), Error> {
         let f = "listen_port_loop";
-		loop {
-			match pe_from_ports.recv().context(PacketEngineError::Chain { func_name: f, comment: S("receive")})? {
-				PortToPePacket::Packet((port_no, packet))  => {
+        loop {
+            match pe_from_ports.recv().context(PacketEngineError::Chain { func_name: f, comment: S("receive")})? {
+                PortToPePacket::Packet((port_no, packet))  => {
                     self.process_packet(port_no, packet, pe_from_pe, trace_header).context(PacketEngineError::Chain { func_name: "listen_port", comment: S("process_packet ") + self.cell_id.get_name()})?
                 },
-				PortToPePacket::Status((port_no, is_border, status)) => {
+                PortToPePacket::Status((port_no, is_border, status)) => {
                     self.pe_to_cm.send(PeToCmPacket::Status((port_no, is_border, status))).context(PacketEngineError::Chain { func_name: "listen_port", comment: S("send status to ca ") + self.cell_id.get_name()})?
                 },
-				PortToPePacket::Tcp((port_no, tcp_msg)) => {
+                PortToPePacket::Tcp((port_no, tcp_msg)) => {
                     self.pe_to_cm.send(PeToCmPacket::Tcp((port_no, tcp_msg))).context(PacketEngineError::Chain { func_name: "listen_port", comment: S("send tcp msg to ca ") + self.cell_id.get_name()})?
                 },
-			};
-		}		
-	}
-	fn process_packet(&mut self, port_no: PortNo, mut packet: Packet, pe_from_pe: &PeFromPe,
+            };
+        }
+    }
+    fn process_packet(&mut self, port_no: PortNo, mut packet: Packet, pe_from_pe: &PeFromPe,
                       trace_header: &mut TraceHeader) -> Result<(), Error> {
         let f = "process_packet";
         //println!("PacketEngine {}: received on port {} my index {} {}", self.cell_id, port_no.v, *my_index, packet);
@@ -266,13 +266,13 @@ impl PacketEngine {
                 }
             }
         }
-		Ok(())
-	}
-	fn forward(&self, recv_port_no: PortNo, entry: RoutingTableEntry, user_mask: Mask, packet: Packet,
+        Ok(())
+    }
+    fn forward(&self, recv_port_no: PortNo, entry: RoutingTableEntry, user_mask: Mask, packet: Packet,
                trace_header: &mut TraceHeader) -> Result<(), Error>{
         let f = "forward";
         if !(recv_port_no == entry.get_parent()) {
-			let parent = entry.get_parent();
+            let parent = entry.get_parent();
             if *parent == 0 {
                 if DEBUG_OPTIONS.trace_all || DEBUG_OPTIONS.pe_pkt_send {   // Debug print
                     let msg_type = MsgType::msg_type(&packet);
@@ -299,9 +299,6 @@ impl PacketEngine {
                     sender.send(PeToPortPacket::Packet(packet)).context(PacketEngineError::Chain { func_name: f, comment: S(self.cell_id.clone()) })?;
                     if DEBUG_OPTIONS.trace_all || DEBUG_OPTIONS.pe_pkt_send {   // Debug print
                         let msg_type = MsgType::msg_type(&packet);
-                        if msg_type == MsgType::Manifest {
-                            println!("PacketEngine {} forwarding manifest leafward", self.cell_id);
-                        }
                         let tree_id = packet.get_tree_id();
                         let ref trace_params = TraceHeaderParams { module: file!(), line_no: line!(), function: f, format: "pe_forward_rootward" };
                         let trace = json!({ "cell_id": &self.cell_id, "tree_id": &tree_id, "msg_type": &msg_type, "parent_port": &parent });
@@ -323,9 +320,9 @@ impl PacketEngine {
                     return Err(PacketEngineError::Sender { cell_id: self.cell_id.clone(), func_name: "forward rootward", port_no: *parent }.into());
                 }
             }
-		} else {  // Leafward
-			let mask = user_mask.and(entry.get_mask());
-			let port_nos = mask.get_port_nos();
+        } else {  // Leafward
+            let mask = user_mask.and(entry.get_mask());
+            let port_nos = mask.get_port_nos();
             if DEBUG_OPTIONS.trace_all || DEBUG_OPTIONS.pe_pkt_send {   // Debug print
                 let msg_type = MsgType::msg_type(&packet);
                 let tree_id = packet.get_tree_id();
@@ -348,7 +345,7 @@ impl PacketEngine {
                 let _ = dal::add_to_trace(trace_header, TraceType::Debug, trace_params, &trace, f);
             }
             // Only side effects so use explicit loop instead of map
-			for port_no in port_nos.iter().cloned() {
+            for port_no in port_nos.iter().cloned() {
                 if *port_no == 0 {
                     self.pe_to_cm.send(PeToCmPacket::Packet((recv_port_no, packet))).context(PacketEngineError::Chain { func_name: f, comment: S("leafcast packet to ca ") + self.cell_id.get_name() })?;
                 } else {
@@ -357,15 +354,15 @@ impl PacketEngine {
                         .send(PeToPortPacket::Packet(packet)).context(PacketEngineError::Chain { func_name: f, comment: S("send packet leafward ") + self.cell_id.get_name() })?;
                 }
             }
-		}
-		Ok(())
-	}
+        }
+        Ok(())
+    }
 }
 impl fmt::Display for PacketEngine {
-	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result { 
-		let mut s = format!("Packet Engine for cell {}", self.cell_id);
-		s = s + &format!("{}", *self.routing_table.lock().unwrap());
-		write!(f, "{}", s) }	
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        let mut s = format!("Packet Engine for cell {}", self.cell_id);
+        s = s + &format!("{}", *self.routing_table.lock().unwrap());
+        write!(f, "{}", s) }
 }
 // Errors
 use failure::{Error, ResultExt};
@@ -373,10 +370,10 @@ use failure::{Error, ResultExt};
 pub enum PacketEngineError {
     #[fail(display = "PacketEngineError::Ait {} {} is not allowed here", func_name, ait_state)]
     Ait { func_name: &'static str, ait_state: AitState },
-	#[fail(display = "PacketEngineError::Chain {} {}", func_name, comment)]
-	Chain { func_name: &'static str, comment: String },
-	#[fail(display = "PacketEngineError::Sender {}: No sender for port {:?} on cell {}", func_name, port_no, cell_id)]
-	Sender { func_name: &'static str, cell_id: CellID, port_no: u8 },
+    #[fail(display = "PacketEngineError::Chain {} {}", func_name, comment)]
+    Chain { func_name: &'static str, comment: String },
+    #[fail(display = "PacketEngineError::Sender {}: No sender for port {:?} on cell {}", func_name, port_no, cell_id)]
+    Sender { func_name: &'static str, cell_id: CellID, port_no: u8 },
     #[fail(display = "PacketEngineError::Uuid {}: CellID {}: type {} entry uuid {}, packet uuid {}", func_name, cell_id, msg_type, table_uuid, packet_uuid)]
     Uuid { func_name: &'static str, cell_id: CellID, msg_type: MsgType, table_uuid: Uuid, packet_uuid: Uuid }
 }

@@ -38,10 +38,11 @@ pub const DEBUG_OPTIONS: DebugOptions = DebugOptions {
     stack_tree:     false,
     traph_state:    false,
 };
-pub const CONTINUE_ON_ERROR: bool = false;
+pub const CONTINUE_ON_ERROR: bool = false; // Don't close channel following an error
+pub const AUTO_BREAK: bool = false; // True when debugging broken link with VSCode
 #[derive(Debug, Copy, Clone)]
 pub enum Quench { Simple, RootPort }
-pub const QUENCH: Quench = Quench::Simple;
+pub const QUENCH: Quench = Quench::RootPort;
 // Size of various fields
 #[derive(Debug, Clone, Hash, Eq, PartialEq, Serialize, Deserialize)]
 pub struct ByteArray(pub Vec<u8>);
@@ -89,17 +90,17 @@ pub struct VmNo(pub usize);
 // Cell types
 #[derive(Debug, Copy, Clone)]
 pub enum CellType {
-	Border,
-	Interior
+    Border,
+    Interior
 }
 impl fmt::Display for CellType {
-	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result { 
-		let s = match *self {
-			CellType::Border   => "Border",
-			CellType::Interior => "Interior",
-		};
-		write!(f, "{}", s)
-	}	
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        let s = match *self {
+            CellType::Border   => "Border",
+            CellType::Interior => "Interior",
+        };
+        write!(f, "{}", s)
+    }
 }
 pub const SCHEMA_VERSION: &'static str = "0.1";
 pub const REPO: &'static str = "CellAgent";
@@ -164,4 +165,4 @@ pub const CONNECTED_PORTS_TREE_NAME: &'static str = "Connected";
 //pub const BASE_TREE_NAME: &'static str = "Base";
 // Place to write output data
 pub const OUTPUT_FILE_NAME: &'static str = "/Users/alan/Documents/multicell-trace.json";
-pub const KAFKA_SERVER: &'static str = "172.16.1.86:9092";
+pub const KAFKA_SERVER: &'static str = "172.16.1.77:9092";

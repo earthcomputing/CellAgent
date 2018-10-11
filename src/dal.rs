@@ -1,6 +1,5 @@
 // This file contains hacks that represent functions of the DAL.
 // which will be replaced by actual distributed storage algorithms.
-
 use std::fs::{File, OpenOptions};
 use std::io::Write;
 
@@ -8,6 +7,7 @@ use rdkafka::config::ClientConfig;
 use rdkafka::producer::{FutureProducer, FutureRecord};
 use serde_json;
 use serde_json::{Value};
+use futures::Future;
 
 use config::{KAFKA_SERVER, OUTPUT_FILE_NAME};
 use utility::{S, TraceHeader, TraceHeaderParams, TraceType};
@@ -42,10 +42,17 @@ pub fn add_to_trace(trace_header: &mut TraceHeader, trace_type: TraceType,
         format!("{:?}", &trace_record)
     };
     file_handle.write(&(line.clone() + "\n").into_bytes()).context(DalError::Chain { func_name: "add_to_trace", comment: S("Write record") })?;
-    PRODUCER_RD.send(FutureRecord::to("CellAgent")
+    let _ = PRODUCER_RD.send(FutureRecord::to("CellAgent4")
             .payload(&line)
             .key(&format!("{:?}", trace_header.get_event_id())),
-        0);
+        0)
+        .then(|result| -> Result<(), Error> {
+            match result {
+                Ok(Ok(_)) => Ok(()),
+                Ok(Err((e, _))) => Err(DalError::Kafka { func_name: _f, kafka_error: S(e) }.into()),
+                Err(e) => Err(DalError::Kafka { func_name: _f, kafka_error: S(e) }.into())
+            }
+        });
     Ok(())
 }
 #[derive(Debug, Clone, Serialize)]

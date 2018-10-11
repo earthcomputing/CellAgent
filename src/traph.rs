@@ -19,31 +19,32 @@ type StackedTrees = HashMap<Uuid, Tree>;
 
 #[derive(Debug, Clone)]
 pub struct Traph {
-	cell_id: CellID, // For debugging
+    cell_id: CellID, // For debugging
     base_tree_id: TreeID,
     port_tree: Option<PortTree>,
     port_trees: Vec<PortTree>,
-	stacked_trees: Arc<Mutex<StackedTrees>>,
-	elements: Vec<TraphElement>,
+    stacked_trees: Arc<Mutex<StackedTrees>>,
+    elements: Vec<TraphElement>,
     tried_ports: HashSet<PortNo>
 }
 impl Traph {
-	pub fn new(cell_id: &CellID, no_ports: PortNo, black_tree_id: &TreeID, gvm_eqn: &GvmEquation) -> Result<Traph, Error> {
-		let mut elements = Vec::new();
-		for i in 1..*no_ports {
-			let port_number = PortNo(i as u8).make_port_number(MAX_PORTS).context(TraphError::Chain { func_name: "new", comment: S("")})?;
-			elements.push(TraphElement::default(port_number));
-		}
-		let entry = RoutingTableEntry::default();
-		let black_tree = Tree::new(black_tree_id, black_tree_id, black_tree_id, gvm_eqn, entry);
-		let stacked_trees = Arc::new(Mutex::new(HashMap::new()));
-		{
-			let mut locked = stacked_trees.lock().unwrap();
-			locked.insert(black_tree_id.get_uuid(), black_tree);
-		}
-		Ok(Traph { cell_id: cell_id.clone(), base_tree_id: black_tree_id.clone(), port_tree: None,
-				   port_trees: Vec::new(), stacked_trees, elements, tried_ports: HashSet::new() })
-	}
+    pub fn new(cell_id: &CellID, no_ports: PortNo, black_tree_id: &TreeID, gvm_eqn: &GvmEquation) -> Result<Traph, Error> {
+        let mut elements = Vec::new();
+        for i in 1..*no_ports {
+            let port_number = PortNo(i as u8).make_port_number(MAX_PORTS).context(TraphError::Chain { func_name: "new", comment: S("")})?;
+            elements.push(TraphElement::default(port_number));
+        }
+        let entry = RoutingTableEntry::default();
+        let black_tree = Tree::new(black_tree_id, black_tree_id, black_tree_id, gvm_eqn, entry);
+        let stacked_trees = Arc::new(Mutex::new(HashMap::new()));
+        {
+            let mut locked = stacked_trees.lock().unwrap();
+            locked.insert(black_tree_id.get_uuid(), black_tree);
+        }
+        Ok(Traph { cell_id: cell_id.clone(), base_tree_id: black_tree_id.clone(), port_tree: None,
+                   port_trees: Vec::new(), stacked_trees, elements, tried_ports: HashSet::new() })
+    }
+    pub fn get_cell_id(&self) -> &CellID { &self.cell_id }
     pub fn get_tree(&self, tree_uuid: &Uuid) -> Result<Tree, Error> {
          self.stacked_trees.lock().unwrap().get(tree_uuid).cloned()
             .ok_or(TraphError::Tree { cell_id: self.cell_id.clone(), func_name: "get_tree_entry", tree_uuid: *tree_uuid }.into())
@@ -55,7 +56,7 @@ impl Traph {
     }
     pub fn get_elements(&self) -> &Vec<TraphElement> { &self.elements }
     pub fn get_tried_ports(&self) -> &HashSet<PortNo> { &self.tried_ports }
-    pub fn add_port_tree_id(&mut self, port_tree: PortTree) -> PortTree {
+    pub fn add_port_tree(&mut self, port_tree: PortTree) -> PortTree {
         if self.port_trees.len() == 0 { self.port_tree = Some(port_tree.clone()); }
         self.port_trees.push(port_tree.clone());
         self.port_trees[0].clone() // Guaranteed to have at least 1 element by line above
@@ -71,10 +72,10 @@ impl Traph {
     pub fn get_port_trees(&self) -> &Vec<PortTree> { &self.port_trees }
     pub fn clear_tried_ports(&mut self) { self.tried_ports.clear() }
     pub fn add_tried_port(&mut self, port_no: PortNo) { self.tried_ports.insert(port_no); }
-	pub fn get_tree_entry(&self, tree_uuid: &Uuid) -> Result<RoutingTableEntry, Error> {
+    pub fn get_tree_entry(&self, tree_uuid: &Uuid) -> Result<RoutingTableEntry, Error> {
         self.get_tree(tree_uuid)
             .map(|tree| tree.get_table_entry())
-	}
+    }
     pub fn set_tree_entry(&mut self, tree_uuid: &Uuid, entry: RoutingTableEntry) -> Result<(), Error> {
         let _f = "set_tree_entry";
         self.stacked_trees.lock().unwrap()
@@ -82,11 +83,11 @@ impl Traph {
             .map(|tree| tree.set_table_entry(entry))
             .ok_or(TraphError::Tree { cell_id: self.cell_id.clone(), func_name: _f, tree_uuid: *tree_uuid }.into() )
     }
-	pub fn get_stacked_trees(&self) -> &Arc<Mutex<StackedTrees>> { &self.stacked_trees }
-	pub fn has_tree(&self, tree_id: &TreeID) -> bool {
+    pub fn get_stacked_trees(&self) -> &Arc<Mutex<StackedTrees>> { &self.stacked_trees }
+    pub fn has_tree(&self, tree_id: &TreeID) -> bool {
         self.stacked_trees.lock().unwrap().contains_key(&tree_id.get_uuid())
-	}
-	pub fn is_port_connected(&self, port_number: PortNumber) -> bool {
+    }
+    pub fn is_port_connected(&self, port_number: PortNumber) -> bool {
         self.elements[*port_number.get_port_no() as usize].is_connected()
     }
     pub fn is_port_broken(&self, port_number: PortNumber) -> bool {
@@ -95,9 +96,9 @@ impl Traph {
     pub fn set_broken(&mut self, port_number: PortNumber) {
         self.elements[*port_number.get_port_no() as usize].set_broken();
     }
-	pub fn get_port_status(&self, port_number: PortNumber) -> PortStatus {
+    pub fn get_port_status(&self, port_number: PortNumber) -> PortStatus {
         self.elements[*port_number.get_port_no() as usize].get_status()
-	}
+    }
     pub fn get_parent_port(&self) -> Result<PortNo, Error> {
         self.get_parent_element()
             .map(|element| element.get_port_no())
@@ -110,6 +111,10 @@ impl Traph {
             .ok_or(TraphError::ParentElement { cell_id: self.cell_id.clone(), func_name: _f, tree_id: self.base_tree_id.clone() }.into())
             .map(|element| element.clone())
     }
+    pub fn get_untried_parent_port(&self, broken_path: Path) -> Option<PortNo> {
+        self.get_untried_parent_element(broken_path)
+            .map(|element| element.get_port_no())
+    }
     pub fn get_untried_pruned_port(&self, broken_path: Path) -> Option<PortNo> {
         self.get_untried_pruned_element(broken_path)
             .map(|element| element.get_port_no())
@@ -118,38 +123,56 @@ impl Traph {
         self.get_untried_child_element()
             .map(|element| element.get_port_no())
     }
+    pub fn get_untried_parent_element(&self, broken_path: Path) -> Option<TraphElement> {
+        match self.get_parent_element() {
+            Err(_) => None,
+            Ok(element) => {
+                if element.is_on_broken_path(broken_path) ||
+                   element.is_broken()        ||
+                   !element.is_connected()    ||
+                   self.tried_ports.contains(&element.get_port_no())
+                    {
+                        None
+                    }
+                else {
+                    Some(element)
+                }
+            }
+        }
+    }
     pub fn get_untried_child_element(&self) -> Option<TraphElement> {
         // TODO: Change to pick child with pruned port with shortest path to root
+        let _f = "get_untried_child_element";
         self.elements
             .iter()
+            .filter(|&element| element.is_connected())
+            .find(|&element| element.is_status(PortStatus::Child))
             .filter(|&element| !self.tried_ports.contains(&element.get_port_no()))
             .filter(|&element| !element.is_broken())
-            .filter(|&element| element.is_connected())
-            .find(|element| element.is_status(PortStatus::Child))
             .map(|element| element.clone())
     }
     pub fn get_untried_pruned_element(&self, broken_path: Path) -> Option<TraphElement> {
-        let _f = "get_trial_port";
+        let _f = "get_untried_pruned_element";
         self.elements
             .iter()
-            .filter(|&element| !self.tried_ports.contains(&element.get_port_no()))
+            .filter(|&element| element.is_connected())
             .filter(|&element| element.is_status(PortStatus::Pruned))
+            .filter(|&element| !self.tried_ports.contains(&element.get_port_no()))
             .filter(|&element| !element.is_on_broken_path(broken_path))
             .filter(|&element| !element.is_broken())
-            .filter(|&element| element.is_connected())
             .min_by(|x, y| x.get_hops().cmp(&*y.get_hops()))
             .map(|element| element.clone())
     }
-	pub fn update_element(&mut self, tree_id: &TreeID, port_number: PortNumber, port_status: PortStatus,
+    pub fn update_element(&mut self, tree_id: &TreeID, port_number: PortNumber, port_status: PortStatus,
                           children: &HashSet<PortNumber>, hops: PathLength, path: Path)
                           -> Result<RoutingTableEntry, Error> {
         let _f = "update_element";
-		let port_no = port_number.get_port_no();
-		let mut stacked_trees = self.stacked_trees.lock().unwrap();
-		let mut tree = stacked_trees.get(&tree_id.without_root_port_number().get_uuid()).cloned()
+        let port_no = port_number.get_port_no();
+        let mut stacked_trees = self.stacked_trees.lock().unwrap();
+        let mut tree = stacked_trees.get(&tree_id.without_root_port_number().get_uuid()).cloned()
             .ok_or::<Error>(TraphError::Tree { func_name: _f, cell_id: self.cell_id.clone(), tree_uuid: tree_id.get_uuid() }.into() )?;
-		let mut table_entry = tree.get_table_entry();
-		match port_status {
+        let mut table_entry = tree.get_table_entry();
+        match port_status {
             PortStatus::Parent => table_entry.set_parent(port_number),
             PortStatus::Child => {
                 let mut children = HashSet::new();
@@ -159,13 +182,13 @@ impl Traph {
         };
         table_entry.set_tree_id(tree_id);
         table_entry.add_children(children);
-		table_entry.set_inuse();
-		tree.set_table_entry(table_entry);
-		stacked_trees.insert(tree_id.get_uuid(), tree);
-		let element = TraphElement::new(true, port_no, port_status, hops, path);
-		self.elements[*port_no as usize] = element; // Cannot fail because self.elements has MAX_PORTS elements
-		Ok(table_entry)
-	}
+        table_entry.set_inuse();
+        tree.set_table_entry(table_entry);
+        stacked_trees.insert(tree_id.get_uuid(), tree);
+        let element = TraphElement::new(true, port_no, port_status, hops, path);
+        self.elements[*port_no as usize] = element; // Cannot fail because self.elements has MAX_PORTS elements
+        Ok(table_entry)
+    }
     // TODO: Figure out how to get rid of repeated code in fn new_element()
     pub fn new_element(&mut self, tree_id: &TreeID, port_number: PortNumber, port_status: PortStatus,
                        children: &HashSet<PortNumber>, hops: PathLength, path: Path)
@@ -188,7 +211,7 @@ impl Traph {
     }
     pub fn has_broken_parent(&self) -> bool {
         let _f = "has_broken_parent";
-		match self.get_parent_element() {
+        match self.get_parent_element() {
             Ok(parent_element) => parent_element.is_broken(),
             Err(_) => false
         }
@@ -201,34 +224,34 @@ impl Traph {
         }
     }
     /*
-	pub fn update_stacked_entries(&self, base_tree_entry: RoutingTableEntry) -> Result<Vec<RoutingTableEntry>, Error> {
-		let locked = self.stacked_trees.lock().unwrap();
-		let mut updated_entries = Vec::new();
-		for stacked_tree in locked.values() {
-			if stacked_tree.get_tree_id() != stacked_tree.get_base_tree_id() {
-				let mut stacked_entry = stacked_tree.get_table_entry();
-				let port_no = PortNo{v: base_tree_entry.get_other_indices().len() as u8};
-				let port_number = PortNumber::new(base_tree_entry.get_parent(), port_no).context(TraphError::Chain { func_name: "update_stacked_entries", comment: S("") })?;
-				stacked_entry.set_parent(port_number);
-				stacked_entry.set_mask(base_tree_entry.get_mask());
-				let gvm_eqn = stacked_tree.get_gvm_eqn();
-				let params = self.get_params(gvm_eqn.get_variables()).context(TraphError::Chain { func_name: "update_stacked_entries", comment: S("")})?;
-				if !gvm_eqn.eval_recv(&params).context(TraphError::Chain { func_name: "update_stacked_entries", comment: S(self.cell_id.get_name()) + " recv"})? {
-					let mask = stacked_entry.get_mask().and(Mask::all_but_zero(PortNo{v:stacked_entry.get_other_indices().len() as u8}));
-					stacked_entry.set_mask(mask);
-				}
-				// TODO: The following is wrong, but what should I do on a failover???
-				//stacked_entry.set_other_indices(base_tree_entry.get_other_indices());
-				updated_entries.push(stacked_entry);
-			}
-		}
-		Ok(updated_entries)		
-	}
+    pub fn update_stacked_entries(&self, base_tree_entry: RoutingTableEntry) -> Result<Vec<RoutingTableEntry>, Error> {
+        let locked = self.stacked_trees.lock().unwrap();
+        let mut updated_entries = Vec::new();
+        for stacked_tree in locked.values() {
+            if stacked_tree.get_tree_id() != stacked_tree.get_base_tree_id() {
+                let mut stacked_entry = stacked_tree.get_table_entry();
+                let port_no = PortNo{v: base_tree_entry.get_other_indices().len() as u8};
+                let port_number = PortNumber::new(base_tree_entry.get_parent(), port_no).context(TraphError::Chain { func_name: "update_stacked_entries", comment: S("") })?;
+                stacked_entry.set_parent(port_number);
+                stacked_entry.set_mask(base_tree_entry.get_mask());
+                let gvm_eqn = stacked_tree.get_gvm_eqn();
+                let params = self.get_params(gvm_eqn.get_variables()).context(TraphError::Chain { func_name: "update_stacked_entries", comment: S("")})?;
+                if !gvm_eqn.eval_recv(&params).context(TraphError::Chain { func_name: "update_stacked_entries", comment: S(self.cell_id.get_name()) + " recv"})? {
+                    let mask = stacked_entry.get_mask().and(Mask::all_but_zero(PortNo{v:stacked_entry.get_other_indices().len() as u8}));
+                    stacked_entry.set_mask(mask);
+                }
+                // TODO: The following is wrong, but what should I do on a failover???
+                //stacked_entry.set_other_indices(base_tree_entry.get_other_indices());
+                updated_entries.push(stacked_entry);
+            }
+        }
+        Ok(updated_entries)
+    }
     */
-	pub fn stack_tree(&mut self, tree: Tree) {
+    pub fn stack_tree(&mut self, tree: Tree) {
         self.stacked_trees.lock().unwrap().insert(tree.get_uuid(), tree);
-	}
-	pub fn get_params(&self, vars: &Vec<GvmVariable>) -> Result<Vec<GvmVariable>, Error> {
+    }
+    pub fn get_params(&self, vars: &Vec<GvmVariable>) -> Result<Vec<GvmVariable>, Error> {
         let f = "get_params";
         vars.iter()
             .map(|var| {
@@ -244,10 +267,10 @@ impl Traph {
                 }
             })
             .collect()
-	}
+    }
 }
 impl fmt::Display for Traph {
-	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let mut s = format!("Traph {} {}",
                             self.base_tree_id, self.base_tree_id.get_uuid());
         s = s + &format!("\n  Stacked Trees");
@@ -268,29 +291,29 @@ impl fmt::Display for Traph {
 }
 #[derive(Debug, Copy, Clone, PartialEq, Serialize)]
 pub enum PortStatus {
-	Parent,
-	Child,
-	Pruned
+    Parent,
+    Child,
+    Pruned
 }
 impl fmt::Display for PortStatus {
-	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-		match *self {
-			PortStatus::Parent => write!(f, "Parent"),
-			PortStatus::Child  => write!(f, "Child "),
-			PortStatus::Pruned => write!(f, "Pruned")
-		}
-	}
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match *self {
+            PortStatus::Parent => write!(f, "Parent"),
+            PortStatus::Child  => write!(f, "Child "),
+            PortStatus::Pruned => write!(f, "Pruned")
+        }
+    }
 }
 // Errors
 use failure::{Error, ResultExt};
 #[derive(Debug, Fail)]
 pub enum TraphError {
-	#[fail(display = "TraphError::Chain {}: {}", func_name, comment)]
-	Chain { func_name: &'static str, comment: String },
+    #[fail(display = "TraphError::Chain {}: {}", func_name, comment)]
+    Chain { func_name: &'static str, comment: String },
     #[fail(display = "TraphError::Gvm {}: var_name {} not implemented", func_name, var_name)]
     Gvm { func_name: &'static str, var_name: String },
-	#[fail(display = "TraphError::ParentElement {}: No parent element for tree {} on cell {}", func_name, tree_id, cell_id)]
-	ParentElement { func_name: &'static str, cell_id: CellID, tree_id: TreeID },
+    #[fail(display = "TraphError::ParentElement {}: No parent element for tree {} on cell {}", func_name, tree_id, cell_id)]
+    ParentElement { func_name: &'static str, cell_id: CellID, tree_id: TreeID },
     #[fail(display = "TraphError::PortElement {}: No element for port {} on cell {}", func_name, port_no, cell_id)]
     PortElement { func_name: &'static str, cell_id: CellID, port_no: u8 },
     #[fail(display = "TraphError::Tree {}: No tree with UUID {} on cell {}", func_name, tree_uuid, cell_id)]
