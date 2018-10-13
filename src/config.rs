@@ -67,7 +67,7 @@ pub const DEBUG_OPTIONS: DebugOptions = DebugOptions {
     traph_state:    false,
 };
 pub const CONTINUE_ON_ERROR: bool = false; // Don't close channel following an error if true
-pub const AUTO_BREAK: usize = 1; // >0 when debugging broken link with VSCode
+pub const AUTO_BREAK: usize = 0; // >0 when debugging broken link with VSCode
 #[derive(Debug, Copy, Clone)]
 pub enum Quench { Simple, RootPort }
 pub const QUENCH: Quench = Quench::RootPort;

@@ -6,7 +6,7 @@ use std::time::{Duration};
 use serde_json;
 
 use blueprint::{Blueprint};
-use config::{NCELLS, SCHEMA_VERSION, ByteArray, get_geometry};
+use config::{NCELLS, SCHEMA_VERSION, ByteArray};
 use dal;
 use datacenter::{Datacenter};
 use gvm_equation::{GvmEquation, GvmEqn, GvmVariable, GvmVariableType};
