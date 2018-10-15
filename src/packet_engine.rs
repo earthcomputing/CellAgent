@@ -74,12 +74,17 @@ impl PacketEngine {
         Ok(())
     }
     //pub fn get_table(&self) -> &Arc<Mutex<RoutingTable>> { &self.routing_table }
-    fn listen_cm_loop(&mut self, pe_from_cm: &PeFromCm, pe_to_pe: &PeToPe,
-                      trace_header: &mut TraceHeader)
+    fn listen_cm_loop(&mut self, pe_from_cm: &PeFromCm, pe_to_pe: &PeToPe, trace_header: &mut TraceHeader)
             -> Result<(), Error> {
         let f = "listen_cm_loop";
         loop {
-            match pe_from_cm.recv().context(PacketEngineError::Chain { func_name: f, comment: S("recv entry from cm ") + self.cell_id.get_name()})? {
+            let msg = pe_from_cm.recv().context(PacketEngineError::Chain { func_name: f, comment: S("recv entry from cm ") + self.cell_id.get_name()})?;
+            if DEBUG_OPTIONS.trace_all {
+                let ref trace_params = TraceHeaderParams { module: file!(), line_no: line!(), function: f, format: "recv" };
+                let trace = json!({ "cell_id": &self.cell_id, "msg": &msg.clone() });
+                let _ = dal::add_to_trace(trace_header, TraceType::Trace, trace_params, &trace, f);
+            }
+            match msg {
                 CmToPePacket::Entry(entry) => {
                     self.routing_table.lock().unwrap().set_entry(entry)
                 },
@@ -172,7 +177,13 @@ impl PacketEngine {
                         trace_header: &mut TraceHeader) -> Result<(), Error> {
         let f = "listen_port_loop";
         loop {
-            match pe_from_ports.recv().context(PacketEngineError::Chain { func_name: f, comment: S("receive")})? {
+            let msg = pe_from_ports.recv().context(PacketEngineError::Chain { func_name: f, comment: S("receive")})?;
+            if DEBUG_OPTIONS.trace_all {
+                let ref trace_params = TraceHeaderParams { module: file!(), line_no: line!(), function: f, format: "pl_recv" };
+                let trace = json!({ "cell_id": &self.cell_id, "msg": &msg.clone() });
+                let _ = dal::add_to_trace(trace_header, TraceType::Trace, trace_params, &trace, f);
+            }
+            match msg {
                 PortToPePacket::Packet((port_no, packet))  => {
                     self.process_packet(port_no, packet, pe_from_pe, trace_header).context(PacketEngineError::Chain { func_name: "listen_port", comment: S("process_packet ") + self.cell_id.get_name()})?
                 },

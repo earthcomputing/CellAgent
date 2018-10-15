@@ -22,7 +22,7 @@ const PAYLOAD_MAX: usize = PACKET_MAX - PACKET_HEADER_SIZE;
 pub type PacketAssemblers = HashMap<MsgID, PacketAssembler>;
 
 static PACKET_COUNT: AtomicUsize = ATOMIC_USIZE_INIT;
-#[derive(Debug, Copy)]
+#[derive(Debug, Copy, Serialize)]
 pub struct Packet {
     header: PacketHeader,
     payload: Payload,
@@ -138,7 +138,21 @@ impl fmt::Display for Payload {
 impl Clone for Payload {
     fn clone(&self) -> Payload { *self }
 }
-impl fmt::Debug for Payload { 
+impl Serialize for Payload {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+        where S: Funky,
+    {
+        let body = self.bytes.to_hex();
+        let mut state = serializer.serialize_struct("Payload", 5)?;
+        state.serialize_field("msg_id", &self.msg_id)?;
+        state.serialize_field("size", &self.size)?;
+        state.serialize_field("is_last", &self.is_last)?;
+        state.serialize_field("is_blocking", &self.is_blocking)?;
+        state.serialize_field("bytes", &body)?;
+        state.end()
+    }
+}
+impl fmt::Debug for Payload {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let s = &format!("{:?}", &self.bytes[0..10]);
         write!(f, "{}", s)
@@ -234,6 +248,34 @@ impl PacketAssembler {
         (packet.is_last_packet(), &self.packets)
     }
 }
+pub trait ToHex {
+    fn to_hex(&self) -> String;
+    fn nonzero(&self) -> usize;
+}
+const CHARS: &[u8] = b"0123456789abcdef";
+impl ToHex for [u8] {
+    fn to_hex(&self) -> String {
+        let len = self.nonzero();
+        let mut v = Vec::with_capacity(len * 2);
+        for &byte in &self[0..len] {
+            v.push(CHARS[(byte >> 4) as usize]);
+            v.push(CHARS[(byte & 0xf) as usize]);
+        }
+        unsafe {
+            String::from_utf8_unchecked(v)
+        }
+    }
+    // very unkind to caches
+    fn nonzero(&self) -> usize {
+        if self.len() < 1 { return 0 }
+        let mut finger : usize = self.len() - 1;
+        loop {
+            if self[finger] != 0 { return finger + 1; }
+            finger -= 1;
+        };
+   }
+}
+use serde::ser::{Serialize, Serializer as Funky, SerializeStruct};
 // Errors
 use failure::{Error, ResultExt};
 #[derive(Debug, Fail)]
