@@ -8,7 +8,7 @@ pub const SCHEMA_VERSION: &'static str = "0.1";
 pub const REPO: &'static str = "CellAgent";
 // Default inputs
 pub const MAX_PORTS: PortNo = PortNo(9); 	// Limit on number of ports per cell
-pub const NCELLS: CellNo    = CellNo(47);
+pub const NCELLS: CellNo    = CellNo(10);
 pub const NPORTS: PortNo    =  PortNo(8);
 pub const NLINKS: LinkNo    = LinkNo(CellNo(40));
 pub const CONTINUE_ON_ERROR: bool = false; // Don't close channel following an error if true
