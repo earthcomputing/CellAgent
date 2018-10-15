@@ -30,7 +30,7 @@ pub struct Traph {
 impl Traph {
     pub fn new(cell_id: &CellID, no_ports: PortNo, black_tree_id: &TreeID, gvm_eqn: &GvmEquation) -> Result<Traph, Error> {
         let mut elements = Vec::new();
-        for i in 1..*no_ports {
+        for i in 1..*no_ports + 1 {
             let port_number = PortNo(i as u8).make_port_number(MAX_PORTS).context(TraphError::Chain { func_name: "new", comment: S("")})?;
             elements.push(TraphElement::default(port_number));
         }

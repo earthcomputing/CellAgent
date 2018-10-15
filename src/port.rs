@@ -4,7 +4,7 @@ use std::sync::atomic::AtomicBool;
 use std::sync::{Arc};
 use std::sync::atomic::Ordering::SeqCst;
 
-use config::{PortNo};
+use config::{CONTINUE_ON_ERROR, PortNo};
 use message_types::{PortToLink, PortFromLink, PortToPe, PortFromPe, LinkToPortPacket, PortToPePacket,
               PeToPortPacket, PortToNoc, PortFromNoc};
 use name::{Name, PortID, CellID};
@@ -67,7 +67,7 @@ impl Port {
         let port = self.clone();
         let join_handle = ::std::thread::spawn( move || {
             let _ = port.listen_pe_for_noc_loop(&port_to_noc, &port_from_pe).map_err(|e| write_err("port", e));
-            let _ = port.listen_pe_for_noc(port_to_noc, port_from_pe);
+            if CONTINUE_ON_ERROR { let _ = port.listen_pe_for_noc(port_to_noc, port_from_pe); }
         });
         Ok(join_handle)
     }
