@@ -250,30 +250,17 @@ impl PacketAssembler {
 }
 pub trait ToHex {
     fn to_hex(&self) -> String;
-    fn nonzero(&self) -> usize;
 }
-const CHARS: &[u8] = b"0123456789abcdef";
 impl ToHex for [u8] {
     fn to_hex(&self) -> String {
-        let len = self.nonzero();
-        let mut v = Vec::with_capacity(len * 2);
-        for &byte in &self[0..len] {
-            v.push(CHARS[(byte >> 4) as usize]);
-            v.push(CHARS[(byte & 0xf) as usize]);
-        }
-        unsafe {
-            String::from_utf8_unchecked(v)
-        }
+        format!("{:x?}", self)
+            .split(", ")
+            .collect::<Vec<_>>()
+            .join("")
+            .trim_left_matches('[')
+            .trim_right_matches(']')
+            .trim_right_matches('0').to_string()
     }
-    // very unkind to caches
-    fn nonzero(&self) -> usize {
-        if self.len() < 1 { return 0 }
-        let mut finger : usize = self.len() - 1;
-        loop {
-            if self[finger] != 0 { return finger + 1; }
-            finger -= 1;
-        };
-   }
 }
 use serde::ser::{Serialize, Serializer as Funky, SerializeStruct};
 // Errors
