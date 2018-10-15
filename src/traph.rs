@@ -118,6 +118,7 @@ impl Traph {
             self.get_untried_child_port()
         ]
             .into_iter()
+            .filter(|element| element.is_some())
             .min_by(|x, y| x.cmp(y))
             .unwrap_or(None)
     }
