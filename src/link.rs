@@ -1,6 +1,7 @@
 use std::fmt;
 use std::thread::JoinHandle;
 
+use config::{CONTINUE_ON_ERROR};
 use message_types::{LinkToPort, LinkFromPort, LinkToPortPacket};
 use name::{Name, LinkID, PortID};
 use port::{PortStatus};
@@ -51,7 +52,7 @@ impl Link {
         let link = self.clone();
         let join_handle = ::std::thread::spawn( move || {
             let _ = link.listen_loop(&link_from, &link_to).map_err(|e| write_err("link", e.into()));
-            let _ = link.listen_port(link_from, link_to);
+            if CONTINUE_ON_ERROR { let _ = link.listen_port(link_from, link_to); }
         });
         Ok(join_handle)
     }
