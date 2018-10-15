@@ -34,8 +34,9 @@ pub const CONTROL_TREE_NAME: &'static str = "Control";
 pub const CONNECTED_PORTS_TREE_NAME: &'static str = "Connected";
 //pub const BASE_TREE_NAME: &'static str = "Base";
 // Place to write output data
-pub const OUTPUT_FILE_NAME: &'static str = "/Users/alan/Documents/multicell-trace.json";
+pub const OUTPUT_FILE_NAME: &'static str = "/tmp/multicell-trace.json";
 pub const KAFKA_SERVER: &'static str = "172.16.1.102:9092";
+pub const KAFKA_TOPIC: &'static str = "CellAgent6";
 
 pub struct DebugOptions {
     pub trace_all:      bool,

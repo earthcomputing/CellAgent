@@ -259,7 +259,7 @@ impl ToHex for [u8] {
             .join("")
             .trim_left_matches('[')
             .trim_right_matches(']')
-            .trim_right_matches('0').to_string()
+            .trim_right_matches("00").to_string()
     }
 }
 use serde::ser::{Serialize, Serializer as Funky, SerializeStruct};
