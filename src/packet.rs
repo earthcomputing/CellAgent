@@ -253,7 +253,7 @@ pub trait ToHex {
 }
 impl ToHex for [u8] {
     fn to_hex(&self) -> String {
-        format!("{:x?}", self)
+        format!("{:02x?}", self)
             .split(", ")
             .collect::<Vec<_>>()
             .join("")
