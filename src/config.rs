@@ -7,15 +7,15 @@ use utility::PortNumber;
 pub const SCHEMA_VERSION: &'static str = "0.1";
 pub const REPO: &'static str = "CellAgent";
 // Default inputs
-pub const MAX_PORTS: PortNo = PortNo(9); 	// Limit on number of ports per cell
 pub const NCELLS: CellNo    = CellNo(10);
 pub const NPORTS: PortNo    =  PortNo(8);
 pub const NLINKS: LinkNo    = LinkNo(CellNo(40));
+pub const MAX_PORTS: PortNo = PortNo(9); 	// Limit on number of ports per cell
 pub const CONTINUE_ON_ERROR: bool = false; // Don't close channel following an error if true
-pub const AUTO_BREAK: usize = 0; // >0 when debugging broken link with VSCode
+pub const AUTO_BREAK: usize = 1; // Set to index of link to break when debugging broken link with VSCode, else 0
 #[derive(Debug, Copy, Clone)]
 pub enum Quench { Simple, RootPort }
-pub const QUENCH: Quench = Quench::RootPort;
+pub const QUENCH: Quench = Quench::Simple;
 // Size limits
 //pub const MAX_ENTRIES: TableIndex    = TableIndex(64);  // Max number of active trees
 //pub const MAX_CHARS: usize         = 128; // Longest valid name
@@ -36,7 +36,7 @@ pub const CONNECTED_PORTS_TREE_NAME: &'static str = "Connected";
 // Place to write output data
 pub const OUTPUT_FILE_NAME: &'static str = "/tmp/multicell-trace.json";
 pub const KAFKA_SERVER: &'static str = "172.16.1.102:9092";
-pub const KAFKA_TOPIC: &'static str = "CellAgent6";
+pub const KAFKA_TOPIC: &'static str = "CellAgent";
 
 pub struct DebugOptions {
     pub trace_all:      bool,
@@ -156,7 +156,7 @@ pub fn get_edges() -> Vec<Edge> {
         _ => panic!("Invalid number of cells")
     }
 }
-pub fn get_geometry() -> Vec<(usize, usize)> {
+pub fn get_geometry() -> (usize, usize, Vec<(usize, usize)>) {
     let geometry = match NCELLS {
         CellNo(3)  => vec![(0,0), (0,2), (1,1)],
         CellNo(4)  => vec![(0,0), (0,1), (1,0), (1,1)],
@@ -170,7 +170,17 @@ pub fn get_geometry() -> Vec<(usize, usize)> {
                            (5,0), (5,1), (5,2), (5,3), (5,4), (5,6)],
         _ => panic!("Invalid number of cells")
     };
+    let max_x = geometry
+        .iter()
+        .max_by_key(|xy| xy.0)
+        .map(|xy| xy.0 +1)
+        .unwrap_or(0);
+    let max_y = geometry
+        .iter()
+        .max_by_key(|xy| xy.1)
+        .map(|xy| xy.1 + 1)
+        .unwrap_or(0);
     if geometry.len() != *NCELLS { panic!(format!("Topology has {} entries for {} cells", geometry.len(), *NCELLS)) };
-    geometry
+    (max_x, max_y, geometry)
 }
 fn is2e(i: usize, j: usize) -> Edge { Edge(CellNo(i),CellNo(j)) }

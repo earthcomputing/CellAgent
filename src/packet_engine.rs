@@ -76,13 +76,13 @@ impl PacketEngine {
     //pub fn get_table(&self) -> &Arc<Mutex<RoutingTable>> { &self.routing_table }
     fn listen_cm_loop(&mut self, pe_from_cm: &PeFromCm, pe_to_pe: &PeToPe, trace_header: &mut TraceHeader)
             -> Result<(), Error> {
-        let f = "listen_cm_loop";
+        let _f = "listen_cm_loop";
         loop {
-            let msg = pe_from_cm.recv().context(PacketEngineError::Chain { func_name: f, comment: S("recv entry from cm ") + self.cell_id.get_name()})?;
+            let msg = pe_from_cm.recv().context(PacketEngineError::Chain { func_name: _f, comment: S("recv entry from cm ") + self.cell_id.get_name()})?;
             if DEBUG_OPTIONS.trace_all {
-                let ref trace_params = TraceHeaderParams { module: file!(), line_no: line!(), function: f, format: "recv" };
+                let ref trace_params = TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "recv" };
                 let trace = json!({ "cell_id": &self.cell_id, "msg": &msg.clone() });
-                let _ = dal::add_to_trace(trace_header, TraceType::Trace, trace_params, &trace, f);
+                let _ = dal::add_to_trace(trace_header, TraceType::Trace, trace_params, &trace, _f);
             }
             match msg {
                 CmToPePacket::Entry(entry) => {
@@ -92,9 +92,9 @@ impl PacketEngine {
                     let mut uuid = packet.get_tree_uuid();
                     uuid.make_normal();  // Strip AIT info for lookup
                     let locked = self.routing_table.lock().unwrap();    // Hold lock until forwarding is done
-                    let entry = locked.get_entry(uuid).context(PacketEngineError::Chain { func_name: f, comment: S(self.cell_id.get_name()) })?;
+                    let entry = locked.get_entry(uuid).context(PacketEngineError::Chain { func_name: _f, comment: S(self.cell_id.get_name()) })?;
                     match packet.get_ait_state() {
-                        AitState::Tick | AitState::Tock | AitState::Tack | AitState::Teck => return Err(PacketEngineError::Ait { func_name: f, ait_state: packet.get_ait_state() }.into()), // Not allowed here
+                        AitState::Tick | AitState::Tock | AitState::Tack | AitState::Teck => return Err(PacketEngineError::Ait { func_name: _f, ait_state: packet.get_ait_state() }.into()), // Not allowed here
                         AitState::Ait => { // Update state and send on ports from entry
                             packet.next_ait_state()?;
                             let mask = user_mask.and(entry.get_mask());
@@ -102,35 +102,35 @@ impl PacketEngine {
                             if DEBUG_OPTIONS.trace_all || DEBUG_OPTIONS.pe_pkt_send {   // Debug print
                                 let msg_type = MsgType::msg_type(&packet);
                                 let tree_id = packet.get_tree_id();
-                                let ref trace_params = TraceHeaderParams { module: file!(), line_no: line!(), function: f, format: "pe_forward_leafward" };
+                                let ref trace_params = TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "pe_forward_leafward" };
                                 let trace = json!({ "cell_id": &self.cell_id, "tree_id": &tree_id,
                                     "ait_state": packet.get_ait_state(), "msg_type": &msg_type, "port_nos": &port_nos });
                                 if DEBUG_OPTIONS.pe_pkt_send {
                                     match msg_type {
                                         MsgType::Discover => (),
                                         MsgType::DiscoverD => if tree_id.is_name("Tree:C:2") {
-                                            println!("PacketEngine {}: {} on {:?} {} {}", self.cell_id, f, port_nos, msg_type, tree_id);
+                                            println!("PacketEngine {}: {} on {:?} {} {}", self.cell_id, _f, port_nos, msg_type, tree_id);
                                         },
                                         MsgType::Manifest => {
                                             println!("PacketEngine {} forwarding manifest leafward mask {} entry {}", self.cell_id, mask, entry);
                                         },
                                         MsgType::StackTree => {
-                                            println!("Packetengine {}: {} AIT state {}", self.cell_id, f, packet.get_ait_state());
+                                            println!("Packetengine {}: {} AIT state {}", self.cell_id, _f, packet.get_ait_state());
                                         },
                                         _ => {
-                                            println!("PacketEngine {}: {} on {:?} {} {}", self.cell_id, f, port_nos, msg_type, tree_id);
+                                            println!("PacketEngine {}: {} on {:?} {} {}", self.cell_id, _f, port_nos, msg_type, tree_id);
                                         }
                                     }
                                 }
-                                let _ = dal::add_to_trace(trace_header, TraceType::Debug, trace_params, &trace, f);
+                                let _ = dal::add_to_trace(trace_header, TraceType::Debug, trace_params, &trace, _f);
                             }
                             for port_no in port_nos.iter().cloned() {
                                 // I think the match version is clearer than the ok_or_else version
                                 //self.pe_to_ports.get(*port_no as usize)
                                 //    .ok_or_else(|| -> Error { PacketEngineError::Sender { cell_id: self.cell_id.clone(), func_name: "forward leaf", port_no: *port_no }.into() })?
-                                //    .send(PeToPortPacket::Packet(packet)).context(PacketEngineError::Chain { func_name: f, comment: S("send packet leafward ") + self.cell_id.get_name() })?;
+                                //    .send(PeToPortPacket::Packet(packet)).context(PacketEngineError::Chain { func_name: _f, comment: S("send packet leafward ") + self.cell_id.get_name() })?;
                                 match self.pe_to_ports.get(*port_no as usize) {
-                                    Some(s) => s.send(PeToPortPacket::Packet(packet)).context(PacketEngineError::Chain { func_name: f, comment: S("send packet leafward ") + self.cell_id.get_name() })?,
+                                    Some(s) => s.send(PeToPortPacket::Packet(packet)).context(PacketEngineError::Chain { func_name: _f, comment: S("send packet leafward ") + self.cell_id.get_name() })?,
                                     None => return Err(PacketEngineError::Sender { cell_id: self.cell_id.clone(), func_name: "forward leaf", port_no: *port_no }.into())
                                 };
                             }
@@ -141,33 +141,33 @@ impl PacketEngine {
                                 let msg_type = MsgType::msg_type(&packet);
                                 let tree_id = packet.get_tree_id();
                                 let ait_state = packet.get_ait_state();
-                                let ref trace_params = TraceHeaderParams { module: file!(), line_no: line!(), function: f, format: "pe_packet_from_cm" };
+                                let ref trace_params = TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "pe_packet_from_cm" };
                                 let trace = json!({ "cell_id": &self.cell_id, "tree_id": &tree_id, "ait_state": ait_state, "msg_type": &msg_type });
                                 if DEBUG_OPTIONS.pe_pkt_recv {
                                     match msg_type {
                                         MsgType::DiscoverD => {
                                             if tree_id.is_name("Tree:C:2") {
-                                                println!("PacketEngine {}: {} got from cm {} {}", self.cell_id, f, msg_type, tree_id);
+                                                println!("PacketEngine {}: {} got from cm {} {}", self.cell_id, _f, msg_type, tree_id);
                                             }
                                         },
                                         _ => (),
                                     }
                                 }
-                                let _ = dal::add_to_trace(trace_header, TraceType::Debug, trace_params, &trace, f);
+                                let _ = dal::add_to_trace(trace_header, TraceType::Debug, trace_params, &trace, _f);
                             }
-                            self.forward(port_no, entry, user_mask, packet, trace_header).context(PacketEngineError::Chain { func_name: f, comment: S(self.cell_id.get_name()) })?;
+                            self.forward(port_no, entry, user_mask, packet, trace_header).context(PacketEngineError::Chain { func_name: _f, comment: S(self.cell_id.get_name()) })?;
                         }
                     }
                 },
                 CmToPePacket::Tcp((port_number, msg)) => {
                     let port_no = port_number.get_port_no();
                     match self.pe_to_ports.get(*port_no as usize) {
-                        Some(sender) => sender.send(PeToPortPacket::Tcp(msg)).context(PacketEngineError::Chain { func_name: f, comment: S("send TCP to port ") + self.cell_id.get_name() })?,
-                        _ => return Err(PacketEngineError::Sender { func_name: f, cell_id: self.cell_id.clone(), port_no: *port_no }.into())
+                        Some(sender) => sender.send(PeToPortPacket::Tcp(msg)).context(PacketEngineError::Chain { func_name: _f, comment: S("send TCP to port ") + self.cell_id.get_name() })?,
+                        _ => return Err(PacketEngineError::Sender { func_name: _f, cell_id: self.cell_id.clone(), port_no: *port_no }.into())
                     }
                 },
                 CmToPePacket::Unblock => {
-                    //println!("PacketEngine {}: {} send unblock", self.cell_id, f);
+                    //println!("PacketEngine {}: {} send unblock", self.cell_id, _f);
                     pe_to_pe.send(S("Unblock"))?;
                 }
             };

@@ -875,7 +875,7 @@ impl CellAgent {
                     self.send_msg(&self.connected_tree_id, msg, mask, trace_header)?;
                 },
                 None => {
-                    println!("Cellagent {}: {} Failover failure", self.cell_id, _f);
+                    println!("Cellagent {}: {} Failover failure \n{}", self.cell_id, _f, rw_traph);
                     let sender_id = SenderID::new(&self.get_id(), "CellAgent")?;
                     let mask = Mask::new(port_no.make_port_number(self.no_ports)?);
                     let failover_d_msg = FailoverDMsg::new(&sender_id, FailoverResponse::Failure,
@@ -1409,24 +1409,24 @@ impl CellAgent {
             trace_header: &mut TraceHeader) -> Result<(), Error>
         where T: Message + ::std::marker::Sized + serde::Serialize + fmt::Display
     {
-        let f = "send_msg";
+        let _f = "send_msg";
         if DEBUG_OPTIONS.trace_all || DEBUG_OPTIONS.ca_msg_send {  // Debug print
             let mask = self.get_mask(tree_id, trace_header)?;
             let port_mask = user_mask.and(mask);
             let ports = Mask::get_port_nos(&port_mask);
             let msg_type = msg.get_msg_type();
-            let ref trace_params = TraceHeaderParams { module: file!(), line_no: line!(), function: f, format: "ca_send_msg" };
+            let ref trace_params = TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "ca_send_msg" };
             let trace = json!({ "cell_id": &self.cell_id, "tree_id": &tree_id, "port_nos": &ports, "msg": msg.value() });
             if DEBUG_OPTIONS.ca_msg_send {
                 match msg_type {
                     MsgType::Discover => (),
-                    MsgType::DiscoverD => println!("Cellagent {}: {} send on ports {:?} msg {}", self.cell_id, f, ports, msg),
+                    MsgType::DiscoverD => println!("Cellagent {}: {} send on ports {:?} msg {}", self.cell_id, _f, ports, msg),
                     _ => {
-                        println!("Cellagent {}: {} send on ports {:?} msg {}", self.cell_id, f, ports, msg)
+                        println!("Cellagent {}: {} send on ports {:?} msg {}", self.cell_id, _f, ports, msg)
                     }
                 }
             }
-            let _ = dal::add_to_trace(trace_header, TraceType::Debug, trace_params, &trace, f);
+            let _ = dal::add_to_trace(trace_header, TraceType::Debug, trace_params, &trace, _f);
         }
         let direction = msg.get_header().get_direction();
         let is_blocking = msg.is_blocking();
@@ -1436,11 +1436,11 @@ impl CellAgent {
     }
     fn send_bytes(&self, tree_id: &TreeID, is_ait: bool, is_blocking: bool, user_mask: Mask,
                   bytes: ByteArray, trace_header: &mut TraceHeader) -> Result<(), Error> {
-        let f = "send_bytes";
+        let _f = "send_bytes";
         let tree_uuid = tree_id.get_uuid();
         let base_tree_uuid = match self.tree_map.lock().unwrap().get(&tree_uuid).cloned() {
             Some(id) => id,
-            None => return Err(CellagentError::Tree { func_name: f, cell_id: self.cell_id.clone(), tree_uuid }.into())
+            None => return Err(CellagentError::Tree { func_name: _f, cell_id: self.cell_id.clone(), tree_uuid }.into())
         };
         let msg = CaToCmBytes::Bytes((tree_id.clone(), is_ait, user_mask, is_blocking, bytes));
         self.ca_to_cm.send(msg)?;

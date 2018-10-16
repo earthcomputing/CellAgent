@@ -34,7 +34,7 @@ impl Datacenter {
                 {
                     let ref trace_params = TraceHeaderParams { module: file!(), line_no: line!(), function: f, format: "border_cell_start" };
                     let cell_no = border_cell.get_cell_no();
-                    let trace = json!({ "cell_number": cell_no, "location":  geometry.get(*cell_no)});
+                    let trace = json!({ "cell_number": cell_no, "location":  geometry.2.get(*cell_no)});
                     let _ = dal::add_to_trace(trace_header, TraceType::Trace, trace_params,&trace, f);
                 }
                 NalCell::new(border_cell.get_cell_no(), border_cell.get_nports(),
@@ -49,7 +49,7 @@ impl Datacenter {
                 {
                     let ref trace_params = TraceHeaderParams { module: file!(), line_no: line!(), function: f, format: "interior_cell_start" };
                     let cell_no = interior_cell.get_cell_no();
-                    let trace = json!({ "cell_number": cell_no, "location": geometry.get(*cell_no as usize) });
+                    let trace = json!({ "cell_number": cell_no, "location": geometry.2.get(*cell_no as usize) });
                     let _ = dal::add_to_trace(trace_header, TraceType::Trace, trace_params,&trace, f);
                 }
                 NalCell::new(interior_cell.get_cell_no(), interior_cell.get_nports(),
