@@ -67,15 +67,19 @@ use uptree_spec::{AllowedTree, ContainerSpec, Manifest, UpTreeSpec, VmSpec};
 use utility::{print_vec, S, TraceHeader, TraceHeaderParams, TraceType};
 
 fn main() -> Result<(), Error> {
-    let f = "main";
+    let _f = "main";
     println!("Multicell Routing: Output to file {} (set in config.rs)", OUTPUT_FILE_NAME);
     println!("{:?} Quenching of Discover messages", QUENCH);
     let mut trace_header = TraceHeader::new();
-    {   // Can't get records from main() to show up in trace file
-        let ref trace_params = TraceHeaderParams { module: file!(), line_no: line!(), function: f, format: "trace_schema" };
-        let trace = json!({ "schema_version": SCHEMA_VERSION, "ncells": NCELLS });
-        let _ = dal::add_to_trace(&mut trace_header, TraceType::Trace, trace_params, &trace, f);
-    }
+    /* Can't get records from main() to show up in trace file
+        let (rows, cols, geometry) = config::get_geometry();
+        {
+            // For reasons I can't understand, the trace record doesn't show up when generated from main.
+            let ref trace_params = TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "trace_schema" };
+            let trace = json!({ "schema_version": SCHEMA_VERSION, "ncells": NCELLS, "rows": rows, "cols": cols });
+            let _ = dal::add_to_trace(trace_header, TraceType::Trace, trace_params,&trace, _f);
+        }
+    */
     let _ = OpenOptions::new().write(true).truncate(true).open(OUTPUT_FILE_NAME);
     /* Doesn't work when debugging in Eclipse
     let args: Vec<String> = env::args().collect();

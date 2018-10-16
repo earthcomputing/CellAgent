@@ -6,7 +6,7 @@ use std::time::{Duration};
 use serde_json;
 
 use blueprint::{Blueprint};
-use config::{NCELLS, SCHEMA_VERSION, ByteArray};
+use config::{NCELLS, SCHEMA_VERSION, ByteArray, get_geometry};
 use dal;
 use datacenter::{Datacenter};
 use gvm_equation::{GvmEquation, GvmEqn, GvmVariable, GvmVariableType};
@@ -34,10 +34,11 @@ impl Noc {
                       trace_header: &mut TraceHeader) ->
             Result<(Datacenter, Vec<JoinHandle<()>>), Error> {
         let f = "initialize";
+        let (rows, cols, geometry) = get_geometry();
         {
             // For reasons I can't understand, the trace record doesn't show up when generated from main.
             let ref trace_params = TraceHeaderParams { module: "src/main.rs", line_no: line!(), function: "MAIN", format: "trace_schema" };
-            let trace = json!({ "schema_version": SCHEMA_VERSION, "ncells": NCELLS });
+            let trace = json!({ "schema_version": SCHEMA_VERSION, "ncells": NCELLS, "rows": rows, "cols": cols });
             let _ = dal::add_to_trace(trace_header, TraceType::Trace, trace_params,&trace, f);
         }
         let (noc_to_port, port_from_noc): (NocToPort, NocFromPort) = channel();

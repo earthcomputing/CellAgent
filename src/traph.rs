@@ -113,14 +113,15 @@ impl Traph {
     }
     pub fn find_new_parent_port(&self, broken_path: Path) -> Option<PortNo> {
         vec![
-            self.get_untried_parent_port(broken_path),
-            self.get_untried_pruned_port(broken_path),
-            self.get_untried_child_port()
+            self.get_untried_parent_element(broken_path),
+            self.get_untried_pruned_element(broken_path),
+            self.get_untried_child_element()
         ]
             .into_iter()
-            .filter(|element| element.is_some())
-            .min_by(|x, y| x.cmp(y))
-            .unwrap_or(None)
+            .filter_map(|element|
+                element)
+            .min_by_key(|element| **element.get_hops())
+            .map(|element| element.get_port_no())
     }
     pub fn get_untried_parent_port(&self, broken_path: Path) -> Option<PortNo> {
         self.get_untried_parent_element(broken_path)
@@ -171,7 +172,7 @@ impl Traph {
             .filter(|&element| !self.tried_ports.contains(&element.get_port_no()))
             .filter(|&element| !element.is_on_broken_path(broken_path))
             .filter(|&element| !element.is_broken())
-            .min_by(|x, y| x.get_hops().cmp(&*y.get_hops()))
+            .min_by_key(|&element| **element.get_hops())
             .map(|element| element.clone())
     }
     pub fn update_element(&mut self, tree_id: &TreeID, port_number: PortNumber, port_status: PortStatus,
