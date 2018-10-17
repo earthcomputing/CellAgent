@@ -8,14 +8,14 @@ pub const SCHEMA_VERSION: &'static str = "0.1";
 pub const REPO: &'static str = "CellAgent";
 // Default inputs
 pub const NCELLS: CellNo    = CellNo(10);
-pub const NPORTS: PortNo    =  PortNo(8);
+pub const NPORTS: PortNo    = PortNo(8);
 pub const NLINKS: LinkNo    = LinkNo(CellNo(40));
 pub const MAX_PORTS: PortNo = PortNo(9); 	// Limit on number of ports per cell
 pub const CONTINUE_ON_ERROR: bool = false; // Don't close channel following an error if true
 pub const AUTO_BREAK: usize = 1; // Set to index of link to break when debugging broken link with VSCode, else 0
 #[derive(Debug, Copy, Clone)]
 pub enum Quench { Simple, RootPort }
-pub const QUENCH: Quench = Quench::Simple;
+pub const QUENCH: Quench = Quench::RootPort;
 // Size limits
 //pub const MAX_ENTRIES: TableIndex    = TableIndex(64);  // Max number of active trees
 //pub const MAX_CHARS: usize         = 128; // Longest valid name
@@ -135,8 +135,7 @@ impl fmt::Display for CellType {
 pub fn get_edges() -> Vec<Edge> {
     match NCELLS {
         CellNo(3)  => vec![is2e(0,1), is2e(0,2), is2e(1,2)],
-        CellNo(4)  => vec![is2e(0,1), is2e(0,2), is2e(0,3), is2e(1,2),
-                           is2e(1,3), is2e(2,3)],
+        CellNo(4)  => vec![is2e(0,1), is2e(0,2), is2e(1,2), is2e(0,3), is2e(1,3)],//, is2e(2,3)],
         CellNo(10) => vec![is2e(0,1),is2e(1,2),is2e(1,6),is2e(3,4),
                            is2e(5,6),is2e(6,7),is2e(7,8),is2e(8,9),
                            is2e(0,5),is2e(2,3),is2e(2,7),is2e(3,8),is2e(4,9)],

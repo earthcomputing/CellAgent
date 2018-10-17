@@ -137,7 +137,8 @@ fn main() -> Result<(), Error> {
 }
 fn break_link(dc: &mut Datacenter) -> Result<(), Error> {
     if AUTO_BREAK > 0 {
-        let sleep_time = std::time::Duration::from_secs(1);
+        // TODO: Wait until discover is done before automatically breaking link, should be removed
+        let sleep_time = std::time::Duration::from_secs(4);
         thread::sleep(sleep_time);
         let links = dc.get_links_mut();
         let link_to_break = links.get_mut(AUTO_BREAK).expect("Always have at least 2 links");
