@@ -112,14 +112,14 @@ impl Traph {
             .map(|element| element.clone())
     }
     pub fn find_new_parent_port(&self, broken_path: Path) -> Option<PortNo> {
+        let _f = "find_new_parent_port";
         vec![
             self.get_untried_parent_element(broken_path),
             self.get_untried_pruned_element(broken_path),
             self.get_untried_child_element()
         ]
             .into_iter()
-            .filter_map(|element|
-                element)
+            .filter_map(|element| element)
             .min_by_key(|element| **element.get_hops())
             .map(|element| element.get_port_no())
     }

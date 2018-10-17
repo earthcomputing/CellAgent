@@ -335,20 +335,6 @@ impl CellAgent {
     }
     pub fn quench_root_port(&self, tree_id: &TreeID, path: Path) -> bool {
         let _f = "quench_root_port";
-        /*let locked = self.traphs.lock().unwrap();
-        match locked.get(&tree_id.get_uuid()) {
-            None => false,
-            Some(traph) => {
-                let port_no = path.get_port_no();
-                let mut found = false;
-                for port_tree in traph.get_port_trees() {
-                    if port_no == *port_tree.get_root_port_no() { found = true; }
-                }
-                println!("Cellagent {}: {} tree {} path {} found {}", self.cell_id, _f, tree_id, *port_no, found);
-                ::utility::print_vec(traph.get_port_trees());
-                found
-            }
-        }*/
         self.traphs.lock().unwrap().get(&tree_id.get_uuid())
             .map_or(false, |traph| {
                 let port_no = path.get_port_no();
@@ -417,13 +403,13 @@ impl CellAgent {
                 _ => (hops, path)
             };
             let traph_status = traph.get_port_status(port_number);
-            let port_status = match traph_status {
+            let entry_port_status = match traph_status {
                 traph::PortStatus::Pruned => port_status,
                 _ => traph_status  // Don't replace if Parent or Child
             };
             if gvm_recv { children.insert(PortNumber::new0()); }
             let is_new_port =  !traph.is_port_connected(port_number);
-            let mut entry = traph.update_element(base_tree_id, port_number, port_status, children, hops, path).context(CellagentError::Chain { func_name: "update_traph", comment: S("") })?;
+            let mut entry = traph.update_element(base_tree_id, port_number, entry_port_status, children, hops, path).context(CellagentError::Chain { func_name: "update_traph", comment: S("") })?;
             if gvm_send { entry.enable_send() } else { entry.disable_send() }
             if DEBUG_OPTIONS.trace_all || DEBUG_OPTIONS.traph_state {
                 let ref trace_params = TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "ca_updated_traph_entry" };
@@ -787,8 +773,6 @@ impl CellAgent {
             Quench::Simple   => tree_seen,     // Must see this tree once
             Quench::RootPort => port_tree_seen // Must see every root port for this tree once
         };
-        let tree_seen = self.quench_simple(new_tree_id);
-        let status = if quench { traph::PortStatus::Pruned } else { traph::PortStatus::Parent };
         let mut eqns = HashSet::new();
         eqns.insert(GvmEqn::Recv("true"));
         eqns.insert(GvmEqn::Send("true"));
@@ -803,10 +787,11 @@ impl CellAgent {
         }
         let children = &mut HashSet::new();
         if !port_tree_seen {
+            let status = if tree_seen { traph::PortStatus::Pruned } else { traph::PortStatus::Parent };
             self.update_traph(new_tree_id, port_number, status, &gvm_equation,
                               children, hops, path, trace_header).context(CellagentError::Chain { func_name: "process_ca", comment: S("DiscoverMsg") })?;
         }
-        if quench { return Ok(()); }
+       if quench { return Ok(()); }
         self.update_base_tree_map(new_tree_id, new_tree_id, trace_header);
         // Send DiscoverD to sender first time this tree is seen
         if !tree_seen {
