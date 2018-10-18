@@ -1,4 +1,5 @@
 #![deny(unused_must_use)]
+//#![warn(rust_2018_idioms)]
 #![recursion_limit="1024"]
 extern crate chrono;
 extern crate eval;
