@@ -813,6 +813,7 @@ impl CellAgent {
         let f = "process_discoverd_msg";
         let payload = msg.get_payload();
         let tree_id = payload.get_tree_id();
+        let path = payload.get_path();
         let port_number = port_no.make_port_number(self.no_ports).context(CellagentError::Chain { func_name: "process_ca", comment: S("DiscoverDMsg")})?;
         let mut children = HashSet::new();
         children.insert(port_number);
@@ -824,7 +825,7 @@ impl CellAgent {
         let gvm_eqn = GvmEquation::new(eqns, Vec::new());
         // Need next statement even though "entry" is only used in debug print
         let _ = self.update_traph(tree_id, port_number, traph::PortStatus::Child, &gvm_eqn,
-                              &mut children, PathLength(CellNo(0)), Path::new0(), trace_header)?;
+                              &mut children, PathLength(CellNo(0)), path, trace_header)?;
         let mask = Mask::new(port_no.make_port_number(self.no_ports)?);
         let tree_id = payload.get_tree_id();
         self.forward_stacked_trees(tree_id, mask, trace_header)?;

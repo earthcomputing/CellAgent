@@ -287,13 +287,13 @@ impl PacketEngine {
             if *parent == 0 {
                 if DEBUG_OPTIONS.trace_all || DEBUG_OPTIONS.pe_pkt_send {   // Debug print
                     let msg_type = MsgType::msg_type(&packet);
-                    if msg_type == MsgType::Manifest {
-                        println!("PacketEngine {} forwarding manifest rootward", self.cell_id);
-                    }
                     let tree_id = packet.get_tree_id();
                     let ref trace_params = TraceHeaderParams { module: file!(), line_no: line!(), function: f, format: "pe_forward_to_cm" };
                     let trace = json!({ "cell_id": &self.cell_id, "tree_id": &tree_id, "msg_type": &msg_type, "parent_port": &parent });
                     if DEBUG_OPTIONS.pe_pkt_send {
+                        if msg_type == MsgType::Manifest {
+                            println!("PacketEngine {} forwarding manifest rootward", self.cell_id);
+                        }
                         match msg_type {
                             MsgType::Discover => (),
                             _ => {
