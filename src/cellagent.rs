@@ -851,10 +851,14 @@ impl CellAgent {
         let broken_tree_ids = payload.get_broken_tree_ids();
         if rw_tree_id == self.my_tree_id {
             println!("Cellagent {}: {} Failover success for {}", self.cell_id, _f, rw_tree_id);
+            let lw_port_tree_id = payload.get_lw_port_tree_id();
+            let lw_tree_id = lw_port_tree_id.without_root_port_number();
+            let lw_traph = self.get_traph(&lw_tree_id, trace_header)?;
+            println!("Cellagent {}: {} port {} lw tree {}\n{}", self.cell_id, _f, *port_no, lw_tree_id, lw_traph);
         } else {
             let mut rw_traph = self.get_traph(&rw_tree_id, trace_header)?;
-            rw_traph.add_tried_port(port_no);
-            match rw_traph.find_new_parent_port(broken_path) {
+            rw_traph.add_tried_port(&rw_tree_id, port_no);
+            match rw_traph.find_new_parent_port(&rw_tree_id, broken_path) {
                 Some(trial_port_no) => {
                     println!("Cellagent {}: {} Forward failover on port {} for tree {}", self.cell_id, _f, *trial_port_no, rw_port_tree_id);
                     let mask = Mask::new(trial_port_no.make_port_number(self.no_ports)?);
@@ -862,10 +866,12 @@ impl CellAgent {
                 },
                 None => {
                     println!("Cellagent {}: {} Failover failure \n{}", self.cell_id, _f, rw_traph);
+                    rw_traph.clear_tried_ports(&rw_tree_id);
                     let sender_id = SenderID::new(&self.get_id(), "CellAgent")?;
                     let mask = Mask::new(port_no.make_port_number(self.no_ports)?);
                     let failover_d_msg = FailoverDMsg::new(&sender_id, FailoverResponse::Failure,
                               rw_port_tree_id, PathLength(CellNo(0)), broken_tree_ids, broken_path);
+                    //self.send_msg(&self.connected_tree_id, &failover_d_msg, mask, trace_header)?;
                 }
             }
         }
@@ -873,7 +879,8 @@ impl CellAgent {
         let mut traph = self.get_traph(&rw_tree_id, trace_header).context(CellagentError::Chain { func_name: _f, comment: S("") })?;
         let parent_element = traph.get_parent_element()?;
         let trial_element = if parent_element.is_on_broken_path(broken_path) {
-            traph.get_untried_pruned_element(broken_path).or(traph.get_untried_child_element())
+            traph.get_untried_pruned_element(&rw_tree_id, broken_path)
+                .or(traph.get_untried_child_element(&rw_tree_id))
         } else {
             Some(parent_element)
         };
@@ -918,7 +925,7 @@ impl CellAgent {
         let payload = msg.get_payload();
         match payload.get_response() {
             FailoverResponse::Success => {
-                let port_tree_id = payload.get_port_tree_id();
+                let port_tree_id = payload.get_rw_tree_id();
                 let tree_id = port_tree_id.without_root_port_number();
                 let hops = *payload.get_hops();
                 let path = *payload.get_path();
@@ -1284,11 +1291,12 @@ impl CellAgent {
                     return Ok(())
                 }
             };
+        let rw_tree_id = rw_traph.get_base_tree_id().clone(); // Need clone to avoid borrow problem
         let broken_path = rw_traph.get_element(port_no)?.get_path();
-        rw_traph.add_tried_port(port_no);  // Don't try port attached to broken link
-        if let Some(trial_parent_port) = rw_traph.find_new_parent_port(broken_path) {
+        rw_traph.add_tried_port(&rw_tree_id, port_no);  // Don't try port attached to broken link
+        if let Some(trial_parent_port) = rw_traph.find_new_parent_port(&rw_tree_id, broken_path) {
             println!("Cellagent {}: {} candidate parent for tree {} is {}", self.cell_id, _f, rw_traph.get_base_tree_id(), *trial_parent_port);
-            rw_traph.add_tried_port(trial_parent_port);
+            rw_traph.add_tried_port(&rw_tree_id, trial_parent_port);
             let sender_id = SenderID::new(&self.get_id(), "CellAgent")?;
             let rootward_tree_id = rw_traph.get_base_tree_id();
             let rw_port_tree_id = rootward_tree_id.with_root_port_number(&port_number);
