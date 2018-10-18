@@ -851,7 +851,7 @@ impl CellAgent {
         let broken_path = payload.get_path();
         let broken_tree_ids = payload.get_broken_tree_ids();
         if rw_tree_id == self.my_tree_id {
-            let port_number = port_no.make_port_number(self.no_ports);
+            let port_number = port_no.make_port_number(self.no_ports)?;
             let lw_port_tree_id = payload.get_lw_port_tree_id();
             let lw_tree_id = lw_port_tree_id.without_root_port_number();
             println!("Cellagent {}: {} Failover success from {} {}", self.cell_id, _f, lw_port_tree_id, lw_port_tree_id.get_uuid());
