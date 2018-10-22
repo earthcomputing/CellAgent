@@ -112,7 +112,6 @@ fn main() -> Result<(), Error> {
     let (mut dc, _) = noc.initialize(&blueprint, noc_from_outside, &mut trace_header).context(MainError::Chain { func_name: "run", comment: S("") })?;
     if AUTO_BREAK > 0{
         println!("---> Automatically break link");
-        println!("---> Automatically break link #1");
         break_link(&mut dc)?;
     }
     loop {
@@ -139,8 +138,8 @@ fn main() -> Result<(), Error> {
 fn break_link(dc: &mut Datacenter) -> Result<(), Error> {
     if AUTO_BREAK > 0 {
         // TODO: Wait until discover is done before automatically breaking link, should be removed
-        let sleep_time = std::time::Duration::from_secs(4);
-        thread::sleep(sleep_time);
+        ::utility::sleep(4);
+        println!("---> Automatically break link #1");
         let links = dc.get_links_mut();
         let link_to_break = links.get_mut(AUTO_BREAK).expect("Always have at least 2 links");
         link_to_break.break_link()?;

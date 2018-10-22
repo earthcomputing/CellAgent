@@ -16,10 +16,11 @@ pub struct TraphElement {
 impl TraphElement {
     pub fn new(is_connected: bool, port_no: PortNo,
             status: PortStatus, hops: PathLength, path: Path) -> TraphElement {
-        TraphElement { port_no,  is_connected, is_broken: false, status,
-            hops, path }
+        let _f = "new";
+        TraphElement { port_no,  is_connected, is_broken: false, status, hops, path }
     }
     pub fn default(port_number: PortNumber) -> TraphElement {
+        let _f = "default";
         let port_no = port_number.get_port_no();
         TraphElement::new(false, port_no, PortStatus::Pruned,
                     PathLength(CellNo(0)), Path::new0())
