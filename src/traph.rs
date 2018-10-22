@@ -1,6 +1,5 @@
 use std::fmt;
 use std::collections::{HashMap, HashSet};
-use std::iter::FromIterator;
 use std::sync::{Arc, Mutex};
 
 use serde_json;
@@ -93,8 +92,7 @@ impl Traph {
             .contains(&port_no)
     }
     pub fn get_tree_entry(&self, tree_uuid: &Uuid) -> Result<RoutingTableEntry, Error> {
-        self.get_tree(tree_uuid)
-            .map(|tree| tree.get_table_entry())
+        Ok(self.get_tree(tree_uuid)?.get_table_entry())
     }
     pub fn set_tree_entry(&mut self, tree_uuid: &Uuid, entry: RoutingTableEntry) -> Result<(), Error> {
         let _f = "set_tree_entry";
@@ -205,7 +203,7 @@ impl Traph {
         let mut table_entry = tree.get_table_entry();
         if port_status == PortStatus::Parent {
             table_entry.set_parent(port_number);
-         };
+        };
         table_entry.set_tree_id(tree_id);
         table_entry.add_children(&children);
         table_entry.set_inuse();
@@ -304,6 +302,7 @@ impl fmt::Display for Traph {
         for tree in locked.values() {
             s = s + &format!("\n  {}", tree);
         }
+        s = s + &format!("\n  Port Trees");
         for port_tree in &self.port_trees {
             s = s + &format!("\n  {}", port_tree);
         }
