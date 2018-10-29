@@ -4,6 +4,7 @@ version = "0.1.0"
 authors = ["Alan Karp <alan@earthcomputing.io>"]
 
 [dependencies]
+backtrace = "0.3"
 chrono = { version = "0.4.3", features = ["serde"] }
 crossbeam = "0.2"
 ditto = "0.2.0" # CRDT library
