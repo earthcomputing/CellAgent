@@ -168,8 +168,8 @@ impl TraceHeader {
         self.epoch    = timestamp();
     }
     pub fn get_event_id(&self) -> Vec<u64> { self.event_id.clone() }
-    fn parse(thread_id: ThreadId) -> u64 {
-        let as_string = format!("{:?}",::std::thread::current().id());
+    pub fn parse(thread_id: ThreadId) -> u64 {
+        let as_string = format!("{:?}", thread_id);
         let r: Vec<&str> = as_string.split('(').collect();
         let n_as_str: Vec<&str> = r[1].split(')').collect();
         n_as_str[0].parse().expect(&format!("Problem parsing ThreadId {:?}", thread_id))
@@ -182,7 +182,7 @@ fn timestamp() -> u64 {
 }
 pub fn sleep(n: usize) { // Sleep for n seconds
     let sleep_time = ::std::time::Duration::from_secs(4);
-    ::std::thread::sleep(sleep_time);
+    thread::sleep(sleep_time);
 }
 pub struct TraceHeaderParams {
     pub module:   &'static str,
