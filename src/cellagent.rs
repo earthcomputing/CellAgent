@@ -462,6 +462,14 @@ impl CellAgent {
             Entry::Vacant(_) => Err(CellagentError::NoTraph { cell_id: self.cell_id.clone(), func_name: "stack_tree", tree_uuid: uuid }.into())
         }
     }
+    fn insert_traph(&self, tree_id: &TreeID, traph: &Traph, trace_header: &mut TraceHeader) -> Result<(), Error> {
+        let f = "update_traph";
+        let base_tree_id = self.get_base_tree_id(tree_id, trace_header).context(CellagentError::Chain { func_name: f, comment: S("") })?;
+        let mut locked = self.traphs.lock().unwrap();
+        let uuid = base_tree_id.get_uuid();
+        locked.insert(uuid, traph.clone());
+        Ok(())
+    }
     pub fn deploy(&mut self, sender_id: &SenderID, deployment_tree_id: &TreeID, _msg_tree_id: &TreeID,
                   msg_tree_map: &MsgTreeMap, manifest: &Manifest,
                   trace_header: &mut TraceHeader) -> Result<(), Error> {
@@ -1284,6 +1292,9 @@ impl CellAgent {
         let port_no_mask = Mask::new(port_number);
         self.connected_tree_entry.lock().unwrap().and_with_mask(port_no_mask.not());
         self.update_entry(*self.connected_tree_entry.lock().unwrap())?;
+        let mut my_traph = self.get_traph(&self.my_tree_id, trace_header)?;
+        my_traph.set_broken(port_number);
+        self.insert_traph(&self.my_tree_id, &my_traph, trace_header)?;
         let mut broken_base_tree_ids = HashSet::new();
         let mut rw_traph = match self.traphs.lock().unwrap()
             .values_mut()
@@ -1302,8 +1313,6 @@ impl CellAgent {
                 }
             };
         let rw_tree_id = rw_traph.get_base_tree_id().clone(); // Need clone to avoid borrow problem
-        let mut my_traph = self.get_traph(&self.my_tree_id, trace_header)?;
-        my_traph.set_broken(port_number);
         let mut element = my_traph.get_element(port_no)?.clone();
         element.set_broken();
         let broken_path = rw_traph.get_element(port_no)?.get_path();
