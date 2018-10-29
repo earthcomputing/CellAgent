@@ -24,7 +24,7 @@ impl fmt::Display for CFrame {
         write!(f, "{}", s)
     }
 }
-pub fn captureStack() -> Vec<CFrame> {
+pub fn capture_stack() -> Vec<CFrame> {
     let mut cframes = Vec::new();
     backtrace::trace(|frame| {
         // let symbol_address = frame.symbol_address();
@@ -49,7 +49,7 @@ use std::thread;
 use TraceHeader;
 pub fn dumpstack() {
     let thread_id = TraceHeader::parse(thread::current().id());
-    let mut v = captureStack();
+    let mut v = capture_stack();
     // trim first couple of frames
     if v[0].f.starts_with("multicell::traph::captureStack::") {
         if v[1].f.starts_with("multicell::traph::dumpstack::") {
