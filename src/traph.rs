@@ -6,6 +6,7 @@ use serde_json;
 //use uuid::Uuid;
 
 use config::{MAX_PORTS, PathLength, PortNo};
+use dumpstack::{dumpstack};
 use gvm_equation::{GvmEquation, GvmVariable, GvmVariableType};
 use name::{Name, CellID, TreeID};
 use port_tree::PortTree;
@@ -41,8 +42,11 @@ impl Traph {
             let mut locked = stacked_trees.lock().unwrap();
             locked.insert(black_tree_id.get_uuid(), black_tree);
         }
-        Ok(Traph { cell_id: cell_id.clone(), base_tree_id: black_tree_id.clone(), port_tree: None,
-                   port_trees: HashSet::new(), stacked_trees, elements, tried_ports: HashMap::new() })
+        let cloth = Traph { cell_id: cell_id.clone(), base_tree_id: black_tree_id.clone(), port_tree: None,
+                   port_trees: HashSet::new(), stacked_trees, elements, tried_ports: HashMap::new() };
+        // println!("new - {}", cloth);
+        // dumpstack();
+        Ok(cloth)
     }
     pub fn get_cell_id(&self) -> &CellID { &self.cell_id }
     pub fn get_tree(&self, tree_uuid: &Uuid) -> Result<Tree, Error> {
@@ -123,6 +127,8 @@ impl Traph {
     }
     pub fn get_parent_element(&self) -> Result<TraphElement, Error> {
         let _f = "get_parent_element";
+        // println!("get_parent_element - {}", self);
+        // dumpstack();
         self.elements
             .iter()
             .find(|&element| element.get_status() == PortStatus::Parent)
@@ -172,6 +178,8 @@ impl Traph {
     pub fn get_untried_child_element(&self, rw_tree_id: &TreeID) -> Option<TraphElement> {
         // TODO: Change to pick child with pruned port with shortest path to root
         let _f = "get_untried_child_element";
+        // println!("get_untried_child_element - {}", self);
+        // dumpstack();
         self.elements
             .iter()
             .filter(|&element| element.is_connected())
@@ -182,6 +190,8 @@ impl Traph {
     }
     pub fn get_untried_pruned_element(&self, rw_tree_id: &TreeID, broken_path: Path) -> Option<TraphElement> {
         let _f = "get_untried_pruned_element";
+        // println!("get_untried_pruned_element - {}", self);
+        // dumpstack();
         self.elements
             .iter()
             .filter(|&element| element.is_connected())
@@ -196,6 +206,8 @@ impl Traph {
                           children: HashSet<PortNumber>, hops: PathLength, path: Path)
                           -> Result<RoutingTableEntry, Error> {
         let _f = "update_element";
+        // println!("update_element - {}", self);
+        // dumpstack();
         let port_no = port_number.get_port_no();
         let mut stacked_trees = self.stacked_trees.lock().unwrap();
         let mut tree = stacked_trees.get(&tree_id.without_root_port_number().get_uuid()).cloned()
@@ -210,6 +222,7 @@ impl Traph {
         tree.set_table_entry(table_entry);
         stacked_trees.insert(tree_id.get_uuid(), tree);
         let element = TraphElement::new(true, port_no, port_status, hops, path);
+        // println!("update_element2 - {}", element);
         self.elements[*port_no as usize] = element; // Cannot fail because self.elements has MAX_PORTS elements
         Ok(table_entry)
     }
@@ -218,6 +231,8 @@ impl Traph {
                        children: &HashSet<PortNumber>, hops: PathLength, path: Path)
                        -> Result<RoutingTableEntry, Error> {
         let _f = "new_element";
+        // println!("new_element - {}", self);
+        // dumpstack();
         let port_no = port_number.get_port_no();
         let mut stacked_trees = self.stacked_trees.lock().unwrap();
         let mut tree = stacked_trees.get(&tree_id.without_root_port_number().get_uuid()).cloned()
@@ -230,6 +245,7 @@ impl Traph {
         tree.set_table_entry(table_entry);
         stacked_trees.insert(tree_id.get_uuid(), tree);
         let element = TraphElement::new(true, port_no, port_status, hops, path);
+        // println!("new_element2 - {}", element);
         self.elements[*port_no as usize] = element; // Cannot fail because self.elements has MAX_PORTS elements
         Ok(table_entry)
     }
