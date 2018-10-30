@@ -561,6 +561,7 @@ impl CellAgent {
              if DEBUG_OPTIONS.trace_all || DEBUG_OPTIONS.ca_msg_recv { // Debug print
                  let ref trace_params = TraceHeaderParams { module: file!(), line_no: line!(), function: f, format: "ca_got_from_uptree" };
                  let trace = json!({ "cell_id": &self.cell_id,
+                    "is_ait": is_ait,
                     "allowed_tree": &allowed_tree, "msg_type": &msg_type,
                     "direction": &direction, "tcp_msg": &serde_json::to_value(&serialized)? });
                  let _ = dal::add_to_trace(trace_header, TraceType::Debug, trace_params, &trace, f);
@@ -671,7 +672,13 @@ impl CellAgent {
     fn listen_cm_loop(&mut self, ca_from_cm: &CaFromCm, trace_header: &mut TraceHeader) -> Result<(), Error> {
         let f = "listen_cm_loop";
         loop {
-            match ca_from_cm.recv().context(CellagentError::Chain { func_name: f, comment: S(self.cell_id.clone())})? {
+            let msg = ca_from_cm.recv().context(CellagentError::Chain { func_name: f, comment: S(self.cell_id.clone())})?;
+            {
+                let ref trace_params = TraceHeaderParams { module: file!(), line_no: line!(), function: f, format: "ca_from_cm" };
+                let trace = json!({ "cell_id": &self.cell_id, "msg": &msg });
+                let _ = dal::add_to_trace(trace_header, TraceType::Trace, trace_params, &trace, f);
+            }
+            match msg {
                 CmToCaBytes::Status((port_no, is_border, status)) => match status {
                     port::PortStatus::Connected => self.port_connected(port_no, is_border, trace_header).context(CellagentError::Chain { func_name: f, comment: S(self.cell_id.clone()) +" port_connected"})?,
                     port::PortStatus::Disconnected => self.port_disconnected(port_no, trace_header).context(CellagentError::Chain { func_name: f, comment: S(self.cell_id.clone()) + " port_disconnected"})?
