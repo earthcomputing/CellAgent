@@ -7,7 +7,7 @@
             "request": "launch",
             "name": "Debug",
             "program": "/Users/alan/Documents/Eclipse/multicell/target/debug/multicell",
-            "args": [],
+            "args": ["config.json"],
             "cwd": "/Users/alan/Documents/Eclipse/multicell",
             //"preLaunchTask": "/Users/alan/.cargo/bin/cargo",
             "sourceLanguages": ["rust"],    
