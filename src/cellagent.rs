@@ -1,6 +1,6 @@
 use std::fmt;
 use std::sync::mpsc::channel;
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, Mutex, MutexGuard};
 use std::thread;
 use std::collections::{HashMap, HashSet};
 use std::collections::hash_map::Entry;
@@ -452,6 +452,13 @@ impl CellAgent {
     fn insert_traph(&mut self, tree_id: &TreeID, traph: &Traph, trace_header: &mut TraceHeader) -> Result<(), Error> {
         let f = "update_traph";
         let base_tree_id = self.get_base_tree_id(tree_id, trace_header).context(CellagentError::Chain { func_name: f, comment: S("") })?;
+        let uuid = base_tree_id.get_uuid();
+        self.traphs.insert(uuid, traph.clone());
+        Ok(())
+    }
+    fn update_traphs(&mut self, tree_id: &TreeID, traph: &Traph, trace_header: &mut TraceHeader) -> Result<(), Error> {
+        let _f = "update_traphs";
+        let base_tree_id = self.get_base_tree_id(tree_id, trace_header).context(CellagentError::Chain { func_name: _f, comment: S("") })?;
         let uuid = base_tree_id.get_uuid();
         self.traphs.insert(uuid, traph.clone());
         Ok(())
@@ -1278,6 +1285,9 @@ impl CellAgent {
         my_traph.set_broken(port_number);
         self.insert_traph(&my_tree_id.clone(), &my_traph, trace_header)?;
         let mut broken_base_tree_ids = HashSet::new();
+        let mut my_traph = self.get_traph(&self.my_tree_id, trace_header)?;
+        my_traph.set_broken(port_number);
+        self.update_traphs(&my_tree_id, &my_traph, trace_header)?;
         let mut rw_traph = match self.traphs
             .values_mut()
             .map(|traph| { traph.set_broken(port_number); traph })
