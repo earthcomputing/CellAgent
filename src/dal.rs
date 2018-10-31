@@ -3,6 +3,7 @@
 use std::fs::{File, OpenOptions};
 use std::io::Write;
 
+use lazy_static::lazy_static;
 use rdkafka::config::ClientConfig;
 use rdkafka::producer::{FutureProducer, FutureRecord};
 use serde_json;

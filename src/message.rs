@@ -353,13 +353,13 @@ impl fmt::Display for DiscoverDMsg {
 }
 #[derive(Debug, Clone, Hash, Serialize, Deserialize)]
 pub struct DiscoverDPayload {
-    senging_cell_id: CellID,
+    sending_cell_id: CellID,
 	tree_id: TreeID,
     path: Path
 }
 impl DiscoverDPayload {
 	fn new(sending_cell_id: &CellID, tree_id: &TreeID, path: Path) -> DiscoverDPayload {
-		DiscoverDPayload { senging_cell_id: sending_cell_id.clone(), tree_id: tree_id.clone(), path }
+		DiscoverDPayload { sending_cell_id: sending_cell_id.clone(), tree_id: tree_id.clone(), path }
 	}
 	pub fn get_tree_id(&self) -> &TreeID { &self.tree_id }
     pub fn get_path(&self) -> Path { self.path }
