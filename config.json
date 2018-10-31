@@ -1,0 +1,46 @@
+{ "title": "3 cells with simple quenching"
+  "size": {
+      "default_ports_per_cell": 8,
+      "max_ports_per_cell": 9,
+      "min_border_cells": 1
+  },
+  "packet": {
+      "packet_min": 64,
+      "packet_max": 9000,
+      "default_element": 0
+  },
+  "control": {
+      "quench": "simple",
+      "continue_on_error": false,
+      "auto_break_link": 1,
+      "debug_options" {
+          "trace_all":      true,
+          "ca_msg_recv":    false,
+          "ca_msg_send":    false,
+          "cm_from_ca":     false,
+          "cm_to_ca":       false,
+          "cm_from_pe":     false,
+          "cm_to_pe":       false,
+          "deploy":         false,
+          "pe_pkt_recv":    false,
+          "pe_pkt_send":    false,
+          "process_msg":    false,
+          "pe_process_pkt": false,
+          "saved_msgs":     false,
+          "stack_tree":     false,
+          "traph_state":    false,
+      }
+},
+  "output": {
+    "output_file_name": "/tmp/multicell-trace.json",
+    "kafka_server": "172.16.1.102:9092",
+    "kafka_topic": "CellAgent"
+  },
+  "names": {
+    "separator": "+",
+    "control_tree_name": "Control",
+    "connected_tree_name": "Connected"
+  },
+  "edges": [[0,1], [0,2], [1,2]],
+  "geometry": [[0,0], [0,2], [1,1]]
+}        
