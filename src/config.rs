@@ -130,6 +130,8 @@ pub fn get_edges() -> Vec<Edge> {
         CellNo(10) => vec![is2e(0,1),is2e(1,2),is2e(1,6),is2e(3,4),
                            is2e(5,6),is2e(6,7),is2e(7,8),is2e(8,9),
                            is2e(0,5),is2e(2,3),is2e(2,7),is2e(3,8),is2e(4,9)],
+        // blueprint-baran-distributed.gv
+        // 97 edges
         CellNo(47) => vec![
             is2e( 0, 1), is2e( 0, 4), is2e( 1, 2), is2e( 1, 5), is2e( 1, 6), is2e( 2, 3), is2e( 2, 6), is2e( 2, 7), is2e( 3, 8),
             is2e( 4, 5), is2e( 4, 9), is2e( 5, 6), is2e( 5,10), is2e( 5,11), is2e( 6, 7), is2e( 6,12), is2e( 7, 8), is2e( 7,13),
