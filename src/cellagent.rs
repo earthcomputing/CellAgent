@@ -1,5 +1,6 @@
 use std::fmt;
 use std::sync::mpsc::channel;
+use std::sync::{Arc, Mutex};
 use std::thread;
 use std::collections::{HashMap, HashSet};
 use std::collections::hash_map::Entry;
@@ -65,7 +66,7 @@ pub struct CellAgent {
     my_entry: RoutingTableEntry,
     connected_tree_entry: RoutingTableEntry,
     saved_discover: Vec<SavedDiscover>,
-    saved_msgs: SavedMsgs,
+    saved_msgs: Arc<Mutex<SavedMsgs>>,
     saved_stack: SavedStackMsgs,
     traphs: Traphs,
     tree_map: TreeMap, // Base tree for given stacked tree
@@ -97,7 +98,7 @@ impl CellAgent {
             no_ports, traphs: HashMap::new(), vm_id_no: 0, tree_id_map: HashMap::new(),
             tree_map: HashMap::new(),
             tree_name_map: HashMap::new(), border_port_tree_id_map: HashMap::new(),
-            saved_msgs: HashMap::new(), saved_discover: Vec::new(),
+            saved_msgs: Arc::new(Mutex::new(HashMap::new())), saved_discover: Vec::new(),
             saved_stack: HashMap::new(),
             my_entry: RoutingTableEntry::default(), base_tree_map, neighbors: HashMap::new(),
             connected_tree_entry: RoutingTableEntry::default(),
@@ -204,7 +205,7 @@ impl CellAgent {
         if DEBUG_OPTIONS.trace_all || DEBUG_OPTIONS.saved_msgs {   // Debug print
             let f = "get_saved_msgs";
             {
-                let saved_msgs = match self.saved_msgs.get(tree_id) {
+                let saved_msgs = match self.saved_msgs.lock().unwrap().get(tree_id) {
                     Some(msgs) => msgs.clone(),
                     None => Vec::new()
                 };
@@ -214,7 +215,7 @@ impl CellAgent {
                 if DEBUG_OPTIONS.saved_msgs { println!("Cellagent {}: {} for tree {} {}", self.cell_id, f, tree_id, saved_msgs.len()); }
             }
         }
-        match self.saved_msgs.get(tree_id) {
+        match self.saved_msgs.lock().unwrap().get(tree_id) {
             Some(msgs) => msgs.clone(),
             None => Vec::new()
         }
@@ -224,15 +225,16 @@ impl CellAgent {
                          trace_header: &mut TraceHeader) -> Result<(), Error> {
         let empty = Vec::new();
         let saved = {
-            let mut saved_msgs = self.saved_msgs.remove(tree_id).unwrap_or(empty);
+            let mut saved_msgs = self.saved_msgs.lock().unwrap().remove(tree_id).unwrap_or(empty);
             saved_msgs.push(options.clone());
             saved_msgs
         };
-        self.saved_msgs.insert(tree_id.clone(), saved);
+        self.saved_msgs.lock().unwrap().insert(tree_id.clone(), saved);
         if DEBUG_OPTIONS.trace_all || DEBUG_OPTIONS.saved_msgs {   // Debug print
             let f = "add_saved_msg";
             let default = &Vec::new();
-            let saved_msgs = self.saved_msgs
+            let locked = self.saved_msgs.lock().unwrap();
+            let saved_msgs = locked
                 .get(tree_id)
                 .unwrap_or(default);
             let ref trace_params = TraceHeaderParams { module: file!(), line_no: line!(), function: f, format: "ca_add_saved_msg" };
