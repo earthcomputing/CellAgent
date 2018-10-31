@@ -7,7 +7,7 @@ extern crate eval;
 extern crate futures;
 extern crate indexmap;
 extern crate internment;
-#[macro_use] extern crate lazy_static;
+extern crate lazy_static;
 extern crate rand;
 extern crate rdkafka;
 extern crate serde;
