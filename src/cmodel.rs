@@ -86,16 +86,18 @@ impl Cmodel {
 
                 // packetize
                 CaToCmBytes::Bytes((tree_id, is_ait, user_mask, is_blocking, bytes)) => {
-                    let dpi_msg = MsgType::msg_from_bytes(&bytes)?;
-                    let dpi_msg_type = dpi_msg.get_msg_type();
-                    let dpi_tree_id = dpi_msg.get_tree_id();
-                    match dpi_msg_type {
-                        MsgType::Discover => (),
-                        MsgType::DiscoverD => {
-                            if dpi_tree_id.is_name(CENTRAL_TREE) { println!("Cmodel {}: {} received {}", self.cell_id, _f, dpi_msg); }
-                        },
-                        _ => {
-                            println!("Cmodel {}: {} received {}", self.cell_id, _f, dpi_msg);
+                    if DEBUG_OPTIONS.cm_from_ca {
+                        let dpi_msg = MsgType::msg_from_bytes(&bytes)?;
+                        let dpi_msg_type = dpi_msg.get_msg_type();
+                        let dpi_tree_id = dpi_msg.get_tree_id();
+                        match dpi_msg_type {
+                            MsgType::Discover => (),
+                            MsgType::DiscoverD => {
+                                if dpi_tree_id.is_name(CENTRAL_TREE) { println!("Cmodel {}: {} received {}", self.cell_id, _f, dpi_msg); }
+                            },
+                            _ => {
+                                println!("Cmodel {}: {} received {}", self.cell_id, _f, dpi_msg);
+                            }
                         }
                     }
                     // xmit msg
@@ -108,7 +110,7 @@ impl Cmodel {
                         let dpi_is_ait = first.is_ait();
                         let msg_id = first.get_msg_id();
                         let packet_count = first.get_count();
-                        println!("Cmodel {}: {} packetize - is_ait {} msg_id {} count {}", self.cell_id, _f, dpi_is_ait, *msg_id, packet_count);
+                        if DEBUG_OPTIONS.cm_from_ca { println!("Cmodel {}: {} packetize - is_ait {} msg_id {} count {}", self.cell_id, _f, dpi_is_ait, *msg_id, packet_count); }
                         for packet in packets {
                             cm_to_pe.send(CmToPePacket::Packet((user_mask, packet)))?;
                         }
@@ -173,21 +175,23 @@ packets: Vec<Packet>,
                 let trace = json!({ "cell_id": &self.cell_id, "packet": &packet });
                 let _ = dal::add_to_trace(trace_header, TraceType::Debug, trace_params, &trace, f);
             }
-            let packet_count = packets[0].get_count();
             let is_ait = packets[0].is_ait();
             let uuid = packet.get_tree_uuid();
             let bytes = Packetizer::unpacketize(packets).context(CmodelError::Chain { func_name: f, comment: S("") })?;
-            let dpi_msg = MsgType::msg_from_bytes(&bytes)?;
-            let dpi_msg_type = dpi_msg.get_msg_type();
-            let dpi_tree_id = dpi_msg.get_tree_id();
 
-            match dpi_msg_type {
-                MsgType::Discover => (),
-                MsgType::DiscoverD => {
-                    if dpi_tree_id.is_name(CENTRAL_TREE) { println!("Cmodel {}: {} received {}", self.cell_id, f, dpi_msg); }
-                },
-                _ => {
-                    println!("Cmodel {}: {} received {} count {}", self.cell_id, f, dpi_msg, packet_count);
+            if DEBUG_OPTIONS.cm_from_ca {
+                let packet_count = packets[0].get_count();
+                let dpi_msg = MsgType::msg_from_bytes(&bytes)?;
+                let dpi_msg_type = dpi_msg.get_msg_type();
+                let dpi_tree_id = dpi_msg.get_tree_id();
+                match dpi_msg_type {
+                    MsgType::Discover => (),
+                    MsgType::DiscoverD => {
+                        if dpi_tree_id.is_name(CENTRAL_TREE) { println!("Cmodel {}: {} received {}", self.cell_id, f, dpi_msg); }
+                    },
+                    _ => {
+                        println!("Cmodel {}: {} received {} count {}", self.cell_id, f, dpi_msg, packet_count);
+                    }
                 }
             }
             let msg = CmToCaBytes::Bytes((port_no, is_ait, uuid, bytes));
