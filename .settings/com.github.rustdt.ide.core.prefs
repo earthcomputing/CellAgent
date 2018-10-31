@@ -6,4 +6,4 @@ rainicorn_path=/Users/alan/.cargo/bin/parse_describe
 rustfmt_path=/Users/alan/.cargo/bin/rustfmt
 sdk_path=/Users/alan/.rustup/toolchains/stable-x86_64-apple-darwin
 sdk_src_path=/Users/alan/.rustup/toolchains/stable-x86_64-apple-darwin/lib/rustlib/src/rust/src
-toolchain_prefs.use_project_settings=true
+toolchain_prefs.use_project_settings=false

@@ -16,6 +16,7 @@ use utility::S;
 use uuid_ec::{Uuid, AitState};
  
 //const LARGEST_MSG: usize = std::u32::MAX as usize;
+const PACKET_HEADER_SIZE: usize = 16; // PacketHeader / Uuid
 const PAYLOAD_MIN: usize = PACKET_MAX - PACKET_HEADER_SIZE;
 const PAYLOAD_MAX: usize = PACKET_MAX - PACKET_HEADER_SIZE;
 
@@ -35,37 +36,44 @@ impl Packet {
         let payload = Payload::new(msg_id, size, is_last_packet, is_blocking, data_bytes);
         Packet { header, payload, packet_count: Packet::get_next_count() }
     }
+
+    pub fn get_next_count() -> usize { PACKET_COUNT.fetch_add(1, Ordering::SeqCst) }
+
+    //pub fn get_header(&self) -> PacketHeader { self.header }
+    pub fn get_count(&self) -> usize { self.packet_count }
+
+    // PacketHeader (delegate)
     pub fn get_uuid(&self) -> Uuid { self.header.get_uuid() }
+    pub fn get_tree_uuid(&self) -> Uuid { self.header.get_uuid() }
+
+    // Payload (delegate)
+    pub fn is_blocking(&self) -> bool { self.payload.is_blocking() }
+    pub fn is_last_packet(&self) -> bool { self.payload.is_last_packet() }
+    pub fn get_msg_id(&self) -> MsgID { self.payload.get_msg_id() }
+    pub fn get_size(&self) -> PacketNo { self.payload.get_size() }
+    pub fn get_bytes(&self) -> Vec<u8> { self.payload.bytes.iter().cloned().collect() }
+    //	pub fn get_payload_bytes(&self) -> Vec<u8> { self.get_payload().get_bytes() }
+    //	pub fn get_payload_size(&self) -> usize { self.payload.get_no_bytes() }
+
+    // UUID Magic
     pub fn make_ait(&mut self) { self.header.make_ait() }
     pub fn make_tock(&mut self) { self.header.make_tock() }
     pub fn is_ait(&self) -> bool { self.header.get_uuid().is_ait() }
     pub fn get_ait_state(&self) -> AitState { self.get_uuid().get_ait_state() }
+    pub fn time_reverse(&mut self) { self.header.get_uuid().time_reverse(); }
     pub fn next_ait_state(&mut self) -> Result<AitState, Error> {
         let mut uuid = self.header.get_uuid();
         uuid.next()?;
         self.header = PacketHeader::new(&uuid);
         Ok(uuid.get_ait_state())
     }
-    pub fn time_reverse(&mut self) {
-        self.header.get_uuid().time_reverse();
-    }
-    pub fn get_next_count() -> usize { PACKET_COUNT.fetch_add(1, Ordering::SeqCst) }
-    //pub fn get_count(&self) -> usize { self.packet_count }
-    // For debugging
-    //pub fn get_header(&self) -> PacketHeader { self.header }
-    pub fn get_tree_uuid(&self) -> Uuid { self.header.get_uuid() }
-    pub fn is_blocking(&self) -> bool { self.payload.is_blocking() }
-    pub fn is_last_packet(&self) -> bool { self.payload.is_last_packet() }
-    pub fn get_bytes(&self) -> Vec<u8> { self.payload.bytes.iter().cloned().collect() }
-    pub fn get_msg_id(&self) -> MsgID { self.payload.get_msg_id() }
-    pub fn get_size(&self) -> PacketNo { self.payload.get_size() }
+
+    // Payload (Deep Packet Inspection)
     // Debug hack to get tree_id out of packets.  Assumes msg is one packet
     pub fn get_tree_id(self) -> TreeID {
         let msg = MsgType::get_msg(&vec![self]).unwrap();
         msg.get_tree_id().clone()
     }
-    //	pub fn get_payload_bytes(&self) -> Vec<u8> { self.get_payload().get_bytes() }
-    //	pub fn get_payload_size(&self) -> usize { self.payload.get_no_bytes() }
 }
 impl fmt::Display for Packet {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
@@ -82,7 +90,6 @@ impl fmt::Display for Packet {
 impl Clone for Packet {
     fn clone(&self) -> Packet { *self }
 }
-const PACKET_HEADER_SIZE: usize = 16; // Last value is padding
 #[derive(Debug, Copy, Clone, Serialize)]
 pub struct PacketHeader {
     uuid: Uuid,     // Tree identifier 16 bytes
@@ -103,6 +110,7 @@ impl fmt::Display for PacketHeader {
         write!(f, "{}", s)
     }
 }
+
 #[derive(Copy)]
 pub struct Payload {
     msg_id: MsgID,	// Unique identifier of this message
@@ -174,22 +182,22 @@ pub struct Packetizer {}
 impl Packetizer {
     pub fn packetize(uuid: &Uuid, msg_bytes: &ByteArray, is_blocking: bool)
             -> Vec<Packet> {
-        let payload_size = Packetizer::packet_payload_size(msg_bytes.len());
-        let num_packets = (msg_bytes.len() + payload_size - 1)/ payload_size; // Poor man's ceiling
-        let last_packet_size = msg_bytes.len() - (num_packets-1)*payload_size;
+        let mtu = Packetizer::packet_payload_size(msg_bytes.len());
+        let num_packets = (msg_bytes.len() + mtu - 1)/ mtu; // Poor man's ceiling
+        let frag = msg_bytes.len() - (num_packets - 1) * mtu;
         let msg_id = MsgID(rand::random()); // Can't use hash in case two cells send the same message
         let mut packets = Vec::new();
         for i in 0..num_packets {
             let (size, is_last_packet) = if i == (num_packets-1) {
-                (last_packet_size, true)
+                (frag, true)
             } else {
                 (num_packets - i, false)
             };
             // Not a very Rusty way to put bytes into payload
-            let mut packet_bytes = vec![PAYLOAD_DEFAULT_ELEMENT; payload_size];
-            for j in 0..payload_size {
-                if i*payload_size + j == msg_bytes.len() { break; }
-                packet_bytes[j] = msg_bytes[i*payload_size + j];
+            let mut packet_bytes = vec![PAYLOAD_DEFAULT_ELEMENT; mtu];
+            for j in 0..mtu {
+                if i*mtu + j == msg_bytes.len() { break; }
+                packet_bytes[j] = msg_bytes[i*mtu + j];
             }
             let packet = Packet::new(msg_id, uuid, PacketNo(size as u16),
                                      is_last_packet, is_blocking, packet_bytes);
@@ -199,18 +207,16 @@ impl Packetizer {
         packets
     }
     pub fn unpacketize(packets: &Vec<Packet>) -> Result<ByteArray, Error> {
-        let mut all_bytes = Vec::new();
+        let mut msg = Vec::new();
         for packet in packets {
-            let is_last_packet = packet.is_last_packet();
-            let last_packet_size = *packet.get_size() as usize;
             let mut bytes = packet.get_bytes();
-            if is_last_packet {
-                bytes.truncate(last_packet_size)
-            };
-            all_bytes.extend_from_slice(&bytes);
+            let frag = *packet.get_size() as usize;
+            let is_last_packet = packet.is_last_packet();
+            if is_last_packet { bytes.truncate(frag) };
+            msg.extend_from_slice(&bytes);
         }
-        Ok(ByteArray(all_bytes))
-        //Ok(str::from_utf8(&all_bytes).context(PacketError::Chain { func_name: "unpacketize", comment: S("")})?.to_string())
+        Ok(ByteArray(msg))
+        //Ok(str::from_utf8(&msg).context(PacketError::Chain { func_name: "unpacketize", comment: S("")})?.to_string())
     }
     fn packet_payload_size(len: usize) -> usize {
         match len-1 {
