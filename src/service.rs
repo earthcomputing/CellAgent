@@ -1,11 +1,13 @@
 use std::fmt;
+use std::thread;
 
 use config::ByteArray;
+use dal;
 use name::{ContainerID, UptreeID};
 use message::{MsgDirection, TcpMsgType};
 use message_types::{ContainerToVm, ContainerFromVm};
 use uptree_spec::{AllowedTree};
-use utility::{S, write_err};
+use utility::{S, write_err, TraceHeader, TraceHeaderParams, TraceType};
 
 pub const NOCMASTER: &'static str ="NocMaster";
 pub const NOCAGENT: &'static str = "NocAgent";
@@ -65,20 +67,36 @@ impl NocMaster {
         self.container_to_vm.send((is_ait, AllowedTree::new("NocMasterAgent"), TcpMsgType::Application, MsgDirection::Leafward, bytes))?;
         Ok(())
     }
-    fn listen_vm(&self, container_from_vm: ContainerFromVm) -> Result<(), Error> {
-        let master = self.clone();
+
+    // SPAWN THREAD (listen_vm_loop)
+    fn listen_vm(&self, container_from_vm: ContainerFromVm, trace_header: TraceHeader) -> Result<(), Error> {
         //println!("Service {} on {}: listening to VM", self.name, self.container_id);
-        ::std::thread::spawn(move || -> Result<(), Error> {
-            let _ = master.listen_vm_loop(&container_from_vm).map_err(|e| write_err("service", e));
+        let thread_name = format!("PacketEngine {} to PortSet", self.cell_id.get_name());
+        let join_handle = thread::Builder::new().name(thread_name.into()).spawn( move || {
+            let ref mut child_trace_header = trace_header.fork_trace();
+            let master = self.clone();
+            let _ = master.listen_vm_loop(&container_from_vm, child_trace_header).map_err(|e| write_err("service", e));
             let _ = master.listen_vm(container_from_vm);
-            Ok(())
         });
+        join_handle?;
         Ok(())
     }
-    fn listen_vm_loop(&self, container_from_vm: &ContainerFromVm) -> Result<(), Error> {
+
+    // WORKER (ContainerFromVm)
+    fn listen_vm_loop(&self, container_from_vm: &ContainerFromVm, mut trace_header: TraceHeader) -> Result<(), Error> {
         let _f = "listen_vm_loop";
+        {
+            let ref trace_params = TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "worker" };
+            let trace = json!({ "cell_id": &self.cell_id, "thread_name": thread::current().name(), "thread_id": TraceHeader::parse(thread::current().id()) });
+            let _ = dal::add_to_trace(trace_header, TraceType::Trace, trace_params, &trace, _f);
+        }
         loop {
             let (is_ait, msg) = container_from_vm.recv().context("NocMaster container_from_vm").context(ServiceError::Chain { func_name: "listen_vm_loop", comment: S("NocMaster from vm")})?;
+            {
+                let ref trace_params = TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "recv" };
+                let trace = json!({ "cell_id": &self.cell_id, "msg": &msg.clone() });
+                let _ = dal::add_to_trace(trace_header, TraceType::Trace, trace_params, &trace, _f);
+            }
             println!("NocMaster on container {} got msg {}", self.container_id, ::std::str::from_utf8(&msg)?);
         }
     }
@@ -103,25 +121,41 @@ impl NocAgent {
             allowed_trees: allowed_trees.clone() }
     }
     pub fn initialize(&self, _up_tree_id: &UptreeID, container_from_vm: ContainerFromVm) -> Result<(), Error> {
-        //let f = "initialize";
-        //self.container_to_vm.send((S("NocAgent"), S("Message from NocAgent"))).context(ServiceError::Chain { func_name: f, comment: S("NocAgent") })?;
+        //let _f = "initialize";
+        //self.container_to_vm.send((S("NocAgent"), S("Message from NocAgent"))).context(ServiceError::Chain { func_name: _f, comment: S("NocAgent") })?;
         println!("Service {} running NocAgent", self.container_id);
         self.listen_vm(container_from_vm)
     }
-    fn listen_vm(&self, container_from_vm: ContainerFromVm) -> Result<(), Error> {
-        let agent = self.clone();
+
+    // SPAWN THREAD (listen_vm_loop)
+    fn listen_vm(&self, container_from_vm: ContainerFromVm, trace_header: TraceHeader) -> Result<(), Error> {
         //println!("Service {} on {}: listening to VM", self.name, self.container_id);
-        ::std::thread::spawn(move || -> Result<(), Error> {
-            let _ = agent.listen_vm_loop(&container_from_vm).map_err(|e| write_err("service", e));
+        let thread_name = format!("PacketEngine {} to PortSet", self.cell_id.get_name());
+        let join_handle = thread::Builder::new().name(thread_name.into()).spawn( move || {
+            let ref mut child_trace_header = trace_header.fork_trace();
+            let agent = self.clone();
+            let _ = agent.listen_vm_loop(&container_from_vm, child_trace_header).map_err(|e| write_err("service", e));
             let _ = agent.listen_vm(container_from_vm);
-            Ok(())
         });
+        join_handle?;
         Ok(())
     }
-    fn listen_vm_loop(&self, container_from_vm: &ContainerFromVm) -> Result<(), Error> {
-        let f = "listen_vm_loop";
+
+    // WORKER (ContainerFromVm)
+    fn listen_vm_loop(&self, container_from_vm: &ContainerFromVm, mut trace_header: TraceHeader) -> Result<(), Error> {
+        let _f = "listen_vm_loop";
+        {
+            let ref trace_params = TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "worker" };
+            let trace = json!({ "cell_id": &self.cell_id, "thread_name": thread::current().name(), "thread_id": TraceHeader::parse(thread::current().id()) });
+            let _ = dal::add_to_trace(trace_header, TraceType::Trace, trace_params, &trace, _f);
+        }
         loop {
-            let (is_ait, msg) = container_from_vm.recv().context(ServiceError::Chain { func_name: f, comment: S("Agent recv from vm") })?;
+            let (is_ait, msg) = container_from_vm.recv().context(ServiceError::Chain { func_name: _f, comment: S("Agent recv from vm") })?;
+            {
+                let ref trace_params = TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "recv" };
+                let trace = json!({ "cell_id": &self.cell_id, "msg": &msg.clone() });
+                let _ = dal::add_to_trace(trace_header, TraceType::Trace, trace_params, &trace, _f);
+            }
             println!("NocAgent on container {} got msg {}", self.container_id, ::std::str::from_utf8(&msg)?);
             let msg = format!("Reply from {}", self.container_id);
             //println!("Service {} sending {}", self.container_id, msg);
