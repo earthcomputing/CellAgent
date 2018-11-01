@@ -191,8 +191,8 @@ pub trait Message {
         let packets = Packetizer::packetize(&tree_id.get_uuid(), &ByteArray(*bytes), self.is_blocking());
 		Ok(packets)
 	}
-	fn process_ca(&mut self, _cell_agent: &mut CellAgent, _port_no: PortNo, _msg_tree_id: &TreeID, is_ait: bool,
-                  trace_header: &mut TraceHeader) -> Result<(), Error> {
+	fn process_ca(&mut self, _cell_agent: &mut CellAgent, _port_no: PortNo, _msg_tree_id: &TreeID, _is_ait: bool,
+                  _trace_header: &mut TraceHeader) -> Result<(), Error> {
         let _f = "process_ca";
         Err(MessageError::Process { func_name: _f }.into()) }
 }
