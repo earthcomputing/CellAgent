@@ -6,6 +6,7 @@ use utility::PortNumber;
 
 pub const SCHEMA_VERSION: &'static str = "0.1";
 pub const REPO: &'static str = "CellAgent";
+pub const CENTRAL_TREE: &'static str = "Tree:C:2";
 // Sizes
 pub const NCELLS: CellNo    = CellNo(10);
 pub const NPORTS: PortNo    = PortNo(8);

@@ -4,7 +4,7 @@ use std::sync::mpsc::channel;
 use std::collections::HashSet;
 use std::thread;
 
-use config::{CONTINUE_ON_ERROR, DEBUG_OPTIONS, MAX_PORTS, PortNo};
+use config::{CENTRAL_TREE, CONTINUE_ON_ERROR, DEBUG_OPTIONS, MAX_PORTS, PortNo};
 use dal;
 use message::MsgType;
 use message_types::{PeFromCm, PeToCm,
@@ -17,10 +17,6 @@ use routing_table_entry::{RoutingTableEntry};
 use utility::{Mask, S, TraceHeader, TraceHeaderParams, TraceType, write_err};
 use uuid_ec::{AitState, Uuid};
 
-// TODO: Figure out how to packet engine gets trace messagesto the DAL
-
-const CENTRAL_TREE : &str = "Tree:C:2"; // MAGIC
-
 #[derive(Debug, Clone)]
 pub struct PacketEngine {
     cell_id: CellID,
@@ -31,7 +27,7 @@ pub struct PacketEngine {
 }
 
 impl PacketEngine {
-    pub fn get_id(&self) -> CellID { self.cell_id.clone() }
+    pub fn get_id(&self) -> &CellID { &self.cell_id }
     //pub fn get_table(&self) -> &Arc<Mutex<RoutingTable>> { &self.routing_table }
 
     // NEW
@@ -58,12 +54,12 @@ impl PacketEngine {
         let mut pe = self.clone();
         let mut outer_trace_header_clone = outer_trace_header.clone();
 
-        let thread_name = format!("PacketEngine {} from CModel", self.cell_id.get_name());
-        let join_handle = thread::Builder::new().name(thread_name.into()).spawn( move || {
+        let thread_name = format!("PacketEngine {} from CModel", self.cell_id);
+        thread::Builder::new().name(thread_name.into()).spawn( move || {
             let ref mut inner_trace_header = outer_trace_header_clone.fork_trace();
             let _ = pe.listen_cm_loop(&pe_from_cm, &pe_to_pe, inner_trace_header).map_err(|e| write_err("packet_engine", e));
             if CONTINUE_ON_ERROR { let _ = pe.listen_cm(pe_from_cm, pe_to_pe, outer_trace_header); }
-        });
+        })?;
         Ok(())
     }
 
@@ -76,11 +72,11 @@ impl PacketEngine {
         let mut pe = self.clone();
         let mut outer_trace_header_clone = outer_trace_header.clone();
         let thread_name = format!("PacketEngine {} to PortSet", self.cell_id.get_name());
-        let join_handle = thread::Builder::new().name(thread_name.into()).spawn( move || {
+        thread::Builder::new().name(thread_name.into()).spawn( move || {
             let ref mut inner_trace_header = outer_trace_header_clone.fork_trace();
             let _ = pe.listen_port_loop(&pe_from_ports, &pe_from_pe, inner_trace_header).map_err(|e| write_err("packet_engine", e));
             if CONTINUE_ON_ERROR { let _ = pe.listen_port(pe_from_ports, pe_from_pe, outer_trace_header); }
-        });
+        })?;
         Ok(())
     }
 
@@ -91,7 +87,7 @@ impl PacketEngine {
         {
             let ref trace_params = TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "worker" };
             let trace = json!({ "cell_id": &self.cell_id, "thread_name": thread::current().name(), "thread_id": TraceHeader::parse(thread::current().id()) });
-            let _ = dal::add_to_trace(trace_header, TraceType::Debug, trace_params, &trace, _f);
+            let _ = dal::add_to_trace(trace_header, TraceType::Trace, trace_params, &trace, _f);
         }
         loop {
             let msg = pe_from_cm.recv().context(PacketEngineError::Chain { func_name: _f, comment: S("recv entry from cm ") + self.cell_id.get_name()})?;
@@ -106,15 +102,13 @@ impl PacketEngine {
                     self.routing_table.lock().unwrap().set_entry(entry)
                 },
                 CmToPePacket::Unblock => {
-                    //println!("PacketEngine {}: {} send unblock", self.cell_id, _f);
                     pe_to_pe.send(S("Unblock"))?;
                 },
 
                 // encapsulated TCP
                 CmToPePacket::Tcp((port_number, msg)) => {
                     let port_no = port_number.get_port_no();
-                    let channel = self.pe_to_ports.get(*port_no as usize);
-                    match channel {
+                    match self.pe_to_ports.get(*port_no as usize) {
                         Some(sender) => sender.send(PeToPortPacket::Tcp(msg)).context(PacketEngineError::Chain { func_name: _f, comment: S("send TCP to port ") + self.cell_id.get_name() })?,
                         _ => return Err(PacketEngineError::Sender { func_name: _f, cell_id: self.cell_id.clone(), port_no: *port_no }.into())
                     }
@@ -150,7 +144,7 @@ impl PacketEngine {
                         let ref trace_params = TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "pe_forward_leafward" };
                         let trace = json!({ "cell_id": &self.cell_id, "tree_id": &tree_id,
                             "ait_state": packet.get_ait_state(), "msg_type": &msg_type, "port_nos": &port_nos });
-                        let _ = dal::add_to_trace(trace_header, TraceType::Debug, trace_params, &trace, _f);
+                        let _ = dal::add_to_trace(trace_header, TraceType::Trace, trace_params, &trace, _f);
                     }
 
                     if DEBUG_OPTIONS.pe_pkt_send {
@@ -168,8 +162,7 @@ impl PacketEngine {
                     //self.pe_to_ports.get(*port_no as usize)
                     //    .ok_or_else(|| -> Error { PacketEngineError::Sender { cell_id: self.cell_id.clone(), func_name: "forward leaf", port_no: *port_no }.into() })?
                     //    .send(PeToPortPacket::Packet(packet)).context(PacketEngineError::Chain { func_name: _f, comment: S("send packet leafward ") + self.cell_id.get_name() })?;
-                    let channel = self.pe_to_ports.get(*port_no as usize);
-                    match channel {
+                   match self.pe_to_ports.get(*port_no as usize) {
                         // forward to neighbor
                         Some(s) => s.send(PeToPortPacket::Packet(packet)).context(PacketEngineError::Chain { func_name: _f, comment: S("send packet leafward ") + self.cell_id.get_name() })?,
                         None => return Err(PacketEngineError::Sender { cell_id: self.cell_id.clone(), func_name: "forward leaf", port_no: *port_no }.into())
@@ -185,7 +178,7 @@ impl PacketEngine {
                     {
                         let ref trace_params = TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "pe_packet_from_cm" };
                         let trace = json!({ "cell_id": &self.cell_id, "tree_id": &tree_id, "ait_state": ait_state, "msg_type": &msg_type });
-                        let _ = dal::add_to_trace(trace_header, TraceType::Debug, trace_params, &trace, _f);
+                        let _ = dal::add_to_trace(trace_header, TraceType::Trace, trace_params, &trace, _f);
                     }
                     if DEBUG_OPTIONS.pe_pkt_recv {
                         match msg_type {
@@ -209,7 +202,7 @@ impl PacketEngine {
         {
             let ref trace_params = TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "worker" };
             let trace = json!({ "cell_id": &self.cell_id, "thread_name": thread::current().name(), "thread_id": TraceHeader::parse(thread::current().id()) });
-            let _ = dal::add_to_trace(trace_header, TraceType::Debug, trace_params, &trace, _f);
+            let _ = dal::add_to_trace(trace_header, TraceType::Trace, trace_params, &trace, _f);
         }
         loop {
             let msg = pe_from_ports.recv().context(PacketEngineError::Chain { func_name: _f, comment: S("receive")})?;
@@ -241,7 +234,6 @@ impl PacketEngine {
     fn process_packet(&mut self, port_no: PortNo, mut packet: Packet, pe_from_pe: &PeFromPe,
                       trace_header: &mut TraceHeader) -> Result<(), Error> {
         let _f = "process_packet";
-        //println!("PacketEngine {}: received on port {} my index {} {}", self.cell_id, port_no.v, *my_index, packet);
 
         match packet.get_ait_state() {
             AitState::Ait => return Err(PacketEngineError::Ait { func_name: _f, ait_state: AitState::Ait }.into()), // Error, should never get from port
@@ -277,8 +269,7 @@ impl PacketEngine {
                 let mut uuid = packet.get_tree_uuid();
                 uuid.make_normal();
                 let entry = {
-                    let locked = self.routing_table.lock().unwrap();
-                    match locked.get_entry(uuid) {
+                    match self.routing_table.lock().unwrap().get_entry(uuid) {
                         Ok(e) => e,
                         Err(_) => {
                             // deliver to CellAgent when tree not recognized
@@ -296,7 +287,7 @@ impl PacketEngine {
                         let ref trace_params = TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "pe_process_packet" };
                         let trace = json!({ "cell_id": &self.cell_id, "tree_id": &tree_id, "ait_state": ait_state,
                             "msg_type": &msg_type, "port_no": &port_no, "entry": &entry });
-                        let _ = dal::add_to_trace(trace_header, TraceType::Debug, trace_params, &trace, _f);
+                        let _ = dal::add_to_trace(trace_header, TraceType::Trace, trace_params, &trace, _f);
                     }
                     if DEBUG_OPTIONS.pe_process_pkt {
                         match msg_type {
@@ -393,7 +384,7 @@ impl PacketEngine {
                 {
                     let ref trace_params = TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "pe_forward_leafward" };
                     let trace = json!({ "cell_id": &self.cell_id, "tree_id": &tree_id, "msg_type": &msg_type, "port_nos": &port_nos });
-                    let _ = dal::add_to_trace(trace_header, TraceType::Debug, trace_params, &trace, _f);
+                    let _ = dal::add_to_trace(trace_header, TraceType::Trace, trace_params, &trace, _f);
                 }
                 if DEBUG_OPTIONS.pe_pkt_send {
                     match msg_type {
