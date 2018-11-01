@@ -28,55 +28,62 @@ impl Cmodel {
     }
 
     // INIT (CmFromCa, CmFromPe)
+    // WORKER (CModel)
     pub fn initialize(&self, cm_from_ca: CmFromCa, cm_to_pe: CmToPe, cm_from_pe: CmFromPe, cm_to_ca: CmToCa,
                       mut trace_header: TraceHeader) -> Result<(), Error> {
-        self.listen_ca(cm_from_ca, cm_to_pe, trace_header.fork_trace())?;
-        self.listen_pe(cm_from_pe, cm_to_ca, trace_header.fork_trace())?;
+        let _f = "initialize";
+        {
+            let ref trace_params = TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "worker" };
+            let trace = json!({ "cell_id": &self.cell_id, "thread_name": thread::current().name(), "thread_id": TraceHeader::parse(thread::current().id()) });
+            let _ = dal::add_to_trace(trace_header, TraceType::Trace, trace_params, &trace, _f);
+        }
+        self.listen_ca(cm_from_ca, cm_to_pe, trace_header)?;
+        self.listen_pe(cm_from_pe, cm_to_ca, trace_header)?;
         Ok(())
     }
 
     // SPAWN THREAD (listen_ca_loop)
     fn listen_ca(&self, cm_from_ca: CmFromCa, cm_to_pe: CmToPe,
-                 mut outer_trace_header: TraceHeader) -> Result<JoinHandle<()>, Error> {
+                 mut trace_header: TraceHeader) -> Result<JoinHandle<()>, Error> {
         let _f = "listen_ca";
-        let cmodel = self.clone();
         let thread_name = format!("Cmodel {} from CellAgent", self.cell_id.get_name());
         let join_handle = thread::Builder::new().name(thread_name.into()).spawn( move || {
-            let ref mut inner_trace_header = outer_trace_header.fork_trace();
-            let _ = cmodel.listen_ca_loop(&cm_from_ca, &cm_to_pe, inner_trace_header).map_err(|e| write_err("cmodel listen_ca", e.into()));
-            if CONTINUE_ON_ERROR { let _ = cmodel.listen_ca(cm_from_ca, cm_to_pe, outer_trace_header); }
+            let ref mut child_trace_header = trace_header.fork_trace();
+            let cmodel = self.clone();
+            let _ = cmodel.listen_ca_loop(&cm_from_ca, &cm_to_pe, child_trace_header).map_err(|e| write_err("cmodel listen_ca", e.into()));
+            if CONTINUE_ON_ERROR { let _ = cmodel.listen_ca(cm_from_ca, cm_to_pe, trace_header); }
         });
         Ok(join_handle?)
     }
 
     // SPAWN THREAD (listen_pe_loop)
-    fn listen_pe(&self, cm_from_pe: CmFromPe, cm_to_ca: CmToCa, mut outer_trace_header: TraceHeader) -> Result<JoinHandle<()>, Error> {
+    fn listen_pe(&self, cm_from_pe: CmFromPe, cm_to_ca: CmToCa, mut trace_header: TraceHeader) -> Result<JoinHandle<()>, Error> {
         let _f = "listen_pe";
-        let mut cmodel = self.clone();
         let thread_name = format!("Cmodel {} from PacketEngine", self.cell_id.get_name());
         let join_handle = thread::Builder::new().name(thread_name.into()).spawn( move || {
-            let ref mut inner_trace_header = outer_trace_header.fork_trace();
-            let _ = cmodel.listen_pe_loop(&cm_from_pe, &cm_to_ca, inner_trace_header).map_err(|e| write_err("cmodel listen_pe", e.into()));;
-            if CONTINUE_ON_ERROR { let _ = cmodel.listen_pe(cm_from_pe, cm_to_ca, outer_trace_header); }
+            let ref mut child_trace_header = trace_header.fork_trace();
+            let mut cmodel = self.clone();
+            let _ = cmodel.listen_pe_loop(&cm_from_pe, &cm_to_ca, child_trace_header).map_err(|e| write_err("cmodel listen_pe", e.into()));;
+            if CONTINUE_ON_ERROR { let _ = cmodel.listen_pe(cm_from_pe, cm_to_ca, trace_header); }
         });
         Ok(join_handle?)
     }
 
-    // WORKER (CellAgent => CModel)
+    // WORKER (CmFromCa)
     fn listen_ca_loop(&self, cm_from_ca: &CmFromCa, cm_to_pe: &CmToPe,
                       trace_header: &mut TraceHeader) -> Result<(), Error> {
         let _f = "listen_ca_loop";
         {
             let ref trace_params = TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "worker" };
             let trace = json!({ "cell_id": &self.cell_id, "thread_name": thread::current().name(), "thread_id": TraceHeader::parse(thread::current().id()) });
-            let _ = dal::add_to_trace(trace_header, TraceType::Debug, trace_params, &trace, _f);
+            let _ = dal::add_to_trace(trace_header, TraceType::Trace, trace_params, &trace, _f);
         }
         loop {
             let msg = cm_from_ca.recv()?;
             {
                 let ref trace_params = TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "cm_bytes_from_ca" };
                 let trace = json!({ "cell_id": &self.cell_id, "msg": &msg });
-                let _ = dal::add_to_trace(trace_header, TraceType::Debug, trace_params, &trace, _f);
+                let _ = dal::add_to_trace(trace_header, TraceType::Trace, trace_params, &trace, _f);
             }
             match msg {
                 // just forward to PE
@@ -121,21 +128,21 @@ impl Cmodel {
         }
     }
 
-    // WORKER (PacketEngine => CModel)
+    // WORKER (CmFromPe)
     fn listen_pe_loop(&mut self, cm_from_pe: &CmFromPe, cm_to_ca: &CmToCa,
                       trace_header: &mut TraceHeader) -> Result<(), Error> {
         let _f = "listen_pe_loop";
         {
             let ref trace_params = TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "worker" };
             let trace = json!({ "cell_id": &self.cell_id, "thread_name": thread::current().name(), "thread_id": TraceHeader::parse(thread::current().id()) });
-            let _ = dal::add_to_trace(trace_header, TraceType::Debug, trace_params, &trace, _f);
+            let _ = dal::add_to_trace(trace_header, TraceType::Trace, trace_params, &trace, _f);
         }
         loop {
             let msg = cm_from_pe.recv()?;
             {
                 let ref trace_params = TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "listen_pe_loop" };
                 let trace = json!({ "cell_id": &self.cell_id, "msg": &msg });
-                let _ = dal::add_to_trace(trace_header, TraceType::Debug, trace_params, &trace, _f);
+                let _ = dal::add_to_trace(trace_header, TraceType::Trace, trace_params, &trace, _f);
             }
             match msg {
                 // just forward to CA
@@ -173,7 +180,7 @@ packets: Vec<Packet>,
             {
                 let ref trace_params = TraceHeaderParams { module: file!(), line_no: line!(), function: f, format: "cm_bytes_to_ca" };
                 let trace = json!({ "cell_id": &self.cell_id, "packet": &packet });
-                let _ = dal::add_to_trace(trace_header, TraceType::Debug, trace_params, &trace, f);
+                let _ = dal::add_to_trace(trace_header, TraceType::Debug, trace_params, &trace, f); // sender side, dup
             }
             let is_ait = packets[0].is_ait();
             let uuid = packet.get_tree_uuid();

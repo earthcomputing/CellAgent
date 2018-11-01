@@ -90,48 +90,58 @@ impl NalCell {
                 ports: boxed_ports, cell_agent, vms: Vec::new(),
                 packet_engine, ports_from_pe })
     }
-    fn start_cell(cell_agent: &CellAgent, ca_from_cm: CaFromCm, outer_trace_header: &mut TraceHeader) {
+
+    // SPAWN THREAD (ca.initialize)
+    fn start_cell(cell_agent: &CellAgent, ca_from_cm: CaFromCm, trace_header: &mut TraceHeader) {
         let f = "start_cell";
-        let mut ca = cell_agent.clone();
         {
             let ref trace_params = TraceHeaderParams { module: file!(), line_no: line!(), function: f, format: "nalcell_start_ca" };
-            let trace = json!({  "cell_id": &ca.get_id() });
-            let _ = dal::add_to_trace(outer_trace_header, TraceType::Trace, trace_params, &trace, f);
+            let trace = json!({ "cell_id": &cell_agent.get_id() });
+            let _ = dal::add_to_trace(trace_header, TraceType::Trace, trace_params, &trace, f);
         }
-        let mut outer_trace_header_clone = outer_trace_header.clone();
-        thread::spawn( move || {
-            let inner_trace_header = outer_trace_header_clone.fork_trace();
-            let _ = ca.initialize(ca_from_cm, inner_trace_header).map_err(|e| ::utility::write_err("nalcell", e));
+        let thread_name = format!("CellAgent {}", cell_agent.cell_id.get_name());
+        let join_handle = thread::Builder::new().name(thread_name.into()).spawn( move || {
+            let child_trace_header = trace_header.fork_trace();
+            let mut ca = cell_agent.clone();
+            let _ = ca.initialize(ca_from_cm, child_trace_header).map_err(|e| ::utility::write_err("nalcell", e));
             // Don't automatically restart cell agent if it crashes
         });
+        join_handle?
     }
+
+    // SPAWN THREAD (cm.initialize)
     fn start_cmodel(cmodel: &Cmodel, cm_from_ca: CmFromCa, cm_to_pe: CmToPe, cm_from_pe: CmFromPe, cm_to_ca: CmToCa,
-                    outer_trace_header: &mut TraceHeader) {
+                    trace_header: &mut TraceHeader) {
         let f = "start_cmodel";
-        let cm = cmodel.clone();
-        let mut outer_trace_header_clone = outer_trace_header.clone();
-        thread::spawn( move || {
-            let inner_trace_header = outer_trace_header_clone.fork_trace();
-            let _ = cm.initialize(cm_from_ca, cm_to_pe, cm_from_pe, cm_to_ca, inner_trace_header);
+        let thread_name = format!("CModel {}", cmodel.cell_id.get_name());
+        let join_handle = thread::Builder::new().name(thread_name.into()).spawn( move || {
+            let child_trace_header = trace_header.fork_trace();
+            let cm = cmodel.clone();
+            let _ = cm.initialize(cm_from_ca, cm_to_pe, cm_from_pe, cm_to_ca, child_trace_header);
             // Don't automatically restart cmodel if it crashes
         });
+        join_handle?
     }
+
+    // SPAWN THREAD (pe.initialize)
     fn start_packet_engine(packet_engine: &PacketEngine, pe_from_cm: PeFromCm, pe_from_ports: PeFromPort,
-                           outer_trace_header: &mut TraceHeader) {
+                           trace_header: &mut TraceHeader) {
         let f = "start_packet_engine";
-        let pe = packet_engine.clone();
         {
             let ref trace_params = TraceHeaderParams { module: file!(), line_no: line!(), function: f, format: "nalcell_start_pe" };
-            let trace = json!({ "cell_id": &pe.get_id() });
-            let _ = dal::add_to_trace(outer_trace_header, TraceType::Trace, trace_params, &trace, f);
+            let trace = json!({ "cell_id": &packet_engine.get_id() });
+            let _ = dal::add_to_trace(trace_header, TraceType::Trace, trace_params, &trace, f);
         }
-        let mut outer_trace_header_clone = outer_trace_header.clone();
-        thread::spawn( move || {
-            let inner_trace_header = outer_trace_header_clone.fork_trace();
-            let _ = pe.initialize(pe_from_cm, pe_from_ports, inner_trace_header).map_err(|e| ::utility::write_err("nalcell", e));
+        let thread_name = format!("PacketEngine {}", packet_engine.cell_id.get_name());
+        let join_handle = thread::Builder::new().name(thread_name.into()).spawn( move || {
+            let child_trace_header = trace_header.fork_trace();
+            let pe = packet_engine.clone();
+            let _ = pe.initialize(pe_from_cm, pe_from_ports, child_trace_header).map_err(|e| ::utility::write_err("nalcell", e));
             // Don't automatically restart packet engine if it crashes
         });
+        join_handle?
     }
+
     pub fn get_id(&self) -> &CellID { &self.id }
     pub fn get_no(&self) -> CellNo { self.cell_no }
 //	pub fn get_cell_agent(&self) -> &CellAgent { &self.cell_agent }

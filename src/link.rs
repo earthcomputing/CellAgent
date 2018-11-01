@@ -1,11 +1,13 @@
 use std::fmt;
+use std::thread;
 use std::thread::JoinHandle;
 
 use config::{CONTINUE_ON_ERROR};
+use dal;
 use message_types::{LinkToPort, LinkFromPort, LinkToPortPacket};
 use name::{Name, LinkID, PortID};
 use port::{PortStatus};
-use utility::{S, write_err};
+use utility::{S, write_err, TraceHeader, TraceHeaderParams, TraceType};
 
 // TODO: There is no distinction between a broken link and a disconnected one.  We may want to revisit.
 #[derive(Debug, Clone)]
@@ -23,15 +25,16 @@ impl Link {
     pub fn get_id(&self) -> &LinkID { &self.id }
     pub fn start_threads(&mut self,
             link_to_left: LinkToPort, link_from_left: LinkFromPort,
-            link_to_rite: LinkToPort, link_from_rite: LinkFromPort )
+            link_to_rite: LinkToPort, link_from_rite: LinkFromPort,
+            mut trace_header: TraceHeader)
                 -> Result<Vec<JoinHandle<()>>, Error> {
         let _f = "start_threads";
         self.to_left = Some(link_to_left.clone());
         self.to_rite = Some(link_to_rite.clone());
-        let left_handle = self.listen(link_to_left.clone(), link_from_left,
-                                      link_to_rite.clone()).context(LinkError::Chain { func_name: _f, comment: S(self.id.clone()) + " left"})?;
-        let rite_handle = self.listen(link_to_rite, link_from_rite,
-                                      link_to_left).context(LinkError::Chain { func_name: _f, comment: S(self.id.clone()) + " rite"})?;
+        let left_handle = self.listen(link_to_left.clone(), link_from_left, link_to_rite.clone(), trace_header)
+            .context(LinkError::Chain { func_name: _f, comment: S(self.id.clone()) + " left"})?;
+        let rite_handle = self.listen(link_to_rite, link_from_rite, link_to_left, trace_header)
+            .context(LinkError::Chain { func_name: _f, comment: S(self.id.clone()) + " rite"})?;
         Ok(vec![left_handle, rite_handle])
     }
     pub fn break_link(&mut self) -> Result<(), Error> {
@@ -41,26 +44,42 @@ impl Link {
         self.clone().to_rite.expect("Cannot fail in break_link").send(LinkToPortPacket::Status(PortStatus::Disconnected)).context(LinkError::Chain { func_name: _f, comment: S(self.id.clone()) + " left"})?;
         Ok(())
     }
-    fn listen(&self, status: LinkToPort, link_from: LinkFromPort, link_to: LinkToPort)
+    fn listen(&self, status: LinkToPort, link_from: LinkFromPort, link_to: LinkToPort, mut trace_header: TraceHeader)
             -> Result<JoinHandle<()>, Error> {
         let _f = "listen";
         status.send(LinkToPortPacket::Status(PortStatus::Connected)).context(LinkError::Chain { func_name: _f, comment: S(self.id.clone()) + " send status to port"})?;
-        let join_handle = self.listen_port(link_from, link_to)?;
+        let join_handle = self.listen_port(link_from, link_to, trace_header)?;
         Ok(join_handle)
     }
-    fn listen_port(&self, link_from: LinkFromPort, link_to: LinkToPort) -> Result<JoinHandle<()>, Error> {
+
+    // SPAWN THREAD (listen_loop)
+    fn listen_port(&self, link_from: LinkFromPort, link_to: LinkToPort, trace_header: TraceHeader) -> Result<JoinHandle<()>, Error> {
         let link = self.clone();
-        let join_handle = ::std::thread::spawn( move || {
-            let _ = link.listen_loop(&link_from, &link_to).map_err(|e| write_err("link", e.into()));
+        let thread_name = format!("Link {} from ??", self.cell_id.get_name());
+        let join_handle = thread::Builder::new().name(thread_name.into()).spawn( move || {
+            let ref mut child_trace_header = trace_header.fork_trace();
+            let _ = link.listen_loop(&link_from, &link_to, child_trace_header).map_err(|e| write_err("link", e.into()));
             if CONTINUE_ON_ERROR { let _ = link.listen_port(link_from, link_to); }
         });
-        Ok(join_handle)
+        Ok(join_handle?)
     }
-    fn listen_loop(&self, link_from: &LinkFromPort, link_to: &LinkToPort) -> Result<(), Error> {
+
+    // WORKER (LinkFromPort)
+    fn listen_loop(&self, link_from: &LinkFromPort, link_to: &LinkToPort, trace_header: &mut TraceHeader) -> Result<(), Error> {
         let _f = "listen_loop";
+        {
+            let ref trace_params = TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "worker" };
+            let trace = json!({ "cell_id": &self.cell_id, "thread_name": thread::current().name(), "thread_id": TraceHeader::parse(thread::current().id()) });
+            let _ = dal::add_to_trace(trace_header, TraceType::Trace, trace_params, &trace, _f);
+        }
         loop {
-            let packet = link_from.recv().context(LinkError::Chain { func_name: _f, comment: S(self.id.clone()) })?;
-            link_to.send(LinkToPortPacket::Packet(packet)).context(LinkError::Chain { func_name: _f, comment: S(self.id.clone()) })?;
+            let msg = link_from.recv().context(LinkError::Chain { func_name: _f, comment: S(self.id.clone()) })?;
+            {
+                let ref trace_params = TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "recv" };
+                let trace = json!({ "cell_id": &self.cell_id, "msg": msg });
+                let _ = dal::add_to_trace(trace_header, TraceType::Trace, trace_params, &trace, _f);
+            }
+            link_to.send(LinkToPortPacket::Packet(msg)).context(LinkError::Chain { func_name: _f, comment: S(self.id.clone()) })?;
         }
     }
 }
