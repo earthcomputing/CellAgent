@@ -69,7 +69,7 @@ impl BorderCell {
 	pub fn get_cell_no(&self) -> CellNo { self.cell_no }
 	pub fn get_nports(&self) -> PortNo { PortNo((self.border_ports.len() + self.interior_ports.len()) as u8) }
 	//pub fn get_interior_ports(&self) -> &Vec<PortNo> { &self.interior_ports }
-	//pub fn get_border_ports(&self) -> &Vec<PortNo> { &self.border_ports }
+	pub fn get_border_ports(&self) -> &Vec<PortNo> { &self.border_ports }
 }
 impl fmt::Display for BorderCell {
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result { 

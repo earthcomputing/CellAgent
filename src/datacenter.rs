@@ -68,17 +68,12 @@ impl Datacenter {
                 (*(edge.0), *(edge.1))
             };
 			let split = self.cells.split_at_mut(max(e0,e1));
-			let left_cell = match split.0.get_mut(e0) {
-				Some(c) => c,
-				None => return Err(DatacenterError::Wire { edge: edge.clone(), func_name: f, comment: "split left" }.into())
-
-			};
+			let left_cell = split.0.get_mut(e0)
+                .ok_or_else(|| -> Error { DatacenterError::Wire { edge: edge.clone(), func_name: f, comment: "split left" }.into() })?;
             let left_cell_id = left_cell.get_id().clone(); // For Trace
 			let (left_port,left_from_pe) = left_cell.get_free_ec_port_mut()?;
-			let rite_cell = match split.1.first_mut() {
-				Some(c) => c,
-				None => return Err(DatacenterError::Wire { edge: edge.clone(), func_name: f, comment: "split rite" }.into())
-			};
+            let rite_cell = split.1.first_mut()
+                .ok_or_else(|| -> Error { DatacenterError::Wire { edge: edge.clone(), func_name: f, comment: "split rite" }.into() })?;
             let rite_cell_id = rite_cell.get_id().clone(); // For Trace
 			let (rite_port, rite_from_pe) = rite_cell.get_free_ec_port_mut()?;
 			//println!("Datacenter: edge {:?} {} {}", edge, *left_port.get_id(), *rite_port.get_id());
