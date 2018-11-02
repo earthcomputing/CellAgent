@@ -56,11 +56,11 @@ impl Noc {
         let join_handles = dc.initialize(blueprint, trace_header).context(NocError::Chain { func_name: "build_datacenter", comment: S("")})?;
         Ok((dc, join_handles))
     }
-//	fn get_msg(&self, msg_type: MsgType, serialized_msg:String) -> Result<Box<Message>> {
-//		Ok(match msg_type {
-//			_ => panic!("Noc doesn't recognize message type {}", msg_type)
-//		})
-//	}
+//    fn get_msg(&self, msg_type: MsgType, serialized_msg:String) -> Result<Box<Message>> {
+//        Ok(match msg_type {
+//            _ => panic!("Noc doesn't recognize message type {}", msg_type)
+//        })
+//    }
     fn listen_port(&mut self, noc_to_port: NocToPort, noc_from_port: NocFromPort,
             outer_trace_header: &mut TraceHeader) -> Result<JoinHandle<()>, Error> {
         let f = "listen_port";

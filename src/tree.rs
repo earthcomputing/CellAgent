@@ -35,10 +35,10 @@ impl Tree {
     //pub fn get_parent(&self) -> PortNo { self.get_table_entry().get_parent() }
     //pub fn set_parent(&mut self, port_number: PortNumber) { self.get_table_entry().set_parent(port_number); }
     //pub fn add_children(&mut self, children: &HashSet<PortNumber>) {
-    //	self.get_table_entry().add_children(children);
+    //    self.get_table_entry().add_children(children);
     //}
     //pub fn add_other_index(&mut self, port_number: PortNumber, other_index: TableIndex) {
-    //	self.get_table_entry().add_other_index(port_number, other_index)
+    //    self.get_table_entry().add_other_index(port_number, other_index)
     //}
     //pub fn set_inuse(&mut self) { self.get_table_entry().set_inuse(); }
 }

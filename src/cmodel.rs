@@ -212,5 +212,5 @@ impl fmt::Display for Cmodel {
 #[derive(Debug, Fail)]
 pub enum CmodelError {
     #[fail(display = "NameError::Chain {} {}", func_name, comment)]
-	Chain { func_name: &'static str, comment: String },
+        Chain { func_name: &'static str, comment: String },
 }

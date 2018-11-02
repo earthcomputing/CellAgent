@@ -134,7 +134,7 @@ impl NalCell {
     }
     pub fn get_id(&self) -> &CellID { &self.id }
     pub fn get_no(&self) -> CellNo { self.cell_no }
-//	pub fn get_cell_agent(&self) -> &CellAgent { &self.cell_agent }
+//  pub fn get_cell_agent(&self) -> &CellAgent { &self.cell_agent }
     pub fn is_border(&self) -> bool {
         match self.cell_type {
             CellType::Border => true,

@@ -1,4 +1,4 @@
-FROM rust:1.27.0
+FROM rust:latest
 
 # http://whitfin.io/speeding-up-rust-docker-builds/
 
