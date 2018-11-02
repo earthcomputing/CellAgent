@@ -54,10 +54,9 @@ use std::io::{stdin, stdout, Read, Write};
 use std::collections::{HashMap, HashSet};
 use std::fs::{File, OpenOptions};
 use std::sync::mpsc::channel;
-use std::{thread};
 
 use blueprint::Blueprint;
-use config::{AUTO_BREAK, NCELLS, NPORTS, NLINKS, OUTPUT_FILE_NAME, QUENCH, SCHEMA_VERSION,
+use config::{AUTO_BREAK, NCELLS, NPORTS, NLINKS, OUTPUT_FILE_NAME, QUENCH,
              get_edges, CellNo, PortNo};
 use datacenter::Datacenter;
 use ecargs::{ECArgs};
@@ -66,7 +65,7 @@ use message_types::{OutsideFromNoc, OutsideToNoc, NocFromOutside, NocToOutside};
 use nalcell::CellConfig;
 use noc::Noc;
 use uptree_spec::{AllowedTree, ContainerSpec, Manifest, UpTreeSpec, VmSpec};
-use utility::{print_vec, S, TraceHeader, TraceHeaderParams, TraceType};
+use utility::{print_vec, S, TraceHeader};
 
 fn main() -> Result<(), Error> {
     let _f = "main";
@@ -169,10 +168,10 @@ fn break_link(dc: &mut Datacenter) -> Result<(), Error> {
 fn deploy(outside_to_noc: OutsideToNoc) -> Result<(), Error> {
     stdout().write(b"Enter the name of a file containing a manifest\n").context(MainError::Chain { func_name: "run", comment: S("") })?;
     let mut filename = String::new();
-    let _ = stdin().read_line(&mut filename).context(MainError::Chain { func_name: "run", comment: S("") })?;
+    stdin().read_line(&mut filename).context(MainError::Chain { func_name: "run", comment: S("") })?;
     let mut f = File::open(filename.trim()).context(MainError::Chain { func_name: "run", comment: S("") })?;
     let mut manifest = String::new();
-    let _ = f.read_to_string(&mut manifest).context(MainError::Chain { func_name: "run", comment: S("") })?;
+    f.read_to_string(&mut manifest).context(MainError::Chain { func_name: "run", comment: S("") })?;
     Ok(outside_to_noc.send(manifest)?)
 }
 fn deployment_demo() -> Result<(), Error> {
