@@ -6,7 +6,7 @@ use std::collections::{HashMap, HashSet};
 use serde_json;
 
 use blueprint::{Blueprint};
-use config::{NCELLS, SCHEMA_VERSION, ByteArray, get_geometry};
+use config::{CONTINUE_ON_ERROR, NCELLS, SCHEMA_VERSION, ByteArray, get_geometry};
 use dal;
 use datacenter::{Datacenter};
 use gvm_equation::{GvmEquation, GvmEqn, GvmVariable, GvmVariableType};
@@ -27,7 +27,7 @@ pub struct Noc {
     noc_to_outside: NocToOutside,
 }
 impl Noc {
-    pub fn get_name(&self) -> String { return "NOC".into(); }
+    pub fn get_name(&self) -> &str { return "NOC"; }
     pub fn new(noc_to_outside: NocToOutside) -> Result<Noc, Error> {
         Ok(Noc { allowed_trees: HashSet::new(), noc_to_outside })
     }
@@ -66,16 +66,15 @@ impl Noc {
 
     // SPAWN THREAD (listen_port_loop)
     fn listen_port(&mut self, noc_to_port: NocToPort, noc_from_port: NocFromPort,
-            outer_trace_header: &mut TraceHeader) -> Result<JoinHandle<()>, Error> {
+            trace_header: &mut TraceHeader) -> Result<JoinHandle<()>, Error> {
         let _f = "listen_port";
         let mut noc = self.clone();
-        let mut outer_trace_header_clone = outer_trace_header.clone();
+        let child_trace_header = trace_header.fork_trace();
         let thread_name = format!("NOC {} from CellAgent", self.get_name());
         let join_port = thread::Builder::new().name(thread_name.into()).spawn( move || {
-            let ref mut inner_trace_header = outer_trace_header_clone.fork_trace();
-            let _ = noc.listen_port_loop(&noc_to_port, &noc_from_port, inner_trace_header).map_err(|e| write_err("port", e));
-            let _ = noc.listen_port(noc_to_port, noc_from_port, inner_trace_header); // self-reference, recursive
-            // re-birth never joined ??
+            let ref mut working_trace_header = child_trace_header.clone();
+            let _ = noc.listen_port_loop(&noc_to_port, &noc_from_port, working_trace_header).map_err(|e| write_err("port", e));
+            if CONTINUE_ON_ERROR { let _ = noc.listen_port(noc_to_port, noc_from_port, working_trace_header); }
         });
         Ok(join_port?)
     }
@@ -114,12 +113,14 @@ impl Noc {
     }
 
     // SPAWN THREAD (listen_outside_loop)
-    fn listen_outside(&mut self, noc_from_outside: NocFromOutside, noc_to_port: NocToPort, trace_header: TraceHeader) -> Result<JoinHandle<()>,Error> {
+    fn listen_outside(&mut self, noc_from_outside: NocFromOutside, noc_to_port: NocToPort, trace_header: &mut TraceHeader) -> Result<JoinHandle<()>,Error> {
         let mut noc = self.clone();
+        let child_trace_header = trace_header.fork_trace();
         let thread_name = format!("NOC {} from Internet", self.get_name());
         let join_outside = thread::Builder::new().name(thread_name.into()).spawn( move || {
-            let ref mut child_trace_header = trace_header.fork_trace();
-            let _ = noc.listen_outside_loop(&noc_from_outside, &noc_to_port, child_trace_header).map_err(|e| write_err("outside", e));
+            let ref mut working_trace_header = child_trace_header.clone();
+            let _ = noc.listen_outside_loop(&noc_from_outside, &noc_to_port, working_trace_header).map_err(|e| write_err("outside", e));
+            if CONTINUE_ON_ERROR { }
         });
         Ok(join_outside?)
     }

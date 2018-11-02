@@ -20,7 +20,7 @@ impl Container {
         let service = Service::new( &id, service_name, allowed_trees, container_to_vm)?;
         Ok(Container { id: id.clone(), allowed_trees: allowed_trees.clone(), service })
     }
-    pub fn initialize(&self, up_tree_id: &UptreeID, container_from_vm: ContainerFromVm, trace_header: TraceHeader) -> Result<(), Error> {
+    pub fn initialize(&self, up_tree_id: &UptreeID, container_from_vm: ContainerFromVm, trace_header: &mut TraceHeader) -> Result<(), Error> {
         self.service.initialize(up_tree_id, container_from_vm, trace_header)
     }
 }

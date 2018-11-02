@@ -2,6 +2,7 @@ use std::collections::{HashSet};
 use std::sync::mpsc::channel;
 use std::thread;
 
+use config::{CONTINUE_ON_ERROR};
 use container::{Container};
 use dal;
 use message_types::{VmToCa, VmFromCa, VmToContainer, ContainerFromVm,
@@ -24,7 +25,7 @@ impl VirtualMachine {
             vm_to_containers: Vec::new() }
     }
     pub fn initialize(&mut self, up_tree_name: &String, vm_from_ca: VmFromCa, _: &HashSet<AllowedTree>,
-            container_specs: &Vec<ContainerSpec>, trace_header: TraceHeader) -> Result<(), Error> {
+            container_specs: &Vec<ContainerSpec>, trace_header: &mut TraceHeader) -> Result<(), Error> {
         //println!("VM {} initializing", self.id);
         let up_tree_id = UptreeID::new(up_tree_name).context(VmError::Chain { func_name: "initialize", comment: S(self.id.get_name()) + " up tree id"})?;
         for container_spec in container_specs {
@@ -47,29 +48,30 @@ impl VirtualMachine {
     //pub fn get_id(&self) -> &VmID { &self.id }
 
     // SPAWN THREAD (listen_ca_loop)
-    fn listen_ca(&self, vm_from_ca: VmFromCa, trace_header: TraceHeader) -> Result<(), Error> {
+    fn listen_ca(&self, vm_from_ca: VmFromCa, trace_header: &mut TraceHeader) -> Result<(), Error> {
         //println!("VM {}: listening to Ca", self.id);
         let vm = self.clone();
+        let child_trace_header = trace_header.fork_trace();
         let thread_name = format!("PacketEngine {} to PortSet", self.id);
         thread::Builder::new().name(thread_name.into()).spawn( move || {
-            let ref mut child_trace_header = trace_header.fork_trace();
-            let _ = vm.listen_ca_loop(&vm_from_ca, child_trace_header).map_err(|e| write_err("vm", e));
-            //let _ = vm.listen_ca(vm_from_ca);
-            Ok(())
+            let ref mut working_trace_header = child_trace_header.clone();
+            let _ = vm.listen_ca_loop(&vm_from_ca, working_trace_header).map_err(|e| write_err("vm", e));
+            if CONTINUE_ON_ERROR { let _ = vm.listen_ca(vm_from_ca, working_trace_header); }
         })?;
         Ok(())
     }
 
     // SPAWN THREAD (listen_container_loop)
     fn listen_container(&self, container_id: ContainerID, vm_from_container: VmFromContainer,
-            vm_to_ca: VmToCa, trace_header: TraceHeader) -> Result<(), Error> {
+            vm_to_ca: VmToCa, trace_header: &mut TraceHeader) -> Result<(), Error> {
         //println!("VM {}: listening to container {}", self.id, container_id);
         let vm = self.clone();
+        let child_trace_header = trace_header.fork_trace();
         let thread_name = format!("PacketEngine {} to PortSet", self.id);
         thread::Builder::new().name(thread_name.into()).spawn( move || {
-            let ref mut child_trace_header = trace_header.fork_trace();
-            let _ = vm.listen_container_loop(&container_id, &vm_from_container, &vm_to_ca, child_trace_header).map_err(|e| write_err("vm", e));
-            //let _ = vm.listen_container(container_id, vm_from_container, vm_to_ca);
+            let ref mut working_trace_header = child_trace_header.clone();
+            let _ = vm.listen_container_loop(&container_id, &vm_from_container, &vm_to_ca, working_trace_header).map_err(|e| write_err("vm", e));
+            if CONTINUE_ON_ERROR { let _ = vm.listen_container(container_id, vm_from_container, vm_to_ca, working_trace_header); }
         })?;
         Ok(())
     }

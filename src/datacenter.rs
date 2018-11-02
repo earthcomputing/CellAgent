@@ -37,9 +37,10 @@ impl Datacenter {
                     let trace = json!({ "cell_number": cell_no, "location":  geometry.2.get(*cell_no)});
                     let _ = dal::add_to_trace(trace_header, TraceType::Trace, trace_params,&trace, _f);
                 }
+                let ref mut child_trace_header = trace_header.fork_trace();
                 NalCell::new(border_cell.get_cell_no(), border_cell.get_nports(),
                                            CellType::Border,CellConfig::Large,
-                                           trace_header.fork_trace())
+                                           child_trace_header)
             })
             .filter(|cell| cell.is_ok())
             .map(|cell| cell.unwrap())
@@ -53,9 +54,10 @@ impl Datacenter {
                     let trace = json!({ "cell_number": cell_no, "location": geometry.2.get(*cell_no as usize) });
                     let _ = dal::add_to_trace(trace_header, TraceType::Trace, trace_params,&trace, _f);
                 }
+                let ref mut child_trace_header = trace_header.fork_trace();
                 NalCell::new(interior_cell.get_cell_no(), interior_cell.get_nports(),
                              CellType::Interior,CellConfig::Large,
-                             trace_header.fork_trace())
+                             child_trace_header)
             })
             .filter(|cell| cell.is_ok())
             .map(|cell| cell.unwrap())
@@ -105,7 +107,7 @@ impl Datacenter {
     pub fn get_link_ids(&self) -> Vec<&LinkID> {
         self.links.iter().map(|link| link.get_id()).collect::<Vec<_>>()
     }
-    pub fn connect_to_noc(&mut self, port_to_noc: PortToNoc, port_from_noc: PortFromNoc, trace_header: TraceHeader)
+    pub fn connect_to_noc(&mut self, port_to_noc: PortToNoc, port_from_noc: PortFromNoc, trace_header: &mut TraceHeader)
             -> Result<(), Error> {
         let _f = "connect_to_noc";
         let (port, port_from_pe) = self.cells

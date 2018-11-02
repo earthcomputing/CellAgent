@@ -71,7 +71,7 @@ fn main() -> Result<(), Error> {
     let _f = "main";
     println!("Multicell Routing: Output to file {} (set in config.rs)", OUTPUT_FILE_NAME);
     println!("{:?} Quenching of Discover messages", QUENCH);
-    let mut trace_header = TraceHeader::new();
+    let ref mut trace_header = TraceHeader::new();
     /* Can't get records from main() to show up in trace file
         let (rows, cols, geometry) = config::get_geometry();
         {
@@ -109,7 +109,7 @@ fn main() -> Result<(), Error> {
     let (outside_to_noc, noc_from_outside): (OutsideToNoc, NocFromOutside) = channel();
     let (noc_to_outside, _outside_from_noc): (NocToOutside, OutsideFromNoc) = channel();
     let mut noc = Noc::new(noc_to_outside)?;
-    let (mut dc, _) = noc.initialize(&blueprint, noc_from_outside, &mut trace_header).context(MainError::Chain { func_name: "run", comment: S("") })?;
+    let (mut dc, _) = noc.initialize(&blueprint, noc_from_outside, trace_header).context(MainError::Chain { func_name: "run", comment: S("") })?;
     if AUTO_BREAK > 0{
         println!("---> Automatically break link");
         break_link(&mut dc)?;

@@ -44,7 +44,7 @@ impl Port {
     pub fn set_disconnected(&mut self) { self.is_connected.store(false, SeqCst); }
     pub fn is_border(&self) -> bool { self.is_border }
     pub fn noc_channel(&self, port_to_noc: PortToNoc,
-            port_from_noc: PortFromNoc, port_from_pe: PortFromPe, trace_header: TraceHeader) -> Result<JoinHandle<()>, Error> {
+            port_from_noc: PortFromNoc, port_from_pe: PortFromPe, trace_header: &mut TraceHeader) -> Result<JoinHandle<()>, Error> {
         self.port_to_pe.send(PortToPePacket::Status((self.get_port_no(), self.is_border, PortStatus::Connected))).context(PortError::Chain { func_name: "outside_channel", comment: S(self.id.get_name()) + " send to pe"})?;
         self.listen_noc_for_pe(port_from_noc, trace_header)?;
         let join_handle = self.listen_pe_for_noc(port_to_noc, port_from_pe, trace_header)?;
@@ -52,13 +52,14 @@ impl Port {
     }
 
     // SPAWN THREAD (listen_noc_for_pe_loop)
-    fn listen_noc_for_pe(&self, port_from_noc: PortFromNoc, trace_header: TraceHeader) -> Result<(), Error> {
+    fn listen_noc_for_pe(&self, port_from_noc: PortFromNoc, trace_header: &mut TraceHeader) -> Result<(), Error> {
         let port = self.clone();
+        let child_trace_header = trace_header.fork_trace();
         let thread_name = format!("PacketEngine {} to PortSet", self.get_id().get_name());
         thread::Builder::new().name(thread_name.into()).spawn( move || {
-            let ref mut child_trace_header = trace_header.fork_trace();
-            let _ = port.listen_noc_for_pe_loop(&port_from_noc, child_trace_header).map_err(|e| write_err("port", e));
-            let _ = port.listen_noc_for_pe(port_from_noc, trace_header);
+            let ref mut working_trace_header = child_trace_header.clone();
+            let _ = port.listen_noc_for_pe_loop(&port_from_noc, working_trace_header).map_err(|e| write_err("port", e));
+            if CONTINUE_ON_ERROR { let _ = port.listen_noc_for_pe(port_from_noc, working_trace_header); }
         })?;
         Ok(())
     }
@@ -84,13 +85,14 @@ impl Port {
     }
 
     // SPAWN THREAD (listen_pe_for_noc_loop)
-    fn listen_pe_for_noc(&self, port_to_noc: PortToNoc, port_from_pe: PortFromPe, trace_header: TraceHeader) -> Result<JoinHandle<()>, Error> {
+    fn listen_pe_for_noc(&self, port_to_noc: PortToNoc, port_from_pe: PortFromPe, trace_header: &mut TraceHeader) -> Result<JoinHandle<()>, Error> {
         let port = self.clone();
+        let child_trace_header = trace_header.fork_trace();
         let thread_name = format!("PacketEngine {} to PortSet", self.get_id().get_name());
         let join_handle = thread::Builder::new().name(thread_name.into()).spawn( move || {
-            let ref mut child_trace_header = trace_header.fork_trace();
-            let _ = port.listen_pe_for_noc_loop(&port_to_noc, &port_from_pe, child_trace_header).map_err(|e| write_err("port", e));
-            if CONTINUE_ON_ERROR { let _ = port.listen_pe_for_noc(port_to_noc, port_from_pe, trace_header); }
+            let ref mut working_trace_header = child_trace_header.clone();
+            let _ = port.listen_pe_for_noc_loop(&port_to_noc, &port_from_pe, working_trace_header).map_err(|e| write_err("port", e));
+            if CONTINUE_ON_ERROR { let _ = port.listen_pe_for_noc(port_to_noc, port_from_pe, working_trace_header); }
         })?;
         Ok(join_handle)
     }
@@ -121,20 +123,24 @@ impl Port {
     }
 
     // SPAWN THREAD (listen_link, listen_pe)
-    pub fn link_channel(&self, port_to_link: PortToLink, port_from_link: PortFromLink, port_from_pe: PortFromPe, trace_header: TraceHeader) {
+    pub fn link_channel(&self, port_to_link: PortToLink, port_from_link: PortFromLink, port_from_pe: PortFromPe, trace_header: &mut TraceHeader) {
         let mut port = self.clone();
+        let child_trace_header = trace_header.fork_trace();
         let thread_name = format!("PacketEngine {} to PortSet", self.get_id().get_name());
         thread::Builder::new().name(thread_name.into()).spawn( move || {
-            let ref mut child_trace_header = trace_header.fork_trace();
-            let _ = port.listen_link(port_from_link, child_trace_header).map_err(|e| write_err("port", e));
-        });
+            let ref mut working_trace_header = child_trace_header.clone();
+            let _ = port.listen_link(port_from_link, working_trace_header).map_err(|e| write_err("port", e));
+            if CONTINUE_ON_ERROR { }
+        }).expect("thread failed");
 
         let port = self.clone();
+        let child_trace_header = trace_header.fork_trace();
         let thread_name = format!("PacketEngine {} to PortSet", self.get_id().get_name());
         thread::Builder::new().name(thread_name.into()).spawn( move || {
-            let ref mut child_trace_header = trace_header.fork_trace();
-            let _ = port.listen_pe(port_to_link, port_from_pe, child_trace_header).map_err(|e| write_err("port", e));
-        });
+            let ref mut working_trace_header = child_trace_header.clone();
+            let _ = port.listen_pe(port_to_link, port_from_pe, working_trace_header).map_err(|e| write_err("port", e));
+            if CONTINUE_ON_ERROR { }
+        }).expect("thread failed");
     }
 
     // WORKER (PortFromLink)

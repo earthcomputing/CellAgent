@@ -1,7 +1,7 @@
 use std::fmt;
 use std::thread;
 
-use config::ByteArray;
+use config::{ByteArray,CONTINUE_ON_ERROR};
 use dal;
 use name::{ContainerID, UptreeID};
 use message::{MsgDirection, TcpMsgType};
@@ -26,7 +26,7 @@ impl Service {
             _ => Err(ServiceError::NoSuchService { func_name: "create_service", service_name: S(service_name) })
         }
     }
-    pub fn initialize(&self, up_tree_id: &UptreeID, container_from_vm: ContainerFromVm, trace_header: TraceHeader) -> Result<(), Error> {
+    pub fn initialize(&self, up_tree_id: &UptreeID, container_from_vm: ContainerFromVm, trace_header: &mut TraceHeader) -> Result<(), Error> {
         match self {
             &Service::NocMaster { ref service } => service.initialize(up_tree_id, container_from_vm, trace_header),
             &Service::NocAgent  { ref service } => service.initialize(up_tree_id, container_from_vm, trace_header)
@@ -49,7 +49,7 @@ pub struct NocMaster {
     allowed_trees: Vec<AllowedTree>
 }
 impl NocMaster {
-    pub fn get_name(&self) -> String { return self.name; }
+    pub fn get_name(&self) -> &str { return &self.name; }
     pub fn new(container_id: ContainerID, name: &str, container_to_vm: ContainerToVm,
                allowed_trees: &Vec<AllowedTree>) -> NocMaster {
         //println!("NocMaster started in container {}", container_id);
@@ -57,7 +57,7 @@ impl NocMaster {
             allowed_trees: allowed_trees.clone() }
     }
     //fn get_container_id(&self) -> &ContainerID { &self.container_id }
-    pub fn initialize(&self, _: &UptreeID, container_from_vm: ContainerFromVm, trace_header: TraceHeader) -> Result<(), Error> {
+    pub fn initialize(&self, _: &UptreeID, container_from_vm: ContainerFromVm, trace_header: &mut TraceHeader) -> Result<(), Error> {
         let _f = "initialize";
         println!("Service {} running NocMaster", self.container_id);
         self.listen_vm(container_from_vm, trace_header)?;
@@ -70,14 +70,15 @@ impl NocMaster {
     }
 
     // SPAWN THREAD (listen_vm_loop)
-    fn listen_vm(&self, container_from_vm: ContainerFromVm, trace_header: TraceHeader) -> Result<(), Error> {
+    fn listen_vm(&self, container_from_vm: ContainerFromVm, trace_header: &mut TraceHeader) -> Result<(), Error> {
         //println!("Service {} on {}: listening to VM", self.name, self.container_id);
         let master = self.clone();
+        let child_trace_header = trace_header.fork_trace();
         let thread_name = format!("PacketEngine {} to PortSet", self.get_name());
         thread::Builder::new().name(thread_name.into()).spawn( move || {
-            let ref mut child_trace_header = trace_header.fork_trace();
-            let _ = master.listen_vm_loop(&container_from_vm, child_trace_header).map_err(|e| write_err("service", e));
-            let _ = master.listen_vm(container_from_vm, trace_header);
+            let ref mut working_trace_header = child_trace_header.clone();
+            let _ = master.listen_vm_loop(&container_from_vm, working_trace_header).map_err(|e| write_err("service", e));
+            if CONTINUE_ON_ERROR { let _ = master.listen_vm(container_from_vm, working_trace_header); }
         })?;
         Ok(())
     }
@@ -114,14 +115,14 @@ pub struct NocAgent {
     allowed_trees: Vec<AllowedTree>
 }
 impl NocAgent {
-    pub fn get_name(&self) -> String { return self.name; }
+    pub fn get_name(&self) -> &str { return &self.name; }
     pub fn new(container_id: ContainerID, name: &str, container_to_vm: ContainerToVm,
             allowed_trees: &Vec<AllowedTree>) -> NocAgent {
         //println!("NocAgent started in container {}", container_id);
         NocAgent { container_id, name: S(name), container_to_vm,
             allowed_trees: allowed_trees.clone() }
     }
-    pub fn initialize(&self, _up_tree_id: &UptreeID, container_from_vm: ContainerFromVm, trace_header: TraceHeader) -> Result<(), Error> {
+    pub fn initialize(&self, _up_tree_id: &UptreeID, container_from_vm: ContainerFromVm, trace_header: &mut TraceHeader) -> Result<(), Error> {
         //let _f = "initialize";
         //self.container_to_vm.send((S("NocAgent"), S("Message from NocAgent"))).context(ServiceError::Chain { func_name: _f, comment: S("NocAgent") })?;
         println!("Service {} running NocAgent", self.container_id);
@@ -129,14 +130,15 @@ impl NocAgent {
     }
 
     // SPAWN THREAD (listen_vm_loop)
-    fn listen_vm(&self, container_from_vm: ContainerFromVm, trace_header: TraceHeader) -> Result<(), Error> {
+    fn listen_vm(&self, container_from_vm: ContainerFromVm, trace_header: &mut TraceHeader) -> Result<(), Error> {
         //println!("Service {} on {}: listening to VM", self.name, self.container_id);
         let agent = self.clone();
+        let child_trace_header = trace_header.fork_trace();
         let thread_name = format!("PacketEngine {} to PortSet", self.get_name());
         thread::Builder::new().name(thread_name.into()).spawn( move || {
-            let ref mut child_trace_header = trace_header.fork_trace();
-            let _ = agent.listen_vm_loop(&container_from_vm, child_trace_header).map_err(|e| write_err("service", e));
-            let _ = agent.listen_vm(container_from_vm, trace_header);
+            let ref mut working_trace_header = child_trace_header.clone();
+            let _ = agent.listen_vm_loop(&container_from_vm, working_trace_header).map_err(|e| write_err("service", e));
+            if CONTINUE_ON_ERROR { let _ = agent.listen_vm(container_from_vm, working_trace_header); }
         })?;
         Ok(())
     }
