@@ -6,7 +6,8 @@ use std::thread::{JoinHandle};
 use blueprint::{Blueprint};
 use config::{CellNo, CellType, Edge, LinkNo, get_geometry};
 use dal;
-use message_types::{LinkToPort, PortFromLink, PortToLink, LinkFromPort, PortToNoc, PortFromNoc};
+use message_types::{LinkToPort, PortFromLink, PortToLink, LinkFromPort,
+    PortToNoc, PortFromNoc};
 use link::{Link};
 use nalcell::{CellConfig, NalCell};
 use name::{CellID, LinkID};
@@ -19,7 +20,8 @@ pub struct Datacenter {
 }
 impl Datacenter {
     pub fn new() -> Datacenter { Datacenter { cells: Vec::new(), links: Vec::new() } }
-    pub fn initialize(&mut self, blueprint: &Blueprint, trace_header: &mut TraceHeader) -> Result<Vec<JoinHandle<()>>, Error> {
+    pub fn initialize(&mut self, blueprint: &Blueprint, trace_header: &mut TraceHeader)
+            -> Result<Vec<JoinHandle<()>>, Error> {
         let _f = "initialize";
         let geometry = get_geometry();  // A cheat used for visualization
         let ncells = blueprint.get_ncells();
@@ -75,15 +77,15 @@ impl Datacenter {
             let rite_cell = split.1.first_mut()
                 .ok_or_else(|| -> Error { DatacenterError::Wire { edge: edge.clone(), func_name: _f, comment: "split rite" }.into() })?;
             let rite_cell_id = rite_cell.get_id().clone(); // For Trace
-                let (rite_port, rite_from_pe) = rite_cell.get_free_ec_port_mut()?;
-                //println!("Datacenter: edge {:?} {} {}", edge, *left_port.get_id(), *rite_port.get_id());
-                let (link_to_left, left_from_link): (LinkToPort, PortFromLink) = channel();
-                let (link_to_rite, rite_from_link): (LinkToPort, PortFromLink) = channel();
-                let (left_to_link, link_from_left): (PortToLink, LinkFromPort) = channel();
-                let (rite_to_link, link_from_rite): (PortToLink, LinkFromPort) = channel();
-                left_port.link_channel(left_to_link, left_from_link, left_from_pe);
-                rite_port.link_channel(rite_to_link, rite_from_link, rite_from_pe);
-                let mut link = Link::new(&left_port.get_id(), &rite_port.get_id())?;
+            let (rite_port, rite_from_pe) = rite_cell.get_free_ec_port_mut()?;
+            //println!("Datacenter: edge {:?} {} {}", edge, *left_port.get_id(), *rite_port.get_id());
+            let (link_to_left, left_from_link): (LinkToPort, PortFromLink) = channel();
+            let (link_to_rite, rite_from_link): (LinkToPort, PortFromLink) = channel();
+            let (left_to_link, link_from_left): (PortToLink, LinkFromPort) = channel();
+            let (rite_to_link, link_from_rite): (PortToLink, LinkFromPort) = channel();
+            left_port.link_channel(left_to_link, left_from_link, left_from_pe);
+            rite_port.link_channel(rite_to_link, rite_from_link, rite_from_pe);
+            let mut link = Link::new(&left_port.get_id(), &rite_port.get_id())?;
             {
                 let ref trace_params = TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "connect_link" };
                 let trace = json!({ "left_cell": left_cell_id, "rite_cell": rite_cell_id, "left_port": left_port.get_port_no(), "rite_port": rite_port.get_port_no(), "link_id": link.get_id() });
@@ -92,8 +94,8 @@ impl Datacenter {
             let mut handle_pair = link.start_threads(link_to_left, link_from_left, link_to_rite, link_from_rite, trace_header)?;
             link_handles.append(&mut handle_pair);
             self.links.push(link); 
-            } 
-            Ok(link_handles)
+        } 
+        Ok(link_handles)
     }
     pub fn get_links(&self) -> &Vec<Link> { &self.links }
     pub fn get_links_mut(&mut self) -> &mut Vec<Link> { &mut self.links }
@@ -103,7 +105,8 @@ impl Datacenter {
     pub fn get_link_ids(&self) -> Vec<&LinkID> {
         self.links.iter().map(|link| link.get_id()).collect::<Vec<_>>()
     }
-    pub fn connect_to_noc(&mut self, port_to_noc: PortToNoc, port_from_noc: PortFromNoc) -> Result<(), Error> {
+    pub fn connect_to_noc(&mut self, port_to_noc: PortToNoc, port_from_noc: PortFromNoc)
+            -> Result<(), Error> {
         let _f = "connect_to_noc";
         let (port, port_from_pe) = self.cells
             .iter_mut()

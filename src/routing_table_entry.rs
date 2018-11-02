@@ -23,15 +23,15 @@ impl RoutingTableEntry {
     }
     pub fn default() -> RoutingTableEntry {
         let port_number = PortNumber::new0();
-        let tree_id = TreeID::new("default").expect("The string 'default' is always a valid tree name")
-;		RoutingTableEntry::new(&tree_id, false, port_number, Mask::empty(), true)
+        let tree_id = TreeID::new("default").expect("The string 'default' is always a valid tree name");
+        RoutingTableEntry::new(&tree_id, false, port_number, Mask::empty(), true)
     }
     pub fn is_in_use(&self) -> bool { self.inuse }
     pub fn may_send(&self) -> bool { self.may_send }
-//    pub fn may_receive(&self) -> bool { !self.mask.and(Mask::port0()).equal(Mask::empty()) }
+//  pub fn may_receive(&self) -> bool { !self.mask.and(Mask::port0()).equal(Mask::empty()) }
     pub fn enable_send(&mut self) { self.may_send = true; }
     pub fn disable_send(&mut self) { self.may_send = false; }
-//	pub fn is_on_tree(&self) -> bool {
+//  pub fn is_on_tree(&self) -> bool {
 //        self.may_send || self.may_receive()
 //    }
     pub fn get_uuid(&self) -> Uuid { self.tree_uuid }
@@ -39,17 +39,17 @@ impl RoutingTableEntry {
     pub fn or_with_mask(&mut self, mask: Mask) { self.mask = self.mask.or(mask); }
     pub fn and_with_mask(&mut self, mask: Mask) { self.mask = self.mask.and(mask); }
     pub fn set_inuse(&mut self) { self.inuse = true; }
-//	pub fn set_not_inuse(&mut self) { self.inuse = false; }
+//  pub fn set_not_inuse(&mut self) { self.inuse = false; }
     pub fn get_parent(&self) -> PortNo { self.parent }
     pub fn get_mask(&self) -> Mask { self.mask }
     pub fn set_mask(&mut self, mask: Mask) { self.mask = mask; }
     pub fn set_tree_id(&mut self, tree_id: &TreeID) {
         self.tree_uuid = tree_id.get_uuid();
     }
-//	pub fn get_other_index(&self, port_number: PortNumber) -> TableIndex {
-//		let port_no = port_number.get_port_no().v as usize;
-//		self.other_indices[port_no]
-//	}
+//    pub fn get_other_index(&self, port_number: PortNumber) -> TableIndex {
+//        let port_no = port_number.get_port_no().v as usize;
+//        self.other_indices[port_no]
+//    }
     pub fn add_children(&mut self, children: &HashSet<PortNumber>) {
         let mask = Mask::make(children);
         self.or_with_mask(mask);

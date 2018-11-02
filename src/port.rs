@@ -37,8 +37,8 @@ impl Port {
     }
     pub fn get_id(&self) -> &PortID { &self.id }
     pub fn get_port_no(&self) -> PortNo { self.port_number.get_port_no() }
-//	pub fn get_port_number(&self) -> PortNumber { self.port_number }
-//	pub fn get_is_connected(&self) -> Arc<AtomicBool> { self.is_connected.clone() }
+//  pub fn get_port_number(&self) -> PortNumber { self.port_number }
+//  pub fn get_is_connected(&self) -> Arc<AtomicBool> { self.is_connected.clone() }
     pub fn is_connected(&self) -> bool { self.is_connected.load(SeqCst) }
     pub fn set_connected(&mut self) { self.is_connected.store(true, SeqCst); }
     pub fn set_disconnected(&mut self) { self.is_connected.store(false, SeqCst); }

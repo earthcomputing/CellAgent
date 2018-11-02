@@ -13,7 +13,7 @@ use utility::{S, write_err, TraceHeader, TraceHeaderParams, TraceType};
 #[derive(Debug, Clone)]
 pub struct Link {
     id: LinkID,
-    is_connected: bool,		      //     Left Port        Link        Right Port
+    is_connected: bool,              //     Left Port        Link        Right Port
     to_left: Option<LinkToPort>,
     to_rite: Option<LinkToPort>
 }
