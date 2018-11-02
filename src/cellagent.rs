@@ -575,7 +575,7 @@ impl CellAgent {
              let tree_map = self.tree_name_map
                  .get(sender_id)
                  .cloned()
-                 .ok_or_else(|| -> Error { CellagentError::TreeNameMap { func_name: f, cell_id: self.cell_id.clone(), sender_id: sender_id.clone() }.into() })?;
+                 .ok_or_else(|| -> Error { CellagentError::TreeNameMap { func_name: _f, cell_id: self.cell_id.clone(), sender_id: sender_id.clone() }.into() })?;
              let tree_map_updated = match msg_type {
                 TcpMsgType::Application => self.tcp_application(&sender_id, is_ait, &allowed_tree, serialized, direction, &tree_map, trace_header).context(CellagentError::Chain { func_name: _f, comment: S("tcp_application") })?,
                 TcpMsgType::DeleteTree => self.tcp_delete_tree(&sender_id, serialized, direction, &tree_map, trace_header).context(CellagentError::Chain { func_name: _f, comment: S("tcp_delete_tree") })?,
