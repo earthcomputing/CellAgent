@@ -27,13 +27,11 @@ pub fn add_to_trace(trace_header: &mut TraceHeader, trace_type: TraceType,
                     trace_params: &TraceHeaderParams, trace_body: &Value, caller: &str) -> Result<(), Error> {
     let _f = "add_to_trace";
     //let mut buf = String::with_capacity(2);
-    let mut file_handle = match OpenOptions::new().append(true).open(OUTPUT_FILE_NAME) {
-        Ok(f) => Ok(f),
-        Err(_) => {
+    let mut file_handle = OpenOptions::new().append(true).open(OUTPUT_FILE_NAME)
+        .or_else(|_| {
             println!("Writing output to {}", OUTPUT_FILE_NAME);
             File::create(OUTPUT_FILE_NAME)
-        }
-    }?;
+        })?;
     trace_header.next(trace_type);
     trace_header.update(trace_params);
     let trace_record = TraceRecord { header: trace_header, body: trace_body };
