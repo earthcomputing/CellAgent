@@ -6,7 +6,7 @@ use std::thread;
 use cellagent::{CellAgent};
 use cmodel::{Cmodel};
 use dal;
-use config::{MAX_PORTS, CellNo, CellType, PortNo};
+use config::{CONTINUE_ON_ERROR, MAX_PORTS, CellNo, CellType, PortNo};
 use message_types::{PortToPe, PeFromPort, PeToPort,PortFromPe,
                     CaToCm, CmFromCa, CmToCa, CaFromCm,
                     CmToPe, PeFromCm, PeToCm, CmFromPe};
@@ -44,7 +44,7 @@ pub struct NalCell {
 
 impl NalCell {
     pub fn new(cell_no: CellNo, nports: PortNo, cell_type: CellType,
-               config: CellConfig, mut trace_header: TraceHeader) -> Result<NalCell, Error> {
+               config: CellConfig, trace_header: &mut TraceHeader) -> Result<NalCell, Error> {
         let _f = "new";
         if *nports > *MAX_PORTS { return Err(NalcellError::NumberPorts { nports, func_name: "new", max_ports: MAX_PORTS }.into()) }
         let cell_id = CellID::new(cell_no).context(NalcellError::Chain { func_name: "new", comment: S("cell_id")})?;
@@ -60,7 +60,7 @@ impl NalCell {
         {
             let ref trace_params = TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "nalcell_port_setup" };
             let trace = json!({ "cell_number": cell_no });
-            let _ = dal::add_to_trace(&mut trace_header, TraceType::Trace, trace_params, &trace, _f);
+            let _ = dal::add_to_trace(trace_header, TraceType::Trace, trace_params, &trace, _f);
         }
         for i in 0..*nports + 1 {
             let is_border_port = match cell_type {
@@ -81,11 +81,11 @@ impl NalCell {
         }
         let boxed_ports: Box<[Port]> = ports.into_boxed_slice();
         let cell_agent = CellAgent::new(&cell_id, cell_type, config, nports, ca_to_cm).context(NalcellError::Chain { func_name: "new", comment: S("cell agent create")})?;
-        NalCell::start_cell(&cell_agent, ca_from_cm, &mut trace_header);
+        NalCell::start_cell(&cell_agent, ca_from_cm, trace_header);
         let cmodel = Cmodel::new(&cell_id);
-        NalCell::start_cmodel(&cmodel, cm_from_ca, cm_to_pe, cm_from_pe, cm_to_ca, &mut trace_header);
+        NalCell::start_cmodel(&cmodel, cm_from_ca, cm_to_pe, cm_from_pe, cm_to_ca, trace_header);
         let packet_engine = PacketEngine::new(&cell_id, pe_to_cm, pe_to_ports, boundary_port_nos).context(NalcellError::Chain { func_name: "new", comment: S("packet engine create")})?;
-        NalCell::start_packet_engine(&packet_engine, pe_from_cm, pe_from_ports, &mut trace_header);
+        NalCell::start_packet_engine(&packet_engine, pe_from_cm, pe_from_ports, trace_header);
         Ok(NalCell { id: cell_id, cell_no, cell_type, config,
                 ports: boxed_ports, cell_agent, vms: Vec::new(),
                 packet_engine, ports_from_pe })
@@ -99,26 +99,28 @@ impl NalCell {
             let trace = json!({ "cell_id": &cell_agent.get_id() });
             let _ = dal::add_to_trace(trace_header, TraceType::Trace, trace_params, &trace, _f);
         }
+        let mut ca = cell_agent.clone();
+        let child_trace_header = trace_header.fork_trace();
         let thread_name = format!("CellAgent {}", cell_agent);
         thread::Builder::new().name(thread_name.into()).spawn( move || {
-            let child_trace_header = trace_header.fork_trace();
-            let mut ca = cell_agent.clone();
-            let _ = ca.initialize(ca_from_cm, child_trace_header).map_err(|e| ::utility::write_err("nalcell", e));
-            // Don't automatically restart cell agent if it crashes
-        });
+            let ref mut working_trace_header = child_trace_header.clone();
+            let _ = ca.initialize(ca_from_cm, working_trace_header).map_err(|e| ::utility::write_err("nalcell", e));
+            if CONTINUE_ON_ERROR { } // Don't automatically restart cell agent if it crashes
+        }).expect("thread failed");
     }
 
     // SPAWN THREAD (cm.initialize)
     fn start_cmodel(cmodel: &Cmodel, cm_from_ca: CmFromCa, cm_to_pe: CmToPe, cm_from_pe: CmFromPe, cm_to_ca: CmToCa,
                     trace_header: &mut TraceHeader) {
         let _f = "start_cmodel";
+        let cm = cmodel.clone();
+        let child_trace_header = trace_header.fork_trace();
         let thread_name = format!("CModel {}", cmodel);
         thread::Builder::new().name(thread_name.into()).spawn( move || {
-            let child_trace_header = trace_header.fork_trace();
-            let cm = cmodel.clone();
-            let _ = cm.initialize(cm_from_ca, cm_to_pe, cm_from_pe, cm_to_ca, child_trace_header);
-            // Don't automatically restart cmodel if it crashes
-        });
+            let ref mut working_trace_header = child_trace_header.clone();
+            let _ = cm.initialize(cm_from_ca, cm_to_pe, cm_from_pe, cm_to_ca, working_trace_header);
+            if CONTINUE_ON_ERROR { } // Don't automatically restart cmodel if it crashes
+        }).expect("thread failed");
     }
 
     // SPAWN THREAD (pe.initialize)
@@ -131,12 +133,13 @@ impl NalCell {
             let _ = dal::add_to_trace(trace_header, TraceType::Trace, trace_params, &trace, _f);
         }
         let pe = packet_engine.clone();
+        let child_trace_header = trace_header.fork_trace();
         let thread_name = format!("PacketEngine {}", packet_engine.get_id());
         thread::Builder::new().name(thread_name.into()).spawn( move || {
-            let child_trace_header = trace_header.fork_trace();
-            let _ = pe.initialize(pe_from_cm, pe_from_ports, child_trace_header).map_err(|e| ::utility::write_err("nalcell", e));
-            // Don't automatically restart packet engine if it crashes
-        });
+            let ref mut working_trace_header = child_trace_header.clone();
+            let _ = pe.initialize(pe_from_cm, pe_from_ports, working_trace_header).map_err(|e| ::utility::write_err("nalcell", e));
+            if CONTINUE_ON_ERROR { } // Don't automatically restart packet engine if it crashes
+        }).expect("thread failed");
     }
 
     pub fn get_id(&self) -> &CellID { &self.id }

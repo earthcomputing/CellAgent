@@ -133,7 +133,7 @@ impl CellAgent {
         let gvm_equation = GvmEquation::new(eqns, Vec::new());
         self.update_traph(&control_tree_id, port_number_0,
                           traph::PortStatus::Parent, &gvm_equation,
-                          HashSet::new(), hops, path, &mut trace_header)?;
+                          HashSet::new(), hops, path, trace_header)?;
         let mut eqns = HashSet::new();
         eqns.insert(GvmEqn::Recv("false"));
         eqns.insert(GvmEqn::Send("true"));
@@ -142,7 +142,7 @@ impl CellAgent {
         let gvm_equation = GvmEquation::new(eqns, Vec::new());
         let connected_tree_entry = self.update_traph(&connected_tree_id, port_number_0,
                                                      traph::PortStatus::Parent, &gvm_equation,
-                                                     HashSet::new(), hops, path, &mut trace_header)?;
+                                                     HashSet::new(), hops, path, trace_header)?;
         self.connected_tree_entry = connected_tree_entry;
         // Create my tree
         let mut eqns = HashSet::new();
@@ -153,8 +153,8 @@ impl CellAgent {
         let gvm_equation = GvmEquation::new(eqns, Vec::new());
         self.my_entry = self.update_traph(&my_tree_id, port_number_0,
                                           traph::PortStatus::Parent, &gvm_equation,
-                                          HashSet::new(), hops, path, &mut trace_header)?;
-        self.listen_cm(ca_from_cm, &mut trace_header.fork_trace())?;
+                                          HashSet::new(), hops, path, trace_header)?;
+        self.listen_cm(ca_from_cm, trace_header)?;
         Ok(())
     }
     pub fn get_no_ports(&self) -> PortNo { self.no_ports }
@@ -522,7 +522,7 @@ impl CellAgent {
                 }
             }
             self.ca_to_vms.insert(vm_id.clone(), ca_to_vm,);
-            self.listen_uptree(vm_sender_id, vm_id, trees, ca_from_vm, &mut trace_header.fork_trace());
+            self.listen_uptree(vm_sender_id, vm_id, trees, ca_from_vm, trace_header);
         }
         Ok(())
     }
@@ -543,15 +543,16 @@ impl CellAgent {
 
     // SPAWN THREAD (listen_uptree_loop)
     fn listen_uptree(&self, sender_id: SenderID, vm_id: VmID, trees: HashSet<AllowedTree>,
-                     ca_from_vm: CaFromVm, trace_header: TraceHeader) {
+                     ca_from_vm: CaFromVm, trace_header: &mut TraceHeader) {
         let _f = "listen_uptree";
         let mut ca = self.clone();
+        let child_trace_header = trace_header.fork_trace();
         let thread_name = format!("CellAgent {} from VM", self.cell_id.get_name());
         thread::Builder::new().name(thread_name.into()).spawn( move || {
-            let ref mut child_trace_header = trace_header.fork_trace();
-            let _ = ca.listen_uptree_loop(&sender_id.clone(), &vm_id, &ca_from_vm, child_trace_header).map_err(|e| ::utility::write_err("cellagent", e));
-            if CONTINUE_ON_ERROR { let _ = ca.listen_uptree(sender_id, vm_id, trees, ca_from_vm, trace_header); }
-        });
+            let ref mut working_trace_header = child_trace_header.clone();
+            let _ = ca.listen_uptree_loop(&sender_id.clone(), &vm_id, &ca_from_vm, working_trace_header).map_err(|e| ::utility::write_err("cellagent", e));
+            if CONTINUE_ON_ERROR { let _ = ca.listen_uptree(sender_id, vm_id, trees, ca_from_vm, working_trace_header); }
+        }).expect("thread failed");
     }
 
     // WORKER (CaFromVm)
@@ -661,15 +662,16 @@ impl CellAgent {
     }
 
     // SPAWN THREAD (listen_cm_loop)
-    fn listen_cm(&mut self, ca_from_cm: CaFromCm, trace_header: TraceHeader) -> Result<(), Error>{
+    fn listen_cm(&mut self, ca_from_cm: CaFromCm, trace_header: &mut TraceHeader) -> Result<(), Error>{
         let _f = "listen_cm";
         let mut ca = self.clone();
+        let child_trace_header = trace_header.fork_trace();
         let thread_name = format!("CellAgent {} from CModel", self.cell_id.get_name());
         thread::Builder::new().name(thread_name.into()).spawn( move || {
-            let ref mut child_trace_header = trace_header.fork_trace();
-            let _ = ca.listen_cm_loop(&ca_from_cm, child_trace_header).map_err(|e| ::utility::write_err("cellagent", e));
+            let ref mut working_trace_header = child_trace_header.clone();
+            let _ = ca.listen_cm_loop(&ca_from_cm, working_trace_header).map_err(|e| ::utility::write_err("cellagent", e));
             // println!("Cellagent {}: Back from listen_cm_loop", ca.cell_id);
-            if CONTINUE_ON_ERROR { let _ = ca.listen_cm(ca_from_cm, trace_header); }
+            if CONTINUE_ON_ERROR { let _ = ca.listen_cm(ca_from_cm, working_trace_header); }
         })?;
         Ok(())
     }

@@ -26,7 +26,7 @@ impl Link {
     pub fn start_threads(&mut self,
             link_to_left: LinkToPort, link_from_left: LinkFromPort,
             link_to_rite: LinkToPort, link_from_rite: LinkFromPort,
-            mut trace_header: TraceHeader)
+            trace_header: &mut TraceHeader)
                 -> Result<Vec<JoinHandle<()>>, Error> {
         let _f = "start_threads";
         self.to_left = Some(link_to_left.clone());
@@ -44,7 +44,7 @@ impl Link {
         self.clone().to_rite.expect("Cannot fail in break_link").send(LinkToPortPacket::Status(PortStatus::Disconnected)).context(LinkError::Chain { func_name: _f, comment: S(self.id.clone()) + " left"})?;
         Ok(())
     }
-    fn listen(&self, status: LinkToPort, link_from: LinkFromPort, link_to: LinkToPort, mut trace_header: TraceHeader)
+    fn listen(&self, status: LinkToPort, link_from: LinkFromPort, link_to: LinkToPort, trace_header: &mut TraceHeader)
             -> Result<JoinHandle<()>, Error> {
         let _f = "listen";
         status.send(LinkToPortPacket::Status(PortStatus::Connected)).context(LinkError::Chain { func_name: _f, comment: S(self.id.clone()) + " send status to port"})?;
@@ -53,13 +53,14 @@ impl Link {
     }
 
     // SPAWN THREAD (listen_loop)
-    fn listen_port(&self, link_from: LinkFromPort, link_to: LinkToPort, trace_header: TraceHeader) -> Result<JoinHandle<()>, Error> {
+    fn listen_port(&self, link_from: LinkFromPort, link_to: LinkToPort, trace_header: &mut TraceHeader) -> Result<JoinHandle<()>, Error> {
         let link = self.clone();
+        let child_trace_header = trace_header.fork_trace();
         let thread_name = format!("Link {} from ??", self.get_id());
         let join_handle = thread::Builder::new().name(thread_name.into()).spawn( move || {
-            let ref mut child_trace_header = trace_header.fork_trace();
-            let _ = link.listen_loop(&link_from, &link_to, child_trace_header).map_err(|e| write_err("link", e.into()));
-            if CONTINUE_ON_ERROR { let _ = link.listen_port(link_from, link_to, trace_header); }
+            let ref mut working_trace_header = child_trace_header.clone();
+            let _ = link.listen_loop(&link_from, &link_to, working_trace_header).map_err(|e| write_err("link", e.into()));
+            if CONTINUE_ON_ERROR { let _ = link.listen_port(link_from, link_to, working_trace_header); }
         })?;
         Ok(join_handle)
     }
