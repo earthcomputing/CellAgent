@@ -20,20 +20,20 @@ pub struct Datacenter {
 impl Datacenter {
     pub fn new() -> Datacenter { Datacenter { cells: Vec::new(), links: Vec::new() } }
     pub fn initialize(&mut self, blueprint: &Blueprint, trace_header: &mut TraceHeader) -> Result<Vec<JoinHandle<()>>, Error> {
-        let f = "initialize";
+        let _f = "initialize";
         let geometry = get_geometry();  // A cheat used for visualization
         let ncells = blueprint.get_ncells();
         let edge_list = blueprint.get_edge_list();
-        if *ncells < 1  { return Err(DatacenterError::Cells{ ncells, func_name: f }.into()); }
-        if edge_list.len() < *ncells - 1 { return Err(DatacenterError::Edges { nlinks: LinkNo(CellNo(edge_list.len())), func_name: f }.into() ); }
+        if *ncells < 1  { return Err(DatacenterError::Cells{ ncells, func_name: _f }.into()); }
+        if edge_list.len() < *ncells - 1 { return Err(DatacenterError::Edges { nlinks: LinkNo(CellNo(edge_list.len())), func_name: _f }.into() ); }
         self.cells.append(&mut blueprint.get_border_cells()
             .iter()
             .map(|border_cell| -> Result<NalCell, Error> {
                 {
-                    let ref trace_params = TraceHeaderParams { module: file!(), line_no: line!(), function: f, format: "border_cell_start" };
+                    let ref trace_params = TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "border_cell_start" };
                     let cell_no = border_cell.get_cell_no();
                     let trace = json!({ "cell_number": cell_no, "location":  geometry.2.get(*cell_no)});
-                    let _ = dal::add_to_trace(trace_header, TraceType::Trace, trace_params,&trace, f);
+                    let _ = dal::add_to_trace(trace_header, TraceType::Trace, trace_params,&trace, _f);
                 }
                 NalCell::new(border_cell.get_cell_no(), border_cell.get_nports(),
                                            CellType::Border,CellConfig::Large,
@@ -46,10 +46,10 @@ impl Datacenter {
             .iter()
             .map(|interior_cell| -> Result<NalCell, Error> {
                 {
-                    let ref trace_params = TraceHeaderParams { module: file!(), line_no: line!(), function: f, format: "interior_cell_start" };
+                    let ref trace_params = TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "interior_cell_start" };
                     let cell_no = interior_cell.get_cell_no();
                     let trace = json!({ "cell_number": cell_no, "location": geometry.2.get(*cell_no as usize) });
-                    let _ = dal::add_to_trace(trace_header, TraceType::Trace, trace_params,&trace, f);
+                    let _ = dal::add_to_trace(trace_header, TraceType::Trace, trace_params,&trace, _f);
                 }
                 NalCell::new(interior_cell.get_cell_no(), interior_cell.get_nports(),
                              CellType::Interior,CellConfig::Large,
@@ -61,7 +61,7 @@ impl Datacenter {
         self.cells.sort_by(|a, b| (*a.get_no()).cmp(&*b.get_no())); // Sort to conform to edge list
         let mut link_handles = Vec::new();
         for edge in edge_list {
-            if (*(edge.0) > ncells.0) | (*(edge.1) >= ncells.0) { return Err(DatacenterError::Wire { edge: edge.clone(), func_name: f, comment: "greater than ncells test" }.into()); }
+            if (*(edge.0) > ncells.0) | (*(edge.1) >= ncells.0) { return Err(DatacenterError::Wire { edge: edge.clone(), func_name: _f, comment: "greater than ncells test" }.into()); }
             let (e0, e1) = if *(edge.0) >= *(edge.1) {
                 (*(edge.1), *(edge.0))
             } else {
@@ -69,11 +69,11 @@ impl Datacenter {
             };
             let split = self.cells.split_at_mut(max(e0,e1));
             let left_cell = split.0.get_mut(e0)
-                .ok_or_else(|| -> Error { DatacenterError::Wire { edge: edge.clone(), func_name: f, comment: "split left" }.into() })?;
+                .ok_or_else(|| -> Error { DatacenterError::Wire { edge: edge.clone(), func_name: _f, comment: "split left" }.into() })?;
             let left_cell_id = left_cell.get_id().clone(); // For Trace
             let (left_port,left_from_pe) = left_cell.get_free_ec_port_mut()?;
             let rite_cell = split.1.first_mut()
-                .ok_or_else(|| -> Error { DatacenterError::Wire { edge: edge.clone(), func_name: f, comment: "split rite" }.into() })?;
+                .ok_or_else(|| -> Error { DatacenterError::Wire { edge: edge.clone(), func_name: _f, comment: "split rite" }.into() })?;
             let rite_cell_id = rite_cell.get_id().clone(); // For Trace
                 let (rite_port, rite_from_pe) = rite_cell.get_free_ec_port_mut()?;
                 //println!("Datacenter: edge {:?} {} {}", edge, *left_port.get_id(), *rite_port.get_id());
@@ -85,9 +85,9 @@ impl Datacenter {
                 rite_port.link_channel(rite_to_link, rite_from_link, rite_from_pe);
                 let mut link = Link::new(&left_port.get_id(), &rite_port.get_id())?;
             {
-                let ref trace_params = TraceHeaderParams { module: file!(), line_no: line!(), function: f, format: "connect_link" };
+                let ref trace_params = TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "connect_link" };
                 let trace = json!({ "left_cell": left_cell_id, "rite_cell": rite_cell_id, "left_port": left_port.get_port_no(), "rite_port": rite_port.get_port_no(), "link_id": link.get_id() });
-                let _ = dal::add_to_trace(trace_header, TraceType::Trace, trace_params, &trace, f);
+                let _ = dal::add_to_trace(trace_header, TraceType::Trace, trace_params, &trace, _f);
             }
             let mut handle_pair = link.start_threads(link_to_left, link_from_left, link_to_rite, link_from_rite, trace_header)?;
             link_handles.append(&mut handle_pair);

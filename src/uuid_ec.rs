@@ -54,7 +54,7 @@ impl Uuid {
         self.get_ait_state() == AitState::Ait
     }
     pub fn get_ait_state(&self) -> AitState {
-        let f = "get_ait_state";
+        let _f = "get_ait_state";
         match self.get_code() {
             TICK => AitState::Tick,
             TOCK => AitState::Tock,
@@ -126,7 +126,7 @@ impl Uuid {
         }
     }
     fn next_state(&mut self) -> Result<AitState, Error> {
-        let f = "next_state";
+        let _f = "next_state";
         Ok(match self.get_code() & !REVERSE {
             TICK => { self.set_code(TOCK); AitState::Tock },
             TOCK => { self.set_code(TICK); AitState::Tick },
@@ -134,18 +134,18 @@ impl Uuid {
             TECK => { self.set_code(TACK); AitState::Tack },
             AIT  => { self.set_code(TECK); AitState::Teck },
             NORMAL => AitState::Normal,
-            _ => return Err(UuidError::AitState { func_name: f, ait_state: self.get_ait_state() }.into())
+            _ => return Err(UuidError::AitState { func_name: _f, ait_state: self.get_ait_state() }.into())
         })
     }
     fn previous_state(&mut self) -> Result<AitState, Error> {
-        let f = "previous_stat";
+        let _f = "previous_stat";
         Ok(match self.get_code() & !REVERSE {
             TICK => { self.set_code(TOCK); self.time_reverse(); AitState::Tock },
             TOCK => { self.set_code(TACK); AitState::Tack },
             TACK => { self.set_code(TECK); AitState::Teck },
             TECK => { self.set_code(AIT);  AitState::Tick },
             NORMAL => AitState::Normal,
-            _ => return Err(UuidError::AitState { func_name: f, ait_state: self.get_ait_state() }.into())
+            _ => return Err(UuidError::AitState { func_name: _f, ait_state: self.get_ait_state() }.into())
         })
     }
 }
