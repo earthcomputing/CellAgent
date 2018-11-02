@@ -103,8 +103,8 @@ impl NocAgent {
             allowed_trees: allowed_trees.clone() }
     }
     pub fn initialize(&self, _up_tree_id: &UptreeID, container_from_vm: ContainerFromVm) -> Result<(), Error> {
-        //let f = "initialize";
-        //self.container_to_vm.send((S("NocAgent"), S("Message from NocAgent"))).context(ServiceError::Chain { func_name: f, comment: S("NocAgent") })?;
+        //let _f = "initialize";
+        //self.container_to_vm.send((S("NocAgent"), S("Message from NocAgent"))).context(ServiceError::Chain { func_name: _f, comment: S("NocAgent") })?;
         println!("Service {} running NocAgent", self.container_id);
         self.listen_vm(container_from_vm)
     }
@@ -119,9 +119,9 @@ impl NocAgent {
         Ok(())
     }
     fn listen_vm_loop(&self, container_from_vm: &ContainerFromVm) -> Result<(), Error> {
-        let f = "listen_vm_loop";
+        let _f = "listen_vm_loop";
         loop {
-            let (is_ait, msg) = container_from_vm.recv().context(ServiceError::Chain { func_name: f, comment: S("Agent recv from vm") })?;
+            let (is_ait, msg) = container_from_vm.recv().context(ServiceError::Chain { func_name: _f, comment: S("Agent recv from vm") })?;
             println!("NocAgent on container {} got msg {}", self.container_id, ::std::str::from_utf8(&msg)?);
             let msg = format!("Reply from {}", self.container_id);
             //println!("Service {} sending {}", self.container_id, msg);
