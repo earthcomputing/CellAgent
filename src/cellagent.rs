@@ -94,7 +94,7 @@ impl CellAgent {
         let mut base_tree_map = HashMap::new();
         base_tree_map.insert(my_tree_id.clone(), my_tree_id.clone());
         Ok(CellAgent { cell_id: cell_id.clone(), my_tree_id, cell_type, config,
-            control_tree_id, connected_tree_id,	tree_vm_map: HashMap::new(), ca_to_vms: HashMap::new(),
+            control_tree_id, connected_tree_id, tree_vm_map: HashMap::new(), ca_to_vms: HashMap::new(),
             no_ports, traphs: HashMap::new(), vm_id_no: 0, tree_id_map: HashMap::new(),
             tree_map: HashMap::new(),
             tree_name_map: HashMap::new(), border_port_tree_id_map: HashMap::new(),

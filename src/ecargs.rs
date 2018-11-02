@@ -18,9 +18,9 @@ impl ECArgs {
             Err(EcargsError::NumberPorts { nports, func_name: "new", max: MAX_PORTS }.into())
         }
     }
-//	pub fn get_nports(&self) -> u8 { return self.nports }
-//	pub fn get_ncells(&self) -> usize { return self.ncells }
-//	pub fn get_nlinks(&self) -> usize { return self.nlinks }
+//  pub fn get_nports(&self) -> u8 { return self.nports }
+//  pub fn get_ncells(&self) -> usize { return self.ncells }
+//  pub fn get_nlinks(&self) -> usize { return self.nlinks }
     pub fn get_args(&self) -> (CellNo, PortNo) { (self.ncells, self.nports) }
 /*
     pub fn args(args: Vec<String>)-> Result<ECArgs,ECArgsError> {
