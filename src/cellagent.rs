@@ -108,7 +108,7 @@ impl CellAgent {
     }
 
     // WORKER (CellAgent)
-    pub fn initialize(&mut self, ca_from_cm: CaFromCm, mut trace_header: TraceHeader) -> Result<(), Error> {
+    pub fn initialize(&mut self, ca_from_cm: CaFromCm, trace_header: &mut TraceHeader) -> Result<(), Error> {
         let _f = "initialize";
         {
             let ref trace_params = TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "worker" };
@@ -492,7 +492,7 @@ impl CellAgent {
             let mut tree_vm_map = self.tree_vm_map.clone();
             trees.insert(AllowedTree::new(CONTROL_TREE_NAME));
             let mut vm = VirtualMachine::new(&vm_id, vm_to_ca, vm_allowed_trees);
-            vm.initialize(up_tree_name, vm_from_ca, &trees, container_specs)?;
+            vm.initialize(up_tree_name, vm_from_ca, &trees, container_specs, trace_header)?;
             for vm_allowed_tree in vm_allowed_trees {
                 match tree_map.get(vm_allowed_tree.get_name()) {
                     Some(allowed_tree_id) => {
@@ -543,16 +543,15 @@ impl CellAgent {
 
     // SPAWN THREAD (listen_uptree_loop)
     fn listen_uptree(&self, sender_id: SenderID, vm_id: VmID, trees: HashSet<AllowedTree>,
-                     ca_from_vm: CaFromVm, trace_header: &mut TraceHeader) {
+                     ca_from_vm: CaFromVm, trace_header: TraceHeader) {
         let _f = "listen_uptree";
-        let thread_name = format!("CellAgent {} from VM", self.cell_id.get_name());
-        let join_handle = thread::Builder::new().name(thread_name.into()).spawn( move || {
-            let ref mut child_trace_header = trace_header.fork_trace();
         let mut ca = self.clone();
+        let thread_name = format!("CellAgent {} from VM", self.cell_id.get_name());
+        thread::Builder::new().name(thread_name.into()).spawn( move || {
+            let ref mut child_trace_header = trace_header.fork_trace();
             let _ = ca.listen_uptree_loop(&sender_id.clone(), &vm_id, &ca_from_vm, child_trace_header).map_err(|e| ::utility::write_err("cellagent", e));
             if CONTINUE_ON_ERROR { let _ = ca.listen_uptree(sender_id, vm_id, trees, ca_from_vm, trace_header); }
         });
-        join_handle?;
     }
 
     // WORKER (CaFromVm)
@@ -564,7 +563,7 @@ impl CellAgent {
             let trace = json!({ "cell_id": &self.cell_id, "thread_name": thread::current().name(), "thread_id": TraceHeader::parse(thread::current().id()) });
             let _ = dal::add_to_trace(trace_header, TraceType::Trace, trace_params, &trace, _f);
         }
-         loop {
+        loop {
             let msg = ca_from_vm.recv()?;
             {
                 let ref trace_params = TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "ca_got_from_uptree" };
@@ -572,20 +571,21 @@ impl CellAgent {
                 let _ = dal::add_to_trace(trace_header, TraceType::Trace, trace_params, &trace, _f);
             }
             let (is_ait, allowed_tree, msg_type, direction, bytes) = msg;
-             let tree_map = self.tree_name_map
-                 .get(sender_id)
-                 .cloned()
-                 .ok_or_else(|| -> Error { CellagentError::TreeNameMap { func_name: _f, cell_id: self.cell_id.clone(), sender_id: sender_id.clone() }.into() })?;
-             let tree_map_updated = match msg_type {
+            let tree_map = self.tree_name_map
+                .get(sender_id)
+                .cloned()
+                .ok_or_else(|| -> Error { CellagentError::TreeNameMap { func_name: _f, cell_id: self.cell_id.clone(), sender_id: sender_id.clone() }.into() })?;
+            let serialized = ::std::str::from_utf8(&bytes)?;
+            let tree_map_updated = match msg_type {
                 TcpMsgType::Application => self.tcp_application(&sender_id, is_ait, &allowed_tree, serialized, direction, &tree_map, trace_header).context(CellagentError::Chain { func_name: _f, comment: S("tcp_application") })?,
                 TcpMsgType::DeleteTree => self.tcp_delete_tree(&sender_id, serialized, direction, &tree_map, trace_header).context(CellagentError::Chain { func_name: _f, comment: S("tcp_delete_tree") })?,
                 TcpMsgType::Manifest => self.tcp_manifest(&sender_id, serialized, direction, &tree_map, trace_header).context(CellagentError::Chain { func_name: _f, comment: S("tcp_manifest") })?,
                 TcpMsgType::Query => self.tcp_query(&sender_id, serialized, direction, &tree_map, trace_header).context(CellagentError::Chain { func_name: _f, comment: S("tcp_query") })?,
                 TcpMsgType::StackTree => self.tcp_stack_tree(&sender_id, serialized, direction, &tree_map, trace_header).context(CellagentError::Chain { func_name: _f, comment: S("tcp_stack_tree") })?,
                 TcpMsgType::TreeName => self.tcp_tree_name(&sender_id, serialized, direction, &tree_map, trace_header).context(CellagentError::Chain { func_name: _f, comment: S("tcp_tree_name") })?,
-             };
-             self.tree_name_map.insert(sender_id.clone(), tree_map_updated);
-         }
+            };
+            self.tree_name_map.insert(sender_id.clone(), tree_map_updated);
+        }
     }
     /*
         fn create_tree(&mut self, id: &str, target_tree_id: &TreeID, port_no_mask: Mask, gvm_eqn: &GvmEquation)
@@ -661,12 +661,12 @@ impl CellAgent {
     }
 
     // SPAWN THREAD (listen_cm_loop)
-    fn listen_cm(&mut self, ca_from_cm: CaFromCm, trace_header: &mut TraceHeader) -> Result<(), Error>{
+    fn listen_cm(&mut self, ca_from_cm: CaFromCm, trace_header: TraceHeader) -> Result<(), Error>{
         let _f = "listen_cm";
+        let mut ca = self.clone();
         let thread_name = format!("CellAgent {} from CModel", self.cell_id.get_name());
         thread::Builder::new().name(thread_name.into()).spawn( move || {
             let ref mut child_trace_header = trace_header.fork_trace();
-            let mut ca = self.clone();
             let _ = ca.listen_cm_loop(&ca_from_cm, child_trace_header).map_err(|e| ::utility::write_err("cellagent", e));
             // println!("Cellagent {}: Back from listen_cm_loop", ca.cell_id);
             if CONTINUE_ON_ERROR { let _ = ca.listen_cm(ca_from_cm, trace_header); }

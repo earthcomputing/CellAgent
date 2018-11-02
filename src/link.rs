@@ -55,13 +55,13 @@ impl Link {
     // SPAWN THREAD (listen_loop)
     fn listen_port(&self, link_from: LinkFromPort, link_to: LinkToPort, trace_header: TraceHeader) -> Result<JoinHandle<()>, Error> {
         let link = self.clone();
-        let thread_name = format!("Link {} from ??", self.cell_id.get_name());
+        let thread_name = format!("Link {} from ??", self.get_id());
         let join_handle = thread::Builder::new().name(thread_name.into()).spawn( move || {
             let ref mut child_trace_header = trace_header.fork_trace();
             let _ = link.listen_loop(&link_from, &link_to, child_trace_header).map_err(|e| write_err("link", e.into()));
-            if CONTINUE_ON_ERROR { let _ = link.listen_port(link_from, link_to); }
-        });
-        Ok(join_handle?)
+            if CONTINUE_ON_ERROR { let _ = link.listen_port(link_from, link_to, trace_header); }
+        })?;
+        Ok(join_handle)
     }
 
     // WORKER (LinkFromPort)
@@ -69,14 +69,14 @@ impl Link {
         let _f = "listen_loop";
         {
             let ref trace_params = TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "worker" };
-            let trace = json!({ "cell_id": &self.cell_id, "thread_name": thread::current().name(), "thread_id": TraceHeader::parse(thread::current().id()) });
+            let trace = json!({ "id": &self.get_id(), "thread_name": thread::current().name(), "thread_id": TraceHeader::parse(thread::current().id()) });
             let _ = dal::add_to_trace(trace_header, TraceType::Trace, trace_params, &trace, _f);
         }
         loop {
             let msg = link_from.recv().context(LinkError::Chain { func_name: _f, comment: S(self.id.clone()) })?;
             {
                 let ref trace_params = TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "recv" };
-                let trace = json!({ "cell_id": &self.cell_id, "msg": msg });
+                let trace = json!({ "id": &self.get_id(), "msg": msg });
                 let _ = dal::add_to_trace(trace_header, TraceType::Trace, trace_params, &trace, _f);
             }
             link_to.send(LinkToPortPacket::Packet(msg)).context(LinkError::Chain { func_name: _f, comment: S(self.id.clone()) })?;

@@ -83,8 +83,8 @@ impl Datacenter {
             let (link_to_rite, rite_from_link): (LinkToPort, PortFromLink) = channel();
             let (left_to_link, link_from_left): (PortToLink, LinkFromPort) = channel();
             let (rite_to_link, link_from_rite): (PortToLink, LinkFromPort) = channel();
-            left_port.link_channel(left_to_link, left_from_link, left_from_pe);
-            rite_port.link_channel(rite_to_link, rite_from_link, rite_from_pe);
+            left_port.link_channel(left_to_link, left_from_link, left_from_pe, trace_header);
+            rite_port.link_channel(rite_to_link, rite_from_link, rite_from_pe, trace_header);
             let mut link = Link::new(&left_port.get_id(), &rite_port.get_id())?;
             {
                 let ref trace_params = TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "connect_link" };
@@ -105,7 +105,7 @@ impl Datacenter {
     pub fn get_link_ids(&self) -> Vec<&LinkID> {
         self.links.iter().map(|link| link.get_id()).collect::<Vec<_>>()
     }
-    pub fn connect_to_noc(&mut self, port_to_noc: PortToNoc, port_from_noc: PortFromNoc)
+    pub fn connect_to_noc(&mut self, port_to_noc: PortToNoc, port_from_noc: PortFromNoc, trace_header: TraceHeader)
             -> Result<(), Error> {
         let _f = "connect_to_noc";
         let (port, port_from_pe) = self.cells
@@ -114,7 +114,7 @@ impl Datacenter {
             .nth(0)
             .ok_or_else(|| -> Error { DatacenterError::Boundary { func_name: _f }.into() })?
             .get_free_boundary_port_mut()?;
-        port.noc_channel(port_to_noc, port_from_noc, port_from_pe)?;
+        port.noc_channel(port_to_noc, port_from_noc, port_from_pe, trace_header)?;
         Ok(())
     }
 }
