@@ -55,7 +55,7 @@ impl Port {
     fn listen_noc_for_pe(&self, port_from_noc: PortFromNoc, trace_header: &mut TraceHeader) -> Result<(), Error> {
         let port = self.clone();
         let child_trace_header = trace_header.fork_trace();
-        let thread_name = format!("PacketEngine {} to PortSet", self.get_id().get_name());
+        let thread_name = format!("Port {} listen_noc_for_pe_loop", self.get_id().get_name());
         thread::Builder::new().name(thread_name.into()).spawn( move || {
             let ref mut working_trace_header = child_trace_header.clone();
             let _ = port.listen_noc_for_pe_loop(&port_from_noc, working_trace_header).map_err(|e| write_err("port", e));
@@ -88,7 +88,7 @@ impl Port {
     fn listen_pe_for_noc(&self, port_to_noc: PortToNoc, port_from_pe: PortFromPe, trace_header: &mut TraceHeader) -> Result<JoinHandle<()>, Error> {
         let port = self.clone();
         let child_trace_header = trace_header.fork_trace();
-        let thread_name = format!("PacketEngine {} to PortSet", self.get_id().get_name());
+        let thread_name = format!("Port {} listen_pe_for_noc_loop", self.get_id().get_name());
         let join_handle = thread::Builder::new().name(thread_name.into()).spawn( move || {
             let ref mut working_trace_header = child_trace_header.clone();
             let _ = port.listen_pe_for_noc_loop(&port_to_noc, &port_from_pe, working_trace_header).map_err(|e| write_err("port", e));
@@ -126,7 +126,7 @@ impl Port {
     pub fn link_channel(&self, port_to_link: PortToLink, port_from_link: PortFromLink, port_from_pe: PortFromPe, trace_header: &mut TraceHeader) {
         let mut port = self.clone();
         let child_trace_header = trace_header.fork_trace();
-        let thread_name = format!("PacketEngine {} to PortSet", self.get_id().get_name());
+        let thread_name = format!("Port {} listen_link", self.get_id().get_name());
         thread::Builder::new().name(thread_name.into()).spawn( move || {
             let ref mut working_trace_header = child_trace_header.clone();
             let _ = port.listen_link(port_from_link, working_trace_header).map_err(|e| write_err("port", e));
@@ -135,7 +135,7 @@ impl Port {
 
         let port = self.clone();
         let child_trace_header = trace_header.fork_trace();
-        let thread_name = format!("PacketEngine {} to PortSet", self.get_id().get_name());
+        let thread_name = format!("Port {} listen_pe", self.get_id().get_name());
         thread::Builder::new().name(thread_name.into()).spawn( move || {
             let ref mut working_trace_header = child_trace_header.clone();
             let _ = port.listen_pe(port_to_link, port_from_pe, working_trace_header).map_err(|e| write_err("port", e));

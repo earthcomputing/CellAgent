@@ -61,7 +61,7 @@ impl PacketEngine {
         let _f = "listen_cm";
         let mut pe = self.clone();
         let child_trace_header = trace_header.fork_trace();
-        let thread_name = format!("PacketEngine {} from CModel", self.cell_id);
+        let thread_name = format!("PacketEngine {} listen_cm_loop", self.cell_id);
         thread::Builder::new().name(thread_name.into()).spawn( move || {
             let ref mut working_trace_header = child_trace_header.clone();
             let _ = pe.listen_cm_loop(&pe_from_cm, &pe_to_pe, working_trace_header).map_err(|e| write_err("packet_engine", e));
@@ -78,7 +78,7 @@ impl PacketEngine {
         let _f = "listen_port";
         let mut pe = self.clone();
         let child_trace_header = trace_header.fork_trace();
-        let thread_name = format!("PacketEngine {} to PortSet", self.cell_id);
+        let thread_name = format!("PacketEngine {} listen_port_loop", self.cell_id);
         thread::Builder::new().name(thread_name.into()).spawn( move || {
             let ref mut working_trace_header = child_trace_header.clone();
             let _ = pe.listen_port_loop(&pe_from_ports, &pe_from_pe, working_trace_header).map_err(|e| write_err("packet_engine", e));

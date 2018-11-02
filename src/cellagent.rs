@@ -547,7 +547,7 @@ impl CellAgent {
         let _f = "listen_uptree";
         let mut ca = self.clone();
         let child_trace_header = trace_header.fork_trace();
-        let thread_name = format!("CellAgent {} from VM", self.cell_id.get_name());
+        let thread_name = format!("CellAgent {} listen_uptree_loop", self.get_id());
         thread::Builder::new().name(thread_name.into()).spawn( move || {
             let ref mut working_trace_header = child_trace_header.clone();
             let _ = ca.listen_uptree_loop(&sender_id.clone(), &vm_id, &ca_from_vm, working_trace_header).map_err(|e| ::utility::write_err("cellagent", e));
@@ -666,7 +666,7 @@ impl CellAgent {
         let _f = "listen_cm";
         let mut ca = self.clone();
         let child_trace_header = trace_header.fork_trace();
-        let thread_name = format!("CellAgent {} from CModel", self.cell_id.get_name());
+        let thread_name = format!("CellAgent {} listen_cm_loop", self.get_id());
         thread::Builder::new().name(thread_name.into()).spawn( move || {
             let ref mut working_trace_header = child_trace_header.clone();
             let _ = ca.listen_cm_loop(&ca_from_cm, working_trace_header).map_err(|e| ::utility::write_err("cellagent", e));

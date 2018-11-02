@@ -52,7 +52,7 @@ impl VirtualMachine {
         //println!("VM {}: listening to Ca", self.id);
         let vm = self.clone();
         let child_trace_header = trace_header.fork_trace();
-        let thread_name = format!("PacketEngine {} to PortSet", self.id);
+        let thread_name = format!("VirtualMachine {} listen_ca_loop", self.id);
         thread::Builder::new().name(thread_name.into()).spawn( move || {
             let ref mut working_trace_header = child_trace_header.clone();
             let _ = vm.listen_ca_loop(&vm_from_ca, working_trace_header).map_err(|e| write_err("vm", e));
@@ -67,7 +67,7 @@ impl VirtualMachine {
         //println!("VM {}: listening to container {}", self.id, container_id);
         let vm = self.clone();
         let child_trace_header = trace_header.fork_trace();
-        let thread_name = format!("PacketEngine {} to PortSet", self.id);
+        let thread_name = format!("VirtualMachine {} listen_container_loop", self.id);
         thread::Builder::new().name(thread_name.into()).spawn( move || {
             let ref mut working_trace_header = child_trace_header.clone();
             let _ = vm.listen_container_loop(&container_id, &vm_from_container, &vm_to_ca, working_trace_header).map_err(|e| write_err("vm", e));

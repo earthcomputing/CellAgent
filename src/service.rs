@@ -74,7 +74,7 @@ impl NocMaster {
         //println!("Service {} on {}: listening to VM", self.name, self.container_id);
         let master = self.clone();
         let child_trace_header = trace_header.fork_trace();
-        let thread_name = format!("PacketEngine {} to PortSet", self.get_name());
+        let thread_name = format!("{} listen_vm_loop", self.get_name()); // NOC NOC
         thread::Builder::new().name(thread_name.into()).spawn( move || {
             let ref mut working_trace_header = child_trace_header.clone();
             let _ = master.listen_vm_loop(&container_from_vm, working_trace_header).map_err(|e| write_err("service", e));
@@ -134,7 +134,7 @@ impl NocAgent {
         //println!("Service {} on {}: listening to VM", self.name, self.container_id);
         let agent = self.clone();
         let child_trace_header = trace_header.fork_trace();
-        let thread_name = format!("PacketEngine {} to PortSet", self.get_name());
+        let thread_name = format!("{} listen_vm_loop", self.get_name()); // NOC NOC
         thread::Builder::new().name(thread_name.into()).spawn( move || {
             let ref mut working_trace_header = child_trace_header.clone();
             let _ = agent.listen_vm_loop(&container_from_vm, working_trace_header).map_err(|e| write_err("service", e));

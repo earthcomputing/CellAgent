@@ -21,6 +21,7 @@ pub struct Cmodel {
     packet_assemblers: PacketAssemblers,
 }
 impl Cmodel {
+    pub fn get_name(&self) -> &str { return self.cell_id.get_name(); }
 
     // NEW
     pub fn new(cell_id: &CellID) -> Cmodel {
@@ -48,7 +49,7 @@ impl Cmodel {
         let _f = "listen_ca";
         let cmodel = self.clone();
         let child_trace_header = trace_header.fork_trace();
-        let thread_name = format!("Cmodel {} from CellAgent", self.cell_id.get_name());
+        let thread_name = format!("Cmodel {} listen_ca_loop", self.cell_id.get_name());
         let join_handle = thread::Builder::new().name(thread_name.into()).spawn( move || {
             let ref mut working_trace_header = child_trace_header.clone();
             let _ = cmodel.listen_ca_loop(&cm_from_ca, &cm_to_pe, working_trace_header).map_err(|e| write_err("cmodel listen_ca", e.into()));
@@ -62,7 +63,7 @@ impl Cmodel {
         let _f = "listen_pe";
         let mut cmodel = self.clone();
         let child_trace_header = trace_header.fork_trace();
-        let thread_name = format!("Cmodel {} from PacketEngine", self.cell_id.get_name());
+        let thread_name = format!("Cmodel {} listen_pe_loop", self.cell_id.get_name());
         let join_handle = thread::Builder::new().name(thread_name.into()).spawn( move || {
             let ref mut working_trace_header = child_trace_header.clone();
             let _ = cmodel.listen_pe_loop(&cm_from_pe, &cm_to_ca, working_trace_header).map_err(|e| write_err("cmodel listen_pe", e.into()));;
