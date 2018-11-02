@@ -70,7 +70,7 @@ impl Noc {
         let _f = "listen_port";
         let mut noc = self.clone();
         let child_trace_header = trace_header.fork_trace();
-        let thread_name = format!("NOC {} from CellAgent", self.get_name());
+        let thread_name = format!("{} listen_port_loop", self.get_name()); // NOC NOC
         let join_port = thread::Builder::new().name(thread_name.into()).spawn( move || {
             let ref mut working_trace_header = child_trace_header.clone();
             let _ = noc.listen_port_loop(&noc_to_port, &noc_from_port, working_trace_header).map_err(|e| write_err("port", e));
@@ -116,7 +116,7 @@ impl Noc {
     fn listen_outside(&mut self, noc_from_outside: NocFromOutside, noc_to_port: NocToPort, trace_header: &mut TraceHeader) -> Result<JoinHandle<()>,Error> {
         let mut noc = self.clone();
         let child_trace_header = trace_header.fork_trace();
-        let thread_name = format!("NOC {} from Internet", self.get_name());
+        let thread_name = format!("{} listen_outside_loop", self.get_name()); // NOC NOC
         let join_outside = thread::Builder::new().name(thread_name.into()).spawn( move || {
             let ref mut working_trace_header = child_trace_header.clone();
             let _ = noc.listen_outside_loop(&noc_from_outside, &noc_to_port, working_trace_header).map_err(|e| write_err("outside", e));

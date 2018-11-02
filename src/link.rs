@@ -56,7 +56,7 @@ impl Link {
     fn listen_port(&self, link_from: LinkFromPort, link_to: LinkToPort, trace_header: &mut TraceHeader) -> Result<JoinHandle<()>, Error> {
         let link = self.clone();
         let child_trace_header = trace_header.fork_trace();
-        let thread_name = format!("Link {} from ??", self.get_id());
+        let thread_name = format!("Link {} listen_loop", self.get_id());
         let join_handle = thread::Builder::new().name(thread_name.into()).spawn( move || {
             let ref mut working_trace_header = child_trace_header.clone();
             let _ = link.listen_loop(&link_from, &link_to, working_trace_header).map_err(|e| write_err("link", e.into()));

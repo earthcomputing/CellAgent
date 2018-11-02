@@ -101,7 +101,7 @@ impl NalCell {
         }
         let mut ca = cell_agent.clone();
         let child_trace_header = trace_header.fork_trace();
-        let thread_name = format!("CellAgent {}", cell_agent);
+        let thread_name = format!("CellAgent {}", cell_agent.get_id());
         thread::Builder::new().name(thread_name.into()).spawn( move || {
             let ref mut working_trace_header = child_trace_header.clone();
             let _ = ca.initialize(ca_from_cm, working_trace_header).map_err(|e| ::utility::write_err("nalcell", e));
@@ -115,7 +115,7 @@ impl NalCell {
         let _f = "start_cmodel";
         let cm = cmodel.clone();
         let child_trace_header = trace_header.fork_trace();
-        let thread_name = format!("CModel {}", cmodel);
+        let thread_name = format!("Cmodel {}", cmodel.get_name());
         thread::Builder::new().name(thread_name.into()).spawn( move || {
             let ref mut working_trace_header = child_trace_header.clone();
             let _ = cm.initialize(cm_from_ca, cm_to_pe, cm_from_pe, cm_to_ca, working_trace_header);
