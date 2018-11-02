@@ -2,7 +2,7 @@ use std::fmt;
 use std::collections::{HashMap, HashSet};
 use std::iter::FromIterator;
 
-use config::{MIN_BORDER_CELLS, CellNo, Edge, PortNo};
+use config::{MIN_BORDER_CELLS, CellNo, CellType, Edge, PortNo};
 
 #[derive(Debug)]
 pub struct Blueprint {
@@ -34,11 +34,11 @@ impl Blueprint {
 				Some(ports) => {
 					let border: HashSet<PortNo> = HashSet::from_iter(ports.clone());
 					let all: HashSet<PortNo> = HashSet::from_iter(port_list);
-					let mut interior = all.difference(&border).cloned().collect::<Vec<_>>();
-					interior.sort();
-					border_cells.push(BorderCell { cell_no, interior_ports: interior, border_ports: ports.clone() });
+					let mut interior_ports = all.difference(&border).cloned().collect::<Vec<_>>();
+					interior_ports.sort();
+					border_cells.push(BorderCell { cell_no, cell_type: CellType::Border, interior_ports, border_ports: ports.clone() });
 				},
-				None => interior_cells.push(InteriorCell { cell_no, interior_ports : port_list })
+				None => interior_cells.push(InteriorCell { cell_no, cell_type: CellType::Interior, interior_ports : port_list })
 			}
 		}
 		Ok(Blueprint { interior_cells, border_cells, edges })
@@ -59,16 +59,26 @@ impl fmt::Display for Blueprint {
 		for edge in self.edges.iter() { s = s + &format!("({},{})", *(edge.0), *(edge.1)); }
 		write!(f, "{}", s) }
 }
+pub trait Cell {
+    fn get_cell_no(&self) -> CellNo;
+    fn get_cell_type(&self) -> CellType;
+    fn get_nports(&self) -> PortNo;
+    fn get_interior_ports(&self) -> &Vec<PortNo>;
+}
 #[derive(Debug, Clone)]
 pub struct BorderCell {
-	cell_no: CellNo, 
+	cell_no: CellNo,
+    cell_type: CellType,
 	interior_ports: Vec<PortNo>,
 	border_ports: Vec<PortNo>,
 }
+impl Cell for BorderCell {
+    fn get_cell_no(&self) -> CellNo { self.cell_no }
+    fn get_cell_type(&self) -> CellType { self.cell_type }
+    fn get_nports(&self) -> PortNo { PortNo((self.border_ports.len() + self.interior_ports.len()) as u8) }
+    fn get_interior_ports(&self) -> &Vec<PortNo> { &self.interior_ports }
+}
 impl BorderCell {
-	pub fn get_cell_no(&self) -> CellNo { self.cell_no }
-	pub fn get_nports(&self) -> PortNo { PortNo((self.border_ports.len() + self.interior_ports.len()) as u8) }
-	//pub fn get_interior_ports(&self) -> &Vec<PortNo> { &self.interior_ports }
 	pub fn get_border_ports(&self) -> &Vec<PortNo> { &self.border_ports }
 }
 impl fmt::Display for BorderCell {
@@ -84,12 +94,14 @@ impl fmt::Display for BorderCell {
 #[derive(Debug, Clone)]
 pub struct InteriorCell {
 	cell_no: CellNo,
+    cell_type: CellType,
 	interior_ports: Vec<PortNo>
 }
-impl InteriorCell {
-	pub fn get_cell_no(&self) -> CellNo { self.cell_no }
-	pub fn get_nports(&self) -> PortNo { PortNo(self.interior_ports.len() as u8) }
-	//pub fn get_interior_ports(&self) -> &Vec<PortNo> { &self.interior_ports }
+impl Cell for InteriorCell {
+	fn get_cell_no(&self) -> CellNo { self.cell_no }
+    fn get_cell_type(&self) -> CellType { self.cell_type }
+	fn get_nports(&self) -> PortNo { PortNo(self.interior_ports.len() as u8) }
+	fn get_interior_ports(&self) -> &Vec<PortNo> { &self.interior_ports }
 }
 impl fmt::Display for InteriorCell {
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result { 
