@@ -41,7 +41,8 @@ impl PacketEngine {
     // INIT (PeFromCm PeFromPort)
     // WORKER (PacketEngine)
     pub fn initialize(&self, pe_from_cm: PeFromCm, pe_from_ports: PeFromPort,
-                      mut trace_header: TraceHeader) -> Result<(), Error> {
+                      trace_header: &mut TraceHeader) -> Result<(), Error> {
+// FIXME: dal::add_to_trace mutates trace_header, spawners don't ??
         let _f = "initialize";
         {
             let ref trace_params = TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "worker" };
@@ -58,10 +59,10 @@ impl PacketEngine {
     fn listen_cm(&self, pe_from_cm: PeFromCm, pe_to_pe: PeToPe,
                  trace_header: TraceHeader) -> Result<(), Error> {
         let _f = "listen_cm";
+        let mut pe = self.clone();
         let thread_name = format!("PacketEngine {} from CModel", self.cell_id);
         thread::Builder::new().name(thread_name.into()).spawn( move || {
             let ref mut child_trace_header = trace_header.fork_trace();
-            let mut pe = self.clone();
             let _ = pe.listen_cm_loop(&pe_from_cm, &pe_to_pe, child_trace_header).map_err(|e| write_err("packet_engine", e));
             if CONTINUE_ON_ERROR { let _ = pe.listen_cm(pe_from_cm, pe_to_pe, trace_header); }
         })?;
@@ -74,10 +75,10 @@ impl PacketEngine {
                    trace_header: TraceHeader)
             -> Result<(),Error> {
         let _f = "listen_port";
+        let mut pe = self.clone();
         let thread_name = format!("PacketEngine {} to PortSet", self.cell_id);
         thread::Builder::new().name(thread_name.into()).spawn( move || {
             let ref mut child_trace_header = trace_header.fork_trace();
-            let mut pe = self.clone();
             let _ = pe.listen_port_loop(&pe_from_ports, &pe_from_pe, child_trace_header).map_err(|e| write_err("packet_engine", e));
             if CONTINUE_ON_ERROR { let _ = pe.listen_port(pe_from_ports, pe_from_pe, trace_header); }
         })?;

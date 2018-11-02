@@ -99,28 +99,26 @@ impl NalCell {
             let trace = json!({ "cell_id": &cell_agent.get_id() });
             let _ = dal::add_to_trace(trace_header, TraceType::Trace, trace_params, &trace, _f);
         }
-        let thread_name = format!("CellAgent {}", cell_agent.cell_id.get_name());
-        let join_handle = thread::Builder::new().name(thread_name.into()).spawn( move || {
+        let thread_name = format!("CellAgent {}", cell_agent);
+        thread::Builder::new().name(thread_name.into()).spawn( move || {
             let child_trace_header = trace_header.fork_trace();
             let mut ca = cell_agent.clone();
             let _ = ca.initialize(ca_from_cm, child_trace_header).map_err(|e| ::utility::write_err("nalcell", e));
             // Don't automatically restart cell agent if it crashes
         });
-        join_handle?
     }
 
     // SPAWN THREAD (cm.initialize)
     fn start_cmodel(cmodel: &Cmodel, cm_from_ca: CmFromCa, cm_to_pe: CmToPe, cm_from_pe: CmFromPe, cm_to_ca: CmToCa,
                     trace_header: &mut TraceHeader) {
         let _f = "start_cmodel";
-        let thread_name = format!("CModel {}", cmodel.cell_id.get_name());
-        let join_handle = thread::Builder::new().name(thread_name.into()).spawn( move || {
+        let thread_name = format!("CModel {}", cmodel);
+        thread::Builder::new().name(thread_name.into()).spawn( move || {
             let child_trace_header = trace_header.fork_trace();
             let cm = cmodel.clone();
             let _ = cm.initialize(cm_from_ca, cm_to_pe, cm_from_pe, cm_to_ca, child_trace_header);
             // Don't automatically restart cmodel if it crashes
         });
-        join_handle?
     }
 
     // SPAWN THREAD (pe.initialize)
@@ -129,17 +127,16 @@ impl NalCell {
         let _f = "start_packet_engine";
         {
             let ref trace_params = TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "nalcell_start_pe" };
-            let trace = json!({ "cell_id": &packet_engine.get_id() });
+            let trace = json!({ "cell_id": packet_engine.get_id() });
             let _ = dal::add_to_trace(trace_header, TraceType::Trace, trace_params, &trace, _f);
         }
-        let thread_name = format!("PacketEngine {}", packet_engine.cell_id.get_name());
-        let join_handle = thread::Builder::new().name(thread_name.into()).spawn( move || {
+        let pe = packet_engine.clone();
+        let thread_name = format!("PacketEngine {}", packet_engine.get_id());
+        thread::Builder::new().name(thread_name.into()).spawn( move || {
             let child_trace_header = trace_header.fork_trace();
-            let pe = packet_engine.clone();
             let _ = pe.initialize(pe_from_cm, pe_from_ports, child_trace_header).map_err(|e| ::utility::write_err("nalcell", e));
             // Don't automatically restart packet engine if it crashes
         });
-        join_handle?
     }
 
     pub fn get_id(&self) -> &CellID { &self.id }
