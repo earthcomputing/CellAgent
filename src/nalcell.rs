@@ -45,7 +45,7 @@ pub struct NalCell {
 impl NalCell {
     pub fn new(cell_no: CellNo, nports: PortNo, cell_type: CellType,
                config: CellConfig, mut trace_header: TraceHeader) -> Result<NalCell, Error> {
-        let f = "new";
+        let _f = "new";
         if *nports > *MAX_PORTS { return Err(NalcellError::NumberPorts { nports, func_name: "new", max_ports: MAX_PORTS }.into()) }
         let cell_id = CellID::new(cell_no).context(NalcellError::Chain { func_name: "new", comment: S("cell_id")})?;
         let (ca_to_cm, cm_from_ca): (CaToCm, CmFromCa) = channel();
@@ -58,9 +58,9 @@ impl NalCell {
         let mut ports_from_pe = HashMap::new(); // So I can remove the item
         let mut boundary_port_nos = HashSet::new();
         {
-            let ref trace_params = TraceHeaderParams { module: file!(), line_no: line!(), function: f, format: "nalcell_port_setup" };
+            let ref trace_params = TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "nalcell_port_setup" };
             let trace = json!({ "cell_number": cell_no });
-            let _ = dal::add_to_trace(&mut trace_header, TraceType::Trace, trace_params, &trace, f);
+            let _ = dal::add_to_trace(&mut trace_header, TraceType::Trace, trace_params, &trace, _f);
         }
         for i in 0..*nports + 1 {
             let is_border_port = match cell_type {
@@ -91,12 +91,12 @@ impl NalCell {
                 packet_engine, ports_from_pe })
     }
     fn start_cell(cell_agent: &CellAgent, ca_from_cm: CaFromCm, outer_trace_header: &mut TraceHeader) {
-        let f = "start_cell";
+        let _f = "start_cell";
         let mut ca = cell_agent.clone();
         {
-            let ref trace_params = TraceHeaderParams { module: file!(), line_no: line!(), function: f, format: "nalcell_start_ca" };
+            let ref trace_params = TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "nalcell_start_ca" };
             let trace = json!({  "cell_id": &ca.get_id() });
-            let _ = dal::add_to_trace(outer_trace_header, TraceType::Trace, trace_params, &trace, f);
+            let _ = dal::add_to_trace(outer_trace_header, TraceType::Trace, trace_params, &trace, _f);
         }
         let mut outer_trace_header_clone = outer_trace_header.clone();
         thread::spawn( move || {
@@ -107,7 +107,7 @@ impl NalCell {
     }
     fn start_cmodel(cmodel: &Cmodel, cm_from_ca: CmFromCa, cm_to_pe: CmToPe, cm_from_pe: CmFromPe, cm_to_ca: CmToCa,
                     outer_trace_header: &mut TraceHeader) {
-        let f = "start_cmodel";
+        let _f = "start_cmodel";
         let cm = cmodel.clone();
         let mut outer_trace_header_clone = outer_trace_header.clone();
         thread::spawn( move || {
@@ -118,12 +118,12 @@ impl NalCell {
     }
     fn start_packet_engine(packet_engine: &PacketEngine, pe_from_cm: PeFromCm, pe_from_ports: PeFromPort,
                            outer_trace_header: &mut TraceHeader) {
-        let f = "start_packet_engine";
+        let _f = "start_packet_engine";
         let pe = packet_engine.clone();
         {
-            let ref trace_params = TraceHeaderParams { module: file!(), line_no: line!(), function: f, format: "nalcell_start_pe" };
+            let ref trace_params = TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "nalcell_start_pe" };
             let trace = json!({ "cell_id": &pe.get_id() });
-            let _ = dal::add_to_trace(outer_trace_header, TraceType::Trace, trace_params, &trace, f);
+            let _ = dal::add_to_trace(outer_trace_header, TraceType::Trace, trace_params, &trace, _f);
         }
         let mut outer_trace_header_clone = outer_trace_header.clone();
         thread::spawn( move || {

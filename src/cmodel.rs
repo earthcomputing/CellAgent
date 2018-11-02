@@ -164,20 +164,20 @@ packets: Vec<Packet>,
 
     fn process_packet(&mut self, cm_to_ca: &CmToCa, port_no: PortNo, packet: Packet,
                       trace_header: &mut TraceHeader) -> Result<(), Error> {
-        let f = "process_packet";
+        let _f = "process_packet";
         let msg_id = packet.get_msg_id();
         let mut packet_assembler = self.packet_assemblers.remove(&msg_id).unwrap_or(PacketAssembler::new(msg_id)); // autovivification
         let (last_packet, packets) = packet_assembler.add(packet);
 
         if last_packet {
             {
-                let ref trace_params = TraceHeaderParams { module: file!(), line_no: line!(), function: f, format: "cm_bytes_to_ca" };
+                let ref trace_params = TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "cm_bytes_to_ca" };
                 let trace = json!({ "cell_id": &self.cell_id, "packet": &packet });
-                let _ = dal::add_to_trace(trace_header, TraceType::Debug, trace_params, &trace, f);
+                let _ = dal::add_to_trace(trace_header, TraceType::Debug, trace_params, &trace, _f);
             }
             let is_ait = packets[0].is_ait();
             let uuid = packet.get_tree_uuid();
-            let bytes = Packetizer::unpacketize(packets).context(CmodelError::Chain { func_name: f, comment: S("") })?;
+            let bytes = Packetizer::unpacketize(packets).context(CmodelError::Chain { func_name: _f, comment: S("") })?;
 
             if DEBUG_OPTIONS.cm_from_ca {
                 let packet_count = packets[0].get_count();
@@ -187,10 +187,10 @@ packets: Vec<Packet>,
                 match dpi_msg_type {
                     MsgType::Discover => (),
                     MsgType::DiscoverD => {
-                        if dpi_tree_id.is_name(CENTRAL_TREE) { println!("Cmodel {}: {} received {}", self.cell_id, f, dpi_msg); }
+                        if dpi_tree_id.is_name(CENTRAL_TREE) { println!("Cmodel {}: {} received {}", self.cell_id, _f, dpi_msg); }
                     },
                     _ => {
-                        println!("Cmodel {}: {} received {} count {}", self.cell_id, f, dpi_msg, packet_count);
+                        println!("Cmodel {}: {} received {} count {}", self.cell_id, _f, dpi_msg, packet_count);
                     }
                 }
             }
