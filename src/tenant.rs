@@ -21,15 +21,15 @@ impl Tenant {
         Ok(Tenant { id: name, ncells: n, children: HashMap::new() })
     }
     pub fn get_id(&self) -> TenantID { self.id.clone() }
-//	pub fn get_ncells(&self) -> usize { self.ncells }
-    //pub fn get_size(&self) -> usize { self.ncells }
-//	pub fn get_children(&self) -> &HashMap<TenantID,Box<Tenant>> { &self.children }
-//	pub fn get_subtenant(&self, id: TenantID) -> Option<&Box<Tenant>> {
-//		self.children.get(&id)
-//	}
-//	pub fn get_mut_subtenant(&mut self, id: TenantID) -> Option<&mut Box<Tenant>> {
-//		self.children.get_mut(&id)
-//	}
+//  pub fn get_ncells(&self) -> usize { self.ncells }
+//  pub fn get_size(&self) -> usize { self.ncells }
+//  pub fn get_children(&self) -> &HashMap<TenantID,Box<Tenant>> { &self.children }
+//  pub fn get_subtenant(&self, id: TenantID) -> Option<&Box<Tenant>> {
+//       self.children.get(&id)
+//  }
+//  pub fn get_mut_subtenant(&mut self, id: TenantID) -> Option<&mut Box<Tenant>> {
+//       self.children.get_mut(&id)
+//  }
     pub fn create_subtenant(&mut self, id: &'static str, n: CellNo) -> Result<Tenant, Error> {
         if *self.ncells < *n {
             Err(TenantError::Quota { request: n, func_name: "create_subtenant", available: self.ncells }.into())

@@ -52,8 +52,8 @@ impl Packet {
     pub fn get_msg_id(&self) -> MsgID { self.payload.get_msg_id() }
     pub fn get_size(&self) -> PacketNo { self.payload.get_size() }
     pub fn get_bytes(&self) -> Vec<u8> { self.payload.bytes.iter().cloned().collect() }
-    //	pub fn get_payload_bytes(&self) -> Vec<u8> { self.get_payload().get_bytes() }
-    //	pub fn get_payload_size(&self) -> usize { self.payload.get_no_bytes() }
+    // pub fn get_payload_bytes(&self) -> Vec<u8> { self.get_payload().get_bytes() }
+    // pub fn get_payload_size(&self) -> usize { self.payload.get_no_bytes() }
 
     // UUID Magic
     pub fn make_ait(&mut self) { self.header.make_ait() }
@@ -113,8 +113,8 @@ impl fmt::Display for PacketHeader {
 
 #[derive(Copy)]
 pub struct Payload {
-    msg_id: MsgID,	// Unique identifier of this message
-    size: PacketNo,	// Number of packets remaining in message if not last packet
+    msg_id: MsgID,  // Unique identifier of this message
+    size: PacketNo, // Number of packets remaining in message if not last packet
                     // Number of bytes in last packet if last packet, 0 => Error
     is_last: bool,
     is_blocking: bool,
@@ -235,9 +235,9 @@ impl PacketAssembler {
     pub fn new(msg_id: MsgID) -> PacketAssembler {
         PacketAssembler { msg_id, packets: Vec::new() }
     }
-//	pub fn create(msg_id: MsgID, packets: &Vec<Packet>) -> PacketAssembler {
-//		PacketAssembler { msg_id, packets: packets.clone() }
-//	}
+//    pub fn create(msg_id: MsgID, packets: &Vec<Packet>) -> PacketAssembler {
+//        PacketAssembler { msg_id, packets: packets.clone() }
+//    }
 /*
     pub fn get_msg_id(&self) -> MsgID { self.msg_id }
     pub fn get_packets(&self) -> &Vec<Packet> { &self.packets }
