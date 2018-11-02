@@ -19,10 +19,10 @@ impl RoutingTable {
         Ok(RoutingTable { id, entries: HashMap::new(), connected_ports: Vec::new(), order: Vec::new() })
     }
     pub fn get_entry(&self, uuid: Uuid) -> Result<RoutingTableEntry, Error> {
-        let f = "get_entry";
+        let _f = "get_entry";
         Ok(self.entries
             .get(&uuid)
-            .ok_or_else(|| -> Error { RoutingTableError::Uuid { func_name: f, cell_id: self.id.clone(), uuid }.into() })?
+            .ok_or_else(|| -> Error { RoutingTableError::Uuid { func_name: _f, cell_id: self.id.clone(), uuid }.into() })?
             .clone())
     }
     pub fn set_entry(&mut self, entry: RoutingTableEntry) {

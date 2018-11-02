@@ -292,7 +292,7 @@ impl Traph {
         self.stacked_trees.lock().unwrap().insert(tree.get_uuid(), tree);
     }
     pub fn get_params(&self, vars: &Vec<GvmVariable>) -> Result<Vec<GvmVariable>, Error> {
-        let f = "get_params";
+        let _f = "get_params";
         vars.iter()
             .map(|var| {
                 match var.get_var_name().as_ref() {
@@ -303,7 +303,7 @@ impl Traph {
                         updated.set_value(str_hops);
                         Ok(updated)
                     },
-                    _ => Err(TraphError::Gvm { func_name: f, var_name: var.get_var_name().clone() }.into())
+                    _ => Err(TraphError::Gvm { func_name: _f, var_name: var.get_var_name().clone() }.into())
                 }
             })
             .collect()

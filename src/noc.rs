@@ -32,13 +32,13 @@ impl Noc {
     pub fn initialize(&mut self, blueprint: &Blueprint, noc_from_outside: NocFromOutside,
                       trace_header: &mut TraceHeader) ->
             Result<(Datacenter, Vec<JoinHandle<()>>), Error> {
-        let f = "initialize";
+        let _f = "initialize";
         let (rows, cols, geometry) = get_geometry();
         {
             // For reasons I can't understand, the trace record doesn't show up when generated from main.
             let ref trace_params = TraceHeaderParams { module: "src/main.rs", line_no: line!(), function: "MAIN", format: "trace_schema" };
             let trace = json!({ "schema_version": SCHEMA_VERSION, "ncells": NCELLS, "rows": rows, "cols": cols });
-            let _ = dal::add_to_trace(trace_header, TraceType::Trace, trace_params,&trace, f);
+            let _ = dal::add_to_trace(trace_header, TraceType::Trace, trace_params,&trace, _f);
         }
         let (noc_to_port, port_from_noc): (NocToPort, NocFromPort) = channel();
         let (port_to_noc, noc_from_port): (PortToNoc, PortFromNoc) = channel();
@@ -63,7 +63,7 @@ impl Noc {
 //    }
     fn listen_port(&mut self, noc_to_port: NocToPort, noc_from_port: NocFromPort,
             outer_trace_header: &mut TraceHeader) -> Result<JoinHandle<()>, Error> {
-        let f = "listen_port";
+        let _f = "listen_port";
         let mut noc = self.clone();
         let mut outer_trace_header_clone = outer_trace_header.clone();
         let join_port = spawn( move ||  {
@@ -75,7 +75,7 @@ impl Noc {
     }
     fn listen_port_loop(&mut self, noc_to_port: &NocToPort, noc_from_port: &NocFromPort,
             trace_header: &mut TraceHeader) -> Result<(), Error> {
-        let f = "listen_port_loop";
+        let _f = "listen_port_loop";
         loop {
             let (is_ait, allowed_tree, msg_type, direction, bytes) = noc_from_port.recv().context(NocError::Chain { func_name: "listen_port", comment: S("")})?;
             let serialized = ::std::str::from_utf8(&bytes)?;
@@ -84,9 +84,9 @@ impl Noc {
                     let msg = serde_json::from_str::<TreeNameMsg>(&serialized).context(NocError::Chain { func_name: "listen_port", comment: S("") })?;
                     let tree_name = msg.get_tree_name();
                     {
-                        let ref trace_params = TraceHeaderParams { module: "src/main.rs", line_no: line!(), function: f, format: "noc_from_ca" };
+                        let ref trace_params = TraceHeaderParams { module: "src/main.rs", line_no: line!(), function: _f, format: "noc_from_ca" };
                         let trace = json!({ "msg_type": msg_type, "tree_name": tree_name });
-                        let _ = dal::add_to_trace(trace_header, TraceType::Trace, trace_params,&trace, f);
+                        let _ = dal::add_to_trace(trace_header, TraceType::Trace, trace_params,&trace, _f);
                     }
                     self.allowed_trees.insert(AllowedTree::new(tree_name));
                     // If this is the first tree, set up NocMaster and NocAgent
