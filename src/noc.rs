@@ -1,3 +1,4 @@
+use std::thread;
 use std::thread::{JoinHandle, spawn};
 use std::sync::mpsc::channel;
 use std::collections::{HashMap, HashSet};
@@ -5,7 +6,7 @@ use std::collections::{HashMap, HashSet};
 use serde_json;
 
 use blueprint::{Blueprint};
-use config::{NCELLS, SCHEMA_VERSION, ByteArray, get_geometry};
+use config::{CONTINUE_ON_ERROR, NCELLS, SCHEMA_VERSION, ByteArray, get_geometry};
 use dal;
 use datacenter::{Datacenter};
 use gvm_equation::{GvmEquation, GvmEqn, GvmVariable, GvmVariableType};
@@ -26,6 +27,7 @@ pub struct Noc {
     noc_to_outside: NocToOutside,
 }
 impl Noc {
+    pub fn get_name(&self) -> &str { return "NOC"; }
     pub fn new(noc_to_outside: NocToOutside) -> Result<Noc, Error> {
         Ok(Noc { allowed_trees: HashSet::new(), noc_to_outside })
     }
@@ -43,8 +45,8 @@ impl Noc {
         let (noc_to_port, port_from_noc): (NocToPort, NocFromPort) = channel();
         let (port_to_noc, noc_from_port): (PortToNoc, PortFromNoc) = channel();
         let (mut dc, mut join_handles) = self.build_datacenter(blueprint, trace_header).context(NocError::Chain { func_name: "initialize", comment: S("")})?;
-        dc.connect_to_noc(port_to_noc, port_from_noc).context(NocError::Chain { func_name: "initialize", comment: S("")})?;
-        let join_outside = self.listen_outside(noc_from_outside, noc_to_port.clone())?;
+        dc.connect_to_noc(port_to_noc, port_from_noc, trace_header).context(NocError::Chain { func_name: "initialize", comment: S("")})?;
+        let join_outside = self.listen_outside(noc_from_outside, noc_to_port.clone(), trace_header)?;
         join_handles.push(join_outside);
         let join_port = self.listen_port(noc_to_port, noc_from_port, trace_header)?;
         join_handles.push(join_port);
@@ -56,38 +58,49 @@ impl Noc {
         let join_handles = dc.initialize(blueprint, trace_header).context(NocError::Chain { func_name: "build_datacenter", comment: S("")})?;
         Ok((dc, join_handles))
     }
-//    fn get_msg(&self, msg_type: MsgType, serialized_msg:String) -> Result<Box<Message>> {
-//        Ok(match msg_type {
-//            _ => panic!("Noc doesn't recognize message type {}", msg_type)
-//        })
-//    }
+//	fn get_msg(&self, msg_type: MsgType, serialized_msg:String) -> Result<Box<Message>> {
+//		Ok(match msg_type {
+//			_ => panic!("Noc doesn't recognize message type {}", msg_type)
+//		})
+//	}
+
+    // SPAWN THREAD (listen_port_loop)
     fn listen_port(&mut self, noc_to_port: NocToPort, noc_from_port: NocFromPort,
-            outer_trace_header: &mut TraceHeader) -> Result<JoinHandle<()>, Error> {
+            trace_header: &mut TraceHeader) -> Result<JoinHandle<()>, Error> {
         let _f = "listen_port";
         let mut noc = self.clone();
-        let mut outer_trace_header_clone = outer_trace_header.clone();
-        let join_port = spawn( move ||  {
-            let ref mut inner_trace_header= outer_trace_header_clone.fork_trace();
-            let _ = noc.listen_port_loop(&noc_to_port, &noc_from_port, inner_trace_header).map_err(|e| write_err("port", e));
-            let _ = noc.listen_port(noc_to_port, noc_from_port, inner_trace_header);
+        let child_trace_header = trace_header.fork_trace();
+        let thread_name = format!("{} listen_port_loop", self.get_name()); // NOC NOC
+        let join_port = thread::Builder::new().name(thread_name.into()).spawn( move || {
+            let ref mut working_trace_header = child_trace_header.clone();
+            let _ = noc.listen_port_loop(&noc_to_port, &noc_from_port, working_trace_header).map_err(|e| write_err("port", e));
+            if CONTINUE_ON_ERROR { let _ = noc.listen_port(noc_to_port, noc_from_port, working_trace_header); }
         });
-        Ok(join_port)
+        Ok(join_port?)
     }
+
+    // WORKER (NocToPort)
     fn listen_port_loop(&mut self, noc_to_port: &NocToPort, noc_from_port: &NocFromPort,
             trace_header: &mut TraceHeader) -> Result<(), Error> {
         let _f = "listen_port_loop";
+        {
+            let ref trace_params = TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "worker" };
+            let trace = json!({ "id": self.get_name(), "thread_name": thread::current().name(), "thread_id": TraceHeader::parse(thread::current().id()) });
+            let _ = dal::add_to_trace(trace_header, TraceType::Trace, trace_params, &trace, _f);
+        }
         loop {
-            let (is_ait, allowed_tree, msg_type, direction, bytes) = noc_from_port.recv().context(NocError::Chain { func_name: "listen_port", comment: S("")})?;
-            let serialized = ::std::str::from_utf8(&bytes)?;
+            let cmd = noc_from_port.recv().context(NocError::Chain { func_name: "listen_port", comment: S("")})?;
+            {
+                let ref trace_params = TraceHeaderParams { module: "src/main.rs", line_no: line!(), function: _f, format: "noc_from_ca" };
+                let trace = json!({ "id": self.get_name(), "cmd": cmd });
+                let _ = dal::add_to_trace(trace_header, TraceType::Trace, trace_params,&trace, _f);
+            }
+            let (is_ait, allowed_tree, msg_type, direction, bytes) = cmd;
             match msg_type {
                 TcpMsgType::TreeName => {
+                    let serialized = ::std::str::from_utf8(&bytes)?;
                     let msg = serde_json::from_str::<TreeNameMsg>(&serialized).context(NocError::Chain { func_name: "listen_port", comment: S("") })?;
                     let tree_name = msg.get_tree_name();
-                    {
-                        let ref trace_params = TraceHeaderParams { module: "src/main.rs", line_no: line!(), function: _f, format: "noc_from_ca" };
-                        let trace = json!({ "msg_type": msg_type, "tree_name": tree_name });
-                        let _ = dal::add_to_trace(trace_header, TraceType::Trace, trace_params,&trace, _f);
-                    }
                     self.allowed_trees.insert(AllowedTree::new(tree_name));
                     // If this is the first tree, set up NocMaster and NocAgent
                     if self.allowed_trees.len() == 1 {
@@ -98,16 +111,35 @@ impl Noc {
             }
         }
     }
-    fn listen_outside(&mut self, noc_from_outside: NocFromOutside, noc_to_port: NocToPort) -> Result<JoinHandle<()>,Error> {
+
+    // SPAWN THREAD (listen_outside_loop)
+    fn listen_outside(&mut self, noc_from_outside: NocFromOutside, noc_to_port: NocToPort, trace_header: &mut TraceHeader) -> Result<JoinHandle<()>,Error> {
         let mut noc = self.clone();
-        let join_outside = spawn( move || {
-            let _ = noc.listen_outside_loop(&noc_from_outside, &noc_to_port).map_err(|e| write_err("outside", e));
+        let child_trace_header = trace_header.fork_trace();
+        let thread_name = format!("{} listen_outside_loop", self.get_name()); // NOC NOC
+        let join_outside = thread::Builder::new().name(thread_name.into()).spawn( move || {
+            let ref mut working_trace_header = child_trace_header.clone();
+            let _ = noc.listen_outside_loop(&noc_from_outside, &noc_to_port, working_trace_header).map_err(|e| write_err("outside", e));
+            if CONTINUE_ON_ERROR { }
         });
-        Ok(join_outside)
+        Ok(join_outside?)
     }
-    fn listen_outside_loop(&mut self, noc_from_outside: &NocFromOutside, _: &NocToPort) -> Result<(), Error> {
+
+    // WORKER (NocFromOutside)
+    fn listen_outside_loop(&mut self, noc_from_outside: &NocFromOutside, _: &NocToPort, trace_header: &mut TraceHeader) -> Result<(), Error> {
+        let _f = "listen_outside_loop";
+        {
+            let ref trace_params = TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "worker" };
+            let trace = json!({ "id": self.get_name(), "thread_name": thread::current().name(), "thread_id": TraceHeader::parse(thread::current().id()) });
+            let _ = dal::add_to_trace(trace_header, TraceType::Trace, trace_params, &trace, _f);
+        }
         loop {
             let input = &noc_from_outside.recv()?;
+            {
+                let ref trace_params = TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "worker" };
+                let trace = json!({ "id": self.get_name(), "thread_name": thread::current().name(), "thread_id": TraceHeader::parse(thread::current().id()) });
+                let _ = dal::add_to_trace(trace_header, TraceType::Trace, trace_params, &trace, _f);
+            }
             println!("Noc: {}", input);
             let manifest = serde_json::from_str::<Manifest>(input).context(NocError::Chain { func_name: "listen_outside", comment: S("")})?;
             println!("Noc: {}", manifest);
