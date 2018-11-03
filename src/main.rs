@@ -180,7 +180,7 @@ fn deployment_demo() -> Result<(), Error> {
     eqns.insert(GvmEqn::Send("true"));
     eqns.insert(GvmEqn::Xtnd("hops<7"));
     eqns.insert(GvmEqn::Save("false"));
-//	let ref gvm_eqn = GvmEquation::new(eqns, vec![GvmVariable::new(GvmVariableType::PathLength, "hops")]);
+//  let ref gvm_eqn = GvmEquation::new(eqns, vec![GvmVariable::new(GvmVariableType::PathLength, "hops")]);
     let up_tree1 = UpTreeSpec::new("test1", vec![0, 0, 0, 2, 2]).context(MainError::Chain { func_name: "deployment_demo", comment: S("")})?;
     let up_tree2 = UpTreeSpec::new("test2", vec![1, 1, 0, 1]).context(MainError::Chain { func_name: "deployment_demo", comment: S("")})?;
     let ref allowed_tree1 = AllowedTree::new("foo");

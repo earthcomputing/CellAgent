@@ -180,8 +180,8 @@ impl fmt::Display for AllowedTree {
 }
 #[derive(Debug, Fail)]
 pub enum UptreeSpecError {
-//	#[fail(display = "UptreeSpecError::Chain {} {}", func_name, comment)]
-//	Chain { func_name: &'static str, comment: String },
+//  #[fail(display = "UptreeSpecError::Chain {} {}", func_name, comment)]
+//  Chain { func_name: &'static str, comment: String },
     #[fail(display = "UpTreeSpecError::Allowed {}: tree {} is not in the allowed set for vm {}", func_name, tree, vm_id)]
     Allowed { func_name: &'static str, vm_id: String, tree: AllowedTree },
     #[fail(display = "UpTreeSpecError::Containers {}: {} containers isn't enough for the specified trees", func_name, n_containers)]
