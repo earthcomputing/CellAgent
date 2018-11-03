@@ -67,7 +67,7 @@ pub trait Cell {
 }
 #[derive(Debug, Clone)]
 pub struct BorderCell {
-	cell_no: CellNo,
+	cell_no: CellNo, 
     cell_type: CellType,
 	interior_ports: Vec<PortNo>,
 	border_ports: Vec<PortNo>,

@@ -21,8 +21,8 @@ type GvmEqnType = String;
 pub struct GvmEquation {
     recv_eqn: GvmEqnType,        // If true, add to traph and set "up" bit
     send_eqn: GvmEqnType,        // If true, add to set maySend true in routing table entry
-    save_eqn: GvmEqnType,		 // If true, save the message for future traph updates
-    xtnd_eqn: GvmEqnType,		 // If false, turn off all ports in routing table entry
+    save_eqn: GvmEqnType,        // If true, save the message for future traph updates
+    xtnd_eqn: GvmEqnType,        // If false, turn off all ports in routing table entry
     variables: Vec<GvmVariable>  // Local variables used in the equations
 }
 // Sample GvmEquation: "hops < 7 || n_childen == 0",  associated variables vec!["hops", "n_children"]
