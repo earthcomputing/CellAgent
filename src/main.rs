@@ -74,8 +74,8 @@ fn main() -> Result<(), Error> {
     let ref mut trace_header = TraceHeader::new();
     /* Can't get records from main() to show up in trace file
         let (rows, cols, geometry) = config::get_geometry();
+        // For reasons I can't understand, the trace record doesn't show up when generated from main.
         {
-            // For reasons I can't understand, the trace record doesn't show up when generated from main.
             let ref trace_params = TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "trace_schema" };
             let trace = json!({ "schema_version": SCHEMA_VERSION, "ncells": NCELLS, "rows": rows, "cols": cols });
             let _ = dal::add_to_trace(trace_header, TraceType::Trace, trace_params,&trace, _f);

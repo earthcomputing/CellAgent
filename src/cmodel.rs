@@ -4,7 +4,7 @@ use std::thread::JoinHandle;
 
 use failure::{Error, ResultExt};
 
-use config::{CONTINUE_ON_ERROR, DEBUG_OPTIONS, PortNo};
+use config::{CENTRAL_TREE, CONTINUE_ON_ERROR, DEBUG_OPTIONS, PortNo};
 use dal;
 use message::MsgType;
 use message_types::{CaToCmBytes, CmToCa, CmFromCa, CmToPe, CmFromPe, PeToCmPacket,
@@ -12,8 +12,6 @@ use message_types::{CaToCmBytes, CmToCa, CmFromCa, CmToPe, CmFromPe, PeToCmPacke
 use name::{Name, CellID};
 use packet::{Packet, PacketAssembler, PacketAssemblers, Packetizer};
 use utility::{S, TraceHeader, TraceHeaderParams, TraceType, write_err};
-
-const CENTRAL_TREE : &str = "Tree:C:2"; // MAGIC
 
 #[derive(Debug, Clone)]
 pub struct Cmodel {
@@ -180,7 +178,7 @@ packets: Vec<Packet>,
         let (last_packet, packets) = packet_assembler.add(packet);
 
         if last_packet {
-            {
+            if DEBUG_OPTIONS.trace_all {
                 let ref trace_params = TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "cm_bytes_to_ca" };
                 let trace = json!({ "cell_id": &self.cell_id, "packet": &packet });
                 let _ = dal::add_to_trace(trace_header, TraceType::Debug, trace_params, &trace, _f); // sender side, dup

@@ -149,8 +149,7 @@ impl PacketEngine {
                     let tree_id = packet.get_tree_id();
                     {
                         let ref trace_params = TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "pe_forward_leafward" };
-                        let trace = json!({ "cell_id": &self.cell_id, "tree_id": &tree_id,
-                            "ait_state": packet.get_ait_state(), "msg_type": &msg_type, "port_nos": &port_nos });
+                        let trace = json!({ "cell_id": &self.cell_id, "tree_id": &tree_id, "ait_state": packet.get_ait_state(), "msg_type": &msg_type, "port_nos": &port_nos });
                         let _ = dal::add_to_trace(trace_header, TraceType::Trace, trace_params, &trace, _f);
                     }
 
@@ -292,8 +291,7 @@ impl PacketEngine {
                     let ait_state = packet.get_ait_state();
                     {
                         let ref trace_params = TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "pe_process_packet" };
-                        let trace = json!({ "cell_id": &self.cell_id, "tree_id": &tree_id, "ait_state": ait_state,
-                            "msg_type": &msg_type, "port_no": &port_no, "entry": &entry });
+                        let trace = json!({ "cell_id": &self.cell_id, "tree_id": &tree_id, "ait_state": ait_state, "msg_type": &msg_type, "port_no": &port_no, "entry": &entry });
                         let _ = dal::add_to_trace(trace_header, TraceType::Trace, trace_params, &trace, _f);
                     }
                     if DEBUG_OPTIONS.pe_process_pkt {
@@ -333,7 +331,7 @@ impl PacketEngine {
         if !(recv_port_no == entry.get_parent()) {
             let parent = entry.get_parent();
             if *parent == 0 {
-                if DEBUG_OPTIONS.pe_pkt_send {
+                if DEBUG_OPTIONS.trace_all || DEBUG_OPTIONS.pe_pkt_send {
                     let msg_type = MsgType::msg_type(&packet);
                     match msg_type {
                         MsgType::Discover => (),
@@ -354,7 +352,7 @@ impl PacketEngine {
             } else {
 // FIXME : option logic
                 if let Some(channel) = self.pe_to_ports.get((*parent) as usize) {
-                    if DEBUG_OPTIONS.pe_pkt_send {
+                    if DEBUG_OPTIONS.trace_all || DEBUG_OPTIONS.pe_pkt_send {
                         let msg_type = MsgType::msg_type(&packet);
                         match msg_type {
                             MsgType::Discover => (),

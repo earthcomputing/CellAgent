@@ -36,8 +36,8 @@ impl Noc {
             Result<(Datacenter, Vec<JoinHandle<()>>), Error> {
         let _f = "initialize";
         let (rows, cols, geometry) = get_geometry();
+        // For reasons I can't understand, the trace record doesn't show up when generated from main.
         {
-            // For reasons I can't understand, the trace record doesn't show up when generated from main.
             let ref trace_params = TraceHeaderParams { module: "src/main.rs", line_no: line!(), function: "MAIN", format: "trace_schema" };
             let trace = json!({ "schema_version": SCHEMA_VERSION, "ncells": NCELLS, "rows": rows, "cols": cols });
             let _ = dal::add_to_trace(trace_header, TraceType::Trace, trace_params,&trace, _f);
@@ -91,7 +91,7 @@ impl Noc {
         loop {
             let cmd = noc_from_port.recv().context(NocError::Chain { func_name: "listen_port", comment: S("")})?;
             {
-                let ref trace_params = TraceHeaderParams { module: "src/main.rs", line_no: line!(), function: _f, format: "noc_from_ca" };
+                let ref trace_params = TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "noc_from_ca" };
                 let trace = json!({ "id": self.get_name(), "cmd": cmd });
                 let _ = dal::add_to_trace(trace_header, TraceType::Trace, trace_params,&trace, _f);
             }
