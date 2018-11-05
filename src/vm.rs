@@ -2,7 +2,7 @@ use std::collections::{HashSet};
 use std::sync::mpsc::channel;
 use std::thread;
 
-use config::{CONTINUE_ON_ERROR};
+use config::{CONTINUE_ON_ERROR, TRACE_OPTIONS};
 use container::{Container};
 use dal;
 use message_types::{VmToCa, VmFromCa, VmToContainer, ContainerFromVm,
@@ -79,14 +79,14 @@ impl VirtualMachine {
     // WORKER (VmFromCa)
     fn listen_ca_loop(&self, vm_from_ca: &VmFromCa, trace_header: &mut TraceHeader) -> Result<(), Error> {
         let _f = "listen_ca_loop";
-        {
+        if TRACE_OPTIONS.all || TRACE_OPTIONS.vm {
             let ref trace_params = TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "worker" };
             let trace = json!({ "id": self.id, "thread_name": thread::current().name(), "thread_id": TraceHeader::parse(thread::current().id()) });
             let _ = dal::add_to_trace(trace_header, TraceType::Trace, trace_params, &trace, _f);
         }
         loop {
             let msg = vm_from_ca.recv().context("listen_ca_loop").context(VmError::Chain { func_name: "listen_ca_loop", comment: S(self.id.get_name()) })?;
-            {
+            if TRACE_OPTIONS.all || TRACE_OPTIONS.vm {
                 let ref trace_params = TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "recv" };
                 let trace = json!({ "id": self.id, "msg": msg });
                 let _ = dal::add_to_trace(trace_header, TraceType::Trace, trace_params, &trace, _f);
@@ -101,14 +101,14 @@ impl VirtualMachine {
     // WORKER (VmFromContainer)
     fn listen_container_loop(&self, _: &ContainerID, vm_from_container: &VmFromContainer, vm_to_ca: &VmToCa, trace_header: &mut TraceHeader) -> Result<(), Error> {
         let _f = "listen_container_loop";
-        {
+        if TRACE_OPTIONS.all || TRACE_OPTIONS.vm {
             let ref trace_params = TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "worker" };
             let trace = json!({ "id": self.id, "thread_name": thread::current().name(), "thread_id": TraceHeader::parse(thread::current().id()) });
             let _ = dal::add_to_trace(trace_header, TraceType::Trace, trace_params, &trace, _f);
         }
         loop {
             let (is_ait, allowed_tree, msg_type, direction, msg) = vm_from_container.recv().context("listen_container_loop").context(VmError::Chain { func_name: "listen_container_loop", comment: S(self.id.get_name()) + " recv from container"})?;
-            {
+            if TRACE_OPTIONS.all || TRACE_OPTIONS.vm {
                 let ref trace_params = TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "recv" };
                 let trace = json!({ "id": self.id, "msg": msg });
                 let _ = dal::add_to_trace(trace_header, TraceType::Trace, trace_params, &trace, _f);

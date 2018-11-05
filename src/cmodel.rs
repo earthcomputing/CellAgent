@@ -4,7 +4,7 @@ use std::thread::JoinHandle;
 
 use failure::{Error, ResultExt};
 
-use config::{CONTINUE_ON_ERROR, DEBUG_OPTIONS, PortNo};
+use config::{CONTINUE_ON_ERROR, DEBUG_OPTIONS, TRACE_OPTIONS, PortNo};
 use dal;
 use message::MsgType;
 use message_types::{CaToCmBytes, CmToCa, CmFromCa, CmToPe, CmFromPe, PeToCmPacket,
@@ -33,7 +33,7 @@ impl Cmodel {
     pub fn initialize(&self, cm_from_ca: CmFromCa, cm_to_pe: CmToPe, cm_from_pe: CmFromPe, cm_to_ca: CmToCa,
                       trace_header: &mut TraceHeader) -> Result<(), Error> {
         let _f = "initialize";
-        {
+        if TRACE_OPTIONS.all || TRACE_OPTIONS.cm {
             let ref trace_params = TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "worker" };
             let trace = json!({ "cell_id": &self.cell_id, "thread_name": thread::current().name(), "thread_id": TraceHeader::parse(thread::current().id()) });
             let _ = dal::add_to_trace(trace_header, TraceType::Trace, trace_params, &trace, _f);
@@ -76,14 +76,14 @@ impl Cmodel {
     fn listen_ca_loop(&self, cm_from_ca: &CmFromCa, cm_to_pe: &CmToPe,
                       trace_header: &mut TraceHeader) -> Result<(), Error> {
         let _f = "listen_ca_loop";
-        {
+        if TRACE_OPTIONS.all || TRACE_OPTIONS.cm {
             let ref trace_params = TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "worker" };
             let trace = json!({ "cell_id": &self.cell_id, "thread_name": thread::current().name(), "thread_id": TraceHeader::parse(thread::current().id()) });
             let _ = dal::add_to_trace(trace_header, TraceType::Trace, trace_params, &trace, _f);
         }
         loop {
             let msg = cm_from_ca.recv()?;
-            {
+            if TRACE_OPTIONS.all || TRACE_OPTIONS.cm {
                 let ref trace_params = TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "cm_bytes_from_ca" };
                 let trace = json!({ "cell_id": &self.cell_id, "msg": &msg });
                 let _ = dal::add_to_trace(trace_header, TraceType::Trace, trace_params, &trace, _f);
@@ -135,14 +135,14 @@ impl Cmodel {
     fn listen_pe_loop(&mut self, cm_from_pe: &CmFromPe, cm_to_ca: &CmToCa,
                       trace_header: &mut TraceHeader) -> Result<(), Error> {
         let _f = "listen_pe_loop";
-        {
+        if TRACE_OPTIONS.all || TRACE_OPTIONS.cm {
             let ref trace_params = TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "worker" };
             let trace = json!({ "cell_id": &self.cell_id, "thread_name": thread::current().name(), "thread_id": TraceHeader::parse(thread::current().id()) });
             let _ = dal::add_to_trace(trace_header, TraceType::Trace, trace_params, &trace, _f);
         }
         loop {
             let msg = cm_from_pe.recv()?;
-            {
+            if TRACE_OPTIONS.all || TRACE_OPTIONS.cm {
                 let ref trace_params = TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "listen_pe_loop" };
                 let trace = json!({ "cell_id": &self.cell_id, "msg": &msg });
                 let _ = dal::add_to_trace(trace_header, TraceType::Trace, trace_params, &trace, _f);
@@ -180,7 +180,7 @@ packets: Vec<Packet>,
         let (last_packet, packets) = packet_assembler.add(packet);
 
         if last_packet {
-            {
+            if TRACE_OPTIONS.all || TRACE_OPTIONS.cm {
                 let ref trace_params = TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "cm_bytes_to_ca" };
                 let trace = json!({ "cell_id": &self.cell_id, "packet": &packet });
                 let _ = dal::add_to_trace(trace_header, TraceType::Debug, trace_params, &trace, _f); // sender side, dup
