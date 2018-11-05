@@ -6,7 +6,7 @@ use std::thread;
 use cellagent::{CellAgent};
 use cmodel::{Cmodel};
 use dal;
-use config::{CONTINUE_ON_ERROR, MAX_PORTS, CellNo, CellType, PortNo};
+use config::{CONTINUE_ON_ERROR, MAX_PORTS, TRACE_OPTIONS, CellNo, CellType, PortNo};
 use message_types::{PortToPe, PeFromPort, PeToPort,PortFromPe,
                     CaToCm, CmFromCa, CmToCa, CaFromCm,
                     CmToPe, PeFromCm, PeToCm, CmFromPe};
@@ -57,7 +57,7 @@ impl NalCell {
         let mut pe_to_ports = Vec::new();
         let mut ports_from_pe = HashMap::new(); // So I can remove the item
         let mut boundary_port_nos = HashSet::new();
-        {
+        if TRACE_OPTIONS.all || TRACE_OPTIONS.nal {
             let ref trace_params = TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "nalcell_port_setup" };
             let trace = json!({ "cell_number": cell_no });
             let _ = dal::add_to_trace(trace_header, TraceType::Trace, trace_params, &trace, _f);
@@ -94,7 +94,7 @@ impl NalCell {
     // SPAWN THREAD (ca.initialize)
     fn start_cell(cell_agent: &CellAgent, ca_from_cm: CaFromCm, trace_header: &mut TraceHeader) {
         let _f = "start_cell";
-        {
+        if TRACE_OPTIONS.all || TRACE_OPTIONS.nal {
             let ref trace_params = TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "nalcell_start_ca" };
             let trace = json!({ "cell_id": &cell_agent.get_id() });
             let _ = dal::add_to_trace(trace_header, TraceType::Trace, trace_params, &trace, _f);
@@ -127,7 +127,7 @@ impl NalCell {
     fn start_packet_engine(packet_engine: &PacketEngine, pe_from_cm: PeFromCm, pe_from_ports: PeFromPort,
                            trace_header: &mut TraceHeader) {
         let _f = "start_packet_engine";
-        {
+        if TRACE_OPTIONS.all || TRACE_OPTIONS.nal {
             let ref trace_params = TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "nalcell_start_pe" };
             let trace = json!({ "cell_id": packet_engine.get_id() });
             let _ = dal::add_to_trace(trace_header, TraceType::Trace, trace_params, &trace, _f);

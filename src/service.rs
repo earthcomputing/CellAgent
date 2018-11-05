@@ -1,7 +1,7 @@
 use std::fmt;
 use std::thread;
 
-use config::{ByteArray,CONTINUE_ON_ERROR};
+use config::{ByteArray,CONTINUE_ON_ERROR, TRACE_OPTIONS};
 use dal;
 use name::{ContainerID, UptreeID};
 use message::{MsgDirection, TcpMsgType};
@@ -86,14 +86,14 @@ impl NocMaster {
     // WORKER (ContainerFromVm)
     fn listen_vm_loop(&self, container_from_vm: &ContainerFromVm, trace_header: &mut TraceHeader) -> Result<(), Error> {
         let _f = "listen_vm_loop";
-        {
+        if TRACE_OPTIONS.all || TRACE_OPTIONS.svc {
             let ref trace_params = TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "worker" };
             let trace = json!({ "NocMaster": self.get_name(), "thread_name": thread::current().name(), "thread_id": TraceHeader::parse(thread::current().id()) });
             let _ = dal::add_to_trace(trace_header, TraceType::Trace, trace_params, &trace, _f);
         }
         loop {
             let (is_ait, msg) = container_from_vm.recv().context("NocMaster container_from_vm").context(ServiceError::Chain { func_name: "listen_vm_loop", comment: S("NocMaster from vm")})?;
-            {
+            if TRACE_OPTIONS.all || TRACE_OPTIONS.svc {
                 let ref trace_params = TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "recv" };
                 let trace = json!({ "NocMaster": self.get_name(), "msg": msg });
                 let _ = dal::add_to_trace(trace_header, TraceType::Trace, trace_params, &trace, _f);
@@ -146,14 +146,14 @@ impl NocAgent {
     // WORKER (ContainerFromVm)
     fn listen_vm_loop(&self, container_from_vm: &ContainerFromVm, trace_header: &mut TraceHeader) -> Result<(), Error> {
         let _f = "listen_vm_loop";
-        {
+        if TRACE_OPTIONS.all || TRACE_OPTIONS.svc {
             let ref trace_params = TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "worker" };
             let trace = json!({ "NocAgent": self.get_name(), "thread_name": thread::current().name(), "thread_id": TraceHeader::parse(thread::current().id()) });
             let _ = dal::add_to_trace(trace_header, TraceType::Trace, trace_params, &trace, _f);
         }
         loop {
             let (is_ait, msg) = container_from_vm.recv().context(ServiceError::Chain { func_name: _f, comment: S("Agent recv from vm") })?;
-            {
+            if TRACE_OPTIONS.all || TRACE_OPTIONS.svc {
                 let ref trace_params = TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "recv" };
                 let trace = json!({ "NocAgent": self.get_name(), "msg": msg });
                 let _ = dal::add_to_trace(trace_header, TraceType::Trace, trace_params, &trace, _f);

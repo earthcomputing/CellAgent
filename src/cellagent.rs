@@ -9,6 +9,7 @@ use serde;
 use serde_json;
 
 use config::{CONNECTED_PORTS_TREE_NAME, CONTINUE_ON_ERROR, CONTROL_TREE_NAME, DEBUG_OPTIONS, QUENCH,
+             TRACE_OPTIONS,
              ByteArray, CellNo, CellType, Quench, PathLength, PortNo};
 use dal;
 use gvm_equation::{GvmEquation, GvmEqn};
@@ -110,7 +111,7 @@ impl CellAgent {
     // WORKER (CellAgent)
     pub fn initialize(&mut self, ca_from_cm: CaFromCm, trace_header: &mut TraceHeader) -> Result<(), Error> {
         let _f = "initialize";
-        {
+        if TRACE_OPTIONS.all || TRACE_OPTIONS.cm {
             let ref trace_params = TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "worker" };
             let trace = json!({ "cell_id": &self.cell_id, "thread_name": thread::current().name(), "thread_id": TraceHeader::parse(thread::current().id()) });
             let _ = dal::add_to_trace(trace_header, TraceType::Trace, trace_params, &trace, _f);
@@ -559,14 +560,14 @@ impl CellAgent {
     fn listen_uptree_loop(&mut self, sender_id: &SenderID, _vm_id: &VmID, ca_from_vm: &CaFromVm,
                           trace_header: &mut TraceHeader) -> Result<(), Error> {
         let _f = "listen_uptree_loop";
-        {
+        if TRACE_OPTIONS.all || TRACE_OPTIONS.ca {
             let ref trace_params = TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "worker" };
             let trace = json!({ "cell_id": &self.cell_id, "thread_name": thread::current().name(), "thread_id": TraceHeader::parse(thread::current().id()) });
             let _ = dal::add_to_trace(trace_header, TraceType::Trace, trace_params, &trace, _f);
         }
         loop {
             let msg = ca_from_vm.recv()?;
-            {
+            if TRACE_OPTIONS.all || TRACE_OPTIONS.ca {
                 let ref trace_params = TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "ca_got_from_uptree" };
                 let trace = json!({ "cell_id": &self.cell_id, "msg": msg });
                 let _ = dal::add_to_trace(trace_header, TraceType::Trace, trace_params, &trace, _f);
@@ -679,14 +680,14 @@ impl CellAgent {
     // WORKER (CaFromCm)
     fn listen_cm_loop(&mut self, ca_from_cm: &CaFromCm, trace_header: &mut TraceHeader) -> Result<(), Error> {
         let _f = "listen_cm_loop";
-        {
+        if TRACE_OPTIONS.all || TRACE_OPTIONS.ca {
             let ref trace_params = TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "worker" };
             let trace = json!({ "cell_id": &self.cell_id, "thread_name": thread::current().name(), "thread_id": TraceHeader::parse(thread::current().id()) });
             let _ = dal::add_to_trace(trace_header, TraceType::Trace, trace_params, &trace, _f);
         }
         loop {
             let msg = ca_from_cm.recv().context(CellagentError::Chain { func_name: _f, comment: S(self.cell_id.clone())})?;
-            {
+            if TRACE_OPTIONS.all || TRACE_OPTIONS.ca {
                 let ref trace_params = TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "ca_from_cm" };
                 let trace = json!({ "cell_id": &self.cell_id, "msg": &msg });
                 let _ = dal::add_to_trace(trace_header, TraceType::Trace, trace_params, &trace, _f);
@@ -1237,7 +1238,7 @@ impl CellAgent {
     fn port_connected(&mut self, port_no: PortNo, is_border: bool,
                       trace_header: &mut TraceHeader) -> Result<(), Error> {
         let _f = "port_connected";
-        {
+        if TRACE_OPTIONS.all || TRACE_OPTIONS.ca {
             let ref trace_params = TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "ca_send_msg" };
             let trace = json!({ "cell_id": &self.cell_id, "port_no": port_no, "is_border": is_border });
             let _ = dal::add_to_trace(trace_header, TraceType::Trace, trace_params, &trace, _f);
