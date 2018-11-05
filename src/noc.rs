@@ -136,8 +136,8 @@ impl Noc {
         loop {
             let input = &noc_from_outside.recv()?;
             {
-                let ref trace_params = TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "worker" };
-                let trace = json!({ "id": self.get_name(), "thread_name": thread::current().name(), "thread_id": TraceHeader::parse(thread::current().id()) });
+                let ref trace_params = TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "recv" };
+                let trace = json!({ "id": self.get_name(), input }); // Manifest
                 let _ = dal::add_to_trace(trace_header, TraceType::Trace, trace_params, &trace, _f);
             }
             println!("Noc: {}", input);
