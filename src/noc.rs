@@ -137,7 +137,7 @@ impl Noc {
             let input = &noc_from_outside.recv()?;
             if TRACE_OPTIONS.all || TRACE_OPTIONS.noc {
                 let ref trace_params = TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "recv" };
-                let trace = json!({ "id": self.get_name(), input }); // Manifest
+                let trace = json!({ "id": self.get_name(), "msg": input }); // Manifest
                 let _ = dal::add_to_trace(trace_header, TraceType::Trace, trace_params, &trace, _f);
             }
             println!("Noc: {}", input);
