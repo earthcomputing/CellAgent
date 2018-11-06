@@ -36,6 +36,39 @@ pub const CONTROL_TREE_NAME: &'static str = "Control";
 pub const CONNECTED_PORTS_TREE_NAME: &'static str = "Connected";
 //pub const BASE_TREE_NAME: &'static str = "Base";
 
+pub struct TraceOptions {
+    pub all:      bool,
+    pub dc:       bool,
+    pub nal:      bool,
+    pub noc:      bool,
+    pub svc:      bool,
+    pub vm:       bool,
+    pub ca:       bool,
+    pub cm:       bool,
+    pub pe:       bool,
+    pub pe_cm:    bool,
+    pub pe_port:  bool,
+    pub port:     bool,
+    pub port_noc: bool,
+    pub link:     bool
+}
+pub const TRACE_OPTIONS: TraceOptions = TraceOptions {
+    all:      false,
+    dc:       true,
+    nal:      true,
+    noc:      true,
+    svc:      true,
+    vm:       true,
+    ca:       true,
+    cm:       true,
+    pe:       true,
+    pe_cm:    true,
+    pe_port:  false,
+    port:     false,
+    port_noc: true,
+    link:     false
+};
+
 pub struct DebugOptions {
     pub trace_all:      bool,
     pub ca_msg_recv:    bool,

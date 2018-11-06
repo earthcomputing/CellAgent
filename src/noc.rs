@@ -6,7 +6,7 @@ use std::collections::{HashMap, HashSet};
 use serde_json;
 
 use blueprint::{Blueprint};
-use config::{CONTINUE_ON_ERROR, NCELLS, SCHEMA_VERSION, ByteArray, get_geometry};
+use config::{CONTINUE_ON_ERROR, NCELLS, SCHEMA_VERSION, TRACE_OPTIONS, ByteArray, get_geometry};
 use dal;
 use datacenter::{Datacenter};
 use gvm_equation::{GvmEquation, GvmEqn, GvmVariable, GvmVariableType};
@@ -37,7 +37,7 @@ impl Noc {
         let _f = "initialize";
         let (rows, cols, geometry) = get_geometry();
         // For reasons I can't understand, the trace record doesn't show up when generated from main.
-        {
+        if TRACE_OPTIONS.all || TRACE_OPTIONS.noc {
             let ref trace_params = TraceHeaderParams { module: "src/main.rs", line_no: line!(), function: "MAIN", format: "trace_schema" };
             let trace = json!({ "schema_version": SCHEMA_VERSION, "ncells": NCELLS, "rows": rows, "cols": cols });
             let _ = dal::add_to_trace(trace_header, TraceType::Trace, trace_params,&trace, _f);
@@ -83,14 +83,14 @@ impl Noc {
     fn listen_port_loop(&mut self, noc_to_port: &NocToPort, noc_from_port: &NocFromPort,
             trace_header: &mut TraceHeader) -> Result<(), Error> {
         let _f = "listen_port_loop";
-        {
+        if TRACE_OPTIONS.all || TRACE_OPTIONS.noc {
             let ref trace_params = TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "worker" };
             let trace = json!({ "id": self.get_name(), "thread_name": thread::current().name(), "thread_id": TraceHeader::parse(thread::current().id()) });
             let _ = dal::add_to_trace(trace_header, TraceType::Trace, trace_params, &trace, _f);
         }
         loop {
             let cmd = noc_from_port.recv().context(NocError::Chain { func_name: "listen_port", comment: S("")})?;
-            {
+            if TRACE_OPTIONS.all || TRACE_OPTIONS.noc {
                 let ref trace_params = TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "noc_from_ca" };
                 let trace = json!({ "id": self.get_name(), "cmd": cmd });
                 let _ = dal::add_to_trace(trace_header, TraceType::Trace, trace_params,&trace, _f);
@@ -128,14 +128,14 @@ impl Noc {
     // WORKER (NocFromOutside)
     fn listen_outside_loop(&mut self, noc_from_outside: &NocFromOutside, _: &NocToPort, trace_header: &mut TraceHeader) -> Result<(), Error> {
         let _f = "listen_outside_loop";
-        {
+        if TRACE_OPTIONS.all || TRACE_OPTIONS.noc {
             let ref trace_params = TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "worker" };
             let trace = json!({ "id": self.get_name(), "thread_name": thread::current().name(), "thread_id": TraceHeader::parse(thread::current().id()) });
             let _ = dal::add_to_trace(trace_header, TraceType::Trace, trace_params, &trace, _f);
         }
         loop {
             let input = &noc_from_outside.recv()?;
-            {
+            if TRACE_OPTIONS.all || TRACE_OPTIONS.noc {
                 let ref trace_params = TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "recv" };
                 let trace = json!({ "id": self.get_name(), input }); // Manifest
                 let _ = dal::add_to_trace(trace_header, TraceType::Trace, trace_params, &trace, _f);

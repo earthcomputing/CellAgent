@@ -2,7 +2,7 @@ use std::fmt;
 use std::thread;
 use std::thread::JoinHandle;
 
-use config::{CONTINUE_ON_ERROR};
+use config::{CONTINUE_ON_ERROR, TRACE_OPTIONS};
 use dal;
 use message_types::{LinkToPort, LinkFromPort, LinkToPortPacket};
 use name::{Name, LinkID, PortID};
@@ -68,14 +68,14 @@ impl Link {
     // WORKER (LinkFromPort)
     fn listen_loop(&self, link_from: &LinkFromPort, link_to: &LinkToPort, trace_header: &mut TraceHeader) -> Result<(), Error> {
         let _f = "listen_loop";
-        {
+        if TRACE_OPTIONS.all || TRACE_OPTIONS.link {
             let ref trace_params = TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "worker" };
             let trace = json!({ "id": &self.get_id(), "thread_name": thread::current().name(), "thread_id": TraceHeader::parse(thread::current().id()) });
             let _ = dal::add_to_trace(trace_header, TraceType::Trace, trace_params, &trace, _f);
         }
         loop {
             let msg = link_from.recv().context(LinkError::Chain { func_name: _f, comment: S(self.id.clone()) })?;
-            {
+            if TRACE_OPTIONS.all || TRACE_OPTIONS.link {
                 let ref trace_params = TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "recv" };
                 let trace = json!({ "id": &self.get_id(), "msg": msg });
                 let _ = dal::add_to_trace(trace_header, TraceType::Trace, trace_params, &trace, _f);

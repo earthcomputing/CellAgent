@@ -9,7 +9,7 @@ use serde;
 use serde_json;
 
 use config::{CENTRAL_TREE, CONNECTED_PORTS_TREE_NAME, CONTINUE_ON_ERROR, CONTROL_TREE_NAME, DEBUG_OPTIONS, QUENCH,
-             ByteArray, CellNo, CellType, Quench, PathLength, PortNo};
+             TRACE_OPTIONS, ByteArray, CellNo, CellType, Quench, PathLength, PortNo};
 use dal;
 use gvm_equation::{GvmEquation, GvmEqn};
 use message::{Message, MsgDirection, MsgTreeMap, MsgType, TcpMsgType,
@@ -110,7 +110,7 @@ impl CellAgent {
     // WORKER (CellAgent)
     pub fn initialize(&mut self, ca_from_cm: CaFromCm, trace_header: &mut TraceHeader) -> Result<(), Error> {
         let _f = "initialize";
-        {
+        if TRACE_OPTIONS.all || TRACE_OPTIONS.cm {
             let ref trace_params = TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "worker" };
             let trace = json!({ "cell_id": &self.cell_id, "thread_name": thread::current().name(), "thread_id": TraceHeader::parse(thread::current().id()) });
             let _ = dal::add_to_trace(trace_header, TraceType::Trace, trace_params, &trace, _f);
@@ -563,14 +563,14 @@ impl CellAgent {
     fn listen_uptree_loop(&mut self, sender_id: &SenderID, _vm_id: &VmID, ca_from_vm: &CaFromVm,
                           trace_header: &mut TraceHeader) -> Result<(), Error> {
         let _f = "listen_uptree_loop";
-        {
+        if TRACE_OPTIONS.all || TRACE_OPTIONS.ca {
             let ref trace_params = TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "worker" };
             let trace = json!({ "cell_id": &self.cell_id, "thread_name": thread::current().name(), "thread_id": TraceHeader::parse(thread::current().id()) });
             let _ = dal::add_to_trace(trace_header, TraceType::Trace, trace_params, &trace, _f);
         }
         loop {
             let msg = ca_from_vm.recv()?;
-            {
+            if TRACE_OPTIONS.all || TRACE_OPTIONS.ca {
                 let ref trace_params = TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "ca_got_from_uptree" };
                 let trace = json!({ "cell_id": &self.cell_id, "msg": msg });
                 let _ = dal::add_to_trace(trace_header, TraceType::Trace, trace_params, &trace, _f);
@@ -683,14 +683,14 @@ impl CellAgent {
     // WORKER (CaFromCm)
     fn listen_cm_loop(&mut self, ca_from_cm: &CaFromCm, trace_header: &mut TraceHeader) -> Result<(), Error> {
         let _f = "listen_cm_loop";
-        {
+        if TRACE_OPTIONS.all || TRACE_OPTIONS.ca {
             let ref trace_params = TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "worker" };
             let trace = json!({ "cell_id": &self.cell_id, "thread_name": thread::current().name(), "thread_id": TraceHeader::parse(thread::current().id()) });
             let _ = dal::add_to_trace(trace_header, TraceType::Trace, trace_params, &trace, _f);
         }
         loop {
             let msg = ca_from_cm.recv().context(CellagentError::Chain { func_name: _f, comment: S(self.cell_id.clone())})?;
-            {
+            if TRACE_OPTIONS.all || TRACE_OPTIONS.ca {
                 let ref trace_params = TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "ca_from_cm" };
                 let trace = json!({ "cell_id": &self.cell_id, "msg": &msg });
                 let _ = dal::add_to_trace(trace_header, TraceType::Trace, trace_params, &trace, _f);
@@ -879,14 +879,9 @@ impl CellAgent {
             let lw_tree_id = lw_port_tree_id.without_root_port_number();
             println!("Cellagent {}: {} Failover success from {} {}", self.cell_id, _f, lw_port_tree_id, lw_port_tree_id.get_uuid());
             let my_traph = self.get_traph(&self.my_tree_id, trace_header)?;
-            //let lw_children = lw_traph.get_c
             println!("Cellagent {}: {} port {} lw tree {}\n{}", self.cell_id, _f, *port_no, lw_tree_id, my_traph);
-            //let lw_base_tree_id = self.get_base_tree_id(lw_tree_id)?;
-            //let old_parent_entry = lw_traph.update_element(lw_base_tree_id, port_number, traph::PortStatus::Pruned)
             let mut old_parent_element = my_traph.get_parent_element()?;
             old_parent_element.set_status(traph::PortStatus::Pruned);
-            //let mut new_parent_element = lw_traph.get_element(port_no)?;
-            //new_parent_element.set_status(traph::PortStatus::Parent);
             //let mut entry = traph.update_element(base_tree_id, port_number, entry_port_status, children, hops, path).context(CellagentError::Chain { func_name: "update_traph", comment: S("") })?;
         } else {
             let mut rw_traph = self.get_traph(&rw_tree_id, trace_header)?;
@@ -1261,7 +1256,7 @@ impl CellAgent {
     fn port_connected(&mut self, port_no: PortNo, is_border: bool,
                       trace_header: &mut TraceHeader) -> Result<(), Error> {
         let _f = "port_connected";
-        {
+        if TRACE_OPTIONS.all || TRACE_OPTIONS.ca {
             let ref trace_params = TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "ca_send_msg" };
             let trace = json!({ "cell_id": &self.cell_id, "port_no": port_no, "is_border": is_border });
             let _ = dal::add_to_trace(trace_header, TraceType::Trace, trace_params, &trace, _f);
