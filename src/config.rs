@@ -63,7 +63,7 @@ pub const TRACE_OPTIONS: TraceOptions = TraceOptions {
     cm:       true,
     pe:       true,
     pe_cm:    true,
-    pe_port:  true,
+    pe_port:  false,
     port:     false,
     port_noc: true,
     link:     false
