@@ -868,14 +868,9 @@ impl CellAgent {
             let lw_tree_id = lw_port_tree_id.without_root_port_number();
             println!("Cellagent {}: {} Failover success from {} {}", self.cell_id, _f, lw_port_tree_id, lw_port_tree_id.get_uuid());
             let my_traph = self.get_traph(&self.my_tree_id, trace_header)?;
-            //let lw_children = lw_traph.get_c
             println!("Cellagent {}: {} port {} lw tree {}\n{}", self.cell_id, _f, *port_no, lw_tree_id, my_traph);
-            //let lw_base_tree_id = self.get_base_tree_id(lw_tree_id)?;
-            //let old_parent_entry = lw_traph.update_element(lw_base_tree_id, port_number, traph::PortStatus::Pruned)
             let mut old_parent_element = my_traph.get_parent_element()?;
             old_parent_element.set_status(traph::PortStatus::Pruned);
-            //let mut new_parent_element = lw_traph.get_element(port_no)?;
-            //new_parent_element.set_status(traph::PortStatus::Parent);
             //let mut entry = traph.update_element(base_tree_id, port_number, entry_port_status, children, hops, path).context(CellagentError::Chain { func_name: "update_traph", comment: S("") })?;
         } else {
             let mut rw_traph = self.get_traph(&rw_tree_id, trace_header)?;

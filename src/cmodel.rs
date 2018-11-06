@@ -84,8 +84,11 @@ impl Cmodel {
         loop {
             let msg = cm_from_ca.recv()?;
             if TRACE_OPTIONS.all || TRACE_OPTIONS.cm {
+                let trace = match &msg {
+                    CaToCmBytes::Bytes(msg) => json!({"cell_id": &self.cell_id, "msg": (&msg.0, &msg.1, &msg.2, &msg.3, &msg.4[0..20])}),
+                    _ => json!({ "cell_id": &self.cell_id, "msg": &msg })
+                };
                 let ref trace_params = TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "cm_bytes_from_ca" };
-                let trace = json!({ "cell_id": &self.cell_id, "msg": &msg });
                 let _ = dal::add_to_trace(trace_header, TraceType::Trace, trace_params, &trace, _f);
             }
             match msg {

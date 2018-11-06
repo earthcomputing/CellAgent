@@ -13,7 +13,6 @@ use uuid_ec::Uuid;
 type ISAIT = bool;
 type ISBLOCKING = bool;
 type CATOCM = (TreeID, ISAIT, Mask, ISBLOCKING, ByteArray);
-pub type CMTOCA = (PortNo, ISAIT, Uuid, ByteArray); // port_no, is_ait, tree_uuid, bytes
 pub type PACKET = Packet;
 pub type TCP = (ISAIT, AllowedTree, TcpMsgType, MsgDirection, ByteArray);
 // PacketEngine to PacketEngine to unblock
