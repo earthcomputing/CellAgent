@@ -337,7 +337,7 @@ impl PacketEngine {
                         MsgType::Discover => (),
                         _ => {
                             let tree_id = packet.get_tree_id();
-                            {
+                            if TRACE_OPTIONS.all || TRACE_OPTIONS.pe {
                                 let ref trace_params = TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "pe_forward_to_cm" };
                                 let trace = json!({ "cell_id": &self.cell_id, "tree_id": &tree_id, "msg_type": &msg_type, "parent_port": &parent });
                                 let _ = dal::add_to_trace(trace_header, TraceType::Debug, trace_params, &trace, _f);
@@ -358,7 +358,7 @@ impl PacketEngine {
                             MsgType::Discover => (),
                             _ => {
                                 let tree_id = packet.get_tree_id();
-                                {
+                                if TRACE_OPTIONS.all || TRACE_OPTIONS.pe {
                                     let ref trace_params = TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "pe_forward_rootward" };
                                     let trace = json!({ "cell_id": &self.cell_id, "tree_id": &tree_id, "msg_type": &msg_type, "parent_port": &parent });
                                     let _ = dal::add_to_trace(trace_header, TraceType::Debug, trace_params, &trace, _f);

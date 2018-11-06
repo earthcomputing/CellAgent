@@ -16,7 +16,7 @@ while (<>) {
     my $n = $#buffer;
     my @slice = @buffer[$n - 4..$n];
     my $chunk = join('', @slice);
-    print($ARGV, $chunk);
+    print($ARGV, $endl, $chunk);
 
     @buffer = ();
 }
