@@ -12,17 +12,17 @@ pub trait Name: Sized {
     fn get_uuid(&self) -> Uuid;
     fn create_from_string(&self, n: &str) -> Self;
     // Default implementations
-    fn stringify(&self) -> String { self.get_name().to_string() }
+    fn stringify(&self) -> String { S(self.get_name()) }
     fn name_from_str(&self, s: &str) -> Result<Self, Error> {
         // Names may not contain blanks
         match s.find(' ') {
-            Some(_) => Err(NameError::Format { name: s.to_string(), func_name: "from_str" }.into()),
+            Some(_) => Err(NameError::Format { name: S(s), func_name: "from_str" }.into()),
             None => Ok(self.create_from_string(s))
         }
     }
     fn add_component(&self, s: &str) -> Result<Self, Error> {
         match s.find(' ') {
-            Some(_) => Err(NameError::Format{ name: s.to_string(), func_name: "add_component" }.into()),
+            Some(_) => Err(NameError::Format{ name: S(s), func_name: "add_component" }.into()),
             None => self.name_from_str(&([self.get_name(),s].join(SEPARATOR)))
         }
     }
@@ -58,7 +58,7 @@ impl Name for PortID {
 impl fmt::Display for PortID { fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result { self.name.fmt(f) } }
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct TreeID { name: NameType, uuid: Uuid}
-impl<'a> TreeID {
+impl TreeID {
     pub fn new(name: &str) -> Result<TreeID, Error> {
         match name.find(' ') {
             None => Ok(TreeID { name: S(name), uuid: Uuid::new() }),
@@ -91,7 +91,7 @@ impl Name for TreeID {
 impl fmt::Display for TreeID { fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result { self.name.fmt(f) } }
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct UptreeID { name: NameType, uuid: Uuid}
-impl<'a> UptreeID {
+impl UptreeID {
     pub fn new(n: &str) -> Result<UptreeID, Error> {
         let name = S(n);
         match n.find(' ') {
@@ -111,7 +111,7 @@ pub struct TenantID { name: NameType, uuid: Uuid }
 impl TenantID {
     /*
     pub fn new(n: &str) -> Result<TenantID, Error> {
-        let name = n.to_string();
+        let name = S(n);
         match n.find(' ') {
             None => Ok(TenantID { name: name.clone(), uuid: Uuid::new() }),
             Some(_) => Err(NameError::Format { name, func_name: "TenantID::new" }.into())
