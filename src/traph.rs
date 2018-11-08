@@ -6,7 +6,7 @@ use serde_json;
 //use uuid::Uuid;
 
 use config::{MAX_PORTS, PathLength, PortNo};
-use dumpstack::{dumpstack};
+//use dumpstack::{dumpstack};
 use gvm_equation::{GvmEquation, GvmVariable, GvmVariableType};
 use name::{Name, CellID, TreeID};
 use port_tree::PortTree;
