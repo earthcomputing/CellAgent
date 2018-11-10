@@ -14,7 +14,7 @@ use message::{MsgDirection, TcpMsgType, TreeNameMsg};
 use message_types::{NocToPort, NocFromPort, PortToNoc, PortFromNoc, NocFromOutside, NocToOutside};
 use nalcell::CellConfig;
 use uptree_spec::{AllowedTree, ContainerSpec, Manifest, UpTreeSpec, VmSpec};
-use utility::{S, TraceHeader, TraceHeaderParams, TraceType, write_err};
+use utility::{TRACE_HEADER, S, TraceHeader, TraceHeaderParams, TraceType, write_err};
 
 const NOC_MASTER_DEPLOY_TREE_NAME:  &'static str = "NocMasterDeploy";
 const NOC_AGENT_DEPLOY_TREE_NAME:   &'static str = "NocAgentDeploy";
