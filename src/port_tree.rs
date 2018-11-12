@@ -1,7 +1,7 @@
 use std::fmt;
 
 use config::{PathLength, PortNo};
-use name::{TreeID};
+use name::{Name, TreeID};
 use utility::{PortNumber};
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]
@@ -23,10 +23,11 @@ impl PortTree {
     pub fn get_in_port_no(&self) -> &PortNo { &self.in_port_no }
     pub fn get_hops(&self) -> &PathLength { &self.hops }
 }
+
 impl fmt::Display for PortTree {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        let s = format!("PortTree: TreeID {}, root_port {}, in_port {}, hops {}",
-                        self.port_tree_id, *self.root_port_no, *self.in_port_no, self.hops);
+        let s = format!("PortTree: TreeID {} {:8?}, root_port {}, in_port {}, hops {}",
+                        self.port_tree_id, self.port_tree_id.get_uuid(), *self.root_port_no, *self.in_port_no, self.hops);
         write!(f, "{}", s)
     }
 }

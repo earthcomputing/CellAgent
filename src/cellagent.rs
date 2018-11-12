@@ -539,7 +539,7 @@ impl CellAgent {
     */
     pub fn get_tree_entry(&self, tree_id: &TreeID, trace_header: &mut TraceHeader)
             -> Result<RoutingTableEntry, Error> {
-        let traph = self.get_traph(&tree_id, trace_header)?;
+        let traph = self.get_traph(&tree_id.without_root_port_number(), trace_header)?;
         traph.get_tree_entry(&tree_id.get_uuid())
     }
     pub fn stack_tree(&mut self, sender_id: &SenderID, allowed_tree: &AllowedTree, new_tree_id: &TreeID, parent_tree_id: &TreeID,
@@ -799,19 +799,22 @@ impl CellAgent {
         let broken_path = payload.get_path();
         let broken_tree_ids = payload.get_broken_tree_ids();
         if rw_tree_id == self.my_tree_id {
+            println!("Cellagent {}: {} broken path {} broken trees\n{:#?}", self.cell_id, _f, broken_path, broken_tree_ids);
             let lw_port_tree_id = payload.get_lw_port_tree_id();
             let lw_tree_id = lw_port_tree_id.without_root_port_number();
             println!("Cellagent {}: {} Failover success from {} {}", self.cell_id, _f, lw_port_tree_id, lw_port_tree_id.get_uuid());
             let my_traph = self.get_traph(&self.my_tree_id, trace_header)?;
             println!("Cellagent {}: {} port {} lw tree {}\n{}", self.cell_id, _f, *port_no, lw_tree_id, my_traph);
             let broken_port_no = broken_path.get_port_no();
-            let mut broken_element = my_traph.get_element(broken_port_no)?.clone();
-            broken_element.set_status(traph::PortStatus::Pruned);
-            let mut broken_entry = self.get_tree_entry(&self.my_tree_id, trace_header)?;
-            let port_number = broken_port_no.make_port_number(self.no_ports)?;
-            broken_entry.remove_child(port_number);
-            self.update_entry(broken_entry)?;
-            
+            let new_entry = self.update_broken(&my_traph, &self.my_tree_id, port_no, broken_port_no, trace_header)?;
+            for (_uuid, tree) in my_traph.get_stacked_trees().lock().unwrap().iter() {
+                let mut old_entry = tree.get_table_entry();
+                old_entry.set_mask(new_entry.get_mask());
+                self.update_entry(old_entry)?;
+            }
+            for port_tree in my_traph.get_port_trees() {
+                self.update_broken(&my_traph,port_tree.get_port_tree_id(), port_no, broken_port_no, trace_header)?;
+            }
         } else {
             let mut rw_traph = self.own_traph(&rw_tree_id, trace_header)?;
             rw_traph.add_tried_port(&rw_tree_id, port_no);
@@ -874,6 +877,21 @@ impl CellAgent {
         };
         //self.send_msg(&self.connected_tree_id,  &failover_d_msg, mask, trace_header)?;
         Ok(())
+    }
+    fn update_broken(&self, traph: &Traph, port_tree_id: &TreeID, port_no: PortNo, broken_port_no: PortNo, trace_header: &mut TraceHeader)
+            -> Result<RoutingTableEntry, Error> {
+        let _f = "update_broken";
+        let mut broken_element = traph.get_element(broken_port_no)?.clone();
+        broken_element.set_status(traph::PortStatus::Pruned);
+        let mut broken_entry = traph.get_tree_entry(&port_tree_id.without_root_port_number().get_uuid())?;
+        let port_number = broken_port_no.make_port_number(self.no_ports)?;
+        let children: HashSet<PortNumber> = [port_no.make_port_number(self.no_ports)?].iter().cloned().collect();
+        broken_entry.set_uuid(&port_tree_id.get_uuid());
+        broken_entry.add_children(&children);
+        broken_entry.remove_child(port_number);
+        println!("Cellagent {}: {} tree {} entry {}", self.cell_id, _f, self.my_tree_id, broken_entry);
+        self.update_entry(broken_entry)?;
+        Ok(broken_entry)
     }
     pub fn process_failover_d_msg(&mut self, msg: &FailoverDMsg, port_no: PortNo, trace_header: &mut TraceHeader)
             -> Result<(), Error> {
@@ -1229,7 +1247,6 @@ impl CellAgent {
         self.update_entry(self.connected_tree_entry)?;
         let my_tree_id = self.my_tree_id.clone();
         let mut my_traph = self.own_traph(&my_tree_id, trace_header)?;
-        my_traph.set_broken(port_number);
         my_traph.set_broken(port_number);
         let mut broken_base_tree_ids = HashSet::new();
         let mut rw_traph = match self.traphs.lock().unwrap()

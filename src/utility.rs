@@ -220,6 +220,12 @@ impl fmt::Display for TraceType {
 pub fn print_vec<T: fmt::Display>(vector: &Vec<T>) {
     for (count, v) in vector.iter().enumerate() { println!("{:3}: {}", count, v) }
 }
+pub fn print_hash_set<T: fmt::Display + Eq + std::hash::Hash>(hashset: &HashSet<T>) {
+    for v in hashset.iter() { println!("{}", v); }
+}
+pub fn new_hash_set<T: Clone + Eq + std::hash::Hash>(values: Box<[T]>) -> HashSet<T> {
+    values.iter().cloned().collect::<HashSet<T>>()
+}
 pub fn write_err(caller: &str, e: Error) {
     use ::std::io::Write;
     let stderr = &mut ::std::io::stderr();
