@@ -818,21 +818,24 @@ impl CellAgent {
         } else {
             let mut rw_traph = self.own_traph(&rw_tree_id, trace_header)?;
             rw_traph.add_tried_port(&rw_tree_id, port_no);
-            rw_traph.find_new_parent_port(&rw_tree_id, broken_path)
-                .map_or_else(|| -> Result<(), Error> {
+            let trial_port_no = rw_traph.find_new_parent_port(&rw_tree_id, broken_path)
+                .map_or_else(|| -> Result<PortNo, Error> {
                     println!("Cellagent {}: {} Failover failure \n{}", self.cell_id, _f, rw_traph);
                     rw_traph.clear_tried_ports(&rw_tree_id);
                     let sender_id = SenderID::new(&self.get_id(), "CellAgent")?;
                     let mask = Mask::new(port_no.make_port_number(self.no_ports)?);
                     let failover_d_msg = FailoverDMsg::new(&sender_id, FailoverResponse::Failure,
                               rw_port_tree_id, PathLength(CellNo(0)), broken_tree_ids, broken_path);
-                    Ok(())
-                    //self.send_msg(&self.connected_tree_id, &failover_d_msg, mask, trace_header)?;
-                }, | trial_port_no | -> Result<(), Error> {
+                    self.send_msg(&self.connected_tree_id, &failover_d_msg, mask, trace_header)?;
+                    Ok(PortNo(0))
+                }, | trial_port_no | -> Result<PortNo, Error> {
                     println!("Cellagent {}: {} Forward failover on port {} for tree {}", self.cell_id, _f, *trial_port_no, rw_port_tree_id);
-                    let mask = Mask::new(trial_port_no.make_port_number(self.no_ports)?);
-                    self.send_msg(&self.connected_tree_id, msg, mask, trace_header)
+                    Ok(trial_port_no)
                 })?;
+            if trial_port_no != PortNo(0) {
+                let mask = Mask::new(trial_port_no.make_port_number(self.no_ports)?);
+                self.send_msg(&self.connected_tree_id, msg, mask, trace_header)?;
+            }
             self.insert_traph(&rw_tree_id, rw_traph, trace_header)?;
         }
         let broken_path = payload.get_path();
