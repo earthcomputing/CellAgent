@@ -827,11 +827,11 @@ impl CellAgent {
             self.send_msg(&self.connected_tree_id, &failover_d_msg, mask, trace_header)?;
         } else {
             let mut rw_traph = self.own_traph(&rw_tree_id, trace_header)?;
-            rw_traph.add_tried_port(&rw_tree_id, port_no);
+            rw_traph.add_tried_port(&rw_port_tree_id, port_no);
             match rw_traph.find_new_parent_port(&rw_tree_id, broken_path) {
                 None => {
                     println!("Cellagent {}: {} Failover failure \n{}", self.cell_id, _f, rw_traph);
-                    rw_traph.clear_tried_ports(&rw_tree_id);
+                    rw_traph.clear_tried_ports(&rw_port_tree_id);
                     let mask = Mask::new(port_no.make_port_number(self.no_ports)?);
                     let failover_d_msg = FailoverDMsg::new(sender_id, FailoverResponse::Failure,
                                                            rw_port_tree_id, PathLength(CellNo(0)), broken_tree_ids, broken_path);
