@@ -2,9 +2,7 @@
 <project version="4">
   <component name="ChangeListManager">
     <list default="true" id="eee480a2-146d-44ab-9647-cef5ea39b250" name="Default" comment="">
-      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/cellagent.rs" beforeDir="false" afterPath="$PROJECT_DIR$/src/cellagent.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/traph.rs" beforeDir="false" afterPath="$PROJECT_DIR$/src/traph.rs" afterDir="false" />
     </list>
     <ignored path="$PROJECT_DIR$/target/" />
     <ignored path="$PROJECT_DIR$/out/" />
@@ -36,14 +34,14 @@
       </usages-collector>
       <usages-collector id="statistics.file.extensions.edit">
         <counts>
-          <entry key="rs" value="100645" />
+          <entry key="rs" value="100655" />
           <entry key="toml" value="225" />
         </counts>
       </usages-collector>
       <usages-collector id="statistics.file.types.edit">
         <counts>
           <entry key="Android RenderScript" value="1" />
-          <entry key="Rust" value="100644" />
+          <entry key="Rust" value="100654" />
           <entry key="TOML file" value="225" />
         </counts>
       </usages-collector>
@@ -102,11 +100,11 @@
           </provider>
         </entry>
       </file>
-      <file pinned="false" current-in-tab="false">
+      <file pinned="false" current-in-tab="true">
         <entry file="file://$PROJECT_DIR$/src/cellagent.rs">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="356">
-              <caret line="885" column="56" selection-start-line="885" selection-start-column="56" selection-end-line="885" selection-end-column="56" />
+            <state relative-caret-position="279">
+              <caret line="829" column="63" lean-forward="true" selection-start-line="829" selection-start-column="63" selection-end-line="829" selection-end-column="63" />
               <folding>
                 <element signature="e#17194#17686#0" />
                 <element signature="e#18025#18790#1" />
@@ -150,11 +148,11 @@
           </provider>
         </entry>
       </file>
-      <file pinned="false" current-in-tab="true">
+      <file pinned="false" current-in-tab="false">
         <entry file="file://$PROJECT_DIR$/src/traph.rs">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="416">
-              <caret line="220" column="79" selection-start-line="220" selection-start-column="79" selection-end-line="220" selection-end-column="79" />
+            <state relative-caret-position="168">
+              <caret line="84" column="15" selection-start-line="84" selection-start-column="15" selection-end-line="84" selection-end-column="15" />
             </state>
           </provider>
         </entry>
@@ -224,7 +222,6 @@
   </component>
   <component name="FindInProjectRecents">
     <findStrings>
-      <find>Blu</find>
       <find>---&gt;</find>
       <find>forwarding manifest leafward</find>
       <find>TraceHeaderParams</find>
@@ -254,6 +251,7 @@
       <find>traph.clone</find>
       <find>Entry::</find>
       <find>ok_or</find>
+      <find>add_tri</find>
     </findStrings>
     <replaceStrings>
       <replace>Arc::</replace>
@@ -305,15 +303,15 @@
         <option value="$PROJECT_DIR$/src/utility.rs" />
         <option value="$PROJECT_DIR$/src/port_tree.rs" />
         <option value="$PROJECT_DIR$/src/dal.rs" />
-        <option value="$PROJECT_DIR$/src/cellagent.rs" />
         <option value="$PROJECT_DIR$/src/traph.rs" />
+        <option value="$PROJECT_DIR$/src/cellagent.rs" />
       </list>
     </option>
   </component>
   <component name="ProjectFrameBounds">
-    <option name="x" value="226" />
-    <option name="y" value="-972" />
-    <option name="width" value="1487" />
+    <option name="x" value="305" />
+    <option name="y" value="-954" />
+    <option name="width" value="1388" />
     <option name="height" value="924" />
   </component>
   <component name="ProjectView">
@@ -345,7 +343,7 @@
   <component name="PropertiesComponent">
     <property name="SearchEverywhereHistoryKey" value="&#9;FILE&#9;file:///Users/alan/Documents/Eclipse/multicell/src/packet_engine.rs&#10;{&#9;null&#9;null" />
     <property name="ToolWindowCargo.ShowToolbar" value="false" />
-    <property name="com.android.tools.idea.instantapp.provision.ProvisionBeforeRunTaskProvider.myTimeStamp" value="1542155043002" />
+    <property name="com.android.tools.idea.instantapp.provision.ProvisionBeforeRunTaskProvider.myTimeStamp" value="1542217021360" />
     <property name="org.rust.cargo.project.model.PROJECT_DISCOVERY" value="true" />
     <property name="run.code.analysis.last.selected.profile" value="pProject Default" />
     <property name="settings.editor.selected.configurable" value="configurable.group.tools" />
@@ -448,10 +446,10 @@
     </todo-panel>
   </component>
   <component name="ToolWindowManager">
-    <frame x="226" y="-972" width="1487" height="924" extended-state="0" />
+    <frame x="305" y="-954" width="1388" height="924" extended-state="0" />
     <editor active="true" />
     <layout>
-      <window_info content_ui="combo" id="Project" order="0" visible="true" weight="0.13079585" />
+      <window_info content_ui="combo" id="Project" order="0" visible="true" weight="0.14041604" />
       <window_info id="Image Layers" order="1" />
       <window_info id="Capture Tool" order="2" />
       <window_info id="Designer" order="3" />
@@ -459,7 +457,7 @@
       <window_info id="Favorites" order="5" side_tool="true" />
       <window_info anchor="bottom" id="Message" order="0" />
       <window_info anchor="bottom" id="Find" order="1" sideWeight="0.4489051" visible="true" weight="0.22968198" />
-      <window_info active="true" anchor="bottom" x="-282" y="-903" width="577" height="781" id="Run" internal_type="FLOATING" order="2" type="FLOATING" visible="true" weight="0.32941177" />
+      <window_info active="true" anchor="bottom" x="-221" y="-917" width="585" height="781" id="Run" internal_type="FLOATING" order="2" type="FLOATING" visible="true" weight="0.32941177" />
       <window_info anchor="bottom" id="Debug" order="3" weight="0.4" />
       <window_info anchor="bottom" id="Cvs" order="4" weight="0.25" />
       <window_info anchor="bottom" id="Inspection" order="5" weight="0.4" />
@@ -478,7 +476,7 @@
       <window_info anchor="right" id="Capture Analysis" order="6" />
       <window_info anchor="right" id="Maven Projects" order="7" />
       <window_info anchor="right" id="Theme Preview" order="8" />
-      <window_info anchor="right" id="Structure" order="9" sideWeight="0.50151515" side_tool="true" visible="true" weight="0.121107265" />
+      <window_info anchor="right" id="Structure" order="9" sideWeight="0.50151515" side_tool="true" visible="true" weight="0.13001485" />
     </layout>
     <layout-to-restore>
       <window_info content_ui="combo" id="Project" order="0" visible="true" weight="0.119446464" />
@@ -805,19 +803,6 @@
         </state>
       </provider>
     </entry>
-    <entry file="file://$PROJECT_DIR$/src/cellagent.rs">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="356">
-          <caret line="885" column="56" selection-start-line="885" selection-start-column="56" selection-end-line="885" selection-end-column="56" />
-          <folding>
-            <element signature="e#17194#17686#0" />
-            <element signature="e#18025#18790#1" />
-            <element signature="e#93047#93048#0" expanded="true" />
-            <element signature="e#93099#93100#0" expanded="true" />
-          </folding>
-        </state>
-      </provider>
-    </entry>
     <entry file="file://$PROJECT_DIR$/src/routing_table_entry.rs">
       <provider selected="true" editor-type-id="text-editor">
         <state relative-caret-position="188">
@@ -827,8 +812,21 @@
     </entry>
     <entry file="file://$PROJECT_DIR$/src/traph.rs">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="416">
-          <caret line="220" column="79" selection-start-line="220" selection-start-column="79" selection-end-line="220" selection-end-column="79" />
+        <state relative-caret-position="168">
+          <caret line="84" column="15" selection-start-line="84" selection-start-column="15" selection-end-line="84" selection-end-column="15" />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/src/cellagent.rs">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="279">
+          <caret line="829" column="63" lean-forward="true" selection-start-line="829" selection-start-column="63" selection-end-line="829" selection-end-column="63" />
+          <folding>
+            <element signature="e#17194#17686#0" />
+            <element signature="e#18025#18790#1" />
+            <element signature="e#93047#93048#0" expanded="true" />
+            <element signature="e#93099#93100#0" expanded="true" />
+          </folding>
         </state>
       </provider>
     </entry>
