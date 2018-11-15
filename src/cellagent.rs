@@ -126,6 +126,9 @@ impl CellAgent {
         let control_tree_id = self.control_tree_id.clone();
         let connected_tree_id = self.connected_tree_id.clone();
         let my_tree_id = self.my_tree_id.clone();
+        self.tree_id_map.insert(control_tree_id.get_uuid(), control_tree_id.clone());
+        self.tree_id_map.insert(connected_tree_id.get_uuid(), connected_tree_id.clone());
+        self.tree_id_map.insert(my_tree_id.get_uuid(), my_tree_id.clone());
         self.tree_map.insert(control_tree_id.get_uuid(), control_tree_id.get_uuid());
         self.tree_map.insert(connected_tree_id.get_uuid(), connected_tree_id.get_uuid());
         self.tree_map.insert(my_tree_id.get_uuid(), my_tree_id.get_uuid());
@@ -370,6 +373,7 @@ impl CellAgent {
                 if traph.get_port_trees().len() == 1 {
                     let mut new_entry = entry;
                     new_entry.set_tree_id(&first_port_tree_id);
+                    self.tree_id_map.insert(first_port_tree_id.get_uuid(), first_port_tree_id.clone());
                     self.update_entry(new_entry).context(CellagentError::Chain { func_name: _f, comment: S("first_port_tree_id") })?;
                 };
                 // TODO: Need to update stacked tree ids to get port tree ids
@@ -595,6 +599,10 @@ impl CellAgent {
     }
     pub fn update_entry(&self, entry: RoutingTableEntry) -> Result<(), Error> {
         let _f = "update_entry";
+        if *entry.get_parent() != 0 {
+            let tree_id = self.tree_id_map.get(&entry.get_uuid()).unwrap();
+            println!("Cellagent {}: {} tree {} entry {}", self.cell_id, _f, tree_id, entry);
+        }
         self.ca_to_cm.send(CaToCmBytes::Entry(entry)).context(CellagentError::Chain { func_name: _f, comment: S("")})?;
         Ok(())
     }
@@ -717,6 +725,7 @@ impl CellAgent {
         let hops = payload.get_hops();
         let path = payload.get_path();
         let new_tree_id = payload.get_tree_id();
+        self.tree_id_map.insert(new_tree_id.get_uuid(), new_tree_id.clone());
         let tree_seen = self.quench_simple(new_tree_id);
         let port_tree_seen = self.quench_root_port(new_tree_id, path);
         let quench = match QUENCH {
@@ -735,12 +744,10 @@ impl CellAgent {
             let _ = dal::add_to_trace(trace_header, TraceType::Debug, trace_params, &trace, _f);
             if DEBUG_OPTIONS.process_msg { println!("Cellagent {}: {} tree_id {}, port_number {} {}", self.cell_id, _f, new_tree_id, port_number, msg);  }
         }
-        let mut children = HashSet::new();
-        children.insert(port_number);
         if !port_tree_seen {
             let status = if tree_seen { traph::PortStatus::Pruned } else { traph::PortStatus::Parent };
             self.update_traph(new_tree_id, port_number, status, &gvm_equation,
-                              children, hops, path, trace_header).context(CellagentError::Chain { func_name: "process_ca", comment: S("DiscoverMsg") })?;
+                              HashSet::new(), hops, path, trace_header).context(CellagentError::Chain { func_name: "process_ca", comment: S("DiscoverMsg") })?;
         }
        if quench { return Ok(()); }
         self.update_base_tree_map(new_tree_id, new_tree_id, trace_header);
@@ -876,7 +883,7 @@ impl CellAgent {
                 let port_number = port_no.make_port_number(self.no_ports)?;
                 let mut traph = self.own_traph(&tree_id, trace_header).context(CellagentError::Chain { func_name: _f, comment: S("") })?;
                 let old_parent_entry = traph.get_tree_entry(&tree_id.get_uuid())?;
-                println!("Cellagent {}: {} tree id {} old entry {}", self.cell_id, _f, tree_id, old_parent_entry);
+                println!("Cellagent {}: {} tree id {:?} old entry {}", self.cell_id, _f, tree_id, old_parent_entry);
                 let old_parent = old_parent_entry.get_parent();
                 let failover_port = self.failover_reply_port
                     .get(port_tree_id)
@@ -1185,6 +1192,7 @@ impl CellAgent {
             eqns.insert(GvmEqn::Save("false"));
             let gvm_eqn = GvmEquation::new(eqns, Vec::new());
             let new_tree_id = self.my_tree_id.add_component("Noc").context(CellagentError::Chain { func_name: "port_connected", comment: S(self.cell_id.clone()) })?;
+            self.tree_id_map.insert(new_tree_id.get_uuid(), new_tree_id.clone());
             let port_number = port_no.make_port_number(self.no_ports).context(CellagentError::Chain { func_name: "port_connected", comment: S(self.cell_id.clone()) })?;
             let _ = self.update_traph(&new_tree_id, port_number, traph::PortStatus::Parent,
                                           &gvm_eqn, HashSet::new(), PathLength(CellNo(1)), Path::new0(),
