@@ -218,36 +218,11 @@ impl Traph {
         table_entry.set_inuse();
         if port_status == PortStatus::Parent {
             table_entry.set_parent(port_number);
-            // TODO: See why I need this to make sure parent isn't also a child
-            table_entry.remove_child(port_number);
         };
         tree.set_table_entry(table_entry);
         stacked_trees.insert(tree_id.get_uuid(), tree);
         let element = TraphElement::new(true, port_no, port_status, hops, path);
         // println!("update_element2 - {}", element);
-        self.elements[*port_no as usize] = element; // Cannot fail because self.elements has MAX_PORTS elements
-        Ok(table_entry)
-    }
-    // TODO: Figure out how to get rid of repeated code in fn new_element()
-    pub fn new_element(&mut self, tree_id: &TreeID, port_number: PortNumber, port_status: PortStatus,
-                       children: &HashSet<PortNumber>, hops: PathLength, path: Path)
-                       -> Result<RoutingTableEntry, Error> {
-        let _f = "new_element";
-        // println!("new_element - {}", self);
-        // dumpstack();
-        let port_no = port_number.get_port_no();
-        let mut stacked_trees = self.stacked_trees.lock().unwrap();
-        let mut tree = stacked_trees.get(&tree_id.without_root_port_number().get_uuid()).cloned()
-            .ok_or_else(|| -> Error { TraphError::Tree { func_name: _f, cell_id: self.cell_id.clone(), tree_uuid: tree_id.get_uuid() }.into() })?;
-        let mut table_entry = RoutingTableEntry::default();
-        table_entry.set_parent(port_number);
-        table_entry.set_tree_id(tree_id);
-        table_entry.add_children(children);
-        table_entry.set_inuse();
-        tree.set_table_entry(table_entry);
-        stacked_trees.insert(tree_id.get_uuid(), tree);
-        let element = TraphElement::new(true, port_no, port_status, hops, path);
-        // println!("new_element2 - {}", element);
         self.elements[*port_no as usize] = element; // Cannot fail because self.elements has MAX_PORTS elements
         Ok(table_entry)
     }
