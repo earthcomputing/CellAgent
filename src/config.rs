@@ -8,7 +8,7 @@ pub const SCHEMA_VERSION: &'static str = "0.1";
 pub const REPO: &'static str = "CellAgent";
 pub const CENTRAL_TREE: &'static str = "Tree:C:2";
 // Sizes
-pub const NCELLS: CellNo    = CellNo(3);
+pub const NCELLS: CellNo    = CellNo(10);
 pub const NPORTS: PortNo    = PortNo(8);
 pub const NLINKS: LinkNo    = LinkNo(CellNo(40));
 pub const MAX_PORTS: PortNo = PortNo(9);          // Limit on number of ports per cell
@@ -17,7 +17,7 @@ pub const PACKET_MIN: usize = 64;
 pub const PACKET_MAX: usize = 9000;
 // Control
 pub const CONTINUE_ON_ERROR: bool = false; // Don't close channel following an error if true
-pub const AUTO_BREAK: usize = 0; // Set to index of link to break when debugging broken link with VSCode, else 0
+pub const AUTO_BREAK: usize = 1; // Set to index of link to break when debugging broken link with VSCode, else 0
 #[derive(Debug, Copy, Clone)]
 pub enum Quench { Simple, RootPort }
 pub const QUENCH: Quench = Quench::RootPort;

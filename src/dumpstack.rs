@@ -1,9 +1,4 @@
 use std::fmt;
-use std::collections::{HashMap, HashSet};
-use std::sync::{Arc, Mutex};
-
-use serde_json;
-//use uuid::Uuid;
 
 extern crate backtrace;
 
@@ -14,7 +9,7 @@ pub struct CFrame {
     a : u64
 }
 impl CFrame {
-pub fn new(path: String, name: String, ip: u64) -> CFrame {
+    pub fn new(path: String, name: String, ip: u64) -> CFrame {
     CFrame { p: path, f: name, a: ip }
 }
 }

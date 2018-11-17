@@ -5,6 +5,7 @@ use std::thread;
 use std::collections::{HashMap, HashSet};
 use std::collections::hash_map::Entry;
 
+use either::{Either, Left, Right};
 use serde;
 use serde_json;
 
@@ -34,8 +35,7 @@ use traph::{Traph};
 use tree::Tree;
 use uptree_spec::{AllowedTree, Manifest};
 use utility::{BASE_TENANT_MASK, DEFAULT_USER_MASK, TRACE_HEADER, Mask, Path,
-              PortNumber, S, TraceHeader, TraceHeaderParams, TraceType, UtilityError,
-              new_hash_set};
+              PortNumber, S, TraceHeader, TraceHeaderParams, TraceType, UtilityError};
 //use uuid::Uuid;
 use uuid_ec::Uuid;
 use vm::VirtualMachine;
@@ -45,7 +45,7 @@ use failure::{Error, ResultExt};
 type BorderTreeIDMap = HashMap<PortNumber, (SenderID, TreeID)>;
 pub type SavedDiscover = DiscoverMsg;
 // The following is a hack, because I can't get thread::spawn to accept Box<Message>
-pub type SavedMsg = (Option<ApplicationMsg>, Option<ManifestMsg>);
+pub type SavedMsg = Either<ApplicationMsg, ManifestMsg>;
 pub type SavedStack = StackTreeMsg;
 pub type SavedMsgs = HashMap<TreeID, Vec<SavedMsg>>;
 pub type SavedStackMsgs = HashMap<TreeID, Vec<SavedStack>>;
@@ -211,22 +211,22 @@ impl CellAgent {
         }
         saved_msgs
     }
-    // The options argument is a hack, because I can't get thread::spawn to accept Box<Message>
-    pub fn add_saved_msg(&mut self, tree_id: &TreeID, _: Mask, options: (Option<ApplicationMsg>, Option<ManifestMsg>),
+    // The either argument is a hack, because I can't get thread::spawn to accept Box<Message>
+    pub fn add_saved_msg(&mut self, tree_id: &TreeID, _: Mask, either: Either<ApplicationMsg, ManifestMsg>,
                          trace_header: &mut TraceHeader) -> Result<(), Error> {
-        let options_clone = options.clone(); // Needed for trace
         let mut locked = self.saved_msgs.lock().unwrap();
         let mut saved_msgs = locked.
             get(tree_id)
             .cloned()
             .unwrap_or(Vec::new());
-        saved_msgs.push(options);
+        saved_msgs.push(either.clone()); // Clone needed for trace
         if DEBUG_OPTIONS.trace_all || DEBUG_OPTIONS.saved_msgs {   // Debug print
             let _f = "add_saved_msg";
+            let pair = (either.clone().left(), either.clone().right());
             let ref trace_params = TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "ca_add_saved_msg" };
-            let trace = json! ({ "cell_id": &self.cell_id, "tree_id": tree_id, "no_saved": saved_msgs.len(), "msg": &options_clone });
+            let trace = json! ({ "cell_id": &self.cell_id, "tree_id": tree_id, "no_saved": saved_msgs.len(), "msg": &pair });
             let _ = dal::add_to_trace(trace_header, TraceType::Debug, trace_params, &trace, _f);
-            if DEBUG_OPTIONS.saved_msgs { println!("Cellagent {}: {} saved_msgs {} for tree {} msg {:?}", self.cell_id, _f, saved_msgs.len(), tree_id, options_clone); }
+            if DEBUG_OPTIONS.saved_msgs { println!("Cellagent {}: {} saved_msgs {} for tree {} msg {:?}", self.cell_id, _f, saved_msgs.len(), tree_id, &pair); }
         }
         locked.insert(tree_id.clone(), saved_msgs);
         Ok(())
@@ -599,10 +599,6 @@ impl CellAgent {
     }
     pub fn update_entry(&self, entry: RoutingTableEntry) -> Result<(), Error> {
         let _f = "update_entry";
-        if *entry.get_parent() != 0 {
-            let tree_id = self.tree_id_map.get(&entry.get_uuid()).unwrap();
-            println!("Cellagent {}: {} tree {} entry {}", self.cell_id, _f, tree_id, entry);
-        }
         self.ca_to_cm.send(CaToCmBytes::Entry(entry)).context(CellagentError::Chain { func_name: _f, comment: S("")})?;
         Ok(())
     }
@@ -713,7 +709,7 @@ impl CellAgent {
             let _ = dal::add_to_trace(trace_header, TraceType::Debug, trace_params, &trace, _f);
             if DEBUG_OPTIONS.process_msg { println!("Cellagent {}: {} tree {} port {} save {} msg {}", self.cell_id, _f, tree_id, *port_no, save, msg); }
         }
-        if save && msg.is_leafward() { self.add_saved_msg(tree_id, user_mask, (Some(msg.clone()), None), trace_header)?; }
+        if save && msg.is_leafward() { self.add_saved_msg(tree_id, user_mask, Left(msg.clone()), trace_header)?; }
         Ok(())
     }
     pub fn process_discover_msg(&mut self, msg: &DiscoverMsg, port_no: PortNo,
@@ -812,20 +808,18 @@ impl CellAgent {
         let broken_tree_ids = payload.get_broken_tree_ids();
         if rw_tree_id == self.my_tree_id {
             //println!("Cellagent {}: {} broken path {} broken trees\n{:#?}", self.cell_id, _f, broken_path, broken_tree_ids);
-            let lw_port_tree_id = payload.get_lw_port_tree_id();
-            let lw_tree_id = lw_port_tree_id.without_root_port_number();
             //println!("Cellagent {}: {} Failover success from {} {}", self.cell_id, _f, lw_port_tree_id, lw_port_tree_id.get_uuid());
             let my_traph = self.get_traph(&self.my_tree_id, trace_header)?;
             //println!("Cellagent {}: {} port {} lw tree {}\n{}", self.cell_id, _f, *port_no, lw_tree_id, my_traph);
             let broken_port_no = broken_path.get_port_no();
-            let new_entry = self.update_broken(&my_traph, &self.my_tree_id, port_no, broken_port_no, trace_header)?;
+            let new_entry = self.update_broken(&my_traph, &self.my_tree_id, port_no, broken_port_no)?;
             for (_uuid, tree) in my_traph.get_stacked_trees().lock().unwrap().iter() {
                 let mut old_entry = tree.get_table_entry();
                 old_entry.set_mask(new_entry.get_mask());
                 self.update_entry(old_entry)?;
             }
             for port_tree in my_traph.get_port_trees() {
-                self.update_broken(&my_traph,port_tree.get_port_tree_id(), port_no, broken_port_no, trace_header)?;
+                self.update_broken(&my_traph,port_tree.get_port_tree_id(), port_no, broken_port_no)?;
             }
             let hops = PathLength(CellNo(0));
             let mask = Mask::new(port_no.make_port_number(self.no_ports)?);
@@ -854,7 +848,7 @@ impl CellAgent {
         }
         Ok(())
     }
-    fn update_broken(&self, traph: &Traph, port_tree_id: &TreeID, port_no: PortNo, broken_port_no: PortNo, trace_header: &mut TraceHeader)
+    fn update_broken(&self, traph: &Traph, port_tree_id: &TreeID, port_no: PortNo, broken_port_no: PortNo)
             -> Result<RoutingTableEntry, Error> {
         let _f = "update_broken";
         let mut broken_element = traph.get_element(broken_port_no)?.clone();
@@ -872,9 +866,9 @@ impl CellAgent {
     pub fn process_failover_d_msg(&mut self, msg: &FailoverDMsg, port_no: PortNo, trace_header: &mut TraceHeader)
             -> Result<(), Error> {
         let _f = "process_failover_d_msg";
-        let header = msg.get_header();
         let payload = msg.get_payload();
         let port_tree_id = payload.get_rw_tree_id();
+        self.tree_id_map.insert(port_tree_id.get_uuid(), port_tree_id.clone());
         match payload.get_response() {
             FailoverResponse::Success => {
                 let tree_id = port_tree_id.without_root_port_number();
@@ -910,7 +904,6 @@ impl CellAgent {
     pub fn process_hello_msg(&mut self, msg: &HelloMsg, port_no: PortNo, trace_header: &mut TraceHeader)
             -> Result<(), Error> {
         let _f = "process_hello_msg";
-        let header = msg.get_header();
         let payload = msg.get_payload();
         let neighbor_cell_id = payload.get_cell_id();
         let neigbor_port_no = payload.get_port_no();
@@ -950,7 +943,7 @@ impl CellAgent {
             let _ = dal::add_to_trace(trace_header, TraceType::Debug, trace_params, &trace, _f);
             if DEBUG_OPTIONS.process_msg { println!("Cellagent {}: {} tree {} save {} port {} manifest {}", self.cell_id, _f, msg_tree_id, save, *port_no, manifest.get_id()); }
         }
-        if save { self.add_saved_msg(tree_id, user_mask, (None, Some(msg.clone())), trace_header)?; }
+        if save { self.add_saved_msg(tree_id, user_mask, Right(msg.clone()), trace_header)?; }
         Ok(())
     }
     pub fn process_stack_tree_msg(&mut self, msg: &StackTreeMsg, port_no: PortNo, msg_tree_id: &TreeID,
@@ -1046,7 +1039,7 @@ impl CellAgent {
             if DEBUG_OPTIONS.process_msg { println!("Cellagent {}: {} sending on tree {} application msg {}", self.cell_id, _f, tree_id, msg); }
         }
         self.send_msg(tree_id, &msg, DEFAULT_USER_MASK, trace_header)?;
-        if msg.is_leafward() { self.add_saved_msg(tree_id, DEFAULT_USER_MASK, (Some(msg), None), trace_header)?; }
+        if msg.is_leafward() { self.add_saved_msg(tree_id, DEFAULT_USER_MASK, Left(msg), trace_header)?; }
         Ok(tree_map.clone())
     }
     fn tcp_delete_tree(&self, _sender_id: &SenderID, _serialized: &str, _direction: MsgDirection,
@@ -1083,7 +1076,7 @@ impl CellAgent {
         }
         let mask = self.get_mask(deploy_tree_id, trace_header)?;
         self.send_msg(deploy_tree_id, &msg, mask.or(Mask::port0()), trace_header).context(CellagentError::Chain { func_name: _f, comment: S(self.cell_id.clone()) + " send manifest" })?;
-        self.add_saved_msg(deploy_tree_id, mask, (None, Some(msg)), trace_header)?;
+        self.add_saved_msg(deploy_tree_id, mask, Right(msg), trace_header)?;
         Ok(tree_map.clone())
     }
     fn tcp_query(&self, _sender_id: &SenderID, _serialized: &str, _direction: MsgDirection,
@@ -1320,13 +1313,10 @@ impl CellAgent {
         let _f = "forward_saved";
         let saved_msgs = self.get_saved_msgs(&tree_id, trace_header);
         for saved_msg in saved_msgs {
-            match saved_msg.0 {
-                Some(msg) => self.forward_saved_application(tree_id, mask, &msg, trace_header)?,
-                None => ()
-            }
-            match saved_msg.1 {
-                Some(msg) => self.forward_saved_manifest(tree_id, mask, &msg, trace_header)?,
-                None => ()
+            if saved_msg.is_left() { // TODO: Make sure unwrap() is safe
+                self.forward_saved_application(tree_id, mask, &saved_msg.left().unwrap(), trace_header)?;
+            } else {
+                self.forward_saved_manifest(tree_id, mask, &saved_msg.right().unwrap(), trace_header)?;
             }
         }
         Ok(())

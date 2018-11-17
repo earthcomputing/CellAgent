@@ -48,7 +48,7 @@ impl Traph {
         // dumpstack();
         Ok(cloth)
     }
-    pub fn get_cell_id(&self) -> &CellID { &self.cell_id }
+    pub fn _get_cell_id(&self) -> &CellID { &self.cell_id }
     pub fn get_tree(&self, tree_uuid: &Uuid) -> Result<Tree, Error> {
          self.stacked_trees.lock().unwrap().get(tree_uuid).cloned()
             .ok_or(TraphError::Tree { cell_id: self.cell_id.clone(), func_name: "get_tree_entry", tree_uuid: *tree_uuid }.into())

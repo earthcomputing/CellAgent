@@ -2,6 +2,7 @@
 //#![warn(rust_2018_idioms)]
 #![recursion_limit="1024"]
 extern crate chrono;
+extern crate either;
 extern crate eval;
 #[macro_use] extern crate failure;
 extern crate futures;

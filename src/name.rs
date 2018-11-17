@@ -78,9 +78,9 @@ impl TreeID {
         uuid.remove_port_no();
         TreeID { name: S(self.get_name()), uuid }
     }
-    pub fn get_port_no(&self) -> PortNo { self.uuid.get_port_no() }
-    pub fn transfer_port_number(&mut self, other: &TreeID) {
-        self.uuid.set_port_no(other.get_port_no());
+    pub fn _get_port_no(&self) -> PortNo { self.uuid.get_port_no() }
+    pub fn _transfer_port_number(&mut self, other: &TreeID) {
+        self.uuid.set_port_no(other._get_port_no());
     }
 }
 impl Name for TreeID {
