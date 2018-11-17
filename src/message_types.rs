@@ -60,13 +60,13 @@ pub type PeFromPort = mpsc::Receiver<PortToPePacket>;
 pub enum PeToCmPacket { Status((PortNo, bool, PortStatus)), Packet((PortNo, Packet)), Tcp((PortNo, TCP)) }
 pub type PeToCm = mpsc::Sender<PeToCmPacket>;
 pub type CmFromPe = mpsc::Receiver<PeToCmPacket>;
-pub type PeCmError = mpsc::SendError<PeToCmPacket>;
+//pub type PeCmError = mpsc::SendError<PeToCmPacket>;
 // Cmodel to CellAgent
 #[derive(Debug, Clone, Serialize)]
 pub enum CmToCaBytes { Status((PortNo, bool, PortStatus)), Bytes((PortNo, bool, Uuid, ByteArray)), Tcp((PortNo, TCP)) }
 pub type CmToCa = mpsc::Sender<CmToCaBytes>;
 pub type CaFromCm = mpsc::Receiver<CmToCaBytes>;
-pub type CmCaError = mpsc::SendError<CmToCaBytes>;
+//pub type CmCaError = mpsc::SendError<CmToCaBytes>;
 // Port to Noc World
 pub type PortToNocMsg = TCP;
 pub type PortToNoc = mpsc::Sender<PortToNocMsg>;

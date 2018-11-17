@@ -99,7 +99,7 @@ impl Datacenter {
         } 
         Ok(link_handles)
     }
-    pub fn get_links(&self) -> &Vec<Link> { &self.links }
+    pub fn _get_links(&self) -> &Vec<Link> { &self.links }
     pub fn get_links_mut(&mut self) -> &mut Vec<Link> { &mut self.links }
     pub fn get_cell_ids(&self) -> Vec<&CellID> {
         self.cells.iter().map(|cell| cell.get_id()).collect::<Vec<_>>()

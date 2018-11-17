@@ -1,5 +1,5 @@
 use std::thread;
-use std::thread::{JoinHandle, spawn};
+use std::thread::{JoinHandle};
 use std::sync::mpsc::channel;
 use std::collections::{HashMap, HashSet};
 
@@ -14,7 +14,7 @@ use message::{MsgDirection, TcpMsgType, TreeNameMsg};
 use message_types::{NocToPort, NocFromPort, PortToNoc, PortFromNoc, NocFromOutside, NocToOutside};
 use nalcell::CellConfig;
 use uptree_spec::{AllowedTree, ContainerSpec, Manifest, UpTreeSpec, VmSpec};
-use utility::{TRACE_HEADER, S, TraceHeader, TraceHeaderParams, TraceType, write_err};
+use utility::{S, TraceHeader, TraceHeaderParams, TraceType, write_err};
 
 const NOC_MASTER_DEPLOY_TREE_NAME:  &'static str = "NocMasterDeploy";
 const NOC_AGENT_DEPLOY_TREE_NAME:   &'static str = "NocAgentDeploy";
@@ -35,9 +35,9 @@ impl Noc {
                       trace_header: &mut TraceHeader) ->
             Result<(Datacenter, Vec<JoinHandle<()>>), Error> {
         let _f = "initialize";
-        let (rows, cols, geometry) = get_geometry();
         if TRACE_OPTIONS.all || TRACE_OPTIONS.noc {
             // For reasons I can't understand, the trace record doesn't show up when generated from main.
+            let (rows, cols, _geometry) = get_geometry();
             let ref trace_params = TraceHeaderParams { module: "src/main.rs", line_no: line!(), function: "MAIN", format: "trace_schema" };
             let trace = json!({ "schema_version": SCHEMA_VERSION, "ncells": NCELLS, "rows": rows, "cols": cols });
             let _ = dal::add_to_trace(trace_header, TraceType::Trace, trace_params,&trace, _f);
@@ -95,7 +95,7 @@ impl Noc {
                 let trace = json!({ "id": self.get_name(), "cmd": cmd });
                 let _ = dal::add_to_trace(trace_header, TraceType::Trace, trace_params,&trace, _f);
             }
-            let (is_ait, allowed_tree, msg_type, direction, bytes) = cmd;
+            let (_is_ait, _allowed_tree, msg_type, _direction, bytes) = cmd;
             match msg_type {
                 TcpMsgType::TreeName => {
                     let serialized = ::std::str::from_utf8(&bytes)?;
@@ -291,8 +291,6 @@ pub enum NocError {
 //    AllowedTree { func_name: &'static str, tree_name: String },
 //    #[fail(display = "NocError::Message {}: Message type {} is malformed {}", func_name, msg_type, message)]
 //    Message { func_name: &'static str, msg_type: MsgType, message: String },
-    #[fail(display = "NocError::Kafka {}: {} ", func_name, error)]
-    Kafka { func_name: &'static str, error: String },
     #[fail(display = "NocError::MsgType {}: {} is not a valid message type for the NOC", func_name, msg_type)]
     MsgType { func_name: &'static str, msg_type: TcpMsgType },
 //    #[fail(display = "NocError::Tree {}: {} is not a valid index in the NOC's list of tree names", func_name, index)]

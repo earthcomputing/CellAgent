@@ -184,8 +184,8 @@ fn timestamp() -> u64 {
     let t = timespec.sec as f64 + (timespec.nsec as f64/1000./1000./1000.);
     (t*1000.0*1000.0) as u64
 }
-pub fn sleep(n: usize) { // Sleep for n seconds
-    let sleep_time = ::std::time::Duration::from_secs(4);
+pub fn sleep(n: u64) { // Sleep for n seconds
+    let sleep_time = ::std::time::Duration::from_secs(n);
     thread::sleep(sleep_time);
 }
 pub struct TraceHeaderParams {

@@ -63,8 +63,8 @@ impl NocMaster {
         self.listen_vm(container_from_vm, trace_header)?;
         let msg = S("Hello From Master");
         println!("---> Uncommment in service::NocMaster to send: Service {} sending {}", self.container_id, msg);
-        let bytes = ByteArray(msg.into_bytes());
-        let is_ait = false;
+        //let bytes = ByteArray(msg.into_bytes());
+        //let is_ait = false;
         //self.container_to_vm.send((is_ait, AllowedTree::new("NocMasterAgent"), TcpMsgType::Application, MsgDirection::Leafward, bytes))?;
         Ok(())
     }
@@ -92,7 +92,7 @@ impl NocMaster {
             let _ = dal::add_to_trace(trace_header, TraceType::Trace, trace_params, &trace, _f);
         }
         loop {
-            let (is_ait, msg) = container_from_vm.recv().context("NocMaster container_from_vm").context(ServiceError::Chain { func_name: "listen_vm_loop", comment: S("NocMaster from vm")})?;
+            let (_is_ait, msg) = container_from_vm.recv().context("NocMaster container_from_vm").context(ServiceError::Chain { func_name: "listen_vm_loop", comment: S("NocMaster from vm")})?;
             if TRACE_OPTIONS.all || TRACE_OPTIONS.svc {
                 let ref trace_params = TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "recv" };
                 let trace = json!({ "NocMaster": self.get_name(), "msg": msg });
@@ -152,7 +152,7 @@ impl NocAgent {
             let _ = dal::add_to_trace(trace_header, TraceType::Trace, trace_params, &trace, _f);
         }
         loop {
-            let (is_ait, msg) = container_from_vm.recv().context(ServiceError::Chain { func_name: _f, comment: S("Agent recv from vm") })?;
+            let (_is_ait, msg) = container_from_vm.recv().context(ServiceError::Chain { func_name: _f, comment: S("Agent recv from vm") })?;
             if TRACE_OPTIONS.all || TRACE_OPTIONS.svc {
                 let ref trace_params = TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "recv" };
                 let trace = json!({ "NocAgent": self.get_name(), "msg": msg });
