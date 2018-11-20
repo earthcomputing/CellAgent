@@ -37,6 +37,7 @@ pub struct NalCell {
     cell_no: CellNo,
     ports: Box<[Port]>,
     cell_agent: CellAgent,
+    cmodel: Cmodel,
     packet_engine: PacketEngine,
     vms: Vec<VirtualMachine>,
     ports_from_pe: HashMap<PortNo, PortFromPe>,
@@ -86,7 +87,7 @@ impl NalCell {
         NalCell::start_cmodel(&cmodel, cm_from_ca, cm_to_pe, cm_from_pe, cm_to_ca, trace_header);
         let packet_engine = PacketEngine::new(&cell_id, pe_to_cm, pe_to_ports, boundary_port_nos).context(NalcellError::Chain { func_name: "new", comment: S("packet engine create")})?;
         NalCell::start_packet_engine(&packet_engine, pe_from_cm, pe_from_ports, trace_header);
-        Ok(NalCell { id: cell_id, cell_no, cell_type, config,
+        Ok(NalCell { id: cell_id, cell_no, cell_type, config, cmodel,
                 ports: boxed_ports, cell_agent, vms: Vec::new(),
                 packet_engine, ports_from_pe })
     }
@@ -144,7 +145,9 @@ impl NalCell {
 
     pub fn get_id(&self) -> &CellID { &self.id }
     pub fn get_no(&self) -> CellNo { self.cell_no }
-//  pub fn get_cell_agent(&self) -> &CellAgent { &self.cell_agent }
+    pub fn get_cell_agent(&self) -> &CellAgent { &self.cell_agent }
+    pub fn get_cmodel(&self) -> &Cmodel { &self.cmodel }
+    pub fn get_packet_engine(&self) -> &PacketEngine { &self.packet_engine }
     pub fn is_border(&self) -> bool {
         match self.cell_type {
             CellType::Border => true,

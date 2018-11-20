@@ -17,7 +17,7 @@ pub const PACKET_MIN: usize = 64;
 pub const PACKET_MAX: usize = 9000;
 // Control
 pub const CONTINUE_ON_ERROR: bool = false; // Don't close channel following an error if true
-pub const AUTO_BREAK: usize = 1; // Set to index of link to break when debugging broken link with VSCode, else 0
+pub const AUTO_BREAK: usize = 0; // Set to index of link to break when debugging broken link with VSCode, else 0
 #[derive(Debug, Copy, Clone)]
 pub enum Quench { Simple, RootPort }
 pub const QUENCH: Quench = Quench::RootPort;

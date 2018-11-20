@@ -127,8 +127,9 @@ fn main() -> Result<(), Error> {
         if print_opt.len() > 1 {
             match print_opt.trim().as_ref() {
                 "d" => Ok(println!("{}", dc)),
-                "c" => Ok(print_vec(&dc.get_cell_ids())),
+                "c" => show_pe(&dc),
                 "l" => break_link(&mut dc),
+                "p" => show_pe(&dc),
                 "m" => deploy(outside_to_noc.clone()),
                 "x" => std::process::exit(0),
                 _   => Ok(println!("Invalid input {}", print_opt))
@@ -136,35 +137,43 @@ fn main() -> Result<(), Error> {
         }
     }
 }
+fn show_pe(dc: &Datacenter) -> Result<(), Error> {
+    let cells = dc.get_cells();
+    print_vec(&dc.get_cell_ids());
+    stdout().write(b"Enter cell to display forwarding table\n")?;
+    let cell_no = read_int()?;
+    cells.get(cell_no)
+        .map_or_else(|| println!("{} is not a valid input", cell_no),
+                     |cell| {
+                         let pe = cell.get_packet_engine();
+                         println!("Cellagent {}: {} {}", cell.get_id(), cell.get_cell_agent(), pe);
+                     });
+    Ok(())
+}
 fn break_link(dc: &mut Datacenter) -> Result<(), Error> {
-    if AUTO_BREAK > 0 {
+    let link_no = if AUTO_BREAK > 0 {
         // TODO: Wait until discover is done before automatically breaking link, should be removed
         ::utility::sleep(4);
-        println!("---> Automatically break link #1");
-        let links = dc.get_links_mut();
-        let link_to_break = links.get_mut(AUTO_BREAK).expect("Always have at least 2 links");
-        link_to_break.break_link()?;
+        println!("---> Automatically break link {}", AUTO_BREAK);
+        AUTO_BREAK
     } else {
-        print_vec(&dc.get_link_ids());
-        stdout().write(b"Enter link to break or null\n").context(MainError::Chain { func_name: "run", comment: S("") })?;
-        let mut link_char = String::new();
-        stdin().read_line(&mut link_char).context(MainError::Chain { func_name: "run", comment: S("") })?;
-        let trimmed = link_char.trim();
-        if trimmed.len() > 0 {
-            if let Ok(link_no) = trimmed.parse::<u32>() {
-                let mut links = dc.get_links_mut();
-                if let Some(link_to_break) = links.get_mut(link_no as usize) {
-                    stdout().write(format!("You selected link {}\n", link_to_break.get_id()).as_bytes())?;
-                    link_to_break.break_link()?;
-                } else {
-                    stdout().write(format!("{} is not a valid link index\n", link_no).as_bytes())?;
-                };
-            } else {
-                stdout().write(format!("{} is not a valid link index\n", trimmed).as_bytes())?;
-            }
-        } else { stdout().write(format!("{} is not a valid link index\n", trimmed).as_bytes())?; }
-    }
+        let link_ids = dc.get_link_ids();
+        print_vec(&link_ids);
+        stdout().write(b"Enter link to break or null\n")?;
+        read_int()?
+    };
+    let links = dc.get_links_mut();
+    links.get_mut(link_no)
+        .map_or_else(|| -> Result<(), Error> { println!("{} is not a valid input", link_no); Ok(()) },
+                     |link: &mut ::link::Link| -> Result<(), Error> { link.break_link()?; Ok(()) }
+        )?;
     Ok(())
+}
+fn read_int() -> Result<usize, Error> {
+    let _f = "read_int";
+    let mut char = String::new();
+    stdin().read_line(&mut char)?;
+    Ok(char.trim().parse::<usize>()?)
 }
 fn deploy(outside_to_noc: OutsideToNoc) -> Result<(), Error> {
     stdout().write(b"Enter the name of a file containing a manifest\n").context(MainError::Chain { func_name: "run", comment: S("") })?;
@@ -193,11 +202,11 @@ fn deployment_demo() -> Result<(), Error> {
     let c5 = ContainerSpec::new("c5", "D2", vec![], &vec![]).context(MainError::Chain { func_name: "deployment_demo", comment: S("")})?;
     let c6 = ContainerSpec::new("c6", "D3", vec!["param4"], &vec![allowed_tree1]).context(MainError::Chain { func_name: "deployment_demo", comment: S("")})?;
     let vm_spec1 = VmSpec::new("vm1", "Ubuntu", CellConfig::Large,
-        &vec![allowed_tree1, allowed_tree2], vec![&c1, &c2, &c4, &c5, &c5], vec![&up_tree1, &up_tree2]).context(MainError::Chain { func_name: "deployment_demo", comment: S("")})?;
+                               &vec![allowed_tree1, allowed_tree2], vec![&c1, &c2, &c4, &c5, &c5], vec![&up_tree1, &up_tree2]).context(MainError::Chain { func_name: "deployment_demo", comment: S("")})?;
     let up_tree3 = UpTreeSpec::new("test3", vec![0, 0]).context(MainError::Chain { func_name: "deployment_demo", comment: S("")})?;
     let up_tree4 = UpTreeSpec::new("test4", vec![1, 1, 0]).context(MainError::Chain { func_name: "deployment_demo", comment: S("")})?;
     let vm_spec2 = VmSpec::new("vm2", "RedHat",  CellConfig::Large,
-        &vec![allowed_tree1], vec![&c5, &c3, &c6], vec![&up_tree3, &up_tree4]).context(MainError::Chain { func_name: "deployment_demo", comment: S("")})?;
+                               &vec![allowed_tree1], vec![&c5, &c3, &c6], vec![&up_tree3, &up_tree4]).context(MainError::Chain { func_name: "deployment_demo", comment: S("")})?;
     let up_tree_def = Manifest::new("mytest", CellConfig::Large, &AllowedTree::new("cell_tree"), &vec![allowed_tree1, allowed_tree2],
                                     vec![&vm_spec1, &vm_spec2], vec![&up_tree3]).context(MainError::Chain { func_name: "deployment_demo", comment: S("")})?;
     println!("{}", up_tree_def);
@@ -209,6 +218,8 @@ use failure::{Error, ResultExt};
 pub enum MainError {
     #[fail(display = "MainError::Chain {} {}", func_name, comment)]
     Chain { func_name: &'static str, comment: String },
+    #[fail(display = "MainError::Console {} {} is not a valid input {}", func_name, input, comment)]
+    Console { func_name: &'static str, input: String, comment: String },
     #[fail(display = "MainError::Kafka {} Kafka producer undefined", func_name)]
     Kafka { func_name: &'static str}
 }
