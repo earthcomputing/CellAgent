@@ -50,7 +50,7 @@ impl Noc {
         join_handles.push(join_outside);
         let join_port = self.listen_port(noc_to_port, noc_from_port, trace_header)?;
         join_handles.push(join_port);
-        ::utility::sleep(1);
+        //::utility::sleep(1);
         Ok((dc, join_handles))
     }
     fn build_datacenter(&self, blueprint: &Blueprint, trace_header: &mut TraceHeader) -> Result<(Datacenter, Vec<JoinHandle<()>>), Error> {
