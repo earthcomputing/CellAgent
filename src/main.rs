@@ -146,7 +146,7 @@ fn show_pe(dc: &Datacenter) -> Result<(), Error> {
         .map_or_else(|| println!("{} is not a valid input", cell_no),
                      |cell| {
                          let pe = cell.get_packet_engine();
-                         println!("Cellagent {}: {} {}", cell.get_id(), cell.get_cell_agent(), pe);
+                         println!("Cellagent {}: {}\n{}", cell.get_id(), cell.get_cell_agent(), pe);
                      });
     Ok(())
 }

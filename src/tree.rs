@@ -44,9 +44,9 @@ impl Tree {
 }
 impl fmt::Display for Tree {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        let mut s = format!("TreeID {} {}, ", self.tree_id, self.gvm_eqn);
+        let mut s = format!("TreeID {} {} {}, ", self.tree_id, self.tree_id.get_uuid(), self.gvm_eqn);
         for stacked in &self.stacked_tree_ids {
-            s = s + &format!("\n{}", stacked);
+            s = s + &format!("\n{} {}", stacked, stacked.get_uuid());
         }
         write!(f, "{}", s)
     }
