@@ -8,7 +8,7 @@ use dal;
 use message_types::{VmToCa, VmFromCa, VmToContainer, ContainerFromVm,
     ContainerToVm, VmFromContainer};
 use name::{Name, ContainerID, UptreeID, VmID};
-use noc::{TRACE_HEADER, fork_trace_header};
+use noc::{fork_trace_header, update_trace_header};
 use uptree_spec::{AllowedTree, ContainerSpec};
 use utility::{S, write_err, TraceHeader, TraceHeaderParams, TraceType};
 
@@ -56,7 +56,7 @@ impl VirtualMachine {
         let child_trace_header = fork_trace_header();
         let thread_name = format!("VirtualMachine {} listen_ca_loop", self.id);
         thread::Builder::new().name(thread_name.into()).spawn( move || {
-            TRACE_HEADER.with(|t| *t.borrow_mut() = child_trace_header);
+            update_trace_header(child_trace_header);
             let _ = vm.listen_ca_loop(&vm_from_ca).map_err(|e| write_err("vm", e));
             if CONTINUE_ON_ERROR { let _ = vm.listen_ca(vm_from_ca); }
         })?;
@@ -72,7 +72,7 @@ impl VirtualMachine {
         let child_trace_header = fork_trace_header();
         let thread_name = format!("VirtualMachine {} listen_container_loop", self.id);
         thread::Builder::new().name(thread_name.into()).spawn( move || {
-            TRACE_HEADER.with(|t| *t.borrow_mut() = child_trace_header);
+            update_trace_header(child_trace_header);
             let _ = vm.listen_container_loop(&container_id, &vm_from_container, &vm_to_ca).map_err(|e| write_err("vm", e));
             if CONTINUE_ON_ERROR { let _ = vm.listen_container(container_id, vm_from_container, vm_to_ca); }
         })?;

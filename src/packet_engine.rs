@@ -11,7 +11,7 @@ use message_types::{PeFromCm, PeToCm,
                     PeToPort, PeFromPort, PortToPePacket, PeToPortPacket,
                     PeToPe, PeFromPe, CmToPePacket, PeToCmPacket};
 use name::{Name, CellID};
-use noc::{TRACE_HEADER, fork_trace_header};
+use noc::{fork_trace_header, update_trace_header};
 use packet::{Packet};
 use routing_table::{RoutingTable};
 use routing_table_entry::{RoutingTableEntry};
@@ -62,7 +62,7 @@ impl PacketEngine {
         let child_trace_header = fork_trace_header();
         let thread_name = format!("PacketEngine {} listen_cm_loop", self.cell_id);
         thread::Builder::new().name(thread_name.into()).spawn( move || {
-            TRACE_HEADER.with(|t| *t.borrow_mut() = child_trace_header);
+            update_trace_header(child_trace_header);
             let _ = pe.listen_cm_loop(&pe_from_cm, &pe_to_pe).map_err(|e| write_err("packet_engine", e));
             if CONTINUE_ON_ERROR { let _ = pe.listen_cm(pe_from_cm, pe_to_pe); }
         })?;
@@ -78,7 +78,7 @@ impl PacketEngine {
         let child_trace_header = fork_trace_header();
         let thread_name = format!("PacketEngine {} listen_port_loop", self.cell_id);
         thread::Builder::new().name(thread_name.into()).spawn( move || {
-            TRACE_HEADER.with(|t| *t.borrow_mut() = child_trace_header);
+            update_trace_header(child_trace_header);
             let _ = pe.listen_port_loop(&pe_from_ports, &pe_from_pe).map_err(|e| write_err("packet_engine", e));
             if CONTINUE_ON_ERROR { let _ = pe.listen_port(pe_from_ports, pe_from_pe); }
         })?;

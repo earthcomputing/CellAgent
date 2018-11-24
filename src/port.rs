@@ -10,7 +10,7 @@ use dal;
 use message_types::{PortToLink, PortFromLink, PortToPe, PortFromPe, LinkToPortPacket, PortToPePacket,
               PeToPortPacket, PortToNoc, PortFromNoc};
 use name::{Name, PortID, CellID};
-use noc::{TRACE_HEADER, fork_trace_header};
+use noc::{fork_trace_header, update_trace_header};
 use utility::{PortNumber, S, write_err, TraceHeader, TraceHeaderParams, TraceType};
 
 // TODO: There is no distinction between a broken link and a disconnected one.  We may want to revisit.
@@ -59,7 +59,7 @@ impl Port {
         let child_trace_header = fork_trace_header();
         let thread_name = format!("Port {} listen_noc_for_pe_loop", self.get_id().get_name());
         thread::Builder::new().name(thread_name.into()).spawn( move || {
-            TRACE_HEADER.with(|t| *t.borrow_mut() = child_trace_header);
+            update_trace_header(child_trace_header);
             let _ = port.listen_noc_for_pe_loop(&port_from_noc).map_err(|e| write_err("port", e));
             if CONTINUE_ON_ERROR { let _ = port.listen_noc_for_pe(port_from_noc); }
         })?;
@@ -94,7 +94,7 @@ impl Port {
         let child_trace_header = fork_trace_header();
         let thread_name = format!("Port {} listen_pe_for_noc_loop", self.get_id().get_name());
         let join_handle = thread::Builder::new().name(thread_name.into()).spawn( move || {
-            TRACE_HEADER.with(|t| *t.borrow_mut() = child_trace_header);
+            update_trace_header(child_trace_header);
             let _ = port.listen_pe_for_noc_loop(&port_to_noc, &port_from_pe).map_err(|e| write_err("port", e));
             if CONTINUE_ON_ERROR { let _ = port.listen_pe_for_noc(port_to_noc, port_from_pe); }
         })?;
@@ -135,7 +135,7 @@ impl Port {
         let child_trace_header = fork_trace_header();
         let thread_name = format!("Port {} listen_link", self.get_id().get_name());
         thread::Builder::new().name(thread_name.into()).spawn( move || {
-            TRACE_HEADER.with(|t| *t.borrow_mut() = child_trace_header);
+            update_trace_header(child_trace_header);
             let _ = port.listen_link(port_from_link).map_err(|e| write_err("port", e));
             if CONTINUE_ON_ERROR { }
         }).expect("thread failed");
@@ -144,7 +144,7 @@ impl Port {
         let child_trace_header = fork_trace_header();
         let thread_name = format!("Port {} listen_pe", self.get_id().get_name());
         thread::Builder::new().name(thread_name.into()).spawn( move || {
-            TRACE_HEADER.with(|t| *t.borrow_mut() = child_trace_header);
+            update_trace_header(child_trace_header);
             let _ = port.listen_pe(port_to_link, port_from_pe).map_err(|e| write_err("port", e));
             if CONTINUE_ON_ERROR { }
         }).expect("thread failed");

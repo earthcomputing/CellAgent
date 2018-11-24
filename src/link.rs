@@ -6,7 +6,7 @@ use config::{CONTINUE_ON_ERROR, TRACE_OPTIONS};
 use dal;
 use message_types::{LinkToPort, LinkFromPort, LinkToPortPacket};
 use name::{Name, LinkID, PortID};
-use noc::{TRACE_HEADER, fork_trace_header};
+use noc::{fork_trace_header, update_trace_header};
 use port::{PortStatus};
 use utility::{S, write_err, TraceHeader, TraceHeaderParams, TraceType};
 
@@ -59,7 +59,7 @@ impl Link {
         let child_trace_header = fork_trace_header();
         let thread_name = format!("Link {} listen_loop", self.get_id());
         let join_handle = thread::Builder::new().name(thread_name.into()).spawn( move || {
-            TRACE_HEADER.with(|t| *t.borrow_mut() = child_trace_header);
+            update_trace_header(child_trace_header);
             let _ = link.listen_loop(&link_from, &link_to).map_err(|e| write_err("link", e.into()));
             if CONTINUE_ON_ERROR { let _ = link.listen_port(link_from, link_to); }
         })?;
