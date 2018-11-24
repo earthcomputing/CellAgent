@@ -6,12 +6,12 @@ use std::thread;
 
 use config::{CENTRAL_TREE, CONTINUE_ON_ERROR, DEBUG_OPTIONS, MAX_PORTS, TRACE_OPTIONS, PortNo};
 use dal;
+use dal::{fork_trace_header, update_trace_header};
 use message::MsgType;
 use message_types::{PeFromCm, PeToCm,
                     PeToPort, PeFromPort, PortToPePacket, PeToPortPacket,
                     PeToPe, PeFromPe, CmToPePacket, PeToCmPacket};
 use name::{Name, CellID};
-use noc::{fork_trace_header, update_trace_header};
 use packet::{Packet};
 use routing_table::{RoutingTable};
 use routing_table_entry::{RoutingTableEntry};

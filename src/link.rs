@@ -4,9 +4,9 @@ use std::thread::JoinHandle;
 
 use config::{CONTINUE_ON_ERROR, TRACE_OPTIONS};
 use dal;
+use dal::{fork_trace_header, update_trace_header};
 use message_types::{LinkToPort, LinkFromPort, LinkToPortPacket};
 use name::{Name, LinkID, PortID};
-use noc::{fork_trace_header, update_trace_header};
 use port::{PortStatus};
 use utility::{S, write_err, TraceHeader, TraceHeaderParams, TraceType};
 

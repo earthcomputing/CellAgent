@@ -5,10 +5,10 @@ use std::thread;
 use config::{CONTINUE_ON_ERROR, TRACE_OPTIONS};
 use container::{Container};
 use dal;
+use dal::{fork_trace_header, update_trace_header};
 use message_types::{VmToCa, VmFromCa, VmToContainer, ContainerFromVm,
     ContainerToVm, VmFromContainer};
 use name::{Name, ContainerID, UptreeID, VmID};
-use noc::{fork_trace_header, update_trace_header};
 use uptree_spec::{AllowedTree, ContainerSpec};
 use utility::{S, write_err, TraceHeader, TraceHeaderParams, TraceType};
 
