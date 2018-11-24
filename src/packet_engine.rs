@@ -11,6 +11,7 @@ use message_types::{PeFromCm, PeToCm,
                     PeToPort, PeFromPort, PortToPePacket, PeToPortPacket,
                     PeToPe, PeFromPe, CmToPePacket, PeToCmPacket};
 use name::{Name, CellID};
+use noc::{TRACE_HEADER, fork_trace_header};
 use packet::{Packet};
 use routing_table::{RoutingTable};
 use routing_table_entry::{RoutingTableEntry};
@@ -40,68 +41,65 @@ impl PacketEngine {
 
     // INIT (PeFromCm PeFromPort)
     // WORKER (PacketEngine)
-    pub fn initialize(&self, pe_from_cm: PeFromCm, pe_from_ports: PeFromPort,
-                      trace_header: &mut TraceHeader) -> Result<(), Error> {
+    pub fn initialize(&self, pe_from_cm: PeFromCm, pe_from_ports: PeFromPort) -> Result<(), Error> {
 // FIXME: dal::add_to_trace mutates trace_header, spawners don't ??
         let _f = "initialize";
         if TRACE_OPTIONS.all || TRACE_OPTIONS.pe {
             let ref trace_params = TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "worker" };
             let trace = json!({ "cell_id": &self.cell_id, "thread_name": thread::current().name(), "thread_id": TraceHeader::parse(thread::current().id()) });
-            let _ = dal::add_to_trace(trace_header, TraceType::Trace, trace_params, &trace, _f);
+            let _ = dal::add_to_trace(TraceType::Trace, trace_params, &trace, _f);
         }
         let (pe_to_pe, pe_from_pe): (PeToPe, PeFromPe) = channel();
-        self.listen_cm(pe_from_cm, pe_to_pe, trace_header)?;
-        self.listen_port(pe_from_ports, pe_from_pe, trace_header)?;
+        self.listen_cm(pe_from_cm, pe_to_pe)?;
+        self.listen_port(pe_from_ports, pe_from_pe)?;
         Ok(())
     }
 
     // SPAWN THREAD (listen_cm_loop)
-    fn listen_cm(&self, pe_from_cm: PeFromCm, pe_to_pe: PeToPe,
-                 trace_header: &mut TraceHeader) -> Result<(), Error> {
+    fn listen_cm(&self, pe_from_cm: PeFromCm, pe_to_pe: PeToPe) -> Result<(), Error> {
         let _f = "listen_cm";
         let mut pe = self.clone();
-        let child_trace_header = trace_header.fork_trace();
+        let child_trace_header = fork_trace_header();
         let thread_name = format!("PacketEngine {} listen_cm_loop", self.cell_id);
         thread::Builder::new().name(thread_name.into()).spawn( move || {
-            let ref mut working_trace_header = child_trace_header.clone();
-            let _ = pe.listen_cm_loop(&pe_from_cm, &pe_to_pe, working_trace_header).map_err(|e| write_err("packet_engine", e));
-            if CONTINUE_ON_ERROR { let _ = pe.listen_cm(pe_from_cm, pe_to_pe, working_trace_header); }
+            TRACE_HEADER.with(|t| *t.borrow_mut() = child_trace_header);
+            let _ = pe.listen_cm_loop(&pe_from_cm, &pe_to_pe).map_err(|e| write_err("packet_engine", e));
+            if CONTINUE_ON_ERROR { let _ = pe.listen_cm(pe_from_cm, pe_to_pe); }
         })?;
         Ok(())
     }
 
     // SPAWN THREAD (listen_port)
     // TODO: One thread for all ports; should be a different thread for each port
-    fn listen_port(&self, pe_from_ports: PeFromPort, pe_from_pe: PeFromPe,
-                   trace_header: &mut TraceHeader)
+    fn listen_port(&self, pe_from_ports: PeFromPort, pe_from_pe: PeFromPe)
             -> Result<(),Error> {
         let _f = "listen_port";
         let mut pe = self.clone();
-        let child_trace_header = trace_header.fork_trace();
+        let child_trace_header = fork_trace_header();
         let thread_name = format!("PacketEngine {} listen_port_loop", self.cell_id);
         thread::Builder::new().name(thread_name.into()).spawn( move || {
-            let ref mut working_trace_header = child_trace_header.clone();
-            let _ = pe.listen_port_loop(&pe_from_ports, &pe_from_pe, working_trace_header).map_err(|e| write_err("packet_engine", e));
-            if CONTINUE_ON_ERROR { let _ = pe.listen_port(pe_from_ports, pe_from_pe, working_trace_header); }
+            TRACE_HEADER.with(|t| *t.borrow_mut() = child_trace_header);
+            let _ = pe.listen_port_loop(&pe_from_ports, &pe_from_pe).map_err(|e| write_err("packet_engine", e));
+            if CONTINUE_ON_ERROR { let _ = pe.listen_port(pe_from_ports, pe_from_pe); }
         })?;
         Ok(())
     }
 
     // WORKER (PeFromCm)
-    fn listen_cm_loop(&mut self, pe_from_cm: &PeFromCm, pe_to_pe: &PeToPe, trace_header: &mut TraceHeader)
+    fn listen_cm_loop(&mut self, pe_from_cm: &PeFromCm, pe_to_pe: &PeToPe)
             -> Result<(), Error> {
         let _f = "listen_cm_loop";
         if TRACE_OPTIONS.all || TRACE_OPTIONS.pe_cm {
             let ref trace_params = TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "worker" };
             let trace = json!({ "cell_id": &self.cell_id, "thread_name": thread::current().name(), "thread_id": TraceHeader::parse(thread::current().id()) });
-            let _ = dal::add_to_trace(trace_header, TraceType::Trace, trace_params, &trace, _f);
+            let _ = dal::add_to_trace(TraceType::Trace, trace_params, &trace, _f);
         }
         loop {
             let msg = pe_from_cm.recv().context(PacketEngineError::Chain { func_name: _f, comment: S("recv entry from cm ") + self.cell_id.get_name()})?;
             if TRACE_OPTIONS.all || TRACE_OPTIONS.pe_cm {
                 let ref trace_params = TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "recv" };
                 let trace = json!({ "cell_id": &self.cell_id, "msg": &msg.clone() });
-                let _ = dal::add_to_trace(trace_header, TraceType::Trace, trace_params, &trace, _f);
+                let _ = dal::add_to_trace(TraceType::Trace, trace_params, &trace, _f);
             }
             match msg {
                 // control plane from CellAgent
@@ -123,13 +121,13 @@ impl PacketEngine {
 
                 // route packet, xmit to neighbor(s) or up to CModel
                 CmToPePacket::Packet((user_mask, packet)) => {
-                    self.route_packet(user_mask, packet, trace_header)?;
+                    self.route_packet(user_mask, packet)?;
                 }
             };
         }
     }
 
-    fn route_packet(&mut self, user_mask: Mask, mut packet: Packet, trace_header: &mut TraceHeader) -> Result<(), Error> {
+    fn route_packet(&mut self, user_mask: Mask, mut packet: Packet) -> Result<(), Error> {
         let _f = "route_packet";
         let mut uuid = packet.get_tree_uuid();
         uuid.make_normal();  // Strip AIT info for lookup
@@ -151,7 +149,7 @@ impl PacketEngine {
                         let ref trace_params = TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "pe_forward_leafward" };
                         let trace = json!({ "cell_id": &self.cell_id, "tree_id": &tree_id,
                             "ait_state": packet.get_ait_state(), "msg_type": &msg_type, "port_nos": &port_nos });
-                        let _ = dal::add_to_trace(trace_header, TraceType::Trace, trace_params, &trace, _f);
+                        let _ = dal::add_to_trace(TraceType::Trace, trace_params, &trace, _f);
                     }
                     if DEBUG_OPTIONS.pe_pkt_send {
                         match msg_type {
@@ -183,7 +181,7 @@ impl PacketEngine {
                     if TRACE_OPTIONS.all || TRACE_OPTIONS.pe_cm {
                         let ref trace_params = TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "pe_packet_from_cm" };
                         let trace = json!({ "cell_id": &self.cell_id, "tree_id": &tree_id, "ait_state": ait_state, "msg_type": &msg_type });
-                        let _ = dal::add_to_trace(trace_header, TraceType::Trace, trace_params, &trace, _f);
+                        let _ = dal::add_to_trace(TraceType::Trace, trace_params, &trace, _f);
                     }
                     if DEBUG_OPTIONS.pe_pkt_recv {
                         match msg_type {
@@ -194,27 +192,26 @@ impl PacketEngine {
                 }
                 // deliver to CModel
                 let port_no = PortNo(0);
-                self.forward(port_no, entry, user_mask, packet, trace_header).context(PacketEngineError::Chain { func_name: _f, comment: S(self.cell_id.get_name()) })?;
+                self.forward(port_no, entry, user_mask, packet).context(PacketEngineError::Chain { func_name: _f, comment: S(self.cell_id.get_name()) })?;
             }
         }
         Ok(())
     }
 
     // WORKER (PeFromPort)
-    fn listen_port_loop(&mut self, pe_from_ports: &PeFromPort, pe_from_pe: &PeFromPe,
-                        trace_header: &mut TraceHeader) -> Result<(), Error> {
+    fn listen_port_loop(&mut self, pe_from_ports: &PeFromPort, pe_from_pe: &PeFromPe) -> Result<(), Error> {
         let _f = "listen_port_loop";
         if TRACE_OPTIONS.all || TRACE_OPTIONS.pe_port {
             let ref trace_params = TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "worker" };
             let trace = json!({ "cell_id": &self.cell_id, "thread_name": thread::current().name(), "thread_id": TraceHeader::parse(thread::current().id()) });
-            let _ = dal::add_to_trace(trace_header, TraceType::Trace, trace_params, &trace, _f);
+            let _ = dal::add_to_trace(TraceType::Trace, trace_params, &trace, _f);
         }
         loop {
             let msg = pe_from_ports.recv().context(PacketEngineError::Chain { func_name: _f, comment: S("receive")})?;
             if TRACE_OPTIONS.all || TRACE_OPTIONS.pe_port {
                 let ref trace_params = TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "pl_recv" };
                 let trace = json!({ "cell_id": &self.cell_id, "msg": &msg.clone() });
-                let _ = dal::add_to_trace(trace_header, TraceType::Trace, trace_params, &trace, _f);
+                let _ = dal::add_to_trace(TraceType::Trace, trace_params, &trace, _f);
             }
             match msg {
                 // deliver to CModel
@@ -227,7 +224,7 @@ impl PacketEngine {
 
                 // recv from neighbor
                 PortToPePacket::Packet((port_no, packet))  => {
-                    self.process_packet(port_no, packet, pe_from_pe, trace_header).context(PacketEngineError::Chain { func_name: "listen_port", comment: S("process_packet ") + self.cell_id.get_name()})?
+                    self.process_packet(port_no, packet, pe_from_pe).context(PacketEngineError::Chain { func_name: "listen_port", comment: S("process_packet ") + self.cell_id.get_name()})?
                 }
             };
         }
@@ -236,8 +233,8 @@ impl PacketEngine {
     // TODO: Make sure I don't have a race condition because I'm dropping the lock on the routing table
     // Potential hazard here; CA may have sent a routing table update.  I can't just hold the lock on the table
     // when I block waiting for a tree update because of a deadlock with listen_cm_loop.
-    fn process_packet(&mut self, port_no: PortNo, mut packet: Packet, pe_from_pe: &PeFromPe,
-                      trace_header: &mut TraceHeader) -> Result<(), Error> {
+    fn process_packet(&mut self, port_no: PortNo, mut packet: Packet, pe_from_pe: &PeFromPe)
+            -> Result<(), Error> {
         let _f = "process_packet";
 
         match packet.get_ait_state() {
@@ -291,7 +288,7 @@ impl PacketEngine {
                         let ref trace_params = TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "pe_process_packet" };
                         let trace = json!({ "cell_id": &self.cell_id, "tree_id": &tree_id, "ait_state": ait_state,
                             "msg_type": &msg_type, "port_no": &port_no, "entry": &entry });
-                        let _ = dal::add_to_trace(trace_header, TraceType::Trace, trace_params, &trace, _f);
+                        let _ = dal::add_to_trace(TraceType::Trace, trace_params, &trace, _f);
                     }
                     if DEBUG_OPTIONS.pe_process_pkt {
                         match msg_type {
@@ -305,7 +302,7 @@ impl PacketEngine {
                     if entry.get_uuid() == packet.get_uuid() {
                         let mask = entry.get_mask();
                         port_no.make_port_number(MAX_PORTS).context(PacketEngineError::Chain { func_name: "process_packet", comment: S("port number ") + self.cell_id.get_name() })?; // Verify that port_no is valid
-                        self.forward(port_no, entry, mask, packet, trace_header).context(PacketEngineError::Chain { func_name: "process_packet", comment: S("forward ") + self.cell_id.get_name() })?;
+                        self.forward(port_no, entry, mask, packet).context(PacketEngineError::Chain { func_name: "process_packet", comment: S("forward ") + self.cell_id.get_name() })?;
                     } else {
                         let msg_type = MsgType::msg_type(&packet);
                         return Err(PacketEngineError::Uuid { cell_id: self.cell_id.clone(), func_name: _f, msg_type, packet_uuid: packet.get_tree_uuid(), table_uuid: entry.get_uuid() }.into());
@@ -320,8 +317,8 @@ impl PacketEngine {
         }
         Ok(())
     }
-    fn forward(&self, recv_port_no: PortNo, entry: RoutingTableEntry, user_mask: Mask, packet: Packet,
-               trace_header: &mut TraceHeader) -> Result<(), Error> {
+    fn forward(&self, recv_port_no: PortNo, entry: RoutingTableEntry, user_mask: Mask, packet: Packet)
+            -> Result<(), Error> {
         let _f = "forward";
         if !(recv_port_no == entry.get_parent()) {
             let parent = entry.get_parent();
@@ -336,7 +333,7 @@ impl PacketEngine {
                             {
                                 let ref trace_params = TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "pe_forward_to_cm" };
                                 let trace = json!({ "cell_id": &self.cell_id, "tree_id": &tree_id, "msg_type": &msg_type, "parent_port": &parent });
-                                let _ = dal::add_to_trace(trace_header, TraceType::Debug, trace_params, &trace, _f);
+                                let _ = dal::add_to_trace(TraceType::Debug, trace_params, &trace, _f);
                             }
                             if msg_type == MsgType::Manifest { println!("PacketEngine {} forwarding manifest rootward", self.cell_id); }
                             println!("PacketEngine {}: {} [{}] {} {}", self.cell_id, _f, *parent, msg_type, tree_id);
@@ -357,7 +354,7 @@ impl PacketEngine {
                                 {
                                     let ref trace_params = TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "pe_forward_rootward" };
                                     let trace = json!({ "cell_id": &self.cell_id, "tree_id": &tree_id, "msg_type": &msg_type, "parent_port": &parent });
-                                    let _ = dal::add_to_trace(trace_header, TraceType::Debug, trace_params, &trace, _f);
+                                    let _ = dal::add_to_trace(TraceType::Debug, trace_params, &trace, _f);
                                 }
                                 println!("PacketEngine {}: {} [{}] {} {}", self.cell_id, _f, *parent, msg_type, tree_id);
                             },
@@ -385,7 +382,7 @@ impl PacketEngine {
                 if TRACE_OPTIONS.all || TRACE_OPTIONS.pe_port {
                     let ref trace_params = TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "pe_forward_leafward" };
                     let trace = json!({ "cell_id": &self.cell_id, "tree_id": &tree_id, "msg_type": &msg_type, "port_nos": &port_nos });
-                    let _ = dal::add_to_trace(trace_header, TraceType::Trace, trace_params, &trace, _f);
+                    let _ = dal::add_to_trace(TraceType::Trace, trace_params, &trace, _f);
                 }
                 if DEBUG_OPTIONS.pe_pkt_send {
                     match msg_type {
