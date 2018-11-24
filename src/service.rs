@@ -3,10 +3,10 @@ use std::thread;
 
 use config::{ByteArray,CONTINUE_ON_ERROR, TRACE_OPTIONS};
 use dal;
+use dal::{fork_trace_header, update_trace_header};
 use message::{MsgDirection, TcpMsgType};
 use message_types::{ContainerToVm, ContainerFromVm};
 use name::{ContainerID, UptreeID};
-use noc::{fork_trace_header, update_trace_header};
 use uptree_spec::{AllowedTree};
 use utility::{S, write_err, TraceHeader, TraceHeaderParams, TraceType};
 

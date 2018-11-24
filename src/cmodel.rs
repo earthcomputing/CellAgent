@@ -6,11 +6,11 @@ use failure::{Error, ResultExt};
 
 use config::{CONTINUE_ON_ERROR, DEBUG_OPTIONS, TRACE_OPTIONS, PortNo};
 use dal;
+use dal::{fork_trace_header, update_trace_header};
 use message::MsgType;
 use message_types::{CaToCmBytes, CmToCa, CmFromCa, CmToPe, CmFromPe, PeToCmPacket,
                     CmToPePacket, CmToCaBytes};
 use name::{Name, CellID};
-use noc::{fork_trace_header, update_trace_header};
 use packet::{Packet, PacketAssembler, PacketAssemblers, Packetizer};
 use utility::{S, TraceHeader, TraceHeaderParams, TraceType, write_err};
 

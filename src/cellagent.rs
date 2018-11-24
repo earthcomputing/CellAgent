@@ -13,6 +13,7 @@ use config::{CONNECTED_PORTS_TREE_NAME, CONTINUE_ON_ERROR, CONTROL_TREE_NAME, DE
              TRACE_OPTIONS,
              ByteArray, CellNo, CellType, Quench, PathLength, PortNo};
 use dal;
+use dal::{fork_trace_header, update_trace_header};
 use gvm_equation::{GvmEquation, GvmEqn};
 use message::{Message, MsgDirection, MsgTreeMap, MsgType, TcpMsgType,
               ApplicationMsg,
@@ -27,7 +28,6 @@ use message_types::{CaToCm, CaFromCm,
                     CaToCmBytes, CmToCaBytes};
 use nalcell::CellConfig;
 use name::{Name, CellID, SenderID, TreeID, UptreeID, VmID};
-use noc::{fork_trace_header, update_trace_header};
 use port;
 use port_tree::PortTree;
 use routing_table_entry::{RoutingTableEntry};

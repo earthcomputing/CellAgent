@@ -2,13 +2,11 @@ use std::thread;
 use std::thread::{JoinHandle};
 use std::sync::mpsc::channel;
 use std::collections::{HashMap, HashSet};
-use std::cell::RefCell;
-
-use serde_json;
 
 use blueprint::{Blueprint};
 use config::{CONTINUE_ON_ERROR, NCELLS, SCHEMA_VERSION, TRACE_OPTIONS, ByteArray, get_geometry};
 use dal;
+use dal::{fork_trace_header, update_trace_header};
 use datacenter::{Datacenter};
 use gvm_equation::{GvmEquation, GvmEqn, GvmVariable, GvmVariableType};
 use message::{MsgDirection, TcpMsgType, TreeNameMsg};
@@ -22,9 +20,6 @@ const NOC_AGENT_DEPLOY_TREE_NAME:   &'static str = "NocAgentDeploy";
 const NOC_CONTROL_TREE_NAME: &'static str = "NocMasterAgent";
 const NOC_LISTEN_TREE_NAME:  &'static str = "NocAgentMaster";
 
-thread_local!(pub static TRACE_HEADER: RefCell<TraceHeader> = RefCell::new(TraceHeader::new()));
-pub fn fork_trace_header() -> TraceHeader { TRACE_HEADER.with(|t| t.borrow_mut().fork_trace()) }
-pub fn update_trace_header(cth: TraceHeader) { TRACE_HEADER.with(|t| *t.borrow_mut() = cth); }
 #[derive(Debug, Clone)]
 pub struct Noc {
     allowed_trees: HashSet<AllowedTree>,

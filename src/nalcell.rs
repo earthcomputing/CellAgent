@@ -5,13 +5,13 @@ use std::thread;
 
 use cellagent::{CellAgent};
 use cmodel::{Cmodel};
-use dal;
 use config::{CONTINUE_ON_ERROR, MAX_PORTS, TRACE_OPTIONS, CellNo, CellType, PortNo};
+use dal;
+use dal::{fork_trace_header, update_trace_header};
 use message_types::{PortToPe, PeFromPort, PeToPort,PortFromPe,
                     CaToCm, CmFromCa, CmToCa, CaFromCm,
                     CmToPe, PeFromCm, PeToCm, CmFromPe};
 use name::{CellID};
-use noc::{fork_trace_header, update_trace_header};
 use packet_engine::{PacketEngine};
 use port::{Port};
 use utility::{S, TraceHeaderParams, TraceType};

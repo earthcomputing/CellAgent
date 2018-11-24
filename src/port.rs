@@ -7,10 +7,10 @@ use std::sync::atomic::Ordering::SeqCst;
 
 use config::{CONTINUE_ON_ERROR, TRACE_OPTIONS, PortNo};
 use dal;
+use dal::{fork_trace_header, update_trace_header};
 use message_types::{PortToLink, PortFromLink, PortToPe, PortFromPe, LinkToPortPacket, PortToPePacket,
               PeToPortPacket, PortToNoc, PortFromNoc};
 use name::{Name, PortID, CellID};
-use noc::{fork_trace_header, update_trace_header};
 use utility::{PortNumber, S, write_err, TraceHeader, TraceHeaderParams, TraceType};
 
 // TODO: There is no distinction between a broken link and a disconnected one.  We may want to revisit.

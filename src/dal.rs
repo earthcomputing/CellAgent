@@ -1,15 +1,19 @@
 // This file contains hacks that represent functions of the DAL.
 // which will be replaced by actual distributed storage algorithms.
+use std::cell::RefCell;
 use std::fs::{File, OpenOptions};
 use std::io::Write;
 
 use lazy_static::lazy_static;
-use noc::TRACE_HEADER;
 use rdkafka::config::ClientConfig;
 use rdkafka::producer::{FutureProducer, FutureRecord};
 use serde_json;
 use serde_json::{Value};
 use futures::Future;
+
+thread_local!(static TRACE_HEADER: RefCell<TraceHeader> = RefCell::new(TraceHeader::new()));
+pub fn fork_trace_header() -> TraceHeader { TRACE_HEADER.with(|t| t.borrow_mut().fork_trace()) }
+pub fn update_trace_header(cth: TraceHeader) { TRACE_HEADER.with(|t| *t.borrow_mut() = cth); }
 
 use config::{KAFKA_SERVER, KAFKA_TOPIC, OUTPUT_FILE_NAME};
 use utility::{S, TraceHeader, TraceHeaderParams, TraceType};
