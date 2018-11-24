@@ -24,7 +24,7 @@ const NOC_LISTEN_TREE_NAME:  &'static str = "NocAgentMaster";
 
 thread_local!(pub static TRACE_HEADER: RefCell<TraceHeader> = RefCell::new(TraceHeader::new()));
 pub fn fork_trace_header() -> TraceHeader { TRACE_HEADER.with(|t| t.borrow_mut().fork_trace()) }
-
+pub fn update_trace_header(cth: TraceHeader) { TRACE_HEADER.with(|t| *t.borrow_mut() = cth); }
 #[derive(Debug, Clone)]
 pub struct Noc {
     allowed_trees: HashSet<AllowedTree>,
@@ -72,10 +72,10 @@ impl Noc {
             -> Result<JoinHandle<()>, Error> {
         let _f = "listen_port";
         let mut noc = self.clone();
-        let child_trace_header = TRACE_HEADER.with(|t| t.borrow_mut().fork_trace());
+        let child_trace_header = fork_trace_header();
         let thread_name = format!("{} listen_port_loop", self.get_name()); // NOC NOC
         let join_port = thread::Builder::new().name(thread_name.into()).spawn( move || {
-            TRACE_HEADER.with(|t| *t.borrow_mut() = child_trace_header);
+            update_trace_header(child_trace_header);
             let _ = noc.listen_port_loop(&noc_to_port, &noc_from_port).map_err(|e| write_err("port", e));
             if CONTINUE_ON_ERROR { let _ = noc.listen_port(noc_to_port, noc_from_port); }
         });
@@ -122,7 +122,7 @@ impl Noc {
         let child_trace_header = fork_trace_header();
         let thread_name = format!("{} listen_outside_loop", self.get_name()); // NOC NOC
         let join_outside = thread::Builder::new().name(thread_name.into()).spawn( move || {
-            TRACE_HEADER.with(|t| *t.borrow_mut() = child_trace_header);
+            update_trace_header(child_trace_header);
             let _ = noc.listen_outside_loop(&noc_from_outside, &noc_to_port).map_err(|e| write_err("outside", e));
             if CONTINUE_ON_ERROR { }
         });

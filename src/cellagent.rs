@@ -27,7 +27,7 @@ use message_types::{CaToCm, CaFromCm,
                     CaToCmBytes, CmToCaBytes};
 use nalcell::CellConfig;
 use name::{Name, CellID, SenderID, TreeID, UptreeID, VmID};
-use noc::{TRACE_HEADER, fork_trace_header};
+use noc::{fork_trace_header, update_trace_header};
 use port;
 use port_tree::PortTree;
 use routing_table_entry::{RoutingTableEntry};
@@ -487,7 +487,7 @@ impl CellAgent {
         let child_trace_header = fork_trace_header();
         let thread_name = format!("CellAgent {} listen_uptree_loop", self.get_id());
         thread::Builder::new().name(thread_name.into()).spawn( move || {
-            TRACE_HEADER.with(|t| *t.borrow_mut() = child_trace_header);
+            update_trace_header(child_trace_header);
             let _ = ca.listen_uptree_loop(&sender_id.clone(), &vm_id, &ca_from_vm).map_err(|e| ::utility::write_err("cellagent", e));
             if CONTINUE_ON_ERROR { let _ = ca.listen_uptree(sender_id, vm_id, trees, ca_from_vm); }
         }).expect("thread failed");
@@ -613,10 +613,10 @@ impl CellAgent {
     fn listen_cm(&mut self, ca_from_cm: CaFromCm) -> Result<(), Error>{
         let _f = "listen_cm";
         let mut ca = self.clone();
-        let cth = fork_trace_header();
+        let child_trace_header = fork_trace_header();
         let thread_name = format!("CellAgent {} listen_cm_loop", self.get_id());
         thread::Builder::new().name(thread_name.into()).spawn( move || {
-            TRACE_HEADER.with(|t| *t.borrow_mut() = cth);
+            update_trace_header(child_trace_header);
             let _ = ca.listen_cm_loop(&ca_from_cm).map_err(|e| ::utility::write_err("cellagent", e));
             // println!("Cellagent {}: Back from listen_cm_loop", ca.cell_id);
             if CONTINUE_ON_ERROR { let _ = ca.listen_cm(ca_from_cm); }
@@ -1012,7 +1012,7 @@ impl CellAgent {
             self.forward_saved(tree_id, user_mask)?;
         //    let mask = Mask::new(port_number);
         //    let new_msg = StackTreeDMsg::new(sender_id, new_tree_id, entry.get_index(), my_fwd_index);
-        //    self.send_msg(self.get_connected_ports_tree_id(), &new_msg, mask, trace_header)?;
+        //    self.send_msg(self.get_connected_ports_tree_id(), &new_msg, mask)?;
         //}
         if DEBUG_OPTIONS.trace_all || DEBUG_OPTIONS.process_msg {
             let ref trace_params = TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "ca_process_stack_tree_d_msg" };

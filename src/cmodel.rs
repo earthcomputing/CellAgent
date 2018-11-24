@@ -10,7 +10,7 @@ use message::MsgType;
 use message_types::{CaToCmBytes, CmToCa, CmFromCa, CmToPe, CmFromPe, PeToCmPacket,
                     CmToPePacket, CmToCaBytes};
 use name::{Name, CellID};
-use noc::{TRACE_HEADER, fork_trace_header};
+use noc::{fork_trace_header, update_trace_header};
 use packet::{Packet, PacketAssembler, PacketAssemblers, Packetizer};
 use utility::{S, TraceHeader, TraceHeaderParams, TraceType, write_err};
 
@@ -51,7 +51,7 @@ impl Cmodel {
         let child_trace_header = fork_trace_header();
         let thread_name = format!("Cmodel {} listen_ca_loop", self.cell_id.get_name());
         let join_handle = thread::Builder::new().name(thread_name.into()).spawn( move || {
-            TRACE_HEADER.with(|t| *t.borrow_mut() = child_trace_header);
+            update_trace_header(child_trace_header);
             let _ = cmodel.listen_ca_loop(&cm_from_ca, &cm_to_pe).map_err(|e| write_err("cmodel listen_ca", e.into()));
             if CONTINUE_ON_ERROR { let _ = cmodel.listen_ca(cm_from_ca, cm_to_pe); }
         })?;
@@ -62,10 +62,10 @@ impl Cmodel {
     fn listen_pe(&self, cm_from_pe: CmFromPe, cm_to_ca: CmToCa) -> Result<JoinHandle<()>, Error> {
         let _f = "listen_pe";
         let mut cmodel = self.clone();
-        let cth = fork_trace_header();
+        let child_trace_header = fork_trace_header();
         let thread_name = format!("Cmodel {} listen_pe_loop", self.cell_id.get_name());
         let join_handle = thread::Builder::new().name(thread_name.into()).spawn( move || {
-            TRACE_HEADER.with(|t| *t.borrow_mut() = cth);
+            update_trace_header(child_trace_header);
             let _ = cmodel.listen_pe_loop(&cm_from_pe, &cm_to_ca).map_err(|e| write_err("cmodel listen_pe", e.into()));;
             if CONTINUE_ON_ERROR { let _ = cmodel.listen_pe(cm_from_pe, cm_to_ca); }
         })?;
