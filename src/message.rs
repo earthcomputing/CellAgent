@@ -12,7 +12,7 @@ use gvm_equation::{GvmEquation, GvmEqn};
 use name::{Name, CellID, SenderID, TreeID};
 use packet::{Packet, Packetizer, Serializer};
 use uptree_spec::{AllowedTree, Manifest};
-use utility::{S, Path, TraceHeader};
+use utility::{S, Path};
 
 static MESSAGE_COUNT: AtomicUsize = ATOMIC_USIZE_INIT;
 pub fn get_next_count() -> MsgID { MsgID(MESSAGE_COUNT.fetch_add(1, Ordering::SeqCst) as u64) }
@@ -191,8 +191,8 @@ pub trait Message {
         let packets = Packetizer::packetize(&tree_id.get_uuid(), &ByteArray(*bytes), self.is_blocking());
         Ok(packets)
     }
-    fn process_ca(&mut self, _cell_agent: &mut CellAgent, _port_no: PortNo, _msg_tree_id: &TreeID, _is_ait: bool,
-                  _trace_header: &mut TraceHeader) -> Result<(), Error> {
+    fn process_ca(&mut self, _cell_agent: &mut CellAgent, _port_no: PortNo,
+                  _msg_tree_id: &TreeID, _is_ait: bool) -> Result<(), Error> {
         let _f = "process_ca";
         Err(MessageError::Process { func_name: _f }.into()) }
 }
@@ -267,9 +267,9 @@ impl Message for DiscoverMsg {
     fn value(&self) -> serde_json::Value where Self: serde::Serialize {
         serde_json::to_value(self).expect("I don't know how to handle errors in msg.value()")
     }
-    fn process_ca(&mut self, cell_agent: &mut CellAgent, port_no: PortNo, _msg_tree_id: &TreeID, _is_ait: bool,
-                  trace_header: &mut TraceHeader) -> Result<(), Error> {
-        cell_agent.process_discover_msg(self, port_no, trace_header)
+    fn process_ca(&mut self, cell_agent: &mut CellAgent, port_no: PortNo,
+                  _msg_tree_id: &TreeID, _is_ait: bool) -> Result<(), Error> {
+        cell_agent.process_discover_msg(self, port_no)
     }
 }
 impl fmt::Display for DiscoverMsg {
@@ -339,10 +339,10 @@ impl Message for DiscoverDMsg {
     fn value(&self) -> serde_json::Value {
         serde_json::to_value(self).expect("I don't know how to handle errors in msg.value()")
     }
-    fn process_ca(&mut self, cell_agent: &mut CellAgent, port_no: PortNo, _msg_tree_id: &TreeID, _is_ait: bool,
-                  trace_header: &mut TraceHeader) -> Result<(), Error> {
+    fn process_ca(&mut self, cell_agent: &mut CellAgent, port_no: PortNo,
+                  _msg_tree_id: &TreeID, _is_ait: bool,) -> Result<(), Error> {
         let _f = "process_ca";
-        cell_agent.process_discover_d_msg(&self, port_no, trace_header)
+        cell_agent.process_discover_d_msg(&self, port_no)
     }
 }
 impl fmt::Display for DiscoverDMsg {
@@ -396,10 +396,10 @@ impl Message for FailoverMsg {
     fn value(&self) -> serde_json::Value {
         serde_json::to_value(self).expect("I don't know how to handle errors in msg.value()")
     }
-    fn process_ca(&mut self, cell_agent: &mut CellAgent, port_no: PortNo, _msg_tree_id: &TreeID, _is_ait: bool,
-                  trace_header: &mut TraceHeader) -> Result<(), Error> {
+    fn process_ca(&mut self, cell_agent: &mut CellAgent, port_no: PortNo,
+                  _msg_tree_id: &TreeID, _is_ait: bool) -> Result<(), Error> {
         let _f = "process_ca";
-        cell_agent.process_failover_msg(&self, port_no, trace_header)
+        cell_agent.process_failover_msg(&self, port_no)
     }
 }
 impl fmt::Display for FailoverMsg {
@@ -458,10 +458,10 @@ impl Message for FailoverDMsg {
     fn value(&self) -> serde_json::Value {
         serde_json::to_value(self).expect("I don't know how to handle errors in msg.value()")
     }
-    fn process_ca(&mut self, cell_agent: &mut CellAgent, port_no: PortNo, _msg_tree_id: &TreeID, _is_ait: bool,
-                  trace_header: &mut TraceHeader) -> Result<(), Error> {
+    fn process_ca(&mut self, cell_agent: &mut CellAgent, port_no: PortNo,
+                  _msg_tree_id: &TreeID, _is_ait: bool) -> Result<(), Error> {
         let _f = "process_ca";
-        cell_agent.process_failover_d_msg(self, port_no, trace_header)
+        cell_agent.process_failover_d_msg(self, port_no)
     }
 }
 impl fmt::Display for FailoverDMsg {
@@ -532,10 +532,10 @@ impl Message for HelloMsg {
     fn value(&self) -> serde_json::Value {
         serde_json::to_value(self).expect("I don't know how to handle errors in msg.value()")
     }
-    fn process_ca(&mut self, cell_agent: &mut CellAgent, port_no: PortNo, _msg_tree_id: &TreeID, _is_ait: bool,
-                  trace_header: &mut TraceHeader) -> Result<(), Error> {
+    fn process_ca(&mut self, cell_agent: &mut CellAgent, port_no: PortNo,
+                  _msg_tree_id: &TreeID, _is_ait: bool) -> Result<(), Error> {
         let _f = "process_ca";
-        cell_agent.process_hello_msg(self, port_no, trace_header)
+        cell_agent.process_hello_msg(self, port_no)
     }
 }
 impl fmt::Display for HelloMsg {
@@ -584,9 +584,9 @@ impl Message for StackTreeMsg {
     fn value(&self) -> serde_json::Value {
         serde_json::to_value(self).expect("I don't know how to handle errors in msg.value()")
     }
-    fn process_ca(&mut self, cell_agent: &mut CellAgent, port_no: PortNo, msg_tree_id: &TreeID, _is_ait: bool,
-                  trace_header: &mut TraceHeader) -> Result<(), Error> {
-        cell_agent.process_stack_tree_msg(&self, port_no, msg_tree_id, trace_header)
+    fn process_ca(&mut self, cell_agent: &mut CellAgent, port_no: PortNo,
+                  msg_tree_id: &TreeID, _is_ait: bool) -> Result<(), Error> {
+        cell_agent.process_stack_tree_msg(&self, port_no, msg_tree_id)
     }
 }
 impl fmt::Display for StackTreeMsg {
@@ -644,9 +644,9 @@ impl Message for StackTreeDMsg {
     fn value(&self) -> serde_json::Value {
         serde_json::to_value(self).expect("I don't know how to handle errors in msg.value()")
     }
-    fn process_ca(&mut self, cell_agent: &mut CellAgent, port_no: PortNo,_msg_tree_id: &TreeID, _is_ait: bool,
-                  trace_header: &mut TraceHeader) -> Result<(), Error> {
-        cell_agent.process_stack_tree_d_msg(&self, port_no, trace_header)
+    fn process_ca(&mut self, cell_agent: &mut CellAgent, port_no: PortNo,
+                  _msg_tree_id: &TreeID, _is_ait: bool) -> Result<(), Error> {
+        cell_agent.process_stack_tree_d_msg(&self, port_no)
     }
 }
 impl fmt::Display for StackTreeDMsg {
@@ -695,9 +695,9 @@ impl Message for ManifestMsg {
     fn value(&self) -> serde_json::Value {
         serde_json::to_value(self).expect("I don't know how to handle errors in msg.value()")
     }
-    fn process_ca(&mut self, cell_agent: &mut CellAgent, port_no: PortNo, msg_tree_id: &TreeID, _is_ait: bool,
-                  trace_header: &mut TraceHeader) -> Result<(), Error> {
-        cell_agent.process_manifest_msg(&self, port_no, msg_tree_id, trace_header)
+    fn process_ca(&mut self, cell_agent: &mut CellAgent, port_no: PortNo,
+                  msg_tree_id: &TreeID, _is_ait: bool) -> Result<(), Error> {
+        cell_agent.process_manifest_msg(&self, port_no, msg_tree_id)
     }
 }
 impl fmt::Display for ManifestMsg {
@@ -752,9 +752,9 @@ impl Message for ApplicationMsg {
     fn value(&self) -> serde_json::Value {
         serde_json::to_value(self).expect("I don't know how to handle errors in msg.value()")
     }
-    fn process_ca(&mut self, cell_agent: &mut CellAgent, port_no: PortNo, msg_tree_id: &TreeID, is_ait: bool,
-                  trace_header: &mut TraceHeader) -> Result<(), Error> {
-        cell_agent.process_application_msg(self, port_no,  msg_tree_id, is_ait, trace_header)
+    fn process_ca(&mut self, cell_agent: &mut CellAgent, port_no: PortNo,
+                  msg_tree_id: &TreeID, is_ait: bool) -> Result<(), Error> {
+        cell_agent.process_application_msg(self, port_no,  msg_tree_id, is_ait)
     }
 }
 impl fmt::Display for ApplicationMsg {

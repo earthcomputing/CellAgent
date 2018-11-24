@@ -10,6 +10,7 @@ use dal;
 use message_types::{PortToLink, PortFromLink, PortToPe, PortFromPe, LinkToPortPacket, PortToPePacket,
               PeToPortPacket, PortToNoc, PortFromNoc};
 use name::{Name, PortID, CellID};
+use noc::{TRACE_HEADER, fork_trace_header};
 use utility::{PortNumber, S, write_err, TraceHeader, TraceHeaderParams, TraceType};
 
 // TODO: There is no distinction between a broken link and a disconnected one.  We may want to revisit.
@@ -44,40 +45,41 @@ impl Port {
     pub fn set_disconnected(&mut self) { self.is_connected.store(false, SeqCst); }
     pub fn is_border(&self) -> bool { self.is_border }
     pub fn noc_channel(&self, port_to_noc: PortToNoc,
-            port_from_noc: PortFromNoc, port_from_pe: PortFromPe, trace_header: &mut TraceHeader) -> Result<JoinHandle<()>, Error> {
+            port_from_noc: PortFromNoc, port_from_pe: PortFromPe) -> Result<JoinHandle<()>, Error> {
         self.port_to_pe.send(PortToPePacket::Status((self.get_port_no(), self.is_border, PortStatus::Connected))).context(PortError::Chain { func_name: "outside_channel", comment: S(self.id.get_name()) + " send to pe"})?;
-        self.listen_noc_for_pe(port_from_noc, trace_header)?;
-        let join_handle = self.listen_pe_for_noc(port_to_noc, port_from_pe, trace_header)?;
+        self.listen_noc_for_pe(port_from_noc)?;
+        let join_handle = self.listen_pe_for_noc(port_to_noc, port_from_pe)?;
         Ok(join_handle)
     }
 
     // SPAWN THREAD (listen_noc_for_pe_loop)
-    fn listen_noc_for_pe(&self, port_from_noc: PortFromNoc, trace_header: &mut TraceHeader) -> Result<(), Error> {
+    fn listen_noc_for_pe(&self, port_from_noc: PortFromNoc) -> Result<(), Error> {
+        let _f = "listen_noc_for_pe";
         let port = self.clone();
-        let child_trace_header = trace_header.fork_trace();
+        let child_trace_header = fork_trace_header();
         let thread_name = format!("Port {} listen_noc_for_pe_loop", self.get_id().get_name());
         thread::Builder::new().name(thread_name.into()).spawn( move || {
-            let ref mut working_trace_header = child_trace_header.clone();
-            let _ = port.listen_noc_for_pe_loop(&port_from_noc, working_trace_header).map_err(|e| write_err("port", e));
-            if CONTINUE_ON_ERROR { let _ = port.listen_noc_for_pe(port_from_noc, working_trace_header); }
+            TRACE_HEADER.with(|t| *t.borrow_mut() = child_trace_header);
+            let _ = port.listen_noc_for_pe_loop(&port_from_noc).map_err(|e| write_err("port", e));
+            if CONTINUE_ON_ERROR { let _ = port.listen_noc_for_pe(port_from_noc); }
         })?;
         Ok(())
     }
 
     // WORKER (PortFromNoc)
-    fn listen_noc_for_pe_loop(&self, port_from_noc: &PortFromNoc, trace_header: &mut TraceHeader) -> Result<(), Error> {
+    fn listen_noc_for_pe_loop(&self, port_from_noc: &PortFromNoc) -> Result<(), Error> {
         let _f = "listen_noc_for_pe_loop";
         if TRACE_OPTIONS.all || TRACE_OPTIONS.port {
             let ref trace_params = TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "worker" };
             let trace = json!({ "id": self.get_id().get_name(), "thread_name": thread::current().name(), "thread_id": TraceHeader::parse(thread::current().id()) });
-            let _ = dal::add_to_trace(trace_header, TraceType::Trace, trace_params, &trace, _f);
+            let _ = dal::add_to_trace(TraceType::Trace, trace_params, &trace, _f);
         }
         loop {
             let msg = port_from_noc.recv()?;
             if TRACE_OPTIONS.all || TRACE_OPTIONS.port {
                 let ref trace_params = TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "recv" };
                 let trace = json!({ "id": self.get_id().get_name(), "msg": msg });
-                let _ = dal::add_to_trace(trace_header, TraceType::Trace, trace_params, &trace, _f);
+                let _ = dal::add_to_trace(TraceType::Trace, trace_params, &trace, _f);
             }
             //println!("Port to pe other_index {}", *other_index);
             self.port_to_pe.send(PortToPePacket::Tcp((self.port_number.get_port_no(), msg))).context(PortError::Chain { func_name: "listen_outside_for_pe", comment: S(self.id.get_name()) + " send to pe"})?;
@@ -85,32 +87,35 @@ impl Port {
     }
 
     // SPAWN THREAD (listen_pe_for_noc_loop)
-    fn listen_pe_for_noc(&self, port_to_noc: PortToNoc, port_from_pe: PortFromPe, trace_header: &mut TraceHeader) -> Result<JoinHandle<()>, Error> {
+    fn listen_pe_for_noc(&self, port_to_noc: PortToNoc, port_from_pe: PortFromPe)
+            -> Result<JoinHandle<()>, Error> {
+        let _f = "listen_pe_for_noc";
         let port = self.clone();
-        let child_trace_header = trace_header.fork_trace();
+        let child_trace_header = fork_trace_header();
         let thread_name = format!("Port {} listen_pe_for_noc_loop", self.get_id().get_name());
         let join_handle = thread::Builder::new().name(thread_name.into()).spawn( move || {
-            let ref mut working_trace_header = child_trace_header.clone();
-            let _ = port.listen_pe_for_noc_loop(&port_to_noc, &port_from_pe, working_trace_header).map_err(|e| write_err("port", e));
-            if CONTINUE_ON_ERROR { let _ = port.listen_pe_for_noc(port_to_noc, port_from_pe, working_trace_header); }
+            TRACE_HEADER.with(|t| *t.borrow_mut() = child_trace_header);
+            let _ = port.listen_pe_for_noc_loop(&port_to_noc, &port_from_pe).map_err(|e| write_err("port", e));
+            if CONTINUE_ON_ERROR { let _ = port.listen_pe_for_noc(port_to_noc, port_from_pe); }
         })?;
         Ok(join_handle)
     }
 
     // WORKER (PortFromPe)
-    fn listen_pe_for_noc_loop(&self, port_to_noc: &PortToNoc, port_from_pe: &PortFromPe, trace_header: &mut TraceHeader) -> Result<(), Error> {
+    fn listen_pe_for_noc_loop(&self, port_to_noc: &PortToNoc, port_from_pe: &PortFromPe)
+            -> Result<(), Error> {
         let _f = "listen_pe_for_noc_loop";
         if TRACE_OPTIONS.all || TRACE_OPTIONS.port_noc {
             let ref trace_params = TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "worker" };
             let trace = json!({ "id": self.get_id().get_name(), "thread_name": thread::current().name(), "thread_id": TraceHeader::parse(thread::current().id()) });
-            let _ = dal::add_to_trace(trace_header, TraceType::Trace, trace_params, &trace, _f);
+            let _ = dal::add_to_trace(TraceType::Trace, trace_params, &trace, _f);
         }
         loop {
             let msg = port_from_pe.recv().context(PortError::Chain { func_name: "listen_pe_for_outside", comment: S(self.id.get_name()) + " recv from pe"})?;
             if TRACE_OPTIONS.all || TRACE_OPTIONS.port_noc {
                 let ref trace_params = TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "recv" };
                 let trace = json!({ "id": self.get_id().get_name(), "msg": msg });
-                let _ = dal::add_to_trace(trace_header, TraceType::Trace, trace_params, &trace, _f);
+                let _ = dal::add_to_trace(TraceType::Trace, trace_params, &trace, _f);
             }
             //println!("Port {}: waiting for packet from pe", port.id);
             let tuple = match msg {
@@ -123,33 +128,35 @@ impl Port {
     }
 
     // SPAWN THREAD (listen_link, listen_pe)
-    pub fn link_channel(&self, port_to_link: PortToLink, port_from_link: PortFromLink, port_from_pe: PortFromPe, trace_header: &mut TraceHeader) {
+    pub fn link_channel(&self, port_to_link: PortToLink, port_from_link: PortFromLink,
+                        port_from_pe: PortFromPe) {
+        let _f = "link_channel";
         let mut port = self.clone();
-        let child_trace_header = trace_header.fork_trace();
+        let child_trace_header = fork_trace_header();
         let thread_name = format!("Port {} listen_link", self.get_id().get_name());
         thread::Builder::new().name(thread_name.into()).spawn( move || {
-            let ref mut working_trace_header = child_trace_header.clone();
-            let _ = port.listen_link(port_from_link, working_trace_header).map_err(|e| write_err("port", e));
+            TRACE_HEADER.with(|t| *t.borrow_mut() = child_trace_header);
+            let _ = port.listen_link(port_from_link).map_err(|e| write_err("port", e));
             if CONTINUE_ON_ERROR { }
         }).expect("thread failed");
 
         let port = self.clone();
-        let child_trace_header = trace_header.fork_trace();
+        let child_trace_header = fork_trace_header();
         let thread_name = format!("Port {} listen_pe", self.get_id().get_name());
         thread::Builder::new().name(thread_name.into()).spawn( move || {
-            let ref mut working_trace_header = child_trace_header.clone();
-            let _ = port.listen_pe(port_to_link, port_from_pe, working_trace_header).map_err(|e| write_err("port", e));
+            TRACE_HEADER.with(|t| *t.borrow_mut() = child_trace_header);
+            let _ = port.listen_pe(port_to_link, port_from_pe).map_err(|e| write_err("port", e));
             if CONTINUE_ON_ERROR { }
         }).expect("thread failed");
     }
 
     // WORKER (PortFromLink)
-    fn listen_link(&mut self, port_from_link: PortFromLink, trace_header: &mut TraceHeader) -> Result<(), Error> {
+    fn listen_link(&mut self, port_from_link: PortFromLink) -> Result<(), Error> {
         let _f = "listen_link";
         if TRACE_OPTIONS.all || TRACE_OPTIONS.port {
             let ref trace_params = TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "worker" };
             let trace = json!({ "id": self.get_id().get_name(), "thread_name": thread::current().name(), "thread_id": TraceHeader::parse(thread::current().id()) });
-            let _ = dal::add_to_trace(trace_header, TraceType::Trace, trace_params, &trace, _f);
+            let _ = dal::add_to_trace(TraceType::Trace, trace_params, &trace, _f);
         }
         //println!("PortID {}: port_no {}", self.id, port_no);
         loop {
@@ -158,7 +165,7 @@ impl Port {
             if TRACE_OPTIONS.all || TRACE_OPTIONS.port {
                 let ref trace_params = TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "recv" };
                 let trace = json!({ "id": self.get_id().get_name(), "msg": msg });
-                let _ = dal::add_to_trace(trace_header, TraceType::Trace, trace_params, &trace, _f);
+                let _ = dal::add_to_trace(TraceType::Trace, trace_params, &trace, _f);
             }
             match msg {
                 LinkToPortPacket::Status(status) => {
@@ -178,12 +185,12 @@ impl Port {
     }
 
     // WORKER (PortFromPe)
-    fn listen_pe(&self, port_to_link: PortToLink, port_from_pe: PortFromPe, trace_header: &mut TraceHeader) -> Result<(), Error> {
+    fn listen_pe(&self, port_to_link: PortToLink, port_from_pe: PortFromPe) -> Result<(), Error> {
         let _f = "listen_pe";
         if TRACE_OPTIONS.all || TRACE_OPTIONS.port {
             let ref trace_params = TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "worker" };
             let trace = json!({ "id": self.get_id().get_name(), "thread_name": thread::current().name(), "thread_id": TraceHeader::parse(thread::current().id()) });
-            let _ = dal::add_to_trace(trace_header, TraceType::Trace, trace_params, &trace, _f);
+            let _ = dal::add_to_trace(TraceType::Trace, trace_params, &trace, _f);
         }
         loop {
             //println!("Port {}: waiting for packet from pe", id);
@@ -191,7 +198,7 @@ impl Port {
             if TRACE_OPTIONS.all || TRACE_OPTIONS.port {
                 let ref trace_params = TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "recv" };
                 let trace = json!({ "id": self.get_id().get_name(), "msg": msg });
-                let _ = dal::add_to_trace(trace_header, TraceType::Trace, trace_params, &trace, _f);
+                let _ = dal::add_to_trace(TraceType::Trace, trace_params, &trace, _f);
             }
             let packet = match msg {
                 PeToPortPacket::Packet(packet) => packet,

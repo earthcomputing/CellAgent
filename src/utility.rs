@@ -1,5 +1,4 @@
 use std::fmt;
-use std::cell::RefCell;
 use std::collections::{HashSet};
 use std::thread::ThreadId;
 use serde_json;
@@ -8,8 +7,6 @@ use serde_json::{Value};
 use time;
 
 use config::{MAX_PORTS, REPO, MaskValue, PortNo};
-
-thread_local!(pub static TRACE_HEADER: RefCell<TraceHeader> = RefCell::new(TraceHeader::new()) );
 
 /*
 pub fn get_first_arg(a: Vec<String>) -> Option<i32> {
