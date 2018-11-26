@@ -404,7 +404,7 @@ impl CellAgent {
         self.traphs.lock().unwrap()
             .get(&uuid)
             .cloned()
-            .ok_or(CellagentError::NoTraph { cell_id: self.cell_id.clone(), func_name: "stack_tree", tree_uuid: uuid }.into())
+            .ok_or(CellagentError::NoTraph { cell_id: self.cell_id.clone(), func_name: "stack_tree", tree_id: tree_id.clone() }.into())
     }
     pub fn own_traph(&mut self, tree_id: &TreeID) -> Result<Traph, Error> {
         let _f = "get_traph";
@@ -412,7 +412,7 @@ impl CellAgent {
         let uuid = base_tree_id.get_uuid();
         self.traphs.lock().unwrap()
             .remove(&uuid)
-            .ok_or(CellagentError::NoTraph { cell_id: self.cell_id.clone(), func_name: "stack_tree", tree_uuid: uuid }.into())
+            .ok_or(CellagentError::NoTraph { cell_id: self.cell_id.clone(), func_name: "stack_tree", tree_id: tree_id.clone() }.into())
     }
     fn insert_traph(&mut self, tree_id: &TreeID, traph: Traph) -> Result<(), Error> {
         let _f = "update_traphs";
@@ -555,18 +555,17 @@ impl CellAgent {
             });
         self.add_tree_name_map_item( sender_id, allowed_tree, new_tree_id);
         self.update_base_tree_map(new_tree_id, &base_tree_id);
-        let mut traph = self.get_traph(&parent_tree_id)?.clone();
+        let parent_entry = self.get_tree_entry(&parent_tree_id).context(CellagentError::Chain { func_name: "stack_tree", comment: S("get_tree_entry")})?;
+        let mut traph = self.own_traph(&parent_tree_id).context(CellagentError::Chain { func_name: "stack_tree", comment: S("own_traph")})?;
         if traph.has_tree(new_tree_id) { return Ok(None); } // Check for redundant StackTreeMsg
-        let parent_entry = self.get_tree_entry(&parent_tree_id).context(CellagentError::Chain { func_name: "stack_tree", comment: S("")})?;
-        let mut entry = parent_entry.clone();
-        entry.set_mask(Mask::empty());
+        let mut entry = parent_entry.clone(); //entry.set_mask(Mask::empty());
         entry.set_uuid(&new_tree_id.get_uuid());
-        let params = traph.get_params(gvm_eqn.get_variables()).context(CellagentError::Chain { func_name: "stack_tree", comment: S("")})?;
+        let params = traph.get_params(gvm_eqn.get_variables()).context(CellagentError::Chain { func_name: "stack_tree", comment: S("get_params")})?;
         let gvm_xtnd = gvm_eqn.eval_xtnd(&params).context(CellagentError::Chain { func_name: _f, comment: S("gvm_xtnd")})?;
         let gvm_send = gvm_eqn.eval_send(&params).context(CellagentError::Chain { func_name: _f, comment: S("gvm_send")})?;
         if !gvm_xtnd { entry.clear_children(); }
         if gvm_send  { entry.enable_send(); } else { entry.disable_send(); }
-        let gvm_recv = gvm_eqn.eval_recv(&params).context(CellagentError::Chain { func_name: _f, comment: S("")})?;
+        let gvm_recv = gvm_eqn.eval_recv(&params).context(CellagentError::Chain { func_name: _f, comment: S("eval_recv")})?;
         let mask = if gvm_recv {
             entry.get_mask().or(Mask::port0())
         } else {
@@ -1429,8 +1428,8 @@ pub enum CellagentError {
     Message { func_name: &'static str, cell_id: CellID, msg: HashMap<String, String> },
 //    #[fail(display = "CellAgentError::NoParentTraph {}: No one hop parent for port {} on cell {}", func_name, port_no, cell_id)]
 //    NoParentTraph { cell_id: CellID, func_name: &'static str, port_no: u8 },
-    #[fail(display = "CellAgentError::NoTraph {}: A Traph with TreeID {} does not exist on cell {}", func_name, tree_uuid, cell_id)]
-    NoTraph { cell_id: CellID, func_name: &'static str, tree_uuid: Uuid },
+    #[fail(display = "CellAgentError::NoTraph {}: A Traph with TreeID {} does not exist on cell {}", func_name, tree_id, cell_id)]
+    NoTraph { cell_id: CellID, func_name: &'static str, tree_id: TreeID },
 //    #[fail(display = "CellagentError::SavedMsgType {}: Message type {} does not support saving", func_name, msg_type)]
 //    SavedMsgType { func_name: &'static str, msg_type: MsgType },
     #[fail(display = "CellAgentError::StackTree {}: Problem stacking tree {} on cell {}", func_name, tree_id, cell_id)]
