@@ -101,7 +101,7 @@ pub const DEBUG_OPTIONS: DebugOptions = DebugOptions {
     deploy:         false,
     discover:       false,
     discoverd:      false,
-    manifest:       true,
+    manifest:       false,
     pe_pkt_recv:    false,
     pe_pkt_send:    false,
     process_msg:    false,

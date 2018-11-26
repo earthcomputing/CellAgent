@@ -64,10 +64,9 @@ impl NocMaster {
         println!("Service {} running NocMaster", self.container_id);
         self.listen_vm(container_from_vm)?;
         let msg = S("Hello From Master");
-        println!("---> Uncommment in service::NocMaster to send: Service {} sending {}", self.container_id, msg);
-        //let bytes = ByteArray(msg.into_bytes());
-        //let is_ait = false;
-        //self.container_to_vm.send((is_ait, AllowedTree::new("NocMasterAgent"), TcpMsgType::Application, MsgDirection::Leafward, bytes))?;
+        let bytes = ByteArray(msg.into_bytes());
+        let is_ait = false;
+        self.container_to_vm.send((is_ait, AllowedTree::new("NocMasterAgent"), TcpMsgType::Application, MsgDirection::Leafward, bytes))?;
         Ok(())
     }
     // SPAWN THREAD (listen_vm_loop)

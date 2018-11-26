@@ -11,12 +11,12 @@ use serde_json;
 use serde_json::{Value};
 use futures::Future;
 
-thread_local!(static TRACE_HEADER: RefCell<TraceHeader> = RefCell::new(TraceHeader::new()));
-pub fn fork_trace_header() -> TraceHeader { TRACE_HEADER.with(|t| t.borrow_mut().fork_trace()) }
-pub fn update_trace_header(cth: TraceHeader) { TRACE_HEADER.with(|t| *t.borrow_mut() = cth); }
-
 use config::{KAFKA_SERVER, KAFKA_TOPIC, OUTPUT_FILE_NAME};
 use utility::{S, TraceHeader, TraceHeaderParams, TraceType};
+
+thread_local!(static TRACE_HEADER: RefCell<TraceHeader> = RefCell::new(TraceHeader::new()));
+pub fn fork_trace_header() -> TraceHeader { TRACE_HEADER.with(|t| t.borrow_mut().fork_trace()) }
+pub fn update_trace_header(child_trace_header: TraceHeader) { TRACE_HEADER.with(|t| *t.borrow_mut() = child_trace_header); }
 
 const FOR_EVAL: bool = true;
 
