@@ -7,7 +7,7 @@ use name::{Name, TreeID};
 use utility::{Mask, PortNumber};
 use uuid_ec::Uuid;
 
-#[derive(Debug, Copy, Clone, Serialize, Deserialize)]
+#[derive(Debug, Copy, Clone, Eq, PartialEq, Hash, Serialize, Deserialize)]
 pub struct RoutingTableEntry {
     tree_uuid: Uuid,
     may_send: bool, // TODO: Move this from here to Tree
