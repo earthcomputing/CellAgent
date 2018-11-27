@@ -307,7 +307,7 @@ impl CellAgent {
                 let port_no = path.get_port_no();
                 traph.get_port_trees()
                     .iter()
-                    .map(|port_tree| -> bool { *port_tree.get_root_port_no() == port_no })
+                    .map(|port_tree| -> bool { *port_tree.1.get_root_port_no() == port_no })
                     .fold(false, |matched, b: bool| matched || b)
                 })
     }
@@ -367,8 +367,7 @@ impl CellAgent {
                 let mut port_tree = PortTree::new(base_tree_id, &root_port_number,
                                                   &port_number.get_port_no(), &updated_hops);
                 // The first port_tree entry is the one that denotes this branch
-                let first_port_tree = traph.add_port_tree(port_tree);
-                let first_port_tree_id = first_port_tree.get_port_tree_id();
+                let first_port_tree_id = traph.add_port_tree(port_tree);
                 if traph.get_port_trees().len() == 1 {
                     let mut new_entry = entry.clone();
                     new_entry.set_tree_id(&first_port_tree_id);
@@ -380,7 +379,7 @@ impl CellAgent {
                 for stacked_tree in locked.values() {
                     let mut entry = stacked_tree.get_table_entry();
                     let stacked_port_tree_id = stacked_tree.get_tree_id().with_root_port_number(&root_port_number);
-                    if &stacked_port_tree_id == first_port_tree_id {
+                    if stacked_port_tree_id == first_port_tree_id {
                         entry.set_tree_id(&stacked_port_tree_id);
                         self.update_entry(entry).context(CellagentError::Chain { func_name: _f, comment: S("stacked_port_tree_id") })?;
                     }
@@ -555,9 +554,9 @@ impl CellAgent {
             });
         self.add_tree_name_map_item( sender_id, allowed_tree, new_tree_id);
         self.update_base_tree_map(new_tree_id, &base_tree_id);
-        let parent_entry = self.get_tree_entry(&parent_tree_id).context(CellagentError::Chain { func_name: "stack_tree", comment: S("get_tree_entry")})?;
         let mut traph = self.own_traph(&parent_tree_id).context(CellagentError::Chain { func_name: "stack_tree", comment: S("own_traph")})?;
         if traph.has_tree(new_tree_id) { return Ok(None); } // Check for redundant StackTreeMsg
+        let parent_entry = traph.get_tree_entry(&parent_tree_id.get_uuid()).context(CellagentError::Chain { func_name: "stack_tree", comment: S("get_tree_entry")})?;
         let mut entry = parent_entry.clone(); //entry.set_mask(Mask::empty());
         entry.set_uuid(&new_tree_id.get_uuid());
         let params = traph.get_params(gvm_eqn.get_variables()).context(CellagentError::Chain { func_name: "stack_tree", comment: S("get_params")})?;
@@ -822,7 +821,7 @@ impl CellAgent {
                 self.update_entry(old_entry)?;
             }
             for port_tree in my_traph.get_port_trees() {
-                self.update_broken(&my_traph,port_tree.get_port_tree_id(), port_no, broken_port_no)?;
+                self.update_broken(&my_traph,port_tree.1.get_port_tree_id(), port_no, broken_port_no)?;
             }
             let hops = PathLength(CellNo(0));
             let mask = Mask::new(port_no.make_port_number(self.no_ports)?);

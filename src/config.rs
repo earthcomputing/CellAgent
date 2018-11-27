@@ -17,7 +17,7 @@ pub const PACKET_MIN: usize = 64;
 pub const PACKET_MAX: usize = 9000;
 // Control
 pub const CONTINUE_ON_ERROR: bool = false; // Don't close channel following an error if true
-pub const AUTO_BREAK: usize = 0; // Set to index of link to break when debugging broken link with VSCode, else 0
+pub const AUTO_BREAK: usize = 1; // Set to index of link to break when debugging broken link with VSCode, else 0
 #[derive(Debug, Copy, Clone)]
 pub enum Quench { Simple, RootPort }
 pub const QUENCH: Quench = Quench::RootPort;
@@ -129,7 +129,7 @@ pub struct Edge(pub CellNo, pub CellNo);
 #[derive(Debug, Copy, Clone)]
 pub struct LinkNo(pub CellNo);
 impl Deref for LinkNo { type Target = CellNo; fn deref(&self) -> &Self::Target { &self.0 } }
-#[derive(Debug, Copy, Clone, Eq, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Copy, Clone, Eq, PartialEq, Hash, Serialize, Deserialize)]
 pub struct MaskValue(pub u16);
 impl Deref for MaskValue { type Target = u16; fn deref(&self) -> &Self::Target { &self.0 } }
 #[derive(Debug, Copy, Clone, Hash, Eq, PartialEq, Serialize, Deserialize)]

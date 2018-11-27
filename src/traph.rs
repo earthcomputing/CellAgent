@@ -22,8 +22,8 @@ type StackedTrees = HashMap<Uuid, Tree>;
 pub struct Traph {
     cell_id: CellID, // For debugging
     base_tree_id: TreeID,
-    port_tree: Option<PortTree>,
-    port_trees: HashSet<PortTree>,
+    port_tree_id: Option<TreeID>,
+    port_trees: HashMap<TreeID, PortTree>,
     stacked_trees: Arc<Mutex<StackedTrees>>,
     elements: Vec<TraphElement>,
     tried_ports: HashMap<TreeID,HashSet<PortNo>>
@@ -42,8 +42,8 @@ impl Traph {
             let mut locked = stacked_trees.lock().unwrap();
             locked.insert(black_tree_id.get_uuid(), black_tree);
         }
-        let cloth = Traph { cell_id: cell_id.clone(), base_tree_id: black_tree_id.clone(), port_tree: None,
-                   port_trees: HashSet::new(), stacked_trees, elements, tried_ports: HashMap::new() };
+        let cloth = Traph { cell_id: cell_id.clone(), base_tree_id: black_tree_id.clone(), port_tree_id: None,
+                   port_trees: HashMap::new(), stacked_trees, elements, tried_ports: HashMap::new() };
         // println!("new - {}", cloth);
         // dumpstack();
         Ok(cloth)
@@ -58,18 +58,13 @@ impl Traph {
         self.get_parent_element()
             .map(|element| element.get_hops())
     }
-    pub fn get_elements(&self) -> &Vec<TraphElement> { &self.elements }
-    pub fn add_port_tree(&mut self, port_tree: PortTree) -> PortTree {
+    pub fn add_port_tree(&mut self, port_tree: PortTree) -> TreeID {
         let _f = "add_port_tree";
-        if self.port_tree.is_none() { self.port_tree = Some(port_tree.clone()); }
-        if !self.port_trees
-            .iter()
-            .any(|pt| pt.get_port_tree_id() == port_tree.get_port_tree_id())
-        {
-            self.port_trees.insert(port_tree);
-        }
-       self.port_tree.clone().unwrap()  // Unwrap is guaranteed to be safe by first line
+        if self.port_tree_id.is_none() { self.port_tree_id = Some(port_tree.get_port_tree_id().clone()); }
+        self.port_trees.insert(port_tree.get_port_tree_id().clone(), port_tree); // Duplicate inserts do no harm
+        self.port_tree_id.clone().unwrap() // Unwrap is guaranteed to be safe by first line
     }
+    pub fn get_elements(&self) -> &Vec<TraphElement> { &self.elements }
     pub fn get_element(&self, port_no: PortNo) -> Result<&TraphElement, Error> {
         let _f = "get_element";
         self.get_elements()
@@ -77,8 +72,8 @@ impl Traph {
             .find(|element| element.get_port_no() == port_no)
             .ok_or(TraphError::PortElement { func_name: _f, cell_id: self.cell_id.clone(), port_no: *port_no }.into())
     }
-    pub fn get_port_tree(&self) -> &Option<PortTree> { &self.port_tree }
-    pub fn get_port_trees(&self) -> &HashSet<PortTree> { &self.port_trees }
+    pub fn get_port_tree(&self) -> Option<&PortTree> { self.port_trees.get(&self.port_tree_id.clone().unwrap()) }
+    pub fn get_port_trees(&self) -> &HashMap<TreeID, PortTree> { &self.port_trees }
     pub fn clear_tried_ports(&mut self, rw_tree_id: &TreeID) {
         self.tried_ports.insert(rw_tree_id.clone(), HashSet::new());
     }
@@ -297,7 +292,7 @@ impl fmt::Display for Traph {
         }
         s = s + &format!("\n  Port Trees");
         for port_tree in &self.port_trees {
-            s = s + &format!("\n  {}", port_tree);
+            s = s + &format!("\n  {}", port_tree.1);
         }
         s = s + &format!("\n Port Connected Broken Status Hops Path");
         // Can't replace with map() because s gets moved into closure
