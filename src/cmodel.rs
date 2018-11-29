@@ -183,7 +183,7 @@ packets: Vec<Packet>,
             if TRACE_OPTIONS.all || TRACE_OPTIONS.cm {
                 let ref trace_params = TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "cm_bytes_to_ca" };
                 let trace = json!({ "cell_id": &self.cell_id, "packet": &packet });
-                let _ = dal::add_to_trace(TraceType::Debug, trace_params, &trace, _f); // sender side, dup
+                let _ = dal::add_to_trace(TraceType::Trace, trace_params, &trace, _f); // sender side, dup
             }
             let is_ait = packets[0].is_ait();
             let uuid = packet.get_tree_uuid();

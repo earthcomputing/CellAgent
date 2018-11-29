@@ -324,76 +324,75 @@ impl CellAgent {
                 "children": children, "gvm": &gvm_eqn });
             let _ = dal::add_to_trace(TraceType::Debug, trace_params, &trace, _f);
         }
-        let (entry, _is_new_port) = {
-            let mut locked = self.traphs.lock().unwrap();
-            let mut traph = locked
-                .remove(&base_tree_id.get_uuid()) // Remove to avoid borrow problems on self
-                .unwrap_or(Traph::new(&self.cell_id, self.no_ports, &base_tree_id, gvm_eqn)?);
-            let (gvm_recv, gvm_send, _gvm_xtnd, _gvm_save) =  {
-                    let variables = traph.get_params(gvm_eqn.get_variables()).context(CellagentError::Chain { func_name: "update_traph", comment: S("") })?;
-                    let recv = gvm_eqn.eval_recv(&variables).context(CellagentError::Chain { func_name: _f, comment: S("eval_recv") })?;
-                    let send = gvm_eqn.eval_send(&variables).context(CellagentError::Chain { func_name: _f, comment: S("eval_send") })?;
-                    let xtnd = gvm_eqn.eval_xtnd(&variables).context(CellagentError::Chain { func_name: _f, comment: S("eval_xtnd") })?;
-                    let save = gvm_eqn.eval_save(&variables).context(CellagentError::Chain { func_name: _f, comment: S("eval_save") })?;
-                    (recv, send, xtnd, save)
+        let mut locked = self.traphs.lock().unwrap();
+        let mut traph = locked
+            .remove(&base_tree_id.get_uuid()) // Remove to avoid borrow problems on self
+            .unwrap_or(Traph::new(&self.cell_id, self.no_ports, &base_tree_id, gvm_eqn)?);
+        let (gvm_recv, gvm_send, _gvm_xtnd, _gvm_save) =  {
+                let variables = traph.get_params(gvm_eqn.get_variables()).context(CellagentError::Chain { func_name: "update_traph", comment: S("") })?;
+                let recv = gvm_eqn.eval_recv(&variables).context(CellagentError::Chain { func_name: _f, comment: S("eval_recv") })?;
+                let send = gvm_eqn.eval_send(&variables).context(CellagentError::Chain { func_name: _f, comment: S("eval_send") })?;
+                let xtnd = gvm_eqn.eval_xtnd(&variables).context(CellagentError::Chain { func_name: _f, comment: S("eval_xtnd") })?;
+                let save = gvm_eqn.eval_save(&variables).context(CellagentError::Chain { func_name: _f, comment: S("eval_save") })?;
+                (recv, send, xtnd, save)
+        };
+        let (updated_hops, _) = match port_status {
+            traph::PortStatus::Child => {
+                let element = traph.get_parent_element().context(CellagentError::Chain { func_name: _f, comment: S("") })?;
+                // Need to coordinate the following with DiscoverMsg.update_discover_msg
+                (element.hops_plus_one(), element.get_path())
+            },
+            _ => (hops, path)
+        };
+        let traph_status = traph.get_port_status(port_number);
+        let entry_port_status = match traph_status {
+            traph::PortStatus::Pruned => port_status,
+            _ => traph_status  // Don't replace if Parent or Child
+        };
+        if gvm_recv { children.insert(PortNumber::new0()); }
+        let mut entry = traph.update_element(base_tree_id, port_number, entry_port_status, children, updated_hops, path).context(CellagentError::Chain { func_name: "update_traph", comment: S("") })?;
+        if gvm_send { entry.enable_send() } else { entry.disable_send() }
+        if DEBUG_OPTIONS.trace_all || DEBUG_OPTIONS.traph_state {
+            let ref trace_params = TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "ca_updated_traph_entry" };
+            let trace = json!({ "cell_id": &self.cell_id, "base_tree_id": base_tree_id, "entry": &entry });
+            let _ = dal::add_to_trace(TraceType::Debug, trace_params, &trace, _f);
+            if DEBUG_OPTIONS.traph_state { println!("CellAgent {}: entry {}", self.cell_id, entry); }
+        }
+        // Need traph even if cell only forwards on this tree
+        self.update_entry(entry).context(CellagentError::Chain { func_name: _f, comment: S("base_tree_id") })?;
+        if path.get_port_number() != PortNumber::new0() {  // Not my tree
+            let root_port_number = path.get_port_number();
+            let mut port_tree = PortTree::new(base_tree_id, &root_port_number,
+                                              &port_number.get_port_no(), &updated_hops);
+            // The first port_tree entry is the one that denotes this branch
+            let first_port_tree_id = traph.add_port_tree(port_tree);
+            let mut first_port_tree = traph.get_port_tree().unwrap().clone(); // Unwrap safe by previous line
+            let mut new_entry = entry.clone();
+            new_entry.set_tree_id(&first_port_tree_id);
+            first_port_tree.set_entry(new_entry);
+            traph.add_port_tree(first_port_tree);
+            self.update_entry(new_entry).context(CellagentError::Chain { func_name: _f, comment: S("first_port_tree_id") })?;
+            if traph.get_port_trees().len() == 1 {
+               self.tree_id_map.insert(first_port_tree_id.get_uuid(), first_port_tree_id.clone());
             };
-            let (updated_hops, _) = match port_status {
-                traph::PortStatus::Child => {
-                    let element = traph.get_parent_element().context(CellagentError::Chain { func_name: _f, comment: S("") })?;
-                    // Need to coordinate the following with DiscoverMsg.update_discover_msg
-                    (element.hops_plus_one(), element.get_path())
-                },
-                _ => (hops, path)
-            };
-            let traph_status = traph.get_port_status(port_number);
-            let entry_port_status = match traph_status {
-                traph::PortStatus::Pruned => port_status,
-                _ => traph_status  // Don't replace if Parent or Child
-            };
-            if gvm_recv { children.insert(PortNumber::new0()); }
-            let is_new_port =  !traph.is_port_connected(port_number);
-            let mut entry = traph.update_element(base_tree_id, port_number, entry_port_status, children, updated_hops, path).context(CellagentError::Chain { func_name: "update_traph", comment: S("") })?;
-            if gvm_send { entry.enable_send() } else { entry.disable_send() }
-            if DEBUG_OPTIONS.trace_all || DEBUG_OPTIONS.traph_state {
-                let ref trace_params = TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "ca_updated_traph_entry" };
-                let trace = json!({ "cell_id": &self.cell_id, "base_tree_id": base_tree_id, "entry": &entry });
-                let _ = dal::add_to_trace(TraceType::Debug, trace_params, &trace, _f);
-                if DEBUG_OPTIONS.traph_state { println!("CellAgent {}: entry {}", self.cell_id, entry); }
-            }
-            // Need traph even if cell only forwards on this tree
-            self.update_entry(entry).context(CellagentError::Chain { func_name: _f, comment: S("base_tree_id") })?;
-            if path.get_port_number() != PortNumber::new0() {  // Not my tree
-                let root_port_number = path.get_port_number();
-                let mut port_tree = PortTree::new(base_tree_id, &root_port_number,
-                                                  &port_number.get_port_no(), &updated_hops);
-                // The first port_tree entry is the one that denotes this branch
-                let first_port_tree_id = traph.add_port_tree(port_tree);
-                if traph.get_port_trees().len() == 1 {
-                    let mut new_entry = entry.clone();
-                    new_entry.set_tree_id(&first_port_tree_id);
-                    self.tree_id_map.insert(first_port_tree_id.get_uuid(), first_port_tree_id.clone());
-                    self.update_entry(new_entry).context(CellagentError::Chain { func_name: _f, comment: S("first_port_tree_id") })?;
-                };
-                // TODO: Need to update stacked tree ids to get port tree ids
-                let locked = traph.get_stacked_trees().lock().unwrap();
-                for stacked_tree in locked.values() {
-                    let mut entry = stacked_tree.get_table_entry();
-                    let stacked_port_tree_id = stacked_tree.get_tree_id().with_root_port_number(&root_port_number);
-                    if stacked_port_tree_id == first_port_tree_id {
-                        entry.set_tree_id(&stacked_port_tree_id);
-                        self.update_entry(entry).context(CellagentError::Chain { func_name: _f, comment: S("stacked_port_tree_id") })?;
-                    }
+            // TODO: Need to update stacked tree ids to get port tree ids
+            let locked = traph.get_stacked_trees().lock().unwrap();
+            for stacked_tree in locked.values() {
+                let mut entry = stacked_tree.get_table_entry();
+                let stacked_port_tree_id = stacked_tree.get_tree_id().with_root_port_number(&root_port_number);
+                if stacked_port_tree_id == first_port_tree_id {
+                    entry.set_tree_id(&stacked_port_tree_id);
+                    self.update_entry(entry).context(CellagentError::Chain { func_name: _f, comment: S("stacked_port_tree_id") })?;
                 }
             }
-            locked.insert(base_tree_id.get_uuid(), traph);
-            // TODO: Need to update entries of stacked trees following a failover but not as base tree builds out
-            //let entries = traph.update_stacked_entries(entry).context(CellagentError::Chain { func_name: _f, comment: S("") })?;
-            //for entry in entries {
-                //println!("Cell {}: sending entry {}", self.cell_id, entry);
-                //self.ca_to_cm.send(CaToPePacket::Entry(entry)).context(CellagentError::Chain { func_name: _f, comment: S("") })?;
-            //}
-            (entry, is_new_port)
-        };
+        }
+        locked.insert(base_tree_id.get_uuid(), traph);
+        // TODO: Need to update entries of stacked trees following a failover but not as base tree builds out
+        //let entries = traph.update_stacked_entries(entry).context(CellagentError::Chain { func_name: _f, comment: S("") })?;
+        //for entry in entries {
+            //println!("Cell {}: sending entry {}", self.cell_id, entry);
+            //self.ca_to_cm.send(CaToPePacket::Entry(entry)).context(CellagentError::Chain { func_name: _f, comment: S("") })?;
+        //}
         Ok(entry)
     }
     pub fn get_traph(&self, tree_id: &TreeID) -> Result<Traph, Error> {
@@ -768,7 +767,7 @@ impl CellAgent {
                                   -> Result<(), Error> {
         let _f = "process_discoverd_msg";
         let payload = msg.get_payload();
-        let tree_id = payload.get_tree_id();
+        let base_tree_id = payload.get_tree_id();
         let path = payload.get_path();
         let port_number = port_no.make_port_number(self.no_ports).context(CellagentError::Chain { func_name: "process_ca", comment: S("DiscoverDMsg")})?;
         let mut children = HashSet::new();
@@ -780,7 +779,7 @@ impl CellAgent {
         eqns.insert(GvmEqn::Save("false"));
         let gvm_eqn = GvmEquation::new(eqns, Vec::new());
         // Need next statement even though "entry" is only used in debug print
-        let _ = self.update_traph(tree_id, port_number, traph::PortStatus::Child, &gvm_eqn,
+        let _ = self.update_traph(base_tree_id, port_number, traph::PortStatus::Child, &gvm_eqn,
                               children, PathLength(CellNo(0)), path)?;
         let mask = Mask::new(port_no.make_port_number(self.no_ports)?);
         let tree_id = payload.get_tree_id();
@@ -820,8 +819,18 @@ impl CellAgent {
                 old_entry.set_mask(new_entry.get_mask());
                 self.update_entry(old_entry)?;
             }
-            for port_tree in my_traph.get_port_trees() {
-                self.update_broken(&my_traph,port_tree.1.get_port_tree_id(), port_no, broken_port_no)?;
+            my_traph
+                .get_port_trees()
+                .get(&rw_port_tree_id)
+                .map(|port_tree| -> Result<(), Error> {
+                    let mut new_port_tree_entry = port_tree.get_entry();
+                    let mask = new_port_tree_entry.get_mask();
+                    new_port_tree_entry.set_mask(mask);
+                    self.update_entry(new_port_tree_entry)?;
+                    Ok(())
+                });
+            for (_tree_id, port_tree) in my_traph.get_port_trees() {
+                self.update_broken(&my_traph,port_tree.get_port_tree_id(), port_no, broken_port_no)?;
             }
             let hops = PathLength(CellNo(0));
             let mask = Mask::new(port_no.make_port_number(self.no_ports)?);

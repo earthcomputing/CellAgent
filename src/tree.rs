@@ -5,6 +5,7 @@ use std::fmt;
 use gvm_equation::GvmEquation;
 use name::{Name, TreeID};
 use routing_table_entry::RoutingTableEntry;
+use utility::PortNumber;
 use uuid_ec::Uuid;
 
 #[derive(Debug, Clone)]
@@ -31,6 +32,11 @@ impl Tree {
     pub fn set_table_entry(&mut self, entry: RoutingTableEntry) { self.table_entry = entry; }
     //pub fn get_table_index(&self) -> TableIndex { self.table_entry.get_index() }
     pub fn get_gvm_eqn(&self) -> &GvmEquation { &self.gvm_eqn }
+    pub fn add_child(&mut self, child: PortNumber) { self.table_entry.add_child(child); }
+    pub fn remove_child(&mut self, child: PortNumber) -> &Vec<TreeID> {
+        self.table_entry.remove_child(child);
+        &self.stacked_tree_ids
+    }
     //pub fn set_gvm_eqn(&mut self, gvm_eqn: GvmEquation) { self.gvm_eqn = gvm_eqn; }
     //pub fn get_parent(&self) -> PortNo { self.get_table_entry().get_parent() }
     //pub fn set_parent(&mut self, port_number: PortNumber) { self.get_table_entry().set_parent(port_number); }
@@ -44,7 +50,9 @@ impl Tree {
 }
 impl fmt::Display for Tree {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        let mut s = format!("TreeID {} {} {}, ", self.tree_id, self.tree_id.get_uuid(), self.gvm_eqn);
+        let mut uuid = self.tree_id.get_uuid().to_string();
+        uuid.truncate(8);
+        let mut s = format!("TreeID {} {:8} {}, ", self.tree_id, uuid, self.gvm_eqn);
         for stacked in &self.stacked_tree_ids {
             s = s + &format!("\n{} {}", stacked, stacked.get_uuid());
         }
