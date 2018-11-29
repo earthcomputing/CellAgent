@@ -24,14 +24,22 @@ impl PortTree {
     pub fn get_root_port_no(&self) -> &PortNo { &self.root_port_no }
     pub fn _get_in_port_no(&self) -> &PortNo { &self.in_port_no }
     pub fn _get_hops(&self) -> &PathLength { &self.hops }
-    pub fn get_entry(&self) -> &RoutingTableEntry { &self.entry }
+    pub fn get_entry(&self) -> RoutingTableEntry { self.entry }
     pub fn set_entry(&mut self, new_entry: RoutingTableEntry) { self.entry = new_entry; }
+    pub fn add_child(&mut self, child: PortNumber) {
+        self.entry.add_child(child);
+    }
+    pub fn remove_child(&mut self, child: PortNumber) {
+        self.entry.remove_child(child);
+    }
 }
 
 impl fmt::Display for PortTree {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        let s = format!("PortTree: TreeID {} {:8?}, root_port {}, in_port {}, hops {} entry {}",
-                        self.port_tree_id, self.port_tree_id.get_uuid(), *self.root_port_no,
+        let mut uuid = self.port_tree_id.get_uuid().to_string();
+        uuid.truncate(8);
+        let s = format!("PortTree: TreeID {} {:8}, root_port {}, in_port {}, hops {} entry {}",
+                        self.port_tree_id, uuid, *self.root_port_no,
                         *self.in_port_no, self.hops, self.entry);
         write!(f, "{}", s)
     }
