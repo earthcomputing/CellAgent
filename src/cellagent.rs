@@ -36,7 +36,8 @@ use traph::{Traph};
 use tree::Tree;
 use uptree_spec::{AllowedTree, Manifest};
 use utility::{BASE_TENANT_MASK, DEFAULT_USER_MASK, Mask, Path,
-              PortNumber, S, TraceHeader, TraceHeaderParams, TraceType, UtilityError};
+              PortNumber, S, TraceHeader, TraceHeaderParams, TraceType, UtilityError,
+              new_hash_set};
 //use uuid::Uuid;
 use uuid_ec::Uuid;
 use vm::VirtualMachine;
@@ -360,15 +361,18 @@ impl CellAgent {
         }
         // Need traph even if cell only forwards on this tree
         self.update_entry(entry).context(CellagentError::Chain { func_name: _f, comment: S("base_tree_id") })?;
-        if path.get_port_number() != PortNumber::new0() {  // Not my tree
-            let root_port_number = path.get_port_number();
-            let mut port_tree = PortTree::new(base_tree_id, &root_port_number,
-                                              &port_number.get_port_no(), &updated_hops);
+        let root_port_number = path.get_port_number();
+        let port_tree_id = base_tree_id.with_root_port_number(&port_number);
+        let mut port_tree = traph
+            .own_port_tree(&port_tree_id)
+            .unwrap_or(PortTree::new(base_tree_id, &root_port_number,
+                              &port_number.get_port_no(), &updated_hops));
+        if base_tree_id != &self.my_tree_id {  // Not my tree
             // The first port_tree entry is the one that denotes this branch
-            let first_port_tree_id = traph.add_port_tree(port_tree);
-            let mut first_port_tree = traph.get_port_tree().unwrap().clone(); // Unwrap safe by previous line
+            let first_port_tree_id = traph.add_port_tree(port_tree.clone());
+            let mut first_port_tree = traph.own_port_tree(&first_port_tree_id).unwrap(); // Unwrap safe by previous line
             let mut new_entry = entry.clone();
-            new_entry.set_tree_id(&first_port_tree_id);
+            new_entry.set_tree_id(&first_port_tree.get_port_tree_id());
             first_port_tree.set_entry(new_entry);
             traph.add_port_tree(first_port_tree);
             self.update_entry(new_entry).context(CellagentError::Chain { func_name: _f, comment: S("first_port_tree_id") })?;
@@ -385,6 +389,12 @@ impl CellAgent {
                     self.update_entry(entry).context(CellagentError::Chain { func_name: _f, comment: S("stacked_port_tree_id") })?;
                 }
             }
+        } else { // This is my tree, so each port_tree has one child
+            let mask = Mask::new(port_number);
+            let new_entry = RoutingTableEntry::new(port_tree.get_port_tree_id(), true,
+                           PortNumber::new0(), mask, gvm_send);
+            port_tree.set_entry(new_entry);
+            traph.add_port_tree(port_tree);
         }
         locked.insert(base_tree_id.get_uuid(), traph);
         // TODO: Need to update entries of stacked trees following a failover but not as base tree builds out
@@ -770,15 +780,13 @@ impl CellAgent {
         let base_tree_id = payload.get_tree_id();
         let path = payload.get_path();
         let port_number = port_no.make_port_number(self.no_ports).context(CellagentError::Chain { func_name: "process_ca", comment: S("DiscoverDMsg")})?;
-        let mut children = HashSet::new();
-        children.insert(port_number);
+        let children = new_hash_set(Box::new([port_number]));
         let mut eqns = HashSet::new();
         eqns.insert(GvmEqn::Recv("true"));
         eqns.insert(GvmEqn::Send("true"));
         eqns.insert(GvmEqn::Xtnd("false"));
         eqns.insert(GvmEqn::Save("false"));
         let gvm_eqn = GvmEquation::new(eqns, Vec::new());
-        // Need next statement even though "entry" is only used in debug print
         let _ = self.update_traph(base_tree_id, port_number, traph::PortStatus::Child, &gvm_eqn,
                               children, PathLength(CellNo(0)), path)?;
         let mask = Mask::new(port_no.make_port_number(self.no_ports)?);
@@ -813,7 +821,7 @@ impl CellAgent {
             let my_traph = self.get_traph(&self.my_tree_id)?;
             //println!("Cellagent {}: {} port {} lw tree {}\n{}", self.cell_id, _f, *port_no, lw_tree_id, my_traph);
             let broken_port_no = broken_path.get_port_no();
-            let new_entry = self.update_broken(&my_traph, &self.my_tree_id, port_no, broken_port_no)?;
+            let new_entry = self.update_broken(&my_traph, rw_port_tree_id, port_no, broken_port_no)?;
             for (_uuid, tree) in my_traph.get_stacked_trees().lock().unwrap().iter() {
                 let mut old_entry = tree.get_table_entry();
                 old_entry.set_mask(new_entry.get_mask());
@@ -862,14 +870,12 @@ impl CellAgent {
     fn update_broken(&self, traph: &Traph, port_tree_id: &TreeID, port_no: PortNo, broken_port_no: PortNo)
             -> Result<RoutingTableEntry, Error> {
         let _f = "update_broken";
+        let port_number = port_no.make_port_number(self.no_ports)?;
         let mut broken_element = traph.get_element(broken_port_no)?.clone();
         broken_element.set_status(traph::PortStatus::Pruned);
         let mut broken_entry = traph.get_tree_entry(&port_tree_id.without_root_port_number().get_uuid())?;
-        let port_number = broken_port_no.make_port_number(self.no_ports)?;
-        let children: HashSet<PortNumber> = [port_no.make_port_number(self.no_ports)?].iter().cloned().collect();
-        broken_entry.set_uuid(&port_tree_id.get_uuid());
+        let children = new_hash_set(Box::new([port_number]));
         broken_entry.add_children(&children);
-        broken_entry.remove_child(port_number);
         //println!("Cellagent {}: {} tree {} entry {}", self.cell_id, _f, self.my_tree_id, broken_entry);
         self.update_entry(broken_entry)?;
         Ok(broken_entry)
