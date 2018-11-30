@@ -72,7 +72,7 @@ impl Traph {
             .find(|element| element.get_port_no() == port_no)
             .ok_or(TraphError::PortElement { func_name: _f, cell_id: self.cell_id.clone(), port_no: *port_no }.into())
     }
-    pub fn get_port_tree(&self) -> Option<&PortTree> { self.port_trees.get(&self.port_tree_id.clone().unwrap()) }
+    pub fn own_port_tree(&mut self, port_tree_id: &TreeID) -> Option<PortTree> { self.port_trees.remove(port_tree_id) }
     pub fn get_port_trees(&self) -> &HashMap<TreeID, PortTree> { &self.port_trees }
     pub fn clear_tried_ports(&mut self, rw_tree_id: &TreeID) {
         self.tried_ports.insert(rw_tree_id.clone(), HashSet::new());
