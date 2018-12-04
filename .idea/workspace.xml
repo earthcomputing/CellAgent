@@ -2,9 +2,8 @@
 <project version="4">
   <component name="ChangeListManager">
     <list default="true" id="eee480a2-146d-44ab-9647-cef5ea39b250" name="Default" comment="">
-      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/cellagent.rs" beforeDir="false" afterPath="$PROJECT_DIR$/src/cellagent.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/traph.rs" beforeDir="false" afterPath="$PROJECT_DIR$/src/traph.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/message.rs" beforeDir="false" afterPath="$PROJECT_DIR$/src/message.rs" afterDir="false" />
     </list>
     <ignored path="$PROJECT_DIR$/target/" />
     <ignored path="$PROJECT_DIR$/out/" />
@@ -23,33 +22,33 @@
       <file pinned="false" current-in-tab="false">
         <entry file="file://$PROJECT_DIR$/src/traph.rs">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="191">
-              <caret line="75" column="11" selection-start-line="75" selection-start-column="11" selection-end-line="75" selection-end-column="11" />
+            <state relative-caret-position="336">
+              <caret line="208" column="29" lean-forward="true" selection-start-line="208" selection-start-column="29" selection-end-line="208" selection-end-column="29" />
             </state>
           </provider>
         </entry>
       </file>
       <file pinned="false" current-in-tab="false">
-        <entry file="file://$PROJECT_DIR$/src/name.rs">
+        <entry file="file://$PROJECT_DIR$/src/traph_element.rs">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="15">
-              <caret line="11" column="26" selection-start-line="11" selection-start-column="26" selection-end-line="11" selection-end-column="26" />
+            <state relative-caret-position="105">
+              <caret line="26" column="5" lean-forward="true" selection-start-line="26" selection-start-column="5" selection-end-line="26" selection-end-column="5" />
             </state>
           </provider>
         </entry>
       </file>
-      <file pinned="false" current-in-tab="true">
+      <file pinned="false" current-in-tab="false">
         <entry file="file://$PROJECT_DIR$/src/cellagent.rs">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="230">
-              <caret line="824" column="13" lean-forward="true" selection-start-line="824" selection-start-column="13" selection-end-line="824" selection-end-column="13" />
+            <state relative-caret-position="-1050">
+              <caret line="990" column="46" lean-forward="true" selection-start-line="990" selection-start-column="46" selection-end-line="990" selection-end-column="46" />
               <folding>
                 <element signature="e#17177#17655#0" />
                 <element signature="e#20014#20478#0" />
                 <element signature="e#46662#47236#0" />
                 <element signature="e#50113#50770#0" />
-                <element signature="e#91107#91108#0" expanded="true" />
-                <element signature="e#91159#91160#0" expanded="true" />
+                <element signature="e#90199#90200#0" expanded="true" />
+                <element signature="e#90251#90252#0" expanded="true" />
               </folding>
             </state>
           </provider>
@@ -58,8 +57,17 @@
       <file pinned="false" current-in-tab="false">
         <entry file="file://$PROJECT_DIR$/src/utility.rs">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="191">
-              <caret line="84" column="11" selection-start-line="84" selection-start-column="11" selection-end-line="84" selection-end-column="11" />
+            <state relative-caret-position="408">
+              <caret line="251" selection-start-line="251" selection-end-line="251" />
+            </state>
+          </provider>
+        </entry>
+      </file>
+      <file pinned="false" current-in-tab="false">
+        <entry file="file://$PROJECT_DIR$/src/datacenter.rs">
+          <provider selected="true" editor-type-id="text-editor">
+            <state relative-caret-position="237">
+              <caret line="41" column="12" selection-start-line="41" selection-start-column="12" selection-end-line="41" selection-end-column="12" />
             </state>
           </provider>
         </entry>
@@ -87,19 +95,10 @@
         </entry>
       </file>
       <file pinned="false" current-in-tab="false">
-        <entry file="file://$PROJECT_DIR$/src/message.rs">
-          <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="-2309">
-              <caret line="47" column="92" selection-start-line="47" selection-start-column="92" selection-end-line="47" selection-end-column="92" />
-            </state>
-          </provider>
-        </entry>
-      </file>
-      <file pinned="false" current-in-tab="false">
         <entry file="file://$PROJECT_DIR$/src/port_tree.rs">
           <provider selected="true" editor-type-id="text-editor">
             <state relative-caret-position="212">
-              <caret line="27" column="11" selection-start-line="27" selection-start-column="11" selection-end-line="27" selection-end-column="11" />
+              <caret line="28" column="49" selection-start-line="28" selection-start-column="49" selection-end-line="28" selection-end-column="49" />
               <folding>
                 <element signature="e#1214#1215#0" expanded="true" />
                 <element signature="e#1239#1240#0" expanded="true" />
@@ -113,23 +112,8 @@
       <file pinned="false" current-in-tab="false">
         <entry file="file://$PROJECT_DIR$/src/routing_table_entry.rs">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="840">
-              <caret line="56" column="11" selection-start-line="56" selection-start-column="11" selection-end-line="56" selection-end-column="11" />
-              <folding>
-                <element signature="e#2014#2015#0" expanded="true" />
-                <element signature="e#2065#2066#0" expanded="true" />
-                <element signature="e#2589#2590#0" expanded="true" />
-                <element signature="e#2637#2638#0" expanded="true" />
-              </folding>
-            </state>
-          </provider>
-        </entry>
-      </file>
-      <file pinned="false" current-in-tab="false">
-        <entry file="file://$PROJECT_DIR$/src/packet.rs">
-          <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="15">
-              <caret line="45" column="30" selection-start-line="45" selection-start-column="30" selection-end-line="45" selection-end-column="30" />
+            <state relative-caret-position="285">
+              <caret line="19" selection-start-line="19" selection-end-line="19" />
             </state>
           </provider>
         </entry>
@@ -139,6 +123,23 @@
           <provider selected="true" editor-type-id="text-editor">
             <state relative-caret-position="191">
               <caret line="301" column="43" selection-start-line="301" selection-start-column="43" selection-end-line="301" selection-end-column="43" />
+            </state>
+          </provider>
+        </entry>
+      </file>
+      <file pinned="false" current-in-tab="true">
+        <entry file="file://$PROJECT_DIR$/src/message.rs">
+          <provider selected="true" editor-type-id="text-editor">
+            <state relative-caret-position="326">
+              <caret line="687" column="27" selection-start-line="687" selection-start-column="27" selection-end-line="687" selection-end-column="27" />
+              <folding>
+                <element signature="e#18420#18421#0" expanded="true" />
+                <element signature="e#18472#18473#0" expanded="true" />
+                <element signature="e#31692#31693#0" expanded="true" />
+                <element signature="e#31741#31742#0" expanded="true" />
+                <element signature="e#38196#38197#0" expanded="true" />
+                <element signature="e#38257#38258#0" expanded="true" />
+              </folding>
             </state>
           </provider>
         </entry>
@@ -155,8 +156,8 @@
       <file pinned="false" current-in-tab="false">
         <entry file="file://$PROJECT_DIR$/src/tree.rs">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="195">
-              <caret line="30" column="11" selection-start-line="30" selection-start-column="11" selection-end-line="30" selection-end-column="11" />
+            <state relative-caret-position="405">
+              <caret line="27" column="24" selection-start-line="27" selection-start-column="24" selection-end-line="27" selection-end-column="24" />
             </state>
           </provider>
         </entry>
@@ -174,7 +175,7 @@
         <entry file="file://$PROJECT_DIR$/src/config.rs">
           <provider selected="true" editor-type-id="text-editor">
             <state relative-caret-position="285">
-              <caret line="19" column="31" selection-start-line="19" selection-start-column="31" selection-end-line="19" selection-end-column="31" />
+              <caret line="19" column="39" selection-start-line="19" selection-start-column="39" selection-end-line="19" selection-end-column="39" />
             </state>
           </provider>
         </entry>
@@ -190,7 +191,6 @@
   </component>
   <component name="FindInProjectRecents">
     <findStrings>
-      <find>locked</find>
       <find>dda5</find>
       <find>TRACE_HEADER</find>
       <find>NalCell</find>
@@ -220,6 +220,7 @@
       <find>b45f</find>
       <find>Packet</find>
       <find>1672</find>
+      <find>MsgID</find>
     </findStrings>
     <replaceStrings>
       <replace>Arc::</replace>
@@ -260,7 +261,6 @@
         <option value="$PROJECT_DIR$/src/dal.rs" />
         <option value="$PROJECT_DIR$/src/main.rs" />
         <option value="$PROJECT_DIR$/src/datacenter.rs" />
-        <option value="$PROJECT_DIR$/src/message.rs" />
         <option value="$PROJECT_DIR$/src/packet.rs" />
         <option value="$PROJECT_DIR$/src/name.rs" />
         <option value="$PROJECT_DIR$/src/message_types.rs" />
@@ -274,6 +274,7 @@
         <option value="$PROJECT_DIR$/src/traph.rs" />
         <option value="$PROJECT_DIR$/src/config.rs" />
         <option value="$PROJECT_DIR$/src/cellagent.rs" />
+        <option value="$PROJECT_DIR$/src/message.rs" />
       </list>
     </option>
   </component>
@@ -422,12 +423,12 @@
       <window_info id="Favorites" order="5" side_tool="true" />
       <window_info anchor="bottom" id="Message" order="0" />
       <window_info anchor="bottom" id="Find" order="1" sideWeight="0.44650817" visible="true" weight="0.24256837" />
-      <window_info anchor="bottom" x="-198" y="-877" width="559" height="858" id="Run" internal_type="FLOATING" order="2" type="FLOATING" visible="true" weight="0.32941177" />
+      <window_info active="true" anchor="bottom" x="-198" y="-877" width="559" height="858" id="Run" internal_type="FLOATING" order="2" type="FLOATING" visible="true" weight="0.32941177" />
       <window_info anchor="bottom" id="Debug" order="3" weight="0.4" />
       <window_info anchor="bottom" id="Cvs" order="4" weight="0.25" />
       <window_info anchor="bottom" id="Inspection" order="5" weight="0.4" />
       <window_info anchor="bottom" id="TODO" order="6" sideWeight="0.49817917" weight="0.32925338" />
-      <window_info active="true" anchor="bottom" id="Event Log" order="7" sideWeight="0.55349183" side_tool="true" visible="true" weight="0.24256837" />
+      <window_info anchor="bottom" id="Event Log" order="7" sideWeight="0.55349183" side_tool="true" visible="true" weight="0.24256837" />
       <window_info anchor="bottom" id="Messages" order="8" />
       <window_info anchor="bottom" id="Terminal" order="9" sideWeight="0.49525893" weight="0.15384616" />
       <window_info anchor="bottom" id="Version Control" order="10" sideWeight="0.49380013" weight="0.18283166" />
@@ -684,15 +685,15 @@
     </entry>
     <entry file="file://$PROJECT_DIR$/src/datacenter.rs">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="106">
-          <caret line="24" column="50" selection-start-line="24" selection-start-column="50" selection-end-line="24" selection-end-column="50" />
+        <state relative-caret-position="237">
+          <caret line="41" column="12" selection-start-line="41" selection-start-column="12" selection-end-line="41" selection-end-column="12" />
         </state>
       </provider>
     </entry>
     <entry file="file://$PROJECT_DIR$/src/traph_element.rs">
       <provider selected="true" editor-type-id="text-editor">
         <state relative-caret-position="105">
-          <caret line="7" column="11" selection-start-line="7" selection-start-column="11" selection-end-line="7" selection-end-column="11" />
+          <caret line="26" column="5" lean-forward="true" selection-start-line="26" selection-start-column="5" selection-end-line="26" selection-end-column="5" />
         </state>
       </provider>
     </entry>
@@ -707,13 +708,6 @@
       <provider selected="true" editor-type-id="text-editor">
         <state relative-caret-position="15">
           <caret line="45" column="30" selection-start-line="45" selection-start-column="30" selection-end-line="45" selection-end-column="30" />
-        </state>
-      </provider>
-    </entry>
-    <entry file="file://$PROJECT_DIR$/src/message.rs">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="-2309">
-          <caret line="47" column="92" selection-start-line="47" selection-start-column="92" selection-end-line="47" selection-end-column="92" />
         </state>
       </provider>
     </entry>
@@ -747,15 +741,15 @@
     </entry>
     <entry file="file://$PROJECT_DIR$/src/tree.rs">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="195">
-          <caret line="30" column="11" selection-start-line="30" selection-start-column="11" selection-end-line="30" selection-end-column="11" />
+        <state relative-caret-position="405">
+          <caret line="27" column="24" selection-start-line="27" selection-start-column="24" selection-end-line="27" selection-end-column="24" />
         </state>
       </provider>
     </entry>
     <entry file="file://$PROJECT_DIR$/src/port_tree.rs">
       <provider selected="true" editor-type-id="text-editor">
         <state relative-caret-position="212">
-          <caret line="27" column="11" selection-start-line="27" selection-start-column="11" selection-end-line="27" selection-end-column="11" />
+          <caret line="28" column="49" selection-start-line="28" selection-start-column="49" selection-end-line="28" selection-end-column="49" />
           <folding>
             <element signature="e#1214#1215#0" expanded="true" />
             <element signature="e#1239#1240#0" expanded="true" />
@@ -778,49 +772,58 @@
     </entry>
     <entry file="file://$PROJECT_DIR$/src/utility.rs">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="191">
-          <caret line="84" column="11" selection-start-line="84" selection-start-column="11" selection-end-line="84" selection-end-column="11" />
+        <state relative-caret-position="408">
+          <caret line="251" selection-start-line="251" selection-end-line="251" />
         </state>
       </provider>
     </entry>
     <entry file="file://$PROJECT_DIR$/src/routing_table_entry.rs">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="840">
-          <caret line="56" column="11" selection-start-line="56" selection-start-column="11" selection-end-line="56" selection-end-column="11" />
-          <folding>
-            <element signature="e#2014#2015#0" expanded="true" />
-            <element signature="e#2065#2066#0" expanded="true" />
-            <element signature="e#2589#2590#0" expanded="true" />
-            <element signature="e#2637#2638#0" expanded="true" />
-          </folding>
+        <state relative-caret-position="285">
+          <caret line="19" selection-start-line="19" selection-end-line="19" />
         </state>
       </provider>
     </entry>
     <entry file="file://$PROJECT_DIR$/src/config.rs">
       <provider selected="true" editor-type-id="text-editor">
         <state relative-caret-position="285">
-          <caret line="19" column="31" selection-start-line="19" selection-start-column="31" selection-end-line="19" selection-end-column="31" />
+          <caret line="19" column="39" selection-start-line="19" selection-start-column="39" selection-end-line="19" selection-end-column="39" />
         </state>
       </provider>
     </entry>
     <entry file="file://$PROJECT_DIR$/src/traph.rs">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="191">
-          <caret line="75" column="11" selection-start-line="75" selection-start-column="11" selection-end-line="75" selection-end-column="11" />
+        <state relative-caret-position="336">
+          <caret line="208" column="29" lean-forward="true" selection-start-line="208" selection-start-column="29" selection-end-line="208" selection-end-column="29" />
         </state>
       </provider>
     </entry>
     <entry file="file://$PROJECT_DIR$/src/cellagent.rs">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="230">
-          <caret line="824" column="13" lean-forward="true" selection-start-line="824" selection-start-column="13" selection-end-line="824" selection-end-column="13" />
+        <state relative-caret-position="-1050">
+          <caret line="990" column="46" lean-forward="true" selection-start-line="990" selection-start-column="46" selection-end-line="990" selection-end-column="46" />
           <folding>
             <element signature="e#17177#17655#0" />
             <element signature="e#20014#20478#0" />
             <element signature="e#46662#47236#0" />
             <element signature="e#50113#50770#0" />
-            <element signature="e#91107#91108#0" expanded="true" />
-            <element signature="e#91159#91160#0" expanded="true" />
+            <element signature="e#90199#90200#0" expanded="true" />
+            <element signature="e#90251#90252#0" expanded="true" />
+          </folding>
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/src/message.rs">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="326">
+          <caret line="687" column="27" selection-start-line="687" selection-start-column="27" selection-end-line="687" selection-end-column="27" />
+          <folding>
+            <element signature="e#18420#18421#0" expanded="true" />
+            <element signature="e#18472#18473#0" expanded="true" />
+            <element signature="e#31692#31693#0" expanded="true" />
+            <element signature="e#31741#31742#0" expanded="true" />
+            <element signature="e#38196#38197#0" expanded="true" />
+            <element signature="e#38257#38258#0" expanded="true" />
           </folding>
         </state>
       </provider>
