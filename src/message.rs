@@ -178,7 +178,7 @@ pub trait Message {
     fn is_ait(&self) -> bool { self.get_header().get_ait() }
     fn is_blocking(&self) -> bool;
     fn value(&self) -> serde_json::Value;
-//    fn get_count(&self) -> MsgID { self.get_header().get_count() }
+    fn get_msg_id(&self) -> MsgID { self.get_header().get_msg_id() }
     fn to_bytes(&self) -> Result<ByteArray, Error> where Self: serde::Serialize + Sized {
         let _f = "to_bytes";
         let bytes = Serializer::serialize(self).context(MessageError::Chain { func_name: _f, comment: S("")})?;
@@ -205,7 +205,7 @@ impl fmt::Display for Message {
 pub trait MsgPayload: fmt::Display {}
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct MsgHeader {
-    msg_count: MsgID, // Debugging only?
+    msg_id: MsgID, // Debugging only?
     is_ait: bool,
     sender_id: SenderID, // Used to find set of AllowedTrees
     msg_type: MsgType,
@@ -215,10 +215,10 @@ pub struct MsgHeader {
 impl MsgHeader {
     pub fn new(sender_id: &SenderID, is_ait: bool, msg_type: MsgType, direction: MsgDirection) -> MsgHeader {
         let msg_count = get_next_count();
-        MsgHeader { sender_id: sender_id.clone(), is_ait, msg_type, direction, msg_count, tree_map: HashMap::new() }
+        MsgHeader { sender_id: sender_id.clone(), is_ait, msg_type, direction, msg_id: msg_count, tree_map: HashMap::new() }
     }
     pub fn get_msg_type(&self) -> MsgType { self.msg_type }
-//    pub fn get_count(&self) -> MsgID { self.msg_count }
+    pub fn get_msg_id(&self) -> MsgID { self.msg_id }
     pub fn get_ait(&self) -> bool { self.is_ait }
     pub fn get_direction(&self) -> MsgDirection { self.direction }
     pub fn get_sender_id(&self) -> &SenderID { &self.sender_id }
@@ -228,7 +228,7 @@ impl MsgHeader {
 }
 impl fmt::Display for MsgHeader { 
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result { 
-        let s = format!("Message {} {} '{}'", *self.msg_count, self.msg_type, self.direction);
+        let s = format!("Message {} {} '{}'", *self.msg_id, self.msg_type, self.direction);
         write!(f, "{}", s) 
     }
 }
@@ -321,11 +321,11 @@ pub struct DiscoverDMsg {
     payload: DiscoverDPayload
 }
 impl DiscoverDMsg {
-    pub fn new(sender_id: &SenderID, sending_cell_id: &CellID, tree_id: &TreeID, path: Path) -> DiscoverDMsg {
+    pub fn new(in_reply_to: MsgID, sender_id: &SenderID, sending_cell_id: &CellID, tree_id: &TreeID, path: Path) -> DiscoverDMsg {
         // Note that direction is leafward so we can use the connected ports tree
         // If we send rootward, then the first recipient forwards the DiscoverD
         let header = MsgHeader::new(sender_id, true,MsgType::DiscoverD, MsgDirection::Leafward);
-        let payload = DiscoverDPayload::new(sending_cell_id, tree_id, path);
+        let payload = DiscoverDPayload::new(in_reply_to, sending_cell_id, tree_id, path);
         DiscoverDMsg { header, payload }
     }
     pub fn get_payload(&self) -> &DiscoverDPayload { &self.payload }
@@ -335,6 +335,7 @@ impl Message for DiscoverDMsg {
     fn get_payload(&self) -> &MsgPayload { &self.payload }
     fn get_msg_type(&self) -> MsgType { self.get_header().msg_type }
     fn get_tree_id(&self) -> TreeID { self.payload.tree_id.clone() }
+    fn get_msg_id(&self) -> MsgID { self.header.get_msg_id()}
     fn is_blocking(&self) -> bool { true }
     fn value(&self) -> serde_json::Value {
         serde_json::to_value(self).expect("I don't know how to handle errors in msg.value()")
@@ -353,13 +354,14 @@ impl fmt::Display for DiscoverDMsg {
 }
 #[derive(Debug, Clone, Hash, Serialize, Deserialize)]
 pub struct DiscoverDPayload {
+    in_reply_to: MsgID,
     sending_cell_id: CellID,
     tree_id: TreeID,
     path: Path
 }
 impl DiscoverDPayload {
-    fn new(sending_cell_id: &CellID, tree_id: &TreeID, path: Path) -> DiscoverDPayload {
-        DiscoverDPayload { sending_cell_id: sending_cell_id.clone(), tree_id: tree_id.clone(), path }
+    fn new(in_reply_to: MsgID, sending_cell_id: &CellID, tree_id: &TreeID, path: Path) -> DiscoverDPayload {
+        DiscoverDPayload { in_reply_to, sending_cell_id: sending_cell_id.clone(), tree_id: tree_id.clone(), path }
     }
     pub fn get_tree_id(&self) -> &TreeID { &self.tree_id }
     pub fn get_path(&self) -> Path { self.path }
@@ -438,12 +440,12 @@ pub struct FailoverDMsg {
     payload: FailoverDMsgPayload
 }
 impl FailoverDMsg {
-    pub fn new(sender_id: &SenderID, response: FailoverResponse, port_tree_id: &TreeID, hops: PathLength,
+    pub fn new(in_reply_to: MsgID, sender_id: &SenderID, response: FailoverResponse, port_tree_id: &TreeID, hops: PathLength,
                broken_tree_ids: &HashSet<TreeID>, path: Path) -> FailoverDMsg {
         // Note that direction is leafward so we can use the connected ports tree
         // If we send rootward, then the first recipient forwards the FailoverMsg
         let header = MsgHeader::new(sender_id, true,MsgType::FailoverD, MsgDirection::Leafward);
-        let payload = FailoverDMsgPayload::new(response, port_tree_id,
+        let payload = FailoverDMsgPayload::new(in_reply_to, response, port_tree_id,
                                                hops, broken_tree_ids, path);
         FailoverDMsg { header, payload }
     }
@@ -472,6 +474,7 @@ impl fmt::Display for FailoverDMsg {
 }
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct FailoverDMsgPayload {
+    in_reply_to: MsgID,
     rw_tree_id: TreeID,
     response: FailoverResponse,
     broken_tree_ids: HashSet<TreeID>,
@@ -479,9 +482,9 @@ pub struct FailoverDMsgPayload {
     path: Path
 }
 impl FailoverDMsgPayload {
-    fn new(response: FailoverResponse, port_tree_id: &TreeID,
+    fn new(in_reply_to: MsgID, response: FailoverResponse, port_tree_id: &TreeID,
            hops: PathLength, broken_tree_ids: &HashSet<TreeID>, path: Path) -> FailoverDMsgPayload {
-        FailoverDMsgPayload { response, rw_tree_id: port_tree_id.clone(), hops,
+        FailoverDMsgPayload { in_reply_to, response, rw_tree_id: port_tree_id.clone(), hops,
             broken_tree_ids: broken_tree_ids.clone(), path }
     }
     pub fn get_response(&self) -> FailoverResponse { self.response }
@@ -624,9 +627,9 @@ pub struct StackTreeDMsg {
     payload: StackTreeMsgDPayload
 }
 impl StackTreeDMsg {
-    pub fn new(sender_id: &SenderID, tree_id: &TreeID) -> StackTreeDMsg {
+    pub fn new(in_reply_to: MsgID, sender_id: &SenderID, tree_id: &TreeID) -> StackTreeDMsg {
         let header = MsgHeader::new(sender_id, true,MsgType::StackTreeD, MsgDirection::Leafward);
-        let payload = StackTreeMsgDPayload::new(tree_id);
+        let payload = StackTreeMsgDPayload::new(in_reply_to, tree_id);
         StackTreeDMsg { header, payload}
     }
 //    fn update_payload(&self, payload: StackTreeMsgDPayload) -> StackTreeDMsg {
@@ -657,11 +660,12 @@ impl fmt::Display for StackTreeDMsg {
 }
 #[derive(Debug, Clone, Hash, Serialize, Deserialize)]
 pub struct StackTreeMsgDPayload {
+    in_reply_to: MsgID,
     tree_id: TreeID,
 }
 impl StackTreeMsgDPayload {
-    fn new(tree_id: &TreeID) -> StackTreeMsgDPayload {
-        StackTreeMsgDPayload { tree_id: tree_id.clone() }
+    fn new(in_reply_to: MsgID, tree_id: &TreeID) -> StackTreeMsgDPayload {
+        StackTreeMsgDPayload { in_reply_to, tree_id: tree_id.clone() }
     }
     pub fn get_tree_id(&self) -> &TreeID { &self.tree_id }
 }

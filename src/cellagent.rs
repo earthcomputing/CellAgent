@@ -762,7 +762,8 @@ impl CellAgent {
         // Send DiscoverD to sender first time this tree is seen
         if !tree_seen {
             let sender_id = SenderID::new(&self.get_id(), "CellAgent")?;
-            let discoverd_msg = DiscoverDMsg::new(&sender_id, &self.cell_id, new_tree_id, path);
+            let in_reply_to = msg.get_msg_id();
+            let discoverd_msg = DiscoverDMsg::new(in_reply_to, &sender_id, &self.cell_id, new_tree_id, path);
             let mask = Mask::new(port_number);
             self.send_msg(&self.get_connected_ports_tree_id(), &discoverd_msg, mask).context(CellagentError::Chain { func_name: "process_ca", comment: S("DiscoverMsg") })?;
         }
@@ -842,7 +843,8 @@ impl CellAgent {
             }
             let hops = PathLength(CellNo(0));
             let mask = Mask::new(port_no.make_port_number(self.no_ports)?);
-            let failover_d_msg = FailoverDMsg::new(sender_id, FailoverResponse::Success,
+            let in_reply_to = msg.get_msg_id();
+            let failover_d_msg = FailoverDMsg::new(in_reply_to, sender_id, FailoverResponse::Success,
                 rw_port_tree_id, hops, broken_tree_ids, broken_path);
             self.send_msg(&self.connected_tree_id, &failover_d_msg, mask)?;
         } else {
@@ -853,7 +855,8 @@ impl CellAgent {
                     println!("Cellagent {}: {} Failover failure \n{}", self.cell_id, _f, rw_traph);
                     rw_traph.clear_tried_ports(&rw_port_tree_id);
                     let mask = Mask::new(port_no.make_port_number(self.no_ports)?);
-                    let failover_d_msg = FailoverDMsg::new(sender_id, FailoverResponse::Failure,
+                    let in_reply_to = msg.get_msg_id();
+                    let failover_d_msg = FailoverDMsg::new(in_reply_to, sender_id, FailoverResponse::Failure,
                                                            rw_port_tree_id, PathLength(CellNo(0)), broken_tree_ids, broken_path);
                     self.send_msg(&self.connected_tree_id, &failover_d_msg, mask)?;
                 },
@@ -986,7 +989,8 @@ impl CellAgent {
             self.update_entry(entry)?;
             // Send StackTreeDMsg
             let mask = Mask::new(port_number);
-            let new_msg = StackTreeDMsg::new(sender_id, new_tree_id);
+            let in_reply_to = msg.get_msg_id();
+            let new_msg = StackTreeDMsg::new(in_reply_to, sender_id, new_tree_id);
             self.send_msg(self.get_connected_ports_tree_id(), &new_msg, mask)?;
             let parent_tree_id = payload.get_parent_tree_id();
             let base_tree_id = self.get_base_tree_id(parent_tree_id).context(CellagentError::Chain { func_name: _f, comment: S("") })?;
