@@ -88,7 +88,14 @@ impl Name for TreeID {
     fn get_uuid(&self) -> Uuid { self.uuid }
     fn create_from_string(&self, name: &str) -> TreeID { TreeID { name: S(name), uuid: Uuid::new() } }
 }
-impl fmt::Display for TreeID { fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result { self.name.fmt(f) } }
+impl fmt::Display for TreeID {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        let mut uuid = S(self.uuid);
+        uuid.truncate(8);
+        let s = format!("{} {}", self.name, uuid);
+        write!(f, "{}", s)
+    }
+}
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct UptreeID { name: NameType, uuid: Uuid}
 impl UptreeID {
