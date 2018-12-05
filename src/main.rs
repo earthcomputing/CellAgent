@@ -172,7 +172,13 @@ fn read_int() -> Result<usize, Error> {
     let _f = "read_int";
     let mut char = String::new();
     stdin().read_line(&mut char)?;
-    Ok(char.trim().parse::<usize>()?)
+    match char.trim().parse::<usize>() {
+        Ok(num) => Ok(num),
+        Err(_) => {
+            println!("{} is not an integer.  Try again.", char.trim());
+            read_int()
+        }
+    }
 }
 fn deploy(outside_to_noc: OutsideToNoc) -> Result<(), Error> {
     stdout().write(b"Enter the name of a file containing a manifest\n").context(MainError::Chain { func_name: "run", comment: S("") })?;
