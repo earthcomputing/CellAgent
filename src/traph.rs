@@ -119,6 +119,7 @@ impl Traph {
         self.elements[*port_number.get_port_no() as usize].is_broken()
     }
     pub fn set_broken(&mut self, port_number: PortNumber) {
+        // Cannont set port status to pruned here because I subsequently use port status to find broken parent links
         self.elements[*port_number.get_port_no() as usize].set_broken();
     }
     pub fn get_port_status(&self, port_number: PortNumber) -> PortStatus {
@@ -138,7 +139,7 @@ impl Traph {
             .ok_or(TraphError::ParentElement { cell_id: self.cell_id.clone(), func_name: _f, tree_id: self.base_tree_id.clone() }.into())
             .map(|element| element.clone())
     }
-    pub fn find_new_parent_port(&self, rw_tree_id: &TreeID, broken_path: Path) -> Option<PortNo> {
+    pub fn find_new_parent_port(&mut self, rw_tree_id: &TreeID, broken_path: Path) -> Option<PortNo> {
         let _f = "find_new_parent_port";
         vec![
             self.get_untried_parent_element(rw_tree_id, broken_path),
@@ -148,22 +149,15 @@ impl Traph {
             .into_iter()
             .filter_map(|element| element)
             .min_by_key(|element| **element.get_hops())
-            .map(|element| element.get_port_no())
-    }
-    pub fn get_untried_parent_port(&self, rw_tree_id: &TreeID,broken_path: Path) -> Option<PortNo> {
-        self.get_untried_parent_element(rw_tree_id, broken_path)
-            .map(|element| element.get_port_no())
-    }
-    pub fn get_untried_pruned_port(&self, rw_tree_id: &TreeID, broken_path: Path) -> Option<PortNo> {
-        self.get_untried_pruned_element(rw_tree_id, broken_path)
-            .map(|element| element.get_port_no())
-    }
-    pub fn get_untried_child_port(&self, rw_tree_id: &TreeID) -> Option<PortNo> {
-        self.get_untried_child_element(rw_tree_id)
-            .map(|element| element.get_port_no())
+            .map(|element| {
+                let port_no = element.get_port_no();
+                self.add_tried_port(rw_tree_id, port_no);
+                port_no
+            })
     }
     pub fn get_untried_parent_element(&self, rw_tree_id: &TreeID, broken_path: Path) -> Option<TraphElement> {
-       match self.get_parent_element() {
+        let _f = "get_untried_parent_element";
+        match self.get_parent_element() {
             Err(_) => None,
             Ok(element) => {
                 if element.is_on_broken_path(broken_path) ||
@@ -178,19 +172,6 @@ impl Traph {
             }
         }
     }
-    pub fn get_untried_child_element(&self, rw_tree_id: &TreeID) -> Option<TraphElement> {
-        // TODO: Change to pick child with pruned port with shortest path to root
-        let _f = "get_untried_child_element";
-        // println!("get_untried_child_element - {}", self);
-        // dumpstack();
-        self.elements
-            .iter()
-            .filter(|&element| element.is_connected())
-            .find(|&element| element.is_status(PortStatus::Child))
-            .filter(|&element| !self.tried_ports_contains(rw_tree_id, element.get_port_no()))
-            .filter(|&element| !element.is_broken())
-            .map(|element| element.clone())
-    }
     pub fn get_untried_pruned_element(&self, rw_tree_id: &TreeID, broken_path: Path) -> Option<TraphElement> {
         let _f = "get_untried_pruned_element";
         // println!("get_untried_pruned_element - {}", self);
@@ -203,6 +184,19 @@ impl Traph {
             .filter(|&element| !element.is_on_broken_path(broken_path))
             .filter(|&element| !element.is_broken())
             .min_by_key(|&element| **element.get_hops())
+            .map(|element| element.clone())
+    }
+    pub fn get_untried_child_element(&self, rw_tree_id: &TreeID) -> Option<TraphElement> {
+        // TODO: Change to pick child with pruned port with shortest path to root
+        let _f = "get_untried_child_element";
+        // println!("get_untried_child_element - {}", self);
+        // dumpstack();
+        self.elements
+            .iter()
+            .filter(|&element| element.is_connected())
+            .find(|&element| element.is_status(PortStatus::Child))
+            .filter(|&element| !self.tried_ports_contains(rw_tree_id, element.get_port_no()))
+            .filter(|&element| !element.is_broken())
             .map(|element| element.clone())
     }
     pub fn add_child(&mut self, port_tree_id: &TreeID, child: PortNumber) -> Result<(), Error> {
@@ -262,17 +256,15 @@ impl Traph {
     }
     pub fn has_broken_parent(&self) -> bool {
         let _f = "has_broken_parent";
-        match self.get_parent_element() {
-            Ok(parent_element) => parent_element.is_broken(),
-            Err(_) => false
-        }
+        self.get_parent_element()
+            .map(|parent_element| parent_element.is_broken())
+            .unwrap_or(false)
     }
     pub fn is_one_hop(&self) -> bool {
         let _f = "is_one_hop";
-        match self.get_parent_element() {
-            Ok(parent_element) => 1 == **parent_element.get_hops(),
-            Err(_) => false
-        }
+        self.get_parent_element()
+            .map(|parent_element| 1 == **parent_element.get_hops())
+            .unwrap_or(false)
     }
     /*
     pub fn update_stacked_entries(&self, base_tree_entry: RoutingTableEntry) -> Result<Vec<RoutingTableEntry>, Error> {
@@ -347,14 +339,16 @@ impl fmt::Display for Traph {
 pub enum PortStatus {
     Parent,
     Child,
-    Pruned
+    Pruned,
+    Broken
 }
 impl fmt::Display for PortStatus {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match *self {
             PortStatus::Parent => write!(f, "Parent"),
             PortStatus::Child  => write!(f, "Child "),
-            PortStatus::Pruned => write!(f, "Pruned")
+            PortStatus::Pruned => write!(f, "Pruned"),
+            PortStatus::Broken => write!(f, "broken")
         }
     }
 }
