@@ -1261,9 +1261,7 @@ impl CellAgent {
                 }
             };
         let rw_tree_id = rw_traph.get_base_tree_id().clone(); // Need clone to avoid borrow problem
-        let mut element = my_traph.get_element(port_no)?.clone();
         self.insert_traph(&my_tree_id.clone(), my_traph)?;
-        element.set_broken();
         let broken_path = rw_traph.get_element(port_no)?.get_path();
         rw_traph.add_tried_port(&rw_tree_id, port_no);  // Don't try port attached to broken link
         if let Some(trial_parent_port) = rw_traph.find_new_parent_port(&rw_tree_id, broken_path) {
