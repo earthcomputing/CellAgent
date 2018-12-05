@@ -78,6 +78,7 @@ impl Traph {
         self.tried_ports.insert(rw_tree_id.clone(), HashSet::new());
     }
     pub fn add_tried_port(&mut self, rw_tree_id: &TreeID, port_no: PortNo) {
+        let _f = "add_tried_port";
         let mut tried = self.tried_ports
             .get(rw_tree_id)
             .cloned()
@@ -141,11 +142,11 @@ impl Traph {
     }
     pub fn find_new_parent_port(&mut self, rw_tree_id: &TreeID, broken_path: Path) -> Option<PortNo> {
         let _f = "find_new_parent_port";
-        vec![
-            self.get_untried_parent_element(rw_tree_id, broken_path),
-            self.get_untried_pruned_element(rw_tree_id, broken_path),
-            self.get_untried_child_element(rw_tree_id)
-        ]
+        // The following 3 lines are useful for debugging
+        let p1 = self.get_untried_parent_element(rw_tree_id, broken_path);
+        let p2 = self.get_untried_pruned_element(rw_tree_id, broken_path);
+        let p3 = self.get_untried_child_element(rw_tree_id);
+        vec![p1, p2, p3]
             .into_iter()
             .filter_map(|element| element)
             .min_by_key(|element| **element.get_hops())

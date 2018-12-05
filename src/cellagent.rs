@@ -290,7 +290,7 @@ impl CellAgent {
             if DEBUG_OPTIONS.traph_state { println!("Cell {}: {}: stacked tree {}", self.cell_id, _f, tree_id); }
         }
         self.base_tree_map
-            .get(tree_id)
+            .get(&tree_id.without_root_port_number())
             .cloned()
             .ok_or(CellagentError::BaseTree { func_name: _f, cell_id: self.cell_id.clone(), tree_id: tree_id.clone() }.into())
     }
@@ -848,9 +848,9 @@ impl CellAgent {
                 rw_port_tree_id, hops, broken_tree_ids, broken_path);
             self.send_msg(&self.connected_tree_id, &failover_d_msg, mask)?;
         } else {
-            let mut rw_traph = self.own_traph(&rw_tree_id)?;
+            let mut rw_traph = self.own_traph(&rw_port_tree_id)?;
             rw_traph.add_tried_port(&rw_port_tree_id, port_no);
-            match rw_traph.find_new_parent_port(&rw_tree_id, broken_path) {
+            match rw_traph.find_new_parent_port(&rw_port_tree_id, broken_path) {
                 None => {
                     println!("Cellagent {}: {} Failover failure \n{}", self.cell_id, _f, rw_traph);
                     rw_traph.clear_tried_ports(&rw_port_tree_id);
@@ -866,7 +866,7 @@ impl CellAgent {
                     self.send_msg(&self.connected_tree_id, msg, mask)?;
                 }
             }
-            self.insert_traph(&rw_tree_id, rw_traph)?;
+            self.insert_traph(&rw_port_tree_id, rw_traph)?;
         }
         Ok(())
     }
@@ -1243,6 +1243,7 @@ impl CellAgent {
         let my_tree_id = self.my_tree_id.clone();
         let mut my_traph = self.own_traph(&my_tree_id)?;
         my_traph.set_broken(port_number);
+        self.insert_traph(&my_tree_id.clone(), my_traph)?;
         let mut broken_base_tree_ids = HashSet::new();
         let mut rw_traph = match self.traphs.lock().unwrap()
             .values_mut()
@@ -1261,7 +1262,6 @@ impl CellAgent {
                 }
             };
         let rw_tree_id = rw_traph.get_base_tree_id().clone(); // Need clone to avoid borrow problem
-        self.insert_traph(&my_tree_id.clone(), my_traph)?;
         let broken_path = rw_traph.get_element(port_no)?.get_path();
         rw_traph.add_tried_port(&rw_tree_id, port_no);  // Don't try port attached to broken link
         if let Some(trial_parent_port) = rw_traph.find_new_parent_port(&rw_tree_id, broken_path) {
