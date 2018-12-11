@@ -4,6 +4,7 @@ use std::thread::ThreadId;
 use serde_json;
 use serde_json::{Value};
 
+use lazy_static::lazy_static;
 use time;
 
 use config::{MAX_PORTS, REPO, MaskValue, PortNo};
@@ -126,8 +127,12 @@ PORT - "port_no":{"v":[0-9]*},"is_border":[a-z]*
 {THDR,FCN,COMMENT}
 
 */
+lazy_static!{
+    static ref STARTING_EPOCH: u64 = timestamp();
+}
 #[derive(Debug, Clone, Serialize)]
 pub struct TraceHeader {
+    starting_epoch: u64,
     epoch: u64,
     thread_id: u64,
     event_id: Vec<u64>,
@@ -142,7 +147,7 @@ impl TraceHeader {
     pub fn new() -> TraceHeader {
         let thread_id = TraceHeader::parse(thread::current().id());
         let epoch = timestamp();
-        TraceHeader { epoch,
+        TraceHeader { starting_epoch: *STARTING_EPOCH, epoch,
             thread_id, event_id: vec![0], trace_type: TraceType::Trace,
             module: "", line_no: 0, function: "", format: "", repo: REPO }
     }
@@ -157,7 +162,7 @@ impl TraceHeader {
         let mut event_id = self.event_id.clone();
         event_id.push(0);
         let thread_id = TraceHeader::parse(thread::current().id());
-        TraceHeader { epoch: timestamp(),
+        TraceHeader { starting_epoch: *STARTING_EPOCH, epoch: timestamp(),
             thread_id, event_id, trace_type: self.trace_type,
             module: self.module, line_no: self.line_no, function: self.function, format: self.format, repo: REPO }
     }

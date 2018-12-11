@@ -178,8 +178,12 @@ impl CellAgent {
             .ok_or(CellagentError::Tree { func_name: _f, cell_id: self.cell_id.clone(), tree_uuid: tree_id.get_uuid() }.into())
     }
     fn get_mask(&self, tree_id: &TreeID) -> Result<Mask, Error> {
+        let _f = "get_mask";
         Ok(match self.get_traph(tree_id) {
-            Ok(t) => t.get_tree_entry(&tree_id.get_uuid())?.get_mask(),
+            Ok(t) => {
+                let entry = t.get_tree_entry(&tree_id.get_uuid()).context(CellagentError::Chain { func_name: _f, comment: S("") })?;
+                entry.get_mask()
+            },
             Err(_) => Mask::empty().not()
         })
     }
@@ -395,6 +399,7 @@ impl CellAgent {
                            PortNumber::new0(), mask, gvm_send);
             port_tree.set_entry(new_entry);
             traph.add_port_tree(port_tree);
+            self.update_entry(new_entry)?;
         }
         locked.insert(base_tree_id.get_uuid(), traph);
         // TODO: Need to update entries of stacked trees following a failover but not as base tree builds out
@@ -549,8 +554,10 @@ impl CellAgent {
     */
     pub fn get_tree_entry(&self, tree_id: &TreeID)
             -> Result<RoutingTableEntry, Error> {
+        let _f = "get_tree_entry";
         let traph = self.get_traph(&tree_id.without_root_port_number())?;
-        traph.get_tree_entry(&tree_id.get_uuid())
+        let entry = traph.get_tree_entry(&tree_id.get_uuid()).context(CellagentError::Chain { func_name: _f, comment: S("") })?;
+        Ok(entry)
     }
     pub fn stack_tree(&mut self, sender_id: &SenderID, allowed_tree: &AllowedTree,
                       new_tree_id: &TreeID, parent_tree_id: &TreeID, new_port_tree_id_opt: Option<&TreeID>,
@@ -812,35 +819,26 @@ impl CellAgent {
         let payload = msg.get_payload();
         let sender_id = header.get_sender_id();
         let rw_port_tree_id = payload.get_rw_port_tree_id();
-        let rw_tree_id= rw_port_tree_id.without_root_port_number();
+        let rw_tree_id = rw_port_tree_id.without_root_port_number();
+        let lw_port_tree_id = payload._get_lw_port_tree_id();
+        let lw_tree_id = lw_port_tree_id.without_root_port_number();
         self.failover_reply_port.insert(rw_port_tree_id.clone(), port_no);
         let broken_path = payload.get_path();
         let broken_tree_ids = payload.get_broken_tree_ids();
-        if rw_tree_id == self.my_tree_id {
-            //println!("Cellagent {}: {} broken path {} broken trees\n{:#?}", self.cell_id, _f, broken_path, broken_tree_ids);
-            //println!("Cellagent {}: {} Failover success from {} {}", self.cell_id, _f, lw_port_tree_id, lw_port_tree_id.get_uuid());
-            let my_traph = self.get_traph(&self.my_tree_id)?;
-            //println!("Cellagent {}: {} port {} lw tree {}\n{}", self.cell_id, _f, *port_no, lw_tree_id, my_traph);
-            let broken_port_no = broken_path.get_port_no();
-            let new_entry = self.update_broken(&my_traph, rw_port_tree_id, port_no, broken_port_no)?;
-            for (_uuid, tree) in my_traph.get_stacked_trees().lock().unwrap().iter() {
-                let mut old_entry = tree.get_table_entry();
-                old_entry.set_mask(new_entry.get_mask());
-                self.update_entry(old_entry)?;
-            }
-            my_traph
-                .get_port_trees()
-                .get(&rw_port_tree_id)
-                .map(|port_tree| -> Result<(), Error> {
-                    let mut new_port_tree_entry = port_tree.get_entry();
-                    let mask = new_port_tree_entry.get_mask();
-                    new_port_tree_entry.set_mask(mask);
-                    self.update_entry(new_port_tree_entry)?;
-                    Ok(())
-                });
-            for (_tree_id, port_tree) in my_traph.get_port_trees() {
-                self.update_broken(&my_traph,port_tree.get_port_tree_id(), port_no, broken_port_no)?;
-            }
+        let my_tree_id = self.my_tree_id.clone();
+        if rw_tree_id == my_tree_id {
+            let mut my_traph = self.get_traph(&self.my_tree_id)?;
+            let lw_traph = self.get_traph(&lw_tree_id)?;
+            let port_number = port_no.make_port_number(self.no_ports)?;
+            let broken_element = lw_traph.get_parent_element()?;
+            let broken_port_no = broken_element.get_port_no();
+            let broken_port_number = broken_port_no.make_port_number(self.no_ports)?;
+            my_traph.mark_broken(broken_port_number);
+            println!("Cellagent {}: {} before\n{}", self.cell_id, _f, my_traph);
+            let changed_entries = my_traph.swap_child(&rw_port_tree_id, broken_port_number, port_number)?;
+            for entry in changed_entries { self.update_entry(entry)?; }
+            println!("Cellagent {}: {} after\n{}", self.cell_id, _f, my_traph);
+            self.insert_traph(&my_tree_id, my_traph)?;
             let hops = PathLength(CellNo(0));
             let mask = Mask::new(port_no.make_port_number(self.no_ports)?);
             let in_reply_to = msg.get_msg_id();
@@ -870,19 +868,6 @@ impl CellAgent {
         }
         Ok(())
     }
-    fn update_broken(&self, traph: &Traph, port_tree_id: &TreeID, port_no: PortNo, broken_port_no: PortNo)
-            -> Result<RoutingTableEntry, Error> {
-        let _f = "update_broken";
-        let port_number = port_no.make_port_number(self.no_ports)?;
-        let mut broken_element = traph.get_element(broken_port_no)?.clone();
-        broken_element.set_status(traph::PortStatus::Pruned);
-        let mut broken_entry = traph.get_tree_entry(&port_tree_id.without_root_port_number().get_uuid())?;
-        let children = new_hash_set(Box::new([port_number]));
-        broken_entry.add_children(&children);
-        //println!("Cellagent {}: {} tree {} entry {}", self.cell_id, _f, self.my_tree_id, broken_entry);
-        self.update_entry(broken_entry)?;
-        Ok(broken_entry)
-    }
     pub fn process_failover_d_msg(&mut self, msg: &FailoverDMsg, port_no: PortNo)
             -> Result<(), Error> {
         let _f = "process_failover_d_msg";
@@ -896,7 +881,7 @@ impl CellAgent {
                 let path = *payload.get_path();
                 let port_number = port_no.make_port_number(self.no_ports)?;
                 let mut traph = self.own_traph(&tree_id).context(CellagentError::Chain { func_name: _f, comment: S("") })?;
-                let old_parent_entry = traph.get_tree_entry(&tree_id.get_uuid())?;
+                let old_parent_entry = traph.get_tree_entry(&tree_id.get_uuid()).context(CellagentError::Chain { func_name: _f, comment: S("") })?;
                 println!("Cellagent {}: {} tree id {:?} old entry {}", self.cell_id, _f, tree_id, old_parent_entry);
                 let old_parent = old_parent_entry.get_parent();
                 let failover_port = self.failover_reply_port
@@ -952,7 +937,7 @@ impl CellAgent {
         self.deploy(sender_id, deployment_tree_id, msg_tree_id, msg_tree_map, manifest).context(CellagentError::Chain { func_name: "process_ca", comment: S("ManifestMsg")})?;
         let tree_id = payload.get_deploy_tree_id();
         let traph = self.get_traph(tree_id)?.clone();
-        let entry = traph.get_tree_entry(&tree_id.get_uuid())?;
+        let entry = traph.get_tree_entry(&tree_id.get_uuid()).context(CellagentError::Chain { func_name: _f, comment: S("") })?;
         let user_mask = entry.get_mask();
         let gvm_eqn = self.get_gvm_eqn(tree_id)?;
         let save = self.gvm_eval_save(&msg_tree_id, &gvm_eqn).context(CellagentError::Chain { func_name: _f, comment: S(self.cell_id.clone())})?;
@@ -1015,7 +1000,7 @@ impl CellAgent {
         let tree_id = payload.get_tree_id();
         let tree_uuid = tree_id.get_uuid();
         let mut traph = self.own_traph(tree_id)?;
-        let mut entry = traph.get_tree_entry(&tree_uuid)?;
+        let mut entry = traph.get_tree_entry(&tree_uuid).context(CellagentError::Chain { func_name: _f, comment: S("") })?;
         let user_mask = Mask::new(port_number);
         let mask = entry.get_mask().or(user_mask);
         entry.set_mask(mask);
@@ -1262,20 +1247,24 @@ impl CellAgent {
                 }
             };
         let rw_tree_id = rw_traph.get_base_tree_id().clone(); // Need clone to avoid borrow problem
-        let broken_path = rw_traph.get_element(port_no)?.get_path();
+        let broken_path = {
+            let broken_element = rw_traph.get_element(port_no)?;
+            broken_element.get_path()
+        };
+        //let broken_path = rw_traph.get_element(port_no)?.get_path();
         rw_traph.add_tried_port(&rw_tree_id, port_no);  // Don't try port attached to broken link
         if let Some(trial_parent_port) = rw_traph.find_new_parent_port(&rw_tree_id, broken_path) {
             rw_traph.add_tried_port(&rw_tree_id, trial_parent_port);
             let sender_id = SenderID::new(&self.get_id(), "CellAgent")?;
             let rootward_tree_id = rw_traph.get_base_tree_id();
-            let rw_port_tree_id = rootward_tree_id.with_root_port_number(&port_number);
-            let lw_port_tree_id = self.my_tree_id.with_root_port_number(&port_no.make_port_number(self.no_ports)?);
+            let rw_port_number = broken_path.get_port_number();
+            let rw_port_tree_id = rootward_tree_id.with_root_port_number(&rw_port_number);
+            let lw_port_tree_id = self.my_tree_id.with_root_port_number(&port_number);
             broken_base_tree_ids.remove(&rw_port_tree_id);
-            let path = rw_traph.get_parent_element()?.get_path();
             let port_number = trial_parent_port.make_port_number(self.no_ports)?;
             let mask = Mask::new(port_number);
             let failover_msg = FailoverMsg::new(&sender_id, &rw_port_tree_id, &lw_port_tree_id,
-                                                path, &broken_base_tree_ids);
+                                                broken_path, &broken_base_tree_ids);
             self.send_msg(&self.connected_tree_id, &failover_msg, mask).context(CellagentError::Chain { func_name: _f, comment: S(self.cell_id.clone()) })?;
             println!("Cellagent {}: {} candidate parent for tree {} is port {}", self.cell_id, _f, rw_traph.get_base_tree_id(), *trial_parent_port);
         } else {
