@@ -6,13 +6,13 @@ use std::sync::atomic::{ATOMIC_USIZE_INIT, AtomicUsize, Ordering};
 use serde;
 use serde_json;
 
-use cellagent::{CellAgent};
-use config::{ByteArray, CellNo, MsgID, PathLength, PortNo};
-use gvm_equation::{GvmEquation, GvmEqn};
-use name::{Name, CellID, SenderID, TreeID};
-use packet::{Packet, Packetizer, Serializer};
-use uptree_spec::{AllowedTree, Manifest};
-use utility::{S, Path};
+use crate::cellagent::{CellAgent};
+use crate::config::{ByteArray, CellNo, MsgID, PathLength, PortNo};
+use crate::gvm_equation::{GvmEquation, GvmEqn};
+use crate::name::{Name, CellID, SenderID, TreeID};
+use crate::packet::{Packet, Packetizer, Serializer};
+use crate::uptree_spec::{AllowedTree, Manifest};
+use crate::utility::{S, Path};
 
 static MESSAGE_COUNT: AtomicUsize = ATOMIC_USIZE_INIT;
 pub fn get_next_count() -> MsgID { MsgID(MESSAGE_COUNT.fetch_add(1, Ordering::SeqCst) as u64) }

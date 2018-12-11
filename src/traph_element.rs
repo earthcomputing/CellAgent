@@ -1,8 +1,8 @@
 use std::fmt;
 
-use config::{CellNo, PathLength, PortNo};
-use traph::{PortStatus};
-use utility::{Path, PortNumber};
+use crate::config::{CellNo, PathLength, PortNo};
+use crate::traph::{PortStatus};
+use crate::utility::{Path, PortNumber};
 
 #[derive(Debug, Copy, Clone)]
 pub struct TraphElement {

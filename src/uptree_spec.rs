@@ -1,8 +1,8 @@
 use std::fmt;
 use std::collections::HashSet;
 
-use nalcell::CellConfig;
-use utility::S;
+use crate::nalcell::CellConfig;
+use crate::utility::S;
 
 #[derive(Debug, Clone, Hash, Serialize, Deserialize)]
 pub struct Manifest {

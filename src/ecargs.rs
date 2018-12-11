@@ -2,7 +2,7 @@ use std::fmt;
 
 use failure::{Error};
 
-use config::{MAX_PORTS, CellNo, LinkNo, PortNo};
+use crate::config::{MAX_PORTS, CellNo, LinkNo, PortNo};
 
 #[derive(Debug)]
 pub struct ECArgs {

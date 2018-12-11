@@ -1,10 +1,10 @@
 use std::fmt;
 use failure::Error;
 
-use message_types::{ContainerToVm, ContainerFromVm};
-use name::{ContainerID, UptreeID};
-use service::{Service};
-use uptree_spec::AllowedTree;
+use crate::message_types::{ContainerToVm, ContainerFromVm};
+use crate::name::{ContainerID, UptreeID};
+use crate::service::{Service};
+use crate::uptree_spec::AllowedTree;
 
 #[derive(Debug, Clone)]
 pub struct Container {

@@ -3,15 +3,15 @@ use std::cmp::max;
 use std::sync::mpsc::channel;
 use std::thread::{JoinHandle};
 
-use blueprint::{Blueprint, Cell};
-use config::{TRACE_OPTIONS, CellNo, CellType, Edge, LinkNo, get_geometry};
-use dal;
-use message_types::{LinkToPort, PortFromLink, PortToLink, LinkFromPort,
+use crate::blueprint::{Blueprint, Cell};
+use crate::config::{TRACE_OPTIONS, CellNo, CellType, Edge, LinkNo, get_geometry};
+use crate::dal;
+use crate::message_types::{LinkToPort, PortFromLink, PortToLink, LinkFromPort,
     PortToNoc, PortFromNoc};
-use link::{Link};
-use nalcell::{CellConfig, NalCell};
-use name::{CellID, LinkID};
-use utility::{TraceHeaderParams, TraceType};
+use crate::link::{Link};
+use crate::nalcell::{CellConfig, NalCell};
+use crate::name::{CellID, LinkID};
+use crate::utility::{TraceHeaderParams, TraceType};
 
 #[derive(Debug)]
 pub struct Datacenter {

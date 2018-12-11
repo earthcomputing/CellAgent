@@ -3,8 +3,8 @@ use std::fmt;
 
 use uuid;
 
-use config::PortNo;
-use utility::PortNumber;
+use crate::config::PortNo;
+use crate::utility::PortNumber;
 
 const NORMAL:   u8 = 0b01000000;  // Used for all Name UUIDs, including TreeIDs used for normal packets
 const AIT:      u8 = 0b00000100;

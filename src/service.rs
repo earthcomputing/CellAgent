@@ -1,14 +1,14 @@
 use std::fmt;
 use std::thread;
 
-use config::{ByteArray,CONTINUE_ON_ERROR, TRACE_OPTIONS};
-use dal;
-use dal::{fork_trace_header, update_trace_header};
-use message::{MsgDirection, TcpMsgType};
-use message_types::{ContainerToVm, ContainerFromVm};
-use name::{ContainerID, UptreeID};
-use uptree_spec::{AllowedTree};
-use utility::{S, write_err, TraceHeader, TraceHeaderParams, TraceType};
+use crate::config::{ByteArray,CONTINUE_ON_ERROR, TRACE_OPTIONS};
+use crate::dal;
+use crate::dal::{fork_trace_header, update_trace_header};
+use crate::message::{MsgDirection, TcpMsgType};
+use crate::message_types::{ContainerToVm, ContainerFromVm};
+use crate::name::{ContainerID, UptreeID};
+use crate::uptree_spec::{AllowedTree};
+use crate::utility::{S, write_err, TraceHeader, TraceHeaderParams, TraceType};
 
 pub const NOCMASTER: &'static str ="NocMaster";
 pub const NOCAGENT: &'static str = "NocAgent";

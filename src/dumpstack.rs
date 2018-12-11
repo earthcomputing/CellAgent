@@ -41,7 +41,7 @@ pub fn capture_stack() -> Vec<CFrame> {
     cframes
 }
 use std::thread;
-use TraceHeader;
+use crate::TraceHeader;
 pub fn dumpstack() {
     let thread_id = TraceHeader::parse(thread::current().id());
     let mut v = capture_stack();

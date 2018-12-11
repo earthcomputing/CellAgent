@@ -5,13 +5,13 @@ use std::sync::atomic::AtomicBool;
 use std::sync::{Arc};
 use std::sync::atomic::Ordering::SeqCst;
 
-use config::{CONTINUE_ON_ERROR, TRACE_OPTIONS, PortNo};
-use dal;
-use dal::{fork_trace_header, update_trace_header};
-use message_types::{PortToLink, PortFromLink, PortToPe, PortFromPe, LinkToPortPacket, PortToPePacket,
+use crate::config::{CONTINUE_ON_ERROR, TRACE_OPTIONS, PortNo};
+use crate::dal;
+use crate::dal::{fork_trace_header, update_trace_header};
+use crate::message_types::{PortToLink, PortFromLink, PortToPe, PortFromPe, LinkToPortPacket, PortToPePacket,
               PeToPortPacket, PortToNoc, PortFromNoc};
-use name::{Name, PortID, CellID};
-use utility::{PortNumber, S, write_err, TraceHeader, TraceHeaderParams, TraceType};
+use crate::name::{Name, PortID, CellID};
+use crate::utility::{PortNumber, S, write_err, TraceHeader, TraceHeaderParams, TraceType};
 
 // TODO: There is no distinction between a broken link and a disconnected one.  We may want to revisit.
 #[derive(Debug, Copy, Clone, Serialize)]

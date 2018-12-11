@@ -11,8 +11,8 @@ use serde_json;
 use serde_json::{Value};
 use futures::Future;
 
-use config::{KAFKA_SERVER, KAFKA_TOPIC, OUTPUT_FILE_NAME};
-use utility::{S, TraceHeader, TraceHeaderParams, TraceType};
+use crate::config::{KAFKA_SERVER, KAFKA_TOPIC, OUTPUT_FILE_NAME};
+use crate::utility::{S, TraceHeader, TraceHeaderParams, TraceType};
 
 thread_local!(static TRACE_HEADER: RefCell<TraceHeader> = RefCell::new(TraceHeader::new()));
 pub fn fork_trace_header() -> TraceHeader { TRACE_HEADER.with(|t| t.borrow_mut().fork_trace()) }

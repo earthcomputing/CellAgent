@@ -8,12 +8,12 @@ use rand;
 use serde;
 use serde_json;
 
-use config::{PACKET_MIN, PACKET_MAX, PAYLOAD_DEFAULT_ELEMENT, 
+use crate::config::{PACKET_MIN, PACKET_MAX, PAYLOAD_DEFAULT_ELEMENT, 
     ByteArray, MsgID, PacketNo};
-use message::{Message, MsgType, TypePlusMsg};
-use name::{TreeID};
-use utility::S;
-use uuid_ec::{Uuid, AitState};
+use crate::message::{Message, MsgType, TypePlusMsg};
+use crate::name::{TreeID};
+use crate::utility::S;
+use crate::uuid_ec::{Uuid, AitState};
  
 //const LARGEST_MSG: usize = std::u32::MAX as usize;
 const PACKET_HEADER_SIZE: usize = 16; // PacketHeader / Uuid
