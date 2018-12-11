@@ -3,19 +3,19 @@ use std::collections::{HashMap, HashSet};
 use std::sync::mpsc::channel;
 use std::thread;
 
-use cellagent::{CellAgent};
-use cmodel::{Cmodel};
-use config::{CONTINUE_ON_ERROR, MAX_PORTS, TRACE_OPTIONS, CellNo, CellType, PortNo};
-use dal;
-use dal::{fork_trace_header, update_trace_header};
-use message_types::{PortToPe, PeFromPort, PeToPort,PortFromPe,
+use crate::cellagent::{CellAgent};
+use crate::cmodel::{Cmodel};
+use crate::config::{CONTINUE_ON_ERROR, MAX_PORTS, TRACE_OPTIONS, CellNo, CellType, PortNo};
+use crate::dal;
+use crate::dal::{fork_trace_header, update_trace_header};
+use crate::message_types::{PortToPe, PeFromPort, PeToPort,PortFromPe,
                     CaToCm, CmFromCa, CmToCa, CaFromCm,
                     CmToPe, PeFromCm, PeToCm, CmFromPe};
-use name::{CellID};
-use packet_engine::{PacketEngine};
-use port::{Port};
-use utility::{S, TraceHeaderParams, TraceType};
-use vm::VirtualMachine;
+use crate::name::{CellID};
+use crate::packet_engine::{PacketEngine};
+use crate::port::{Port};
+use crate::utility::{S, TraceHeaderParams, TraceType};
+use crate::vm::VirtualMachine;
 
 #[derive(Debug, Copy, Clone, Hash, Serialize, Deserialize)]
 pub enum CellConfig { Small, Medium, Large }
@@ -106,7 +106,7 @@ impl NalCell {
         let thread_name = format!("CellAgent {}", cell_agent.get_id());
         thread::Builder::new().name(thread_name.into()).spawn( move || {
             update_trace_header(child_trace_header);
-            let _ = ca.initialize(ca_from_cm).map_err(|e| ::utility::write_err("nalcell", e));
+            let _ = ca.initialize(ca_from_cm).map_err(|e| crate::utility::write_err("nalcell", e));
             if CONTINUE_ON_ERROR { } // Don't automatically restart cell agent if it crashes
         }).expect("thread failed");
     }
@@ -138,7 +138,7 @@ impl NalCell {
         let thread_name = format!("PacketEngine {}", packet_engine.get_id());
         thread::Builder::new().name(thread_name.into()).spawn( move || {
             update_trace_header(child_trace_header);
-            let _ = pe.initialize(pe_from_cm, pe_from_ports).map_err(|e| ::utility::write_err("nalcell", e));
+            let _ = pe.initialize(pe_from_cm, pe_from_ports).map_err(|e| crate::utility::write_err("nalcell", e));
             if CONTINUE_ON_ERROR { } // Don't automatically restart packet engine if it crashes
         }).expect("thread failed");
     }

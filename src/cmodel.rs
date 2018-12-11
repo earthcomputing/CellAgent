@@ -4,15 +4,15 @@ use std::thread::JoinHandle;
 
 use failure::{Error, ResultExt};
 
-use config::{CONTINUE_ON_ERROR, DEBUG_OPTIONS, TRACE_OPTIONS, PortNo};
-use dal;
-use dal::{fork_trace_header, update_trace_header};
-use message::MsgType;
-use message_types::{CaToCmBytes, CmToCa, CmFromCa, CmToPe, CmFromPe, PeToCmPacket,
+use crate::config::{CONTINUE_ON_ERROR, DEBUG_OPTIONS, TRACE_OPTIONS, PortNo};
+use crate::dal;
+use crate::dal::{fork_trace_header, update_trace_header};
+use crate::message::MsgType;
+use crate::message_types::{CaToCmBytes, CmToCa, CmFromCa, CmToPe, CmFromPe, PeToCmPacket,
                     CmToPePacket, CmToCaBytes};
-use name::{Name, CellID};
-use packet::{Packet, PacketAssembler, PacketAssemblers, Packetizer};
-use utility::{S, TraceHeader, TraceHeaderParams, TraceType, write_err};
+use crate::name::{Name, CellID};
+use crate::packet::{Packet, PacketAssembler, PacketAssemblers, Packetizer};
+use crate::utility::{S, TraceHeader, TraceHeaderParams, TraceType, write_err};
 
 const CENTRAL_TREE : &str = "Tree:C:2"; // MAGIC
 

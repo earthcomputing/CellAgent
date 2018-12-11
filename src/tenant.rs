@@ -1,8 +1,8 @@
 //use std::fmt;
 use std::collections::HashMap;
 
-use config::CellNo;
-use name::{TenantID};
+use crate::config::CellNo;
+use crate::name::{TenantID};
 //use utility::S;
 
 #[derive(Clone)]

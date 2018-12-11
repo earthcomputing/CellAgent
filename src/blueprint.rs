@@ -2,7 +2,7 @@ use std::fmt;
 use std::collections::{HashMap, HashSet};
 use std::iter::FromIterator;
 
-use config::{MIN_BORDER_CELLS, CellNo, CellType, Edge, PortNo};
+use crate::config::{MIN_BORDER_CELLS, CellNo, CellType, Edge, PortNo};
 
 #[derive(Debug)]
 pub struct Blueprint {

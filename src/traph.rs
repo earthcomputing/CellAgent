@@ -6,16 +6,16 @@ use std::sync::{Arc, Mutex};
 use serde_json;
 //use uuid::Uuid;
 
-use config::{MAX_PORTS, PathLength, PortNo};
+use crate::config::{MAX_PORTS, PathLength, PortNo};
 //use dumpstack::{dumpstack};
-use gvm_equation::{GvmEquation, GvmVariable, GvmVariableType};
-use name::{Name, CellID, TreeID};
-use port_tree::PortTree;
-use routing_table_entry::{RoutingTableEntry};
-use traph_element::TraphElement;
-use tree::Tree;
-use utility::{Path, PortNumber, S};
-use uuid_ec::Uuid;
+use crate::gvm_equation::{GvmEquation, GvmVariable, GvmVariableType};
+use crate::name::{Name, CellID, TreeID};
+use crate::port_tree::PortTree;
+use crate::routing_table_entry::{RoutingTableEntry};
+use crate::traph_element::TraphElement;
+use crate::tree::Tree;
+use crate::utility::{Path, PortNumber, S};
+use crate::uuid_ec::Uuid;
 
 type StackedTrees = HashMap<Uuid, Tree>;
 
@@ -224,7 +224,7 @@ impl Traph {
                     port_tree_id: &TreeID,
                     child: PortNumber) -> Result<Vec<RoutingTableEntry>, Error> {
         let _f = "add_or_remove_child";
-        let tree_id = port_tree_id.without_root_port_number();
+        let _tree_id = port_tree_id.without_root_port_number();
         let tree_entry = self.tree_apply_update(port_tree_fn, tree_fn, port_tree_id, child).context(TraphError::Chain { func_name: _f, comment: S("") })?;
         let port_tree_entry = self.port_tree_apply_update(port_tree_fn, tree_fn, port_tree_id, child).context(TraphError::Chain { func_name: _f, comment: S("") })?;
         let mut stacked_tree_entries = self.stacked_tree_apply_update(port_tree_fn, tree_fn, port_tree_id, child)?;
@@ -234,7 +234,7 @@ impl Traph {
     }
     fn tree_apply_update(&mut self,
                     port_tree_fn: fn(&mut PortTree, PortNumber) -> RoutingTableEntry,
-                    tree_fn: fn(&mut Tree, PortNumber) -> RoutingTableEntry,
+                    _tree_fn: fn(&mut Tree, PortNumber) -> RoutingTableEntry,
                     port_tree_id: &TreeID,
                     child: PortNumber) -> Result<RoutingTableEntry, Error> {
         let _f = "tree_apply_update";
@@ -247,7 +247,7 @@ impl Traph {
     }
     fn port_tree_apply_update(&mut self,
                     port_tree_fn: fn(&mut PortTree, PortNumber) -> RoutingTableEntry,
-                    tree_fn: fn(&mut Tree, PortNumber) -> RoutingTableEntry,
+                    _tree_fn: fn(&mut Tree, PortNumber) -> RoutingTableEntry,
                     port_tree_id: &TreeID,
                     child: PortNumber) -> Result<RoutingTableEntry, Error> {
         let _f = "port_tree_apply_update";
@@ -258,9 +258,9 @@ impl Traph {
         Ok(port_tree_entry)
     }
     fn stacked_tree_apply_update(&mut self,
-                    port_tree_fn: fn(&mut PortTree, PortNumber) -> RoutingTableEntry,
+                    _port_tree_fn: fn(&mut PortTree, PortNumber) -> RoutingTableEntry,
                     tree_fn: fn(&mut Tree, PortNumber) -> RoutingTableEntry,
-                    port_tree_id: &TreeID,
+                    _port_tree_id: &TreeID,
                     child: PortNumber) -> Result<Vec<RoutingTableEntry>, Error> {
         let _f = "stacked_tree_apply_update";
         let stacked_tree_entries = self.stacked_trees.lock().unwrap()

@@ -1,9 +1,9 @@
 use std::fmt;
 use std::marker::Sized;
 
-use config::{SEPARATOR, CellNo, PortNo};
-use utility::{PortNumber, S};
-use uuid_ec::Uuid;
+use crate::config::{SEPARATOR, CellNo, PortNo};
+use crate::utility::{PortNumber, S};
+use crate::uuid_ec::Uuid;
 
 // Using String means names are not Copy
 type NameType = String;

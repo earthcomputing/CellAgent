@@ -2,15 +2,15 @@ use std::collections::{HashSet};
 use std::sync::mpsc::channel;
 use std::thread;
 
-use config::{CONTINUE_ON_ERROR, TRACE_OPTIONS};
-use container::{Container};
-use dal;
-use dal::{fork_trace_header, update_trace_header};
-use message_types::{VmToCa, VmFromCa, VmToContainer, ContainerFromVm,
+use crate::config::{CONTINUE_ON_ERROR, TRACE_OPTIONS};
+use crate::container::{Container};
+use crate::dal;
+use crate::dal::{fork_trace_header, update_trace_header};
+use crate::message_types::{VmToCa, VmFromCa, VmToContainer, ContainerFromVm,
     ContainerToVm, VmFromContainer};
-use name::{Name, ContainerID, UptreeID, VmID};
-use uptree_spec::{AllowedTree, ContainerSpec};
-use utility::{S, write_err, TraceHeader, TraceHeaderParams, TraceType};
+use crate::name::{Name, ContainerID, UptreeID, VmID};
+use crate::uptree_spec::{AllowedTree, ContainerSpec};
+use crate::utility::{S, write_err, TraceHeader, TraceHeaderParams, TraceType};
 
 #[derive(Debug, Clone)]
 pub struct VirtualMachine {

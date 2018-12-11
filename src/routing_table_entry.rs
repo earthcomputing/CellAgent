@@ -2,10 +2,10 @@ use std::fmt;
 use std::collections::HashSet;
 //use uuid::Uuid;
 
-use config::{PortNo};
-use name::{Name, TreeID};
-use utility::{Mask, PortNumber};
-use uuid_ec::Uuid;
+use crate::config::{PortNo};
+use crate::name::{Name, TreeID};
+use crate::utility::{Mask, PortNumber};
+use crate::uuid_ec::Uuid;
 
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Hash, Serialize, Deserialize)]
 pub struct RoutingTableEntry {

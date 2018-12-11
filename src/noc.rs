@@ -3,17 +3,17 @@ use std::thread::{JoinHandle};
 use std::sync::mpsc::channel;
 use std::collections::{HashMap, HashSet};
 
-use blueprint::{Blueprint};
-use config::{CONTINUE_ON_ERROR, NCELLS, SCHEMA_VERSION, TRACE_OPTIONS, ByteArray, get_geometry};
-use dal;
-use dal::{fork_trace_header, update_trace_header};
-use datacenter::{Datacenter};
-use gvm_equation::{GvmEquation, GvmEqn, GvmVariable, GvmVariableType};
-use message::{MsgDirection, TcpMsgType, TreeNameMsg};
-use message_types::{NocToPort, NocFromPort, PortToNoc, PortFromNoc, NocFromOutside, NocToOutside};
-use nalcell::CellConfig;
-use uptree_spec::{AllowedTree, ContainerSpec, Manifest, UpTreeSpec, VmSpec};
-use utility::{S, TraceHeader, TraceHeaderParams, TraceType, write_err};
+use crate::blueprint::{Blueprint};
+use crate::config::{CONTINUE_ON_ERROR, NCELLS, SCHEMA_VERSION, TRACE_OPTIONS, ByteArray, get_geometry};
+use crate::dal;
+use crate::dal::{fork_trace_header, update_trace_header};
+use crate::datacenter::{Datacenter};
+use crate::gvm_equation::{GvmEquation, GvmEqn, GvmVariable, GvmVariableType};
+use crate::message::{MsgDirection, TcpMsgType, TreeNameMsg};
+use crate::message_types::{NocToPort, NocFromPort, PortToNoc, PortFromNoc, NocFromOutside, NocToOutside};
+use crate::nalcell::CellConfig;
+use crate::uptree_spec::{AllowedTree, ContainerSpec, Manifest, UpTreeSpec, VmSpec};
+use crate::utility::{S, TraceHeader, TraceHeaderParams, TraceType, write_err};
 
 const NOC_MASTER_DEPLOY_TREE_NAME:  &'static str = "NocMasterDeploy";
 const NOC_AGENT_DEPLOY_TREE_NAME:   &'static str = "NocAgentDeploy";

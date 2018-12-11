@@ -9,13 +9,13 @@ use either::{Either, Left, Right};
 use serde;
 use serde_json;
 
-use config::{CONNECTED_PORTS_TREE_NAME, CONTINUE_ON_ERROR, CONTROL_TREE_NAME, DEBUG_OPTIONS, QUENCH,
+use crate::config::{CONNECTED_PORTS_TREE_NAME, CONTINUE_ON_ERROR, CONTROL_TREE_NAME, DEBUG_OPTIONS, QUENCH,
              TRACE_OPTIONS,
              ByteArray, CellNo, CellType, Quench, PathLength, PortNo};
-use dal;
-use dal::{fork_trace_header, update_trace_header};
-use gvm_equation::{GvmEquation, GvmEqn};
-use message::{Message, MsgDirection, MsgTreeMap, MsgType, TcpMsgType,
+use crate::dal;
+use crate::dal::{fork_trace_header, update_trace_header};
+use crate::gvm_equation::{GvmEquation, GvmEqn};
+use crate::message::{Message, MsgDirection, MsgTreeMap, MsgType, TcpMsgType,
               ApplicationMsg,
               DiscoverMsg, DiscoverDMsg,
               FailoverMsg, FailoverDMsg, FailoverResponse,
@@ -23,24 +23,24 @@ use message::{Message, MsgDirection, MsgTreeMap, MsgType, TcpMsgType,
               ManifestMsg,
               StackTreeMsg, StackTreeDMsg,
               TreeNameMsg};
-use message_types::{CaToCm, CaFromCm,
+use crate::message_types::{CaToCm, CaFromCm,
                     CaToVm, VmFromCa, VmToCa, CaFromVm,
                     CaToCmBytes, CmToCaBytes};
-use nalcell::CellConfig;
-use name::{Name, CellID, SenderID, TreeID, UptreeID, VmID};
-use port;
-use port_tree::PortTree;
-use routing_table_entry::{RoutingTableEntry};
-use traph;
-use traph::{Traph};
-use tree::Tree;
-use uptree_spec::{AllowedTree, Manifest};
-use utility::{BASE_TENANT_MASK, DEFAULT_USER_MASK, Mask, Path,
+use crate::nalcell::CellConfig;
+use crate::name::{Name, CellID, SenderID, TreeID, UptreeID, VmID};
+use crate::port;
+use crate::port_tree::PortTree;
+use crate::routing_table_entry::{RoutingTableEntry};
+use crate::traph;
+use crate::traph::{Traph};
+use crate::tree::Tree;
+use crate::uptree_spec::{AllowedTree, Manifest};
+use crate::utility::{BASE_TENANT_MASK, DEFAULT_USER_MASK, Mask, Path,
               PortNumber, S, TraceHeader, TraceHeaderParams, TraceType, UtilityError,
               new_hash_set};
 //use uuid::Uuid;
-use uuid_ec::Uuid;
-use vm::VirtualMachine;
+use crate::uuid_ec::Uuid;
+use crate::vm::VirtualMachine;
 
 use failure::{Error, ResultExt};
 
@@ -501,7 +501,7 @@ impl CellAgent {
         let thread_name = format!("CellAgent {} listen_uptree_loop", self.get_id());
         thread::Builder::new().name(thread_name.into()).spawn( move || {
             update_trace_header(child_trace_header);
-            let _ = ca.listen_uptree_loop(&sender_id.clone(), &vm_id, &ca_from_vm).map_err(|e| ::utility::write_err("cellagent", e));
+            let _ = ca.listen_uptree_loop(&sender_id.clone(), &vm_id, &ca_from_vm).map_err(|e| crate::utility::write_err("cellagent", e));
             if CONTINUE_ON_ERROR { let _ = ca.listen_uptree(sender_id, vm_id, trees, ca_from_vm); }
         }).expect("thread failed");
     }
@@ -631,7 +631,7 @@ impl CellAgent {
         let thread_name = format!("CellAgent {} listen_cm_loop", self.get_id());
         thread::Builder::new().name(thread_name.into()).spawn( move || {
             update_trace_header(child_trace_header);
-            let _ = ca.listen_cm_loop(&ca_from_cm).map_err(|e| ::utility::write_err("cellagent", e));
+            let _ = ca.listen_cm_loop(&ca_from_cm).map_err(|e| crate::utility::write_err("cellagent", e));
             // println!("Cellagent {}: Back from listen_cm_loop", ca.cell_id);
             if CONTINUE_ON_ERROR { let _ = ca.listen_cm(ca_from_cm); }
         })?;

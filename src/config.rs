@@ -2,7 +2,7 @@ use std::fmt;
 use std::ops::{Deref};
 
 use failure::Error;
-use utility::PortNumber;
+use crate::utility::PortNumber;
 
 pub const SCHEMA_VERSION: &'static str = "0.1";
 pub const REPO: &'static str = "CellAgent";

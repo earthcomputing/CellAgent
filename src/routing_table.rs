@@ -3,9 +3,9 @@ use std::collections::HashMap;
 
 use failure::{Error};
 
-use name::{CellID};
-use routing_table_entry::{RoutingTableEntry};
-use uuid_ec::Uuid;
+use crate::name::{CellID};
+use crate::routing_table_entry::{RoutingTableEntry};
+use crate::uuid_ec::Uuid;
 
 #[derive(Debug)]
 pub struct RoutingTable {

@@ -1,9 +1,9 @@
 use std::fmt;
 
-use config::{PathLength, PortNo};
-use name::{TreeID};
-use routing_table_entry::RoutingTableEntry;
-use utility::{PortNumber};
+use crate::config::{PathLength, PortNo};
+use crate::name::{TreeID};
+use crate::routing_table_entry::RoutingTableEntry;
+use crate::utility::{PortNumber};
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]
 pub struct PortTree {

@@ -1,22 +1,9 @@
 #![deny(unused_must_use)]
 //#![warn(rust_2018_idioms)]
 #![recursion_limit="1024"]
-extern crate chrono;
-extern crate either;
-extern crate eval;
 #[macro_use] extern crate failure;
-extern crate futures;
-extern crate indexmap;
-extern crate internment;
-extern crate lazy_static;
-extern crate rand;
-extern crate rdkafka;
-extern crate serde;
 #[macro_use] extern crate serde_derive;
 #[macro_use] extern crate serde_json;
-extern crate time;
-extern crate tokio;
-extern crate uuid;
 
 mod blueprint;
 mod cellagent;
@@ -56,17 +43,17 @@ use std::collections::{HashMap, HashSet};
 use std::fs::{File, OpenOptions};
 use std::sync::mpsc::channel;
 
-use blueprint::Blueprint;
-use config::{AUTO_BREAK, NCELLS, NPORTS, NLINKS, OUTPUT_FILE_NAME, QUENCH,
+use crate::blueprint::Blueprint;
+use crate::config::{AUTO_BREAK, NCELLS, NPORTS, NLINKS, OUTPUT_FILE_NAME, QUENCH,
              get_edges, CellNo, PortNo};
-use datacenter::Datacenter;
-use ecargs::{ECArgs};
-use gvm_equation::{GvmEqn};
-use message_types::{OutsideFromNoc, OutsideToNoc, NocFromOutside, NocToOutside};
-use nalcell::CellConfig;
-use noc::Noc;
-use uptree_spec::{AllowedTree, ContainerSpec, Manifest, UpTreeSpec, VmSpec};
-use utility::{print_vec, S, TraceHeader};
+use crate::datacenter::Datacenter;
+use crate::ecargs::{ECArgs};
+use crate::gvm_equation::{GvmEqn};
+use crate::message_types::{OutsideFromNoc, OutsideToNoc, NocFromOutside, NocToOutside};
+use crate::nalcell::CellConfig;
+use crate::noc::Noc;
+use crate::uptree_spec::{AllowedTree, ContainerSpec, Manifest, UpTreeSpec, VmSpec};
+use crate::utility::{print_vec, S, TraceHeader};
 
 fn main() -> Result<(), Error> {
     let _f = "main";
@@ -152,7 +139,7 @@ fn show_pe(dc: &Datacenter) -> Result<(), Error> {
 fn break_link(dc: &mut Datacenter) -> Result<(), Error> {
     let link_no = if AUTO_BREAK > 0 {
         // TODO: Wait until discover is done before automatically breaking link, should be removed
-        ::utility::sleep(4);
+        crate::utility::sleep(4);
         println!("---> Automatically break link {}", AUTO_BREAK);
         AUTO_BREAK
     } else {
@@ -164,7 +151,7 @@ fn break_link(dc: &mut Datacenter) -> Result<(), Error> {
     let links = dc.get_links_mut();
     links.get_mut(link_no)
         .map_or_else(|| -> Result<(), Error> { println!("{} is not a valid input", link_no); Ok(()) },
-                     |link: &mut ::link::Link| -> Result<(), Error> { link.break_link()?; Ok(()) }
+                     |link: &mut crate::link::Link| -> Result<(), Error> { link.break_link()?; Ok(()) }
         )?;
     Ok(())
 }
