@@ -36,8 +36,12 @@ impl TraphElement {
     pub fn set_broken(&mut self) { self.is_broken = true; }
 //  pub fn set_connected(&mut self) { self.is_connected = true; }
 //  pub fn set_disconnected(&mut self) { self.is_connected = false; }
-    pub fn set_status(&mut self, status: PortStatus) { self.status = status; }
+    fn set_status(&mut self, status: PortStatus) { self.status = status; }
     pub fn is_on_broken_path(&self, broken_path: Path) -> bool { self.path == broken_path }
+    pub fn mark_parent(&mut self) { self.set_status(PortStatus::Parent) }
+    pub fn mark_child(&mut self)  { self.set_status(PortStatus::Child) }
+    pub fn mark_pruned(&mut self) { self.set_status(PortStatus::Pruned) }
+    pub fn mark_broken(&mut self) { self.set_status(PortStatus::Broken) }
 }
 impl fmt::Display for TraphElement {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
