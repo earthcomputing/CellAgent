@@ -2,6 +2,7 @@
 name = "multicell"
 version = "0.1.0"
 authors = ["Alan Karp <alan@earthcomputing.io>"]
+edition = "2018"
 
 [dependencies]
 backtrace = "0.3"
