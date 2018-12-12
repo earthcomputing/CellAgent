@@ -150,13 +150,13 @@ impl Uuid {
     }
 }
 impl fmt::Display for Uuid {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         if self.is_ait() { write!(f, "{} in time {}", self.get_direction(), self.uuid ) }
         else             { write!(f, "{}", self.uuid) }
     }
 }
 impl fmt::Debug for Uuid {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{} {}", self.get_ait_state(), self.uuid)
     }
 }
@@ -170,7 +170,7 @@ pub enum AitState {
     Normal, Ait, Teck, Tack, Tock, Tick
 }
 impl fmt::Display for AitState {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let s = match self {
             &AitState::Normal => "Normal",
             &AitState::Ait    => "AIT",
@@ -187,7 +187,7 @@ pub enum TimeDirection {
     Forward, Reverse
 }
 impl fmt::Display for TimeDirection {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let s = match self {
             &TimeDirection::Forward => "Forward",
             &TimeDirection::Reverse => "Reverse"

@@ -76,7 +76,7 @@ impl Packet {
     }
 }
 impl fmt::Display for Packet {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let bytes = self.payload.get_bytes();
         let len = if self.payload.is_last_packet() {
             *self.payload.get_size() as usize
@@ -103,7 +103,7 @@ impl PacketHeader {
     fn make_tock(&mut self) { self.uuid.make_tock(); }
 }
 impl fmt::Display for PacketHeader { 
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let mut uuid = self.uuid.to_string();
         uuid.truncate(8);
         let s = &format!(", UUID {}", self.uuid );
@@ -134,7 +134,7 @@ impl Payload {
     fn is_blocking(&self) -> bool { self.is_blocking }
 }
 impl fmt::Display for Payload {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let mut s = format!("Message ID {}", *self.msg_id);
         if self.is_last_packet() { s = s + ", Last packet"; }
         else                     { s = s + ", Not last packet"; }
@@ -161,7 +161,7 @@ impl Serialize for Payload {
     }
 }
 impl fmt::Debug for Payload {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let s = &format!("{:?}", &self.bytes[0..10]);
         write!(f, "{}", s)
     }
@@ -220,8 +220,8 @@ impl Packetizer {
     }
     fn packet_payload_size(len: usize) -> usize {
         match len-1 {
-            0...PACKET_MIN           => PAYLOAD_MIN,
-            PAYLOAD_MIN...PAYLOAD_MAX => len,
+            0..=PACKET_MIN           => PAYLOAD_MIN,
+            PAYLOAD_MIN..=PAYLOAD_MAX => len,
             _                         => PAYLOAD_MAX
         }
     }

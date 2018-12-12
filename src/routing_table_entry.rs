@@ -75,7 +75,7 @@ impl RoutingTableEntry {
     }
 }
 impl fmt::Display for RoutingTableEntry {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let mut uuid = self.tree_uuid.to_string();
         uuid.truncate(8);
         let mut s = format!(" {:8?}", uuid);

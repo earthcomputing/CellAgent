@@ -66,7 +66,7 @@ impl Traph {
         self.port_trees.insert(port_tree.get_port_tree_id().clone(), port_tree); // Duplicate inserts do no harm
         self.port_tree_id.clone().unwrap() // Unwrap is guaranteed to be safe by first line
     }
-    pub fn get_elements(&self) -> Iter<TraphElement> { self.elements.iter() }
+    pub fn get_elements(&self) -> Iter<'_, TraphElement> { self.elements.iter() }
     pub fn set_element(&mut self, traph_element: TraphElement) {
         self.elements[*traph_element.get_port_no() as usize] = traph_element;
     }
@@ -349,7 +349,7 @@ impl Traph {
     }
 }
 impl fmt::Display for Traph {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let mut uuid = self.base_tree_id.get_uuid().to_string();
         uuid.truncate(8);
         let mut s = format!("Traph {}", self.base_tree_id);
@@ -378,7 +378,7 @@ pub enum PortStatus {
     Broken
 }
 impl fmt::Display for PortStatus {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match *self {
             PortStatus::Parent => write!(f, "Parent"),
             PortStatus::Child  => write!(f, "Child "),

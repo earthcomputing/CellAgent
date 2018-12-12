@@ -36,7 +36,7 @@ impl Manifest {
     pub fn get_vms(&self) -> &Vec<VmSpec> { &self.vms }
 }
 impl fmt::Display for Manifest {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let s = format!("Deploy {} on tree {}", self.id, self.deployment_tree);
         // Next 4 lines commented out for debugging purposes
         //s = s + &format!("\n  Allowed Trees");
@@ -83,7 +83,7 @@ impl VmSpec {
     pub fn get_containers(&self) -> &Vec<ContainerSpec> { &self.containers }
 }
 impl fmt::Display for VmSpec {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let mut s = format!("  Virtual Machine {}({}, {})", self.id, self.image, self.required_config);
         s = s + &format!("\n      Allowed Trees");
         for a in &self.allowed_trees { s = s + &format!("\n        {}", a); }
@@ -112,7 +112,7 @@ impl ContainerSpec {
     pub fn get_allowed_trees(&self) -> &Vec<AllowedTree> { &self.allowed_trees }
 }
 impl fmt::Display for ContainerSpec {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let mut s = format!(" Service {}({})", self.id, self.image);
         if self.params.len() == 0 { s = s + &format!(" No parameters"); }
         else                      { s = s + &format!(" Parameters: {:?}", self.params); }
@@ -156,7 +156,7 @@ impl UpTreeSpec {
     fn get_tree_size(&self) -> usize { self.parent_list.len() }
 }
 impl fmt::Display for UpTreeSpec {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let s = format!("UpTree: {}, parent list {:?}", self.id, self.parent_list);
         write!(f, "{}", s)
     }
@@ -172,7 +172,7 @@ impl AllowedTree {
     pub fn get_name(&self) -> &String { &self.name }
 }
 impl fmt::Display for AllowedTree {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let s = format!("{}", self.name);
         write!(f, "{}", s)
     }

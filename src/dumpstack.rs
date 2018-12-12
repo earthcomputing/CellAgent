@@ -12,7 +12,7 @@ impl CFrame {
 }
 }
 impl fmt::Display for CFrame {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let s = format!("CFrame {} {} {}", self.p, self.f, self.a);
         write!(f, "{}", s)
     }

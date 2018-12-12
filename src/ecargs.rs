@@ -58,7 +58,7 @@ impl ECArgs {
     }
 }
 impl fmt::Display for ECArgs { 
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result { write!(f, "{}", self.to_string()) }
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result { write!(f, "{}", self.to_string()) }
 }
 // Errors
 #[derive(Debug, Fail)]

@@ -51,7 +51,7 @@ impl Tree {
     //pub fn set_inuse(&mut self) { self.get_table_entry().set_inuse(); }
 }
 impl fmt::Display for Tree {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let mut s = format!("TreeID {}: {} {}", self.tree_id, self.table_entry, self.gvm_eqn);
         for stacked in &self.stacked_tree_ids {
             s = s + &format!("\n{} {}", stacked, stacked.get_uuid());

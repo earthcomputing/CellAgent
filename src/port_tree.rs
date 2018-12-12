@@ -36,7 +36,7 @@ impl PortTree {
 }
 
 impl fmt::Display for PortTree {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let s = format!("PortTree: TreeID {}: root_port {}, in_port {}, hops {} entry {}",
                         self.port_tree_id, *self.root_port_no,
                         *self.in_port_no, self.hops, self.entry);

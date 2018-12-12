@@ -75,7 +75,7 @@ impl Mask {
     }
 }
 impl fmt::Display for Mask {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, " {:016.b}", *self.mask)
     }
 }
@@ -93,7 +93,7 @@ impl PortNumber {
     pub fn get_port_no(&self) -> PortNo { self.port_no }
 }
 impl fmt::Display for PortNumber {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result { write!(f, "{}", *self.port_no) }
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result { write!(f, "{}", *self.port_no) }
 }
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Hash, Serialize, Deserialize)]
 pub struct Path { port_number: PortNumber }
@@ -107,7 +107,7 @@ impl Path {
     pub fn get_port_no(&self) -> PortNo { self.port_number.get_port_no() }
 }
 impl fmt::Display for Path {
-    fn fmt(&self, f:&mut fmt::Formatter) -> fmt::Result { write!(f, "{}", self.port_number) }
+    fn fmt(&self, f:&mut fmt::Formatter<'_>) -> fmt::Result { write!(f, "{}", self.port_number) }
 }
 use std::thread;
 /*
@@ -202,7 +202,7 @@ impl TraceHeaderParams {
     pub fn get_format(&self)   -> &'static str { self.format }
 }
 impl fmt::Display for TraceHeader {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "Thread id {}, Event id {:?}", self.thread_id, self.event_id) }
 }
 #[derive(Debug, Copy, Clone, Serialize)]
@@ -211,7 +211,7 @@ pub enum TraceType {
     Debug,
 }
 impl fmt::Display for TraceType {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "Trace type {}", match self {
             &TraceType::Trace => "Trace",
             &TraceType::Debug => "Debug"
@@ -234,7 +234,7 @@ pub fn write_err(caller: &str, e: Error) {
     for cause in e.iter_chain() {
         println!("*** Caused by {}", cause);
     }
-    let fail: &Fail = e.as_fail();
+    let fail: &dyn Fail = e.as_fail();
     if let Some(_) = fail.cause().and_then(|cause| cause.backtrace()) {
         let _ = writeln!(stderr, "---> Backtrace available: uncomment line in utility.rs containing --->");
         // let _ = writeln!(stderr, "Backtrace: {:?}", backtrace);

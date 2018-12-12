@@ -225,7 +225,7 @@ impl CellAgent {
         saved_msgs.push(either.clone()); // Clone needed for trace
         if DEBUG_OPTIONS.trace_all || DEBUG_OPTIONS.saved_msgs {   // Debug print
             let _f = "add_saved_msg";
-            let actual = if either.clone().left().is_some() { Box::new(either.clone().left().unwrap()) as Box<Message> } else { Box::new(either.clone().right().unwrap()) as Box<Message> };
+            let actual = if either.clone().left().is_some() { Box::new(either.clone().left().unwrap()) as Box<dyn Message> } else { Box::new(either.clone().right().unwrap()) as Box<dyn Message> };
             let ref trace_params = TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "ca_add_saved_msg" };
             let trace = json! ({ "cell_id": &self.cell_id, "tree_id": tree_id, "no_saved": saved_msgs.len(), "msg": &(either.clone().left(), either.right()) });
             let _ = dal::add_to_trace(TraceType::Debug, trace_params, &trace, _f);
@@ -1388,7 +1388,7 @@ impl CellAgent {
     }
 }
 impl fmt::Display for CellAgent {
-    fn fmt(&self, _f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, _f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let mut s = format!("Cell Agent {}", self.cell_info);
         for (_, traph) in self.traphs.lock().unwrap().iter() {
             s = s + &format!("\n{}", traph);
@@ -1405,7 +1405,7 @@ impl CellInfo {
     }
 }
 impl fmt::Display for CellInfo {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "External ID {}", self.external_id)
     }
 }

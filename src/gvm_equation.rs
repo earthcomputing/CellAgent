@@ -26,7 +26,7 @@ pub struct GvmEquation {
 }
 // Sample GvmEquation: "hops < 7 || n_childen == 0",  associated variables vec!["hops", "n_children"]
 impl GvmEquation {
-    pub fn new(equations: HashSet<GvmEqn>, variables: Vec<GvmVariable>) -> GvmEquation {
+    pub fn new(equations: HashSet<GvmEqn<'_>>, variables: Vec<GvmVariable>) -> GvmEquation {
         let (mut recv, mut send, mut xtnd, mut save) = (S("false"), S("false"), S("false"), S("false"));
         for eqn in equations.iter() {
             match *eqn {
@@ -75,7 +75,7 @@ impl GvmEquation {
     }
 }
 impl fmt::Display for GvmEquation {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let mut s = format!("GVM: receive '{}', send '{}', extend '{}', save '{}', Variables:",
             self.recv_eqn, self.send_eqn, self.xtnd_eqn, self.save_eqn);
         for variable in self.variables.iter() {
@@ -90,7 +90,7 @@ pub enum GvmVariableType {
     PathLength
 }
 impl fmt::Display for GvmVariableType {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let s = match *self {
             GvmVariableType::CellNo => "CellNo",
             GvmVariableType::PathLength => "PathLength",
@@ -114,7 +114,7 @@ impl GvmVariable {
     pub fn set_value(&mut self, value: String) { self.value = value; }
 }
 impl fmt::Display for GvmVariable {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{}:{} = {}", self.var_type, self.var_name, self.value) }
 }
 #[derive(Debug, Fail)]
