@@ -34,7 +34,7 @@ impl Service {
     }
 }
 impl fmt::Display for Service {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self.clone() {
             Service::NocMaster { service } => write!(f, "{}", service),
             Service::NocAgent  { service } => write!(f, "{}", service),
@@ -103,7 +103,7 @@ impl NocMaster {
     }
 }
 impl fmt::Display for NocMaster {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{} running in {}", self.name, self.container_id)
     }
 }
@@ -169,7 +169,7 @@ impl NocAgent {
     }
 }
 impl fmt::Display for NocAgent {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{} running in {}", self.name, self.container_id)
     }
 }

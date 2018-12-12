@@ -84,7 +84,7 @@ impl Link {
     }
 }
 impl fmt::Display for Link { 
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let mut s = format!("Link {}", self.id.get_name().to_string());
         if self.is_connected { s = s + " is connected"; }
         else                 { s = s + " is not connected"; }

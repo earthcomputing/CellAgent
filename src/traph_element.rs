@@ -44,7 +44,7 @@ impl TraphElement {
     pub fn mark_broken(&mut self) { self.set_status(PortStatus::Broken) }
 }
 impl fmt::Display for TraphElement {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let s = format!("{:5} {:9} {:6} {:6} {:4} {:4}",
              (*self.port_no), self.is_connected, self.is_broken, self.status, (self.hops.0).0, *self.path.get_port_no());
         write!(f, "{}", s)

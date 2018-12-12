@@ -20,7 +20,7 @@ use crate::vm::VirtualMachine;
 #[derive(Debug, Copy, Clone, Hash, Serialize, Deserialize)]
 pub enum CellConfig { Small, Medium, Large }
 impl fmt::Display for CellConfig { 
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let s = match *self {
             CellConfig::Small  => "Small",
             CellConfig::Medium => "Medium",
@@ -178,7 +178,7 @@ impl NalCell {
     }
 }
 impl fmt::Display for NalCell {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let mut s = String::new();
         match self.cell_type {
             CellType::Border => s = s + &format!("Border Cell {}", self.id),

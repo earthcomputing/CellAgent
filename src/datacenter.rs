@@ -117,7 +117,7 @@ impl Datacenter {
     }
 }
 impl fmt::Display for Datacenter {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let mut s = format!("Links");
         for l in &self.links {
             s = s + &format!("{}",l);

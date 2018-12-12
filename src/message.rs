@@ -97,7 +97,7 @@ impl MsgType {
     }
 }
 impl fmt::Display for MsgType {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match *self {
             MsgType::Application => write!(f, "Application"),
             MsgType::Discover    => write!(f, "Discover"),
@@ -122,7 +122,7 @@ pub enum TcpMsgType {
     TreeName,
 }
 impl fmt::Display for TcpMsgType {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match *self {
             TcpMsgType::Application  => write!(f, "Application"),
             TcpMsgType::DeleteTree   => write!(f, "DeleteTree"),
@@ -139,7 +139,7 @@ pub enum MsgDirection {
     Leafward
 }
 impl fmt::Display for MsgDirection {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match *self {
             MsgDirection::Rootward => write!(f, "Rootward"),
             MsgDirection::Leafward => write!(f, "Leafward")
@@ -159,13 +159,13 @@ impl TypePlusMsg {
     fn get_serialized_msg(&self) -> &str { &self.serialized_msg }
 }
 impl fmt::Display for TypePlusMsg {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{}: {}", self.msg_type, self.serialized_msg)
     }
 }
 pub trait Message {
     fn get_header(&self) -> &MsgHeader;
-    fn get_payload(&self) -> &MsgPayload;
+    fn get_payload(&self) -> &dyn MsgPayload;
     fn get_msg_type(&self) -> MsgType;
     fn get_tree_id(&self) -> TreeID { TreeID::default() }
     fn is_rootward(&self) -> bool {
@@ -196,8 +196,8 @@ pub trait Message {
         let _f = "process_ca";
         Err(MessageError::Process { func_name: _f }.into()) }
 }
-impl fmt::Display for Message {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+impl fmt::Display for dyn Message {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let s = format!("{} {}", self.get_header(), self.get_payload());
         write!(f, "{}", s)
     }
@@ -227,7 +227,7 @@ impl MsgHeader {
     //pub fn set_direction(&mut self, direction: MsgDirection) { self.direction = direction; }
 }
 impl fmt::Display for MsgHeader { 
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result { 
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result { 
         let s = format!("Message {} {} '{}'", *self.msg_id, self.msg_type, self.direction);
         write!(f, "{}", s) 
     }
@@ -260,7 +260,7 @@ impl DiscoverMsg {
 }
 impl Message for DiscoverMsg {
     fn get_header(&self) -> &MsgHeader { &self.header }
-    fn get_payload(&self) -> &MsgPayload { &self.payload }
+    fn get_payload(&self) -> &dyn MsgPayload { &self.payload }
     fn get_msg_type(&self) -> MsgType { self.get_header().msg_type }
     fn get_tree_id(&self) -> TreeID { self.payload.tree_id.clone() }
     fn is_blocking(&self) -> bool { false }
@@ -273,7 +273,7 @@ impl Message for DiscoverMsg {
     }
 }
 impl fmt::Display for DiscoverMsg {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let s = format!("{}: {}", self.get_header(), self.get_payload());
         write!(f, "{}", s)
     }
@@ -309,7 +309,7 @@ impl DiscoverPayload {
 }
 impl MsgPayload for DiscoverPayload {}
 impl fmt::Display for DiscoverPayload {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let s = format!("Tree {}, sending cell {}, hops {}, path {}", self.tree_id,
             self.sending_cell_id, **self.hops, self.path);
         write!(f, "{}", s)
@@ -332,7 +332,7 @@ impl DiscoverDMsg {
 }
 impl Message for DiscoverDMsg {
     fn get_header(&self) -> &MsgHeader { &self.header }
-    fn get_payload(&self) -> &MsgPayload { &self.payload }
+    fn get_payload(&self) -> &dyn MsgPayload { &self.payload }
     fn get_msg_type(&self) -> MsgType { self.get_header().msg_type }
     fn get_tree_id(&self) -> TreeID { self.payload.tree_id.clone() }
     fn is_blocking(&self) -> bool { true }
@@ -346,7 +346,7 @@ impl Message for DiscoverDMsg {
     }
 }
 impl fmt::Display for DiscoverDMsg {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let s = format!("{}: {}", self.get_header(), self.get_payload());
         write!(f, "{}", s)
     }
@@ -367,7 +367,7 @@ impl DiscoverDPayload {
 }
 impl MsgPayload for DiscoverDPayload {}
 impl fmt::Display for DiscoverDPayload {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "My Tree {}", self.tree_id)
     }
 }
@@ -390,7 +390,7 @@ impl FailoverMsg {
 }
 impl Message for FailoverMsg {
     fn get_header(&self) -> &MsgHeader { &self.header }
-    fn get_payload(&self) -> &MsgPayload { &self.payload }
+    fn get_payload(&self) -> &dyn MsgPayload { &self.payload }
     fn get_msg_type(&self) -> MsgType { self.get_header().msg_type }
     fn get_tree_id(&self) -> TreeID { self.payload.rw_port_tree_id.clone() }
     fn is_blocking(&self) -> bool { false }
@@ -404,7 +404,7 @@ impl Message for FailoverMsg {
     }
 }
 impl fmt::Display for FailoverMsg {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let s = format!("{}: {}", self.get_header(), self.get_payload());
         write!(f, "{}", s)
     }
@@ -429,7 +429,7 @@ impl FailoverMsgPayload {
 }
 impl MsgPayload for FailoverMsgPayload {}
 impl fmt::Display for FailoverMsgPayload {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "Rootward Tree {}, root port {}", self.rw_port_tree_id, self.path)
     }
 }
@@ -452,7 +452,7 @@ impl FailoverDMsg {
 }
 impl Message for FailoverDMsg {
     fn get_header(&self) -> &MsgHeader { &self.header }
-    fn get_payload(&self) -> &MsgPayload { &self.payload }
+    fn get_payload(&self) -> &dyn MsgPayload { &self.payload }
     fn get_msg_type(&self) -> MsgType { self.get_header().msg_type }
     fn get_tree_id(&self) -> TreeID { self.payload.rw_tree_id.clone() }
     fn is_blocking(&self) -> bool { false }
@@ -466,7 +466,7 @@ impl Message for FailoverDMsg {
     }
 }
 impl fmt::Display for FailoverDMsg {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let s = format!("{}: {}", self.get_header(), self.get_payload());
         write!(f, "{}", s)
     }
@@ -494,7 +494,7 @@ impl FailoverDMsgPayload {
 }
 impl MsgPayload for FailoverDMsgPayload {}
 impl fmt::Display for FailoverDMsgPayload {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "Response {} Port Tree {} hops {}", self.response, self.rw_tree_id, self.hops)
     }
 }
@@ -504,7 +504,7 @@ pub enum FailoverResponse {
     Failure
 }
 impl fmt::Display for FailoverResponse {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             FailoverResponse::Success => write!(f, "Success"),
             FailoverResponse::Failure => write!(f, "Failure")
@@ -528,7 +528,7 @@ impl HelloMsg {
 }
 impl Message for HelloMsg {
     fn get_header(&self) -> &MsgHeader { &self.header }
-    fn get_payload(&self) -> &MsgPayload { &self.payload }
+    fn get_payload(&self) -> &dyn MsgPayload { &self.payload }
     fn get_msg_type(&self) -> MsgType { self.header.msg_type }
     fn is_blocking(&self) -> bool { false }
     fn value(&self) -> serde_json::Value {
@@ -541,7 +541,7 @@ impl Message for HelloMsg {
     }
 }
 impl fmt::Display for HelloMsg {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let s = format!("{}: {}", self.get_header(), self.get_payload());
         write!(f, "{}", s)
     }
@@ -560,7 +560,7 @@ impl HelloMsgPayload {
 }
 impl MsgPayload for HelloMsgPayload {}
 impl fmt::Display for HelloMsgPayload {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "Neigbor cell id {} neighbor port {}", self.cell_id, *self.port_no)
     }
 }
@@ -580,7 +580,7 @@ impl StackTreeMsg {
 }
 impl Message for StackTreeMsg {
     fn get_header(&self) -> &MsgHeader { &self.header }
-    fn get_payload(&self) -> &MsgPayload { &self.payload }
+    fn get_payload(&self) -> &dyn MsgPayload { &self.payload }
     fn get_msg_type(&self) -> MsgType { self.header.msg_type }
     fn is_blocking(&self) -> bool { true }
     fn value(&self) -> serde_json::Value {
@@ -592,7 +592,7 @@ impl Message for StackTreeMsg {
     }
 }
 impl fmt::Display for StackTreeMsg {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let s = format!("{}: {}", self.get_header(), self.get_payload());
         write!(f, "{}", s)
     }
@@ -616,7 +616,7 @@ impl StackTreeMsgPayload {
 }
 impl MsgPayload for StackTreeMsgPayload {}
 impl fmt::Display for StackTreeMsgPayload {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "Tree {} stacked on tree {} {}", self.new_tree_id, self.parent_tree_id, self.gvm_eqn)
     }
 }
@@ -639,7 +639,7 @@ impl StackTreeDMsg {
 }
 impl Message for StackTreeDMsg {
     fn get_header(&self) -> &MsgHeader { &self.header }
-    fn get_payload(&self) -> &MsgPayload { &self.payload }
+    fn get_payload(&self) -> &dyn MsgPayload { &self.payload }
     fn get_msg_type(&self) -> MsgType { self.header.msg_type }
     fn get_tree_id(&self) -> TreeID { self.payload.tree_id.clone() }
     fn is_blocking(&self) -> bool { true }
@@ -652,7 +652,7 @@ impl Message for StackTreeDMsg {
     }
 }
 impl fmt::Display for StackTreeDMsg {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let s = format!("{}: {}", self.get_header(), self.get_payload());
         write!(f, "{}", s)
     }
@@ -670,7 +670,7 @@ impl StackTreeMsgDPayload {
 }
 impl MsgPayload for StackTreeMsgDPayload {}
 impl fmt::Display for StackTreeMsgDPayload {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "Tree {}", self.tree_id)
     }
 }
@@ -691,7 +691,7 @@ impl ManifestMsg {
 }
 impl Message for ManifestMsg {
     fn get_header(&self) -> &MsgHeader { &self.header }
-    fn get_payload(&self) -> &MsgPayload { &self.payload }
+    fn get_payload(&self) -> &dyn MsgPayload { &self.payload }
     fn get_msg_type(&self) -> MsgType { self.get_header().msg_type }
     fn get_tree_id(&self) -> TreeID { self.payload.deploy_tree_id.clone() }
     fn is_blocking(&self) -> bool { false }
@@ -704,7 +704,7 @@ impl Message for ManifestMsg {
     }
 }
 impl fmt::Display for ManifestMsg {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let s = format!("{}: {}", self.get_header(), self.get_payload());
         write!(f, "{}", s)
     }
@@ -727,7 +727,7 @@ impl ManifestMsgPayload {
 }
 impl MsgPayload for ManifestMsgPayload {}
 impl fmt::Display for ManifestMsgPayload {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let s = format!("Manifest: {}", self.get_manifest());
         write!(f, "{}", s)
     }
@@ -748,7 +748,7 @@ impl ApplicationMsg {
 }
 impl Message for ApplicationMsg {
     fn get_header(&self) -> &MsgHeader { &self.header }
-    fn get_payload(&self) -> &MsgPayload { &self.payload }
+    fn get_payload(&self) -> &dyn MsgPayload { &self.payload }
     fn get_msg_type(&self) -> MsgType { self.get_header().msg_type }
     fn get_tree_id(&self) -> TreeID { self.payload.tree_id.clone() }
     fn is_blocking(&self) -> bool { false }
@@ -761,7 +761,7 @@ impl Message for ApplicationMsg {
     }
 }
 impl fmt::Display for ApplicationMsg {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let s = format!("{}: tree {}", self.get_header(), self.get_payload());
         write!(f, "{}", s)
     }
@@ -780,7 +780,7 @@ impl ApplicationMsgPayload {
 }
 impl MsgPayload for ApplicationMsgPayload {}
 impl fmt::Display for ApplicationMsgPayload {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         if let Ok(body) = ::std::str::from_utf8(&self.body) {
             let s = format!("Application message {}", body);
             write!(f, "{}", s)
@@ -806,7 +806,7 @@ impl TreeNameMsg {
 }
 impl Message for TreeNameMsg {
     fn get_header(&self) -> &MsgHeader { &self.header }
-    fn get_payload(&self) -> &MsgPayload { &self.payload }
+    fn get_payload(&self) -> &dyn MsgPayload { &self.payload }
     fn get_msg_type(&self) -> MsgType { self.get_header().msg_type }
     fn is_blocking(&self) -> bool { false }
     fn value(&self) -> serde_json::Value {
@@ -814,7 +814,7 @@ impl Message for TreeNameMsg {
     }
 }
 impl fmt::Display for TreeNameMsg {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let s = format!("{}: {}", self.get_header(), self.get_payload());
         write!(f, "{}", s)
     }
@@ -831,7 +831,7 @@ impl TreeNameMsgPayload {
 }
 impl MsgPayload for TreeNameMsgPayload {}
 impl fmt::Display for TreeNameMsgPayload {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let s = format!("Tree name for border cell {}", self.tree_name);
         write!(f, "{}", s)
     }

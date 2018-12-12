@@ -141,7 +141,7 @@ impl Deref for PacketNo { type Target = u16; fn deref(&self) -> &Self::Target { 
 #[derive(Debug, Copy, Clone, Hash, Eq, PartialEq, Serialize, Deserialize)]
 pub struct PathLength(pub CellNo);
 impl Deref for PathLength { type Target = CellNo; fn deref(&self) -> &Self::Target { &self.0 } }
-impl fmt::Display for PathLength { fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result { write!(f, "{}", *self.0)} }
+impl fmt::Display for PathLength { fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result { write!(f, "{}", *self.0)} }
 #[derive(Debug, Copy, Clone, Hash, Eq, PartialEq, Ord, PartialOrd, Serialize, Deserialize)]
 pub struct PortNo(pub u8);
 impl PortNo {
@@ -156,7 +156,7 @@ pub enum CellType {
     Interior
 }
 impl fmt::Display for CellType {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let s = match *self {
             CellType::Border   => "Border",
             CellType::Interior => "Interior",

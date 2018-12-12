@@ -51,7 +51,7 @@ impl Blueprint {
     pub fn get_interior_cells(&self) -> &Vec<InteriorCell> { &self.interior_cells }
 }
 impl fmt::Display for Blueprint {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let mut s = format!("\nBlueprint");
         for cell in self.border_cells.iter() { s = s + &format!("{}", cell); }
         for cell in self.interior_cells.iter() { s = s + &format!("{}", cell); }
@@ -82,7 +82,7 @@ impl BorderCell {
     pub fn _get_border_ports(&self) -> &Vec<PortNo> { &self.border_ports }
 }
 impl fmt::Display for BorderCell {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let mut s = format!("\n  Border Cell {}: ", *self.cell_no);
         s = s + &format!("Border Ports:");
         for p in self.border_ports.iter().cloned() { s = s + &format!(" {}", *p); }
@@ -104,7 +104,7 @@ impl Cell for InteriorCell {
     fn get_interior_ports(&self) -> &Vec<PortNo> { &self.interior_ports }
 }
 impl fmt::Display for InteriorCell {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let mut s = format!("\n  Interior Cell {}: ", *self.cell_no);
         s = s + &format!("Interior Ports:");
         for p in self.interior_ports.iter().cloned() { s = s + &format!(" {}", *p); }

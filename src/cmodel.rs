@@ -212,7 +212,7 @@ packets: Vec<Packet>,
 }
 
 impl fmt::Display for Cmodel {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let s = format!("\nCmodel {}", self.cell_id.get_name());
         write!(f, "{}", s)
     }

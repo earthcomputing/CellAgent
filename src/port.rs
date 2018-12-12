@@ -209,7 +209,7 @@ impl Port {
     }
 }
 impl fmt::Display for Port { 
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let is_connected = self.is_connected();
         let mut s = format!("Port {} {}", self.port_number, self.id);
         if self.is_border { s = s + " is boundary  port,"; }
