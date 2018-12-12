@@ -71,7 +71,7 @@ impl Packet {
     // Payload (Deep Packet Inspection)
     // Debug hack to get tree_id out of packets.  Assumes msg is one packet
     pub fn get_tree_id(self) -> TreeID {
-        let msg = MsgType::get_msg(&vec![self]).unwrap();
+        let msg = MsgType::get_msg(&[self]).unwrap();
         msg.get_tree_id().clone()
     }
 }
@@ -170,14 +170,14 @@ impl fmt::Debug for Payload {
 }
 pub struct Serializer {}
 impl Serializer {
-    pub fn serialize<M>(msg: &M) -> Result<Box<Vec<u8>>, Error>
+    pub fn serialize<M>(msg: &M) -> Result<Vec<u8>, Error>
             where M: Message + serde::Serialize {
         let msg_type = msg.get_header().get_msg_type();
         let serialized_msg = serde_json::to_string(msg).context(PacketError::Chain { func_name: "serialize", comment: S("msg")})?;
         let msg_obj = TypePlusMsg::new(msg_type, serialized_msg);
         let serialized = serde_json::to_string(&msg_obj).context(PacketError::Chain { func_name: "serialize", comment: S("msg_obj")})?;
         let msg_bytes = serialized.clone().into_bytes();
-        Ok(Box::new(msg_bytes))
+        Ok(msg_bytes)
     }
 }
 pub struct Packetizer {}

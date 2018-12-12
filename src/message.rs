@@ -179,13 +179,13 @@ pub trait Message {
     fn to_bytes(&self) -> Result<ByteArray, Error> where Self: serde::Serialize + Sized {
         let _f = "to_bytes";
         let bytes = Serializer::serialize(self).context(MessageError::Chain { func_name: _f, comment: S("")})?;
-        Ok(ByteArray(*bytes))
+        Ok(ByteArray(bytes))
     }
     fn to_packets(&self, tree_id: &TreeID) -> Result<Vec<Packet>, Error>
             where Self:std::marker::Sized + serde::Serialize {
         let _f = "to_packets";
         let bytes = Serializer::serialize(self).context(MessageError::Chain { func_name: _f, comment: S("")})?;
-        let packets = Packetizer::packetize(&tree_id.get_uuid(), &ByteArray(*bytes), self.is_blocking());
+        let packets = Packetizer::packetize(&tree_id.get_uuid(), &ByteArray(bytes), self.is_blocking());
         Ok(packets)
     }
     fn process_ca(&mut self, _cell_agent: &mut CellAgent, _port_no: PortNo,
@@ -291,7 +291,7 @@ impl DiscoverPayload {
         eqns.insert(GvmEqn::Send("true"));
         eqns.insert(GvmEqn::Xtnd("true"));
         eqns.insert(GvmEqn::Save("false"));
-        let gvm_eqn = GvmEquation::new(&eqns, Vec::new());
+        let gvm_eqn = GvmEquation::new(&eqns, &Vec::new());
         DiscoverPayload { tree_id: tree_id.clone(), sending_cell_id: sending_cell_id.clone(),
             hops, path, gvm_eqn }
     }

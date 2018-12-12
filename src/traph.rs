@@ -86,7 +86,7 @@ impl Traph {
         let mut tried = self.tried_ports
             .get(rw_tree_id)
             .cloned()
-            .unwrap_or(HashSet::new());
+            .unwrap_or_default();
         tried.insert(port_no);
         self.tried_ports.insert(rw_tree_id.clone(), tried);
     }
@@ -203,7 +203,7 @@ impl Traph {
             .filter(|&element| !element.is_on_broken_path(broken_path))
             .filter(|&element| !element.is_broken())
             .min_by_key(|&element| **element.get_hops())
-            .map(|element| *element)
+            .cloned()
     }
     pub fn get_untried_child_element(&self, rw_tree_id: &TreeID) -> Option<TraphElement> {
         // TODO: Change to pick child with pruned port with shortest path to root
@@ -216,7 +216,7 @@ impl Traph {
             .find(|&element| element.is_status(PortStatus::Child))
             .filter(|&element| !self.tried_ports_contains(rw_tree_id, element.get_port_no()))
             .filter(|&element| !element.is_broken())
-            .map(|element| *element)
+            .cloned()
     }
     fn apply_update(&mut self,
                     port_tree_fn: fn(&mut PortTree, PortNumber) -> RoutingTableEntry,
