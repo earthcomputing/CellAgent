@@ -63,7 +63,7 @@ fn main() -> Result<(), Error> {
         let (rows, cols, geometry) = config::get_geometry();
         {
             // For reasons I can't understand, the trace record doesn't show up when generated from main.
-            let ref trace_params = TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "trace_schema" };
+            let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "trace_schema" };
             let trace = json!({ "schema_version": SCHEMA_VERSION, "ncells": NCELLS, "rows": rows, "cols": cols });
             let _ = dal::add_to_trace(trace_header, TraceType::Trace, trace_params,&trace, _f);
         }
@@ -90,14 +90,14 @@ fn main() -> Result<(), Error> {
     let mut border = HashMap::new();
     border.insert(CellNo(2), vec![PortNo(2)]);
     border.insert(CellNo(7), vec![PortNo(2)]);
-    let blueprint = Blueprint::new(ncells, nports, edges, exceptions, border).context(MainError::Chain { func_name: "run", comment: S("") })?;
+    let blueprint = Blueprint::new(ncells, nports, edges, &exceptions, &border).context(MainError::Chain { func_name: "run", comment: S("") })?;
     println!("{}", blueprint);
     if false { deployment_demo()?; }    // Demonstrate features of deployment spec
     let (outside_to_noc, noc_from_outside): (OutsideToNoc, NocFromOutside) = channel();
     let (noc_to_outside, _outside_from_noc): (NocToOutside, OutsideFromNoc) = channel();
     let mut noc = Noc::new(noc_to_outside)?;
     let (mut dc, _) = noc.initialize(&blueprint, noc_from_outside).context(MainError::Chain { func_name: "run", comment: S("") })?;
-    if AUTO_BREAK > 0{
+    if AUTO_BREAK != 0 {
         println!("---> Automatically break link");
         break_link(&mut dc)?;
     }
@@ -111,14 +111,20 @@ fn main() -> Result<(), Error> {
         let mut print_opt = String::new();
         stdin().read_line(&mut print_opt).context(MainError::Chain { func_name: "run", comment: S("") })?;
         if print_opt.len() > 1 {
-            match print_opt.trim().as_ref() {
-                "d" => Ok(println!("{}", dc)),
+            match print_opt.trim() {
+                "d" => {
+                    println!("{}", dc);
+                    Ok(())
+                },
                 "c" => show_pe(&dc),
                 "l" => break_link(&mut dc),
                 "p" => show_pe(&dc),
-                "m" => deploy(outside_to_noc.clone()),
+                "m" => deploy(&outside_to_noc.clone()),
                 "x" => std::process::exit(0),
-                _   => Ok(println!("Invalid input {}", print_opt))
+                _   => {
+                    println!("Invalid input {}", print_opt);
+                    Ok(())
+                }
             }?;
         }
     }
@@ -126,7 +132,7 @@ fn main() -> Result<(), Error> {
 fn show_pe(dc: &Datacenter) -> Result<(), Error> {
     let cells = dc.get_cells();
     print_vec(&dc.get_cell_ids());
-    stdout().write(b"Enter cell to display forwarding table\n")?;
+    let _ = stdout().write(b"Enter cell to display forwarding table\n")?;
     let cell_no = read_int()?;
     cells.get(cell_no)
         .map_or_else(|| println!("{} is not a valid input", cell_no),
@@ -137,7 +143,7 @@ fn show_pe(dc: &Datacenter) -> Result<(), Error> {
     Ok(())
 }
 fn break_link(dc: &mut Datacenter) -> Result<(), Error> {
-    let link_no = if AUTO_BREAK > 0 {
+    let link_no = if AUTO_BREAK != 0 {
         // TODO: Wait until discover is done before automatically breaking link, should be removed
         crate::utility::sleep(4);
         println!("---> Automatically break link {}", AUTO_BREAK);
@@ -145,7 +151,7 @@ fn break_link(dc: &mut Datacenter) -> Result<(), Error> {
     } else {
         let link_ids = dc.get_link_ids();
         print_vec(&link_ids);
-        stdout().write(b"Enter link to break or null\n")?;
+        let _ = stdout().write(b"Enter link to break or null\n")?;
         read_int()?
     };
     let links = dc.get_links_mut();
@@ -167,14 +173,15 @@ fn read_int() -> Result<usize, Error> {
         }
     }
 }
-fn deploy(outside_to_noc: OutsideToNoc) -> Result<(), Error> {
+fn deploy(outside_to_noc: &OutsideToNoc) -> Result<(), Error> {
     stdout().write(b"Enter the name of a file containing a manifest\n").context(MainError::Chain { func_name: "run", comment: S("") })?;
     let mut filename = String::new();
     stdin().read_line(&mut filename).context(MainError::Chain { func_name: "run", comment: S("") })?;
     let mut f = File::open(filename.trim()).context(MainError::Chain { func_name: "run", comment: S("") })?;
     let mut manifest = String::new();
     f.read_to_string(&mut manifest).context(MainError::Chain { func_name: "run", comment: S("") })?;
-    Ok(outside_to_noc.send(manifest)?)
+    outside_to_noc.send(manifest)?;
+    Ok(())
 }
 fn deployment_demo() -> Result<(), Error> {
     let mut eqns = HashSet::new();
@@ -185,8 +192,8 @@ fn deployment_demo() -> Result<(), Error> {
 //  let ref gvm_eqn = GvmEquation::new(eqns, vec![GvmVariable::new(GvmVariableType::PathLength, "hops")]);
     let up_tree1 = UpTreeSpec::new("test1", vec![0, 0, 0, 2, 2]).context(MainError::Chain { func_name: "deployment_demo", comment: S("")})?;
     let up_tree2 = UpTreeSpec::new("test2", vec![1, 1, 0, 1]).context(MainError::Chain { func_name: "deployment_demo", comment: S("")})?;
-    let ref allowed_tree1 = AllowedTree::new("foo");
-    let ref allowed_tree2 = AllowedTree::new("bar");
+    let allowed_tree1 = &AllowedTree::new("foo");
+    let allowed_tree2 = &AllowedTree::new("bar");
     let c1 = ContainerSpec::new("c1", "D1", vec!["param1"], &vec![allowed_tree1, allowed_tree2]).context(MainError::Chain { func_name: "deployment_demo", comment: S("")})?;
     let c2 = ContainerSpec::new("c2", "D1", vec!["param1","param2"], &vec![allowed_tree1]).context(MainError::Chain { func_name: "deployment_demo", comment: S("")})?;
     let c3 = ContainerSpec::new("c3", "D3", vec!["param3"], &vec![allowed_tree1]).context(MainError::Chain { func_name: "deployment_demo", comment: S("")})?;

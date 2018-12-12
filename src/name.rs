@@ -67,13 +67,13 @@ impl TreeID {
     pub fn default() -> TreeID {
         TreeID { name: S("Default"), uuid: Uuid::new() }
     }
-    pub fn with_root_port_number(&self, port_number: &PortNumber) -> TreeID {
+    pub fn with_root_port_number(&self, port_number: PortNumber) -> TreeID {
         let mut uuid = self.uuid;
         uuid.set_port_number(port_number);
         TreeID { name: S(self.get_name()), uuid }
     }
     pub fn without_root_port_number(&self) -> TreeID {
-        let mut uuid = self.uuid.clone();
+        let mut uuid = self.uuid; // Copy so next line doesn't change self.uuid
         uuid.remove_port_no();
         TreeID { name: S(self.get_name()), uuid }
     }

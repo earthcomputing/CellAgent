@@ -32,7 +32,7 @@ pub struct Traph {
 impl Traph {
     pub fn new(cell_id: &CellID, no_ports: PortNo, black_tree_id: &TreeID, gvm_eqn: &GvmEquation) -> Result<Traph, Error> {
         let mut elements = Vec::new();
-        for i in 1..*no_ports + 1 {
+        for i in 1..=*no_ports {
             let port_number = PortNo(i as u8).make_port_number(MAX_PORTS).context(TraphError::Chain { func_name: "new", comment: S("")})?;
             elements.push(TraphElement::default(port_number));
         }
@@ -156,7 +156,7 @@ impl Traph {
             .iter()
             .find(|&element| element.get_status() == PortStatus::Parent)
             .ok_or(TraphError::ParentElement { cell_id: self.cell_id.clone(), func_name: _f, tree_id: self.base_tree_id.clone() }.into())
-            .map(|element| element.clone())
+            .map(|element| *element)
     }
     pub fn find_new_parent_port(&mut self, rw_tree_id: &TreeID, broken_path: Path) -> Option<PortNo> {
         let _f = "find_new_parent_port";
@@ -203,7 +203,7 @@ impl Traph {
             .filter(|&element| !element.is_on_broken_path(broken_path))
             .filter(|&element| !element.is_broken())
             .min_by_key(|&element| **element.get_hops())
-            .map(|element| element.clone())
+            .map(|element| *element)
     }
     pub fn get_untried_child_element(&self, rw_tree_id: &TreeID) -> Option<TraphElement> {
         // TODO: Change to pick child with pruned port with shortest path to root
@@ -216,7 +216,7 @@ impl Traph {
             .find(|&element| element.is_status(PortStatus::Child))
             .filter(|&element| !self.tried_ports_contains(rw_tree_id, element.get_port_no()))
             .filter(|&element| !element.is_broken())
-            .map(|element| element.clone())
+            .map(|element| *element)
     }
     fn apply_update(&mut self,
                     port_tree_fn: fn(&mut PortTree, PortNumber) -> RoutingTableEntry,
@@ -290,7 +290,7 @@ impl Traph {
         self.apply_update(PortTree::remove_child, Tree::remove_child, port_tree_id, child)
     }
     pub fn update_element(&mut self, tree_id: &TreeID, port_number: PortNumber, port_status: PortStatus,
-                          children: HashSet<PortNumber>, hops: PathLength, path: Path)
+                          children: &HashSet<PortNumber>, hops: PathLength, path: Path)
                           -> Result<RoutingTableEntry, Error> {
         let _f = "update_element";
         // println!("update_element - {}", self);
@@ -330,13 +330,13 @@ impl Traph {
     pub fn stack_tree(&mut self, tree: Tree) {
         self.stacked_trees.lock().unwrap().insert(tree.get_uuid(), tree);
     }
-    pub fn get_params(&self, vars: &Vec<GvmVariable>) -> Result<Vec<GvmVariable>, Error> {
+    pub fn get_params(&self, vars: &[GvmVariable]) -> Result<Vec<GvmVariable>, Error> {
         let _f = "get_params";
         vars.iter()
             .map(|var| {
                 match var.get_var_name().as_ref() {
                     "hops" => {
-                        let ref hops = self.get_hops().context(TraphError::Chain { func_name: "get_params", comment: S("")})?;
+                        let hops = &self.get_hops().context(TraphError::Chain { func_name: "get_params", comment: S("")})?;
                         let str_hops = serde_json::to_string(hops).context(TraphError::Chain { func_name: "get_params", comment: S("") })?;
                         let mut updated = GvmVariable::new(GvmVariableType::PathLength, "hops");
                         updated.set_value(str_hops);

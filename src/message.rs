@@ -34,7 +34,7 @@ pub enum MsgType {
 }
 impl MsgType {
     // Used for debug hack in packet_engine
-    pub fn get_msg(packets: &Vec<Packet>) -> Result<Box<dyn Message>, Error> {
+    pub fn get_msg(packets: &[Packet]) -> Result<Box<dyn Message>, Error> {
         let _f = "get_msg";
         let bytes = Packetizer::unpacketize(packets).context(MessageError::Chain { func_name: _f, comment: S("unpacketize")})?;
         //println!("Message get_msg: serialized {}, packets {:?}", serialized, packets);
@@ -76,10 +76,7 @@ impl MsgType {
     }
     // A hack for printing debug output only for a specific message type
     pub fn is_type(packet: &Packet, type_of_msg: MsgType) -> bool {
-        match format!("{}", packet).find(&(S(type_of_msg) + "\\")) {
-            Some(_) => true,
-            None => false
-        }        
+        format!("{}", packet).find(&(S(type_of_msg) + "\\")).is_some()
     }
     // A hack for finding the message type
     pub fn msg_type(packet: &Packet) -> MsgType {
@@ -294,7 +291,7 @@ impl DiscoverPayload {
         eqns.insert(GvmEqn::Send("true"));
         eqns.insert(GvmEqn::Xtnd("true"));
         eqns.insert(GvmEqn::Save("false"));
-        let gvm_eqn = GvmEquation::new(eqns, Vec::new());
+        let gvm_eqn = GvmEquation::new(&eqns, Vec::new());
         DiscoverPayload { tree_id: tree_id.clone(), sending_cell_id: sending_cell_id.clone(),
             hops, path, gvm_eqn }
     }

@@ -96,7 +96,7 @@ pub struct PacketHeader {
 }
 impl PacketHeader {
     pub fn new(uuid: &Uuid) -> PacketHeader {
-        PacketHeader { uuid: uuid.clone() }
+        PacketHeader { uuid: *uuid }
     }
     fn get_uuid(&self) -> Uuid { self.uuid }
     fn make_ait(&mut self) { self.uuid.make_ait(); }
@@ -124,6 +124,8 @@ impl Payload {
     pub fn new(msg_id: MsgID, size: PacketNo,
                is_last: bool, is_blocking: bool, data_bytes: Vec<u8>) -> Payload {
         let mut bytes = [0 as u8; PAYLOAD_MAX];
+        // Next line recommended by clippy, but I think the loop is clearer
+        //bytes[..min(data_bytes.len(), PAYLOAD_MAX)].clone_from_slice(&data_bytes[..min(data_bytes.len(), PAYLOAD_MAX)]);
         for i in 0..min(data_bytes.len(), PAYLOAD_MAX) { bytes[i] = data_bytes[i]; }
         Payload { msg_id, size, is_last, is_blocking, bytes}
     }
@@ -206,7 +208,7 @@ impl Packetizer {
         }
         packets
     }
-    pub fn unpacketize(packets: &Vec<Packet>) -> Result<ByteArray, Error> {
+    pub fn unpacketize(packets: &[Packet]) -> Result<ByteArray, Error> {
         let mut msg = Vec::new();
         for packet in packets {
             let mut bytes = packet.get_bytes();
@@ -220,7 +222,7 @@ impl Packetizer {
     }
     fn packet_payload_size(len: usize) -> usize {
         match len-1 {
-            0..=PACKET_MIN           => PAYLOAD_MIN,
+            0..=PACKET_MIN            => PAYLOAD_MIN,
             PAYLOAD_MIN..=PAYLOAD_MAX => len,
             _                         => PAYLOAD_MAX
         }

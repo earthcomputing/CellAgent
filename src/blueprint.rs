@@ -12,7 +12,7 @@ pub struct Blueprint {
 }
 impl Blueprint {
     pub fn new(ncells: CellNo, ports_per_cell: PortNo, edges: Vec<Edge>,
-               exceptions: HashMap<CellNo, PortNo>, border_cell_map: HashMap<CellNo, Vec<PortNo>>) ->
+               exceptions: &HashMap<CellNo, PortNo>, border_cell_map: &HashMap<CellNo, Vec<PortNo>>) ->
                Result<Blueprint, BlueprintError> {
         let _f = "new";
         let num_border = border_cell_map.len();

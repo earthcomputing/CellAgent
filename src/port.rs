@@ -56,9 +56,9 @@ impl Port {
         let port = self.clone();
         let child_trace_header = fork_trace_header();
         let thread_name = format!("Port {} listen_noc_for_pe_loop", self.get_id().get_name());
-        thread::Builder::new().name(thread_name.into()).spawn( move || {
+        thread::Builder::new().name(thread_name).spawn( move || {
             update_trace_header(child_trace_header);
-            let _ = port.listen_noc_for_pe_loop(&port_from_noc).map_err(|e| write_err("port", e));
+            let _ = port.listen_noc_for_pe_loop(&port_from_noc).map_err(|e| write_err("port", &e));
             if CONTINUE_ON_ERROR { let _ = port.listen_noc_for_pe(port_from_noc); }
         })?;
         Ok(())
@@ -68,14 +68,14 @@ impl Port {
     fn listen_noc_for_pe_loop(&self, port_from_noc: &PortFromNoc) -> Result<(), Error> {
         let _f = "listen_noc_for_pe_loop";
         if TRACE_OPTIONS.all || TRACE_OPTIONS.port {
-            let ref trace_params = TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "worker" };
+            let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "worker" };
             let trace = json!({ "id": self.get_id().get_name(), "thread_name": thread::current().name(), "thread_id": TraceHeader::parse(thread::current().id()) });
             let _ = dal::add_to_trace(TraceType::Trace, trace_params, &trace, _f);
         }
         loop {
             let msg = port_from_noc.recv()?;
             if TRACE_OPTIONS.all || TRACE_OPTIONS.port {
-                let ref trace_params = TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "recv" };
+                let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "recv" };
                 let trace = json!({ "id": self.get_id().get_name(), "msg": msg });
                 let _ = dal::add_to_trace(TraceType::Trace, trace_params, &trace, _f);
             }
@@ -91,9 +91,9 @@ impl Port {
         let port = self.clone();
         let child_trace_header = fork_trace_header();
         let thread_name = format!("Port {} listen_pe_for_noc_loop", self.get_id().get_name());
-        let join_handle = thread::Builder::new().name(thread_name.into()).spawn( move || {
+        let join_handle = thread::Builder::new().name(thread_name).spawn( move || {
             update_trace_header(child_trace_header);
-            let _ = port.listen_pe_for_noc_loop(&port_to_noc, &port_from_pe).map_err(|e| write_err("port", e));
+            let _ = port.listen_pe_for_noc_loop(&port_to_noc, &port_from_pe).map_err(|e| write_err("port", &e));
             if CONTINUE_ON_ERROR { let _ = port.listen_pe_for_noc(port_to_noc, port_from_pe); }
         })?;
         Ok(join_handle)
@@ -104,14 +104,14 @@ impl Port {
             -> Result<(), Error> {
         let _f = "listen_pe_for_noc_loop";
         if TRACE_OPTIONS.all || TRACE_OPTIONS.port_noc {
-            let ref trace_params = TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "worker" };
+            let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "worker" };
             let trace = json!({ "id": self.get_id().get_name(), "thread_name": thread::current().name(), "thread_id": TraceHeader::parse(thread::current().id()) });
             let _ = dal::add_to_trace(TraceType::Trace, trace_params, &trace, _f);
         }
         loop {
             let msg = port_from_pe.recv().context(PortError::Chain { func_name: "listen_pe_for_outside", comment: S(self.id.get_name()) + " recv from pe"})?;
             if TRACE_OPTIONS.all || TRACE_OPTIONS.port_noc {
-                let ref trace_params = TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "recv" };
+                let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "recv" };
                 let trace = json!({ "id": self.get_id().get_name(), "msg": msg });
                 let _ = dal::add_to_trace(TraceType::Trace, trace_params, &trace, _f);
             }
@@ -132,18 +132,18 @@ impl Port {
         let mut port = self.clone();
         let child_trace_header = fork_trace_header();
         let thread_name = format!("Port {} listen_link", self.get_id().get_name());
-        thread::Builder::new().name(thread_name.into()).spawn( move || {
+        thread::Builder::new().name(thread_name).spawn( move || {
             update_trace_header(child_trace_header);
-            let _ = port.listen_link(port_from_link).map_err(|e| write_err("port", e));
+            let _ = port.listen_link(port_from_link).map_err(|e| write_err("port", &e));
             if CONTINUE_ON_ERROR { }
         }).expect("thread failed");
 
         let port = self.clone();
         let child_trace_header = fork_trace_header();
         let thread_name = format!("Port {} listen_pe", self.get_id().get_name());
-        thread::Builder::new().name(thread_name.into()).spawn( move || {
+        thread::Builder::new().name(thread_name).spawn( move || {
             update_trace_header(child_trace_header);
-            let _ = port.listen_pe(port_to_link, port_from_pe).map_err(|e| write_err("port", e));
+            let _ = port.listen_pe(&port_to_link, &port_from_pe).map_err(|e| write_err("port", &e));
             if CONTINUE_ON_ERROR { }
         }).expect("thread failed");
     }
@@ -152,7 +152,7 @@ impl Port {
     fn listen_link(&mut self, port_from_link: PortFromLink) -> Result<(), Error> {
         let _f = "listen_link";
         if TRACE_OPTIONS.all || TRACE_OPTIONS.port {
-            let ref trace_params = TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "worker" };
+            let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "worker" };
             let trace = json!({ "id": self.get_id().get_name(), "thread_name": thread::current().name(), "thread_id": TraceHeader::parse(thread::current().id()) });
             let _ = dal::add_to_trace(TraceType::Trace, trace_params, &trace, _f);
         }
@@ -161,7 +161,7 @@ impl Port {
             //println!("Port {}: waiting for status or packet from link", port.id);
             let msg = port_from_link.recv().context(PortError::Chain { func_name: "listen_link", comment: S(self.id.get_name()) + " recv from link"})?;
             if TRACE_OPTIONS.all || TRACE_OPTIONS.port {
-                let ref trace_params = TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "recv" };
+                let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "recv" };
                 let trace = json!({ "id": self.get_id().get_name(), "msg": msg });
                 let _ = dal::add_to_trace(TraceType::Trace, trace_params, &trace, _f);
             }
@@ -183,10 +183,10 @@ impl Port {
     }
 
     // WORKER (PortFromPe)
-    fn listen_pe(&self, port_to_link: PortToLink, port_from_pe: PortFromPe) -> Result<(), Error> {
+    fn listen_pe(&self, port_to_link: &PortToLink, port_from_pe: &PortFromPe) -> Result<(), Error> {
         let _f = "listen_pe";
         if TRACE_OPTIONS.all || TRACE_OPTIONS.port {
-            let ref trace_params = TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "worker" };
+            let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "worker" };
             let trace = json!({ "id": self.get_id().get_name(), "thread_name": thread::current().name(), "thread_id": TraceHeader::parse(thread::current().id()) });
             let _ = dal::add_to_trace(TraceType::Trace, trace_params, &trace, _f);
         }
@@ -194,7 +194,7 @@ impl Port {
             //println!("Port {}: waiting for packet from pe", id);
             let msg = port_from_pe.recv().context(PortError::Chain { func_name: "listen_pe", comment: S(self.id.get_name()) + " recv from port"})?;
             if TRACE_OPTIONS.all || TRACE_OPTIONS.port {
-                let ref trace_params = TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "recv" };
+                let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "recv" };
                 let trace = json!({ "id": self.get_id().get_name(), "msg": msg });
                 let _ = dal::add_to_trace(TraceType::Trace, trace_params, &trace, _f);
             }

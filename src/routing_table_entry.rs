@@ -55,20 +55,20 @@ impl RoutingTableEntry {
     pub fn add_child(&mut self, child: PortNumber) -> Self {
         let mask = Mask::new(child);
         self.or_with_mask(mask);
-        self.clone()
+        *self
     }
     pub fn remove_child(&mut self, port_number: PortNumber) -> Self {
         let mask = Mask::new(port_number).not();
         self.and_with_mask(mask);
-        self.clone()
+        *self
     }
     pub fn clear_children(&mut self) -> Self {
         self.and_with_mask(Mask::port0());
-        self.clone()
+        *self
     }
     pub fn set_parent(&mut self, port_number: PortNumber) -> Self {
         self.parent = port_number.get_port_no();
-        self.clone()
+        *self
     }
     pub fn has_child(&self, port_number: PortNumber) -> bool {
         self.get_mask().and(Mask::new(port_number)) != Mask::empty()

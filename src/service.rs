@@ -9,8 +9,8 @@ use crate::name::{ContainerID, UptreeID};
 use crate::uptree_spec::{AllowedTree};
 use crate::utility::{S, write_err, TraceHeader, TraceHeaderParams, TraceType};
 
-pub const NOCMASTER: &'static str ="NocMaster";
-pub const NOCAGENT: &'static str = "NocAgent";
+pub const NOCMASTER: &str ="NocMaster";
+pub const NOCAGENT: &str = "NocAgent";
 
 #[derive(Debug, Clone)]
 pub enum Service {
@@ -18,7 +18,7 @@ pub enum Service {
     NocAgent { service: NocAgent }
 }
 impl Service {
-    pub fn new(container_id: &ContainerID, service_name: &str, allowed_trees: &Vec<AllowedTree>,
+    pub fn new(container_id: &ContainerID, service_name: &str, allowed_trees: &[AllowedTree],
             container_to_vm: ContainerToVm) -> Result<Service, ServiceError> {
         match service_name {
             NOCMASTER => Ok(Service::NocMaster { service: NocMaster::new(container_id.clone(), NOCMASTER, container_to_vm, allowed_trees) }),
@@ -27,9 +27,9 @@ impl Service {
         }
     }
     pub fn initialize(&self, up_tree_id: &UptreeID, container_from_vm: ContainerFromVm) -> Result<(), Error> {
-        match self {
-            &Service::NocMaster { ref service } => service.initialize(up_tree_id, container_from_vm),
-            &Service::NocAgent  { ref service } => service.initialize(up_tree_id, container_from_vm)
+        match *self {
+            Service::NocMaster { ref service } => service.initialize(up_tree_id, container_from_vm),
+            Service::NocAgent  { ref service } => service.initialize(up_tree_id, container_from_vm)
         }
     }
 }
@@ -49,13 +49,13 @@ pub struct NocMaster {
     allowed_trees: Vec<AllowedTree>
 }
 impl NocMaster {
-    pub fn get_name(&self) -> &str { return &self.name; }
+    pub fn get_name(&self) -> &str { &self.name }
     //pub fn get_id(&self) -> &ContainerID { &self.container_id }
     pub fn new(container_id: ContainerID, name: &str, container_to_vm: ContainerToVm,
-               allowed_trees: &Vec<AllowedTree>) -> NocMaster {
+               allowed_trees: &[AllowedTree]) -> NocMaster {
         //println!("NocMaster started in container {}", container_id);
         NocMaster { container_id, name: S(name), container_to_vm,
-            allowed_trees: allowed_trees.clone() }
+            allowed_trees: allowed_trees.to_owned() }
     }
     //fn get_container_id(&self) -> &ContainerID { &self.container_id }
     pub fn initialize(&self, _: &UptreeID, container_from_vm: ContainerFromVm) -> Result<(), Error> {
@@ -75,9 +75,9 @@ impl NocMaster {
         let master = self.clone();
         let child_trace_header = fork_trace_header();
         let thread_name = format!("{} listen_vm_loop", self.get_name()); // NOC NOC
-        thread::Builder::new().name(thread_name.into()).spawn( move || {
+        thread::Builder::new().name(thread_name).spawn( move || {
             update_trace_header(child_trace_header);
-            let _ = master.listen_vm_loop(&container_from_vm).map_err(|e| write_err("service", e));
+            let _ = master.listen_vm_loop(&container_from_vm).map_err(|e| write_err("service", &e));
             if CONTINUE_ON_ERROR { let _ = master.listen_vm(container_from_vm); }
         })?;
         Ok(())
@@ -87,14 +87,14 @@ impl NocMaster {
     fn listen_vm_loop(&self, container_from_vm: &ContainerFromVm) -> Result<(), Error> {
         let _f = "listen_vm_loop";
         if TRACE_OPTIONS.all || TRACE_OPTIONS.svc {
-            let ref trace_params = TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "worker" };
+            let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "worker" };
             let trace = json!({ "NocMaster": self.get_name(), "thread_name": thread::current().name(), "thread_id": TraceHeader::parse(thread::current().id()) });
             let _ = dal::add_to_trace(TraceType::Trace, trace_params, &trace, _f);
         }
         loop {
             let (_is_ait, msg) = container_from_vm.recv().context("NocMaster container_from_vm").context(ServiceError::Chain { func_name: "listen_vm_loop", comment: S("NocMaster from vm")})?;
             if TRACE_OPTIONS.all || TRACE_OPTIONS.svc {
-                let ref trace_params = TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "recv" };
+                let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "recv" };
                 let trace = json!({ "NocMaster": self.get_name(), "msg": msg });
                 let _ = dal::add_to_trace(TraceType::Trace, trace_params, &trace, _f);
             }
@@ -115,12 +115,12 @@ pub struct NocAgent {
     allowed_trees: Vec<AllowedTree>
 }
 impl NocAgent {
-    pub fn get_name(&self) -> &str { return &self.name; }
+    pub fn get_name(&self) -> &str { &self.name }
     pub fn new(container_id: ContainerID, name: &str, container_to_vm: ContainerToVm,
-            allowed_trees: &Vec<AllowedTree>) -> NocAgent {
+            allowed_trees: &[AllowedTree]) -> NocAgent {
         //println!("NocAgent started in container {}", container_id);
         NocAgent { container_id, name: S(name), container_to_vm,
-            allowed_trees: allowed_trees.clone() }
+            allowed_trees: allowed_trees.to_owned() }
     }
     pub fn initialize(&self, _up_tree_id: &UptreeID, container_from_vm: ContainerFromVm) -> Result<(), Error> {
         //let _f = "initialize";
@@ -136,9 +136,9 @@ impl NocAgent {
         let agent = self.clone();
         let child_trace_header = fork_trace_header();
         let thread_name = format!("{} listen_vm_loop", self.get_name()); // NOC NOC
-        thread::Builder::new().name(thread_name.into()).spawn( move || {
+        thread::Builder::new().name(thread_name).spawn( move || {
             update_trace_header(child_trace_header);
-            let _ = agent.listen_vm_loop(&container_from_vm).map_err(|e| write_err("service", e));
+            let _ = agent.listen_vm_loop(&container_from_vm).map_err(|e| write_err("service", &e));
             if CONTINUE_ON_ERROR { let _ = agent.listen_vm(container_from_vm); }
         })?;
         Ok(())
@@ -148,14 +148,14 @@ impl NocAgent {
     fn listen_vm_loop(&self, container_from_vm: &ContainerFromVm) -> Result<(), Error> {
         let _f = "listen_vm_loop";
         if TRACE_OPTIONS.all || TRACE_OPTIONS.svc {
-            let ref trace_params = TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "worker" };
+            let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "worker" };
             let trace = json!({ "NocAgent": self.get_name(), "thread_name": thread::current().name(), "thread_id": TraceHeader::parse(thread::current().id()) });
             let _ = dal::add_to_trace(TraceType::Trace, trace_params, &trace, _f);
         }
         loop {
             let (_is_ait, msg) = container_from_vm.recv().context(ServiceError::Chain { func_name: _f, comment: S("Agent recv from vm") })?;
             if TRACE_OPTIONS.all || TRACE_OPTIONS.svc {
-                let ref trace_params = TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "recv" };
+                let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "recv" };
                 let trace = json!({ "NocAgent": self.get_name(), "msg": msg });
                 let _ = dal::add_to_trace(TraceType::Trace, trace_params, &trace, _f);
             }

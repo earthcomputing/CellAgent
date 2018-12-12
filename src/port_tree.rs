@@ -14,11 +14,11 @@ pub struct PortTree {
     entry: RoutingTableEntry
 }
 impl PortTree {
-    pub fn new(tree_id: &TreeID, root_port_number: &PortNumber, in_port_no: &PortNo, hops: &PathLength)
+    pub fn new(tree_id: &TreeID, root_port_number: PortNumber, in_port_no: PortNo, hops: PathLength)
             -> PortTree {
         let port_tree_id = tree_id.with_root_port_number(root_port_number);
         PortTree { port_tree_id, root_port_no: root_port_number.get_port_no(),
-                   in_port_no: *in_port_no, hops: *hops, entry: RoutingTableEntry::default() }
+                   in_port_no, hops, entry: RoutingTableEntry::default() }
     }
     pub fn get_port_tree_id(&self) -> &TreeID { &self.port_tree_id }
     pub fn get_root_port_no(&self) -> &PortNo { &self.root_port_no }

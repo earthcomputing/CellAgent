@@ -26,7 +26,7 @@ pub struct GvmEquation {
 }
 // Sample GvmEquation: "hops < 7 || n_childen == 0",  associated variables vec!["hops", "n_children"]
 impl GvmEquation {
-    pub fn new(equations: HashSet<GvmEqn<'_>>, variables: Vec<GvmVariable>) -> GvmEquation {
+    pub fn new(equations: &HashSet<GvmEqn<'_>>, variables: Vec<GvmVariable>) -> GvmEquation {
         let (mut recv, mut send, mut xtnd, mut save) = (S("false"), S("false"), S("false"), S("false"));
         for eqn in equations.iter() {
             match *eqn {
@@ -39,20 +39,20 @@ impl GvmEquation {
         GvmEquation { recv_eqn: recv, send_eqn: send,
             save_eqn: save, xtnd_eqn: xtnd, variables: variables.clone() }
     }
-    pub fn get_variables(&self) -> &Vec<GvmVariable> { &self.variables }
-    pub fn eval_recv(&self, params: &Vec<GvmVariable>) -> Result<bool, Error> {
+    pub fn get_variables(&self) -> &[GvmVariable] { &self.variables }
+    pub fn eval_recv(&self, params: &[GvmVariable]) -> Result<bool, Error> {
         self.evaluate(&self.recv_eqn, params)
     }
-    pub fn eval_send(&self, params: &Vec<GvmVariable>) -> Result<bool, Error> {
+    pub fn eval_send(&self, params: &[GvmVariable]) -> Result<bool, Error> {
         self.evaluate(&self.send_eqn, params)
     }
-    pub fn eval_save(&self, params: &Vec<GvmVariable>) -> Result<bool, Error> {
+    pub fn eval_save(&self, params: &[GvmVariable]) -> Result<bool, Error> {
         self.evaluate(&self.save_eqn, params)
     }
-    pub fn eval_xtnd(&self, params: &Vec<GvmVariable>) -> Result<bool, Error> {
+    pub fn eval_xtnd(&self, params: &[GvmVariable]) -> Result<bool, Error> {
         self.evaluate(&self.xtnd_eqn, params)
     }
-    fn evaluate(&self, eqn: &GvmEqnType, params: &Vec<GvmVariable>) -> Result<bool, Error> {
+    fn evaluate(&self, eqn: &GvmEqnType, params: &[GvmVariable]) -> Result<bool, Error> {
         let mut expr = Expr::new(eqn.clone());
         for variable in params.iter() {
             let var_type = variable.get_var_type();

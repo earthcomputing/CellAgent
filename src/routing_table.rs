@@ -19,10 +19,9 @@ impl RoutingTable {
     }
     pub fn get_entry(&self, uuid: Uuid) -> Result<RoutingTableEntry, Error> {
         let _f = "get_entry";
-        Ok(self.entries
+        Ok(*(self.entries
             .get(&uuid)
-            .ok_or_else(|| -> Error { RoutingTableError::Uuid { func_name: _f, cell_id: self.id.clone(), uuid }.into() })?
-            .clone())
+            .ok_or_else(|| -> Error { RoutingTableError::Uuid { func_name: _f, cell_id: self.id.clone(), uuid }.into() })?))
     }
     pub fn set_entry(&mut self, entry: RoutingTableEntry) {
         let _f = "set_entry";
@@ -36,7 +35,7 @@ impl fmt::Display for RoutingTable {
         let mut s = format!("\nRouting Table");
         s = s + &format!("\n Tree UUID  In Use Send? Parent Mask ");
         for key in &self.order {
-            let entry = self.entries.get(key).unwrap();
+            let entry = self.entries[key];
             s = s + &format!("\n{}", entry);
         }
         write!(f, "{}", s)
