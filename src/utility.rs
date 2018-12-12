@@ -42,18 +42,18 @@ impl Mask {
     pub fn all_but_zero(no_ports: PortNo) -> Mask {
         Mask { mask: MaskValue((2 as u16).pow((*no_ports) as u32)-2) }
     }
-    pub fn equal(&self, other: Mask) -> bool { *self.mask == *other.mask }
+    pub fn equal(self, other: Mask) -> bool { *self.mask == *other.mask }
     //pub fn get_as_value(&self) -> MaskValue { self.mask }
-    pub fn or(&self, mask: Mask) -> Mask {
+    pub fn or(self, mask: Mask) -> Mask {
         Mask { mask: MaskValue(*self.mask | *mask.mask) }
     }
-    pub fn and(&self, mask: Mask) -> Mask {
+    pub fn and(self, mask: Mask) -> Mask {
         Mask { mask: MaskValue(*self.mask & *mask.mask) }
     }
-    pub fn not(&self) -> Mask {
+    pub fn not(self) -> Mask {
         Mask { mask: MaskValue(!*self.mask) }
     }
-    pub fn all_but_port(&self, port_number: PortNumber) -> Mask {
+    pub fn all_but_port(self, port_number: PortNumber) -> Mask {
         let port_mask = Mask::new(port_number);
         self.and(port_mask.not())
     }
@@ -63,7 +63,7 @@ impl Mask {
             .fold(Mask::empty(), |mask, port_number|
                 mask.or(Mask::new(*port_number)) )
     }
-    pub fn get_port_nos(&self) -> Vec<PortNo> {
+    pub fn get_port_nos(self) -> Vec<PortNo> {
         (0..*MAX_PORTS)
             .map(|i| PortNo(i).make_port_number(MAX_PORTS)
                 .expect("Mask make_port_number cannont generate an error"))
@@ -82,7 +82,7 @@ impl fmt::Display for Mask {
 #[derive(Debug, Copy, Clone, Hash, PartialEq, Eq, Serialize, Deserialize)]
 pub struct PortNumber { pub port_no: PortNo }
 impl PortNumber {
-    pub fn new(no: PortNo, no_ports: PortNo) -> Result<PortNumber, UtilityError> {
+    pub fn new(no: PortNo, no_ports: PortNo) -> Result<PortNumber, Error> {
         if *no > *no_ports {
             Err(UtilityError::PortNumber{ port_no: no, func_name: "PortNumber::new", max: no_ports }.into())
         } else {
@@ -90,7 +90,7 @@ impl PortNumber {
         }
     }
     pub fn new0() -> PortNumber { PortNumber { port_no: (PortNo(0)) } }
-    pub fn get_port_no(&self) -> PortNo { self.port_no }
+    pub fn get_port_no(self) -> PortNo { self.port_no }
 }
 impl fmt::Display for PortNumber {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result { write!(f, "{}", *self.port_no) }
@@ -103,8 +103,8 @@ impl Path {
         Ok(Path { port_number })
     }
     pub fn new0() -> Path { Path { port_number: PortNumber::new0() } }
-    pub fn get_port_number(&self) -> PortNumber { self.port_number }
-    pub fn get_port_no(&self) -> PortNo { self.port_number.get_port_no() }
+    pub fn get_port_number(self) -> PortNumber { self.port_number }
+    pub fn get_port_no(self) -> PortNo { self.port_number.get_port_no() }
 }
 impl fmt::Display for Path {
     fn fmt(&self, f:&mut fmt::Formatter<'_>) -> fmt::Result { write!(f, "{}", self.port_number) }
@@ -182,7 +182,7 @@ impl TraceHeader {
 }
 fn timestamp() -> u64 {
     let timespec = time::get_time();
-    let t = timespec.sec as f64 + (timespec.nsec as f64/1000./1000./1000.);
+    let t = (timespec.sec as f64) + (timespec.nsec as f64/1000./1000./1000.);
     (t*1000.0*1000.0) as u64
 }
 pub fn sleep(n: u64) { // Sleep for n seconds
@@ -212,13 +212,13 @@ pub enum TraceType {
 }
 impl fmt::Display for TraceType {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "Trace type {}", match self {
-            &TraceType::Trace => "Trace",
-            &TraceType::Debug => "Debug"
+        write!(f, "Trace type {}", match *self {
+            TraceType::Trace => "Trace",
+            TraceType::Debug => "Debug"
         })
     }
 }
-pub fn print_vec<T: fmt::Display>(vector: &Vec<T>) {
+pub fn print_vec<T: fmt::Display>(vector: &[T]) {
     for (count, v) in vector.iter().enumerate() { println!("{:3}: {}", count, v) }
 }
 pub fn print_hash_set<T: fmt::Display + Eq + std::hash::Hash>(hashset: &HashSet<T>) {
@@ -227,7 +227,7 @@ pub fn print_hash_set<T: fmt::Display + Eq + std::hash::Hash>(hashset: &HashSet<
 pub fn new_hash_set<T: Clone + Eq + std::hash::Hash>(values: Box<[T]>) -> HashSet<T> {
     values.iter().cloned().collect::<HashSet<T>>()
 }
-pub fn write_err(caller: &str, e: Error) {
+pub fn write_err(caller: &str, e: &Error) {
     use ::std::io::Write;
     let stderr = &mut ::std::io::stderr();
     let _ = writeln!(stderr, "*** {}: {}", caller, e);
@@ -235,7 +235,7 @@ pub fn write_err(caller: &str, e: Error) {
         println!("*** Caused by {}", cause);
     }
     let fail: &dyn Fail = e.as_fail();
-    if let Some(_) = fail.cause().and_then(|cause| cause.backtrace()) {
+    if fail.cause().and_then(|cause| cause.backtrace()).is_some() {
         let _ = writeln!(stderr, "---> Backtrace available: uncomment line in utility.rs containing --->");
         // let _ = writeln!(stderr, "Backtrace: {:?}", backtrace);
     }

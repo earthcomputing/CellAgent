@@ -13,12 +13,12 @@ pub struct Manifest {
     trees: Vec<UpTreeSpec>
 }
 impl Manifest {
-    pub fn new(id: &str, cell_config: CellConfig, deployment_tree: &AllowedTree, allowed_refs: &Vec<&AllowedTree>,
+    pub fn new(id: &str, cell_config: CellConfig, deployment_tree: &AllowedTree, allowed_refs: &[&AllowedTree],
             vm_refs: Vec<&VmSpec>, tree_refs: Vec<&UpTreeSpec>) -> Result<Manifest, UptreeSpecError> {
         let mut trees = Vec::new();
         for t in tree_refs { trees.push(t.clone()); }
         let mut allowed_trees = Vec::new();
-        for a in allowed_refs { allowed_trees.push(a.clone().clone()); }
+        for &a in allowed_refs { allowed_trees.push(a.clone()); }
         let mut vms = Vec::new();
         for v in vm_refs {
             vms.push(v.to_owned());
@@ -60,7 +60,7 @@ impl VmSpec {
             container_refs: Vec<&ContainerSpec>, tree_refs: Vec<&UpTreeSpec>) -> Result<VmSpec, UptreeSpecError> {
         let mut max_tree_size = 0;
         let mut allowed_trees = Vec::new();
-        for a in allowed_refs { allowed_trees.push(a.clone().clone()); }
+        for &a in allowed_refs { allowed_trees.push(a.clone()); }
         let mut trees = Vec::new();
         for t in tree_refs {
             trees.push(t.clone());
@@ -100,11 +100,11 @@ pub struct ContainerSpec {
     allowed_trees: Vec<AllowedTree>
 }
 impl ContainerSpec {
-    pub fn new(id: &str, image: &str, param_refs: Vec<&str>, allowed_refs: &Vec<&AllowedTree>) -> Result<ContainerSpec, UptreeSpecError> {
+    pub fn new(id: &str, image: &str, param_refs: Vec<&str>, allowed_refs: &[&AllowedTree]) -> Result<ContainerSpec, Error> {
         let mut params = Vec::new();
         for p in param_refs { params.push(S(p)); }
         let mut allowed_trees = Vec::new();
-        for a in allowed_refs { allowed_trees.push(a.clone().clone()); }
+        for &a in allowed_refs { allowed_trees.push(a.clone()); }
         Ok(ContainerSpec { id: S(id), image: S(image), params, allowed_trees: allowed_trees.clone() })
     }
     pub fn get_id(&self) -> String { self.id.clone() }
@@ -114,7 +114,7 @@ impl ContainerSpec {
 impl fmt::Display for ContainerSpec {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let mut s = format!(" Service {}({})", self.id, self.image);
-        if self.params.len() == 0 { s = s + &format!(" No parameters"); }
+        if self.params.is_empty() { s = s + &format!(" No parameters"); }
         else                      { s = s + &format!(" Parameters: {:?}", self.params); }
         s = s + &format!("\n        Allowed Trees");
         for a in &self.allowed_trees { s = s + &format!("\n          {}", a); }
@@ -127,7 +127,7 @@ pub struct UpTreeSpec {
     parent_list: Vec<usize>,
 }
 impl UpTreeSpec {
-    pub fn new(id: &str, parent_list: Vec<usize>) -> Result<UpTreeSpec, UptreeSpecError> {
+    pub fn new(id: &str, parent_list: Vec<usize>) -> Result<UpTreeSpec, Error> {
         // Validate parent_list
         if parent_list.len() > 1 {
             let mut count = 0;
@@ -177,6 +177,7 @@ impl fmt::Display for AllowedTree {
         write!(f, "{}", s)
     }
 }
+use failure::{Error, Fail};
 #[derive(Debug, Fail)]
 pub enum UptreeSpecError {
 //  #[fail(display = "UptreeSpecError::Chain {} {}", func_name, comment)]

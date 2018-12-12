@@ -15,10 +15,10 @@ use crate::nalcell::CellConfig;
 use crate::uptree_spec::{AllowedTree, ContainerSpec, Manifest, UpTreeSpec, VmSpec};
 use crate::utility::{S, TraceHeader, TraceHeaderParams, TraceType, write_err};
 
-const NOC_MASTER_DEPLOY_TREE_NAME:  &'static str = "NocMasterDeploy";
-const NOC_AGENT_DEPLOY_TREE_NAME:   &'static str = "NocAgentDeploy";
-const NOC_CONTROL_TREE_NAME: &'static str = "NocMasterAgent";
-const NOC_LISTEN_TREE_NAME:  &'static str = "NocAgentMaster";
+const NOC_MASTER_DEPLOY_TREE_NAME:  &str = "NocMasterDeploy";
+const NOC_AGENT_DEPLOY_TREE_NAME:   &str = "NocAgentDeploy";
+const NOC_CONTROL_TREE_NAME:        &str = "NocMasterAgent";
+const NOC_LISTEN_TREE_NAME:         &str = "NocAgentMaster";
 
 #[derive(Debug, Clone)]
 pub struct Noc {
@@ -26,7 +26,7 @@ pub struct Noc {
     noc_to_outside: NocToOutside,
 }
 impl Noc {
-    pub fn get_name(&self) -> &str { return "NOC"; }
+    pub fn get_name(&self) -> &str { "NOC" }
     pub fn new(noc_to_outside: NocToOutside) -> Result<Noc, Error> {
         Ok(Noc { allowed_trees: HashSet::new(), noc_to_outside })
     }
@@ -36,7 +36,7 @@ impl Noc {
         if TRACE_OPTIONS.all || TRACE_OPTIONS.noc {
             // For reasons I can't understand, the trace record doesn't show up when generated from main.
             let (rows, cols, _geometry) = get_geometry();
-            let ref trace_params = TraceHeaderParams { module: "src/main.rs", line_no: line!(), function: "MAIN", format: "trace_schema" };
+            let trace_params = &TraceHeaderParams { module: "src/main.rs", line_no: line!(), function: "MAIN", format: "trace_schema" };
             let trace = json!({ "schema_version": SCHEMA_VERSION, "ncells": NCELLS, "rows": rows, "cols": cols });
             let _ = dal::add_to_trace(TraceType::Trace, trace_params,&trace, _f);
         }
@@ -69,9 +69,9 @@ impl Noc {
         let mut noc = self.clone();
         let child_trace_header = fork_trace_header();
         let thread_name = format!("{} listen_port_loop", self.get_name()); // NOC NOC
-        let join_port = thread::Builder::new().name(thread_name.into()).spawn( move || {
+        let join_port = thread::Builder::new().name(thread_name).spawn( move || {
             update_trace_header(child_trace_header);
-            let _ = noc.listen_port_loop(&noc_to_port, &noc_from_port).map_err(|e| write_err("port", e));
+            let _ = noc.listen_port_loop(&noc_to_port, &noc_from_port).map_err(|e| write_err("port", &e));
             if CONTINUE_ON_ERROR { let _ = noc.listen_port(noc_to_port, noc_from_port); }
         });
         Ok(join_port?)
@@ -82,14 +82,14 @@ impl Noc {
             -> Result<(), Error> {
         let _f = "listen_port_loop";
         if TRACE_OPTIONS.all || TRACE_OPTIONS.noc {
-            let ref trace_params = TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "worker" };
+            let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "worker" };
             let trace = json!({ "id": self.get_name(), "thread_name": thread::current().name(), "thread_id": TraceHeader::parse(thread::current().id()) });
             let _ = dal::add_to_trace(TraceType::Trace, trace_params, &trace, _f);
         }
         loop {
             let cmd = noc_from_port.recv().context(NocError::Chain { func_name: "listen_port", comment: S("")})?;
             if TRACE_OPTIONS.all || TRACE_OPTIONS.noc {
-                let ref trace_params = TraceHeaderParams { module: "src/main.rs", line_no: line!(), function: _f, format: "noc_from_ca" };
+                let trace_params = &TraceHeaderParams { module: "src/main.rs", line_no: line!(), function: _f, format: "noc_from_ca" };
                 let trace = json!({ "id": self.get_name(), "cmd": cmd });
                 let _ = dal::add_to_trace(TraceType::Trace, trace_params,&trace, _f);
             }
@@ -105,7 +105,7 @@ impl Noc {
                         self.create_noc(tree_name, &noc_to_port).context(NocError::Chain { func_name: "listen_port", comment: S("") })?;
                     }
                 }
-                _ => write_err("Noc: listen_port: {}", NocError::MsgType { func_name: "listen_port", msg_type }.into())
+                _ => write_err("Noc: listen_port: {}", &NocError::MsgType { func_name: "listen_port", msg_type }.into())
             }
         }
     }
@@ -116,9 +116,9 @@ impl Noc {
         let mut noc = self.clone();
         let child_trace_header = fork_trace_header();
         let thread_name = format!("{} listen_outside_loop", self.get_name()); // NOC NOC
-        let join_outside = thread::Builder::new().name(thread_name.into()).spawn( move || {
+        let join_outside = thread::Builder::new().name(thread_name).spawn( move || {
             update_trace_header(child_trace_header);
-            let _ = noc.listen_outside_loop(&noc_from_outside, &noc_to_port).map_err(|e| write_err("outside", e));
+            let _ = noc.listen_outside_loop(&noc_from_outside, &noc_to_port).map_err(|e| write_err("outside", &e));
             if CONTINUE_ON_ERROR { }
         });
         Ok(join_outside?)
@@ -129,14 +129,14 @@ impl Noc {
             -> Result<(), Error> {
         let _f = "listen_outside_loop";
         if TRACE_OPTIONS.all || TRACE_OPTIONS.noc {
-            let ref trace_params = TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "worker" };
+            let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "worker" };
             let trace = json!({ "id": self.get_name(), "thread_name": thread::current().name(), "thread_id": TraceHeader::parse(thread::current().id()) });
             let _ = dal::add_to_trace(TraceType::Trace, trace_params, &trace, _f);
         }
         loop {
             let input = &noc_from_outside.recv()?;
             if TRACE_OPTIONS.all || TRACE_OPTIONS.noc {
-                let ref trace_params = TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "worker" };
+                let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "worker" };
                 let trace = json!({ "id": self.get_name(), "thread_name": thread::current().name(), "thread_id": TraceHeader::parse(thread::current().id()) });
                 let _ = dal::add_to_trace(TraceType::Trace, trace_params, &trace, _f);
             }
@@ -146,7 +146,7 @@ impl Noc {
         }
     }
     // Sets up the NOC Master and NOC Agent services on up trees
-    fn create_noc(&mut self, tree_name: &String, noc_to_port: &NocToPort) -> Result<(), Error> {
+    fn create_noc(&mut self, tree_name: &str, noc_to_port: &NocToPort) -> Result<(), Error> {
         // TODO: Avoids race condition of deployment with Discover, remove to debug
         //::utility::sleep(4);
         let is_ait = false;
@@ -195,7 +195,7 @@ impl Noc {
         Ok(())
     }
     // Because of packet forwarding, this tree gets stacked on all cells even though only one of them can receive the deployment message
-    fn noc_master_deploy_tree(noc_master_deploy_tree: &AllowedTree, tree_name: &String, noc_to_port: &NocToPort) -> Result<(), Error> {
+    fn noc_master_deploy_tree(noc_master_deploy_tree: &AllowedTree, tree_name: &str, noc_to_port: &NocToPort) -> Result<(), Error> {
         let is_ait = false;
         // Tree for deploying the NocMaster, which only runs on the border cell connected to this instance of Noc
         let mut params = HashMap::new();
@@ -206,7 +206,7 @@ impl Noc {
         eqns.insert(GvmEqn::Recv("hops == 0"));
         eqns.insert(GvmEqn::Xtnd("false"));
         eqns.insert(GvmEqn::Save("false"));
-        let gvm_eqn = GvmEquation::new(eqns, vec![GvmVariable::new(GvmVariableType::PathLength, "hops")]);
+        let gvm_eqn = GvmEquation::new(&eqns, vec![GvmVariable::new(GvmVariableType::PathLength, "hops")]);
         let gvm_eqn_ser = serde_json::to_string(&gvm_eqn).context(NocError::Chain { func_name: "noc_master_deploy_tree", comment: S("gvm")})?;;
         params.insert(S("gvm_eqn"), gvm_eqn_ser);
         let stack_tree_msg = serde_json::to_string(&params).context(NocError::Chain { func_name: "noc_master_deploy_tree", comment: S("")})?;
@@ -218,7 +218,7 @@ impl Noc {
     }
     // For the reasons given in the comments to the following two functions, the agent does not run
     // on the same cell as the master
-    fn noc_agent_deploy_tree(noc_agent_deploy_tree: &AllowedTree, tree_name: &String, noc_to_port: &NocToPort) -> Result<(), Error> {
+    fn noc_agent_deploy_tree(noc_agent_deploy_tree: &AllowedTree, tree_name: &str, noc_to_port: &NocToPort) -> Result<(), Error> {
         let is_ait = false;
         // Stack a tree for deploying the NocAgents, which run on all cells, including the one running the NocMaster
         let mut params = HashMap::new();
@@ -229,7 +229,7 @@ impl Noc {
         eqns.insert(GvmEqn::Recv("hops > 0"));
         eqns.insert(GvmEqn::Xtnd("true"));
         eqns.insert(GvmEqn::Save("true"));
-        let gvm_eqn = GvmEquation::new(eqns, vec![GvmVariable::new(GvmVariableType::PathLength, "hops")]);
+        let gvm_eqn = GvmEquation::new(&eqns, vec![GvmVariable::new(GvmVariableType::PathLength, "hops")]);
         let gvm_eqn_ser = serde_json::to_string(&gvm_eqn).context(NocError::Chain { func_name: "noc_agent_deploy_tree", comment: S("gvm")})?;;
         params.insert(S("gvm_eqn"), gvm_eqn_ser);
         let stack_tree_msg = serde_json::to_string(&params).context(NocError::Chain { func_name: "noc_agent_deploy_tree", comment: S("")})?;
@@ -240,7 +240,7 @@ impl Noc {
     }
     // I need a more comprehensive GVM to express the fact that the agent running on the same cell as the master
     // can receive messages from the master
-    fn noc_master_agent_tree(noc_master_agent: &AllowedTree, tree_name: &String, noc_to_port: &NocToPort) -> Result<(), Error> {
+    fn noc_master_agent_tree(noc_master_agent: &AllowedTree, tree_name: &str, noc_to_port: &NocToPort) -> Result<(), Error> {
         let is_ait = false;
         let mut params = HashMap::new();
         params.insert(S("new_tree_name"), S(NOC_CONTROL_TREE_NAME));
@@ -250,7 +250,7 @@ impl Noc {
         eqns.insert(GvmEqn::Recv("hops > 0"));
         eqns.insert(GvmEqn::Xtnd("true"));
         eqns.insert(GvmEqn::Save("true"));
-        let gvm_eqn = GvmEquation::new(eqns, vec![GvmVariable::new(GvmVariableType::PathLength, "hops")]);
+        let gvm_eqn = GvmEquation::new(&eqns, vec![GvmVariable::new(GvmVariableType::PathLength, "hops")]);
         let gvm_eqn_ser = serde_json::to_string(&gvm_eqn).context(NocError::Chain { func_name: "noc_master_tree", comment: S("gvm")})?;;
         params.insert(S("gvm_eqn"), gvm_eqn_ser);
         let stack_tree_msg = serde_json::to_string(&params).context(NocError::Chain { func_name: "noc_master_tree", comment: S("")})?;
@@ -261,7 +261,7 @@ impl Noc {
     }
     // I need a more comprehensive GVM to express the fact that the agent running on the same cell as the master
     // can send messages to the master
-    fn noc_agent_master_tree(noc_agent_master: &AllowedTree, tree_name: &String, noc_to_port: &NocToPort) -> Result<(), Error> {
+    fn noc_agent_master_tree(noc_agent_master: &AllowedTree, tree_name: &str, noc_to_port: &NocToPort) -> Result<(), Error> {
         let is_ait = false;
         let mut params = HashMap::new();
         params.insert(S("new_tree_name"), S(NOC_LISTEN_TREE_NAME));
@@ -271,7 +271,7 @@ impl Noc {
         eqns.insert(GvmEqn::Recv("hops == 0"));
         eqns.insert(GvmEqn::Xtnd("true"));
         eqns.insert(GvmEqn::Save("true"));
-        let gvm_eqn = GvmEquation::new(eqns, vec![GvmVariable::new(GvmVariableType::PathLength, "hops")]);
+        let gvm_eqn = GvmEquation::new(&eqns, vec![GvmVariable::new(GvmVariableType::PathLength, "hops")]);
         let gvm_eqn_ser = serde_json::to_string(&gvm_eqn).context(NocError::Chain { func_name: "noc_master_tree", comment: S("gvm")})?;;
         params.insert(S("gvm_eqn"), gvm_eqn_ser);
         let stack_tree_msg = serde_json::to_string(&params).context(NocError::Chain { func_name: "noc_master_tree", comment: S("")})?;

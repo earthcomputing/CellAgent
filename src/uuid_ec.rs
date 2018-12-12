@@ -6,14 +6,14 @@ use uuid;
 use crate::config::PortNo;
 use crate::utility::PortNumber;
 
-const NORMAL:   u8 = 0b01000000;  // Used for all Name UUIDs, including TreeIDs used for normal packets
-const AIT:      u8 = 0b00000100;
-const TECK:     u8 = 0b00000011;
-const TACK:     u8 = 0b00000010;
-const TOCK:     u8 = 0b00000001;
-const TICK:     u8 = 0b00000000;
-const FORWARD:  u8 = 0b00000000;  // Denotes forward direction in time for AIT transfer
-const REVERSE:  u8 = 0b10000000;  // Denotes time reversal for AIT transfer
+const NORMAL:   u8 = 0b0100_0000;  // Used for all Name UUIDs, including TreeIDs used for normal packets
+const AIT:      u8 = 0b0000_0100;
+const TECK:     u8 = 0b0000_0011;
+const TACK:     u8 = 0b0000_0010;
+const TOCK:     u8 = 0b0000_0001;
+const TICK:     u8 = 0b0000_0000;
+const FORWARD:  u8 = 0b0000_0000;  // Denotes forward direction in time for AIT transfer
+const REVERSE:  u8 = 0b1000_0000;  // Denotes time reversal for AIT transfer
 
 const AIT_BYTE: usize = 0;
 const PORT_NO_BYTE: usize = 1;
@@ -93,7 +93,7 @@ impl Uuid {
         self.set_code(TOCK);
         AitState::Tock
     }
-    pub fn set_port_number(&mut self, port_number: &PortNumber) {
+    pub fn set_port_number(&mut self, port_number: PortNumber) {
         let port_no = port_number.get_port_no();
         self.set_port_no(port_no);
     }
@@ -171,13 +171,13 @@ pub enum AitState {
 }
 impl fmt::Display for AitState {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let s = match self {
-            &AitState::Normal => "Normal",
-            &AitState::Ait    => "AIT",
-            &AitState::Teck   => "TECK",
-            &AitState::Tack   => "TACK",
-            &AitState::Tock   => "TOCK",
-            &AitState::Tick   => "TICK",
+        let s = match *self {
+            AitState::Normal => "Normal",
+            AitState::Ait    => "AIT",
+            AitState::Teck   => "TECK",
+            AitState::Tack   => "TACK",
+            AitState::Tock   => "TOCK",
+            AitState::Tick   => "TICK",
         };
         write!(f, "{}", s)
     }
@@ -189,8 +189,8 @@ pub enum TimeDirection {
 impl fmt::Display for TimeDirection {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let s = match self {
-            &TimeDirection::Forward => "Forward",
-            &TimeDirection::Reverse => "Reverse"
+            TimeDirection::Forward => "Forward",
+            TimeDirection::Reverse => "Reverse"
         };
         write!(f, "{}", s)
     }
