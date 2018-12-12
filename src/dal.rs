@@ -1,12 +1,11 @@
 // This file contains hacks that represent functions of the DAL.
 // which will be replaced by actual distributed storage algorithms.
-use std::cell::RefCell;
-use std::fs::{File, OpenOptions};
-use std::io::Write;
+use std::{cell::RefCell,
+          fs::{File, OpenOptions},
+          io::Write};
 
 use lazy_static::lazy_static;
-use rdkafka::config::ClientConfig;
-use rdkafka::producer::{FutureProducer, FutureRecord};
+use rdkafka::{config::ClientConfig, producer::{FutureProducer, FutureRecord}};
 use serde_json;
 use serde_json::{Value};
 use futures::Future;

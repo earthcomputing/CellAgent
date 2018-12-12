@@ -1,9 +1,7 @@
-use std::fmt;
-use std::sync::mpsc::channel;
-use std::sync::{Arc, Mutex};
-use std::thread;
-use std::collections::{HashMap, HashSet};
-use std::collections::hash_map::Entry;
+use std::{fmt,
+          sync::{Arc, Mutex, mpsc::channel},
+          thread,
+          collections::{HashMap, HashSet, hash_map::Entry}};
 
 use either::{Either, Left, Right};
 use serde;
@@ -38,7 +36,6 @@ use crate::uptree_spec::{AllowedTree, Manifest};
 use crate::utility::{BASE_TENANT_MASK, DEFAULT_USER_MASK, Mask, Path,
               PortNumber, S, TraceHeader, TraceHeaderParams, TraceType, UtilityError,
               new_hash_set};
-//use uuid::Uuid;
 use crate::uuid_ec::Uuid;
 use crate::vm::VirtualMachine;
 

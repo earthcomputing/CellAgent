@@ -1,5 +1,4 @@
-use std::fmt;
-use std::collections::HashSet;
+use std::{fmt, collections::HashSet};
 
 use crate::nalcell::CellConfig;
 use crate::utility::S;

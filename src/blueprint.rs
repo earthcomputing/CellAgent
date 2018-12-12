@@ -1,6 +1,6 @@
-use std::fmt;
-use std::collections::{HashMap, HashSet};
-use std::iter::FromIterator;
+use std::{fmt,
+          collections::{HashMap, HashSet},
+          iter::FromIterator};
 
 use crate::config::{MIN_BORDER_CELLS, CellNo, CellType, Edge, PortNo};
 

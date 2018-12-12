@@ -1,7 +1,7 @@
-use std::fmt;
-use std::collections::{HashMap, HashSet};
-use std::slice::Iter;
-use std::sync::{Arc, Mutex};
+use std::{fmt,
+          collections::{HashMap, HashSet},
+          slice::Iter,
+          sync::{Arc, Mutex}};
 
 use serde_json;
 //use uuid::Uuid;

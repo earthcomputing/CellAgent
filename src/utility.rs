@@ -1,6 +1,5 @@
-use std::fmt;
-use std::collections::{HashSet};
-use std::thread::ThreadId;
+use std::{fmt, collections::{HashSet}, thread::ThreadId};
+
 use serde_json;
 use serde_json::{Value};
 

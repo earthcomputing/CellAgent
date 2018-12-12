@@ -38,10 +38,10 @@ mod utility;
 mod uuid_ec;
 mod vm;
 
-use std::io::{stdin, stdout, Read, Write};
-use std::collections::{HashMap, HashSet};
-use std::fs::{File, OpenOptions};
-use std::sync::mpsc::channel;
+use std::{io::{stdin, stdout, Read, Write},
+          collections::{HashMap, HashSet},
+          fs::{File, OpenOptions},
+          sync::mpsc::channel};
 
 use crate::blueprint::Blueprint;
 use crate::config::{AUTO_BREAK, NCELLS, NPORTS, NLINKS, OUTPUT_FILE_NAME, QUENCH,

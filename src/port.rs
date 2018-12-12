@@ -1,9 +1,7 @@
-use std::fmt;
-use std::thread;
-use std::thread::JoinHandle;
-use std::sync::atomic::AtomicBool;
-use std::sync::{Arc};
-use std::sync::atomic::Ordering::SeqCst;
+use std::{fmt,
+          thread,
+          thread::JoinHandle,
+          sync::{atomic::AtomicBool, Arc, atomic::Ordering::SeqCst}};
 
 use crate::config::{CONTINUE_ON_ERROR, TRACE_OPTIONS, PortNo};
 use crate::dal;
