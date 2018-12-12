@@ -14,7 +14,7 @@ pub struct Manifest {
 }
 impl Manifest {
     pub fn new(id: &str, cell_config: CellConfig, deployment_tree: &AllowedTree, allowed_refs: &[&AllowedTree],
-            vm_refs: Vec<&VmSpec>, tree_refs: Vec<&UpTreeSpec>) -> Result<Manifest, UptreeSpecError> {
+            vm_refs: Vec<&VmSpec>, tree_refs: Vec<&UpTreeSpec>) -> Result<Manifest, Error> {
         let mut trees = Vec::new();
         for t in tree_refs { trees.push(t.clone()); }
         let mut allowed_trees = Vec::new();
@@ -56,8 +56,8 @@ pub struct VmSpec {
     trees: Vec<UpTreeSpec>
 }
 impl VmSpec {
-    pub fn new(id: &str, image: &str, config: CellConfig, allowed_refs: &Vec<&AllowedTree>,
-            container_refs: Vec<&ContainerSpec>, tree_refs: Vec<&UpTreeSpec>) -> Result<VmSpec, UptreeSpecError> {
+    pub fn new(id: &str, image: &str, config: CellConfig, allowed_refs: &[&AllowedTree],
+            container_refs: Vec<&ContainerSpec>, tree_refs: Vec<&UpTreeSpec>) -> Result<VmSpec, Error> {
         let mut max_tree_size = 0;
         let mut allowed_trees = Vec::new();
         for &a in allowed_refs { allowed_trees.push(a.clone()); }
@@ -132,7 +132,7 @@ impl UpTreeSpec {
         if parent_list.len() > 1 {
             let mut count = 0;
             let mut root = 0;
-            for i in 0..parent_list.len() { if i == parent_list[i] { root = i; count = count + 1; } }
+            for (i, &item) in parent_list.iter().enumerate() { if i == item { root = i; count = count + 1; } };
             if count != 1 { return Err(UptreeSpecError::Tree { func_name: "UptreeSpec::new", id: S(id), parent_list, reason: "More than one root" }.into()); }
             for p in parent_list.clone() {
                 //let mut reached_root = true;

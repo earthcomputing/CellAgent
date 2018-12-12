@@ -206,7 +206,7 @@ impl Noc {
         eqns.insert(GvmEqn::Recv("hops == 0"));
         eqns.insert(GvmEqn::Xtnd("false"));
         eqns.insert(GvmEqn::Save("false"));
-        let gvm_eqn = GvmEquation::new(&eqns, vec![GvmVariable::new(GvmVariableType::PathLength, "hops")]);
+        let gvm_eqn = GvmEquation::new(&eqns, &[GvmVariable::new(GvmVariableType::PathLength, "hops")]);
         let gvm_eqn_ser = serde_json::to_string(&gvm_eqn).context(NocError::Chain { func_name: "noc_master_deploy_tree", comment: S("gvm")})?;;
         params.insert(S("gvm_eqn"), gvm_eqn_ser);
         let stack_tree_msg = serde_json::to_string(&params).context(NocError::Chain { func_name: "noc_master_deploy_tree", comment: S("")})?;
@@ -229,7 +229,7 @@ impl Noc {
         eqns.insert(GvmEqn::Recv("hops > 0"));
         eqns.insert(GvmEqn::Xtnd("true"));
         eqns.insert(GvmEqn::Save("true"));
-        let gvm_eqn = GvmEquation::new(&eqns, vec![GvmVariable::new(GvmVariableType::PathLength, "hops")]);
+        let gvm_eqn = GvmEquation::new(&eqns, &[GvmVariable::new(GvmVariableType::PathLength, "hops")]);
         let gvm_eqn_ser = serde_json::to_string(&gvm_eqn).context(NocError::Chain { func_name: "noc_agent_deploy_tree", comment: S("gvm")})?;;
         params.insert(S("gvm_eqn"), gvm_eqn_ser);
         let stack_tree_msg = serde_json::to_string(&params).context(NocError::Chain { func_name: "noc_agent_deploy_tree", comment: S("")})?;
@@ -250,7 +250,7 @@ impl Noc {
         eqns.insert(GvmEqn::Recv("hops > 0"));
         eqns.insert(GvmEqn::Xtnd("true"));
         eqns.insert(GvmEqn::Save("true"));
-        let gvm_eqn = GvmEquation::new(&eqns, vec![GvmVariable::new(GvmVariableType::PathLength, "hops")]);
+        let gvm_eqn = GvmEquation::new(&eqns, &[GvmVariable::new(GvmVariableType::PathLength, "hops")]);
         let gvm_eqn_ser = serde_json::to_string(&gvm_eqn).context(NocError::Chain { func_name: "noc_master_tree", comment: S("gvm")})?;;
         params.insert(S("gvm_eqn"), gvm_eqn_ser);
         let stack_tree_msg = serde_json::to_string(&params).context(NocError::Chain { func_name: "noc_master_tree", comment: S("")})?;
@@ -271,7 +271,7 @@ impl Noc {
         eqns.insert(GvmEqn::Recv("hops == 0"));
         eqns.insert(GvmEqn::Xtnd("true"));
         eqns.insert(GvmEqn::Save("true"));
-        let gvm_eqn = GvmEquation::new(&eqns, vec![GvmVariable::new(GvmVariableType::PathLength, "hops")]);
+        let gvm_eqn = GvmEquation::new(&eqns, &[GvmVariable::new(GvmVariableType::PathLength, "hops")]);
         let gvm_eqn_ser = serde_json::to_string(&gvm_eqn).context(NocError::Chain { func_name: "noc_master_tree", comment: S("gvm")})?;;
         params.insert(S("gvm_eqn"), gvm_eqn_ser);
         let stack_tree_msg = serde_json::to_string(&params).context(NocError::Chain { func_name: "noc_master_tree", comment: S("")})?;

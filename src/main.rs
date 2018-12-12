@@ -194,19 +194,21 @@ fn deployment_demo() -> Result<(), Error> {
     let up_tree2 = UpTreeSpec::new("test2", vec![1, 1, 0, 1]).context(MainError::Chain { func_name: "deployment_demo", comment: S("")})?;
     let allowed_tree1 = &AllowedTree::new("foo");
     let allowed_tree2 = &AllowedTree::new("bar");
-    let c1 = ContainerSpec::new("c1", "D1", vec!["param1"], &vec![allowed_tree1, allowed_tree2]).context(MainError::Chain { func_name: "deployment_demo", comment: S("")})?;
-    let c2 = ContainerSpec::new("c2", "D1", vec!["param1","param2"], &vec![allowed_tree1]).context(MainError::Chain { func_name: "deployment_demo", comment: S("")})?;
-    let c3 = ContainerSpec::new("c3", "D3", vec!["param3"], &vec![allowed_tree1]).context(MainError::Chain { func_name: "deployment_demo", comment: S("")})?;
-    let c4 = ContainerSpec::new("c4", "D2", vec![], &vec![allowed_tree1, allowed_tree2]).context(MainError::Chain { func_name: "deployment_demo", comment: S("")})?;
-    let c5 = ContainerSpec::new("c5", "D2", vec![], &vec![]).context(MainError::Chain { func_name: "deployment_demo", comment: S("")})?;
-    let c6 = ContainerSpec::new("c6", "D3", vec!["param4"], &vec![allowed_tree1]).context(MainError::Chain { func_name: "deployment_demo", comment: S("")})?;
+    let c1 = ContainerSpec::new("c1", "D1", vec!["param1"], &[allowed_tree1, allowed_tree2]).context(MainError::Chain { func_name: "deployment_demo", comment: S("")})?;
+    let c2 = ContainerSpec::new("c2", "D1", vec!["param1","param2"], &[allowed_tree1]).context(MainError::Chain { func_name: "deployment_demo", comment: S("")})?;
+    let c3 = ContainerSpec::new("c3", "D3", vec!["param3"], &[allowed_tree1]).context(MainError::Chain { func_name: "deployment_demo", comment: S("")})?;
+    let c4 = ContainerSpec::new("c4", "D2", vec![], &[allowed_tree1, allowed_tree2]).context(MainError::Chain { func_name: "deployment_demo", comment: S("")})?;
+    let c5 = ContainerSpec::new("c5", "D2", vec![], &[]).context(MainError::Chain { func_name: "deployment_demo", comment: S("")})?;
+    let c6 = ContainerSpec::new("c6", "D3", vec!["param4"], &[allowed_tree1]).context(MainError::Chain { func_name: "deployment_demo", comment: S("")})?;
     let vm_spec1 = VmSpec::new("vm1", "Ubuntu", CellConfig::Large,
                                &vec![allowed_tree1, allowed_tree2], vec![&c1, &c2, &c4, &c5, &c5], vec![&up_tree1, &up_tree2]).context(MainError::Chain { func_name: "deployment_demo", comment: S("")})?;
     let up_tree3 = UpTreeSpec::new("test3", vec![0, 0]).context(MainError::Chain { func_name: "deployment_demo", comment: S("")})?;
     let up_tree4 = UpTreeSpec::new("test4", vec![1, 1, 0]).context(MainError::Chain { func_name: "deployment_demo", comment: S("")})?;
     let vm_spec2 = VmSpec::new("vm2", "RedHat",  CellConfig::Large,
                                &vec![allowed_tree1], vec![&c5, &c3, &c6], vec![&up_tree3, &up_tree4]).context(MainError::Chain { func_name: "deployment_demo", comment: S("")})?;
-    let up_tree_def = Manifest::new("mytest", CellConfig::Large, &AllowedTree::new("cell_tree"), &vec![allowed_tree1, allowed_tree2],
+    let up_tree_def = Manifest::new("mytest", CellConfig::Large,
+                                    &AllowedTree::new("cell_tree"),
+                                    &[allowed_tree1, allowed_tree2],
                                     vec![&vm_spec1, &vm_spec2], vec![&up_tree3]).context(MainError::Chain { func_name: "deployment_demo", comment: S("")})?;
     println!("{}", up_tree_def);
     Ok(())

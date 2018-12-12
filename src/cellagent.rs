@@ -136,7 +136,7 @@ impl CellAgent {
         eqns.insert(GvmEqn::Send("true"));
         eqns.insert(GvmEqn::Xtnd("true"));
         eqns.insert(GvmEqn::Save("false"));
-        let gvm_equation = GvmEquation::new(&eqns, Vec::new());
+        let gvm_equation = GvmEquation::new(&eqns, &Vec::new());
         self.update_traph(&control_tree_id, port_number_0,
                           traph::PortStatus::Parent, &gvm_equation,
                           HashSet::new(), hops, path)?;
@@ -145,7 +145,7 @@ impl CellAgent {
         eqns.insert(GvmEqn::Send("true"));
         eqns.insert(GvmEqn::Xtnd("true"));
         eqns.insert(GvmEqn::Save("false"));
-        let gvm_equation = GvmEquation::new(&eqns, Vec::new());
+        let gvm_equation = GvmEquation::new(&eqns, &Vec::new());
         let connected_tree_entry = self.update_traph(&connected_tree_id, port_number_0,
                                                      traph::PortStatus::Parent, &gvm_equation,
                                                      HashSet::new(), hops, path)?;
@@ -156,7 +156,7 @@ impl CellAgent {
         eqns.insert(GvmEqn::Send("true"));
         eqns.insert(GvmEqn::Xtnd("true"));
         eqns.insert(GvmEqn::Save("false"));
-        let gvm_equation = GvmEquation::new(&eqns, Vec::new());
+        let gvm_equation = GvmEquation::new(&eqns, &Vec::new());
         self.my_entry = self.update_traph(&my_tree_id, port_number_0,
                                           traph::PortStatus::Parent, &gvm_equation,
                                           HashSet::new(), hops, path)?;
@@ -626,7 +626,7 @@ impl CellAgent {
         let mut ca = self.clone();
         let child_trace_header = fork_trace_header();
         let thread_name = format!("CellAgent {} listen_cm_loop", self.get_id());
-        thread::Builder::new().name(thread_name.into()).spawn( move || {
+        thread::Builder::new().name(thread_name).spawn( move || {
             update_trace_header(child_trace_header);
             let _ = ca.listen_cm_loop(&ca_from_cm).map_err(|e| crate::utility::write_err("cellagent", &e));
             // println!("Cellagent {}: Back from listen_cm_loop", ca.cell_id);
@@ -749,7 +749,7 @@ impl CellAgent {
         eqns.insert(GvmEqn::Send("true"));
         eqns.insert(GvmEqn::Xtnd("true"));
         eqns.insert(GvmEqn::Save("false"));
-        let gvm_equation = GvmEquation::new(&eqns, Vec::new());
+        let gvm_equation = GvmEquation::new(&eqns, &Vec::new());
         if DEBUG_OPTIONS.trace_all || DEBUG_OPTIONS.process_msg {   // Debug
             let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "ca_process_discover_msg" };
             let trace = json!({ "cell_id": &self.cell_id, "quench": quench, "new_tree_id": new_tree_id, "port_no": port_no, "msg": msg.value() });
@@ -791,7 +791,7 @@ impl CellAgent {
         eqns.insert(GvmEqn::Send("true"));
         eqns.insert(GvmEqn::Xtnd("false"));
         eqns.insert(GvmEqn::Save("false"));
-        let gvm_eqn = GvmEquation::new(&eqns, Vec::new());
+        let gvm_eqn = GvmEquation::new(&eqns, &Vec::new());
         let _ = self.update_traph(base_tree_id, port_number, traph::PortStatus::Child, &gvm_eqn,
                               children, PathLength(CellNo(0)), path)?;
         let mask = Mask::new(port_no.make_port_number(self.no_ports)?);
@@ -1052,8 +1052,8 @@ impl CellAgent {
     fn tcp_manifest(&mut self, sender_id: &SenderID, serialized: &str, _direction: MsgDirection,
                     tree_map: &MsgTreeMap) -> Result<MsgTreeMap, Error> {
         let _f = "tcp_manifest";
-        let ref mut tcp_msg = serde_json::from_str::<HashMap<String, String>>(&serialized).context(CellagentError::Chain { func_name: _f, comment: S(self.cell_id.clone()) + " deserialize StackTree" })?;
-        let ref deploy_tree_name = self.get_msg_params(tcp_msg, "deploy_tree_name").context(CellagentError::Chain { func_name: _f, comment: S(self.cell_id.clone()) + " parent tree name" })?;
+        let tcp_msg = &mut serde_json::from_str::<HashMap<String, String>>(&serialized).context(CellagentError::Chain { func_name: _f, comment: S(self.cell_id.clone()) + " deserialize StackTree" })?;
+        let deploy_tree_name = &self.get_msg_params(tcp_msg, "deploy_tree_name").context(CellagentError::Chain { func_name: _f, comment: S(self.cell_id.clone()) + " parent tree name" })?;
         let deploy_tree_id = tree_map
             .get(AllowedTree::new(deploy_tree_name).get_name())
             .ok_or_else(|| -> Error { CellagentError::TreeMap { func_name: "listen_cm_loop 4", cell_id: self.cell_id.clone(), tree_name: AllowedTree::new(deploy_tree_name) }.into() })?;
@@ -1089,7 +1089,7 @@ impl CellAgent {
     fn tcp_stack_tree(&mut self, sender_id: &SenderID, serialized: &str, direction: MsgDirection,
                       tree_map: &MsgTreeMap) -> Result<MsgTreeMap, Error> {
         let _f = "tcp_stack_tree";
-        let ref mut tcp_msg = serde_json::from_str::<HashMap<String, String>>(&serialized).context(CellagentError::Chain { func_name: _f, comment: S(self.cell_id.clone()) + " deserialize StackTree" })?;
+        let tcp_msg = &mut serde_json::from_str::<HashMap<String, String>>(&serialized).context(CellagentError::Chain { func_name: _f, comment: S(self.cell_id.clone()) + " deserialize StackTree" })?;
         let parent_tree_str = self.get_msg_params(tcp_msg, "parent_tree_name")?;
         let parent_tree_name = AllowedTree::new(&parent_tree_str);
         let parent_tree_id = &(*tree_map
@@ -1099,9 +1099,9 @@ impl CellAgent {
         let my_tree_id = &self.my_tree_id.clone();
         let new_tree_name = self.get_msg_params(tcp_msg, "new_tree_name")?;
         let allowed_tree = AllowedTree::new(&new_tree_name);
-        let ref new_tree_id = self.my_tree_id.add_component(&new_tree_name).context(CellagentError::Chain { func_name: _f, comment: S(self.cell_id.clone()) + " new_tree_id" })?;
+        let new_tree_id = &self.my_tree_id.add_component(&new_tree_name).context(CellagentError::Chain { func_name: _f, comment: S(self.cell_id.clone()) + " new_tree_id" })?;
         let gvm_eqn_serialized = self.get_msg_params(tcp_msg, "gvm_eqn")?;
-        let ref gvm_eqn = serde_json::from_str::<GvmEquation>(&gvm_eqn_serialized).context(CellagentError::Chain { func_name: _f, comment: S(self.cell_id.clone()) + " gvm" })?;
+        let gvm_eqn = &serde_json::from_str::<GvmEquation>(&gvm_eqn_serialized).context(CellagentError::Chain { func_name: _f, comment: S(self.cell_id.clone()) + " gvm" })?;
         // There is no port_tree for up trees
         let entry = self.stack_tree(sender_id, &allowed_tree, new_tree_id, parent_tree_id,
                                     None, gvm_eqn)?
@@ -1184,7 +1184,7 @@ impl CellAgent {
             eqns.insert(GvmEqn::Send("true"));
             eqns.insert(GvmEqn::Xtnd("false"));
             eqns.insert(GvmEqn::Save("false"));
-            let gvm_eqn = GvmEquation::new(&eqns, Vec::new());
+            let gvm_eqn = GvmEquation::new(&eqns, &Vec::new());
             let new_tree_id = self.my_tree_id.add_component("Noc").context(CellagentError::Chain { func_name: "port_connected", comment: S(self.cell_id.clone()) })?;
             self.tree_id_map.insert(new_tree_id.get_uuid(), new_tree_id.clone());
             let port_number = port_no.make_port_number(self.no_ports).context(CellagentError::Chain { func_name: "port_connected", comment: S(self.cell_id.clone()) })?;

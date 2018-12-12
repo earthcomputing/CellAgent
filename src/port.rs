@@ -134,7 +134,7 @@ impl Port {
         let thread_name = format!("Port {} listen_link", self.get_id().get_name());
         thread::Builder::new().name(thread_name).spawn( move || {
             update_trace_header(child_trace_header);
-            let _ = port.listen_link(port_from_link).map_err(|e| write_err("port", &e));
+            let _ = port.listen_link(&port_from_link).map_err(|e| write_err("port", &e));
             if CONTINUE_ON_ERROR { }
         }).expect("thread failed");
 
@@ -149,7 +149,7 @@ impl Port {
     }
 
     // WORKER (PortFromLink)
-    fn listen_link(&mut self, port_from_link: PortFromLink) -> Result<(), Error> {
+    fn listen_link(&mut self, port_from_link: &PortFromLink) -> Result<(), Error> {
         let _f = "listen_link";
         if TRACE_OPTIONS.all || TRACE_OPTIONS.port {
             let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "worker" };
