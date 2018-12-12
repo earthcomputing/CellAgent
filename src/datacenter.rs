@@ -1,7 +1,7 @@
-use std::fmt;
-use std::cmp::max;
-use std::sync::mpsc::channel;
-use std::thread::{JoinHandle};
+use std::{fmt,
+          cmp::max,
+          sync::mpsc::channel,
+          thread::{JoinHandle}};
 
 use crate::blueprint::{Blueprint, Cell};
 use crate::config::{TRACE_OPTIONS, CellNo, CellType, Edge, LinkNo, get_geometry};

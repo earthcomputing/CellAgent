@@ -1,8 +1,8 @@
-use std::fmt;
-use std::collections::HashMap;
-use std::cmp::min;
-use std::sync::atomic::{ATOMIC_USIZE_INIT, AtomicUsize, Ordering};
-use std::str;
+use std::{fmt,
+          collections::HashMap,
+          cmp::min,
+          sync::atomic::{ATOMIC_USIZE_INIT, AtomicUsize, Ordering},
+          str};
 
 use rand;
 use serde;

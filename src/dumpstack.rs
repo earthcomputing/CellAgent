@@ -1,7 +1,5 @@
 use std::fmt;
 
-extern crate backtrace;
-
 #[derive(Debug, Clone, Serialize)]
 pub struct CFrame {
     p : String,

@@ -1,8 +1,8 @@
-use std::fmt;
-use std::sync::{Arc, Mutex};
-use std::sync::mpsc::channel;
-use std::collections::HashSet;
-use std::thread;
+use std::{fmt,
+          sync::{Arc, Mutex},
+          sync::mpsc::channel,
+          collections::HashSet,
+          thread};
 
 use crate::config::{CENTRAL_TREE, CONTINUE_ON_ERROR, DEBUG_OPTIONS, MAX_PORTS, TRACE_OPTIONS, PortNo};
 use crate::dal;

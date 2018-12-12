@@ -1,6 +1,4 @@
-use std::collections::{HashSet};
-use std::sync::mpsc::channel;
-use std::thread;
+use std::{collections::{HashSet}, sync::mpsc::channel, thread};
 
 use crate::config::{CONTINUE_ON_ERROR, TRACE_OPTIONS};
 use crate::container::{Container};

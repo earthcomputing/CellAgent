@@ -1,7 +1,7 @@
-use std::fmt;
-use std::collections::{HashMap, HashSet};
-use std::sync::mpsc::channel;
-use std::thread;
+use std::{fmt,
+          collections::{HashMap, HashSet},
+          sync::mpsc::channel,
+          thread};
 
 use crate::cellagent::{CellAgent};
 use crate::cmodel::{Cmodel};

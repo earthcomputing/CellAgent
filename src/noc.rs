@@ -1,7 +1,7 @@
-use std::thread;
-use std::thread::{JoinHandle};
-use std::sync::mpsc::channel;
-use std::collections::{HashMap, HashSet};
+use std::{thread,
+          thread::{JoinHandle},
+          sync::mpsc::channel,
+          collections::{HashMap, HashSet}};
 
 use crate::blueprint::{Blueprint};
 use crate::config::{CONTINUE_ON_ERROR, NCELLS, SCHEMA_VERSION, TRACE_OPTIONS, ByteArray, get_geometry};

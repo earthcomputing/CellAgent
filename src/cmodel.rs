@@ -1,6 +1,6 @@
-use std::fmt;
-use std::thread;
-use std::thread::JoinHandle;
+use std::{fmt,
+          thread,
+          thread::JoinHandle};
 
 use failure::{Error, ResultExt};
 

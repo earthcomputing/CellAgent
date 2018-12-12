@@ -1,7 +1,7 @@
 use std;
-use std::fmt;
-use std::collections::{HashMap, HashSet};
-use std::sync::atomic::{ATOMIC_USIZE_INIT, AtomicUsize, Ordering};
+use std::{fmt,
+          collections::{HashMap, HashSet},
+          sync::atomic::{ATOMIC_USIZE_INIT, AtomicUsize, Ordering}};
 
 use serde;
 use serde_json;
@@ -335,7 +335,6 @@ impl Message for DiscoverDMsg {
     fn get_payload(&self) -> &MsgPayload { &self.payload }
     fn get_msg_type(&self) -> MsgType { self.get_header().msg_type }
     fn get_tree_id(&self) -> TreeID { self.payload.tree_id.clone() }
-    fn get_msg_id(&self) -> MsgID { self.header.get_msg_id()}
     fn is_blocking(&self) -> bool { true }
     fn value(&self) -> serde_json::Value {
         serde_json::to_value(self).expect("I don't know how to handle errors in msg.value()")

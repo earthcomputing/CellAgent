@@ -1,12 +1,12 @@
-use std::fmt;
-use std::ops::{Deref};
+use std::{fmt,
+          ops::{Deref}};
 
 use failure::Error;
 use crate::utility::PortNumber;
 
-pub const SCHEMA_VERSION: &'static str = "0.1";
-pub const REPO: &'static str = "CellAgent";
-pub const CENTRAL_TREE: &'static str = "Tree:C:2";
+pub const SCHEMA_VERSION: &str = "0.1";
+pub const REPO: &str = "CellAgent";
+pub const CENTRAL_TREE: & str = "Tree:C:2";
 // Sizes
 pub const NCELLS: CellNo    = CellNo(10);
 pub const NPORTS: PortNo    = PortNo(8);
@@ -23,18 +23,18 @@ pub enum Quench { Simple, RootPort }
 pub const QUENCH: Quench = Quench::RootPort;
 pub const PAYLOAD_DEFAULT_ELEMENT: u8 = 0;
 // Place to write output data
-pub const OUTPUT_FILE_NAME: &'static str = "/tmp/multicell-trace.json";
-pub const KAFKA_SERVER: &'static str = "172.16.1.2:9092";
-pub const KAFKA_TOPIC: &'static str = "CellAgent";
+pub const OUTPUT_FILE_NAME: & str = "/tmp/multicell-trace.json";
+pub const KAFKA_SERVER: & str = "172.16.1.2:9092";
+pub const KAFKA_TOPIC: & str = "CellAgent";
 //pub const MAX_ENTRIES: TableIndex    = TableIndex(64);  // Max number of active trees
 //pub const MAX_CHARS: usize         = 128; // Longest valid name
 //pub const MAX_PACKETS: PacketNo    = 255;  // Maximum number of packets collected before processing
 // Things used in constructing names
-pub const SEPARATOR: &'static str = "+"; // Separator for compound names
+pub const SEPARATOR: & str = "+"; // Separator for compound names
 // Default names for up trees
-pub const CONTROL_TREE_NAME: &'static str = "Control";
-pub const CONNECTED_PORTS_TREE_NAME: &'static str = "Connected";
-//pub const BASE_TREE_NAME: &'static str = "Base";
+pub const CONTROL_TREE_NAME: & str = "Control";
+pub const CONNECTED_PORTS_TREE_NAME: & str = "Connected";
+//pub const BASE_TREE_NAME: & str = "Base";
 
 pub struct TraceOptions {
     pub all:      bool,

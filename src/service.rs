@@ -1,5 +1,4 @@
-use std::fmt;
-use std::thread;
+use std::{fmt, thread};
 
 use crate::config::{ByteArray,CONTINUE_ON_ERROR, TRACE_OPTIONS};
 use crate::dal;

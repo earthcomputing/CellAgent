@@ -1,11 +1,11 @@
 use std::sync::mpsc;
-use crate::routing_table_entry::{RoutingTableEntry};
 
 use crate::config::{ByteArray, PortNo};
 use crate::message::{MsgDirection, TcpMsgType};
 use crate::name::TreeID;
 use crate::packet::{Packet};
 use crate::port::{PortStatus};
+use crate::routing_table_entry::{RoutingTableEntry};
 use crate::uptree_spec::AllowedTree;
 use crate::utility::{Mask, PortNumber};
 use crate::uuid_ec::Uuid;

@@ -1,5 +1,4 @@
-use std::fmt;
-use std::marker::Sized;
+use std::{fmt, marker::Sized};
 
 use crate::config::{SEPARATOR, CellNo, PortNo};
 use crate::utility::{PortNumber, S};

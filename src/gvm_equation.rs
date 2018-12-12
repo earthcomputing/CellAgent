@@ -1,5 +1,4 @@
-use std::fmt;
-use std::collections::{HashSet};
+use std::{fmt, collections::{HashSet}};
 
 use eval::{Expr, to_value};
 use serde_json;

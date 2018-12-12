@@ -1,5 +1,4 @@
-use std::fmt;
-use std::collections::HashMap;
+use std::{fmt, collections::HashMap};
 
 use failure::{Error};
 
