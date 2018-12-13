@@ -411,23 +411,25 @@ pub struct FailoverMsgPayload {
     rw_port_tree_id: TreeID,
     lw_port_tree_id: TreeID,
     broken_tree_ids: HashSet<TreeID>,
-    path: Path
+    broken_path: Path
 }
 impl FailoverMsgPayload {
     fn new(rw_port_tree_id: &TreeID, lw_port_tree_id: &TreeID, broken_tree_ids: &HashSet<TreeID>, path: Path)
             -> FailoverMsgPayload {
         FailoverMsgPayload { rw_port_tree_id: rw_port_tree_id.clone(), lw_port_tree_id: lw_port_tree_id.clone(),
-            broken_tree_ids: broken_tree_ids.clone(), path }
+            broken_tree_ids: broken_tree_ids.clone(),
+            broken_path: path
+        }
     }
     pub fn get_rw_port_tree_id(&self) -> &TreeID { &self.rw_port_tree_id }
     pub fn _get_lw_port_tree_id(&self) -> &TreeID { &self.lw_port_tree_id }
     pub fn get_broken_tree_ids(&self) -> &HashSet<TreeID> { &self.broken_tree_ids }
-    pub fn get_path(&self) -> Path { self.path }
+    pub fn get_broken_path(&self) -> Path { self.broken_path }
 }
 impl MsgPayload for FailoverMsgPayload {}
 impl fmt::Display for FailoverMsgPayload {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "Rootward Tree {}, root port {}", self.rw_port_tree_id, self.path)
+        write!(f, "Rootward Tree {}, root port {}", self.rw_port_tree_id, self.broken_path)
     }
 }
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -436,22 +438,21 @@ pub struct FailoverDMsg {
     payload: FailoverDMsgPayload
 }
 impl FailoverDMsg {
-    pub fn new(in_reply_to: MsgID, sender_id: &SenderID, response: FailoverResponse, port_tree_id: &TreeID, hops: PathLength,
-               broken_tree_ids: &HashSet<TreeID>, path: Path) -> FailoverDMsg {
+    pub fn new(in_reply_to: MsgID, sender_id: &SenderID, response: FailoverResponse,
+               failover_payload: &FailoverMsgPayload) -> FailoverDMsg {
         // Note that direction is leafward so we can use the connected ports tree
         // If we send rootward, then the first recipient forwards the FailoverMsg
         let header = MsgHeader::new(sender_id, true,MsgType::FailoverD, MsgDirection::Leafward);
-        let payload = FailoverDMsgPayload::new(in_reply_to, response, port_tree_id,
-                                               hops, broken_tree_ids, path);
+        let payload = FailoverDMsgPayload::new(in_reply_to, response, failover_payload);
         FailoverDMsg { header, payload }
     }
     pub fn get_payload(&self) -> &FailoverDMsgPayload { &self.payload }
+    pub fn get_rw_port_tree_id(&self) -> &TreeID { self.payload.get_rw_tree_id() }
 }
 impl Message for FailoverDMsg {
     fn get_header(&self) -> &MsgHeader { &self.header }
     fn get_payload(&self) -> &dyn MsgPayload { &self.payload }
     fn get_msg_type(&self) -> MsgType { self.get_header().msg_type }
-    fn get_tree_id(&self) -> TreeID { self.payload.rw_tree_id.clone() }
     fn is_blocking(&self) -> bool { false }
     fn value(&self) -> serde_json::Value {
         serde_json::to_value(self).expect("I don't know how to handle errors in msg.value()")
@@ -471,28 +472,22 @@ impl fmt::Display for FailoverDMsg {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct FailoverDMsgPayload {
     in_reply_to: MsgID,
-    rw_tree_id: TreeID,
     response: FailoverResponse,
-    broken_tree_ids: HashSet<TreeID>,
-    hops: PathLength,
-    path: Path
+    failover_payload: FailoverMsgPayload
 }
 impl FailoverDMsgPayload {
-    fn new(in_reply_to: MsgID, response: FailoverResponse, port_tree_id: &TreeID,
-           hops: PathLength, broken_tree_ids: &HashSet<TreeID>, path: Path) -> FailoverDMsgPayload {
-        FailoverDMsgPayload { in_reply_to, response, rw_tree_id: port_tree_id.clone(), hops,
-            broken_tree_ids: broken_tree_ids.clone(), path }
+    fn new(in_reply_to: MsgID, response: FailoverResponse, failover_payload: &FailoverMsgPayload) -> FailoverDMsgPayload {
+        FailoverDMsgPayload { in_reply_to, response, failover_payload: failover_payload.clone() }
     }
     pub fn get_response(&self) -> FailoverResponse { self.response }
-    pub fn get_rw_tree_id(&self) -> &TreeID { &self.rw_tree_id }
-    pub fn _get_broken_tree_ids(&self) -> &HashSet<TreeID> { &self.broken_tree_ids }
-    pub fn get_hops(&self) -> &PathLength { &self.hops }
-    pub fn get_path(&self) -> &Path { &self.path }
+    pub fn get_rw_tree_id(&self) -> &TreeID { &self.failover_payload.get_rw_port_tree_id() }
+    pub fn _get_broken_tree_ids(&self) -> &HashSet<TreeID> { &self.failover_payload.get_broken_tree_ids() }
+    pub fn get_broken_path(&self) -> Path { self.failover_payload.get_broken_path() }
 }
 impl MsgPayload for FailoverDMsgPayload {}
 impl fmt::Display for FailoverDMsgPayload {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "Response {} Port Tree {} hops {}", self.response, self.rw_tree_id, self.hops)
+        write!(f, "Response {} Failover payload {}", self.response, self.failover_payload)
     }
 }
 #[derive(Debug, Copy, Clone, Serialize, Deserialize)]
