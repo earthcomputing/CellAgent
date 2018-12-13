@@ -447,7 +447,7 @@ impl FailoverDMsg {
         FailoverDMsg { header, payload }
     }
     pub fn get_payload(&self) -> &FailoverDMsgPayload { &self.payload }
-    pub fn get_rw_port_tree_id(&self) -> &TreeID { self.payload.get_rw_tree_id() }
+    pub fn get_rw_port_tree_id(&self) -> &TreeID { self.payload.get_rw_port_tree_id() }
 }
 impl Message for FailoverDMsg {
     fn get_header(&self) -> &MsgHeader { &self.header }
@@ -480,9 +480,8 @@ impl FailoverDMsgPayload {
         FailoverDMsgPayload { in_reply_to, response, failover_payload: failover_payload.clone() }
     }
     pub fn get_response(&self) -> FailoverResponse { self.response }
-    pub fn get_rw_tree_id(&self) -> &TreeID { &self.failover_payload.get_rw_port_tree_id() }
-    pub fn _get_broken_tree_ids(&self) -> &HashSet<TreeID> { &self.failover_payload.get_broken_tree_ids() }
-    pub fn get_broken_path(&self) -> Path { self.failover_payload.get_broken_path() }
+    pub fn get_failover_payload(&self) -> &FailoverMsgPayload { &self.failover_payload }
+    pub fn get_rw_port_tree_id(&self) -> &TreeID { self.failover_payload.get_rw_port_tree_id() }
 }
 impl MsgPayload for FailoverDMsgPayload {}
 impl fmt::Display for FailoverDMsgPayload {
