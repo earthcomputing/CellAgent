@@ -794,7 +794,7 @@ impl CellAgent {
         let gvm_eqn = GvmEquation::new(&eqns, &Vec::new());
         let _ = self.update_traph(base_tree_id, port_number, traph::PortStatus::Child, &gvm_eqn,
                               children, PathLength(CellNo(0)), path)?;
-        let mask = Mask::new(port_no.make_port_number(self.no_ports)?);
+        let mask = Mask::new(port_number);
         let tree_id = payload.get_tree_id();
         self.forward_stacked_trees(tree_id, mask)?;
         if DEBUG_OPTIONS.trace_all || DEBUG_OPTIONS.process_msg && tree_id.is_name("Tree:C:2") {   // Debug
@@ -822,22 +822,22 @@ impl CellAgent {
         self.failover_reply_port.insert(rw_port_tree_id.clone(), port_no);
         let broken_path = payload.get_path();
         let broken_tree_ids = payload.get_broken_tree_ids();
+        let port_number = port_no.make_port_number(self.no_ports)?;
         let my_tree_id = self.my_tree_id.clone();
         if rw_tree_id == my_tree_id {
             let mut my_traph = self.get_traph(&self.my_tree_id)?;
             let lw_traph = self.get_traph(&lw_tree_id)?;
-            let port_number = port_no.make_port_number(self.no_ports)?;
             let broken_element = lw_traph.get_parent_element()?;
             let broken_port_no = broken_element.get_port_no();
             let broken_port_number = broken_port_no.make_port_number(self.no_ports)?;
             my_traph.mark_broken(broken_port_number);
-            println!("Cellagent {}: {} before\n{}", self.cell_id, _f, my_traph);
+            //println!("Cellagent {}: {} before\n{}", self.cell_id, _f, my_traph);
             let changed_entries = my_traph.swap_child(&rw_port_tree_id, broken_port_number, port_number)?;
             for entry in changed_entries { self.update_entry(entry)?; }
-            println!("Cellagent {}: {} after\n{}", self.cell_id, _f, my_traph);
+            //println!("Cellagent {}: {} after\n{}", self.cell_id, _f, my_traph);
             self.insert_traph(&my_tree_id, my_traph)?;
             let hops = PathLength(CellNo(0));
-            let mask = Mask::new(port_no.make_port_number(self.no_ports)?);
+            let mask = Mask::new(port_number);
             let in_reply_to = msg.get_msg_id();
             let failover_d_msg = FailoverDMsg::new(in_reply_to, sender_id, FailoverResponse::Success,
                 rw_port_tree_id, hops, broken_tree_ids, broken_path);
@@ -849,7 +849,7 @@ impl CellAgent {
                 None => {
                     println!("Cellagent {}: {} Failover failure \n{}", self.cell_id, _f, rw_traph);
                     rw_traph.clear_tried_ports(&rw_port_tree_id);
-                    let mask = Mask::new(port_no.make_port_number(self.no_ports)?);
+                    let mask = Mask::new(port_number);
                     let in_reply_to = msg.get_msg_id();
                     let failover_d_msg = FailoverDMsg::new(in_reply_to, sender_id, FailoverResponse::Failure,
                                                            rw_port_tree_id, PathLength(CellNo(0)), broken_tree_ids, broken_path);
@@ -1177,6 +1177,7 @@ impl CellAgent {
             let trace = json!({ "cell_id": &self.cell_id, "port_no": port_no, "is_border": is_border });
             let _ = dal::add_to_trace(TraceType::Trace, trace_params, &trace, _f);
         }
+        let port_number = port_no.make_port_number(self.no_ports).context(CellagentError::Chain { func_name: "port_connected", comment: S(self.cell_id.clone()) })?;
         if is_border {
             // Create tree to talk to outside
             let mut eqns = HashSet::new();
@@ -1187,7 +1188,6 @@ impl CellAgent {
             let gvm_eqn = GvmEquation::new(&eqns, &Vec::new());
             let new_tree_id = self.my_tree_id.add_component("Noc").context(CellagentError::Chain { func_name: "port_connected", comment: S(self.cell_id.clone()) })?;
             self.tree_id_map.insert(new_tree_id.get_uuid(), new_tree_id.clone());
-            let port_number = port_no.make_port_number(self.no_ports).context(CellagentError::Chain { func_name: "port_connected", comment: S(self.cell_id.clone()) })?;
             let _ = self.update_traph(&new_tree_id, port_number, traph::PortStatus::Parent,
                                           &gvm_eqn, HashSet::new(), PathLength(CellNo(1)), Path::new0(), ).context(CellagentError::Chain { func_name: "port_connected", comment: S(self.cell_id.clone()) })?;
             let base_tree = AllowedTree::new("Base");
@@ -1202,7 +1202,7 @@ impl CellAgent {
             Ok(())
         } else {
             let sender_id = SenderID::new(&self.cell_id, "CellAgent")?;
-            let port_no_mask = Mask::new(port_no.make_port_number(self.no_ports)?);
+            let port_no_mask = Mask::new(port_number);
             self.connected_tree_entry.or_with_mask(port_no_mask); // Add to connected ports
             self.update_entry(self.connected_tree_entry)?;
             let hello_msg = HelloMsg::new(&sender_id, &self.cell_id, port_no);
