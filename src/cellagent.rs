@@ -820,7 +820,7 @@ impl CellAgent {
         let lw_port_tree_id = payload._get_lw_port_tree_id();
         let lw_tree_id = lw_port_tree_id.without_root_port_number();
         self.failover_reply_port.insert(rw_port_tree_id.clone(), port_no);
-        let broken_path = payload.get_path();
+        let broken_path = payload.get_broken_path();
         let broken_tree_ids = payload.get_broken_tree_ids();
         let port_number = port_no.make_port_number(self.no_ports)?;
         let my_tree_id = self.my_tree_id.clone();
@@ -840,7 +840,7 @@ impl CellAgent {
             let mask = Mask::new(port_number);
             let in_reply_to = msg.get_msg_id();
             let failover_d_msg = FailoverDMsg::new(in_reply_to, sender_id, FailoverResponse::Success,
-                rw_port_tree_id, hops, broken_tree_ids, broken_path);
+                payload);
             self.send_msg(&self.connected_tree_id, &failover_d_msg, mask)?;
         } else {
             let mut rw_traph = self.own_traph(&rw_port_tree_id)?;
@@ -851,8 +851,9 @@ impl CellAgent {
                     rw_traph.clear_tried_ports(&rw_port_tree_id);
                     let mask = Mask::new(port_number);
                     let in_reply_to = msg.get_msg_id();
-                    let failover_d_msg = FailoverDMsg::new(in_reply_to, sender_id, FailoverResponse::Failure,
-                                                           rw_port_tree_id, PathLength(CellNo(0)), broken_tree_ids, broken_path);
+                    let failover_d_msg = FailoverDMsg::new(in_reply_to, sender_id,
+                                                           FailoverResponse::Failure,
+                                                           payload);
                     self.send_msg(&self.connected_tree_id, &failover_d_msg, mask)?;
                 },
                 Some(trial_port_no) => {
@@ -869,29 +870,29 @@ impl CellAgent {
             -> Result<(), Error> {
         let _f = "process_failover_d_msg";
         let payload = msg.get_payload();
-        let port_tree_id = payload.get_rw_tree_id();
-        self.tree_id_map.insert(port_tree_id.get_uuid(), port_tree_id.clone());
+        let rw_port_tree_id = payload.get_rw_tree_id();
+        let broken_path = payload.get_broken_path();
+        let port_number = port_no.make_port_number(self.no_ports)?;
+        self.tree_id_map.insert(rw_port_tree_id.get_uuid(), rw_port_tree_id.clone());
         match payload.get_response() {
             FailoverResponse::Success => {
-                let tree_id = port_tree_id.without_root_port_number();
-                let hops = *payload.get_hops();
-                let path = *payload.get_path();
-                let port_number = port_no.make_port_number(self.no_ports)?;
+                let tree_id = rw_port_tree_id.without_root_port_number();
                 let mut traph = self.own_traph(&tree_id).context(CellagentError::Chain { func_name: _f, comment: S("") })?;
+                let hops = traph.get_parent_element()?.get_hops();
                 let old_parent_entry = traph.get_tree_entry(&tree_id.get_uuid()).context(CellagentError::Chain { func_name: _f, comment: S("") })?;
                 println!("Cellagent {}: {} tree id {:?} old entry {}", self.cell_id, _f, tree_id, old_parent_entry);
                 let old_parent = old_parent_entry.get_parent();
                 let failover_port = self.failover_reply_port
-                    .get(port_tree_id)
+                    .get(rw_port_tree_id)
                     .cloned()
-                    .ok_or_else(|| -> Error { CellagentError::FailoverPort { func_name: _f, cell_id: self.cell_id.clone(), tree_id: port_tree_id.clone() }.into() })?;
+                    .ok_or_else(|| -> Error { CellagentError::FailoverPort { func_name: _f, cell_id: self.cell_id.clone(), tree_id: rw_port_tree_id.clone() }.into() })?;
                 let children = [failover_port.make_port_number(self.no_ports)?].iter().cloned().collect::<HashSet<PortNumber>>();
                 let mut updated_entry = traph.update_element(&tree_id, port_number,
-                                                             traph::PortStatus::Parent, &children, hops, path).context(CellagentError::Chain { func_name: _f, comment: S("") })?;
+                                                             traph::PortStatus::Parent, &children, hops, broken_path).context(CellagentError::Chain { func_name: _f, comment: S("") })?;
                 self.insert_traph(&tree_id, traph)?;
                 println!("Cellagent {}: {} tree id {} old parent {} updated entry {}", self.cell_id, _f, tree_id, *old_parent, updated_entry);
                 self.update_entry(updated_entry)?;
-                updated_entry.set_tree_id(port_tree_id);
+                updated_entry.set_tree_id(rw_port_tree_id);
                 println!("Cellagent {}: {} tree id {} old parent {} updated entry {}", self.cell_id, _f, tree_id, *old_parent, updated_entry);
                 self.update_entry(updated_entry)?;
             },
