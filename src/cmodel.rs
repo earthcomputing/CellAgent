@@ -4,7 +4,7 @@ use std::{fmt,
 
 use failure::{Error, ResultExt};
 
-use crate::config::{CONTINUE_ON_ERROR, DEBUG_OPTIONS, TRACE_OPTIONS, PortNo};
+use crate::config::{CENTRAL_TREE, CONTINUE_ON_ERROR, DEBUG_OPTIONS, TRACE_OPTIONS, PortNo};
 use crate::dal;
 use crate::dal::{fork_trace_header, update_trace_header};
 use crate::message::MsgType;
@@ -13,8 +13,6 @@ use crate::message_types::{CaToCmBytes, CmToCa, CmFromCa, CmToPe, CmFromPe, PeTo
 use crate::name::{Name, CellID};
 use crate::packet::{Packet, PacketAssembler, PacketAssemblers, Packetizer};
 use crate::utility::{S, TraceHeader, TraceHeaderParams, TraceType, write_err};
-
-const CENTRAL_TREE : &str = "Tree:C:2"; // MAGIC
 
 #[derive(Debug, Clone)]
 pub struct Cmodel {
@@ -101,7 +99,7 @@ impl Cmodel {
                     if DEBUG_OPTIONS.cm_from_ca {
                         let dpi_msg = MsgType::msg_from_bytes(&bytes)?;
                         let dpi_msg_type = dpi_msg.get_msg_type();
-                        let dpi_tree_id = dpi_msg.get_tree_id();
+                        let dpi_tree_id = dpi_msg.get_port_tree_id();
                         match dpi_msg_type {
                             MsgType::Discover => (),
                             MsgType::DiscoverD => {
@@ -193,7 +191,7 @@ packets: Vec<Packet>,
                 let packet_count = packets[0].get_count();
                 let dpi_msg = MsgType::msg_from_bytes(&bytes)?;
                 let dpi_msg_type = dpi_msg.get_msg_type();
-                let dpi_tree_id = dpi_msg.get_tree_id();
+                let dpi_tree_id = dpi_msg.get_port_tree_id();
                 match dpi_msg_type {
                     MsgType::Discover => (),
                     MsgType::DiscoverD => {

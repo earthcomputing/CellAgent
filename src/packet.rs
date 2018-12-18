@@ -11,7 +11,7 @@ use serde_json;
 use crate::config::{PACKET_MIN, PACKET_MAX, PAYLOAD_DEFAULT_ELEMENT, 
     ByteArray, MsgID, PacketNo};
 use crate::message::{Message, MsgType, TypePlusMsg};
-use crate::name::{TreeID};
+use crate::name::{PortTreeID};
 use crate::utility::S;
 use crate::uuid_ec::{Uuid, AitState};
  
@@ -69,10 +69,10 @@ impl Packet {
     }
 
     // Payload (Deep Packet Inspection)
-    // Debug hack to get tree_id out of packets.  Assumes msg is one packet
-    pub fn get_tree_id(self) -> TreeID {
+    // Debug hack to get tree name out of packets.  Assumes msg is one packet
+    pub fn get_port_tree_id(self) -> PortTreeID {
         let msg = MsgType::get_msg(&[self]).unwrap();
-        msg.get_tree_id().clone()
+        msg.get_port_tree_id().clone()
     }
 }
 impl fmt::Display for Packet {

@@ -6,6 +6,7 @@ use crate::uuid_ec::Uuid;
 
 // Using String means names are not Copy
 type NameType = String;
+
 pub trait Name: Sized {
     fn get_name(&self) -> &str;
     fn get_uuid(&self) -> Uuid;
@@ -22,7 +23,7 @@ pub trait Name: Sized {
     fn add_component(&self, s: &str) -> Result<Self, Error> {
         match s.find(' ') {
             Some(_) => Err(NameError::Format{ name: S(s), func_name: "add_component" }.into()),
-            None => self.name_from_str(&([self.get_name(),s].join(SEPARATOR)))
+            None => self.name_from_str(&([self.get_name(), s].join(SEPARATOR)))
         }
     }
     fn is_name(&self, name: &str) -> bool { self.get_name() == name }
@@ -45,7 +46,7 @@ impl fmt::Display for CellID { fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt:
 pub struct PortID { name: NameType, uuid: Uuid }
 impl PortID {
     pub fn new(cell_id: &CellID, port_number: PortNumber) -> Result<PortID, Error> {
-        let name = [cell_id.get_name(), &format!("P:{}",port_number)].join(SEPARATOR);
+        let name = [cell_id.get_name(), &format!("P:{}", port_number)].join(SEPARATOR);
         Ok(PortID { name: name.clone(), uuid: Uuid::new() })
     }
 }
@@ -67,11 +68,12 @@ impl TreeID {
     pub fn default() -> TreeID {
         TreeID { name: S("Default"), uuid: Uuid::new() }
     }
-    pub fn with_root_port_number(&self, port_number: PortNumber) -> TreeID {
+    pub fn to_port_tree_id(&self, port_number: PortNumber) -> PortTreeID {
         let mut uuid = self.uuid;
         uuid.set_port_number(port_number);
-        TreeID { name: S(self.get_name()), uuid }
+        PortTreeID { name: S(self.get_name()), uuid }
     }
+    pub fn to_port_tree_id_0(&self) -> PortTreeID { self.to_port_tree_id(PortNumber::new0()) }
     pub fn without_root_port_number(&self) -> TreeID {
         let mut uuid = self.uuid; // Copy so next line doesn't change self.uuid
         uuid.remove_port_no();
@@ -88,6 +90,32 @@ impl Name for TreeID {
     fn create_from_string(&self, name: &str) -> TreeID { TreeID { name: S(name), uuid: Uuid::new() } }
 }
 impl fmt::Display for TreeID {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let mut uuid = S(self.uuid);
+        uuid.truncate(8);
+        let s = format!("{} {}", self.name, uuid);
+        write!(f, "{}", s)
+    }
+}
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub struct PortTreeID { name: NameType, uuid: Uuid}
+impl PortTreeID {
+    pub fn to_tree_id(&self) -> TreeID {
+        let mut uuid = self.uuid; // Copy so next line doesn't change self.uuid
+        uuid.remove_port_no();
+        TreeID { name: S(self.get_name()), uuid }
+    }
+    pub fn _get_port_no(&self) -> PortNo { self.uuid.get_port_no() }
+    pub fn _transfer_port_number(&mut self, other: &PortTreeID) {
+        self.uuid.set_port_no(other._get_port_no());
+    }
+}
+impl Name for PortTreeID {
+    fn get_name(&self) -> &str { &self.name }
+    fn get_uuid(&self) -> Uuid { self.uuid }
+    fn create_from_string(&self, name: &str) -> PortTreeID { unimplemented!() }
+}
+impl fmt::Display for PortTreeID {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let mut uuid = S(self.uuid);
         uuid.truncate(8);

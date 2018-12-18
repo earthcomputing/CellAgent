@@ -80,7 +80,7 @@ impl fmt::Display for Mask {
     }
 }
 #[derive(Debug, Copy, Clone, Hash, PartialEq, Eq, Serialize, Deserialize)]
-pub struct PortNumber { pub port_no: PortNo }
+pub struct PortNumber { port_no: PortNo }
 impl PortNumber {
     pub fn new(no: PortNo, no_ports: PortNo) -> Result<PortNumber, Error> {
         if *no > *no_ports {

@@ -144,7 +144,7 @@ impl PacketEngine {
 
                 {
                     let msg_type = MsgType::msg_type(&packet);
-                    let tree_id = packet.get_tree_id();
+                    let tree_id = packet.get_port_tree_id();
                     if TRACE_OPTIONS.all || TRACE_OPTIONS.pe_cm {
                         let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "pe_forward_leafward" };
                         let trace = json!({ "cell_id": &self.cell_id, "tree_id": &tree_id,
@@ -176,16 +176,16 @@ impl PacketEngine {
             AitState::Normal => {
                 {
                     let msg_type = MsgType::msg_type(&packet);
-                    let tree_id = packet.get_tree_id();
+                    let port_tree_id = packet.get_port_tree_id();
                     let ait_state = packet.get_ait_state();
                     if TRACE_OPTIONS.all || TRACE_OPTIONS.pe_cm {
                         let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "pe_packet_from_cm" };
-                        let trace = json!({ "cell_id": &self.cell_id, "tree_id": &tree_id, "ait_state": ait_state, "msg_type": &msg_type });
+                        let trace = json!({ "cell_id": &self.cell_id, "port_tree_id": &port_tree_id, "ait_state": ait_state, "msg_type": &msg_type });
                         let _ = dal::add_to_trace(TraceType::Trace, trace_params, &trace, _f);
                     }
                     if DEBUG_OPTIONS.pe_pkt_recv {
                         match msg_type {
-                            MsgType::DiscoverD => { if tree_id.is_name(CENTRAL_TREE) { println!("PacketEngine {}: {} got from cm {} {}", self.cell_id, _f, msg_type, tree_id); } },
+                            MsgType::DiscoverD => { if port_tree_id.is_name(CENTRAL_TREE) { println!("PacketEngine {}: {} got from cm {} {}", self.cell_id, _f, msg_type, port_tree_id); } },
                             _ => (),
                         }
                     }
@@ -283,19 +283,19 @@ impl PacketEngine {
                 };
                 {
                     let msg_type = MsgType::msg_type(&packet);
-                    let tree_id = packet.get_tree_id();
+                    let port_tree_id = packet.get_port_tree_id();
                     let ait_state = packet.get_ait_state();
                     if TRACE_OPTIONS.all || TRACE_OPTIONS.pe_cm {
                         let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "pe_process_packet" };
-                        let trace = json!({ "cell_id": &self.cell_id, "tree_id": &tree_id, "ait_state": ait_state,
+                        let trace = json!({ "cell_id": &self.cell_id, "port_tree_id": &port_tree_id, "ait_state": ait_state,
                             "msg_type": &msg_type, "port_no": &port_no, "entry": &entry });
                         let _ = dal::add_to_trace(TraceType::Trace, trace_params, &trace, _f);
                     }
                     if DEBUG_OPTIONS.pe_process_pkt {
                         match msg_type {
                             MsgType::Discover => (),
-                            MsgType::DiscoverD => if tree_id.is_name(CENTRAL_TREE) { println!("PacketEngine {}: got from {} {} {}", self.cell_id, *port_no, msg_type, tree_id); }
-                            _ => { println!("PacketEngine {}: got from {} {} {} {}", self.cell_id, *port_no, msg_type, tree_id, entry); },
+                            MsgType::DiscoverD => if port_tree_id.is_name(CENTRAL_TREE) { println!("PacketEngine {}: got from {} {} {}", self.cell_id, *port_no, msg_type, port_tree_id); }
+                            _ => { println!("PacketEngine {}: got from {} {} {} {}", self.cell_id, *port_no, msg_type, port_tree_id, entry); },
                         }
                     }
                 }
@@ -330,14 +330,14 @@ impl PacketEngine {
                     match msg_type {
                         MsgType::Discover => (),
                         _ => {
-                            let tree_id = packet.get_tree_id();
+                            let tree_name = packet.get_port_tree_id();
                             {
                                 let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "pe_forward_to_cm" };
-                                let trace = json!({ "cell_id": &self.cell_id, "tree_id": &tree_id, "msg_type": &msg_type, "parent_port": &parent });
+                                let trace = json!({ "cell_id": &self.cell_id, "tree_name": &tree_name, "msg_type": &msg_type, "parent_port": &parent });
                                 let _ = dal::add_to_trace(TraceType::Debug, trace_params, &trace, _f);
                             }
                             if msg_type == MsgType::Manifest { println!("PacketEngine {} forwarding manifest rootward", self.cell_id); }
-                            println!("PacketEngine {}: {} [{}] {} {}", self.cell_id, _f, *parent, msg_type, tree_id);
+                            println!("PacketEngine {}: {} [{}] {} {}", self.cell_id, _f, *parent, msg_type, tree_name);
                         },
                     }
                 }
@@ -351,13 +351,13 @@ impl PacketEngine {
                         match msg_type {
                             MsgType::Discover => (),
                             _ => {
-                                let tree_id = packet.get_tree_id();
+                                let tree_name = packet.get_port_tree_id();
                                 {
                                     let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "pe_forward_rootward" };
-                                    let trace = json!({ "cell_id": &self.cell_id, "tree_id": &tree_id, "msg_type": &msg_type, "parent_port": &parent });
+                                    let trace = json!({ "cell_id": &self.cell_id, "tree_name": &tree_name, "msg_type": &msg_type, "parent_port": &parent });
                                     let _ = dal::add_to_trace(TraceType::Debug, trace_params, &trace, _f);
                                 }
-                                println!("PacketEngine {}: {} [{}] {} {}", self.cell_id, _f, *parent, msg_type, tree_id);
+                                println!("PacketEngine {}: {} [{}] {} {}", self.cell_id, _f, *parent, msg_type, tree_name);
                             },
                         }
                     }
@@ -379,18 +379,18 @@ impl PacketEngine {
             let port_nos = mask.get_port_nos();
             {
                 let msg_type = MsgType::msg_type(&packet);
-                let tree_id = packet.get_tree_id();
+                let port_tree_id = packet.get_port_tree_id();
                 if TRACE_OPTIONS.all || TRACE_OPTIONS.pe_port {
                     let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "pe_forward_leafward" };
-                    let trace = json!({ "cell_id": &self.cell_id, "tree_id": &tree_id, "msg_type": &msg_type, "port_nos": &port_nos });
+                    let trace = json!({ "cell_id": &self.cell_id, "port_tree_id": &port_tree_id, "msg_type": &msg_type, "port_nos": &port_nos });
                     let _ = dal::add_to_trace(TraceType::Trace, trace_params, &trace, _f);
                 }
                 if DEBUG_OPTIONS.pe_pkt_send {
                     match msg_type {
                         MsgType::Discover => (),
-                        MsgType::DiscoverD => if tree_id.is_name(CENTRAL_TREE) { println!("PacketEngine {}: {} on {:?} {} {}", self.cell_id, _f, port_nos, msg_type, tree_id); },
+                        MsgType::DiscoverD => if port_tree_id.is_name(CENTRAL_TREE) { println!("PacketEngine {}: {} on {:?} {} {}", self.cell_id, _f, port_nos, msg_type, port_tree_id); },
                         MsgType::Manifest => { println!("PacketEngine {} forwarding manifest leafward mask {} entry {}", self.cell_id, mask, entry); },
-                        _ => { println!("PacketEngine {}: {} on {:?} {} {}", self.cell_id, _f, port_nos, msg_type, tree_id); }
+                        _ => { println!("PacketEngine {}: {} on {:?} {} {}", self.cell_id, _f, port_nos, msg_type, port_tree_id); }
                     };
                 }
             }
