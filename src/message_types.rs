@@ -2,7 +2,7 @@ use std::sync::mpsc;
 
 use crate::config::{ByteArray, PortNo};
 use crate::message::{MsgDirection, TcpMsgType};
-use crate::name::TreeID;
+use crate::name::{TreeID};
 use crate::packet::{Packet};
 use crate::port::{PortStatus};
 use crate::routing_table_entry::{RoutingTableEntry};

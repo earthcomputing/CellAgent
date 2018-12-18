@@ -1,13 +1,13 @@
 use std::fmt;
 
 use crate::config::{PathLength, PortNo};
-use crate::name::{TreeID};
+use crate::name::{PortTreeID, TreeID};
 use crate::routing_table_entry::RoutingTableEntry;
 use crate::utility::{PortNumber};
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]
 pub struct PortTree {
-    port_tree_id: TreeID,
+    port_tree_id: PortTreeID,
     root_port_no: PortNo,
     in_port_no: PortNo,
     hops: PathLength,
@@ -16,11 +16,11 @@ pub struct PortTree {
 impl PortTree {
     pub fn new(tree_id: &TreeID, root_port_number: PortNumber, in_port_no: PortNo, hops: PathLength)
             -> PortTree {
-        let port_tree_id = tree_id.with_root_port_number(root_port_number);
+        let port_tree_id = tree_id.to_port_tree_id(root_port_number);
         PortTree { port_tree_id, root_port_no: root_port_number.get_port_no(),
                    in_port_no, hops, entry: RoutingTableEntry::default() }
     }
-    pub fn get_port_tree_id(&self) -> &TreeID { &self.port_tree_id }
+    pub fn get_port_tree_id(&self) -> &PortTreeID { &self.port_tree_id }
     pub fn get_root_port_no(&self) -> &PortNo { &self.root_port_no }
     pub fn _get_in_port_no(&self) -> &PortNo { &self.in_port_no }
     pub fn _get_hops(&self) -> &PathLength { &self.hops }
@@ -32,6 +32,9 @@ impl PortTree {
     }
     pub fn remove_child(&mut self, child: PortNumber) -> RoutingTableEntry {
         self.entry.remove_child(child)
+    }
+    pub fn set_parent(&mut self, new_parent: PortNumber) -> RoutingTableEntry {
+        self.entry.set_parent(new_parent)
     }
 }
 
