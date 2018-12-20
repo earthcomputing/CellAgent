@@ -24,7 +24,7 @@ pub const QUENCH: Quench = Quench::RootPort;
 pub const PAYLOAD_DEFAULT_ELEMENT: u8 = 0;
 // Place to write output data
 pub const OUTPUT_FILE_NAME: & str = "/tmp/multicell-trace.json";
-pub const KAFKA_SERVER: & str = "172.16.1.2:9092";
+pub const KAFKA_SERVER: & str = "http://kafkaserver.com:9092";
 pub const KAFKA_TOPIC: & str = "CellAgent";
 //pub const MAX_ENTRIES: TableIndex    = TableIndex(64);  // Max number of active trees
 //pub const MAX_CHARS: usize         = 128; // Longest valid name
