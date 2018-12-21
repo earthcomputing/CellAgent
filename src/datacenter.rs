@@ -68,11 +68,11 @@ impl Datacenter {
             };
             let split = self.cells.split_at_mut(max(e0,e1));
             let left_cell = split.0.get_mut(e0)
-                .ok_or_else(|| -> Error { DatacenterError::Wire { edge: *edge, func_name: _f, comment: "split left" }.into() })?;
+                .ok_or::<Error>(DatacenterError::Wire { edge: *edge, func_name: _f, comment: "split left" }.into())?;
             let left_cell_id = left_cell.get_id().clone(); // For Trace
             let (left_port,left_from_pe) = left_cell.get_free_ec_port_mut()?;
             let rite_cell = split.1.first_mut()
-                .ok_or_else(|| -> Error { DatacenterError::Wire { edge: *edge, func_name: _f, comment: "split rite" }.into() })?;
+                .ok_or::<Error>(DatacenterError::Wire { edge: *edge, func_name: _f, comment: "split rite" }.into())?;
             let rite_cell_id = rite_cell.get_id().clone(); // For Trace
             let (rite_port, rite_from_pe) = rite_cell.get_free_ec_port_mut()?;
             //println!("Datacenter: edge {:?} {} {}", edge, *left_port.get_id(), *rite_port.get_id());
@@ -110,7 +110,7 @@ impl Datacenter {
             .iter_mut()
             .filter(|cell| cell.is_border())
             .nth(0)
-            .ok_or_else(|| -> Error { DatacenterError::Boundary { func_name: _f }.into() })?
+            .ok_or::<Error>(DatacenterError::Boundary { func_name: _f }.into())?
             .get_free_boundary_port_mut()?;
         port.noc_channel(port_to_noc, port_from_noc, port_from_pe)?;
         Ok(())

@@ -161,9 +161,9 @@ impl PacketEngine {
                     }
                 }
                 for port_no in port_nos.iter().cloned() {
-                    // I think the match version is clearer than the ok_or_else version
+                    // I think the match version is clearer than the ok_or version
                     //self.pe_to_ports.get(*port_no as usize)
-                    //    .ok_or_else(|| -> Error { PacketEngineError::Sender { cell_id: self.cell_id.clone(), func_name: "forward leaf", port_no: *port_no }.into() })?
+                    //    .ok_or::<Error>(PacketEngineError::Sender { cell_id: self.cell_id.clone(), func_name: "forward leaf", port_no: *port_no }.into())?
                     //    .send(PeToPortPacket::Packet(packet)).context(PacketEngineError::Chain { func_name: _f, comment: S("send packet leafward ") + self.cell_id.get_name() })?;
                    match self.pe_to_ports.get(*port_no as usize) {
                         // forward to neighbor
@@ -245,7 +245,7 @@ impl PacketEngine {
 
                 // Send to CM and transition to ENTL
                 let channel = self.pe_to_ports.get(*port_no as usize)
-                    .ok_or_else(|| -> Error { PacketEngineError::Sender { cell_id: self.cell_id.clone(), func_name: "forward leaf", port_no: *port_no }.into() })?;
+                    .ok_or::<Error>(PacketEngineError::Sender { cell_id: self.cell_id.clone(), func_name: "forward leaf", port_no: *port_no }.into())?;
                 channel.send(PeToPortPacket::Packet(packet)).context(PacketEngineError::Chain { func_name: _f, comment: S("send packet leafward ") + self.cell_id.get_name() })?;
 
                 packet.make_ait();
@@ -264,7 +264,7 @@ impl PacketEngine {
                 // Update and send back on same port
                 packet.next_ait_state()?;
                 let channel = self.pe_to_ports.get(*port_no as usize)
-                    .ok_or_else(|| -> Error { PacketEngineError::Sender { cell_id: self.cell_id.clone(), func_name: "forward leaf", port_no: *port_no }.into() })?;
+                    .ok_or::<Error>(PacketEngineError::Sender { cell_id: self.cell_id.clone(), func_name: "forward leaf", port_no: *port_no }.into())?;
                 channel.send(PeToPortPacket::Packet(packet)).context(PacketEngineError::Chain { func_name: _f, comment: S("send packet leafward ") + self.cell_id.get_name() })?;
             },
 
@@ -402,7 +402,7 @@ impl PacketEngine {
                 } else {
                     // forward to neighbor
                     let channel = self.pe_to_ports.get(*port_no as usize)
-                        .ok_or_else(|| -> Error { PacketEngineError::Sender { cell_id: self.cell_id.clone(), func_name: "forward leaf", port_no: *port_no }.into() })?;
+                        .ok_or::<Error>(PacketEngineError::Sender { cell_id: self.cell_id.clone(), func_name: "forward leaf", port_no: *port_no }.into())?;
                     channel
                         .send(PeToPortPacket::Packet(packet)).context(PacketEngineError::Chain { func_name: _f, comment: S("send packet leafward ") + self.cell_id.get_name() })?;
                 }
