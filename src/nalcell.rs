@@ -170,10 +170,10 @@ impl NalCell {
             .filter(|port| !(want_boundary_port ^ port.is_border()))
             .filter(|port| (*(port.get_port_no()) != 0 as u8))
             .nth(0)
-            .ok_or_else(|| -> Error { NalcellError::NoFreePorts{ cell_id: id.clone(), func_name: _f }.into() })?;
+            .ok_or::<Error>(NalcellError::NoFreePorts{ cell_id: id.clone(), func_name: _f }.into())?;
         port.set_connected();
         let recvr = self.ports_from_pe.remove(&port.get_port_no())
-            .ok_or_else(|| -> Error { NalcellError::Channel { port_no: port.get_port_no(), func_name: _f }.into() })?;
+            .ok_or::<Error>(NalcellError::Channel { port_no: port.get_port_no(), func_name: _f }.into())?;
         Ok((port, recvr))
     }
 }
