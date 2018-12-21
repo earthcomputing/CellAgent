@@ -195,12 +195,6 @@ impl CellAgent {
         Ok(gvm_eqn.clone())
     }
     fn get_saved_discover(&self) -> &Vec<SavedDiscover> { &self.saved_discover }
-    fn get_saved_stack_tree(&self, tree_id: &TreeID) -> Vec<SavedStack> {
-        self.saved_stack
-            .get(tree_id)
-            .cloned()
-            .unwrap_or_default()
-    }
     fn get_saved_msgs(&self, tree_id: &TreeID) -> Vec<SavedMsg> {
         let _f = "get_saved_msgs";
         let locked = self.saved_msgs.lock().unwrap();
@@ -1324,17 +1318,21 @@ impl CellAgent {
     fn forward_stack_tree(&mut self, port_tree_id: &PortTreeID, mask: Mask)
             -> Result<(), Error> {
         let _f = "forward_stack_tree";
-        let saved = self.get_saved_stack_tree(&port_tree_id.to_tree_id());
-        for msg in saved.iter() {
-            if DEBUG_OPTIONS.trace_all || DEBUG_OPTIONS.saved_msgs {   // Debug print
-                let msg_type = msg.get_msg_type();
-                let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "ca_forward_stack_tree_msg" };
-                let trace = json!({ "cell_id": &self.cell_id, "port_tree_id": &port_tree_id, "port_nos": &mask.get_port_nos(), "msg_type": &msg_type });
-                let _ = dal::add_to_trace(TraceType::Debug, trace_params, &trace, _f);
-                if DEBUG_OPTIONS.saved_msgs { println!("CellAgent {}: {} tree on ports {:?} {}", self.cell_id, _f, mask.get_port_nos(), msg_type); }
-            }
-            self.send_msg(&self.connected_tree_id, msg,mask)?;
-        }
+        self.saved_stack
+            .get(&port_tree_id.to_tree_id())
+            .map(|saved| -> Result<(), Error> {
+                for msg in saved.iter() {
+                    if DEBUG_OPTIONS.trace_all || DEBUG_OPTIONS.saved_msgs {   // Debug print
+                        let msg_type = msg.get_msg_type();
+                        let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "ca_forward_stack_tree_msg" };
+                        let trace = json!({ "cell_id": &self.cell_id, "port_tree_id": &port_tree_id, "port_nos": &mask.get_port_nos(), "msg_type": &msg_type });
+                        let _ = dal::add_to_trace(TraceType::Debug, trace_params, &trace, _f);
+                        if DEBUG_OPTIONS.saved_msgs { println!("CellAgent {}: {} tree on ports {:?} {}", self.cell_id, _f, mask.get_port_nos(), msg_type); }
+                    }
+                    self.send_msg(&self.connected_tree_id, msg,mask)?;
+                }
+                Ok(())
+            });
         Ok(())
     }
     // Continuation of the hack due thread::spawn not accepting Box<Message>

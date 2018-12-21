@@ -2,7 +2,6 @@
 <project version="4">
   <component name="ChangeListManager">
     <list default="true" id="eee480a2-146d-44ab-9647-cef5ea39b250" name="Default" comment="">
-      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/cellagent.rs" beforeDir="false" afterPath="$PROJECT_DIR$/src/cellagent.rs" afterDir="false" />
     </list>
     <ignored path="$PROJECT_DIR$/target/" />
@@ -67,10 +66,11 @@
       <file pinned="false" current-in-tab="true">
         <entry file="file://$PROJECT_DIR$/src/cellagent.rs">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="243">
-              <caret line="200" column="21" lean-forward="true" selection-start-line="200" selection-start-column="21" selection-end-line="200" selection-end-column="21" />
+            <state relative-caret-position="442">
+              <caret line="976" lean-forward="true" selection-start-line="976" selection-end-line="976" />
               <folding>
                 <element signature="e#11383#12183#0" />
+                <element signature="e#87564#88180#0" />
                 <element signature="e#93656#93657#0" expanded="true" />
                 <element signature="e#93708#93709#0" expanded="true" />
               </folding>
@@ -261,10 +261,10 @@
     </option>
   </component>
   <component name="ProjectFrameBounds">
-    <option name="x" value="304" />
-    <option name="y" value="-967" />
+    <option name="x" value="325" />
+    <option name="y" value="-989" />
     <option name="width" value="1388" />
-    <option name="height" value="967" />
+    <option name="height" value="957" />
   </component>
   <component name="ProjectView">
     <navigator proportions="" version="1">
@@ -295,7 +295,7 @@
   <component name="PropertiesComponent">
     <property name="SearchEverywhereHistoryKey" value="&#9;FILE&#9;file:///Users/alan/Documents/Eclipse/multicell/src/packet_engine.rs&#10;{&#9;null&#9;null" />
     <property name="ToolWindowCargo.ShowToolbar" value="false" />
-    <property name="com.android.tools.idea.instantapp.provision.ProvisionBeforeRunTaskProvider.myTimeStamp" value="1545421007425" />
+    <property name="com.android.tools.idea.instantapp.provision.ProvisionBeforeRunTaskProvider.myTimeStamp" value="1545431340469" />
     <property name="org.rust.cargo.project.model.PROJECT_DISCOVERY" value="true" />
     <property name="run.code.analysis.last.selected.profile" value="pProject Default" />
     <property name="settings.editor.selected.configurable" value="configurable.group.tools" />
@@ -394,7 +394,7 @@
     </todo-panel>
   </component>
   <component name="ToolWindowManager">
-    <frame x="304" y="-967" width="1388" height="967" extended-state="0" />
+    <frame x="325" y="-989" width="1388" height="957" extended-state="0" />
     <editor active="true" />
     <layout>
       <window_info content_ui="combo" id="Project" order="0" visible="true" weight="0.15230311" />
@@ -404,13 +404,13 @@
       <window_info id="UI Designer" order="4" />
       <window_info id="Favorites" order="5" side_tool="true" />
       <window_info anchor="bottom" id="Message" order="0" />
-      <window_info anchor="bottom" id="Find" order="1" sideWeight="0.44279346" visible="true" weight="0.26760563" />
-      <window_info active="true" anchor="bottom" x="-199" y="-931" width="578" height="858" id="Run" internal_type="FLOATING" order="2" type="FLOATING" visible="true" weight="0.32941177" />
+      <window_info anchor="bottom" id="Find" order="1" sideWeight="0.44279346" visible="true" weight="0.25653207" />
+      <window_info active="true" anchor="bottom" x="-201" y="-906" width="578" height="858" id="Run" internal_type="FLOATING" order="2" type="FLOATING" visible="true" weight="0.32941177" />
       <window_info anchor="bottom" id="Debug" order="3" weight="0.4" />
       <window_info anchor="bottom" id="Cvs" order="4" weight="0.25" />
       <window_info anchor="bottom" id="Inspection" order="5" weight="0.4" />
       <window_info anchor="bottom" id="TODO" order="6" sideWeight="0.49817917" weight="0.32925338" />
-      <window_info anchor="bottom" id="Event Log" order="7" sideWeight="0.5572065" side_tool="true" visible="true" weight="0.26760563" />
+      <window_info anchor="bottom" id="Event Log" order="7" sideWeight="0.5572065" side_tool="true" visible="true" weight="0.25653207" />
       <window_info anchor="bottom" id="Messages" order="8" />
       <window_info anchor="bottom" id="Terminal" order="9" sideWeight="0.4947994" weight="0.15338883" />
       <window_info anchor="bottom" id="Version Control" order="10" sideWeight="0.49380013" weight="0.18283166" />
@@ -786,10 +786,11 @@
     </entry>
     <entry file="file://$PROJECT_DIR$/src/cellagent.rs">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="243">
-          <caret line="200" column="21" lean-forward="true" selection-start-line="200" selection-start-column="21" selection-end-line="200" selection-end-column="21" />
+        <state relative-caret-position="442">
+          <caret line="976" lean-forward="true" selection-start-line="976" selection-end-line="976" />
           <folding>
             <element signature="e#11383#12183#0" />
+            <element signature="e#87564#88180#0" />
             <element signature="e#93656#93657#0" expanded="true" />
             <element signature="e#93708#93709#0" expanded="true" />
           </folding>
