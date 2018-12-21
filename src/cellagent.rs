@@ -1,7 +1,7 @@
 use std::{fmt,
           sync::{Arc, Mutex, MutexGuard, mpsc::channel},
-          thread, cell::RefCell,
-          collections::{HashMap, HashSet, hash_map::Entry}};
+          thread,
+          collections::{HashMap, HashSet}};
 
 use either::{Either, Left, Right};
 use serde;
@@ -69,7 +69,7 @@ pub struct CellAgent {
     saved_discover: Vec<SavedDiscover>,
     // Next 4 items shared between listen_uptree and listen_cmodel
     saved_msgs: Arc<Mutex<SavedMsgs>>,
-    saved_stack: Arc<Mutex<SavedStackMsgs>>,
+    saved_stack: SavedStackMsgs,
     traphs: Arc<Mutex<Traphs>>,
     tree_name_map: Arc<Mutex<TreeNameMap>>,
     tree_map: TreeMap, // Base tree for given stacked tree
@@ -104,7 +104,7 @@ impl CellAgent {
             tree_map: HashMap::new(),
             tree_name_map: Arc::new(Mutex::new(HashMap::new())), border_port_tree_id_map: HashMap::new(),
             saved_msgs: Arc::new(Mutex::new(HashMap::new())), saved_discover: Vec::new(),
-            saved_stack: Arc::new(Mutex::new(HashMap::new())),
+            saved_stack: HashMap::new(),
             my_entry: RoutingTableEntry::default(), base_tree_map, neighbors: HashMap::new(),
             connected_tree_entry: RoutingTableEntry::default(),
             tenant_masks, up_tree_senders: HashMap::new(), cell_info: CellInfo::new(),
@@ -196,7 +196,7 @@ impl CellAgent {
     }
     fn get_saved_discover(&self) -> &Vec<SavedDiscover> { &self.saved_discover }
     fn get_saved_stack_tree(&self, tree_id: &TreeID) -> Vec<SavedStack> {
-        self.saved_stack.lock().unwrap()
+        self.saved_stack
             .get(tree_id)
             .cloned()
             .unwrap_or_default()
@@ -236,21 +236,20 @@ impl CellAgent {
         locked.insert(tree_id.clone(), saved_msgs);
         Ok(())
     }
-    fn add_saved_stack_tree(&mut self, tree_id: &PortTreeID, stack_tree_msg: &SavedStack) {
-        let mut locked = self.saved_stack.lock().unwrap();
-        let mut saved_msgs = locked
-                .get_mut(&tree_id.to_tree_id())
+    fn add_saved_stack_tree(&mut self, port_tree_id: &PortTreeID, stack_tree_msg: &SavedStack) {
+        let mut saved_msgs = self.saved_stack
+                .get_mut(&port_tree_id.to_tree_id())
                 .cloned()
                 .unwrap_or_default();
         saved_msgs.push(stack_tree_msg.clone());
         if DEBUG_OPTIONS.trace_all || DEBUG_OPTIONS.saved_msgs {   // Debug print
             let _f = "add_saved_stack_tree";
             let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "ca_save_stack_tree_msg" };
-            let trace = json!({ "cell_id": &self.cell_id, "tree_id": tree_id, "no_saved": saved_msgs.len(), "msg": &stack_tree_msg });
+            let trace = json!({ "cell_id": &self.cell_id, "port_tree_id": port_tree_id, "no_saved": saved_msgs.len(), "msg": &stack_tree_msg });
             let _ = dal::add_to_trace(TraceType::Debug, trace_params, &trace, _f);
             if DEBUG_OPTIONS.saved_msgs { println!("Cellagent {}: {} saving {} msg {}", self.cell_id, _f, saved_msgs.len(), stack_tree_msg); }
         }
-        locked.insert(tree_id.to_tree_id(), saved_msgs);
+        self.saved_stack.insert(port_tree_id.to_tree_id(), saved_msgs);
     }
     fn add_saved_discover(&mut self, discover_msg: &SavedDiscover) {
         if DEBUG_OPTIONS.trace_all || DEBUG_OPTIONS.saved_discover {    // Debug print
@@ -833,7 +832,6 @@ impl CellAgent {
         let rw_port_tree_id = payload.get_rw_port_tree_id();
         let rw_tree_id = rw_port_tree_id.to_tree_id();
         let lw_port_tree_id = payload.get_lw_port_tree_id();
-        let lw_tree_id = lw_port_tree_id.to_tree_id();
         self.failover_reply_port.insert(rw_port_tree_id.clone(), port_no);
         let port_number = port_no.make_port_number(self.no_ports)?;
         let my_tree_id = self.my_tree_id.clone();
@@ -947,8 +945,6 @@ impl CellAgent {
         let _f = "process_stack_tree_msg";
         let header = msg.get_header();
         let payload = msg.get_payload();
-        let foo = RefCell::new(payload);
-        let bar = foo.borrow_mut();
         let allowed_tree = payload.get_allowed_tree();
         let parent_tree_id = payload.get_parent_port_tree_id();
         let new_port_tree_id = payload.get_new_port_tree_id();
@@ -988,7 +984,6 @@ impl CellAgent {
     }
     pub fn process_stack_tree_d_msg(&mut self, msg: &StackTreeDMsg, port_no: PortNo) -> Result<(), Error> {
         let _f = "process_stack_treed_msg";
-        let payload = msg.get_payload();
         let port_number = port_no.make_port_number(self.no_ports)?;
         let port_tree_id = msg.get_port_tree_id();
         let tree_uuid = port_tree_id.get_uuid();
@@ -1128,7 +1123,6 @@ impl CellAgent {
             .ok_or::<Error>(CellagentError::TreeMap { func_name: _f, cell_id: self.cell_id.clone(), tree_name: parent_tree_name }.into())?);
         let parent_port_tree_id = parent_tree_id.to_port_tree_id_0();
         if !self.may_send(&parent_port_tree_id)? { return Err(CellagentError::MayNotSend { func_name: _f, cell_id: self.cell_id.clone(), tree_id: parent_tree_id.clone() }.into()); }
-        let my_port_tree_id = &self.my_tree_id.to_port_tree_id_0();
         let new_tree_name = self.get_msg_params(tcp_msg, "new_tree_name")?;
         let allowed_tree = AllowedTree::new(&new_tree_name);
         let new_tree_id = &self.my_tree_id.add_component(&new_tree_name).context(CellagentError::Chain { func_name: _f, comment: S(self.cell_id.clone()) + " new_tree_id" })?;
@@ -1456,8 +1450,8 @@ pub enum CellagentError {
     Border { func_name: &'static str, cell_id: CellID, port_no: u8 },
 //    #[fail(display = "CellAgentError::BorderMsgType {}: Message type {} is not accepted from a border port on cell {}", func_name, msg_type, cell_id)]
 //    BorderMsgType { func_name: &'static str, cell_id: CellID, msg_type: MsgType },
-    #[fail(display = "CellAgentError::FailoverPort {}: No reply port for tree {} on cell {}", func_name, port_tree_id, cell_id)]
-    FailoverPort { func_name: &'static str, cell_id: CellID, port_tree_id: PortTreeID },
+//    #[fail(display = "CellAgentError::FailoverPort {}: No reply port for tree {} on cell {}", func_name, port_tree_id, cell_id)]
+//    FailoverPort { func_name: &'static str, cell_id: CellID, port_tree_id: PortTreeID },
 //    #[fail(display = "CellagentError::ManifestVms {}: No VMs in manifest for cell {}", func_name, cell_id)]
 //    ManifestVms { cell_id: CellID, func_name: &'static str },
     #[fail(display = "CellagentError::MayNotSend {}: Cell {} does not have permission to send on tree {}", func_name, cell_id, tree_id)]
