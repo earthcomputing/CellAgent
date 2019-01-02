@@ -844,6 +844,7 @@ impl CellAgent {
         let _f = "process_failover_d_msg";
         let cell_id = &self.cell_id.clone();
         let failover_reply_ports = &self.failover_reply_ports.clone();
+        let header = msg.get_header();
         let payload = msg.get_payload();
         let failover_payload = payload.get_failover_payload();
         let rw_port_tree_id = failover_payload.get_rw_port_tree_id();
@@ -871,8 +872,15 @@ impl CellAgent {
                             self.update_entry(updated_entry)?;
                             updated_entry.set_tree_id(rw_port_tree_id);
                             println!("Cellagent {}: {} tree id {} old parent {} updated entry {}", self.cell_id, _f, rw_tree_id, *old_parent, updated_entry);
-                            self.update_entry(updated_entry)
+                            self.update_entry(updated_entry)?;
+                            let mask = Mask::new(port_number);
+                            let in_reply_to = msg.get_msg_id();
+                            let sender_id = header.get_sender_id();
+                            let failover_d_msg = FailoverDMsg::new(in_reply_to, sender_id, FailoverResponse::Success,
+                                                                   payload.get_failover_payload());
+                            self.send_msg(&self.connected_tree_id, &failover_d_msg, mask)
                         })?;
+                self.failover_reply_ports.remove(rw_port_tree_id);
             },
             FailoverResponse::Failure => {
                 println!("Cellagent {}: {} FailoverDMsg {}", self.cell_id, _f, msg);
