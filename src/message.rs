@@ -95,18 +95,19 @@ impl MsgType {
 }
 impl fmt::Display for MsgType {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match *self {
-            MsgType::Application => write!(f, "Application"),
-            MsgType::Discover    => write!(f, "Discover"),
-            MsgType::DiscoverD   => write!(f, "DiscoverD"),
-            MsgType::Failover    => write!(f, "Failover"),
-            MsgType::FailoverD   => write!(f, "FailoverD"),
-            MsgType::Hello       => write!(f, "Hello"),
-            MsgType::Manifest    => write!(f, "Manifest"),
-            MsgType::StackTree   => write!(f, "StackTree"),
-            MsgType::StackTreeD  => write!(f, "StackTreeD"),
-            MsgType::TreeName    => write!(f, "TreeName"),
-        }
+        let s = match *self {
+            MsgType::Application => "Application",
+            MsgType::Discover    => "Discover",
+            MsgType::DiscoverD   => "DiscoverD",
+            MsgType::Failover    => "Failover",
+            MsgType::FailoverD   => "FailoverD",
+            MsgType::Hello       => "Hello",
+            MsgType::Manifest    => "Manifest",
+            MsgType::StackTree   => "StackTree",
+            MsgType::StackTreeD  => "StackTreeD",
+            MsgType::TreeName    => "TreeName",
+        };
+        write!(f, "{}", s)
     }
 }
 #[derive(Debug, Copy, Clone, Hash, Eq, PartialEq, Serialize, Deserialize)]
@@ -120,14 +121,15 @@ pub enum TcpMsgType {
 }
 impl fmt::Display for TcpMsgType {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match *self {
-            TcpMsgType::Application  => write!(f, "Application"),
-            TcpMsgType::DeleteTree   => write!(f, "DeleteTree"),
-            TcpMsgType::Manifest     => write!(f, "Manifest"),
-            TcpMsgType::Query        => write!(f, "Query"),
-            TcpMsgType::StackTree    => write!(f, "StackTree"),
-            TcpMsgType::TreeName     => write!(f, "TreeName"),
-        }
+        let s = match *self {
+            TcpMsgType::Application  => "Application",
+            TcpMsgType::DeleteTree   => "DeleteTree",
+            TcpMsgType::Manifest     => "Manifest",
+            TcpMsgType::Query        => "Query",
+            TcpMsgType::StackTree    => "StackTree",
+            TcpMsgType::TreeName     =>  "TreeName",
+        };
+        write!(f, "{}", s)
     }
 }
 #[derive(Debug, Copy, Clone, Hash, Serialize, Deserialize)]
@@ -137,10 +139,11 @@ pub enum MsgDirection {
 }
 impl fmt::Display for MsgDirection {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match *self {
-            MsgDirection::Rootward => write!(f, "Rootward"),
-            MsgDirection::Leafward => write!(f, "Leafward")
-        }
+        let s = match *self {
+            MsgDirection::Rootward => "Rootward",
+            MsgDirection::Leafward => "Leafward"
+        };
+        write!(f, "{}", s)
     }
 }
 #[derive(Debug, Clone, Hash, Serialize, Deserialize)]

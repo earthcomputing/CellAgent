@@ -1,4 +1,4 @@
-use std::{fmt,
+use std::{fmt, fmt::Write,
           sync::{Arc, Mutex},
           sync::mpsc::channel,
           collections::HashSet,
@@ -414,7 +414,7 @@ impl PacketEngine {
 impl fmt::Display for PacketEngine {
     fn fmt(&self, _f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let mut s = format!("Packet Engine for cell {}", self.cell_id);
-        s = s + &format!("{}", *self.routing_table.lock().unwrap());
+        write!(s, "{}", *self.routing_table.lock().unwrap())?;
         write!(_f, "{}", s) }
 }
 // Errors

@@ -1,4 +1,5 @@
-use std::{fmt, collections::HashSet};
+use std::{fmt, fmt::Write,
+          collections::HashSet};
 
 use crate::config::{PortNo};
 use crate::name::{Name, PortTreeID, TreeID};
@@ -80,12 +81,12 @@ impl fmt::Display for RoutingTableEntry {
         let mut uuid = self.tree_uuid.to_string();
         uuid.truncate(8);
         let mut s = format!(" {:8?}", uuid);
-        if self.inuse { s = s + &format!("  Yes  "); }
-        else          { s = s + &format!("  No   "); }
-        if self.may_send { s = s + &format!("  Yes "); }
-        else             { s = s + &format!("  No  "); }
-        s = s + &format!("{:7}", self.parent.0);
-        s = s + &format!("{}", self.mask);
+        if self.inuse { write!(s, "  Yes  ")?; }
+        else          { write!(s, "  No   ")?; }
+        if self.may_send { write!(s, "  Yes ")?; }
+        else             { write!(s, "  No  ")?; }
+        write!(s, "{:7}", self.parent.0)?;
+        write!(s, "{}", self.mask)?;
         write!(f, "{}", s)
     }
 }

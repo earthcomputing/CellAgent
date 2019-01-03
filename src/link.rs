@@ -1,4 +1,5 @@
-use std::{fmt, thread, thread::JoinHandle};
+use std::{fmt,
+          thread, thread::JoinHandle};
 
 use crate::config::{CONTINUE_ON_ERROR, TRACE_OPTIONS};
 use crate::dal;

@@ -1,4 +1,4 @@
-use std::{fmt,
+use std::{fmt, fmt::Write,
           cmp::max,
           sync::mpsc::channel,
           thread::{JoinHandle}};
@@ -94,7 +94,7 @@ impl Datacenter {
         } 
         Ok(link_handles)
     }
-    pub fn get_links(&self) -> &Vec<Link> { &self.links }
+    //pub fn get_links(&self) -> &Vec<Link> { &self.links }
     pub fn get_cells(&self) -> &Vec<NalCell> { &self.cells }
     pub fn get_links_mut(&mut self) -> &mut Vec<Link> { &mut self.links }
     pub fn get_cell_ids(&self) -> Vec<&CellID> {
@@ -120,11 +120,11 @@ impl fmt::Display for Datacenter {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let mut s = format!("Links");
         for l in &self.links {
-            s = s + &format!("{}",l);
+            write!(s, "{}",l)?;
         }
         s = s + "\nCells";
         for i in 0..self.cells.len() {
-            if i < 30 { s = s + &format!("\n{}", self.cells[i]); }
+            if i < 30 { write!(s, "\n{}", self.cells[i])?; }
         }
         write!(f, "{}", s)
     }

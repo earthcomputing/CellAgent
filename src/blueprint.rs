@@ -1,4 +1,4 @@
-use std::{fmt,
+use std::{fmt, fmt::Write,
           collections::{HashMap, HashSet},
           iter::FromIterator};
 
@@ -106,8 +106,8 @@ impl Cell for InteriorCell {
 impl fmt::Display for InteriorCell {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let mut s = format!("\n  Interior Cell {}: ", *self.cell_no);
-        s = s + &format!("Interior Ports:");
-        for p in self.interior_ports.iter().cloned() { s = s + &format!(" {}", *p); }
+        write!(s, "Interior Ports:")?;
+        for p in self.interior_ports.iter().cloned() { write!(s, " {}", *p)?; }
         write!(f, "{}", s)
     }
 }

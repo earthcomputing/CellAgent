@@ -1,4 +1,5 @@
-use std::{fmt, collections::HashMap};
+use std::{fmt, fmt::Write,
+          collections::HashMap};
 
 use failure::{Error};
 
@@ -33,10 +34,10 @@ impl RoutingTable {
 impl fmt::Display for RoutingTable {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let mut s = format!("\nRouting Table");
-        s = s + &format!("\n Tree UUID  In Use Send? Parent Mask ");
+        write!(s, "\n Tree UUID  In Use Send? Parent Mask ")?;
         for key in &self.order {
             let entry = self.entries[key];
-            s = s + &format!("\n{}", entry);
+            write!(s, "\n{}", entry)?;
         }
         write!(f, "{}", s)
     }
