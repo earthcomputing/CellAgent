@@ -106,6 +106,7 @@ fn main() -> Result<(), Error> {
             d to print datacenter
             c to print cells
             l to print links
+            p to print forwarding table
             m to deploy an application
             x to exit program\n").context(MainError::Chain { func_name: "run", comment: S("") })?;
         let mut print_opt = String::new();
@@ -116,7 +117,7 @@ fn main() -> Result<(), Error> {
                     println!("{}", dc);
                     Ok(())
                 },
-                "c" => show_pe(&dc),
+                "c" => show_ca(&dc),
                 "l" => break_link(&mut dc),
                 "p" => show_pe(&dc),
                 "m" => deploy(&outside_to_noc.clone()),
@@ -129,6 +130,18 @@ fn main() -> Result<(), Error> {
         }
     }
 }
+fn show_ca(dc: &Datacenter) -> Result<(), Error> {
+    let cells = dc.get_cells();
+    print_vec(&dc.get_cell_ids());
+    let _ = stdout().write(b"Enter cell to display cell\n")?;
+    let cell_no = read_int()?;
+    cells.get(cell_no)
+        .map_or_else(|| println!("{} is not a valid input", cell_no),
+                     |cell| {
+                         println!("{}", cell);
+                     });
+    Ok(())
+}
 fn show_pe(dc: &Datacenter) -> Result<(), Error> {
     let cells = dc.get_cells();
     print_vec(&dc.get_cell_ids());
@@ -137,8 +150,7 @@ fn show_pe(dc: &Datacenter) -> Result<(), Error> {
     cells.get(cell_no)
         .map_or_else(|| println!("{} is not a valid input", cell_no),
                      |cell| {
-                         let pe = cell.get_packet_engine();
-                         println!("Cellagent {}: {}\n{}", cell.get_id(), cell.get_cell_agent(), pe);
+                         println!("{}", cell.get_packet_engine());
                      });
     Ok(())
 }

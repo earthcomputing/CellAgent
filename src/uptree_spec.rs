@@ -1,4 +1,5 @@
-use std::{fmt, collections::HashSet};
+use std::{fmt, fmt::Write,
+          collections::HashSet};
 
 use crate::nalcell::CellConfig;
 use crate::utility::S;
@@ -39,10 +40,10 @@ impl fmt::Display for Manifest {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let s = format!("Deploy {} on tree {}", self.id, self.deployment_tree);
         // Next 4 lines commented out for debugging purposes
-        //s = s + &format!("\n  Allowed Trees");
-        //for a in &self.allowed_trees { s = s + &format!("\n    {}", a); }
-        //for t in &self.trees { s = s + &format!("\n  {}", t); }
-        //for v in &self.vms { s = s + &format!("\n  {}", v); }
+        //write!(s, "\n  Allowed Trees")?;
+        //for a in &self.allowed_trees { write!(s, "\n    {}", a)?; }
+        //for t in &self.trees { write!(s, "\n  {}", t)?; }
+        //for v in &self.vms { write!(s, "\n  {}", v)?; }
         write!(f, "{}", s)
     }
 }
@@ -85,10 +86,10 @@ impl VmSpec {
 impl fmt::Display for VmSpec {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let mut s = format!("  Virtual Machine {}({}, {})", self.id, self.image, self.required_config);
-        s = s + &format!("\n      Allowed Trees");
-        for a in &self.allowed_trees { s = s + &format!("\n        {}", a); }
-        for t in &self.trees { s = s + &format!("\n      {}", t); }
-        for c in &self.containers { s = s + &format!("\n     {}", c); }
+        write!(s, "\n      Allowed Trees")?;
+        for a in &self.allowed_trees { write!(s, "\n        {}", a)?; }
+        for t in &self.trees { write!(s, "\n      {}", t)?; }
+        for c in &self.containers { write!(s, "\n     {}", c)?; }
         write!(f, "{}", s)
     }
 }
@@ -114,10 +115,10 @@ impl ContainerSpec {
 impl fmt::Display for ContainerSpec {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let mut s = format!(" Service {}({})", self.id, self.image);
-        if self.params.is_empty() { s = s + &format!(" No parameters"); }
-        else                      { s = s + &format!(" Parameters: {:?}", self.params); }
-        s = s + &format!("\n        Allowed Trees");
-        for a in &self.allowed_trees { s = s + &format!("\n          {}", a); }
+        if self.params.is_empty() { write!(s, " No parameters")?; }
+        else                      { write!(s, " Parameters: {:?}", self.params)?; }
+        write!(s, "\n        Allowed Trees")?;
+        for a in &self.allowed_trees { write!(s, "\n          {}", a)?; }
         write!(f, "{}", s)
     }
 }

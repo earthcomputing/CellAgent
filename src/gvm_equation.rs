@@ -1,4 +1,5 @@
-use std::{fmt, collections::{HashSet}};
+use std::{fmt, fmt::Write,
+          collections::{HashSet}};
 
 use eval::{Expr, to_value};
 use serde_json;
@@ -79,7 +80,7 @@ impl fmt::Display for GvmEquation {
         let mut s = format!("GVM: receive '{}', send '{}', extend '{}', save '{}', Variables:",
             self.recv_eqn, self.send_eqn, self.xtnd_eqn, self.save_eqn);
         for variable in self.variables.iter() {
-            s = s + &format!(" {} ", variable);
+            write!(s, " {} ", variable)?;
         }
         write!(f, "{}", s)
     }

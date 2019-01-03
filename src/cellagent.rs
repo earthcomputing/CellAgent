@@ -1,4 +1,4 @@
-use std::{fmt,
+use std::{fmt, fmt::Write,
           sync::{Arc, Mutex, mpsc::channel},
           thread,
           collections::{HashMap, HashSet}};
@@ -113,7 +113,7 @@ impl CellAgent {
     }
 
     // WORKER (CellAgent)
-    pub fn initialize(&mut self, ca_from_cm: CaFromCm) -> Result<(), Error> {
+    pub fn initialize(&mut self, ca_from_cm: CaFromCm) -> Result<&mut Self, Error> {
         let _f = "initialize";
         if TRACE_OPTIONS.all || TRACE_OPTIONS.cm {
             let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "worker" };
@@ -163,7 +163,7 @@ impl CellAgent {
                                           traph::PortStatus::Parent, &gvm_equation,
                                           HashSet::new(), hops, path)?;
         self.listen_cm(ca_from_cm)?;
-        Ok(())
+        Ok(self)
     }
     fn get_no_ports(&self) -> PortNo { self.no_ports }
     pub fn get_id(&self) -> CellID { self.cell_id.clone() }
@@ -1418,7 +1418,7 @@ impl fmt::Display for CellAgent {
     fn fmt(&self, _f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let mut s = format!("Cell Agent {}", self.cell_info);
         for (_, traph) in self.traphs.iter() {
-            s = s + &format!("\n{}", traph);
+            write!(s, "\n{}", traph)?;
         }
         write!(_f, "{}", s) }
 }

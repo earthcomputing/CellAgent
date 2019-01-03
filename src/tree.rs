@@ -1,4 +1,4 @@
-use std::fmt;
+use std::{fmt, fmt::Write};
 
 //use uuid::Uuid;
 
@@ -55,7 +55,7 @@ impl fmt::Display for Tree {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let mut s = format!("TreeID {}: {} {}", self.port_tree_id, self.table_entry, self.gvm_eqn);
         for stacked in &self.stacked_tree_ids {
-            s = s + &format!("\n{} {}", stacked, stacked.get_uuid());
+            write!(s, "\n{} {}", stacked, stacked.get_uuid())?;
         }
         write!(f, "{}", s)
     }

@@ -1,4 +1,4 @@
-use std::{fmt,
+use std::{fmt, fmt::Write,
           collections::{HashMap, HashSet},
           sync::mpsc::channel,
           thread};
@@ -181,12 +181,12 @@ impl fmt::Display for NalCell {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let mut s = String::new();
         match self.cell_type {
-            CellType::Border => s = s + &format!("Border Cell {}", self.id),
-            CellType::Interior => s = s + &format!("Cell {}", self.id)
+            CellType::Border => write!(s, "Border Cell {}", self.id)?,
+            CellType::Interior => write!(s, "Cell {}", self.id)?
         }
-        s = s + &format!(" {}", self.config);
-        s = s + &format!("\n{}", self.cell_agent);
-        s = s + &format!("\n{}", self.packet_engine);
+        write!(s, " {}", self.config)?;
+        write!(s, "\n{}", self.cell_agent)?;
+        write!(s, "\n{}", self.packet_engine)?;
         write!(f, "{}", s) }
 }
 // Errors

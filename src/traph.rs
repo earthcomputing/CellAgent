@@ -1,4 +1,4 @@
-use std::{fmt,
+use std::{fmt, fmt::Write,
           collections::{HashMap, HashSet},
           slice::Iter,
           sync::{Arc, Mutex}};
@@ -84,12 +84,10 @@ impl Traph {
     }
     pub fn add_tried_port(&mut self, rw_port_tree_id: &PortTreeID, port_no: PortNo) {
         let _f = "add_tried_port";
-        let mut tried = self.tried_ports
-            .get(rw_port_tree_id)
-            .cloned()
-            .unwrap_or_default();
+        let tried = self.tried_ports
+            .entry(rw_port_tree_id.clone())
+            .or_insert(HashSet::new());
         tried.insert(port_no);
-        self.tried_ports.insert(rw_port_tree_id.clone(), tried);
     }
     fn tried_ports_contains(&self, rw_port_tree_id: &PortTreeID, port_no: PortNo) -> bool {
         self.tried_ports.get(rw_port_tree_id)
@@ -177,20 +175,14 @@ impl Traph {
     }
     pub fn get_untried_parent_element(&self, rw_port_tree_id: &PortTreeID, broken_path: Path) -> Option<TraphElement> {
         let _f = "get_untried_parent_element";
-        match self.get_parent_element() {
-            Err(_) => None,
-            Ok(element) => {
-                if element.is_on_broken_path(broken_path) ||
-                    element.is_broken()        ||
-                    !element.is_connected()    ||
-                    self.tried_ports_contains(rw_port_tree_id, element.get_port_no())
-                {
-                    None
-                } else {
-                    Some(element)
-                }
-            }
-        }
+        // println!("get_untried_parent_element - {}", self);
+        // dumpstack();
+        self.get_parent_element()
+            .ok()
+            .filter(|element| !element.is_on_broken_path(broken_path))
+            .filter(|element| !element.is_broken())
+            .filter(|element| element.is_connected())
+            .filter(|element| !self.tried_ports_contains(rw_port_tree_id, element.get_port_no()))
     }
     pub fn get_untried_pruned_element(&self, rw_port_tree_id: &PortTreeID, broken_path: Path) -> Option<TraphElement> {
         let _f = "get_untried_pruned_element";
@@ -313,7 +305,7 @@ impl Traph {
         let port_no = port_number.get_port_no();
         let mut stacked_trees = self.stacked_trees.lock().unwrap();
         let mut tree = stacked_trees
-            .get(&tree_id.get_uuid())
+            .get_mut(&tree_id.get_uuid())
             .cloned()
             .ok_or::<Error>(TraphError::Tree { func_name: _f, cell_id: self.cell_id.clone(), tree_uuid: tree_id.get_uuid() }.into() )?;
         let mut table_entry = tree.get_table_entry();
@@ -324,7 +316,7 @@ impl Traph {
             table_entry.set_parent(port_number);
         };
         tree.set_table_entry(table_entry);
-        stacked_trees.insert(tree_id.get_uuid(), tree);
+        stacked_trees.insert(tree_id.get_uuid(), tree.clone());
         let element = TraphElement::new(true, port_no, port_status, hops, path);
         // println!("update_element2 - {}", element);
         self.elements[*port_no as usize] = element; // Cannot fail because self.elements has MAX_PORTS elements
@@ -368,19 +360,19 @@ impl fmt::Display for Traph {
         let mut uuid = self.base_tree_id.get_uuid().to_string();
         uuid.truncate(8);
         let mut s = format!("Traph {}", self.base_tree_id);
-        s = s + &format!("\n  Stacked Trees");
+        write!(s, "\n  Stacked Trees")?;
         let locked = self.stacked_trees.lock().unwrap();
         for tree in locked.values() {
-            s = s + &format!("\n  {}", tree);
+            write!(s, "\n  {}", tree)?;
         }
-        s = s + &format!("\n  Port Trees");
+        write!(s, "\n  Port Trees")?;
         for port_tree in &self.port_trees {
-            s = s + &format!("\n  {}", port_tree.1);
+            write!(s, "\n  {}", port_tree.1)?;
         }
-        s = s + &format!("\n Port Connected Broken Status Hops Path");
+        write!(s, "\n Port Connected Broken Status Hops Path")?;
         // Can't replace with map() because s gets moved into closure
         for element in self.elements.iter() {
-            if element.is_connected() { s = s + &format!("\n{}",element); }
+            if element.is_connected() { write!(s, "\n{}",element)?; }
         }
         write!(f, "{}", s)
     }
@@ -394,12 +386,13 @@ pub enum PortStatus {
 }
 impl fmt::Display for PortStatus {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match *self {
-            PortStatus::Parent => write!(f, "Parent"),
-            PortStatus::Child  => write!(f, "Child "),
-            PortStatus::Pruned => write!(f, "Pruned"),
-            PortStatus::Broken => write!(f, "Broken")
-        }
+        let s = match *self {
+            PortStatus::Parent => "Parent",
+            PortStatus::Child  => "Child ",
+            PortStatus::Pruned => "Pruned",
+            PortStatus::Broken => "Broken"
+        };
+        write!(f, "{}", s)
     }
 }
 // Errors
