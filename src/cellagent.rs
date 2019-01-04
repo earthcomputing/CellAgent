@@ -267,23 +267,23 @@ impl CellAgent {
         locked.insert(sender_id.clone(), tree_map);
     }
     fn update_base_tree_map(&mut self, stacked_tree_id: &PortTreeID, base_tree_id: &TreeID) {
-        if DEBUG_OPTIONS.trace_all || DEBUG_OPTIONS.traph_state {   // Debug print
+        if DEBUG_OPTIONS.trace_all || DEBUG_OPTIONS.traph_entry {   // Debug print
             let _f = "update_base_tree_map";
             let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "ca_update_base_tree_map" };
             let trace = json!({ "cell_id": &self.cell_id, "stacked_tree_id": stacked_tree_id, "base_tree_id": base_tree_id, });
             let _ = dal::add_to_trace(TraceType::Debug, trace_params, &trace, _f);
-            if DEBUG_OPTIONS.traph_state { println!("Cellagent {}: {}: stacked tree {}, base tree {}", self.cell_id, _f, stacked_tree_id, base_tree_id); }
+            if DEBUG_OPTIONS.traph_entry { println!("Cellagent {}: {}: stacked tree {}, base tree {}", self.cell_id, _f, stacked_tree_id, base_tree_id); }
         }
         self.base_tree_map.insert(stacked_tree_id.clone(), base_tree_id.clone());
         self.tree_map.insert(stacked_tree_id.get_uuid(), base_tree_id.get_uuid());
     }
     fn get_base_tree_id(&self, port_tree_id: &PortTreeID) -> Result<TreeID, Error> {
         let _f = "get_base_tree_id";
-        if DEBUG_OPTIONS.trace_all || DEBUG_OPTIONS.traph_state {   // Debug print
+        if DEBUG_OPTIONS.trace_all || DEBUG_OPTIONS.traph_entry {   // Debug print
             let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "ca_get_base_tree_id" };
             let trace = json!({ "cell_id": &self.cell_id, "port_tree_id": port_tree_id });
             let _ = dal::add_to_trace(TraceType::Debug, trace_params, &trace, _f);
-            if DEBUG_OPTIONS.traph_state { println!("Cell {}: {}: stacked tree {}", self.cell_id, _f, port_tree_id); }
+            if DEBUG_OPTIONS.traph_entry { println!("Cell {}: {}: stacked tree {}", self.cell_id, _f, port_tree_id); }
         }
         self.base_tree_map
             .get(&port_tree_id)
@@ -313,7 +313,7 @@ impl CellAgent {
                         hops: PathLength, path: Path)
                         -> Result<RoutingTableEntry, Error> {
         let _f = "update_traph";
-        if DEBUG_OPTIONS.trace_all || DEBUG_OPTIONS.traph_state {
+        if DEBUG_OPTIONS.trace_all || DEBUG_OPTIONS.traph_entry {
             let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "ca_update_traph" };
             let trace = json!({ "cell_id": &self.cell_id,
                 "base_tree_id": base_tree_id, "port_number": &port_number, "hops": &hops,
@@ -348,11 +348,11 @@ impl CellAgent {
         if gvm_recv { children.insert(PortNumber::new0()); }
         let mut entry = traph.update_element(base_tree_id, port_number, entry_port_status, &children, updated_hops, path).context(CellagentError::Chain { func_name: "update_traph", comment: S("") })?;
         if gvm_send { entry.enable_send() } else { entry.disable_send() }
-        if DEBUG_OPTIONS.trace_all || DEBUG_OPTIONS.traph_state {
+        if DEBUG_OPTIONS.trace_all || DEBUG_OPTIONS.traph_entry {
             let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "ca_updated_traph_entry" };
             let trace = json!({ "cell_id": &self.cell_id, "base_tree_id": base_tree_id, "entry": &entry });
             let _ = dal::add_to_trace(TraceType::Debug, trace_params, &trace, _f);
-            if DEBUG_OPTIONS.traph_state { println!("CellAgent {}: entry {}", self.cell_id, entry); }
+            if DEBUG_OPTIONS.traph_entry { println!("CellAgent {}: entry {}", self.cell_id, entry); }
         }
         // Need traph even if cell only forwards on this tree
         self.update_entry(entry).context(CellagentError::Chain { func_name: _f, comment: S("base_tree_id") })?;
@@ -391,6 +391,12 @@ impl CellAgent {
             port_tree.set_entry(new_entry);
             traph.add_port_tree(port_tree);
             self.update_entry(new_entry)?;
+        }
+        if DEBUG_OPTIONS.trace_all || DEBUG_OPTIONS.traph_state {
+            let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "ca_traph" };
+            let trace = json!({ "cell_id": &self.cell_id,
+                "base_tree_id": base_tree_id, "traph": S(&traph) });
+            let _ = dal::add_to_trace(TraceType::Debug, trace_params, &trace, _f);
         }
         self.traphs.insert(base_tree_id.get_uuid(), traph);
         // TODO: Need to update entries of stacked trees following a failover but not as base tree builds out
