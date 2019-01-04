@@ -88,6 +88,7 @@ pub struct DebugOptions {
     pub saved_discover: bool,
     pub saved_msgs:     bool,
     pub stack_tree:     bool,
+    pub traph_entry:    bool,
     pub traph_state:    bool,
 }
 pub const DEBUG_OPTIONS: DebugOptions = DebugOptions {
@@ -109,6 +110,7 @@ pub const DEBUG_OPTIONS: DebugOptions = DebugOptions {
     saved_discover: false,
     saved_msgs:     false,
     stack_tree:     false,
+    traph_entry:    false,
     traph_state:    false,
 };
 // Size of various fields
