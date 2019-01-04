@@ -89,7 +89,6 @@ pub struct DebugOptions {
     pub saved_msgs:     bool,
     pub stack_tree:     bool,
     pub traph_entry:    bool,
-    pub traph_state:    bool,
 }
 pub const DEBUG_OPTIONS: DebugOptions = DebugOptions {
     trace_all:      true,
@@ -111,7 +110,6 @@ pub const DEBUG_OPTIONS: DebugOptions = DebugOptions {
     saved_msgs:     false,
     stack_tree:     false,
     traph_entry:    false,
-    traph_state:    false,
 };
 // Size of various fields
 #[derive(Debug, Clone, Hash, Eq, PartialEq, Serialize, Deserialize)]
