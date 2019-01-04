@@ -67,11 +67,12 @@ pub struct CellAgent {
     my_entry: RoutingTableEntry,
     connected_tree_entry: RoutingTableEntry,
     saved_discover: Vec<SavedDiscover>,
-    // Next 4 items shared between listen_uptree and listen_cmodel
+    // Next 2 items shared between listen_uptree and listen_cmodel
     saved_msgs: Arc<Mutex<SavedMsgs>>,
+    tree_name_map: Arc<Mutex<TreeNameMap>>,
     saved_stack: SavedStackMsgs,
     traphs: Traphs,
-    tree_name_map: Arc<Mutex<TreeNameMap>>,
+    traphs_mutex: Arc<Mutex<Traphs>>, // Used to show traphs on the console
     tree_map: TreeMap, // Base tree for given stacked tree
     border_port_tree_id_map: BorderTreeIDMap, // Find the tree id associated with a border port
     base_tree_map: HashMap<PortTreeID, TreeID>, // Find the black tree associated with any tree, needed for stacking
@@ -98,10 +99,10 @@ impl CellAgent {
             .add_component(CONNECTED_PORTS_TREE_NAME)?;
         let mut base_tree_map = HashMap::new();
         base_tree_map.insert(my_tree_id.to_port_tree_id_0(), my_tree_id.clone());
-        Ok(CellAgent { cell_id: cell_id.clone(), my_tree_id, cell_type, config,
+        Ok(CellAgent { cell_id: cell_id.clone(), my_tree_id, cell_type, config, no_ports,
             control_tree_id, connected_tree_id, tree_vm_map: HashMap::new(), ca_to_vms: HashMap::new(),
-            no_ports, traphs: HashMap::new(), vm_id_no: 0, tree_id_map: HashMap::new(),
-            tree_map: HashMap::new(),
+            traphs: HashMap::new(), traphs_mutex: Arc::new(Mutex::new(HashMap::new())),
+            vm_id_no: 0, tree_id_map: HashMap::new(), tree_map: HashMap::new(),
             tree_name_map: Arc::new(Mutex::new(HashMap::new())), border_port_tree_id_map: HashMap::new(),
             saved_msgs: Arc::new(Mutex::new(HashMap::new())), saved_discover: Vec::new(),
             saved_stack: HashMap::new(),
@@ -392,12 +393,7 @@ impl CellAgent {
             traph.add_port_tree(port_tree);
             self.update_entry(new_entry)?;
         }
-        if DEBUG_OPTIONS.trace_all || DEBUG_OPTIONS.traph_state {
-            let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "ca_traph" };
-            let trace = json!({ "cell_id": &self.cell_id,
-                "base_tree_id": base_tree_id, "traph": S(&traph) });
-            let _ = dal::add_to_trace(TraceType::Debug, trace_params, &trace, _f);
-        }
+        self.traphs_mutex.lock().unwrap().insert(base_tree_id.get_uuid(), traph.clone());
         self.traphs.insert(base_tree_id.get_uuid(), traph);
         // TODO: Need to update entries of stacked trees following a failover but not as base tree builds out
         //let entries = traph.update_stacked_entries(entry).context(CellagentError::Chain { func_name: _f, comment: S("") })?;
@@ -1423,7 +1419,7 @@ impl CellAgent {
 impl fmt::Display for CellAgent {
     fn fmt(&self, _f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let mut s = format!("Cell Agent {}", self.cell_info);
-        for (_, traph) in self.traphs.iter() {
+        for (_, traph) in self.traphs_mutex.lock().unwrap().iter() {
             write!(s, "\n{}", traph)?;
         }
         write!(_f, "{}", s) }
