@@ -61,10 +61,10 @@ impl Traph {
         self.get_parent_element()
             .map(|element| element.get_hops())
     }
-    pub fn add_port_tree(&mut self, port_tree: PortTree) -> PortTreeID {
+    pub fn add_port_tree(&mut self, port_tree: &PortTree) -> PortTreeID {
         let _f = "add_port_tree";
         if self.port_tree_id.is_none() { self.port_tree_id = Some(port_tree.get_port_tree_id().clone()); }
-        self.port_trees.insert(port_tree.get_port_tree_id().clone(), port_tree); // Duplicate inserts do no harm
+        self.port_trees.insert(port_tree.get_port_tree_id().clone(), port_tree.clone()); // Duplicate inserts do no harm
         self.port_tree_id.clone().unwrap() // Unwrap is guaranteed to be safe by first line
     }
     pub fn get_elements(&self) -> Iter<'_, TraphElement> { self.elements.iter() }
@@ -230,30 +230,13 @@ impl Traph {
                     port_tree_id: &PortTreeID,
                     child: PortNumber) -> Result<Vec<RoutingTableEntry>, Error> {
         let _f = "add_or_remove_child";
-        let tree_id = &port_tree_id.to_tree_id();
-        let tree_entry = self.tree_apply_update(port_tree_fn, tree_fn, tree_id, child).context(TraphError::Chain { func_name: _f, comment: S("") })?;
-        let port_tree_entry = self.port_tree_apply_update(port_tree_fn, tree_fn, port_tree_id, child).context(TraphError::Chain { func_name: _f, comment: S("") })?;
-        let mut stacked_tree_entries = self.stacked_tree_apply_update(port_tree_fn, tree_fn, port_tree_id, child)?;
-        stacked_tree_entries.push(tree_entry);
+        let port_tree_entry = self.port_tree_apply_update(port_tree_fn, port_tree_id, child).context(TraphError::Chain { func_name: _f, comment: S("") })?;
+        let mut stacked_tree_entries = self.stacked_tree_apply_update(tree_fn, child)?;
         stacked_tree_entries.push(port_tree_entry);
         Ok(stacked_tree_entries)
     }
-    fn tree_apply_update(&mut self,
-                    port_tree_fn: fn(&mut PortTree, PortNumber) -> RoutingTableEntry,
-                    _tree_fn: fn(&mut Tree, PortNumber) -> RoutingTableEntry,
-                    tree_id: &TreeID,
-                    child: PortNumber) -> Result<RoutingTableEntry, Error> {
-        let _f = "tree_apply_update";
-        let port_tree_id = tree_id.to_port_tree_id_0();
-        let tree_entry = self.port_trees  // Table entry for tree
-            .get_mut(&port_tree_id)
-            .map(|port_tree| port_tree_fn(port_tree, child))
-            .ok_or::<Error>(TraphError::Tree { func_name: _f, cell_id: self.cell_id.clone(), tree_uuid: port_tree_id.get_uuid() }.into() )?;
-        Ok(tree_entry)
-    }
     fn port_tree_apply_update(&mut self,
                     port_tree_fn: fn(&mut PortTree, PortNumber) -> RoutingTableEntry,
-                    _tree_fn: fn(&mut Tree, PortNumber) -> RoutingTableEntry,
                     port_tree_id: &PortTreeID,
                     child: PortNumber) -> Result<RoutingTableEntry, Error> {
         let _f = "port_tree_apply_update";
@@ -264,12 +247,12 @@ impl Traph {
         Ok(port_tree_entry)
     }
     fn stacked_tree_apply_update(&mut self,
-                    _port_tree_fn: fn(&mut PortTree, PortNumber) -> RoutingTableEntry,
                     tree_fn: fn(&mut Tree, PortNumber) -> RoutingTableEntry,
-                    _port_tree_id: &PortTreeID,
                     child: PortNumber) -> Result<Vec<RoutingTableEntry>, Error> {
         let _f = "stacked_tree_apply_update";
-        let stacked_tree_entries = self.stacked_trees.lock().unwrap()
+        let stacked_tree_entries = self.stacked_trees
+            .lock()
+            .unwrap()
             .values_mut()
             .map(|stacked_tree| tree_fn(stacked_tree, child))
             .collect::<Vec<_>>();
@@ -278,15 +261,8 @@ impl Traph {
     pub fn swap_child(&mut self, port_tree_id: &PortTreeID, old_child: PortNumber, new_child: PortNumber)
             -> Result<Vec<RoutingTableEntry>, Error> {
         let _f = "swap_child";
-        let tree_id = &port_tree_id.to_tree_id();
-        self.tree_apply_update(PortTree::remove_child, Tree::remove_child, tree_id, old_child).context(TraphError::Chain { func_name: _f, comment: S("tree remove") })?;
-        let tree_entry = self.tree_apply_update(PortTree::add_child, Tree::add_child, tree_id, new_child).context(TraphError::Chain { func_name: _f, comment: S("tree add") })?;
-        self.port_tree_apply_update(PortTree::remove_child, Tree::remove_child, port_tree_id, old_child).context(TraphError::Chain { func_name: _f, comment: S("port tree remove") })?;
-        let port_tree_entry = self.port_tree_apply_update(PortTree::add_child, Tree::add_child, port_tree_id, new_child).context(TraphError::Chain { func_name: _f, comment: S("port tree add") })?;
-        self.stacked_tree_apply_update(PortTree::remove_child, Tree::remove_child, port_tree_id, old_child).context(TraphError::Chain { func_name: _f, comment: S("stack tree remove") })?;
-        let mut stacked_tree_entries = self.stacked_tree_apply_update(PortTree::add_child, Tree::add_child, port_tree_id, new_child).context(TraphError::Chain { func_name: _f, comment: S("stack tree add") })?;
-        stacked_tree_entries.append(&mut vec![tree_entry, port_tree_entry]);
-        Ok(stacked_tree_entries)
+        self.remove_child(port_tree_id, old_child)?;
+        self.add_child(port_tree_id, new_child)
     }
     pub fn add_child(&mut self, port_tree_id: &PortTreeID, child: PortNumber) -> Result<Vec<RoutingTableEntry>, Error> {
         let _f = "add_child";

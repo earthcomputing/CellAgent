@@ -1,7 +1,7 @@
 use std::fmt;
 
 use crate::config::{PathLength, PortNo};
-use crate::name::{PortTreeID, TreeID};
+use crate::name::{PortTreeID};
 use crate::routing_table_entry::RoutingTableEntry;
 use crate::utility::{PortNumber};
 
@@ -14,10 +14,10 @@ pub struct PortTree {
     entry: RoutingTableEntry
 }
 impl PortTree {
-    pub fn new(tree_id: &TreeID, root_port_number: PortNumber, in_port_no: PortNo, hops: PathLength)
+    pub fn new(port_tree_id: &PortTreeID, in_port_no: PortNo, hops: PathLength)
             -> PortTree {
-        let port_tree_id = tree_id.to_port_tree_id(root_port_number);
-        PortTree { port_tree_id, root_port_no: root_port_number.get_port_no(),
+        let root_port_no = port_tree_id._get_port_no();
+        PortTree { port_tree_id: port_tree_id.clone(), root_port_no,
                    in_port_no, hops, entry: RoutingTableEntry::default() }
     }
     pub fn get_port_tree_id(&self) -> &PortTreeID { &self.port_tree_id }
