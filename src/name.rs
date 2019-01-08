@@ -113,7 +113,7 @@ impl PortTreeID {
 impl Name for PortTreeID {
     fn get_name(&self) -> &str { &self.name }
     fn get_uuid(&self) -> Uuid { self.uuid }
-    fn create_from_string(&self, name: &str) -> PortTreeID { unimplemented!() }
+    fn create_from_string(&self, _name: &str) -> PortTreeID { unimplemented!() }
 }
 impl fmt::Display for PortTreeID {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
