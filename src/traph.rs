@@ -36,9 +36,11 @@ impl Traph {
             let port_number = PortNo(i as u8).make_port_number(MAX_PORTS).context(TraphError::Chain { func_name: "new", comment: S("")})?;
             elements.push(TraphElement::default(port_number));
         }
-        let entry = RoutingTableEntry::default();
+        let mut entry = RoutingTableEntry::default();
+        entry.add_child(PortNumber::new0());
         let black_port_tree_id = black_tree_id.to_port_tree_id_0();
-        let black_tree = Tree::new(&black_port_tree_id, black_tree_id, &black_port_tree_id, gvm_eqn, entry);
+        let black_tree = Tree::new(&black_port_tree_id, black_tree_id,
+                                   &black_port_tree_id, gvm_eqn, entry);
         let stacked_trees = Arc::new(Mutex::new(HashMap::new()));
         {
             let mut locked = stacked_trees.lock().unwrap();
@@ -77,7 +79,9 @@ impl Traph {
             .find(|element| element.get_port_no() == port_no)
             .ok_or(TraphError::PortElement { func_name: _f, cell_id: self.cell_id.clone(), port_no: *port_no }.into())
     }
-    pub fn own_port_tree(&mut self, port_tree_id: &PortTreeID) -> Option<PortTree> { self.port_trees.remove(port_tree_id) }
+    pub fn own_port_tree(&mut self, port_tree_id: &PortTreeID) -> Option<PortTree> {
+        self.port_trees.remove(port_tree_id)
+    }
     pub fn get_port_trees(&self) -> &HashMap<PortTreeID, PortTree> { &self.port_trees }
     pub fn clear_tried_ports(&mut self, rw_port_tree_id: &PortTreeID) {
         self.tried_ports.insert(rw_port_tree_id.clone(), HashSet::new());
