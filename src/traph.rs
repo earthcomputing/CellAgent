@@ -79,6 +79,16 @@ impl Traph {
             .find(|element| element.get_port_no() == port_no)
             .ok_or(TraphError::PortElement { func_name: _f, cell_id: self.cell_id.clone(), port_no: *port_no }.into())
     }
+    pub fn get_port_tree(&self, port_number: &PortNumber) -> &PortTree {
+        let _f = "get_port_tree";
+        let port_no = port_number.get_port_no();
+        self.port_trees
+            .values()
+            .filter(|&port_tree| *port_tree._get_in_port_no() == port_no)
+            .filter(|&port_tree| port_tree.get_entry().get_parent() == port_no)
+            .next()
+            .expect(&S(TraphError::PortTree { func_name: _f, cell_id: self.cell_id.clone(), port_no: *port_no }) )
+    }
     pub fn own_port_tree(&mut self, port_tree_id: &PortTreeID) -> Option<PortTree> {
         self.port_trees.remove(port_tree_id)
     }
@@ -215,18 +225,23 @@ impl Traph {
             .filter(|&element| !element.is_broken())
             .cloned()
     }
-    pub fn set_parent(&mut self, new_parent: PortNumber, port_tree_id: &PortTreeID) -> Result<(), Error> {
+    pub fn set_parent(&mut self, new_parent: PortNumber, port_tree_id: &PortTreeID)
+            -> Result<Vec<RoutingTableEntry>, Error> {
         let _f = "set_parent";
         let mut parent_element = self.get_parent_element()?;
-        let new_port_no = new_parent.get_port_no();
-        if *parent_element.get_port_no() != *new_port_no {
+        let new_parent_port_no = new_parent.get_port_no();
+        if *parent_element.get_port_no() != *new_parent_port_no {
             parent_element.mark_pruned();
-            self.elements[*new_port_no as usize].mark_parent();
+            self.elements[*new_parent_port_no as usize].mark_parent();
             self.port_trees.get_mut(port_tree_id)
                 .map(|port_tree| port_tree.set_parent(new_parent))
                 .ok_or::<Error>(TraphError::ParentElement { func_name: _f, cell_id: self.cell_id.clone(), tree_id: port_tree_id.to_tree_id()}.into() )?;
         }
-        Ok(())
+        let entries = self.stacked_trees.lock().unwrap()
+            .values_mut()
+            .map(|tree| tree.set_parent(new_parent))
+            .collect::<Vec<_>>();
+        Ok(entries)
     }
     fn apply_update(&mut self,
                     port_tree_fn: fn(&mut PortTree, PortNumber) -> RoutingTableEntry,
@@ -262,19 +277,27 @@ impl Traph {
             .collect::<Vec<_>>();
         Ok(stacked_tree_entries)
     }
-    pub fn swap_child(&mut self, port_tree_id: &PortTreeID, old_child: PortNumber, new_child: PortNumber)
-            -> Result<Vec<RoutingTableEntry>, Error> {
+    pub fn change_child(&mut self, port_tree_id: &PortTreeID, old_child: PortNumber, new_child: PortNumber)
+                        -> Result<Vec<RoutingTableEntry>, Error> {
         let _f = "swap_child";
         self.remove_child(port_tree_id, old_child)?;
         self.add_child(port_tree_id, new_child)
     }
-    pub fn add_child(&mut self, port_tree_id: &PortTreeID, child: PortNumber) -> Result<Vec<RoutingTableEntry>, Error> {
+    pub fn add_child(&mut self, port_tree_id: &PortTreeID, child: PortNumber)
+            -> Result<Vec<RoutingTableEntry>, Error> {
         let _f = "add_child";
         self.apply_update(PortTree::add_child, Tree::add_child, port_tree_id, child)
     }
-    pub fn remove_child(&mut self, port_tree_id: &PortTreeID, child: PortNumber) -> Result<Vec<RoutingTableEntry>, Error> {
+    pub fn remove_child(&mut self, port_tree_id: &PortTreeID, child: PortNumber)
+            -> Result<Vec<RoutingTableEntry>, Error> {
         let _f = "remove_child";
         self.apply_update(PortTree::remove_child, Tree::remove_child, port_tree_id, child)
+    }
+    pub fn make_child_parent(&mut self, port_tree_id: &PortTreeID, child: PortNumber)
+            -> Result<Vec<RoutingTableEntry>, Error> {
+        let _f = "make_child_parent";
+        self.apply_update(PortTree::make_child_parent, Tree::make_child_parent,
+            port_tree_id, child)
     }
     pub fn update_element(&mut self, tree_id: &TreeID, port_number: PortNumber, port_status: PortStatus,
                           children: &HashSet<PortNumber>, hops: PathLength, path: Path)
@@ -387,6 +410,8 @@ pub enum TraphError {
     ParentElement { func_name: &'static str, cell_id: CellID, tree_id: TreeID },
     #[fail(display = "TraphError::PortElement {}: No element for port {} on cell {}", func_name, port_no, cell_id)]
     PortElement { func_name: &'static str, cell_id: CellID, port_no: u8 },
+    #[fail(display = "TraphError::PortTree {}: No port tree with ID {} on cell {}", func_name, port_no, cell_id)]
+    PortTree { func_name: &'static str, cell_id: CellID, port_no: u8 },
     #[fail(display = "TraphError::Tree {}: No tree with UUID {} on cell {}", func_name, tree_uuid, cell_id)]
     Tree { func_name: &'static str, cell_id: CellID, tree_uuid: Uuid }
 }

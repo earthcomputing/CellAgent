@@ -31,20 +31,23 @@ impl Tree {
     pub fn get_uuid(&self) -> Uuid { self.port_tree_id.get_uuid() }
     pub fn get_table_entry(&self) -> RoutingTableEntry { self.table_entry }
     pub fn set_table_entry(&mut self, entry: RoutingTableEntry) { self.table_entry = entry; }
-    //pub fn get_table_index(&self) -> TableIndex { self.table_entry.get_index() }
     pub fn get_gvm_eqn(&self) -> &GvmEquation { &self.gvm_eqn }
     pub fn has_child(&self, child: PortNumber) -> bool { self.table_entry.has_child(child) }
     pub fn add_child(&mut self, child: PortNumber) -> RoutingTableEntry { self.table_entry.add_child(child) }
-    pub fn remove_child(&mut self, child: PortNumber) -> RoutingTableEntry { self.table_entry.remove_child(child) }
+    pub fn remove_child(&mut self, child: PortNumber) -> RoutingTableEntry {
+        self.table_entry.remove_child(child)
+    }
+    pub fn make_child_parent(&mut self, child: PortNumber) -> RoutingTableEntry {
+        self.remove_child(child);
+        self.set_parent(child)
+    }
     //pub fn set_gvm_eqn(&mut self, gvm_eqn: GvmEquation) { self.gvm_eqn = gvm_eqn; }
     //pub fn get_parent(&self) -> PortNo { self.get_table_entry().get_parent() }
-    //pub fn set_parent(&mut self, port_number: PortNumber) { self.get_table_entry().set_parent(port_number); }
-    //pub fn add_children(&mut self, children: &HashSet<PortNumber>) {
-    //    self.get_table_entry().add_children(children);
-    //}
-    //pub fn add_other_index(&mut self, port_number: PortNumber, other_index: TableIndex) {
-    //    self.get_table_entry().add_other_index(port_number, other_index)
-    //}
+    pub fn set_parent(&mut self, port_number: PortNumber) -> RoutingTableEntry {
+        let mut entry = self.table_entry;
+        entry.set_parent(port_number);
+        entry
+    }
     //pub fn set_inuse(&mut self) { self.get_table_entry().set_inuse(); }
 }
 impl fmt::Display for Tree {

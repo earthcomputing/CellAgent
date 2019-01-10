@@ -283,12 +283,13 @@ impl fmt::Display for DiscoverMsg {
 pub struct DiscoverPayload {
     port_tree_id: PortTreeID,
     sending_cell_id: CellID,
+    root_port_no: PortNo,
     hops: PathLength,
     path: Path,
     gvm_eqn: GvmEquation,
 }
 impl DiscoverPayload {
-    fn new(tree_id: &PortTreeID, sending_cell_id: &CellID, hops: PathLength, path: Path)
+    fn new(port_tree_id: &PortTreeID, sending_cell_id: &CellID, hops: PathLength, path: Path)
             -> DiscoverPayload {
         let mut eqns = HashSet::new();
         eqns.insert(GvmEqn::Recv("true"));
@@ -296,14 +297,16 @@ impl DiscoverPayload {
         eqns.insert(GvmEqn::Xtnd("true"));
         eqns.insert(GvmEqn::Save("false"));
         let gvm_eqn = GvmEquation::new(&eqns, &Vec::new());
-        DiscoverPayload { port_tree_id: tree_id.clone(), sending_cell_id: sending_cell_id.clone(),
-            hops, path, gvm_eqn }
+        let root_port_no = port_tree_id.get_port_no();
+        DiscoverPayload { port_tree_id: port_tree_id.clone(), sending_cell_id: sending_cell_id.clone(),
+            root_port_no, hops, path, gvm_eqn }
     }
     //fn get_sending_cell(&self) -> CellID { self.sending_cell_id.clone() }
     pub fn get_hops(&self) -> PathLength { self.hops }
     pub fn hops_plus_one(&self) -> PathLength { PathLength(CellNo(**self.hops + 1)) }
     pub fn get_path(&self) -> Path { self.path }
     pub fn get_port_tree_id(&self) -> &PortTreeID { &self.port_tree_id }
+    pub fn get_root_port_no(&self) -> PortNo { self.root_port_no }
     pub fn set_hops(&mut self, hops: PathLength) { self.hops = hops; }
     pub fn set_path(&mut self, path: Path) { self.path = path; }
     pub fn set_sending_cell(&mut self, sending_cell_id: CellID) { self.sending_cell_id = sending_cell_id; }
@@ -311,7 +314,7 @@ impl DiscoverPayload {
 impl MsgPayload for DiscoverPayload {}
 impl fmt::Display for DiscoverPayload {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let s = format!("Tree {}, sending cell {}, hops {}, path {}", self.port_tree_id,
+        let s = format!("Port tree {}, sending cell {}, hops {}, path {}", self.port_tree_id,
                         self.sending_cell_id, **self.hops, self.path);
         write!(f, "{}", s)
     }
@@ -357,11 +360,14 @@ pub struct DiscoverDPayload {
     in_reply_to: MsgID,
     sending_cell_id: CellID,
     port_tree_id: PortTreeID,
+    root_port_no: PortNo,
     path: Path
 }
 impl DiscoverDPayload {
     fn new(in_reply_to: MsgID, sending_cell_id: &CellID, port_tree_id: &PortTreeID, path: Path) -> DiscoverDPayload {
-        DiscoverDPayload { in_reply_to, sending_cell_id: sending_cell_id.clone(), port_tree_id: port_tree_id.clone(), path }
+        let root_port_no = port_tree_id.get_port_no();
+        DiscoverDPayload { in_reply_to, sending_cell_id: sending_cell_id.clone(), port_tree_id: port_tree_id.clone(),
+            path, root_port_no }
     }
     pub fn get_port_tree_id(&self) -> &PortTreeID { &self.port_tree_id }
     pub fn get_path(&self) -> Path { self.path }
@@ -379,7 +385,7 @@ pub struct FailoverMsg {
 }
 impl FailoverMsg {
     pub fn new(sender_id: &SenderID, rw_port_tree_id: &PortTreeID, lw_port_tree_id: &PortTreeID,
-               path: Path, broken_tree_ids: &HashSet<TreeID>) -> FailoverMsg {
+               path: Path, broken_tree_ids: &HashSet<PortTreeID>) -> FailoverMsg {
         // Note that direction is leafward so we can use the connected ports tree
         // If we send rootward, then the first recipient forwards the FailoverMsg
         let header = MsgHeader::new(sender_id, true,MsgType::Failover, MsgDirection::Leafward);
@@ -415,11 +421,11 @@ impl fmt::Display for FailoverMsg {
 pub struct FailoverMsgPayload {
     rw_port_tree_id: PortTreeID,
     lw_port_tree_id: PortTreeID,
-    broken_tree_ids: HashSet<TreeID>,
+    broken_tree_ids: HashSet<PortTreeID>,
     broken_path: Path
 }
 impl FailoverMsgPayload {
-    fn new(rw_port_tree_id: &PortTreeID, lw_port_tree_id: &PortTreeID, broken_tree_ids: &HashSet<TreeID>, path: Path)
+    fn new(rw_port_tree_id: &PortTreeID, lw_port_tree_id: &PortTreeID, broken_tree_ids: &HashSet<PortTreeID>, path: Path)
             -> FailoverMsgPayload {
         FailoverMsgPayload { rw_port_tree_id: rw_port_tree_id.clone(), lw_port_tree_id: lw_port_tree_id.clone(),
             broken_tree_ids: broken_tree_ids.clone(),
@@ -428,7 +434,7 @@ impl FailoverMsgPayload {
     }
     pub fn get_rw_port_tree_id(&self) -> &PortTreeID { &self.rw_port_tree_id }
     pub fn get_lw_port_tree_id(&self) -> &PortTreeID { &self.lw_port_tree_id }
-    pub fn get_broken_tree_ids(&self) -> &HashSet<TreeID> { &self.broken_tree_ids }
+    pub fn get_broken_port_tree_ids(&self) -> &HashSet<PortTreeID> { &self.broken_tree_ids }
     pub fn get_broken_path(&self) -> Path { self.broken_path }
 }
 impl MsgPayload for FailoverMsgPayload {}
