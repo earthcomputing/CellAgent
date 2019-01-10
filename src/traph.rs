@@ -6,7 +6,7 @@ use std::{fmt, fmt::Write,
 use serde_json;
 //use uuid::Uuid;
 
-use crate::config::{MAX_PORTS, PathLength, PortNo};
+use crate::config::{PathLength, PortNo};
 //use dumpstack::{dumpstack};
 use crate::gvm_equation::{GvmEquation, GvmVariable, GvmVariableType};
 use crate::name::{Name, CellID, PortTreeID, TreeID};
@@ -32,8 +32,8 @@ pub struct Traph {
 impl Traph {
     pub fn new(cell_id: &CellID, no_ports: PortNo, black_tree_id: &TreeID, gvm_eqn: &GvmEquation) -> Result<Traph, Error> {
         let mut elements = Vec::new();
-        for i in 1..=*no_ports {
-            let port_number = PortNo(i as u8).make_port_number(MAX_PORTS).context(TraphError::Chain { func_name: "new", comment: S("")})?;
+        for i in 0..=*no_ports {
+            let port_number = PortNo(i as u8).make_port_number(no_ports).context(TraphError::Chain { func_name: "new", comment: S("")})?;
             elements.push(TraphElement::default(port_number));
         }
         let mut entry = RoutingTableEntry::default();
@@ -75,8 +75,8 @@ impl Traph {
     }
     pub fn get_element(&self, port_no: PortNo) -> Result<&TraphElement, Error> {
         let _f = "get_element";
-        self.get_elements()
-            .find(|element| element.get_port_no() == port_no)
+        self.elements
+            .get(*port_no as usize)
             .ok_or(TraphError::PortElement { func_name: _f, cell_id: self.cell_id.clone(), port_no: *port_no }.into())
     }
     pub fn get_port_tree(&self, port_number: &PortNumber) -> &PortTree {
