@@ -808,6 +808,8 @@ impl CellAgent {
     }
     pub fn process_failover_msg(&mut self, msg: &FailoverMsg, port_no: PortNo) -> Result<(), Error> {
         let _f = "process_failover_msg";
+        let cell_id = self.cell_id.clone();
+        let my_tree_id = self.my_tree_id.clone();
         let no_ports = self.no_ports;
         let header = msg.get_header();
         let payload = msg.get_payload();
@@ -816,9 +818,8 @@ impl CellAgent {
         let rw_tree_id = rw_port_tree_id.to_tree_id();
         let lw_port_tree_id = payload.get_lw_port_tree_id();
         let port_number = port_no.make_port_number(self.no_ports)?;
-        let my_tree_id = self.my_tree_id.clone();
         if rw_tree_id == my_tree_id {
-            println!("Cellagent {}: {} found path to rootward for port tree {}", self.cell_id, _f, rw_port_tree_id);
+            println!("Cellagent {}: {} found path to rootward for port tree {}", cell_id, _f, rw_port_tree_id);
             let broken_port_tree_ids = payload.get_broken_port_tree_ids();
             let lw_traph = self.get_traph(&lw_port_tree_id).context(CellagentError::Chain { func_name: _f, comment: S("lw_traph") })?;
             let broken_element = lw_traph.get_parent_element().context(CellagentError::Chain { func_name: _f, comment: S("lw element") })?;
@@ -827,8 +828,10 @@ impl CellAgent {
             let broken_port_number = broken_port_no.make_port_number(no_ports)?;
             my_traph.mark_broken(broken_port_number);
             let changed_entries = my_traph.change_child(rw_port_tree_id, broken_port_number, port_number)?;
-            //println!("CellAgent {}: {}", self.cell_id, _f);
-            //crate::utility::print_vec(&changed_entries);
+            println!("CellAgent {}: {}", cell_id, _f);
+            crate::utility::print_vec(&changed_entries);
+            let my_traph = my_traph.clone();
+            self.traphs_mutex.lock().unwrap().insert(my_tree_id.get_uuid(), my_traph);
             for entry in changed_entries { self.update_entry(entry)?; }
             let mask = Mask::new(port_number);
             let in_reply_to = msg.get_msg_id();
@@ -1271,7 +1274,7 @@ impl CellAgent {
             .map(|traph| { traph.set_broken(port_number); traph })
             .filter(|traph| { traph.has_broken_parent() })
             .map(|broken_parent_traph| {
-                let broken_port_tree = broken_parent_traph.get_port_tree(&port_number);
+                let broken_port_tree = broken_parent_traph.get_port_tree_by_port_number(&port_number);
                 broken_port_tree_ids.insert(broken_port_tree.get_port_tree_id().clone());
                 broken_parent_traph.clone()
             })

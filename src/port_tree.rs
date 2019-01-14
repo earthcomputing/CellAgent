@@ -23,7 +23,7 @@ impl PortTree {
     }
     pub fn get_port_tree_id(&self) -> &PortTreeID { &self.port_tree_id }
     pub fn get_root_port_no(&self) -> &PortNo { &self.root_port_no }
-    pub fn _get_in_port_no(&self) -> &PortNo { &self.in_port_no }
+    pub fn get_in_port_no(&self) -> &PortNo { &self.in_port_no }
     pub fn _get_hops(&self) -> &PathLength { &self.hops }
     pub fn get_entry(&self) -> RoutingTableEntry { self.entry }
     pub fn has_child(&self, child: PortNumber) -> bool { self.entry.has_child(child) }
