@@ -58,6 +58,13 @@ impl Traph {
          self.stacked_trees.lock().unwrap().get(tree_uuid).cloned()
             .ok_or(TraphError::Tree { cell_id: self.cell_id.clone(), func_name: _f, tree_uuid: *tree_uuid }.into())
     }
+    pub fn get_port_tree(&self, port_tree_id: &PortTreeID) -> Result<&PortTree, Error> {
+        let _f = "get_port_tree";
+        let port_no = port_tree_id.get_port_no();
+        self.port_trees
+            .get(port_tree_id)
+            .ok_or(TraphError::PortTree { cell_id: self.cell_id.clone(), func_name: _f, port_no: *port_no }.into())
+    }
     pub fn get_base_tree_id(&self) -> &TreeID { &self.base_tree_id }
     pub fn get_hops(&self) -> Result<PathLength, Error> {
         self.get_parent_element()
@@ -79,12 +86,12 @@ impl Traph {
             .get(*port_no as usize)
             .ok_or(TraphError::PortElement { func_name: _f, cell_id: self.cell_id.clone(), port_no: *port_no }.into())
     }
-    pub fn get_port_tree(&self, port_number: &PortNumber) -> &PortTree {
+    pub fn get_port_tree_by_port_number(&self, port_number: &PortNumber) -> &PortTree {
         let _f = "get_port_tree";
         let port_no = port_number.get_port_no();
         self.port_trees
             .values()
-            .filter(|&port_tree| *port_tree._get_in_port_no() == port_no)
+            .filter(|&port_tree| *port_tree.get_in_port_no() == port_no)
             .filter(|&port_tree| port_tree.get_entry().get_parent() == port_no)
             .next()
             .expect(&S(TraphError::PortTree { func_name: _f, cell_id: self.cell_id.clone(), port_no: *port_no }) )
@@ -259,11 +266,10 @@ impl Traph {
                     port_tree_id: &PortTreeID,
                     child: PortNumber) -> Result<RoutingTableEntry, Error> {
         let _f = "port_tree_apply_update";
-        let port_tree_entry = self.port_trees  // Table entry for port_tree
+        self.port_trees  // Table entry for port_tree
             .get_mut(port_tree_id)
             .map(|port_tree| port_tree_fn(port_tree, child))
-            .ok_or::<Error>(TraphError::Tree { func_name: _f, cell_id: self.cell_id.clone(), tree_uuid: port_tree_id.get_uuid() }.into() )?;
-        Ok(port_tree_entry)
+            .ok_or::<Error>(TraphError::Tree { func_name: _f, cell_id: self.cell_id.clone(), tree_uuid: port_tree_id.get_uuid() }.into())
     }
     fn stacked_tree_apply_update(&mut self,
                     tree_fn: fn(&mut Tree, PortNumber) -> RoutingTableEntry,
