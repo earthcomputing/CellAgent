@@ -42,21 +42,19 @@ mod uuid_ec;
 mod vm;
 
 use std::{io::{stdin, stdout, Read, Write},
-          collections::{HashMap, HashSet},
+          collections::{HashSet},
           fs::{File, OpenOptions, create_dir, remove_dir_all},
           path::Path,
           sync::mpsc::channel};
 
 use crate::blueprint::Blueprint;
-use crate::config::{AUTO_BREAK, NCELLS, NPORTS, NLINKS,
+use crate::config::{AUTO_BREAK, NPORTS, NLINKS,
                     OUTPUT_DIR_NAME, OUTPUT_FILE_NAME, QUENCH,
-                    get_edges, CellNo, PortNo};
+                    CellNo};
 use crate::datacenter::Datacenter;
-use crate::ecargs::{ECArgs};
 use crate::gvm_equation::{GvmEqn};
-use crate::message_types::{OutsideFromNoc, OutsideToNoc, NocFromOutside, NocToOutside};
+use crate::message_types::{OutsideToNoc};
 use crate::nalcell::CellConfig;
-use crate::noc::Noc;
 use crate::uptree_spec::{AllowedTree, ContainerSpec, Manifest, UpTreeSpec, VmSpec};
 use crate::utility::{print_vec, S, TraceHeader};
 
@@ -69,6 +67,7 @@ fn main() -> Result<(), Error> {
     println!("Multicell Routing: Output to file {} (set in config.rs)", OUTPUT_FILE_NAME);
     println!("{:?} Quenching of Discover messages", QUENCH);
     /* Can't get records from main() to show up in trace file
+        use crate::config::{NCELLS};
         let (rows, cols, geometry) = config::get_geometry();
         {
             // For reasons I can't understand, the trace record doesn't show up when generated from main.
@@ -78,34 +77,11 @@ fn main() -> Result<(), Error> {
         }
     */
     let _ = OpenOptions::new().write(true).truncate(true).open(OUTPUT_FILE_NAME);
-    /* Doesn't work when debugging in Eclipse
-    let args: Vec<String> = env::args().collect();
-    println!("Main: args {:?}",args);
-    let ecargs = match ECArgs::get_args(args) {
-        Ok(e) => e,
-        Err(err) => panic!("Argument Error: {}",err)
-    };
-*/
-    let ecargs = match ECArgs::new(NCELLS, NPORTS, *NLINKS) {
-        Ok(a) => a,
-        Err(err) => panic!("Argument Error: {}", err)
-    };
-    let (ncells, nports) = ecargs.get_args();
-    println!("\nMain: {} ports for each of {} cells", *nports, *ncells);
-    let edges = get_edges();
-    let mut exceptions = HashMap::new();
-    exceptions.insert(CellNo(5), PortNo(7));
-    exceptions.insert(CellNo(2), PortNo(6));
-    let mut border = HashMap::new();
-    border.insert(CellNo(2), vec![PortNo(2)]);
-    border.insert(CellNo(7), vec![PortNo(2)]);
-    let blueprint = Blueprint::new(ncells, nports, edges, &exceptions, &border).context(MainError::Chain { func_name: "run", comment: S("") })?;
-    println!("{}", blueprint);
+    let (mut dc, outside_to_noc) = match Datacenter::construct_sample() {
+            Ok(pair) => pair,
+            Err(err) => panic!("Datacenter construction failure: {}", err)
+        };
     if false { deployment_demo()?; }    // Demonstrate features of deployment spec
-    let (outside_to_noc, noc_from_outside): (OutsideToNoc, NocFromOutside) = channel();
-    let (noc_to_outside, _outside_from_noc): (NocToOutside, OutsideFromNoc) = channel();
-    let mut noc = Noc::new(noc_to_outside)?;
-    let (mut dc, _) = noc.initialize(&blueprint, noc_from_outside).context(MainError::Chain { func_name: "run", comment: S("") })?;
     if AUTO_BREAK != 0 {
         println!("---> Automatically break link");
         break_link(&mut dc)?;
