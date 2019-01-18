@@ -1,17 +1,21 @@
 use std::{fmt, fmt::Write,
           cmp::max,
+          collections::{HashMap},
           sync::mpsc::channel,
           thread::{JoinHandle}};
 
 use crate::blueprint::{Blueprint, Cell};
-use crate::config::{TRACE_OPTIONS, CellNo, CellType, Edge, LinkNo, get_geometry};
+use crate::config::{TRACE_OPTIONS, NCELLS, NPORTS, NLINKS, CellNo, CellType, PortNo, Edge, LinkNo, get_edges, get_geometry};
 use crate::dal;
+use crate::ecargs::{ECArgs};
 use crate::message_types::{LinkToPort, PortFromLink, PortToLink, LinkFromPort,
     PortToNoc, PortFromNoc};
 use crate::link::{Link};
+use crate::message_types::{OutsideFromNoc, OutsideToNoc, NocFromOutside, NocToOutside};
 use crate::nalcell::{CellConfig, NalCell};
 use crate::name::{CellID, LinkID};
-use crate::utility::{TraceHeaderParams, TraceType};
+use crate::noc::Noc;
+use crate::utility::{S, TraceHeaderParams, TraceType};
 
 #[derive(Debug)]
 pub struct Datacenter {
@@ -20,6 +24,33 @@ pub struct Datacenter {
 }
 impl Datacenter {
     pub fn new() -> Datacenter { Datacenter { cells: Vec::new(), links: Vec::new() } }
+    pub fn construct_sample() -> Result<(Datacenter, OutsideToNoc), Error> {
+        /* Doesn't work when debugging in Eclipse
+        let args: Vec<String> = env::args().collect();
+        println!("Main: args {:?}",args);
+        let ecargs = match ECArgs::get_args(args) {
+        Ok(e) => e,
+        Err(err) => panic!("Argument Error: {}",err)
+    };
+         */
+        let ecargs = ECArgs::new(NCELLS, NPORTS, *NLINKS)?;
+        let (ncells, nports) = ecargs.get_args();
+        println!("\nMain: {} ports for each of {} cells", *nports, *ncells);
+        let edges = get_edges();
+        let mut exceptions = HashMap::new();
+        exceptions.insert(CellNo(5), PortNo(7));
+        exceptions.insert(CellNo(2), PortNo(6));
+        let mut border = HashMap::new();
+        border.insert(CellNo(2), vec![PortNo(2)]);
+        border.insert(CellNo(7), vec![PortNo(2)]);
+        let blueprint = Blueprint::new(ncells, nports, edges.clone(), &exceptions, &border)?;
+        println!("{}", blueprint);
+        let (outside_to_noc, noc_from_outside): (OutsideToNoc, NocFromOutside) = channel();
+        let (noc_to_outside, _outside_from_noc): (NocToOutside, OutsideFromNoc) = channel();
+        let mut noc = Noc::new(noc_to_outside)?;
+        let (dc, _) = noc.initialize(&blueprint, noc_from_outside)?;
+        return Ok((dc, outside_to_noc));
+    }
     pub fn initialize(&mut self, blueprint: &Blueprint)  -> Result<Vec<JoinHandle<()>>, Error> {
         let _f = "initialize";
         let geometry = get_geometry();  // A cheat used for visualization
@@ -140,7 +171,7 @@ impl fmt::Display for Datacenter {
     }
 }
 // Errors
-use failure::{Error};
+use failure::{Error, ResultExt};
 #[derive(Debug, Fail)]
 pub enum DatacenterError {
     #[fail(display = "DatacenterError::Boundary {}: No boundary cells found", func_name)]
