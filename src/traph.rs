@@ -165,7 +165,9 @@ impl Traph {
         self.elements[*port_number.get_port_no() as usize].mark_pruned();
     }
     pub fn mark_broken(&mut self, port_number: PortNumber) {
-        self.elements[*port_number.get_port_no() as usize].mark_broken();
+        let index = *port_number.get_port_no() as usize;
+        self.elements[index].set_broken();
+        self.elements[index].mark_broken();
     }
     pub fn get_port_status(&self, port_number: PortNumber) -> PortStatus {
         self.elements[*port_number.get_port_no() as usize].get_status()
@@ -182,7 +184,6 @@ impl Traph {
             .iter()
             .find(|&element| element.get_status() == PortStatus::Parent)
             .ok_or(TraphError::ParentElement { cell_id: self.cell_id.clone(), func_name: _f, tree_id: self.base_tree_id.clone() }.into())
-            .map(|element| element)
     }
     pub fn get_parent_element_mut(&mut self) -> Result<&mut TraphElement, Error> {
         let _f = "get_parent_element_mut";
@@ -192,7 +193,6 @@ impl Traph {
             .iter_mut()
             .find(|element| element.get_status() == PortStatus::Parent)
             .ok_or(TraphError::ParentElement { cell_id: self.cell_id.clone(), func_name: _f, tree_id: self.base_tree_id.clone() }.into())
-            .map(|element| element)
     }
     pub fn find_new_parent_port(&mut self, rw_port_tree_id: &PortTreeID, broken_path: Path) -> Option<PortNo> {
         let _f = "find_new_parent_port";
@@ -250,15 +250,17 @@ impl Traph {
     pub fn set_parent(&mut self, new_parent: PortNumber, port_tree_id: &PortTreeID)
             -> Result<Vec<RoutingTableEntry>, Error> {
         let _f = "set_parent";
-        let port_tree_entry = self.port_trees.get_mut(port_tree_id)
+        let port_tree_entry = self.port_trees
+            .get_mut(port_tree_id)
             .map(|port_tree| port_tree.set_parent(new_parent))
             .ok_or::<Error>(TraphError::PortTree { func_name: _f, cell_id: self.cell_id.clone(), port_no: *new_parent.get_port_no() }.into())?;
         let parent_element = self.get_parent_element_mut()?;
         if parent_element.get_port_no() != new_parent.get_port_no() {
-            let mut entries = self.stacked_trees.lock().unwrap()
-                .values_mut()
-                .map(|tree| tree.set_parent(new_parent))
+            let mut entries= self.stacked_trees.lock().unwrap()
+                .iter_mut()
+                .map(|(_, tree)| { tree.set_parent(new_parent) })
                 .collect::<Vec<_>>();
+            // Get parent_element again to avoid mutability error; requires NLL
             let parent_element = self.get_parent_element_mut()?;
             parent_element.mark_pruned();
             let new_parent_port_no = new_parent.get_port_no();
@@ -267,7 +269,7 @@ impl Traph {
             entries.push(port_tree_entry);
             Ok(entries)
         } else {
-            Ok(Vec::new())
+            Ok(vec![port_tree_entry])
         }
     }
     fn apply_update(&mut self,
@@ -299,7 +301,8 @@ impl Traph {
             .lock()
             .unwrap()
             .values_mut()
-            .map(|stacked_tree| tree_fn(stacked_tree, child))
+            .map(|stacked_tree| {
+                tree_fn(stacked_tree, child)})
             .collect::<Vec<_>>();
         Ok(stacked_tree_entries)
     }

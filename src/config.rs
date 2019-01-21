@@ -36,6 +36,7 @@ pub const CONTROL_TREE_NAME: & str = "Control";
 pub const CONNECTED_PORTS_TREE_NAME: & str = "Connected";
 //pub const BASE_TREE_NAME: & str = "Base";
 
+// TODO: Use log crate for this
 pub struct TraceOptions {
     pub all:      bool,
     pub dc:       bool,

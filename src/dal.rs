@@ -19,6 +19,8 @@ pub fn update_trace_header(child_trace_header: TraceHeader) { TRACE_HEADER.with(
 
 const FOR_EVAL: bool = true;
 
+// TODO: Integrate with log crate
+
 lazy_static! {
     static ref PRODUCER_RD: FutureProducer = ClientConfig::new()
                         .set("bootstrap.servers", KAFKA_SERVER)
