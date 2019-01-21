@@ -17,6 +17,7 @@ futures = "0.1.23"
 indexmap = "1.0.1" # HashMap and HashSet that preserve order
 internment = "0.3.6"
 lazy_static = "1.1.0"
+log = {version = "0.4.6", features = ["std", "serde"]} # Should use instead of my trace approach
 rand = "*" # Or a specific version
 rdkafka = "0.17.0"
 #schema = { path = "/Users/alan/Documents/Eclipse/schema" }

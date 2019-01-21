@@ -43,10 +43,8 @@ impl Tree {
     }
     //pub fn set_gvm_eqn(&mut self, gvm_eqn: GvmEquation) { self.gvm_eqn = gvm_eqn; }
     //pub fn get_parent(&self) -> PortNo { self.get_table_entry().get_parent() }
-    pub fn set_parent(&mut self, port_number: PortNumber) -> RoutingTableEntry {
-        let mut entry = self.table_entry;
-        entry.set_parent(port_number);
-        entry
+    pub fn set_parent(&mut self, new_parent: PortNumber) -> RoutingTableEntry {
+        self.table_entry.set_parent(new_parent)
     }
     //pub fn set_inuse(&mut self) { self.get_table_entry().set_inuse(); }
 }
