@@ -1268,6 +1268,7 @@ impl CellAgent {
             .values_mut()
             .map(|traph| {
                 traph.set_broken(port_number);
+                println!("CellAgent {}: {} port number {} ***\n{}", cell_id, _f, port_number, traph);
                 traph })
             .filter(|traph| { traph.has_broken_parent() })
             .map(|broken_parent_traph| {
@@ -1283,6 +1284,8 @@ impl CellAgent {
                     return Ok(())
                 }
             };
+        println!("CellAgent {}: {} broken port tree ids", self.cell_id, _f);
+        print_hash_set(&broken_port_tree_ids);
         let rw_port_tree_id = rw_traph.get_base_tree_id().to_port_tree_id(port_number);
         let broken_path = {
             let broken_element = rw_traph.get_element(port_no)?;
