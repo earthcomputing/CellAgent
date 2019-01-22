@@ -98,12 +98,12 @@ impl NalCell {
         let _f = "start_cell";
         if TRACE_OPTIONS.all || TRACE_OPTIONS.nal {
             let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "nalcell_start_ca" };
-            let trace = json!({ "cell_id": &cell_agent.get_id() });
+            let trace = json!({ "cell_id": &cell_agent.get_cell_id() });
             let _ = dal::add_to_trace(TraceType::Trace, trace_params, &trace, _f);
         }
         let mut ca = cell_agent.clone();
         let child_trace_header = fork_trace_header();
-        let thread_name = format!("CellAgent {}", cell_agent.get_id());
+        let thread_name = format!("CellAgent {}", cell_agent.get_cell_id());
         thread::Builder::new().name(thread_name).spawn( move || {
             update_trace_header(child_trace_header);
             let _ = ca.initialize(ca_from_cm).map_err(|e| crate::utility::write_err("nalcell", &e));
