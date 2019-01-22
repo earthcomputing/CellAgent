@@ -35,7 +35,7 @@ use crate::tree::Tree;
 use crate::uptree_spec::{AllowedTree, Manifest};
 use crate::utility::{BASE_TENANT_MASK, DEFAULT_USER_MASK, Mask, Path,
               PortNumber, S, TraceHeader, TraceHeaderParams, TraceType, UtilityError,
-              new_hash_set, print_hash_set, print_vec, write_err};
+              new_hash_set, write_err};
 use crate::uuid_ec::Uuid;
 use crate::vm::VirtualMachine;
 
@@ -1253,30 +1253,32 @@ impl CellAgent {
         self.connected_tree_entry.remove_child(port_number);
         self.update_entry(&self.connected_tree_entry)?;
         let mut broken_port_tree_ids = HashSet::new();
+        let mut rw_traph_opt = None;
         for traph in self.traphs.values_mut() {
             traph.set_broken(port_number);
+            if traph.has_broken_parent() {
+                let broken_port_tree = traph.get_port_tree_by_port_number(&port_number);
+                let broken_port_tree_id = broken_port_tree.get_port_tree_id();
+                broken_port_tree_ids.insert(broken_port_tree_id.clone());
+                if traph.is_one_hop() { rw_traph_opt = Some(traph); }
+            }
         }
-        let mut rw_traph = match self.traphs
-            .values_mut()
-            .filter(|traph| traph.has_broken_parent())
-            .find(|broken_parent|  broken_parent.is_one_hop())
-            {
-                Some(traph) => traph.clone(),
-                None => { // It is possible that no trees cross the broken link in a given direction
-                    println!("Cellagent {}: {} no tree is one hop away on port {}", self.cell_id, _f, *port_no);
-                    return Ok(())
-                }
-            };
+        let rw_traph = match rw_traph_opt {
+            Some(traph) => traph,
+            None => {
+                println!("Cellagent {}: {} no tree is one hop away on port {}", self.cell_id, _f, *port_no);
+                return Ok(())
+            }
+        };
         let rw_port_tree_id = rw_traph.get_base_tree_id().to_port_tree_id(port_number);
         let broken_path = {
             let broken_element = rw_traph.get_element(port_no)?;
             broken_element.get_path()
         };
-        //let broken_path = rw_traph.get_element(port_no)?.get_path();
         rw_traph.add_tried_port(&rw_port_tree_id, port_no);  // Don't try port attached to broken link
         if let Some(trial_parent_port) = rw_traph.find_new_parent_port(&rw_port_tree_id, broken_path) {
             rw_traph.add_tried_port(&rw_port_tree_id, trial_parent_port);
-            let sender_id = SenderID::new(&self.get_cell_id(), "CellAgent")?;
+            let sender_id = SenderID::new(&cell_id, "CellAgent")?;
             let rootward_tree_id = rw_traph.get_base_tree_id();
             let rw_port_number = broken_path.get_port_number();
             let rw_port_tree_id = rootward_tree_id.to_port_tree_id(rw_port_number);
@@ -1285,8 +1287,8 @@ impl CellAgent {
             let mask = Mask::new(port_number);
             let failover_msg = FailoverMsg::new(&sender_id, &rw_port_tree_id, &lw_port_tree_id,
                                                 broken_path, &broken_port_tree_ids);
-            self.send_msg(&self.connected_tree_id, &failover_msg, mask).context(CellagentError::Chain { func_name: _f, comment: S(self.get_cell_id()) })?;
             println!("Cellagent {}: {} candidate parent for tree {} is port {}", self.cell_id, _f, rw_traph.get_base_tree_id(), *trial_parent_port);
+            self.send_msg(&self.connected_tree_id, &failover_msg, mask).context(CellagentError::Chain { func_name: _f, comment: S(cell_id) })?;
         } else {
             println!("Cellagent {}: {} no candidate parent found for tree {}", self.cell_id, _f, rw_traph.get_base_tree_id())
         }
