@@ -824,7 +824,6 @@ impl CellAgent {
         let rw_tree_id = rw_port_tree_id.to_tree_id();
         let lw_port_tree_id = payload.get_lw_port_tree_id();
         let port_number = port_no.make_port_number(self.no_ports)?;
-        println!("CellAgent {}: {} port {} for rw tree {}", self.cell_id, _f, *port_no, rw_port_tree_id);
         if rw_tree_id == my_tree_id {
             println!("Cellagent {}: {} found path to rootward for port tree {}", cell_id, _f, rw_port_tree_id);
             let broken_port_tree_ids = payload.get_broken_port_tree_ids();
@@ -860,7 +859,6 @@ impl CellAgent {
         let rw_port_tree_id = failover_payload.get_rw_port_tree_id();
         let lw_port_tree_id = failover_payload.get_lw_port_tree_id();
         let broken_port_tree_ids = failover_payload.get_broken_port_tree_ids();
-        println!("CellAgent {}: {} port {} rw tree {}", self.cell_id, _f, *port_no, rw_port_tree_id);
         let port_number = port_no.make_port_number(self.no_ports)?;
         self.tree_id_map.insert(rw_port_tree_id.get_uuid(), rw_port_tree_id.clone());
         if self.my_tree_id == lw_port_tree_id.to_tree_id() {
@@ -872,16 +870,10 @@ impl CellAgent {
                         .get(rw_port_tree_id)
                         .map(|failover_port_no| -> Result<(), Error> {
                             let failover_port_number = failover_port_no.make_port_number(self.no_ports)?;
-                            println!("CellAgent {}: {} broken tree id", self.cell_id, _f);
-                            print_hash_set(broken_port_tree_ids);
                             for broken_port_tree_id in broken_port_tree_ids {
                                 let traph = self.get_traph_mut(broken_port_tree_id)?;
                                 let parent_entries = traph.set_parent(port_number, broken_port_tree_id)?;
                                 let child_entries = traph.add_child(broken_port_tree_id, failover_port_number)?;
-                                println!("CellAgent {}: {} broken tree {} parent entries", self.cell_id, _f, broken_port_tree_id);
-                                print_vec(&parent_entries);
-                                println!("CellAgent {}: {} broken tree {} child entries", self.cell_id, _f, broken_port_tree_id);
-                                print_vec(&child_entries);
                                 self.update_entries(&parent_entries)?;
                                 self.update_entries(&child_entries)?;
                             }
@@ -1264,18 +1256,12 @@ impl CellAgent {
         //let my_traph = self.get_traph_mut(&my_port_tree_id)?;
         //my_traph.set_broken(port_number);
         let mut broken_port_tree_ids = HashSet::new();
+        for traph in self.traphs.values_mut() {
+            traph.set_broken(port_number);
+        }
         let mut rw_traph = match self.traphs
             .values_mut()
-            .map(|traph| {
-                traph.set_broken(port_number);
-                println!("CellAgent {}: {} port number {} ***\n{}", cell_id, _f, port_number, traph);
-                traph })
-            .filter(|traph| { traph.has_broken_parent() })
-            .map(|broken_parent_traph| {
-                let broken_port_tree = broken_parent_traph.get_port_tree_by_port_number(&port_number);
-                broken_port_tree_ids.insert(broken_port_tree.get_port_tree_id().clone());
-                broken_parent_traph
-            })
+            .filter(|traph| traph.has_broken_parent())
             .find(|broken_parent|  broken_parent.is_one_hop())
             {
                 Some(traph) => traph.clone(),
@@ -1284,8 +1270,6 @@ impl CellAgent {
                     return Ok(())
                 }
             };
-        println!("CellAgent {}: {} broken port tree ids", self.cell_id, _f);
-        print_hash_set(&broken_port_tree_ids);
         let rw_port_tree_id = rw_traph.get_base_tree_id().to_port_tree_id(port_number);
         let broken_path = {
             let broken_element = rw_traph.get_element(port_no)?;
