@@ -336,9 +336,8 @@ impl Traph {
         // dumpstack();
         let port_no = port_number.get_port_no();
         let mut stacked_trees = self.stacked_trees.lock().unwrap();
-        let mut tree = stacked_trees
+        let tree = stacked_trees
             .get_mut(&tree_id.get_uuid())
-            .cloned()
             .ok_or::<Error>(TraphError::Tree { func_name: _f, cell_id: self.cell_id.clone(), tree_uuid: tree_id.get_uuid() }.into() )?;
         let mut table_entry = tree.get_table_entry();
         table_entry.set_tree_id(&tree_id.to_port_tree_id_0());
@@ -348,7 +347,6 @@ impl Traph {
             table_entry.set_parent(port_number);
         };
         tree.set_table_entry(table_entry);
-        stacked_trees.insert(tree_id.get_uuid(), tree.clone());
         let element = TraphElement::new(true, port_no, port_status, hops, path);
         // println!("update_element2 - {}", element);
         self.elements[*port_no as usize] = element; // Cannot fail because self.elements has MAX_PORTS elements

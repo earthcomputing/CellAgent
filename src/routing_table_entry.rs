@@ -15,9 +15,9 @@ pub struct RoutingTableEntry {
     mask: Mask,
 }
 impl RoutingTableEntry {
-    pub fn new(tree_id: &PortTreeID, inuse: bool, parent: PortNumber, mask: Mask,
+    pub fn new(port_tree_id: &PortTreeID, inuse: bool, parent: PortNumber, mask: Mask,
             may_send: bool) -> RoutingTableEntry {
-        RoutingTableEntry { tree_uuid: tree_id.get_uuid(), parent: parent.get_port_no(),
+        RoutingTableEntry { tree_uuid: port_tree_id.get_uuid(), parent: parent.get_port_no(),
             may_send, inuse, mask }
     }
     pub fn default() -> RoutingTableEntry {
