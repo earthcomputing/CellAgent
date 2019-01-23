@@ -17,7 +17,9 @@ impl PortTree {
     pub fn new(port_tree_id: &PortTreeID, in_port_no: PortNo, hops: PathLength)
             -> PortTree {
         let root_port_no = port_tree_id.get_port_no();
-        let entry = RoutingTableEntry::default().add_child(PortNumber::new0());
+        let mut entry = RoutingTableEntry::default();
+        entry.set_tree_id(port_tree_id);
+        entry.add_child(PortNumber::new0());
         PortTree { port_tree_id: port_tree_id.clone(), root_port_no,
                    in_port_no, hops, entry }
     }
