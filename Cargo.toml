@@ -4,6 +4,22 @@ version = "0.1.0"
 authors = ["Alan Karp <alan@earthcomputing.io>"]
 edition = "2018"
 
+[[bin]]
+name = "simulator"
+path = "src/simulator.rs"
+
+[[bin]]
+name = "interiorCell"
+path = "src/interiorCell.rs"
+
+[[bin]]
+name = "borderCell"
+path = "src/borderCell.rs"
+
+[[bin]]
+name = "external_echoDemo"
+path = "src/external_echoDemo.rs"
+
 [dependencies]
 backtrace = "0.3" # used in dumpstack.rs
 #chrono = { version = "0.4.3", features = ["serde"] }

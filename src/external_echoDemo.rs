@@ -1,7 +1,4 @@
 #![deny(unused_must_use)]
-//#![allow(dead_code)]
-//#![allow(unused_variables)]
-//#![allow(unused_imports)]
 //#![warn(rust_2018_idioms)]
 #![recursion_limit="1024"]
 #[macro_use] extern crate failure;
@@ -42,135 +39,40 @@ mod vm;
 
 use std::{io::{stdin, stdout, Read, Write},
           collections::{HashMap, HashSet},
-          fs::{File, OpenOptions, create_dir, remove_dir_all},
-          path::Path,
+          fs::{File, OpenOptions},
           sync::mpsc::channel};
 
 use crate::blueprint::Blueprint;
-use crate::config::{AUTO_BREAK, OUTPUT_DIR_NAME, OUTPUT_FILE_NAME, QUENCH,
+use crate::config::{AUTO_BREAK, OUTPUT_FILE_NAME, QUENCH,
                     CellNo, CellQty, PortNo, PortQty, is2e};
 use crate::datacenter::Datacenter;
 use crate::gvm_equation::{GvmEqn};
-use crate::message_types::{OutsideToNoc};
+use crate::message_types::{OutsideFromNoc, OutsideToNoc, NocFromOutside, NocToOutside};
 use crate::nalcell::CellConfig;
+use crate::noc::Noc;
 use crate::uptree_spec::{AllowedTree, ContainerSpec, Manifest, UpTreeSpec, VmSpec};
 use crate::utility::{print_vec, S, TraceHeader};
 
 fn main() -> Result<(), Error> {
     let _f = "main";
-    if Path::new(OUTPUT_DIR_NAME).exists() {
-        remove_dir_all(OUTPUT_DIR_NAME)?;
-    }
-    create_dir(OUTPUT_DIR_NAME)?;
     println!("Multicell Routing: Output to file {} (set in config.rs)", OUTPUT_FILE_NAME);
     println!("{:?} Quenching of Discover messages", QUENCH);
-    /* Can't get records from main() to show up in trace file
-        use crate::config::{NCELLS};
-        let (rows, cols, geometry) = config::get_geometry();
-        {
-            // For reasons I can't understand, the trace record doesn't show up when generated from main.
-            let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "trace_schema" };
-            let trace = json!({ "schema_version": SCHEMA_VERSION, "ncells": NCELLS, "rows": rows, "cols": cols });
-            let _ = dal::add_to_trace(trace_header, TraceType::Trace, trace_params,&trace, _f);
-        }
-    */
     let _ = OpenOptions::new().write(true).truncate(true).open(OUTPUT_FILE_NAME);
-    let mut cell_port_exceptions = HashMap::new();
-    cell_port_exceptions.insert(CellNo(5), PortQty(7));
-    cell_port_exceptions.insert(CellNo(2), PortQty(6));
+    let cell_port_exceptions = HashMap::new();
     let mut border_cell_ports = HashMap::new();
-    border_cell_ports.insert(CellNo(2), vec![PortNo(2)]);
-    border_cell_ports.insert(CellNo(7), vec![PortNo(2)]);
-    let (mut dc, outside_to_noc) =
-        match Datacenter::construct(
-            CellQty(10),
-            &vec![is2e(0,1), is2e(1,2), is2e(2,3), is2e(3,4),
-                  is2e(5,6), is2e(6,7), is2e(7,8), is2e(8,9),
-                  is2e(0,5), is2e(1,6), is2e(2,7), is2e(3,8), is2e(4,9)],
-            PortQty(8),
-            &cell_port_exceptions,
-            &border_cell_ports
-        ) {
-            Ok(pair) => pair,
-            Err(err) => panic!("Datacenter construction failure: {}", err)
-        };
+    border_cell_ports.insert(CellNo(0), vec![PortNo(2)]);
+    let blueprint = Blueprint::new(CellQty(3), &vec![is2e(0,1), is2e(1,2), is2e(0,2)], PortQty(3), &cell_port_exceptions, &border_cell_ports).context(MainError::Chain { func_name: "run", comment: S("") })?;
+    println!("{}", blueprint);
     if false { deployment_demo()?; }    // Demonstrate features of deployment spec
-    if AUTO_BREAK != 0 {
-        println!("---> Automatically break link");
-        break_link(&mut dc)?;
-    }
-    loop {
-        stdout().write(b"\nType:
-            d to print datacenter
-            c to print cells
-            l to print links
-            p to print forwarding table
-            m to deploy an application
-            x to exit program\n").context(MainError::Chain { func_name: "run", comment: S("") })?;
-        let mut print_opt = String::new();
-        stdin().read_line(&mut print_opt).context(MainError::Chain { func_name: "run", comment: S("") })?;
-        if print_opt.len() > 1 {
-            match print_opt.trim() {
-                "d" => {
-                    println!("{}", dc);
-                    Ok(())
-                },
-                "c" => show_ca(&dc),
-                "l" => break_link(&mut dc),
-                "p" => show_pe(&dc),
-                "m" => deploy(&outside_to_noc.clone()),
-                "x" => std::process::exit(0),
-                _   => {
-                    println!("Invalid input {}", print_opt);
-                    Ok(())
-                }
-            }?;
-        }
-    }
-}
-fn show_ca(dc: &Datacenter) -> Result<(), Error> {
-    let cells = dc.get_cells();
-    print_vec(&dc.get_cell_ids());
-    let _ = stdout().write(b"Enter cell to display cell\n")?;
-    let cell_no = read_int()?;
-    cells.get(cell_no)
-        .map_or_else(|| println!("{} is not a valid input", cell_no),
-                     |cell| {
-                         println!("{}", cell);
-                     });
+    let (outside_to_noc, noc_from_outside): (OutsideToNoc, NocFromOutside) = channel();
+    let (noc_to_outside, _outside_from_noc): (NocToOutside, OutsideFromNoc) = channel();
+    let mut noc = Noc::new(noc_to_outside)?;
+    let (dc, _) = noc.initialize(&blueprint, noc_from_outside).context(MainError::Chain { func_name: "run", comment: S("") })?;
+    deploy(&outside_to_noc.clone())?; /* Deploy Echo */
+    /* Send Ping request */
     Ok(())
 }
-fn show_pe(dc: &Datacenter) -> Result<(), Error> {
-    let cells = dc.get_cells();
-    print_vec(&dc.get_cell_ids());
-    let _ = stdout().write(b"Enter cell to display forwarding table\n")?;
-    let cell_no = read_int()?;
-    cells.get(cell_no)
-        .map_or_else(|| println!("{} is not a valid input", cell_no),
-                     |cell| {
-                         println!("{}", cell.get_packet_engine());
-                     });
-    Ok(())
-}
-fn break_link(dc: &mut Datacenter) -> Result<(), Error> {
-    let link_no = if AUTO_BREAK != 0 {
-        // TODO: Wait until discover is done before automatically breaking link, should be removed
-        crate::utility::sleep(4);
-        println!("---> Automatically break link {}", AUTO_BREAK);
-        AUTO_BREAK
-    } else {
-        let link_ids = dc.get_link_ids();
-        print_vec(&link_ids);
-        let _ = stdout().write(b"Enter link to break or null\n")?;
-        read_int()?
-    };
-    let links = dc.get_links_mut();
-    links.get_mut(link_no)
-        .map_or_else(|| -> Result<(), Error> { println!("{} is not a valid input", link_no); Ok(()) },
-                     |link: &mut crate::link::Link| -> Result<(), Error> { link.break_link()?; Ok(()) }
-        )?;
-    Ok(())
-}
+
 fn read_int() -> Result<usize, Error> {
     let _f = "read_int";
     let mut char = String::new();

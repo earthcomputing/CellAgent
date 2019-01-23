@@ -141,6 +141,9 @@ impl Cell for BorderCell {
     fn get_interior_ports(&self) -> &Vec<PortNo> { &self.interior_ports }
 }
 impl BorderCell {
+    pub fn new(cell_no: CellNo, cell_type: CellType, interior_ports: Vec<PortNo>, border_ports: Vec<PortNo>) -> BorderCell {
+	BorderCell { cell_no, cell_type, interior_ports, border_ports }
+    }
     pub fn get_border_ports(&self) -> &Vec<PortNo> { &self.border_ports }
 }
 impl fmt::Display for BorderCell {
@@ -164,6 +167,11 @@ impl Cell for InteriorCell {
     fn get_cell_type(&self) -> CellType { self.cell_type }
     fn get_num_phys_ports(&self) -> PortQty { PortQty(self.interior_ports.len() as u8) }
     fn get_interior_ports(&self) -> &Vec<PortNo> { &self.interior_ports }
+}
+impl InteriorCell {
+    pub fn new(cell_no: CellNo, cell_type: CellType, interior_ports: Vec<PortNo>) -> InteriorCell {
+	InteriorCell { cell_no, cell_type, interior_ports }
+    }
 }
 impl fmt::Display for InteriorCell {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
