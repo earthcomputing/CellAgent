@@ -20,11 +20,11 @@ pub struct Cmodel {
     packet_assemblers: PacketAssemblers,
 }
 impl Cmodel {
-    pub fn get_name(&self) -> &str { self.cell_id.get_name() }
+    pub fn get_name(&self) -> String { self.cell_id.get_name() }
     //pub fn get_cell_id(&self) -> &CellID { &self.cell_id }
     // NEW
-    pub fn new(cell_id: &CellID) -> Cmodel {
-        Cmodel { cell_id: cell_id.clone(), packet_assemblers: PacketAssemblers::new() }
+    pub fn new(cell_id: CellID) -> Cmodel {
+        Cmodel { cell_id, packet_assemblers: PacketAssemblers::new() }
     }
 
     // INIT (CmFromCa, CmFromPe)

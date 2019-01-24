@@ -27,14 +27,14 @@ pub struct Port {
     port_to_pe: PortToPe,
 }
 impl Port {
-    pub fn new(cell_id: &CellID, port_number: PortNumber, is_border: bool, is_connected: bool,
+    pub fn new(cell_id: CellID, port_number: PortNumber, is_border: bool, is_connected: bool,
                port_to_pe: PortToPe) -> Result<Port, Error> {
         let port_id = PortID::new(cell_id, port_number).context(PortError::Chain { func_name: "new", comment: S(cell_id.get_name()) + &S(*port_number.get_port_no())})?;
         Ok(Port{ id: port_id, port_number, is_border,
             is_connected: Arc::new(AtomicBool::new(is_connected)),
             port_to_pe})
     }
-    pub fn get_id(&self) -> &PortID { &self.id }
+    pub fn get_id(&self) -> PortID { self.id }
     pub fn get_port_no(&self) -> PortNo { self.port_number.get_port_no() }
 //  pub fn get_port_number(&self) -> PortNumber { self.port_number }
 //  pub fn get_is_connected(&self) -> Arc<AtomicBool> { self.is_connected.clone() }

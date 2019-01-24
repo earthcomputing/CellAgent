@@ -18,15 +18,15 @@ pub enum Service {
     NocAgent { service: NocAgent }
 }
 impl Service {
-    pub fn new(container_id: &ContainerID, service_name: &str, allowed_trees: &[AllowedTree],
+    pub fn new(container_id: ContainerID, service_name: &str, allowed_trees: &[AllowedTree],
             container_to_vm: ContainerToVm) -> Result<Service, ServiceError> {
         match service_name {
-            NOCMASTER => Ok(Service::NocMaster { service: NocMaster::new(container_id.clone(), NOCMASTER, container_to_vm, allowed_trees) }),
-            NOCAGENT => Ok(Service::NocAgent { service: NocAgent::new(container_id.clone(), NOCAGENT, container_to_vm, allowed_trees) }),
+            NOCMASTER => Ok(Service::NocMaster { service: NocMaster::new(container_id, NOCMASTER, container_to_vm, allowed_trees) }),
+            NOCAGENT => Ok(Service::NocAgent { service: NocAgent::new(container_id, NOCAGENT, container_to_vm, allowed_trees) }),
             _ => Err(ServiceError::NoSuchService { func_name: "create_service", service_name: S(service_name) })
         }
     }
-    pub fn initialize(&self, up_tree_id: &UptreeID, container_from_vm: ContainerFromVm) -> Result<(), Error> {
+    pub fn initialize(&self, up_tree_id: UptreeID, container_from_vm: ContainerFromVm) -> Result<(), Error> {
         match *self {
             Service::NocMaster { ref service } => service.initialize(up_tree_id, container_from_vm),
             Service::NocAgent  { ref service } => service.initialize(up_tree_id, container_from_vm)
@@ -58,7 +58,7 @@ impl NocMaster {
             allowed_trees: allowed_trees.to_owned() }
     }
     //fn get_container_id(&self) -> &ContainerID { &self.container_id }
-    pub fn initialize(&self, _: &UptreeID, container_from_vm: ContainerFromVm) -> Result<(), Error> {
+    pub fn initialize(&self, _: UptreeID, container_from_vm: ContainerFromVm) -> Result<(), Error> {
         let _f = "initialize";
         println!("Service {} running NocMaster", self.container_id);
         self.listen_vm(container_from_vm)?;
@@ -122,7 +122,7 @@ impl NocAgent {
         NocAgent { container_id, name: S(name), container_to_vm,
             allowed_trees: allowed_trees.to_owned() }
     }
-    pub fn initialize(&self, _up_tree_id: &UptreeID, container_from_vm: ContainerFromVm) -> Result<(), Error> {
+    pub fn initialize(&self, _up_tree_id: UptreeID, container_from_vm: ContainerFromVm) -> Result<(), Error> {
         //let _f = "initialize";
         //self.container_to_vm.send((S("NocAgent"), S("Message from NocAgent"))).context(ServiceError::Chain { func_name: _f, comment: S("NocAgent") })?;
         println!("Service {} running NocAgent", self.container_id);

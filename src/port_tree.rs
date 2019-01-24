@@ -14,7 +14,7 @@ pub struct PortTree {
     entry: RoutingTableEntry
 }
 impl PortTree {
-    pub fn new(port_tree_id: &PortTreeID, in_port_no: PortNo, hops: PathLength)
+    pub fn new(port_tree_id: PortTreeID, in_port_no: PortNo, hops: PathLength)
             -> PortTree {
         let root_port_no = port_tree_id.get_port_no();
         let mut entry = RoutingTableEntry::default();
@@ -23,9 +23,9 @@ impl PortTree {
         PortTree { port_tree_id: port_tree_id.clone(), root_port_no,
                    in_port_no, hops, entry }
     }
-    pub fn get_port_tree_id(&self) -> &PortTreeID { &self.port_tree_id }
-    pub fn get_root_port_no(&self) -> &PortNo { &self.root_port_no }
-    pub fn get_in_port_no(&self) -> &PortNo { &self.in_port_no }
+    pub fn get_port_tree_id(&self) -> PortTreeID { self.port_tree_id }
+    pub fn get_root_port_no(&self) -> PortNo { self.root_port_no }
+    pub fn get_in_port_no(&self) -> PortNo { self.in_port_no }
     pub fn _get_hops(&self) -> &PathLength { &self.hops }
     pub fn get_entry(&self) -> RoutingTableEntry { self.entry }
     pub fn has_child(&self, child: PortNumber) -> bool { self.entry.has_child(child) }

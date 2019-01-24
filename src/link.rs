@@ -18,11 +18,11 @@ pub struct Link {
     to_rite: Option<LinkToPort>
 }
 impl Link {
-    pub fn new(left_id: &PortID, rite_id: &PortID) -> Result<Link, Error> {
+    pub fn new(left_id: PortID, rite_id: PortID) -> Result<Link, Error> {
         let id = LinkID::new(left_id, rite_id)?;
         Ok(Link { id, is_connected: true, to_left: None, to_rite: None })
     }
-    pub fn get_id(&self) -> &LinkID { &self.id }
+    pub fn get_id(&self) -> LinkID { self.id }
     pub fn start_threads(&mut self,
             link_to_left: LinkToPort, link_from_left: LinkFromPort,
             link_to_rite: LinkToPort, link_from_rite: LinkFromPort)
