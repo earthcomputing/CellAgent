@@ -102,7 +102,7 @@ impl TreeID {
         TreeID { name: str_to_chars(&self.get_name()), uuid }
     }
     pub fn _get_port_no(&self) -> PortNo { self.uuid.get_port_no() }
-    pub fn _transfer_port_number(&mut self, other: &TreeID) {
+    pub fn _transfer_port_number(&mut self, other: TreeID) {
         self.uuid.set_port_no(other._get_port_no());
     }
 }
@@ -128,7 +128,7 @@ impl PortTreeID {
         TreeID { name: str_to_chars(&self.get_name()), uuid }
     }
     pub fn get_port_no(&self) -> PortNo { self.uuid.get_port_no() }
-    pub fn _transfer_port_number(&mut self, other: &PortTreeID) {
+    pub fn _transfer_port_number(&mut self, other: PortTreeID) {
         self.uuid.set_port_no(other.get_port_no());
     }
 }
@@ -198,7 +198,7 @@ impl fmt::Display for LinkID { fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt:
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct VmID { name: NameType, uuid: Uuid}
 impl VmID {
-    pub fn new(cell_id: &CellID, name: &str) -> Result<VmID, Error> {
+    pub fn new(cell_id: CellID, name: &str) -> Result<VmID, Error> {
         let name = str_to_chars(&format!("VM:{}+{}", cell_id, name));
         Ok(VmID { name, uuid: Uuid::new() })
     }
@@ -212,7 +212,7 @@ impl fmt::Display for VmID { fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::R
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct SenderID { name: NameType, uuid: Uuid}
 impl SenderID {
-    pub fn new(cell_id: &CellID, name: &str) -> Result<SenderID, Error> {
+    pub fn new(cell_id: CellID, name: &str) -> Result<SenderID, Error> {
         let name = str_to_chars(&format!("Sender:{}+{}", cell_id, name));
         Ok(SenderID { name, uuid: Uuid::new() })
     }

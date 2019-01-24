@@ -184,7 +184,7 @@ pub trait Message {
         let bytes = Serializer::serialize(self).context(MessageError::Chain { func_name: _f, comment: S("")})?;
         Ok(ByteArray(bytes))
     }
-    fn to_packets(&self, tree_id: &TreeID) -> Result<Vec<Packet>, Error>
+    fn to_packets(&self, tree_id: TreeID) -> Result<Vec<Packet>, Error>
             where Self:std::marker::Sized + serde::Serialize {
         let _f = "to_packets";
         let bytes = Serializer::serialize(self).context(MessageError::Chain { func_name: _f, comment: S("")})?;
@@ -238,20 +238,20 @@ pub struct DiscoverMsg {
     payload: DiscoverPayload
 }
 impl DiscoverMsg {
-    pub fn new(sender_id: SenderID, port_tree_id: &PortTreeID, sending_cell_id: &CellID,
+    pub fn new(sender_id: SenderID, port_tree_id: PortTreeID, sending_cell_id: CellID,
             hops: PathLength, path: Path) -> DiscoverMsg {
         let header = MsgHeader::new(sender_id, true,MsgType::Discover, MsgDirection::Leafward);
         //println!("DiscoverMsg: msg_count {}", header.get_count());
-        let payload = DiscoverPayload::new(port_tree_id, &sending_cell_id, hops, path);
+        let payload = DiscoverPayload::new(port_tree_id, sending_cell_id, hops, path);
         DiscoverMsg { header, payload }
     }
-    pub fn update(&self, cell_id: &CellID) -> DiscoverMsg {
+    pub fn update(&self, cell_id: CellID) -> DiscoverMsg {
         let mut msg = self.clone();
         let hops = self.update_hops();
         let path = self.update_path();
         msg.payload.set_hops(hops);
         msg.payload.set_path(path);
-        msg.payload.set_sending_cell(cell_id.clone());
+        msg.payload.set_sending_cell(cell_id);
         msg
     }
     pub fn update_hops(&self) -> PathLength { self.payload.hops_plus_one() }
@@ -289,7 +289,7 @@ pub struct DiscoverPayload {
     gvm_eqn: GvmEquation,
 }
 impl DiscoverPayload {
-    fn new(port_tree_id: &PortTreeID, sending_cell_id: &CellID, hops: PathLength, path: Path)
+    fn new(port_tree_id: PortTreeID, sending_cell_id: CellID, hops: PathLength, path: Path)
             -> DiscoverPayload {
         let mut eqns = HashSet::new();
         eqns.insert(GvmEqn::Recv("true"));
@@ -521,7 +521,7 @@ pub struct HelloMsg {
     payload: HelloMsgPayload
 }
 impl HelloMsg {
-    pub fn new(sender_id: SenderID, cell_id: &CellID, port_no: PortNo) -> HelloMsg {
+    pub fn new(sender_id: SenderID, cell_id: CellID, port_no: PortNo) -> HelloMsg {
         // Note that direction is leafward so we can use the connected ports tree
         // If we send rootward, then the first recipient forwards the FailoverMsg
         let header = MsgHeader::new(sender_id, true,MsgType::Hello, MsgDirection::Leafward);
@@ -556,8 +556,8 @@ pub struct HelloMsgPayload {
     port_no: PortNo
 }
 impl HelloMsgPayload {
-    fn new(cell_id: &CellID, port_no: PortNo) -> HelloMsgPayload {
-        HelloMsgPayload { cell_id: cell_id.clone(), port_no }
+    fn new(cell_id: CellID, port_no: PortNo) -> HelloMsgPayload {
+        HelloMsgPayload { cell_id, port_no }
     }
     pub fn get_cell_id(&self) -> CellID { self.cell_id }
     pub fn get_port_no(&self) -> &PortNo { &self.port_no }
@@ -683,7 +683,7 @@ pub struct ManifestMsg {
     payload: ManifestMsgPayload
 }
 impl ManifestMsg {
-    pub fn new(sender_id: SenderID, is_ait: bool, deploy_tree_id: &TreeID, tree_map: &MsgTreeMap, manifest: &Manifest) -> ManifestMsg {
+    pub fn new(sender_id: SenderID, is_ait: bool, deploy_tree_id: TreeID, tree_map: &MsgTreeMap, manifest: &Manifest) -> ManifestMsg {
         // Note that direction is leafward so cell agent will get the message
         let mut header = MsgHeader::new(sender_id, is_ait, MsgType::Manifest, MsgDirection::Leafward);
         header.set_tree_map(tree_map.clone());
@@ -741,7 +741,7 @@ pub struct ApplicationMsg {
     payload: ApplicationMsgPayload
 }
 impl ApplicationMsg {
-    pub fn new(sender_id: SenderID, is_ait: bool, tree_id: &TreeID, direction: MsgDirection, body: &str) -> ApplicationMsg {
+    pub fn new(sender_id: SenderID, is_ait: bool, tree_id: TreeID, direction: MsgDirection, body: &str) -> ApplicationMsg {
         let header = MsgHeader::new(sender_id, is_ait,MsgType::Application, direction);
         let payload = ApplicationMsgPayload::new(&tree_id.to_port_tree_id_0(), body);
         ApplicationMsg { header, payload }

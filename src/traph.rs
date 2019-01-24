@@ -58,11 +58,11 @@ impl Traph {
          self.stacked_trees.lock().unwrap().get(tree_uuid).cloned()
             .ok_or(TraphError::Tree { cell_id: self.cell_id.clone(), func_name: _f, tree_uuid: *tree_uuid }.into())
     }
-    pub fn get_port_tree(&self, port_tree_id: &PortTreeID) -> Result<&PortTree, Error> {
+    pub fn get_port_tree(&self, port_tree_id: PortTreeID) -> Result<&PortTree, Error> {
         let _f = "get_port_tree";
         let port_no = port_tree_id.get_port_no();
         self.port_trees
-            .get(port_tree_id)
+            .get(&port_tree_id)
             .ok_or(TraphError::PortTree { cell_id: self.cell_id.clone(), func_name: _f, port_no: *port_no }.into())
     }
     pub fn get_base_tree_id(&self) -> TreeID { self.base_tree_id }
@@ -134,11 +134,11 @@ impl Traph {
             .map(|tree| tree.set_table_entry(entry))
             .ok_or(TraphError::Tree { func_name: _f, cell_id: self.cell_id, tree_uuid: *tree_uuid }.into())
     }
-    pub fn set_port_tree_entry(&mut self, port_tree_id: &PortTreeID, entry: RoutingTableEntry)
+    pub fn set_port_tree_entry(&mut self, port_tree_id: PortTreeID, entry: RoutingTableEntry)
             -> Result<(), Error> {
         let _f = "set_port_tree_entry";
         self.port_trees
-            .get_mut(port_tree_id)
+            .get_mut(&port_tree_id)
             .map(|port_tree| port_tree.set_entry(entry))
             .ok_or(TraphError::Tree { func_name: _f, cell_id: self.cell_id, tree_uuid: port_tree_id.get_uuid() }.into())
     }
@@ -329,7 +329,7 @@ impl Traph {
         self.apply_update(PortTree::make_child_parent, Tree::make_child_parent,
             port_tree_id, child)
     }
-    pub fn update_element(&mut self, tree_id: &TreeID, port_number: PortNumber, port_status: PortStatus,
+    pub fn update_element(&mut self, tree_id: TreeID, port_number: PortNumber, port_status: PortStatus,
                           children: &HashSet<PortNumber>, hops: PathLength, path: Path)
                           -> Result<RoutingTableEntry, Error> {
         let _f = "update_element";

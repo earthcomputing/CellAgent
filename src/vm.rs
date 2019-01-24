@@ -71,7 +71,7 @@ impl VirtualMachine {
         let thread_name = format!("VirtualMachine {} listen_container_loop", self.id);
         thread::Builder::new().name(thread_name).spawn( move || {
             update_trace_header(child_trace_header);
-            let _ = vm.listen_container_loop(&container_id, &vm_from_container, &vm_to_ca).map_err(|e| write_err("vm", &e));
+            let _ = vm.listen_container_loop(container_id, &vm_from_container, &vm_to_ca).map_err(|e| write_err("vm", &e));
             if CONTINUE_ON_ERROR { let _ = vm.listen_container(container_id, vm_from_container, vm_to_ca); }
         })?;
         Ok(())
@@ -100,7 +100,7 @@ impl VirtualMachine {
     }
 
     // WORKER (VmFromContainer)
-    fn listen_container_loop(&self, _: &ContainerID, vm_from_container: &VmFromContainer, vm_to_ca: &VmToCa)
+    fn listen_container_loop(&self, _: ContainerID, vm_from_container: &VmFromContainer, vm_to_ca: &VmToCa)
             -> Result<(), Error> {
         let _f = "listen_container_loop";
         if TRACE_OPTIONS.all || TRACE_OPTIONS.vm {
