@@ -33,9 +33,9 @@ impl VirtualMachine {
             let name = format!("Container:{}+{}", self.id, container_specs.len() + 1);
             let container_id = ContainerID::new(&name).context(VmError::Chain { func_name: "initialize", comment: S(self.id.get_name())})?;
             let service_name = container_spec.get_image();
-            let container = Container::new(&container_id, service_name.as_str(), &self.allowed_trees,
+            let container = Container::new(container_id, service_name.as_str(), &self.allowed_trees,
                  container_to_vm).context(VmError::Chain { func_name: "initialize", comment: S("")})?;
-            container.initialize(&up_tree_id, container_from_vm).context(VmError::Chain { func_name: "initialize", comment: S(self.id.get_name())})?;
+            container.initialize(up_tree_id, container_from_vm).context(VmError::Chain { func_name: "initialize", comment: S(self.id.get_name())})?;
             self.vm_to_containers.push(vm_to_container);
             // Next line must be inside loop or vm_to_container goes out of scope in listen_container
             self.listen_container(container_id, vm_from_container, self.vm_to_ca.clone()).context(VmError::Chain { func_name: "initialize", comment: S(self.id.get_name()) + " listen_container"})?;

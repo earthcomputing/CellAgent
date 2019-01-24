@@ -69,11 +69,11 @@ impl Datacenter {
             let split = self.cells.split_at_mut(max(e0,e1));
             let left_cell = split.0.get_mut(e0)
                 .ok_or::<Error>(DatacenterError::Wire { edge: *edge, func_name: _f, comment: "split left" }.into())?;
-            let left_cell_id = left_cell.get_id().clone(); // For Trace
+            let left_cell_id = left_cell.get_id(); // For Trace
             let (left_port,left_from_pe) = left_cell.get_free_ec_port_mut()?;
             let rite_cell = split.1.first_mut()
                 .ok_or::<Error>(DatacenterError::Wire { edge: *edge, func_name: _f, comment: "split rite" }.into())?;
-            let rite_cell_id = rite_cell.get_id().clone(); // For Trace
+            let rite_cell_id = rite_cell.get_id(); // For Trace
             let (rite_port, rite_from_pe) = rite_cell.get_free_ec_port_mut()?;
             //println!("Datacenter: edge {:?} {} {}", edge, *left_port.get_id(), *rite_port.get_id());
             let (link_to_left, left_from_link): (LinkToPort, PortFromLink) = channel();
@@ -82,7 +82,7 @@ impl Datacenter {
             let (rite_to_link, link_from_rite): (PortToLink, LinkFromPort) = channel();
             left_port.link_channel(left_to_link, left_from_link, left_from_pe);
             rite_port.link_channel(rite_to_link, rite_from_link, rite_from_pe);
-            let mut link = Link::new(&left_port.get_id(), &rite_port.get_id())?;
+            let mut link = Link::new(left_port.get_id(), rite_port.get_id())?;
             if TRACE_OPTIONS.all || TRACE_OPTIONS.dc {
                 let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "connect_link" };
                 let trace = json!({ "left_cell": left_cell_id, "rite_cell": rite_cell_id, "left_port": left_port.get_port_no(), "rite_port": rite_port.get_port_no(), "link_id": link.get_id() });
@@ -97,10 +97,10 @@ impl Datacenter {
     //pub fn get_links(&self) -> &Vec<Link> { &self.links }
     pub fn get_cells(&self) -> &Vec<NalCell> { &self.cells }
     pub fn get_links_mut(&mut self) -> &mut Vec<Link> { &mut self.links }
-    pub fn get_cell_ids(&self) -> Vec<&CellID> {
+    pub fn get_cell_ids(&self) -> Vec<CellID> {
         self.cells.iter().map(|cell| cell.get_id()).collect::<Vec<_>>()
     }
-    pub fn get_link_ids(&self) -> Vec<&LinkID> {
+    pub fn get_link_ids(&self) -> Vec<LinkID> {
         self.links.iter().map(|link| link.get_id()).collect::<Vec<_>>()
     }
     pub fn connect_to_noc(&mut self, port_to_noc: PortToNoc, port_from_noc: PortFromNoc)

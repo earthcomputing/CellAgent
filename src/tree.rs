@@ -18,15 +18,15 @@ pub struct Tree {
     gvm_eqn: GvmEquation,
 }
 impl Tree {
-    pub fn new(tree_id: &PortTreeID, base_tree_id: &TreeID, parent_tree_id: &PortTreeID,
+    pub fn new(tree_id: PortTreeID, base_tree_id: TreeID, parent_tree_id: PortTreeID,
                gvm_eqn: &GvmEquation, table_entry: RoutingTableEntry) -> Tree {
         Tree { base_tree_id: base_tree_id.clone(), port_tree_id: tree_id.clone(),
             parent_tree_id: parent_tree_id.clone(),
             gvm_eqn: gvm_eqn.clone(), table_entry, stacked_tree_ids: Vec::new() }
     }
-    pub fn get_port_tree_id(&self) -> &PortTreeID { &self.port_tree_id }
-    //pub fn get_base_tree_id(&self) -> &TreeID { &self.base_tree_id }
-    //pub fn get_parent_tree_id(&self) -> &TreeID { &self.parent_tree_id }
+    pub fn get_port_tree_id(&self) -> PortTreeID { self.port_tree_id }
+    //pub fn get_base_tree_id(&self) -> TreeID { self.base_tree_id }
+    //pub fn get_parent_tree_id(&self) -> TreeID { self.parent_tree_id }
     pub fn get_stacked_tree_ids(&self) -> &Vec<PortTreeID> { &self.stacked_tree_ids }
     pub fn get_uuid(&self) -> Uuid { self.port_tree_id.get_uuid() }
     pub fn get_table_entry(&self) -> RoutingTableEntry { self.table_entry }

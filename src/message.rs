@@ -192,7 +192,7 @@ pub trait Message {
         Ok(packets)
     }
     fn process_ca(&mut self, _cell_agent: &mut CellAgent, _port_no: PortNo,
-                  _msg_tree_id: &PortTreeID, _is_ait: bool) -> Result<(), Error> {
+                  _msg_tree_id: PortTreeID, _is_ait: bool) -> Result<(), Error> {
         let _f = "process_ca";
         Err(MessageError::Process { func_name: _f }.into()) }
 }
@@ -213,15 +213,15 @@ pub struct MsgHeader {
     tree_map: MsgTreeMap,
 }
 impl MsgHeader {
-    pub fn new(sender_id: &SenderID, is_ait: bool, msg_type: MsgType, direction: MsgDirection) -> MsgHeader {
+    pub fn new(sender_id: SenderID, is_ait: bool, msg_type: MsgType, direction: MsgDirection) -> MsgHeader {
         let msg_count = get_next_count();
-        MsgHeader { sender_id: sender_id.clone(), is_ait, msg_type, direction, msg_id: msg_count, tree_map: HashMap::new() }
+        MsgHeader { sender_id, is_ait, msg_type, direction, msg_id: msg_count, tree_map: HashMap::new() }
     }
     pub fn get_msg_type(&self) -> MsgType { self.msg_type }
     pub fn get_msg_id(&self) -> MsgID { self.msg_id }
     pub fn get_ait(&self) -> bool { self.is_ait }
     pub fn get_direction(&self) -> MsgDirection { self.direction }
-    pub fn get_sender_id(&self) -> &SenderID { &self.sender_id }
+    pub fn get_sender_id(&self) -> SenderID { self.sender_id }
     pub fn get_tree_map(&self) -> &MsgTreeMap { &self.tree_map }
     pub fn set_tree_map(&mut self, tree_map: MsgTreeMap) { self.tree_map = tree_map; } // Should this be set in new()?
     //pub fn set_direction(&mut self, direction: MsgDirection) { self.direction = direction; }
@@ -238,7 +238,7 @@ pub struct DiscoverMsg {
     payload: DiscoverPayload
 }
 impl DiscoverMsg {
-    pub fn new(sender_id: &SenderID, port_tree_id: &PortTreeID, sending_cell_id: &CellID,
+    pub fn new(sender_id: SenderID, port_tree_id: &PortTreeID, sending_cell_id: &CellID,
             hops: PathLength, path: Path) -> DiscoverMsg {
         let header = MsgHeader::new(sender_id, true,MsgType::Discover, MsgDirection::Leafward);
         //println!("DiscoverMsg: msg_count {}", header.get_count());
@@ -257,7 +257,7 @@ impl DiscoverMsg {
     pub fn update_hops(&self) -> PathLength { self.payload.hops_plus_one() }
     pub fn update_path(&self) -> Path { self.payload.get_path() } // No change per hop
     pub fn get_payload(&self) -> &DiscoverPayload { &self.payload }
-    pub fn get_port_tree_id(&self) -> &PortTreeID { self.payload.get_port_tree_id() }
+    pub fn get_port_tree_id(&self) -> PortTreeID { self.payload.get_port_tree_id() }
 }
 impl Message for DiscoverMsg {
     fn get_header(&self) -> &MsgHeader { &self.header }
@@ -269,7 +269,7 @@ impl Message for DiscoverMsg {
         serde_json::to_value(self).expect("I don't know how to handle errors in msg.value()")
     }
     fn process_ca(&mut self, cell_agent: &mut CellAgent, port_no: PortNo,
-                  _msg_tree_id: &PortTreeID, _is_ait: bool) -> Result<(), Error> {
+                  _msg_tree_id: PortTreeID, _is_ait: bool) -> Result<(), Error> {
         cell_agent.process_discover_msg(self, port_no)
     }
 }
@@ -305,7 +305,7 @@ impl DiscoverPayload {
     pub fn get_hops(&self) -> PathLength { self.hops }
     pub fn hops_plus_one(&self) -> PathLength { PathLength(CellNo(**self.hops + 1)) }
     pub fn get_path(&self) -> Path { self.path }
-    pub fn get_port_tree_id(&self) -> &PortTreeID { &self.port_tree_id }
+    pub fn get_port_tree_id(&self) -> PortTreeID { self.port_tree_id }
     pub fn get_root_port_no(&self) -> PortNo { self.root_port_no }
     pub fn set_hops(&mut self, hops: PathLength) { self.hops = hops; }
     pub fn set_path(&mut self, path: Path) { self.path = path; }
@@ -325,7 +325,7 @@ pub struct DiscoverDMsg {
     payload: DiscoverDPayload
 }
 impl DiscoverDMsg {
-    pub fn new(in_reply_to: MsgID, sender_id: &SenderID, sending_cell_id: &CellID, tree_id: &PortTreeID, path: Path) -> DiscoverDMsg {
+    pub fn new(in_reply_to: MsgID, sender_id: SenderID, sending_cell_id: CellID, tree_id: PortTreeID, path: Path) -> DiscoverDMsg {
         // Note that direction is leafward so we can use the connected ports tree
         // If we send rootward, then the first recipient forwards the DiscoverD
         let header = MsgHeader::new(sender_id, true,MsgType::DiscoverD, MsgDirection::Leafward);
@@ -333,7 +333,7 @@ impl DiscoverDMsg {
         DiscoverDMsg { header, payload }
     }
     pub fn get_payload(&self) -> &DiscoverDPayload { &self.payload }
-    fn get_port_tree_id(&self) -> &PortTreeID { self.payload.get_port_tree_id() }
+    fn get_port_tree_id(&self) -> PortTreeID { self.payload.get_port_tree_id() }
 }
 impl Message for DiscoverDMsg {
     fn get_header(&self) -> &MsgHeader { &self.header }
@@ -344,7 +344,7 @@ impl Message for DiscoverDMsg {
         serde_json::to_value(self).expect("I don't know how to handle errors in msg.value()")
     }
     fn process_ca(&mut self, cell_agent: &mut CellAgent, port_no: PortNo,
-                  _msg_tree_id: &PortTreeID, _is_ait: bool,) -> Result<(), Error> {
+                  _msg_tree_id: PortTreeID, _is_ait: bool,) -> Result<(), Error> {
         let _f = "process_ca";
         cell_agent.process_discover_d_msg(&self, port_no)
     }
@@ -364,12 +364,12 @@ pub struct DiscoverDPayload {
     path: Path
 }
 impl DiscoverDPayload {
-    fn new(in_reply_to: MsgID, sending_cell_id: &CellID, port_tree_id: &PortTreeID, path: Path) -> DiscoverDPayload {
+    fn new(in_reply_to: MsgID, sending_cell_id: CellID, port_tree_id: PortTreeID, path: Path) -> DiscoverDPayload {
         let root_port_no = port_tree_id.get_port_no();
         DiscoverDPayload { in_reply_to, sending_cell_id: sending_cell_id.clone(), port_tree_id: port_tree_id.clone(),
             path, root_port_no }
     }
-    pub fn get_port_tree_id(&self) -> &PortTreeID { &self.port_tree_id }
+    pub fn get_port_tree_id(&self) -> PortTreeID { self.port_tree_id }
     pub fn get_path(&self) -> Path { self.path }
 }
 impl MsgPayload for DiscoverDPayload {}
@@ -384,7 +384,7 @@ pub struct FailoverMsg {
     payload: FailoverMsgPayload
 }
 impl FailoverMsg {
-    pub fn new(sender_id: &SenderID, rw_port_tree_id: &PortTreeID, lw_port_tree_id: &PortTreeID,
+    pub fn new(sender_id: SenderID, rw_port_tree_id: PortTreeID, lw_port_tree_id: PortTreeID,
                path: Path, broken_tree_ids: &HashSet<PortTreeID>) -> FailoverMsg {
         // Note that direction is leafward so we can use the connected ports tree
         // If we send rootward, then the first recipient forwards the FailoverMsg
@@ -394,8 +394,8 @@ impl FailoverMsg {
         FailoverMsg { header, payload }
     }
     pub fn get_payload(&self) -> &FailoverMsgPayload { &self.payload }
-    pub fn get_rw_port_tree_id(&self) -> &PortTreeID { self.payload.get_rw_port_tree_id() }
-    pub fn get_lw_port_tree_id(&self) -> &PortTreeID { self.payload.get_lw_port_tree_id() }
+    pub fn get_rw_port_tree_id(&self) -> PortTreeID { self.payload.get_rw_port_tree_id() }
+    pub fn get_lw_port_tree_id(&self) -> PortTreeID { self.payload.get_lw_port_tree_id() }
 }
 impl Message for FailoverMsg {
     fn get_header(&self) -> &MsgHeader { &self.header }
@@ -406,7 +406,7 @@ impl Message for FailoverMsg {
         serde_json::to_value(self).expect("I don't know how to handle errors in msg.value()")
     }
     fn process_ca(&mut self, cell_agent: &mut CellAgent, port_no: PortNo,
-                  _msg_tree_id: &PortTreeID, _is_ait: bool) -> Result<(), Error> {
+                  _msg_tree_id: PortTreeID, _is_ait: bool) -> Result<(), Error> {
         let _f = "process_ca";
         cell_agent.process_failover_msg(&self, port_no)
     }
@@ -425,15 +425,15 @@ pub struct FailoverMsgPayload {
     broken_path: Path
 }
 impl FailoverMsgPayload {
-    fn new(rw_port_tree_id: &PortTreeID, lw_port_tree_id: &PortTreeID, broken_tree_ids: &HashSet<PortTreeID>, path: Path)
+    fn new(rw_port_tree_id: PortTreeID, lw_port_tree_id: PortTreeID, broken_tree_ids: &HashSet<PortTreeID>, path: Path)
             -> FailoverMsgPayload {
         FailoverMsgPayload { rw_port_tree_id: rw_port_tree_id.clone(), lw_port_tree_id: lw_port_tree_id.clone(),
             broken_tree_ids: broken_tree_ids.clone(),
             broken_path: path
         }
     }
-    pub fn get_rw_port_tree_id(&self) -> &PortTreeID { &self.rw_port_tree_id }
-    pub fn get_lw_port_tree_id(&self) -> &PortTreeID { &self.lw_port_tree_id }
+    pub fn get_rw_port_tree_id(&self) -> PortTreeID { self.rw_port_tree_id }
+    pub fn get_lw_port_tree_id(&self) -> PortTreeID { self.lw_port_tree_id }
     pub fn get_broken_port_tree_ids(&self) -> &HashSet<PortTreeID> { &self.broken_tree_ids }
     pub fn get_broken_path(&self) -> Path { self.broken_path }
 }
@@ -449,7 +449,7 @@ pub struct FailoverDMsg {
     payload: FailoverDMsgPayload
 }
 impl FailoverDMsg {
-    pub fn new(in_reply_to: MsgID, sender_id: &SenderID, response: FailoverResponse,
+    pub fn new(in_reply_to: MsgID, sender_id: SenderID, response: FailoverResponse,
                failover_payload: &FailoverMsgPayload) -> FailoverDMsg {
         // Note that direction is leafward so we can use the connected ports tree
         // If we send rootward, then the first recipient forwards the FailoverMsg
@@ -458,8 +458,8 @@ impl FailoverDMsg {
         FailoverDMsg { header, payload }
     }
     pub fn get_payload(&self) -> &FailoverDMsgPayload { &self.payload }
-    pub fn get_rw_port_tree_id(&self) -> &PortTreeID { self.payload.get_rw_port_tree_id() }
-    pub fn get_lw_port_tree_id(&self) -> &PortTreeID { self.payload.get_lw_port_tree_id() }
+    pub fn get_rw_port_tree_id(&self) -> PortTreeID { self.payload.get_rw_port_tree_id() }
+    pub fn get_lw_port_tree_id(&self) -> PortTreeID { self.payload.get_lw_port_tree_id() }
 }
 impl Message for FailoverDMsg {
     fn get_header(&self) -> &MsgHeader { &self.header }
@@ -470,7 +470,7 @@ impl Message for FailoverDMsg {
         serde_json::to_value(self).expect("I don't know how to handle errors in msg.value()")
     }
     fn process_ca(&mut self, cell_agent: &mut CellAgent, port_no: PortNo,
-                  _msg_tree_id: &PortTreeID, _is_ait: bool) -> Result<(), Error> {
+                  _msg_tree_id: PortTreeID, _is_ait: bool) -> Result<(), Error> {
         let _f = "process_ca";
         cell_agent.process_failover_d_msg(self, port_no)
     }
@@ -493,8 +493,8 @@ impl FailoverDMsgPayload {
     }
     pub fn get_response(&self) -> FailoverResponse { self.response }
     pub fn get_failover_payload(&self) -> &FailoverMsgPayload { &self.failover_payload }
-    pub fn get_rw_port_tree_id(&self) -> &PortTreeID { self.failover_payload.get_rw_port_tree_id() }
-    pub fn get_lw_port_tree_id(&self) -> &PortTreeID { self.failover_payload.get_lw_port_tree_id() }
+    pub fn get_rw_port_tree_id(&self) -> PortTreeID { self.failover_payload.get_rw_port_tree_id() }
+    pub fn get_lw_port_tree_id(&self) -> PortTreeID { self.failover_payload.get_lw_port_tree_id() }
 }
 impl MsgPayload for FailoverDMsgPayload {}
 impl fmt::Display for FailoverDMsgPayload {
@@ -521,7 +521,7 @@ pub struct HelloMsg {
     payload: HelloMsgPayload
 }
 impl HelloMsg {
-    pub fn new(sender_id: &SenderID, cell_id: &CellID, port_no: PortNo) -> HelloMsg {
+    pub fn new(sender_id: SenderID, cell_id: &CellID, port_no: PortNo) -> HelloMsg {
         // Note that direction is leafward so we can use the connected ports tree
         // If we send rootward, then the first recipient forwards the FailoverMsg
         let header = MsgHeader::new(sender_id, true,MsgType::Hello, MsgDirection::Leafward);
@@ -539,7 +539,7 @@ impl Message for HelloMsg {
         serde_json::to_value(self).expect("I don't know how to handle errors in msg.value()")
     }
     fn process_ca(&mut self, cell_agent: &mut CellAgent, port_no: PortNo,
-                  _msg_tree_id: &PortTreeID, _is_ait: bool) -> Result<(), Error> {
+                  _msg_tree_id: PortTreeID, _is_ait: bool) -> Result<(), Error> {
         let _f = "process_ca";
         cell_agent.process_hello_msg(self, port_no)
     }
@@ -559,7 +559,7 @@ impl HelloMsgPayload {
     fn new(cell_id: &CellID, port_no: PortNo) -> HelloMsgPayload {
         HelloMsgPayload { cell_id: cell_id.clone(), port_no }
     }
-    pub fn get_cell_id(&self) -> &CellID { &self.cell_id }
+    pub fn get_cell_id(&self) -> CellID { self.cell_id }
     pub fn get_port_no(&self) -> &PortNo { &self.port_no }
 }
 impl MsgPayload for HelloMsgPayload {}
@@ -574,14 +574,14 @@ pub struct StackTreeMsg {
     payload: StackTreeMsgPayload
 }
 impl StackTreeMsg {
-    pub fn new(sender_id: &SenderID, new_tree_name: &AllowedTree, new_tree_id: &TreeID, parent_tree_id: &TreeID,
+    pub fn new(sender_id: SenderID, new_tree_name: &AllowedTree, new_tree_id: TreeID, parent_tree_id: TreeID,
                direction: MsgDirection, gvm_eqn: &GvmEquation) -> StackTreeMsg {
         let header = MsgHeader::new( sender_id, true,MsgType::StackTree, direction);
         let payload = StackTreeMsgPayload::new(new_tree_name, new_tree_id, parent_tree_id, gvm_eqn);
         StackTreeMsg { header, payload}
     }
     pub fn get_payload(&self) -> &StackTreeMsgPayload { &self.payload }
-    fn get_port_tree_id(&self) -> &PortTreeID { self.payload.get_port_tree_id() }
+    fn get_port_tree_id(&self) -> PortTreeID { self.payload.get_port_tree_id() }
 }
 impl Message for StackTreeMsg {
     fn get_header(&self) -> &MsgHeader { &self.header }
@@ -592,7 +592,7 @@ impl Message for StackTreeMsg {
         serde_json::to_value(self).expect("I don't know how to handle errors in msg.value()")
     }
     fn process_ca(&mut self, cell_agent: &mut CellAgent, port_no: PortNo,
-                  msg_port_tree_id: &PortTreeID, _is_ait: bool) -> Result<(), Error> {
+                  msg_port_tree_id: PortTreeID, _is_ait: bool) -> Result<(), Error> {
         cell_agent.process_stack_tree_msg(&self, port_no, msg_port_tree_id)
     }
 }
@@ -610,15 +610,15 @@ pub struct StackTreeMsgPayload {
     gvm_eqn: GvmEquation
 }
 impl StackTreeMsgPayload {
-    fn new(allowed_tree: &AllowedTree, new_tree_id: &TreeID, parent_tree_id: &TreeID, gvm_eqn: &GvmEquation) -> StackTreeMsgPayload {
+    fn new(allowed_tree: &AllowedTree, new_tree_id: TreeID, parent_tree_id: TreeID, gvm_eqn: &GvmEquation) -> StackTreeMsgPayload {
         StackTreeMsgPayload { allowed_tree: allowed_tree.clone(), new_port_tree_id: new_tree_id.to_port_tree_id_0(),
             parent_port_tree_id: parent_tree_id.to_port_tree_id_0(), gvm_eqn: gvm_eqn.clone() }
     }
     pub fn get_allowed_tree(&self) -> &AllowedTree { &self.allowed_tree }
-    pub fn get_new_port_tree_id(&self) -> &PortTreeID { &self.new_port_tree_id }
-    pub fn get_parent_port_tree_id(&self) -> &PortTreeID { &self.parent_port_tree_id }
+    pub fn get_new_port_tree_id(&self) -> PortTreeID { self.new_port_tree_id }
+    pub fn get_parent_port_tree_id(&self) -> PortTreeID { self.parent_port_tree_id }
     pub fn get_gvm_eqn(&self) -> &GvmEquation { &self.gvm_eqn }
-    fn get_port_tree_id(&self) -> &PortTreeID { &self.new_port_tree_id }
+    fn get_port_tree_id(&self) -> PortTreeID { self.new_port_tree_id }
 }
 impl MsgPayload for StackTreeMsgPayload {}
 impl fmt::Display for StackTreeMsgPayload {
@@ -632,13 +632,13 @@ pub struct StackTreeDMsg {
     payload: StackTreeMsgDPayload
 }
 impl StackTreeDMsg {
-    pub fn new(in_reply_to: MsgID, sender_id: &SenderID, port_tree_id: &PortTreeID) -> StackTreeDMsg {
+    pub fn new(in_reply_to: MsgID, sender_id: SenderID, port_tree_id: PortTreeID) -> StackTreeDMsg {
         let header = MsgHeader::new(sender_id, true,MsgType::StackTreeD, MsgDirection::Leafward);
         let payload = StackTreeMsgDPayload::new(in_reply_to, port_tree_id);
         StackTreeDMsg { header, payload}
     }
     pub fn get_payload(&self) -> &StackTreeMsgDPayload { &self.payload }
-    pub fn get_port_tree_id(&self) -> &PortTreeID { self.payload.get_port_tree_id() }
+    pub fn get_port_tree_id(&self) -> PortTreeID { self.payload.get_port_tree_id() }
 }
 impl Message for StackTreeDMsg {
     fn get_header(&self) -> &MsgHeader { &self.header }
@@ -650,7 +650,7 @@ impl Message for StackTreeDMsg {
         serde_json::to_value(self).expect("I don't know how to handle errors in msg.value()")
     }
     fn process_ca(&mut self, cell_agent: &mut CellAgent, port_no: PortNo,
-                  _msg_tree_id: &PortTreeID, _is_ait: bool) -> Result<(), Error> {
+                  _msg_tree_id: PortTreeID, _is_ait: bool) -> Result<(), Error> {
         cell_agent.process_stack_tree_d_msg(&self, port_no)
     }
 }
@@ -666,10 +666,10 @@ pub struct StackTreeMsgDPayload {
     port_tree_id: PortTreeID,
 }
 impl StackTreeMsgDPayload {
-    fn new(in_reply_to: MsgID, port_tree_id: &PortTreeID) -> StackTreeMsgDPayload {
-        StackTreeMsgDPayload { in_reply_to, port_tree_id: port_tree_id.clone() }
+    fn new(in_reply_to: MsgID, port_tree_id: PortTreeID) -> StackTreeMsgDPayload {
+        StackTreeMsgDPayload { in_reply_to, port_tree_id }
     }
-    fn get_port_tree_id(&self) -> &PortTreeID { &self.port_tree_id }
+    fn get_port_tree_id(&self) -> PortTreeID { self.port_tree_id }
 }
 impl MsgPayload for StackTreeMsgDPayload {}
 impl fmt::Display for StackTreeMsgDPayload {
@@ -683,7 +683,7 @@ pub struct ManifestMsg {
     payload: ManifestMsgPayload
 }
 impl ManifestMsg {
-    pub fn new(sender_id: &SenderID, is_ait: bool, deploy_tree_id: &TreeID, tree_map: &MsgTreeMap, manifest: &Manifest) -> ManifestMsg {
+    pub fn new(sender_id: SenderID, is_ait: bool, deploy_tree_id: &TreeID, tree_map: &MsgTreeMap, manifest: &Manifest) -> ManifestMsg {
         // Note that direction is leafward so cell agent will get the message
         let mut header = MsgHeader::new(sender_id, is_ait, MsgType::Manifest, MsgDirection::Leafward);
         header.set_tree_map(tree_map.clone());
@@ -691,7 +691,7 @@ impl ManifestMsg {
         ManifestMsg { header, payload }
     }
     pub fn get_payload(&self) -> &ManifestMsgPayload { &self.payload }
-    pub fn get_port_tree_id(&self) -> &PortTreeID { self.payload.get_port_tree_id() }
+    pub fn get_port_tree_id(&self) -> PortTreeID { self.payload.get_port_tree_id() }
 }
 impl Message for ManifestMsg {
     fn get_header(&self) -> &MsgHeader { &self.header }
@@ -702,7 +702,7 @@ impl Message for ManifestMsg {
         serde_json::to_value(self).expect("I don't know how to handle errors in msg.value()")
     }
     fn process_ca(&mut self, cell_agent: &mut CellAgent, port_no: PortNo,
-                  msg_port_tree_id: &PortTreeID, _is_ait: bool) -> Result<(), Error> {
+                  msg_port_tree_id: PortTreeID, _is_ait: bool) -> Result<(), Error> {
         cell_agent.process_manifest_msg(&self, port_no, msg_port_tree_id)
     }
 }
@@ -725,8 +725,8 @@ impl ManifestMsgPayload {
             manifest: manifest.clone() }
     }
     pub fn get_manifest(&self) -> &Manifest { &self.manifest }
-    pub fn get_deploy_port_tree_id(&self) -> &PortTreeID { &self.deploy_port_tree_id }
-    pub fn get_port_tree_id(&self) -> &PortTreeID { &self.deploy_port_tree_id }
+    pub fn get_deploy_port_tree_id(&self) -> PortTreeID { self.deploy_port_tree_id }
+    pub fn get_port_tree_id(&self) -> PortTreeID { self.deploy_port_tree_id }
 }
 impl MsgPayload for ManifestMsgPayload {}
 impl fmt::Display for ManifestMsgPayload {
@@ -741,13 +741,13 @@ pub struct ApplicationMsg {
     payload: ApplicationMsgPayload
 }
 impl ApplicationMsg {
-    pub fn new(sender_id: &SenderID, is_ait: bool, tree_id: &TreeID, direction: MsgDirection, body: &str) -> ApplicationMsg {
+    pub fn new(sender_id: SenderID, is_ait: bool, tree_id: &TreeID, direction: MsgDirection, body: &str) -> ApplicationMsg {
         let header = MsgHeader::new(sender_id, is_ait,MsgType::Application, direction);
         let payload = ApplicationMsgPayload::new(&tree_id.to_port_tree_id_0(), body);
         ApplicationMsg { header, payload }
     }
     pub fn get_payload(&self) -> &ApplicationMsgPayload { &self.payload }
-    pub fn get_port_tree_id(&self) -> &PortTreeID { self.payload.get_port_tree_id() }
+    pub fn get_port_tree_id(&self) -> PortTreeID { self.payload.get_port_tree_id() }
 }
 impl Message for ApplicationMsg {
     fn get_header(&self) -> &MsgHeader { &self.header }
@@ -758,8 +758,8 @@ impl Message for ApplicationMsg {
         serde_json::to_value(self).expect("I don't know how to handle errors in msg.value()")
     }
     fn process_ca(&mut self, cell_agent: &mut CellAgent, port_no: PortNo,
-                  msg_tree_id: &PortTreeID, is_ait: bool) -> Result<(), Error> {
-        cell_agent.process_application_msg(self, port_no,  &msg_tree_id, is_ait)
+                  msg_tree_id: PortTreeID, is_ait: bool) -> Result<(), Error> {
+        cell_agent.process_application_msg(self, port_no, msg_tree_id, is_ait)
     }
 }
 impl fmt::Display for ApplicationMsg {
@@ -779,7 +779,7 @@ impl ApplicationMsgPayload {
     }
     pub fn get_body(&self) -> &ByteArray { &self.body }
     pub fn get_tree_id(&self) -> &PortTreeID { &self.port_tree_id }
-    pub fn get_port_tree_id(&self) -> &PortTreeID { &self.port_tree_id }
+    pub fn get_port_tree_id(&self) -> PortTreeID { self.port_tree_id }
 }
 impl MsgPayload for ApplicationMsgPayload {}
 impl fmt::Display for ApplicationMsgPayload {
@@ -798,7 +798,7 @@ pub struct TreeNameMsg {
     payload: TreeNameMsgPayload
 }
 impl TreeNameMsg {
-    pub fn new(sender_id: &SenderID, tree_name: &str) -> TreeNameMsg {
+    pub fn new(sender_id: SenderID, tree_name: &str) -> TreeNameMsg {
         // Note that direction is rootward so cell agent will get the message
         let header = MsgHeader::new(sender_id, false,MsgType::TreeName, MsgDirection::Rootward);
         let payload = TreeNameMsgPayload::new(tree_name);

@@ -15,7 +15,7 @@ pub struct RoutingTableEntry {
     mask: Mask,
 }
 impl RoutingTableEntry {
-    pub fn new(port_tree_id: &PortTreeID, inuse: bool, parent: PortNumber, mask: Mask,
+    pub fn new(port_tree_id: PortTreeID, inuse: bool, parent: PortNumber, mask: Mask,
             may_send: bool) -> RoutingTableEntry {
         RoutingTableEntry { tree_uuid: port_tree_id.get_uuid(), parent: parent.get_port_no(),
             may_send, inuse, mask }
@@ -24,7 +24,7 @@ impl RoutingTableEntry {
         let port_number = PortNumber::new0();
         let tree_id = TreeID::new("default").expect("The string 'default' is always a valid tree name");
         let port_tree_id = tree_id.to_port_tree_id_0();
-        RoutingTableEntry::new(&port_tree_id, false, port_number, Mask::empty(), true)
+        RoutingTableEntry::new(port_tree_id, false, port_number, Mask::empty(), true)
     }
     pub fn is_in_use(&self) -> bool { self.inuse }
     pub fn may_send(&self) -> bool { self.may_send }
@@ -43,7 +43,7 @@ impl RoutingTableEntry {
     pub fn get_parent(&self) -> PortNo { self.parent }
     pub fn get_mask(&self) -> Mask { self.mask }
     pub fn set_mask(&mut self, mask: Mask) { self.mask = mask; }
-    pub fn set_tree_id(&mut self, port_tree_id: &PortTreeID) {
+    pub fn set_tree_id(&mut self, port_tree_id: PortTreeID) {
         self.tree_uuid = port_tree_id.get_uuid();
     }
 //    pub fn get_other_index(&self, port_number: PortNumber) -> TableIndex {

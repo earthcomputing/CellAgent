@@ -78,15 +78,15 @@ impl NalCell {
             ports_from_pe.insert(PortNo(i), port_from_pe);
             let is_connected = i == 0;
             let port_number = PortNo(i).make_port_number(nports).context(NalcellError::Chain { func_name: "new", comment: S("port number")})?;
-            let port = Port::new(&cell_id, port_number, is_border_port, is_connected,port_to_pe.clone()).context(NalcellError::Chain { func_name: "new", comment: S("port")})?;
+            let port = Port::new(cell_id, port_number, is_border_port, is_connected,port_to_pe.clone()).context(NalcellError::Chain { func_name: "new", comment: S("port")})?;
             ports.push(port);
         }
         let boxed_ports: Box<[Port]> = ports.into_boxed_slice();
-        let cell_agent = CellAgent::new(&cell_id, cell_type, config, nports, ca_to_cm).context(NalcellError::Chain { func_name: "new", comment: S("cell agent create")})?;
+        let cell_agent = CellAgent::new(cell_id, cell_type, config, nports, ca_to_cm).context(NalcellError::Chain { func_name: "new", comment: S("cell agent create")})?;
         NalCell::start_cell(&cell_agent, ca_from_cm);
-        let cmodel = Cmodel::new(&cell_id);
+        let cmodel = Cmodel::new(cell_id);
         NalCell::start_cmodel(&cmodel, cm_from_ca, cm_to_pe, cm_from_pe, cm_to_ca);
-        let packet_engine = PacketEngine::new(&cell_id, pe_to_cm, pe_to_ports, boundary_port_nos).context(NalcellError::Chain { func_name: "new", comment: S("packet engine create")})?;
+        let packet_engine = PacketEngine::new(cell_id, pe_to_cm, pe_to_ports, boundary_port_nos).context(NalcellError::Chain { func_name: "new", comment: S("packet engine create")})?;
         NalCell::start_packet_engine(&packet_engine, pe_from_cm, pe_from_ports);
         Ok(NalCell { id: cell_id, cell_no, cell_type, config, cmodel,
                 ports: boxed_ports, cell_agent, vms: Vec::new(),
@@ -143,7 +143,7 @@ impl NalCell {
         }).expect("thread failed");
     }
 
-    pub fn get_id(&self) -> &CellID { &self.id }
+    pub fn get_id(&self) -> CellID { self.id }
     pub fn get_no(&self) -> CellNo { self.cell_no }
     pub fn get_cell_agent(&self) -> &CellAgent { &self.cell_agent }
     //pub fn get_cmodel(&self) -> &Cmodel { &self.cmodel }
@@ -163,14 +163,14 @@ impl NalCell {
     pub fn get_free_port_mut(&mut self, want_boundary_port: bool)
             -> Result<(&mut Port, PortFromPe), Error> {
         let _f = "get_free_port_mut";
-        let id = &self.id;
+        let cell_id = self.id;
         let port = self.ports
             .iter_mut()
             .filter(|port| !port.is_connected())
             .filter(|port| !(want_boundary_port ^ port.is_border()))
             .filter(|port| (*(port.get_port_no()) != 0 as u8))
             .nth(0)
-            .ok_or::<Error>(NalcellError::NoFreePorts{ cell_id: id.clone(), func_name: _f }.into())?;
+            .ok_or::<Error>(NalcellError::NoFreePorts{ cell_id, func_name: _f }.into())?;
         port.set_connected();
         let recvr = self.ports_from_pe.remove(&port.get_port_no())
             .ok_or::<Error>(NalcellError::Channel { port_no: port.get_port_no(), func_name: _f }.into())?;
