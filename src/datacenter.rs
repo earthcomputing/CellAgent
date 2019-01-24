@@ -50,7 +50,7 @@ impl Datacenter {
                           .map(|border_cell| -> Result<NalCell, Error> {
                               let nalcell = NalCell::new(border_cell.get_cell_no(), border_cell.get_num_phys_ports(),
                                                          &HashSet::from_iter(border_cell.get_border_ports().clone()),
-                                                         CellType::Border, CellConfig::Large)?;
+                                                         CellConfig::Large)?;
                               {
                                   if TRACE_OPTIONS.all || TRACE_OPTIONS.dc {
                                       let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "border_cell_start" };
@@ -69,7 +69,7 @@ impl Datacenter {
                           .iter()
                           .map(|interior_cell| -> Result<NalCell, Error> {
                               let nalcell = NalCell::new(interior_cell.get_cell_no(), interior_cell.get_num_phys_ports(),
-                                                         &HashSet::new(), CellType::Interior, CellConfig::Large)?;
+                                                         &HashSet::new(), CellConfig::Large)?;
                               {
                                   if TRACE_OPTIONS.all || TRACE_OPTIONS.dc {
                                       let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "interior_cell_start" };

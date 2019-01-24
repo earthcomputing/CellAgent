@@ -9,12 +9,8 @@ name = "simulator"
 path = "src/simulator.rs"
 
 [[bin]]
-name = "interiorCell"
-path = "src/interiorCell.rs"
-
-[[bin]]
-name = "borderCell"
-path = "src/borderCell.rs"
+name = "cell"
+path = "src/cell.rs"
 
 [[bin]]
 name = "external_echoDemo"
