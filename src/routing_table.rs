@@ -22,7 +22,7 @@ impl RoutingTable {
         let _f = "get_entry";
         Ok(*(self.entries
             .get(&uuid)
-            .ok_or::<Error>(RoutingTableError::Uuid { func_name: _f, cell_id: self.id.clone(), uuid }.into())?))
+            .ok_or::<Error>(RoutingTableError::Uuid { func_name: _f, cell_id: self.id, uuid }.into())?))
     }
     pub fn set_entry(&mut self, entry: RoutingTableEntry) {
         let _f = "set_entry";

@@ -20,7 +20,7 @@ impl Tenant {
         }?;
         Ok(Tenant { id: name, ncells: n, children: HashMap::new() })
     }
-    pub fn get_id(&self) -> TenantID { self.id.clone() }
+    pub fn get_id(&self) -> TenantID { self.id }
 //  pub fn get_ncells(&self) -> usize { self.ncells }
 //  pub fn get_size(&self) -> usize { self.ncells }
 //  pub fn get_children(&self) -> &HashMap<TenantID,Box<Tenant>> { &self.children }
