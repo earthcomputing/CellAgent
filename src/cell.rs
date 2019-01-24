@@ -5,7 +5,6 @@
 #[macro_use] extern crate serde_derive;
 #[macro_use] extern crate serde_json;
 
-mod blueprint;
 mod cellagent;
 mod cmodel;
 mod config;
@@ -38,9 +37,9 @@ mod vm;
 use std::{io::{stdin, stdout, Read, Write},
           collections::{HashMap, HashSet},
           fs::{File, OpenOptions},
-          sync::mpsc::channel};
+          sync::mpsc::channel,
+	  iter::FromIterator};
 
-use crate::blueprint::InteriorCell;
 use crate::config::{AUTO_BREAK, OUTPUT_FILE_NAME, QUENCH,
              CellNo, CellType, PortNo, PortQty};
 use crate::gvm_equation::{GvmEqn};
@@ -56,14 +55,14 @@ fn main() -> Result<(), Error> {
     let _ = OpenOptions::new()
         .write(true)
         .truncate(true)
-        .open(OUTPUT_FILE_NAME);
-    let cell_no = CellNo(8484);
-    let num_phys_ports = PortQty(2);
-    let port_list = (0..*num_phys_ports as u8)
-        .map(|i| PortNo(i as u8))
-        .collect();
-    let cell = InteriorCell::new(cell_no, CellType::Interior, port_list);
-    let nal_cell = NalCell::new(cell_no, num_phys_ports, &HashSet::new(), CellType::Interior, CellConfig::Large);
+	.open(OUTPUT_FILE_NAME);
+    let cell_no = CellNo(0);
+    let num_phys_ports = PortQty(3);
+    let border_port_list : Vec<PortNo> = vec![2u8]
+        .iter()
+        .map(|i| PortNo(*i as u8))
+	.collect();
+    let nal_cell = NalCell::new(cell_no, num_phys_ports, &HashSet::from_iter(border_port_list.clone()), CellConfig::Large);
     Ok(())
 }
 

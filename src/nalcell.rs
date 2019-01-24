@@ -1,7 +1,8 @@
 use std::{fmt, fmt::Write,
           collections::{HashMap, HashSet},
           sync::mpsc::channel,
-          thread};
+          thread,
+          iter::FromIterator};
 
 use crate::cellagent::{CellAgent};
 use crate::cmodel::{Cmodel};
@@ -45,7 +46,7 @@ pub struct NalCell {
 }
 
 impl NalCell {
-    pub fn new(cell_no: CellNo, num_phys_ports: PortQty, border_port_nos: &HashSet<PortNo>, cell_type: CellType, config: CellConfig)
+    pub fn new(cell_no: CellNo, num_phys_ports: PortQty, border_port_nos: &HashSet<PortNo>, config: CellConfig)
             -> Result<NalCell, Error> {
         let _f = "new";
         if *num_phys_ports > *MAX_NUM_PHYS_PORTS_PER_CELL { return Err(NalcellError::NumberPorts { num_phys_ports, func_name: "new", max_num_phys_ports: MAX_NUM_PHYS_PORTS_PER_CELL }.into()) }
@@ -55,6 +56,15 @@ impl NalCell {
         let (cm_to_pe, pe_from_cm): (CmToPe, PeFromCm) = channel();
         let (pe_to_cm, cm_from_pe): (PeToCm, CmFromPe) = channel();
         let (port_to_pe, pe_from_ports): (PortToPe, PeFromPort) = channel();
+        let port_list : Vec<PortNo> = (0..*num_phys_ports)
+            .map(|i| PortNo(i as u8))
+            .collect();
+        let all: HashSet<PortNo> = HashSet::from_iter(port_list);
+        let mut interior_port_list = all
+            .difference(&border_port_nos)
+            .cloned()
+	    .collect::<Vec<_>>();
+        interior_port_list.sort();
         let mut ports = Vec::new();
         let mut pe_to_ports = Vec::new();
         let mut ports_from_pe = HashMap::new(); // So I can remove the item
@@ -65,6 +75,7 @@ impl NalCell {
                 let _ = dal::add_to_trace(TraceType::Trace, trace_params, &trace, _f);
             }
         }
+        let cell_type = if border_port_nos.is_empty() { CellType::Interior } else { CellType::Border };
         for i in 0..=*num_phys_ports {
             let is_border_port = border_port_nos.contains(&PortNo(i));
             let (pe_to_port, port_from_pe): (PeToPort, PortFromPe) = channel();
@@ -72,7 +83,7 @@ impl NalCell {
             ports_from_pe.insert(PortNo(i), port_from_pe);
             let is_connected = i == 0;
             let port_number = PortNo(i).make_port_number(num_phys_ports).context(NalcellError::Chain { func_name: "new", comment: S("port number")})?;
-            let port = Port::new(cell_id, port_number, is_border_port, is_connected,port_to_pe.clone()).context(NalcellError::Chain { func_name: "new", comment: S("port")})?;
+            let port = Port::new(cell_id, port_number, is_border_port, is_connected, port_to_pe.clone()).context(NalcellError::Chain { func_name: "new", comment: S("port")})?;
             ports.push(port);
         }
         let boxed_ports: Box<[Port]> = ports.into_boxed_slice();
