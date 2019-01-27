@@ -2,33 +2,11 @@ use std::{fmt, marker::Sized};
 use std::string::String;
 
 use crate::config::{SEPARATOR, CellNo, PortNo};
+use crate::name_type::{NameType, str_to_chars, str_from_chars};
 use crate::utility::{PortNumber, S};
 use crate::uuid_ec::Uuid;
 
-// Names are limited to 32 characters because that's the largest Rust has implmented for copying arrays
-// If you want longer names, you must implement Copy for each ID struct
-type NameType = [char; 32];
 
-fn str_to_chars(string: &str) -> [char; 32] {
-    let _f = "str_to_chars";
-    if string.len() > 32 {
-        panic!(format!("String |{}| is longer than 32 characters {}", string, string.len()))
-    }
-    let padded = format!("{:\n<32}", string);
-    let mut char_slice = ['\n'; 32];
-    for (i, c) in padded.char_indices() {
-        char_slice[i] = c; }
-    char_slice
-}
-fn str_from_chars(chars: [char; 32]) -> String {
-    let _f = "str_from_chars";
-    let mut output = S("");
-    for c in &chars {
-        if c == &'\n' { break; }
-        output.push(*c);
-    }
-    output
-}
 pub trait Name: Sized {
     fn get_name(&self) -> String;
     fn get_uuid(&self) -> Uuid;
