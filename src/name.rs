@@ -1,11 +1,42 @@
 use std::{fmt, marker::Sized};
 use std::string::String;
 
-use crate::config::{SEPARATOR, CellNo, PortNo};
-use crate::name_type::{NameType, str_to_chars, str_from_chars};
+use serde::{Deserialize, Deserializer, Serializer};
+
+use crate::config::{MAX_CHARS, SEPARATOR, CellNo, PortNo};
 use crate::utility::{PortNumber, S};
 use crate::uuid_ec::Uuid;
 
+type NameType = [char; MAX_CHARS];
+
+fn name_string<S: Serializer>(name: &[char; MAX_CHARS], s: S) -> Result<S::Ok, S::Error> {
+    s.serialize_str(&str_from_chars(*name))
+}
+fn string_name<'de, D: Deserializer<'de>>(deserializer: D) -> Result<[char; MAX_CHARS], D::Error>
+{
+    let s: &str = Deserialize::deserialize(deserializer)?;
+    Ok(str_to_chars(s))
+}
+fn str_to_chars(string: &str) -> NameType {
+    let _f = "str_to_chars";
+    if string.len() > MAX_CHARS {
+        // Should never reach here because check is done when name is created
+        panic!(format!("String |{}| is longer than {} characters {}", string, MAX_CHARS, string.len()))
+    }
+    let mut char_slice = ['\n'; MAX_CHARS];
+    for (i, c) in string.char_indices() {
+        char_slice[i] = c; }
+    char_slice
+}
+fn str_from_chars(chars: NameType) -> String {
+    let _f = "str_from_chars";
+    let mut output = S("");
+    for c in &chars {
+        if c == &'\n' { break; }
+        output.push(*c);
+    }
+    output
+}
 
 pub trait Name: Sized {
     fn get_name(&self) -> String;
@@ -29,7 +60,12 @@ pub trait Name: Sized {
     fn is_name(&self, name: &str) -> bool { self.get_name() == name }
 }
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
-pub struct CellID { name: NameType, uuid: Uuid }
+pub struct CellID {
+    #[serde(serialize_with = "name_string")]
+    #[serde(deserialize_with = "string_name")]
+    name: NameType,
+    uuid: Uuid
+}
 impl CellID {
     pub fn new(CellNo(n): CellNo) -> Result<CellID, NameError> {
         let name = str_to_chars(&format!("C:{}",n));
@@ -42,8 +78,13 @@ impl Name for CellID {
     fn create_from_string(&self, name: &str) -> CellID { CellID { name: str_to_chars(name), uuid: Uuid::new() } }
 }
 impl fmt::Display for CellID { fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result { str_from_chars(self.name).fmt(f) } }
-#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
-pub struct PortID { name: NameType, uuid: Uuid }
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub struct PortID {
+    #[serde(serialize_with = "name_string")]
+    #[serde(deserialize_with = "string_name")]
+    name: NameType,
+    uuid: Uuid
+}
 impl PortID {
     pub fn new(cell_id: CellID, port_number: PortNumber) -> Result<PortID, Error> {
         let name = str_to_chars(&([cell_id.get_name(), format!("P:{}", port_number)].join(SEPARATOR)));
@@ -57,7 +98,12 @@ impl Name for PortID {
 }
 impl fmt::Display for PortID { fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result { str_from_chars(self.name).fmt(f) } }
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
-pub struct TreeID { name: NameType, uuid: Uuid}
+pub struct TreeID {
+    #[serde(serialize_with = "name_string")]
+    #[serde(deserialize_with = "string_name")]
+    name: NameType,
+    uuid: Uuid
+}
 impl TreeID {
     pub fn new(name: &str) -> Result<TreeID, Error> {
         match name.find(' ') {
@@ -98,7 +144,12 @@ impl fmt::Display for TreeID {
     }
 }
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
-pub struct PortTreeID { name: NameType, uuid: Uuid}
+pub struct PortTreeID {
+    #[serde(serialize_with = "name_string")]
+    #[serde(deserialize_with = "string_name")]
+    name: NameType,
+    uuid: Uuid
+}
 impl PortTreeID {
     pub fn to_tree_id(&self) -> TreeID {
         let mut uuid = self.uuid; // Copy so next line doesn't change self.uuid
@@ -124,7 +175,12 @@ impl fmt::Display for PortTreeID {
     }
 }
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
-pub struct UptreeID { name: NameType, uuid: Uuid}
+pub struct UptreeID {
+    #[serde(serialize_with = "name_string")]
+    #[serde(deserialize_with = "string_name")]
+    name: NameType,
+    uuid: Uuid
+}
 impl UptreeID {
     pub fn new(n: &str) -> Result<UptreeID, Error> {
         let name = str_to_chars(n);
@@ -140,8 +196,13 @@ impl Name for UptreeID {
     fn create_from_string(&self, name: &str) -> UptreeID { UptreeID { name: str_to_chars(name), uuid: Uuid::new() } }
 }
 impl fmt::Display for UptreeID { fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result { str_from_chars(self.name).fmt(f) } }
-#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
-pub struct TenantID { name: NameType, uuid: Uuid }
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub struct TenantID {
+    #[serde(serialize_with = "name_string")]
+    #[serde(deserialize_with = "string_name")]
+    name: NameType,
+    uuid: Uuid
+}
 impl TenantID {
     /*
     pub fn new(n: &str) -> Result<TenantID, Error> {
@@ -160,7 +221,12 @@ impl Name for TenantID {
 }
 impl fmt::Display for TenantID { fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result { str_from_chars(self.name).fmt(f) } }
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, Serialize)]
-pub struct LinkID { name: NameType, uuid: Uuid}
+pub struct LinkID {
+    #[serde(serialize_with = "name_string")]
+    #[serde(deserialize_with = "string_name")]
+    name: NameType,
+    uuid: Uuid
+}
 impl LinkID {
     pub fn new(left_id: PortID, rite_id: PortID) -> Result<LinkID, Error> {
         let name = str_to_chars(&[left_id.get_name(), rite_id.get_name()].join(SEPARATOR));
@@ -174,7 +240,12 @@ impl Name for LinkID {
 }
 impl fmt::Display for LinkID { fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result { str_from_chars(self.name).fmt(f) } }
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
-pub struct VmID { name: NameType, uuid: Uuid}
+pub struct VmID {
+    #[serde(serialize_with = "name_string")]
+    #[serde(deserialize_with = "string_name")]
+    name: NameType,
+    uuid: Uuid
+}
 impl VmID {
     pub fn new(cell_id: CellID, name: &str) -> Result<VmID, Error> {
         let name = str_to_chars(&format!("VM:{}+{}", cell_id, name));
@@ -188,7 +259,12 @@ impl Name for VmID {
 }
 impl fmt::Display for VmID { fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result { str_from_chars(self.name).fmt(f) } }
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
-pub struct SenderID { name: NameType, uuid: Uuid}
+pub struct SenderID {
+    #[serde(serialize_with = "name_string")]
+    #[serde(deserialize_with = "string_name")]
+    name: NameType,
+    uuid: Uuid
+}
 impl SenderID {
     pub fn new(cell_id: CellID, name: &str) -> Result<SenderID, Error> {
         let name = str_to_chars(&format!("Sender:{}+{}", cell_id, name));
@@ -202,7 +278,12 @@ impl Name for SenderID {
 }
 impl fmt::Display for SenderID { fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result { str_from_chars(self.name).fmt(f) } }
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
-pub struct ContainerID { name: NameType, uuid: Uuid}
+pub struct ContainerID {
+    #[serde(serialize_with = "name_string")]
+    #[serde(deserialize_with = "string_name")]
+    name: NameType,
+    uuid: Uuid
+}
 impl ContainerID {
     pub fn new(n: &str) -> Result<ContainerID, Error> {
         let name = str_to_chars(n);

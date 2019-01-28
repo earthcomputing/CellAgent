@@ -21,7 +21,6 @@ mod message;
 mod message_types;
 mod nalcell;
 mod name;
-mod name_type;
 mod noc;
 mod packet;
 mod packet_engine;

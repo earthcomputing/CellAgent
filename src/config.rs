@@ -27,7 +27,7 @@ pub const OUTPUT_FILE_NAME: & str = "/tmp/multicell-trace.json";
 pub const KAFKA_SERVER: & str = "http://kafkaserver.com:9092";
 pub const KAFKA_TOPIC: & str = "CellAgent";
 //pub const MAX_ENTRIES: TableIndex    = TableIndex(64);  // Max number of active trees
-//pub const MAX_CHARS: usize         = 128; // Longest valid name
+pub const MAX_CHARS: usize = 32; // Longest valid name
 //pub const MAX_PACKETS: PacketNo    = 255;  // Maximum number of packets collected before processing
 // Things used in constructing names
 pub const SEPARATOR: & str = "+"; // Separator for compound names
