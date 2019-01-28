@@ -310,8 +310,10 @@ impl Traph {
     pub fn change_child(&mut self, port_tree_id: PortTreeID, old_child: PortNumber, new_child: PortNumber)
                         -> Result<Vec<RoutingTableEntry>, Error> {
         let _f = "swap_child";
-        self.remove_child(port_tree_id, old_child)?;
-        self.add_child(port_tree_id, new_child)
+        // The order of the next two statements doesn't matter even though a stacked tree will add the new
+        // only if the old child is a child.  That test is handled before this call is made.
+        self.add_child(port_tree_id, new_child)?;
+        self.remove_child(port_tree_id, old_child)
     }
     pub fn add_child(&mut self, port_tree_id: PortTreeID, child: PortNumber)
             -> Result<Vec<RoutingTableEntry>, Error> {
