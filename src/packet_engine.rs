@@ -1,7 +1,7 @@
 use std::{fmt, fmt::Write,
           sync::{Arc, Mutex},
           sync::mpsc::channel,
-          collections::HashSet,
+          collections::{HashMap, HashSet},
           thread};
 
 use crate::config::{CENTRAL_TREE, CONTINUE_ON_ERROR, DEBUG_OPTIONS, MAX_PORTS, TRACE_OPTIONS, PortNo};
@@ -23,6 +23,7 @@ pub struct PacketEngine {
     cell_id: CellID,
     boundary_port_nos: HashSet<PortNo>,
     routing_table: Arc<Mutex<RoutingTable>>,
+    saved_packets: Arc<Mutex<HashMap<PortNo, Packet>>>, // Change to [Packet; N] when pipelining N packets
     pe_to_cm: PeToCm,
     pe_to_ports: Vec<PeToPort>,
 }
@@ -36,6 +37,7 @@ impl PacketEngine {
             boundary_port_nos: HashSet<PortNo>) -> Result<PacketEngine, Error> {
         let routing_table = Arc::new(Mutex::new(RoutingTable::new(cell_id).context(PacketEngineError::Chain { func_name: "new", comment: S(cell_id.get_name())})?));
         Ok(PacketEngine { cell_id, routing_table, boundary_port_nos,
+            saved_packets: Arc::new(Mutex::new(HashMap::new())),
             pe_to_cm, pe_to_ports })
     }
 
@@ -135,7 +137,11 @@ impl PacketEngine {
         let entry = locked.get_entry(uuid).context(PacketEngineError::Chain { func_name: _f, comment: S(self.cell_id.get_name()) })?;
 
         match packet.get_ait_state() {
-            AitState::Tick | AitState::Tock | AitState::Tack | AitState::Teck => return Err(PacketEngineError::Ait { func_name: _f, ait_state: packet.get_ait_state() }.into()), // Not allowed here
+            AitState::Entl |
+            AitState::Tick |
+            AitState::Tock |
+            AitState::Tack |
+            AitState::Teck => return Err(PacketEngineError::Ait { func_name: _f, ait_state: packet.get_ait_state() }.into()), // Not allowed here
 
             AitState::Ait => { // Update state and send on ports from entry
                 packet.next_ait_state()?;
@@ -166,9 +172,9 @@ impl PacketEngine {
                     //    .send(PeToPortPacket::Packet(packet)).context(PacketEngineError::Chain { func_name: _f, comment: S("send packet leafward ") + self.cell_id.get_name() })?;
                    match self.pe_to_ports.get(*port_no as usize) {
                         // forward to neighbor
-                        Some(s) => s.send(PeToPortPacket::Packet(packet)).context(PacketEngineError::Chain { func_name: _f, comment: S("send packet leafward ") + &self.cell_id.get_name() })?,
+                        Some(s) => self.send_packet(s, port_no, packet),
                         None => return Err(PacketEngineError::Sender { cell_id: self.cell_id, func_name: "forward leaf", port_no: *port_no }.into())
-                    };
+                    }?;
                 }
             }
 
@@ -194,6 +200,13 @@ impl PacketEngine {
                 self.forward(port_no, entry, user_mask, packet).context(PacketEngineError::Chain { func_name: _f, comment: S(self.cell_id.get_name()) })?;
             }
         }
+        Ok(())
+    }
+    
+    fn send_packet(&self, sender: &PeToPort, port_no: PortNo, packet: Packet) -> Result<(), Error> {
+        let _f = "send_packet";
+        self.saved_packets.lock().unwrap().insert(port_no, packet);
+        sender.send(PeToPortPacket::Packet(packet))?;
         Ok(())
     }
 
@@ -238,14 +251,14 @@ impl PacketEngine {
 
         match packet.get_ait_state() {
             AitState::Ait => return Err(PacketEngineError::Ait { func_name: _f, ait_state: AitState::Ait }.into()), // Error, should never get from port
-
+            AitState::Entl => (),
             AitState::Tock => {
                 packet.next_ait_state()?;
 
                 // Send to CM and transition to ENTL
                 let channel = self.pe_to_ports.get(*port_no as usize)
                     .ok_or::<Error>(PacketEngineError::Sender { cell_id: self.cell_id, func_name: "forward leaf", port_no: *port_no }.into())?;
-                channel.send(PeToPortPacket::Packet(packet)).context(PacketEngineError::Chain { func_name: _f, comment: S("send packet leafward ") + &self.cell_id.get_name() })?;
+                self.send_packet(&channel, port_no, packet)?;
 
                 packet.make_ait();
                 self.pe_to_cm.send(PeToCmPacket::Packet((port_no, packet))).or_else(|_| -> Result<(), Error> {
@@ -264,7 +277,7 @@ impl PacketEngine {
                 packet.next_ait_state()?;
                 let channel = self.pe_to_ports.get(*port_no as usize)
                     .ok_or::<Error>(PacketEngineError::Sender { cell_id: self.cell_id, func_name: "forward leaf", port_no: *port_no }.into())?;
-                channel.send(PeToPortPacket::Packet(packet)).context(PacketEngineError::Chain { func_name: _f, comment: S("send packet leafward ") + &self.cell_id.get_name() })?;
+                self.send_packet(&channel, port_no, packet)?;
             },
 
             AitState::Normal => { // Forward packet
@@ -362,7 +375,7 @@ impl PacketEngine {
                     }
 
                     // forward rootward
-                    channel.send(PeToPortPacket::Packet(packet)).context(PacketEngineError::Chain { func_name: _f, comment: S(self.cell_id) })?;
+                    self.send_packet(&channel, recv_port_no, packet)?;
 
                     // deliver to CModel
                     let is_up = entry.get_mask().and(user_mask).equal(Mask::port0());
@@ -402,8 +415,7 @@ impl PacketEngine {
                     // forward to neighbor
                     let channel = self.pe_to_ports.get(*port_no as usize)
                         .ok_or::<Error>(PacketEngineError::Sender { cell_id: self.cell_id, func_name: "forward leaf", port_no: *port_no }.into())?;
-                    channel
-                        .send(PeToPortPacket::Packet(packet)).context(PacketEngineError::Chain { func_name: _f, comment: S("send packet leafward ") + &self.cell_id.get_name() })?;
+                    self.send_packet(&channel, port_no, packet)?;
                 }
             }
         }

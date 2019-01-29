@@ -7,6 +7,7 @@ use crate::config::PortNo;
 use crate::utility::PortNumber;
 
 const NORMAL:   u8 = 0b0100_0000;  // Used for all Name UUIDs, including TreeIDs used for normal packets
+const ENTL:     u8 = 0b0000_1000;
 const AIT:      u8 = 0b0000_0100;
 const TECK:     u8 = 0b0000_0011;
 const TACK:     u8 = 0b0000_0010;
@@ -53,6 +54,9 @@ impl Uuid {
     pub fn is_ait(&self) -> bool {
         self.get_ait_state() == AitState::Ait
     }
+    pub fn is_entl(&self) -> bool {
+        self.get_ait_state() == AitState::Entl
+    }
     pub fn get_ait_state(&self) -> AitState {
         let _f = "get_ait_state";
         match self.get_code() {
@@ -84,6 +88,10 @@ impl Uuid {
         bytes[PORT_NO_BYTE] = 0; // Used to code root port number in TreeID
         self.set_bytes(bytes);
         AitState::Normal
+    }
+    pub fn make_entl(&mut self) -> AitState {
+        self.set_code(ENTL);
+        AitState::Entl
     }
     pub fn make_ait(&mut self) -> AitState {
         self.set_code(AIT);
@@ -167,12 +175,13 @@ impl PartialEq for Uuid {
 }
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum AitState {
-    Normal, Ait, Teck, Tack, Tock, Tick
+    Normal, Entl, Ait, Teck, Tack, Tock, Tick
 }
 impl fmt::Display for AitState {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let s = match *self {
             AitState::Normal => "Normal",
+            AitState::Entl   => "Entl",
             AitState::Ait    => "AIT",
             AitState::Teck   => "TECK",
             AitState::Tack   => "TACK",
