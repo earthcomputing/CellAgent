@@ -6,13 +6,13 @@ use uuid;
 use crate::config::PortNo;
 use crate::utility::PortNumber;
 
-const NORMAL:   u8 = 0b0100_0000;  // Used for all Name UUIDs, including TreeIDs used for normal packets
+const NORMAL:   u8 = 0b0000_0000;  // Used for all Name UUIDs, including TreeIDs and for normal packets
 const ENTL:     u8 = 0b0000_1000;
 const AIT:      u8 = 0b0000_0100;
-const TECK:     u8 = 0b0000_0011;
-const TACK:     u8 = 0b0000_0010;
-const TOCK:     u8 = 0b0000_0001;
-const TICK:     u8 = 0b0000_0000;
+const TECK:     u8 = 0b0000_0111;
+const TACK:     u8 = 0b0000_0101;
+const TOCK:     u8 = 0b0000_0011;
+const TICK:     u8 = 0b0000_0001;
 const FORWARD:  u8 = 0b0000_0000;  // Denotes forward direction in time for AIT transfer
 const REVERSE:  u8 = 0b1000_0000;  // Denotes time reversal for AIT transfer
 
@@ -37,10 +37,9 @@ impl Uuid {
     }
     fn get_bytes(&self) -> Bytes { *self.uuid.as_bytes() }
     fn set_bytes(&mut self, bytes: Bytes) { self.uuid = uuid::Uuid::from_bytes(bytes); }
-    fn mask_special_bytes(&self) -> Bytes {
+    fn mask_ait_byte(&self) -> Bytes {
         let mut bytes = self.clone().get_bytes();
         bytes[AIT_BYTE] = 0;
-        bytes[PORT_NO_BYTE] = 0;
         bytes
     }
     fn get_code(&self) -> u8 {
@@ -82,6 +81,11 @@ impl Uuid {
         }
     }
     fn is_reverse(&self) -> bool { !self.is_forward() }
+    pub fn for_lookup(&self) -> Uuid {
+        let mut bytes = self.mask_ait_byte();
+        bytes[AIT_BYTE] = NORMAL;
+        Uuid { uuid: uuid::Uuid::from_bytes(bytes) }
+    }
     pub fn make_normal(&mut self) -> AitState {
         let mut bytes = self.get_bytes();
         bytes[AIT_BYTE] = NORMAL;
