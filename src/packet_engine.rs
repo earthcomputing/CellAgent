@@ -131,8 +131,7 @@ impl PacketEngine {
 
     fn route_packet(&mut self, user_mask: Mask, mut packet: Packet) -> Result<(), Error> {
         let _f = "route_packet";
-        let mut uuid = packet.get_tree_uuid();
-        uuid.make_normal();  // Strip AIT info for lookup
+        let uuid = packet.get_tree_uuid().for_lookup();  // Strip AIT info for lookup
         let locked = self.routing_table.lock().unwrap();    // Hold lock until forwarding is done
         let entry = locked.get_entry(uuid).context(PacketEngineError::Chain { func_name: _f, comment: S(self.cell_id.get_name()) })?;
 
@@ -281,8 +280,7 @@ impl PacketEngine {
             },
 
             AitState::Normal => { // Forward packet
-                let mut uuid = packet.get_tree_uuid();
-                uuid.make_normal();
+                let uuid = packet.get_tree_uuid().for_lookup();
                 let entry = {
                     match self.routing_table.lock().unwrap().get_entry(uuid) {
                         Ok(e) => e,
