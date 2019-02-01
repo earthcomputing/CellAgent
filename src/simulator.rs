@@ -19,8 +19,8 @@ mod dumpstack;
 mod errors;
 mod gvm_equation;
 mod link;
-mod message;
-mod message_types;
+mod ec_message;
+mod ec_message_types;
 mod nalcell;
 mod name;
 mod noc;
@@ -31,6 +31,8 @@ mod port_tree;
 mod routing_table;
 mod routing_table_entry;
 mod service;
+mod tcp_message;
+mod tcp_message_types;
 mod tenant;
 mod traph;
 mod traph_element;
@@ -44,14 +46,14 @@ use std::{io::{stdin, stdout, Read, Write},
           collections::{HashMap, HashSet},
           fs::{File, OpenOptions, create_dir, remove_dir_all},
           path::Path,
-          sync::mpsc::channel};
+          sync::mpsc::channel,
+          thread::{JoinHandle}};
 
 use crate::config::{AUTO_BREAK, OUTPUT_DIR_NAME, OUTPUT_FILE_NAME, QUENCH,
-                    CellNo, CellQty, PortNo, PortQty, is2e};
+                    CellNo, CellConfig, CellQty, PortNo, PortQty, is2e};
 use crate::datacenter::Datacenter;
 use crate::gvm_equation::{GvmEqn};
-use crate::message_types::{OutsideToNoc};
-use crate::nalcell::CellConfig;
+use crate::tcp_message_types::{OutsideToNoc, OutsideFromNoc};
 use crate::uptree_spec::{AllowedTree, ContainerSpec, Manifest, UpTreeSpec, VmSpec};
 use crate::utility::{print_vec, S, TraceHeader};
 
@@ -80,7 +82,7 @@ fn main() -> Result<(), Error> {
     let mut border_cell_ports = HashMap::new();
     border_cell_ports.insert(CellNo(2), vec![PortNo(2)]);
     border_cell_ports.insert(CellNo(7), vec![PortNo(2)]);
-    let (mut dc, outside_to_noc) =
+    let (mut dc, outside_to_noc, outside_from_noc) =
         match Datacenter::construct(
             CellQty(10),
             &vec![is2e(0,1), is2e(1,2), is2e(2,3), is2e(3,4),

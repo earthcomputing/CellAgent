@@ -15,6 +15,19 @@ pub const PACKET_MAX: usize = 9000;
 // Control
 pub const CONTINUE_ON_ERROR: bool = false; // Don't close channel following an error if true
 pub const AUTO_BREAK: usize = 0; // Set to index of link to break when debugging broken link with VSCode, else 0
+#[derive(Debug, Copy, Clone, Hash, Serialize, Deserialize)]
+pub enum CellConfig { Small, Medium, Large }
+impl fmt::Display for CellConfig {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let s = match *self {
+            CellConfig::Small  => "Small",
+            CellConfig::Medium => "Medium",
+            CellConfig::Large  => "Large"
+        };
+        write!(f, "{}", s)
+    }
+}
+
 #[derive(Debug, Copy, Clone)]
 pub enum Quench { Simple, RootPort }
 pub const QUENCH: Quench = Quench::RootPort;

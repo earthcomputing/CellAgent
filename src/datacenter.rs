@@ -6,15 +6,15 @@ use std::{fmt, fmt::Write,
           thread::{JoinHandle}};
 
 use crate::blueprint::{Blueprint, Cell};
-use crate::config::{TRACE_OPTIONS, CellNo, CellQty, CellType, PortNo, PortQty, Edge, LinkNo, get_geometry};
+use crate::config::{TRACE_OPTIONS, CellNo, CellQty, CellType, CellConfig, PortNo, PortQty, Edge, LinkNo, get_geometry};
 use crate::dal;
-use crate::message_types::{LinkToPort, PortFromLink, PortToLink, LinkFromPort,
-    PortToNoc, PortFromNoc};
+use crate::ec_message_types::{LinkToPort, PortFromLink, PortToLink, LinkFromPort};
 use crate::link::{Link};
-use crate::message_types::{OutsideFromNoc, OutsideToNoc, NocFromOutside, NocToOutside};
-use crate::nalcell::{CellConfig, NalCell};
+use crate::nalcell::{NalCell};
 use crate::name::{CellID, LinkID};
-use crate::noc::Noc;
+use crate::noc::{Noc};
+use crate::tcp_message_types::{OutsideFromNoc, OutsideToNoc, NocFromOutside, NocToOutside,
+                               PortToNoc, PortFromNoc};
 use crate::utility::{S, TraceHeaderParams, TraceType};
 
 #[derive(Debug)]
@@ -24,7 +24,7 @@ pub struct Datacenter {
 }
 impl Datacenter {
     pub fn new() -> Datacenter { Datacenter { cells: Vec::new(), links: Vec::new() } }
-    pub fn construct(num_cells: CellQty, edges: &Vec<Edge>, default_num_phys_ports_per_cell: PortQty, cell_port_exceptions: &HashMap<CellNo, PortQty>, border_cell_ports: &HashMap<CellNo, Vec<PortNo>>) -> Result<(Datacenter, OutsideToNoc), Error> {
+    pub fn construct(num_cells: CellQty, edges: &Vec<Edge>, default_num_phys_ports_per_cell: PortQty, cell_port_exceptions: &HashMap<CellNo, PortQty>, border_cell_ports: &HashMap<CellNo, Vec<PortNo>>) -> Result<(Datacenter, OutsideToNoc, OutsideFromNoc), Error> {
         /* Doesn't work when debugging in Eclipse
         let args: Vec<String> = env::args().collect();
         println!("Main: args {:?}",args);
@@ -32,11 +32,13 @@ impl Datacenter {
         println!("\nMain: {} ports for each of {} cells", *default_num_phys_ports_per_cell, *num_cells);
         let blueprint = Blueprint::new(num_cells, &edges, default_num_phys_ports_per_cell, &cell_port_exceptions, border_cell_ports)?;
         println!("{}", blueprint);
+        let (mut dc, join_handles) = build_datacenter(&blueprint).context(DatacenterError::Chain { func_name: "initialize", comment: S("")})?;
         let (outside_to_noc, noc_from_outside): (OutsideToNoc, NocFromOutside) = channel();
-        let (noc_to_outside, _outside_from_noc): (NocToOutside, OutsideFromNoc) = channel();
+        let (noc_to_outside, outside_from_noc): (NocToOutside, OutsideFromNoc) = channel();
         let mut noc = Noc::new(noc_to_outside)?;
-        let (dc, _) = noc.initialize(&blueprint, noc_from_outside)?;
-        return Ok((dc, outside_to_noc));
+        let (port_to_noc, port_from_noc) = noc.initialize(&blueprint, noc_from_outside)?;
+        dc.connect_to_noc(port_to_noc, port_from_noc).context(DatacenterError::Chain { func_name: "initialize", comment: S("")})?;
+        return Ok((dc, outside_to_noc, outside_from_noc));
     }
     pub fn initialize(&mut self, blueprint: &Blueprint)  -> Result<Vec<JoinHandle<()>>, Error> {
         let _f = "initialize";
@@ -145,6 +147,11 @@ impl Datacenter {
         Ok(())
     }
 }
+fn build_datacenter(blueprint: &Blueprint) -> Result<(Datacenter, Vec<JoinHandle<()>>), Error> {
+    let mut dc = Datacenter::new();
+    let join_handles = dc.initialize(blueprint).context(DatacenterError::Chain { func_name: "build_datacenter", comment: S("")})?;
+    Ok((dc, join_handles))
+}
 impl fmt::Display for Datacenter {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let mut s = format!("Links");
@@ -162,6 +169,8 @@ impl fmt::Display for Datacenter {
 use failure::{Error, ResultExt};
 #[derive(Debug, Fail)]
 pub enum DatacenterError {
+    #[fail(display = "DatacenterError::Chain {} {}", func_name, comment)]
+    Chain { func_name: &'static str, comment: String },
     #[fail(display = "DatacenterError::Boundary {}: No boundary cells found", func_name)]
     Boundary { func_name: &'static str },
     #[fail(display = "DatacenterError::Cells {}: The number of cells {:?} must be at least 1", func_name, num_cells)]

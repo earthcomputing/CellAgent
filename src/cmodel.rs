@@ -7,8 +7,8 @@ use failure::{Error, ResultExt};
 use crate::config::{CENTRAL_TREE, CONTINUE_ON_ERROR, DEBUG_OPTIONS, TRACE_OPTIONS, PortNo};
 use crate::dal;
 use crate::dal::{fork_trace_header, update_trace_header};
-use crate::message::MsgType;
-use crate::message_types::{CaToCmBytes, CmToCa, CmFromCa, CmToPe, CmFromPe, PeToCmPacket,
+use crate::ec_message::MsgType;
+use crate::ec_message_types::{CaToCmBytes, CmToCa, CmFromCa, CmToPe, CmFromPe, PeToCmPacket,
                     CmToPePacket, CmToCaBytes};
 use crate::name::{Name, CellID};
 use crate::packet::{Packet, PacketAssembler, PacketAssemblers, Packetizer};

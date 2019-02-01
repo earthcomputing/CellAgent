@@ -8,8 +8,8 @@ use crate::config::{CENTRAL_TREE, CONTINUE_ON_ERROR, DEBUG_OPTIONS,
                     MAX_NUM_PHYS_PORTS_PER_CELL, TRACE_OPTIONS, PortNo};
 use crate::dal;
 use crate::dal::{fork_trace_header, update_trace_header};
-use crate::message::MsgType;
-use crate::message_types::{PeFromCm, PeToCm,
+use crate::ec_message::{MsgType};
+use crate::ec_message_types::{PeFromCm, PeToCm,
                     PeToPort, PeFromPort, PortToPePacket, PeToPortPacket,
                     PeToPe, PeFromPe, CmToPePacket, PeToCmPacket};
 use crate::name::{Name, CellID};

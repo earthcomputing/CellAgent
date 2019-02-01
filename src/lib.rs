@@ -13,11 +13,11 @@ mod container;
 mod dal;
 mod datacenter;
 mod dumpstack;
+mod ec_message;
+mod ec_message_types;
 mod errors;
 mod gvm_equation;
 mod link;
-mod message;
-mod message_types;
 mod nalcell;
 mod name;
 mod noc;
@@ -28,6 +28,8 @@ mod port_tree;
 mod routing_table;
 mod routing_table_entry;
 mod service;
+mod tcp_message;
+mod tcp_message_types;
 mod tenant;
 mod traph;
 mod traph_element;
@@ -135,7 +137,7 @@ impl Test for DatacenterGraphSpec {
     fn test(&mut self) {
         let mut border_cell_ports = HashMap::new();
         border_cell_ports.insert(CellNo(0), vec![PortNo(0)]);
-        let (dc, outside_to_noc) =
+        let (dc, outside_to_noc, outside_from_noc) =
             match Datacenter::construct(
                 self.num_cells,
                 &self.edges,
@@ -160,7 +162,7 @@ impl DatacenterGraph {
     fn new_three_cells() -> DatacenterGraph {
         let mut border_cell_ports = HashMap::new();
         border_cell_ports.insert(CellNo(0), vec![PortNo(2)]);
-        let (dc, outside_to_noc) =
+        let (dc, outside_to_noc, outside_from_noc) =
             match Datacenter::construct(
                 triangle_graph_spec.num_cells,
                 &triangle_graph_spec.edges,
@@ -179,7 +181,7 @@ impl DatacenterGraph {
     fn new_four_cells() -> DatacenterGraph {
         let mut border_cell_ports = HashMap::new();
         border_cell_ports.insert(CellNo(0), vec![PortNo(3)]);
-        let (dc, outside_to_noc) =
+        let (dc, outside_to_noc, outside_from_noc) =
             match Datacenter::construct(
                 two_by_two_with_diagonals_graph_spec.num_cells,
                 &two_by_two_with_diagonals_graph_spec.edges,
@@ -198,7 +200,7 @@ impl DatacenterGraph {
     fn new_ten_cells() -> DatacenterGraph {
         let mut border_cell_ports = HashMap::new();
         border_cell_ports.insert(CellNo(0), vec![PortNo(4)]);
-        let (dc, outside_to_noc) =
+        let (dc, outside_to_noc, outside_from_noc) =
             match Datacenter::construct(
                 five_by_two_graph_spec.num_cells,
                 &five_by_two_graph_spec.edges,
@@ -219,7 +221,7 @@ impl DatacenterGraph {
     fn new_fortyseven_cells() -> DatacenterGraph {
         let mut border_cell_ports = HashMap::new();
         border_cell_ports.insert(CellNo(0), vec![PortNo(7)]);
-        let (dc, outside_to_noc) =
+        let (dc, outside_to_noc, outside_from_noc) =
             match Datacenter::construct(
                 fortyseven_graph_spec.num_cells,
                 &fortyseven_graph_spec.edges,
@@ -327,7 +329,7 @@ impl<'a> Test for DatacenterPortsSpec<'a> {
     fn test(&mut self) {
         let mut border_cell_ports = HashMap::new();
         border_cell_ports.insert(CellNo(0), vec![PortNo(0)]);
-        let (dc, outside_to_noc) =
+        let (dc, outside_to_noc, outside_from_noc) =
             match Datacenter::construct(
                 self.graph_spec.num_cells,
                 &self.graph_spec.edges,
@@ -354,7 +356,7 @@ impl<'a> DatacenterPorts<'a> {
     fn new_with_exceptions() -> DatacenterPorts<'static> {
         let mut border_cell_ports = HashMap::new();
         border_cell_ports.insert(CellNo(0), vec![PortNo(2)]);
-        let (dc, outside_to_noc) =
+        let (dc, outside_to_noc, outside_from_noc) =
             match Datacenter::construct(
                 five_by_two_ports_spec.graph_spec.num_cells,
                 &five_by_two_ports_spec.graph_spec.edges,
@@ -430,7 +432,7 @@ impl<'a, 'b> DatacenterBorderSpec<'a, 'b> {
 
 impl<'a, 'b> Test for DatacenterBorderSpec<'a, 'b> {
     fn test(&mut self) {
-        let (dc, outside_to_noc) =
+        let (dc, outside_to_noc, outside_from_noc) =
             match Datacenter::construct(
                 self.ports_spec.graph_spec.num_cells,
                 &self.ports_spec.graph_spec.edges,
@@ -458,7 +460,7 @@ impl<'a, 'b> DatacenterBorder<'a, 'b> {
         let mut border_cell_ports = HashMap::new();
         border_cell_ports.insert(CellNo(0), vec![PortNo(2)]);
         border_cell_ports.insert(CellNo(7), vec![PortNo(2)]);
-        let (dc, outside_to_noc) =
+        let (dc, outside_to_noc, outside_from_noc) =
             match Datacenter::construct(
                 five_by_two_ports_spec.graph_spec.num_cells,
                 &five_by_two_ports_spec.graph_spec.edges,
@@ -480,7 +482,7 @@ impl<'a, 'b> DatacenterBorder<'a, 'b> {
     fn new_exception_port_border() -> DatacenterBorder<'static, 'static> {
         let mut border_cell_ports = HashMap::new();
         border_cell_ports.insert(CellNo(0), vec![PortNo(2)]);
-        let (dc, outside_to_noc) =
+        let (dc, outside_to_noc, outside_from_noc) =
             match Datacenter::construct(
                 triangle_ports_spec.graph_spec.num_cells,
                 &triangle_ports_spec.graph_spec.edges,

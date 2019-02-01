@@ -4,7 +4,7 @@ use std::{fmt,
 use crate::config::{CONTINUE_ON_ERROR, TRACE_OPTIONS};
 use crate::dal;
 use crate::dal::{fork_trace_header, update_trace_header};
-use crate::message_types::{LinkToPort, LinkFromPort, LinkToPortPacket};
+use crate::ec_message_types::{LinkToPort, LinkFromPort, LinkToPortPacket};
 use crate::name::{Name, LinkID, PortID};
 use crate::port::{PortStatus};
 use crate::utility::{S, write_err, TraceHeader, TraceHeaderParams, TraceType};

@@ -10,8 +10,9 @@ use serde_json;
 
 use crate::config::{PACKET_MIN, PACKET_MAX, PAYLOAD_DEFAULT_ELEMENT, 
     ByteArray, MsgID, PacketNo};
-use crate::message::{Message, MsgType, TypePlusMsg, get_next_count};
+use crate::ec_message::{Message, MsgType, TypePlusMsg};
 use crate::name::{PortTreeID};
+use crate::tcp_message::{get_next_count};
 use crate::utility::S;
 use crate::uuid_ec::{Uuid, AitState};
  
@@ -78,7 +79,6 @@ impl Packet {
         self.header = PacketHeader::new(&uuid);
         Ok(uuid.get_ait_state())
     }
-
     // Payload (Deep Packet Inspection)
     // Debug hack to get tree name out of packets.  Assumes msg is one packet
     pub fn get_port_tree_id(self) -> PortTreeID {

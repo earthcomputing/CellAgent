@@ -6,8 +6,9 @@ use std::{fmt,
 use crate::config::{CONTINUE_ON_ERROR, TRACE_OPTIONS, PortNo};
 use crate::dal;
 use crate::dal::{fork_trace_header, update_trace_header};
-use crate::message_types::{PortToLink, PortFromLink, PortToPe, PortFromPe, LinkToPortPacket, PortToPePacket,
-              PeToPortPacket, PortToNoc, PortFromNoc};
+use crate::tcp_message_types::{PortToNoc, PortFromNoc};
+use crate::ec_message_types::{PortToLink, PortFromLink, PortToPe, PortFromPe, LinkToPortPacket, PortToPePacket,
+              PeToPortPacket};
 use crate::name::{Name, PortID, CellID};
 use crate::utility::{PortNumber, S, write_err, TraceHeader, TraceHeaderParams, TraceType};
 

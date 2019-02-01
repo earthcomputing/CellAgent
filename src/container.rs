@@ -1,9 +1,9 @@
 use std::fmt;
 use failure::Error;
 
-use crate::message_types::{ContainerToVm, ContainerFromVm};
 use crate::name::{ContainerID, UptreeID};
 use crate::service::{Service};
+use crate::tcp_message_types::{ContainerToVm, ContainerFromVm};
 use crate::uptree_spec::AllowedTree;
 
 #[derive(Debug, Clone)]
