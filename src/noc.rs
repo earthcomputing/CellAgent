@@ -94,7 +94,7 @@ impl Noc {
             let cmd = noc_from_port.recv().context(NocError::Chain { func_name: "listen_port", comment: S("")})?;
             {
                 if TRACE_OPTIONS.all || TRACE_OPTIONS.noc {
-                    let trace_params = &TraceHeaderParams { module: "src/main.rs", line_no: line!(), function: _f, format: "noc_from_ca" };
+                    let trace_params = &TraceHeaderParams { module: "src/noc.rs", line_no: line!(), function: _f, format: "noc_from_port" };
                     let trace = json!({ "id": self.get_name(), "cmd": cmd });
                     let _ = dal::add_to_trace(TraceType::Trace, trace_params, &trace, _f);
                 }
