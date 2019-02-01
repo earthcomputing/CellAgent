@@ -13,9 +13,8 @@ mod dal;
 mod dumpstack;
 mod errors;
 mod gvm_equation;
-mod link;
-mod message;
-mod message_types;
+mod ec_message;
+mod ec_message_types;
 mod nalcell;
 mod name;
 mod packet;
@@ -25,6 +24,8 @@ mod port_tree;
 mod routing_table;
 mod routing_table_entry;
 mod service;
+mod tcp_message;
+mod tcp_message_types;
 mod tenant;
 mod traph;
 mod traph_element;
@@ -41,10 +42,9 @@ use std::{io::{stdin, stdout, Read, Write},
 	  iter::FromIterator};
 
 use crate::config::{AUTO_BREAK, OUTPUT_FILE_NAME, QUENCH,
-             CellNo, CellType, PortNo, PortQty};
+                    CellNo, CellType, CellConfig, PortNo, PortQty};
 use crate::gvm_equation::{GvmEqn};
-use crate::message_types::{OutsideFromNoc, OutsideToNoc, NocFromOutside, NocToOutside};
-use crate::nalcell::{CellConfig, NalCell};
+use crate::nalcell::{NalCell};
 use crate::uptree_spec::{AllowedTree, ContainerSpec, Manifest, UpTreeSpec, VmSpec};
 use crate::utility::{print_vec, S, TraceHeader};
 

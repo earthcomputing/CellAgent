@@ -6,10 +6,10 @@ use std::{fmt, fmt::Write,
 
 use crate::cellagent::{CellAgent};
 use crate::cmodel::{Cmodel};
-use crate::config::{CONTINUE_ON_ERROR, MAX_NUM_PHYS_PORTS_PER_CELL, TRACE_OPTIONS, CellNo, CellType, PortNo, PortQty};
+use crate::config::{CONTINUE_ON_ERROR, MAX_NUM_PHYS_PORTS_PER_CELL, TRACE_OPTIONS, CellNo, CellType, CellConfig, PortNo, PortQty};
 use crate::dal;
 use crate::dal::{fork_trace_header, update_trace_header};
-use crate::message_types::{PortToPe, PeFromPort, PeToPort,PortFromPe,
+use crate::ec_message_types::{PortToPe, PeFromPort, PeToPort,PortFromPe,
                     CaToCm, CmFromCa, CmToCa, CaFromCm,
                     CmToPe, PeFromCm, PeToCm, CmFromPe};
 use crate::name::{CellID};
@@ -17,19 +17,6 @@ use crate::packet_engine::{PacketEngine};
 use crate::port::{Port};
 use crate::utility::{S, TraceHeaderParams, TraceType};
 use crate::vm::VirtualMachine;
-
-#[derive(Debug, Copy, Clone, Hash, Serialize, Deserialize)]
-pub enum CellConfig { Small, Medium, Large }
-impl fmt::Display for CellConfig { 
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let s = match *self {
-            CellConfig::Small  => "Small",
-            CellConfig::Medium => "Medium",
-            CellConfig::Large  => "Large"
-        };
-        write!(f, "{}", s)
-    }
-}
 
 #[derive(Debug)]
 pub struct NalCell {

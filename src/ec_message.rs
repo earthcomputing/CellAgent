@@ -1,7 +1,6 @@
 use std;
 use std::{fmt,
-          collections::{HashMap, HashSet},
-          sync::atomic::{ATOMIC_USIZE_INIT, AtomicUsize, Ordering}};
+          collections::{HashMap, HashSet}};
 
 use serde;
 use serde_json;
@@ -12,11 +11,9 @@ use crate::gvm_equation::{GvmEquation, GvmEqn};
 use crate::name::{Name, CellID, PortTreeID, SenderID, TreeID};
 use crate::packet::{Packet, Packetizer, Serializer};
 use crate::packet_engine::NumberOfPackets;
+use crate::tcp_message::{get_next_count, TcpMsgDirection};
 use crate::uptree_spec::{AllowedTree, Manifest};
 use crate::utility::{S, Path};
-
-static MESSAGE_COUNT: AtomicUsize = ATOMIC_USIZE_INIT;
-pub fn get_next_count() -> MsgID { MsgID(MESSAGE_COUNT.fetch_add(1, Ordering::SeqCst) as u64) }
 
 pub type MsgTreeMap = HashMap<String, TreeID>;
 
@@ -32,7 +29,7 @@ pub enum MsgType {
     Manifest,
     StackTree,
     StackTreeD,
-    TreeName,
+    TreeName
 }
 impl MsgType {
     // Used for debug hack in packet_engine
@@ -65,7 +62,7 @@ impl MsgType {
         let msg_type = type_msg.get_type();
         let serialized_msg = type_msg.get_serialized_msg();
         Ok(match msg_type {
-            MsgType::Application => Box::new(serde_json::from_str::<ApplicationMsg>(&serialized_msg).context(MessageError::Chain { func_name: _f, comment: S("DiscoverMsg")})?),
+            MsgType::Application => Box::new(serde_json::from_str::<ApplicationMsg>(&serialized_msg).context(MessageError::Chain { func_name: _f, comment: S("ApplicationMsg")})?),
             MsgType::Discover    => Box::new(serde_json::from_str::<DiscoverMsg>(&serialized_msg).context(MessageError::Chain { func_name: _f, comment: S("DiscoverMsg")})?),
             MsgType::DiscoverD   => Box::new(serde_json::from_str::<DiscoverDMsg>(&serialized_msg).context(MessageError::Chain { func_name: _f, comment: S("DiscoverDMsg")})?),
             MsgType::Failover    => Box::new(serde_json::from_str::<FailoverMsg>(&serialized_msg).context(MessageError::Chain { func_name: _f, comment: S("FailoverMsg")})?),
@@ -100,39 +97,17 @@ impl MsgType {
 impl fmt::Display for MsgType {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let s = match *self {
-            MsgType::Entl        => "Entl",
-            MsgType::Application => "Application",
-            MsgType::Discover    => "Discover",
-            MsgType::DiscoverD   => "DiscoverD",
-            MsgType::Failover    => "Failover",
-            MsgType::FailoverD   => "FailoverD",
-            MsgType::Hello       => "Hello",
-            MsgType::Manifest    => "Manifest",
-            MsgType::StackTree   => "StackTree",
-            MsgType::StackTreeD  => "StackTreeD",
-            MsgType::TreeName    => "TreeName",
-        };
-        write!(f, "{}", s)
-    }
-}
-#[derive(Debug, Copy, Clone, Hash, Eq, PartialEq, Serialize, Deserialize)]
-pub enum TcpMsgType {
-    Application,
-    DeleteTree,
-    Manifest,
-    Query,
-    StackTree,
-    TreeName,
-}
-impl fmt::Display for TcpMsgType {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let s = match *self {
-            TcpMsgType::Application  => "Application",
-            TcpMsgType::DeleteTree   => "DeleteTree",
-            TcpMsgType::Manifest     => "Manifest",
-            TcpMsgType::Query        => "Query",
-            TcpMsgType::StackTree    => "StackTree",
-            TcpMsgType::TreeName     =>  "TreeName",
+            MsgType::Entl         => "Entl",
+            MsgType::Application  => "Application",
+            MsgType::Discover     => "Discover",
+            MsgType::DiscoverD    => "DiscoverD",
+            MsgType::Failover     => "Failover",
+            MsgType::FailoverD    => "FailoverD",
+            MsgType::Hello        => "Hello",
+            MsgType::Manifest     => "Manifest",
+            MsgType::StackTree    => "StackTree",
+            MsgType::StackTreeD   => "StackTreeD",
+            MsgType::TreeName     => "TreeName",
         };
         write!(f, "{}", s)
     }
@@ -141,6 +116,14 @@ impl fmt::Display for TcpMsgType {
 pub enum MsgDirection {
     Rootward,
     Leafward
+}
+impl MsgDirection {
+    pub fn from_tcp(direction: TcpMsgDirection) -> MsgDirection {
+        match direction {
+            TcpMsgDirection::Rootward => MsgDirection::Rootward,
+            TcpMsgDirection::Leafward => MsgDirection::Leafward,
+        }
+    }
 }
 impl fmt::Display for MsgDirection {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -811,7 +794,7 @@ pub struct TreeNameMsg {
 impl TreeNameMsg {
     pub fn new(sender_id: SenderID, tree_name: &str) -> TreeNameMsg {
         // Note that direction is rootward so cell agent will get the message
-        let header = MsgHeader::new(sender_id, false,MsgType::TreeName, MsgDirection::Rootward);
+        let header = MsgHeader::new(sender_id, false, MsgType::TreeName, MsgDirection::Rootward);
         let payload = TreeNameMsgPayload::new(tree_name);
         TreeNameMsg { header, payload }
     }
@@ -850,6 +833,7 @@ impl fmt::Display for TreeNameMsgPayload {
         write!(f, "{}", s)
     }
 }
+
 // Errors
 use failure::{Error, ResultExt};
 #[derive(Debug, Fail)]
@@ -857,19 +841,19 @@ pub enum MessageError {
     #[fail(display = "MessageError::Chain {} {}", func_name, comment)]
     Chain { func_name: &'static str, comment: String },
 //    #[fail(display = "MessageError::Gvm {}: No GVM for this message type {}", func_name, msg_type)]
-//    Gvm { func_name: &'static str, msg_type: MsgType },
-//    #[fail(display = "MessageError::InvalidMsgType {}: Invalid message type {} from packet assembler", func_name, msg_type)]
-//    InvalidMsgType { func_name: &'static str, msg_type: MsgType },
+//    Gvm { func_name: &'static str, msg_type: TcpMsgType },
+//    #[fail(display = "MessageError::InvalidTcpMsgType {}: Invalid message type {} from packet assembler", func_name, msg_type)]
+//    InvalidTcpMsgType { func_name: &'static str, msg_type: TcpMsgType },
 //    #[fail(display = "MessageError::Message {}: Message error from {}", func_name, handler)]
 //    Message { func_name: &'static str, handler: &'static str },
 //    #[fail(display = "MessageError::NoGmv {}: No GVM in StackTreeMsg", func_name)]
 //    NoGvm { func_name: &'static str },
 //    #[fail(display = "MessageError::Payload {}: Wrong payload for type {}", func_name, msg_type)]
-//    Payload { func_name: &'static str, msg_type: MsgType },
+//    Payload { func_name: &'static str, msg_type: TcpMsgType },
     #[fail(display = "MessageError::Process {}: Wrong message process function called", func_name)]
     Process { func_name: &'static str },
-//    #[fail(display = "MessageError::TreeID {}: No TreeID ", func_name, msg_type: MsgType)]
-//    TreeID { func_name: &'static str, msg_type: MsgType },
+//    #[fail(display = "MessageError::TreeID {}: No TreeID ", func_name, msg_type: TcpMsgType)]
+//    TreeID { func_name: &'static str, msg_type: TcpMsgType },
 //    #[fail(display = "MessageError::TreeMapEntry {}: No tree named {} in map", func_name, tree_name)]
 //    TreeMapEntry { func_name: &'static str, tree_name: String }
 }

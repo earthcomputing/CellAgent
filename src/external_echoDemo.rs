@@ -6,36 +6,21 @@
 #[macro_use] extern crate serde_json;
 
 mod blueprint;
-mod cellagent;
-mod cmodel;
 mod config;
 mod container;
 mod dal;
-mod datacenter;
 mod dumpstack;
 mod errors;
 mod gvm_equation;
-mod link;
-mod message;
-mod message_types;
-mod nalcell;
 mod name;
 mod noc;
-mod packet;
-mod packet_engine;
-mod port;
-mod port_tree;
-mod routing_table;
-mod routing_table_entry;
 mod service;
+mod tcp_message;
+mod tcp_message_types;
 mod tenant;
-mod traph;
-mod traph_element;
-mod tree;
 mod uptree_spec;
 mod utility;
 mod uuid_ec;
-mod vm;
 
 use std::{io::{stdin, stdout, Read, Write},
           collections::{HashMap, HashSet},
@@ -44,12 +29,10 @@ use std::{io::{stdin, stdout, Read, Write},
 
 use crate::blueprint::Blueprint;
 use crate::config::{AUTO_BREAK, OUTPUT_FILE_NAME, QUENCH,
-                    CellNo, CellQty, PortNo, PortQty, is2e};
-use crate::datacenter::Datacenter;
+                    CellNo, CellQty, CellConfig, PortNo, PortQty, is2e};
 use crate::gvm_equation::{GvmEqn};
-use crate::message_types::{OutsideFromNoc, OutsideToNoc, NocFromOutside, NocToOutside};
-use crate::nalcell::CellConfig;
 use crate::noc::Noc;
+use crate::tcp_message_types::{OutsideFromNoc, OutsideToNoc, NocFromOutside, NocToOutside};
 use crate::uptree_spec::{AllowedTree, ContainerSpec, Manifest, UpTreeSpec, VmSpec};
 use crate::utility::{print_vec, S, TraceHeader};
 
@@ -67,7 +50,7 @@ fn main() -> Result<(), Error> {
     let (outside_to_noc, noc_from_outside): (OutsideToNoc, NocFromOutside) = channel();
     let (noc_to_outside, _outside_from_noc): (NocToOutside, OutsideFromNoc) = channel();
     let mut noc = Noc::new(noc_to_outside)?;
-    let (dc, _) = noc.initialize(&blueprint, noc_from_outside).context(MainError::Chain { func_name: "run", comment: S("") })?;
+    let (port_to_noc, port_from_noc) = noc.initialize(&blueprint, noc_from_outside).context(MainError::Chain { func_name: "run", comment: S("") })?;
     deploy(&outside_to_noc.clone())?; /* Deploy Echo */
     /* Send Ping request */
     Ok(())

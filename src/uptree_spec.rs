@@ -1,7 +1,7 @@
 use std::{fmt, fmt::Write,
           collections::HashSet};
 
-use crate::nalcell::CellConfig;
+use crate::config::{CellConfig};
 use crate::utility::S;
 
 #[derive(Debug, Clone, Hash, Serialize, Deserialize)]
