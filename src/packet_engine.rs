@@ -4,7 +4,8 @@ use std::{fmt, fmt::Write,
           collections::{HashMap, HashSet},
           thread};
 
-use crate::config::{CENTRAL_TREE, CONTINUE_ON_ERROR, DEBUG_OPTIONS, MAX_PORTS, TRACE_OPTIONS, PortNo};
+use crate::config::{CENTRAL_TREE, CONTINUE_ON_ERROR, DEBUG_OPTIONS,
+                    MAX_PORTS, PACKET_PIPELINE_SIZE, TRACE_OPTIONS, PortNo};
 use crate::dal;
 use crate::dal::{fork_trace_header, update_trace_header};
 use crate::message::MsgType;
@@ -23,7 +24,8 @@ pub struct PacketEngine {
     cell_id: CellID,
     boundary_port_nos: HashSet<PortNo>,
     routing_table: Arc<Mutex<RoutingTable>>,
-    saved_packets: Arc<Mutex<HashMap<PortNo, Packet>>>, // Change to [Packet; N] when pipelining N packets
+    seen_packets: Arc<Mutex<HashMap<PortNo, Vec<Packet>>>>,
+    sent_packets: Arc<Mutex<HashMap<PortNo, Vec<Packet>>>>,
     pe_to_cm: PeToCm,
     pe_to_ports: Vec<PeToPort>,
 }
@@ -37,7 +39,8 @@ impl PacketEngine {
             boundary_port_nos: HashSet<PortNo>) -> Result<PacketEngine, Error> {
         let routing_table = Arc::new(Mutex::new(RoutingTable::new(cell_id).context(PacketEngineError::Chain { func_name: "new", comment: S(cell_id.get_name())})?));
         Ok(PacketEngine { cell_id, routing_table, boundary_port_nos,
-            saved_packets: Arc::new(Mutex::new(HashMap::new())),
+            seen_packets: Arc::new(Mutex::new(HashMap::new())),
+            sent_packets: Arc::new(Mutex::new(HashMap::new())),
             pe_to_cm, pe_to_ports })
     }
 
@@ -164,15 +167,7 @@ impl PacketEngine {
                     }
                 }
                 for port_no in port_nos.iter().cloned() {
-                    // I think the match version is clearer than the ok_or version
-                    //self.pe_to_ports.get(*port_no as usize)
-                    //    .ok_or::<Error>(PacketEngineError::Sender { cell_id: self.cell_id, func_name: "forward leaf", port_no: *port_no }.into())?
-                    //    .send(PeToPortPacket::Packet(packet)).context(PacketEngineError::Chain { func_name: _f, comment: S("send packet leafward ") + self.cell_id.get_name() })?;
-                   match self.pe_to_ports.get(*port_no as usize) {
-                        // forward to neighbor
-                        Some(s) => self.send_packet(s, port_no, packet),
-                        None => return Err(PacketEngineError::Sender { cell_id: self.cell_id, func_name: "forward leaf", port_no: *port_no }.into())
-                    }?;
+                    self.send_packet(port_no, packet)?;
                 }
             }
 
@@ -201,10 +196,24 @@ impl PacketEngine {
         Ok(())
     }
     
-    fn send_packet(&self, sender: &PeToPort, port_no: PortNo, packet: Packet) -> Result<(), Error> {
+    fn add_seen_packet(&self, port_no: PortNo, packet: Packet) {
+        let mut default = vec![];
+        self.seen_packets
+            .lock()
+            .unwrap()
+            .get_mut(&port_no)
+            .unwrap_or(&mut default)
+            .push(packet);
+    }
+    
+    fn send_packet(&self, port_no: PortNo, packet: Packet) -> Result<(), Error> {
         let _f = "send_packet";
-        self.saved_packets.lock().unwrap().insert(port_no, packet);
-        sender.send(PeToPortPacket::Packet(packet))?;
+        if self.seen_packets.lock().unwrap().len() < PACKET_PIPELINE_SIZE {
+            self.pe_to_ports.get(*port_no as usize)
+                .ok_or::<Error>(PacketEngineError::Sender { cell_id: self.cell_id, func_name: "forward leaf", port_no: *port_no }.into())?
+                .send(PeToPortPacket::Packet(packet))?;
+            self.add_seen_packet(port_no, packet);
+        };
         Ok(())
     }
 
@@ -252,17 +261,15 @@ impl PacketEngine {
             AitState::Tock => {
                 packet.next_ait_state()?;
 
-                // Send to CM and transition to ENTL
-                let channel = self.pe_to_ports.get(*port_no as usize)
-                    .ok_or::<Error>(PacketEngineError::Sender { cell_id: self.cell_id, func_name: "forward leaf", port_no: *port_no }.into())?;
-                self.send_packet(&channel, port_no, packet)?;
+                // Send to CM and transition to ENTL if time is FORWARD
+                self.send_packet(port_no, packet)?;
 
                 packet.make_ait();
                 self.pe_to_cm.send(PeToCmPacket::Packet((port_no, packet))).or_else(|_| -> Result<(), Error> {
                     // Time reverse on error sending to CM
                     packet.make_tock();
                     packet.time_reverse();
-                    channel.send(PeToPortPacket::Packet(packet))?;
+                    self.send_packet(port_no, packet)?;
                     Ok(())
                 })?;
             },
@@ -272,9 +279,7 @@ impl PacketEngine {
             AitState::Tack | AitState::Teck => {
                 // Update and send back on same port
                 packet.next_ait_state()?;
-                let channel = self.pe_to_ports.get(*port_no as usize)
-                    .ok_or::<Error>(PacketEngineError::Sender { cell_id: self.cell_id, func_name: "forward leaf", port_no: *port_no }.into())?;
-                self.send_packet(&channel, port_no, packet)?;
+                self.send_packet(port_no, packet)?;
             },
 
             AitState::Normal => { // Forward packet
@@ -352,34 +357,13 @@ impl PacketEngine {
                 // deliver to CModel
                 self.pe_to_cm.send(PeToCmPacket::Packet((recv_port_no, packet)))?;
             } else {
-// FIXME : option logic
-                if let Some(channel) = self.pe_to_ports.get((*parent) as usize) {
-                    if DEBUG_OPTIONS.pe_pkt_send {
-                        let msg_type = MsgType::msg_type(&packet);
-                        match msg_type {
-                            MsgType::Discover => (),
-                            _ => {
-                                let tree_name = packet.get_port_tree_id();
-                                {
-                                    let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "pe_forward_rootward" };
-                                    let trace = json!({ "cell_id": self.cell_id, "tree_name": &tree_name, "msg_type": &msg_type, "parent_port": &parent });
-                                    let _ = dal::add_to_trace(TraceType::Debug, trace_params, &trace, _f);
-                                }
-                                println!("PacketEngine {}: {} [{}] {} {}", self.cell_id, _f, *parent, msg_type, tree_name);
-                            },
-                        }
-                    }
-
-                    // forward rootward
-                    self.send_packet(&channel, recv_port_no, packet)?;
-
-                    // deliver to CModel
-                    let is_up = entry.get_mask().and(user_mask).equal(Mask::port0());
-                    if is_up {
-                        self.pe_to_cm.send(PeToCmPacket::Packet((recv_port_no, packet))).context(PacketEngineError::Chain { func_name: "forward", comment: S("rootcast packet to ca ") + &self.cell_id.get_name() })?;
-                    }
-                } else {
-                    return Err(PacketEngineError::Sender { cell_id: self.cell_id, func_name: "forward rootward", port_no: *parent }.into());
+                // forward rootward
+                self.send_packet(recv_port_no, packet)?;
+    
+                // deliver to CModel
+                let is_up = entry.get_mask().and(user_mask).equal(Mask::port0());
+                if is_up {
+                    self.pe_to_cm.send(PeToCmPacket::Packet((recv_port_no, packet))).context(PacketEngineError::Chain { func_name: "forward", comment: S("rootcast packet to ca ") + &self.cell_id.get_name() })?;
                 }
             }
         } else {  // Leafward
@@ -409,9 +393,7 @@ impl PacketEngine {
                     self.pe_to_cm.send(PeToCmPacket::Packet((recv_port_no, packet))).context(PacketEngineError::Chain { func_name: _f, comment: S("leafcast packet to ca ") + &self.cell_id.get_name() })?;
                 } else {
                     // forward to neighbor
-                    let channel = self.pe_to_ports.get(*port_no as usize)
-                        .ok_or::<Error>(PacketEngineError::Sender { cell_id: self.cell_id, func_name: "forward leaf", port_no: *port_no }.into())?;
-                    self.send_packet(&channel, port_no, packet)?;
+                    self.send_packet(port_no, packet)?;
                 }
             }
         }
