@@ -136,7 +136,6 @@ impl PacketEngine {
         let entry = locked.get_entry(uuid).context(PacketEngineError::Chain { func_name: _f, comment: S(self.cell_id.get_name()) })?;
 
         match packet.get_ait_state() {
-            AitState::Entl |
             AitState::Tick |
             AitState::Tock |
             AitState::Tack |
@@ -250,7 +249,6 @@ impl PacketEngine {
 
         match packet.get_ait_state() {
             AitState::Ait => return Err(PacketEngineError::Ait { func_name: _f, ait_state: AitState::Ait }.into()), // Error, should never get from port
-            AitState::Entl => (),
             AitState::Tock => {
                 packet.next_ait_state()?;
 
