@@ -130,12 +130,12 @@ impl NalCell {
         let _f = "start_packet_engine";
         if TRACE_OPTIONS.all || TRACE_OPTIONS.nal {
             let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "nalcell_start_pe" };
-            let trace = json!({ "cell_id": packet_engine.get_id() });
+            let trace = json!({ "cell_id": packet_engine.get_cell_id() });
             let _ = dal::add_to_trace(TraceType::Trace, trace_params, &trace, _f);
         }
         let pe = packet_engine.clone();
         let child_trace_header = fork_trace_header();
-        let thread_name = format!("PacketEngine {}", packet_engine.get_id());
+        let thread_name = format!("PacketEngine {}", packet_engine.get_cell_id());
         thread::Builder::new().name(thread_name).spawn( move || {
             update_trace_header(child_trace_header);
             let _ = pe.initialize(pe_from_cm, pe_from_ports).map_err(|e| crate::utility::write_err("nalcell", &e));
