@@ -91,6 +91,7 @@ impl PortNumber {
     }
     pub fn new0() -> PortNumber { PortNumber { port_no: (PortNo(0)) } }
     pub fn get_port_no(self) -> PortNo { self.port_no }
+    pub fn as_usize(self) -> usize { *self.port_no as usize }
 }
 impl fmt::Display for PortNumber {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result { write!(f, "{}", *self.port_no) }

@@ -150,6 +150,7 @@ impl PortNo {
     pub fn make_port_number(self, no_ports: PortNo) -> Result<PortNumber, Error> {
         Ok(PortNumber::new(self, no_ports)?)
     }
+    pub fn as_usize(self) -> usize { self.0 as usize }
 }
 impl Deref for PortNo { type Target = u8; fn deref(&self) -> &Self::Target { &self.0 } }
 #[derive(Debug, Copy, Clone)]
