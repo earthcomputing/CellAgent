@@ -1,7 +1,7 @@
 use std::{fmt, fmt::Write,
           sync::{Arc, Mutex},
           sync::mpsc::channel,
-          collections::{HashMap, HashSet},
+          collections::{HashSet},
           thread};
 
 use crate::config::{CENTRAL_TREE, CONTINUE_ON_ERROR, DEBUG_OPTIONS,
@@ -24,8 +24,12 @@ pub struct PacketEngine {
     cell_id: CellID,
     boundary_port_nos: HashSet<PortNo>,
     routing_table: Arc<Mutex<RoutingTable>>,
-    seen_packets: Arc<Mutex<HashMap<PortNo, Vec<Packet>>>>,
-    sent_packets: Arc<Mutex<HashMap<PortNo, Vec<Packet>>>>,
+    no_seen_packets: [usize; MAX_PORTS.0 as usize], // Number of packets received since last packet sent
+    no_sent_packets: [usize; MAX_PORTS.0 as usize], // Number of packets sent since last packet received
+    sent_packets: [Option<Box<Vec<Packet>>>; MAX_PORTS.0 as usize], // Packets that may need to be resent
+    out_buffer: [Option<Box<Vec<Packet>>>; MAX_PORTS.0 as usize],   // Packets waiting to go on the out port
+    in_buffer: [Option<Box<Vec<Packet>>>; MAX_PORTS.0 as usize],    // Packets on the in port waiting to into out_buf on the out port
+    port_got_event: [bool; MAX_PORTS.0 as usize],
     pe_to_cm: PeToCm,
     pe_to_ports: Vec<PeToPort>,
 }
@@ -33,14 +37,18 @@ pub struct PacketEngine {
 impl PacketEngine {
     pub fn get_id(&self) -> CellID { self.cell_id }
     //pub fn get_table(&self) -> &Arc<Mutex<RoutingTable>> { &self.routing_table }
-
     // NEW
     pub fn new(cell_id: CellID, pe_to_cm: PeToCm, pe_to_ports: Vec<PeToPort>,
             boundary_port_nos: HashSet<PortNo>) -> Result<PacketEngine, Error> {
         let routing_table = Arc::new(Mutex::new(RoutingTable::new(cell_id).context(PacketEngineError::Chain { func_name: "new", comment: S(cell_id.get_name())})?));
+        let array: [Option<Box<Vec<Packet>>>; MAX_PORTS.0 as usize] = Default::default();
+        let sent_packets = array.clone();
+        let out_buffer = array.clone();
+        let in_buffer = array.clone();
         Ok(PacketEngine { cell_id, routing_table, boundary_port_nos,
-            seen_packets: Arc::new(Mutex::new(HashMap::new())),
-            sent_packets: Arc::new(Mutex::new(HashMap::new())),
+            no_seen_packets: [0; MAX_PORTS.0 as usize], no_sent_packets: [0; MAX_PORTS.0 as usize],
+            sent_packets, out_buffer, in_buffer,
+            port_got_event: [true; MAX_PORTS.0 as usize],
             pe_to_cm, pe_to_ports })
     }
 
@@ -118,7 +126,7 @@ impl PacketEngine {
                 // encapsulated TCP
                 CmToPePacket::Tcp((port_number, msg)) => {
                     let port_no = port_number.get_port_no();
-                    match self.pe_to_ports.get(*port_no as usize) {
+                    match self.pe_to_ports.get(port_no.as_usize()) {
                         Some(sender) => sender.send(PeToPortPacket::Tcp(msg)).context(PacketEngineError::Chain { func_name: _f, comment: S("send TCP to port ") + &self.cell_id.get_name() })?,
                         _ => return Err(PacketEngineError::Sender { func_name: _f, cell_id: self.cell_id, port_no: *port_no }.into())
                     }
@@ -126,17 +134,19 @@ impl PacketEngine {
 
                 // route packet, xmit to neighbor(s) or up to CModel
                 CmToPePacket::Packet((user_mask, packet)) => {
-                    self.route_packet(user_mask, packet)?;
+                    self.route_cm_packet(user_mask, packet)?;
                 }
             };
         }
     }
 
-    fn route_packet(&mut self, user_mask: Mask, mut packet: Packet) -> Result<(), Error> {
+    fn route_cm_packet(&mut self, user_mask: Mask, mut packet: Packet) -> Result<(), Error> {
         let _f = "route_packet";
         let uuid = packet.get_tree_uuid().for_lookup();  // Strip AIT info for lookup
-        let locked = self.routing_table.lock().unwrap();    // Hold lock until forwarding is done
-        let entry = locked.get_entry(uuid).context(PacketEngineError::Chain { func_name: _f, comment: S(self.cell_id.get_name()) })?;
+        let entry = {
+            let locked = self.routing_table.lock().unwrap();
+            locked.get_entry(uuid).context(PacketEngineError::Chain { func_name: _f, comment: S(self.cell_id.get_name()) })?
+        };
 
         match packet.get_ait_state() {
             AitState::Tick |
@@ -170,7 +180,7 @@ impl PacketEngine {
                     self.send_packet(port_no, packet)?;
                 }
             }
-
+            AitState::Entl => (),
             AitState::Normal => {
                 {
                     let msg_type = MsgType::msg_type(&packet);
@@ -195,25 +205,44 @@ impl PacketEngine {
         }
         Ok(())
     }
-    
-    fn add_seen_packet(&self, port_no: PortNo, packet: Packet) {
-        let mut default = vec![];
-        self.seen_packets
-            .lock()
-            .unwrap()
-            .get_mut(&port_no)
-            .unwrap_or(&mut default)
-            .push(packet);
+    fn add_seen_packet(&mut self, port_no: PortNo, packet: Packet) {
+        if self.no_seen_packets.len() == PACKET_PIPELINE_SIZE {
+            self.no_seen_packets[port_no.as_usize()] = 0;
+        } else {
+            self.no_seen_packets[port_no.as_usize()] = self.no_seen_packets[port_no.as_usize()] + 1;
+        }
     }
-    
-    fn send_packet(&self, port_no: PortNo, packet: Packet) -> Result<(), Error> {
+    fn clear_see_packets(&mut self, port_no: PortNo) {
+        self.no_seen_packets[port_no.as_usize()] = 0;
+    }
+    fn add_packet(packet_vecs: &mut [Option<Box<Vec<Packet>>>; MAX_PORTS.0 as usize],
+                  port_no: PortNo, packet: Packet) {
+        let default = Some(Box::new(vec![]));
+        let foo = packet_vecs
+            .get(port_no.as_usize())
+            .unwrap_or(&default);
+    }
+    fn add_sent_packet(&mut self, port_no: PortNo, packet: Packet) {
+        PacketEngine::add_packet(&mut self.sent_packets, port_no, packet);
+    }
+    fn clear_sent_packets(&mut self, port_no: PortNo) {
+        self.no_seen_packets[port_no.as_usize()] = 0;
+    }
+    fn add_to_out_buffer(&mut self, port_no: PortNo, packet: Packet) {
+        PacketEngine::add_packet(&mut self.out_buffer, port_no, packet);
+    }
+    fn add_to_in_buffer(&mut self, port_no: PortNo, packet: Packet) {
+        PacketEngine::add_packet(&mut self.in_buffer, port_no, packet);
+    }
+    fn send_packet(&mut self, port_no: PortNo, packet: Packet) -> Result<(), Error> {
         let _f = "send_packet";
-        if self.seen_packets.lock().unwrap().len() < PACKET_PIPELINE_SIZE {
-            self.pe_to_ports.get(*port_no as usize)
-                .ok_or::<Error>(PacketEngineError::Sender { cell_id: self.cell_id, func_name: "forward leaf", port_no: *port_no }.into())?
+//        if self.seen_packets.len() < PACKET_PIPELINE_SIZE {
+            self.pe_to_ports.get(port_no.as_usize())
+                .ok_or::<Error>(PacketEngineError::Sender { cell_id: self.cell_id, func_name: _f, port_no: *port_no }.into())?
                 .send(PeToPortPacket::Packet(packet))?;
-            self.add_seen_packet(port_no, packet);
-        };
+//            self.add_seen_packet(port_no, packet);
+//            self.port_got_event[port_no.as_usize()] = false;
+//        };
         Ok(())
     }
 
@@ -263,7 +292,7 @@ impl PacketEngine {
 
                 // Send to CM and transition to ENTL if time is FORWARD
                 self.send_packet(port_no, packet)?;
-
+    
                 packet.make_ait();
                 self.pe_to_cm.send(PeToCmPacket::Packet((port_no, packet))).or_else(|_| -> Result<(), Error> {
                     // Time reverse on error sending to CM
@@ -281,7 +310,9 @@ impl PacketEngine {
                 packet.next_ait_state()?;
                 self.send_packet(port_no, packet)?;
             },
-
+            AitState::Entl => {
+                self.port_got_event[port_no.as_usize()] = true; // Safe because array is MAX_PORTS in size
+            }
             AitState::Normal => { // Forward packet
                 let uuid = packet.get_tree_uuid().for_lookup();
                 let entry = {
@@ -315,7 +346,6 @@ impl PacketEngine {
                 if entry.is_in_use() {
                     if entry.get_uuid() == packet.get_uuid() {
                         let mask = entry.get_mask();
-                        port_no.make_port_number(MAX_PORTS).context(PacketEngineError::Chain { func_name: "process_packet", comment: S("port number ") + &self.cell_id.get_name() })?; // Verify that port_no is valid
                         self.forward(port_no, entry, mask, packet).context(PacketEngineError::Chain { func_name: "process_packet", comment: S("forward ") + &self.cell_id.get_name() })?;
                     } else {
                         let msg_type = MsgType::msg_type(&packet);
@@ -331,7 +361,7 @@ impl PacketEngine {
         }
         Ok(())
     }
-    fn forward(&self, recv_port_no: PortNo, entry: RoutingTableEntry, user_mask: Mask, packet: Packet)
+    fn forward(&mut self, recv_port_no: PortNo, entry: RoutingTableEntry, user_mask: Mask, packet: Packet)
             -> Result<(), Error> {
         let _f = "forward";
         if recv_port_no != entry.get_parent() {
@@ -406,12 +436,16 @@ impl fmt::Display for PacketEngine {
         write!(s, "{}", *self.routing_table.lock().unwrap())?;
         write!(_f, "{}", s) }
 }
+#[derive(Debug, Clone, Default)]
+struct MyVec<T> { v: Vec<T> }
 // Errors
 use failure::{Error, ResultExt};
 #[derive(Debug, Fail)]
 pub enum PacketEngineError {
     #[fail(display = "PacketEngineError::Ait {} {} is not allowed here", func_name, ait_state)]
     Ait { func_name: &'static str, ait_state: AitState },
+    #[fail(display = "PacketEngineError::Buffer {} no room for packet in {}", func_name, buffer_name)]
+    Buffer { func_name: &'static str, buffer_name: &'static str },
     #[fail(display = "PacketEngineError::Chain {} {}", func_name, comment)]
     Chain { func_name: &'static str, comment: String },
     #[fail(display = "PacketEngineError::Sender {}: No sender for port {:?} on cell {}", func_name, port_no, cell_id)]
