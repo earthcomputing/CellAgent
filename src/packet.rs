@@ -10,7 +10,7 @@ use serde_json;
 
 use crate::config::{PACKET_MIN, PACKET_MAX, PAYLOAD_DEFAULT_ELEMENT, 
     ByteArray, MsgID, PacketNo};
-use crate::message::{Message, MsgType, TypePlusMsg};
+use crate::message::{Message, MsgType, TypePlusMsg, get_next_count};
 use crate::name::{PortTreeID};
 use crate::utility::S;
 use crate::uuid_ec::{Uuid, AitState};
@@ -37,6 +37,12 @@ impl Packet {
         Packet { header, payload, packet_count: Packet::get_next_count() }
     }
 
+    pub fn make_entl_packet(uuid: &mut Uuid) -> Packet {
+        uuid.make_entl();
+        Packet::new(get_next_count(), uuid, PacketNo(1),
+                    false, false, vec![])
+    }
+    
     pub fn get_next_count() -> usize { PACKET_COUNT.fetch_add(1, Ordering::SeqCst) }
 
     //pub fn get_header(&self) -> PacketHeader { self.header }

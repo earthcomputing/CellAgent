@@ -15,7 +15,6 @@ pub const MAX_PORTS: PortNo = PortNo(9);          // Limit on number of ports pe
 pub const MIN_BORDER_CELLS: CellNo = CellNo(1);   // Minimum acceptable number of border cells
 pub const PACKET_MIN: usize = 64;
 pub const PACKET_MAX: usize = 9000;
-pub const PACKET_PIPELINE_SIZE: usize = 1; // Number of packets sent before need to receive reply
 // Control
 pub const CONTINUE_ON_ERROR: bool = false; // Don't close channel following an error if true
 pub const AUTO_BREAK: usize = 0; // Set to index of link to break when debugging broken link with VSCode, else 0
