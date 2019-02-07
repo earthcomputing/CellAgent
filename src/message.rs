@@ -45,7 +45,7 @@ impl MsgType {
         let msg_type = type_msg.get_type();
         let serialized_msg = type_msg.get_serialized_msg();
         Ok(match msg_type {
-            MsgType::Application => Box::new(serde_json::from_str::<ApplicationMsg>(&serialized_msg).context(MessageError::Chain { func_name: _f, comment: S("DiscoverMsg")})?),
+            MsgType::Application => Box::new(serde_json::from_str::<ApplicationMsg>(&serialized_msg).context(MessageError::Chain { func_name: _f, comment: S("ApplicationMsg")})?),
             MsgType::Discover    => Box::new(serde_json::from_str::<DiscoverMsg>(&serialized_msg).context(MessageError::Chain { func_name: _f, comment: S("DiscoverMsg")})?),
             MsgType::DiscoverD   => Box::new(serde_json::from_str::<DiscoverDMsg>(&serialized_msg).context(MessageError::Chain { func_name: _f, comment: S("DiscoverDMsg")})?),
             MsgType::Failover    => Box::new(serde_json::from_str::<FailoverMsg>(&serialized_msg).context(MessageError::Chain { func_name: _f, comment: S("FailoverMsg")})?),
