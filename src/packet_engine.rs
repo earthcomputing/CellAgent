@@ -5,7 +5,7 @@ use std::{fmt, fmt::Write,
           thread};
 
 use crate::config::{CENTRAL_TREE, CONTINUE_ON_ERROR, DEBUG_OPTIONS,
-                    MAX_PORTS, PACKET_PIPELINE_SIZE, TRACE_OPTIONS, PortNo};
+                    MAX_PORTS, TRACE_OPTIONS, PortNo};
 use crate::dal;
 use crate::dal::{fork_trace_header, update_trace_header};
 use crate::message::MsgType;
@@ -233,13 +233,11 @@ impl PacketEngine {
         PacketEngine::get_packet_item(&self.sent_packets, port_no).push(packet);
         let mut outbuf = PacketEngine::get_packet_item(&self.out_buffer, port_no);
         outbuf.push(packet);
+        let (send_packet, rest) = outbuf.split_at(1);
         if self.can_send(port_no) {
-            let (first, rest) = outbuf.split_at(PACKET_PIPELINE_SIZE);
-            for packet in first {
-                self.pe_to_ports.get(port_no.as_usize())
-                    .ok_or::<Error>(PacketEngineError::Sender { cell_id: self.cell_id, func_name: _f, port_no: *port_no }.into())?
-                    .send(PeToPortPacket::Packet(*packet))?;
-            }
+            self.pe_to_ports.get(port_no.as_usize())
+                .ok_or::<Error>(PacketEngineError::Sender { cell_id: self.cell_id, func_name: _f, port_no: *port_no }.into())?
+                .send(PeToPortPacket::Packet(send_packet[0]))?;
             // Uncomment the next line when
             // self.set_cannot_send(port_no);
             outbuf = Box::new(rest.to_vec());
@@ -432,7 +430,7 @@ impl PacketEngine {
         Ok(())
     }
     fn add_to_packet_count(packet_count: &mut UsizeArray, port_no: PortNo) {
-        if packet_count.len() == PACKET_PIPELINE_SIZE {
+        if packet_count.len() == 1 { // Replace 1 with PACKET_PIPELINE_SIZE when adding pipelining
             packet_count[port_no.as_usize()] = 0;
         } else {
             packet_count[port_no.as_usize()] = packet_count[port_no.as_usize()] + 1;
