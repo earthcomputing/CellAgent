@@ -19,9 +19,9 @@ use crate::routing_table_entry::{RoutingTableEntry};
 use crate::utility::{Mask, S, TraceHeader, TraceHeaderParams, TraceType, write_err};
 use crate::uuid_ec::{AitState, Uuid};
 
-type BoolArray = [bool; MAX_PORTS.0 as usize];
-type UsizeArray = [usize; MAX_PORTS.0 as usize];
-type PacketArray = [Option<Box<Vec<Packet>>>; MAX_PORTS.0 as usize];
+type BoolArray = Vec<bool>;
+type UsizeArray = Vec<usize>;
+type PacketArray = Vec<Vec<Packet>>;
 
 #[derive(Debug, Clone)]
 pub struct PacketEngine {
@@ -44,14 +44,13 @@ impl PacketEngine {
     pub fn new(cell_id: CellID, pe_to_cm: PeToCm, pe_to_ports: Vec<PeToPort>,
             boundary_port_nos: HashSet<PortNo>) -> Result<PacketEngine, Error> {
         let routing_table = Arc::new(Mutex::new(RoutingTable::new(cell_id).context(PacketEngineError::Chain { func_name: "new", comment: S(cell_id.get_name())})?));
-        let array: PacketArray = Default::default();
-        let sent_packets = array.clone();
-        let out_buffer = array.clone();
-        let in_buffer = array.clone();
+        let mut array = vec![];
+        for i in 0..MAX_PORTS.0 as usize { array.push(vec![]); }
+        let count_vec = [0; MAX_PORTS.0 as usize].to_vec();
         Ok(PacketEngine { cell_id, routing_table, boundary_port_nos,
-            no_seen_packets: [0; MAX_PORTS.0 as usize], no_sent_packets: [0; MAX_PORTS.0 as usize],
-            sent_packets, out_buffer, in_buffer,
-            port_got_event: [true; MAX_PORTS.0 as usize],
+            no_seen_packets: count_vec.clone(), no_sent_packets: count_vec.clone(),
+            sent_packets: array.clone(), out_buffer: array.clone(), in_buffer: array.clone(),
+            port_got_event: [true; MAX_PORTS.0 as usize].to_vec(),
             pe_to_cm, pe_to_ports })
     }
 
@@ -71,6 +70,7 @@ impl PacketEngine {
         Ok(())
     }
     pub fn get_cell_id(&self) -> CellID { self.cell_id }
+    
     fn can_send(&self, port_no: PortNo) -> bool {
         self.port_got_event[port_no.as_usize()]
     }
@@ -80,16 +80,38 @@ impl PacketEngine {
     fn set_can_send(&mut self, port_no: PortNo) {
         self.port_got_event[port_no.as_usize()] = true;
     }
-    fn get_usize_item(array: &UsizeArray, port_no: PortNo) -> usize {
-        array[port_no.as_usize()]
+    fn pop_first(array: &mut PacketArray, port_no: PortNo) -> Option<Packet> {
+        let clone = array.clone();
+        let item = clone.get(port_no.as_usize()).unwrap(); // Safe since vector always has MAX_PORTS entries
+        if item.len() > 0 {
+            let (car, cdr) = item.split_at(1); // Will panic on an empty vector
+            array[port_no.as_usize()] = cdr.to_vec();
+            Some(car[0])
+        } else {
+            None
+        }
     }
-    fn get_packet_item(array: &PacketArray, port_no: PortNo) -> Box<Vec<Packet>> {
-        array[port_no.as_usize()]
-            .clone()
-            .unwrap_or(Box::new(Vec::new()))
+    fn pop_first_outbuf(&mut self, port_no: PortNo) -> Option<Packet> {
+        PacketEngine::pop_first(&mut self.out_buffer, port_no)
     }
-    fn set_packet_item(array: &mut PacketArray, port_no: PortNo, value: Vec<Packet>) {
-        array[port_no.as_usize()] = Some(Box::new(value));
+    fn pop_first_inbuf(&mut self, port_no: PortNo) -> Option<Packet> {
+        PacketEngine::pop_first(&mut self.in_buffer, port_no)
+    }
+    fn pop_first_sent(&mut self, port_no: PortNo) -> Option<Packet> {
+        PacketEngine::pop_first(&mut self.sent_packets, port_no)
+    }
+    fn add_packet(array: &mut PacketArray, port_no: PortNo, packet: Packet) {
+        let item = array.get_mut(port_no.as_usize()).unwrap();
+        item.push(packet);
+    }
+    fn add_to_outbuf(&mut self, port_no: PortNo, packet: Packet) {
+        PacketEngine::add_packet(&mut self.out_buffer, port_no, packet);
+    }
+    fn add_to_inbuf(&mut self, port_no: PortNo, packet: Packet) {
+        PacketEngine::add_packet(&mut self.in_buffer, port_no, packet);
+    }
+    fn add_to_sent(&mut self, port_no: PortNo, packet: Packet) {
+        PacketEngine::add_packet(&mut self.sent_packets, port_no, packet);
     }
     // SPAWN THREAD (listen_cm_loop)
     fn listen_cm(&self, pe_from_cm: PeFromCm, pe_to_pe: PeToPe) -> Result<(), Error> {
@@ -193,10 +215,10 @@ impl PacketEngine {
                     }
                     if DEBUG_OPTIONS.pe_pkt_send {
                         match msg_type {
-                            MsgType::Discover => (),
-                            MsgType::DiscoverD => if tree_id.is_name(CENTRAL_TREE) { println!("PacketEngine {}: {} on {:?} {} {}", self.cell_id, _f, port_nos, msg_type, tree_id); },
-                            MsgType::StackTree => { println!("Packetengine {}: {} AIT state {}", self.cell_id, _f, packet.get_ait_state()); },
-                            _ => { println!("PacketEngine {}: {} on {:?} {} {}", self.cell_id, _f, port_nos, msg_type, tree_id); }
+                            MsgType::Discover => println!("PacketEngine {}: {} got discover {:?}", self.cell_id, _f, port_nos),
+                            MsgType::DiscoverD => (),//if tree_id.is_name(CENTRAL_TREE) { println!("PacketEngine {}: {} on {:?} {} {}", self.cell_id, _f, port_nos, msg_type, tree_id); },
+                            MsgType::StackTree => (),//println!("PacketEngine {}: {} AIT state {}", self.cell_id, _f, packet.get_ait_state()),
+                            _ => ()//println!("PacketEngine {}: {} on {:?} {} {}", self.cell_id, _f, port_nos, msg_type, tree_id)
                         }
                     }
                 }
@@ -230,19 +252,16 @@ impl PacketEngine {
     }
     fn send_packet(&mut self, port_no: PortNo, packet: Packet) -> Result<(), Error> {
         let _f = "send_packet";
-        PacketEngine::get_packet_item(&self.sent_packets, port_no).push(packet);
-        let mut outbuf = PacketEngine::get_packet_item(&self.out_buffer, port_no);
-        outbuf.push(packet);
-        let (send_packet, rest) = outbuf.split_at(1);
-        if self.can_send(port_no) {
-            self.pe_to_ports.get(port_no.as_usize())
-                .ok_or::<Error>(PacketEngineError::Sender { cell_id: self.cell_id, func_name: _f, port_no: *port_no }.into())?
-                .send(PeToPortPacket::Packet(send_packet[0]))?;
-            // Uncomment the next line when
-            // self.set_cannot_send(port_no);
-            outbuf = Box::new(rest.to_vec());
+        self.add_to_out_buffer(port_no, packet);
+        if let Some(packet) = self.pop_first_outbuf(port_no) {
+            if self.can_send(port_no) {
+                self.pe_to_ports.get(port_no.as_usize())
+                    .ok_or::<Error>(PacketEngineError::Sender { cell_id: self.cell_id, func_name: _f, port_no: *port_no }.into())?
+                    .send(PeToPortPacket::Packet(packet))?;
+                // Uncomment the next line to turn on flow control
+                // self.set_cannot_send(port_no);
+            }
         }
-        PacketEngine::set_packet_item(&mut self.out_buffer, port_no, *outbuf);
         Ok(())
     }
 
@@ -264,14 +283,17 @@ impl PacketEngine {
             match msg {
                 // deliver to CModel
                 PortToPePacket::Status((port_no, is_border, status)) => {
+                    self.set_can_send(port_no);
                     self.pe_to_cm.send(PeToCmPacket::Status((port_no, is_border, status))).context(PacketEngineError::Chain { func_name: "listen_port", comment: S("send status to ca ") + &self.cell_id.get_name()})?
                 },
                 PortToPePacket::Tcp((port_no, tcp_msg)) => {
+                    self.set_can_send(port_no);
                     self.pe_to_cm.send(PeToCmPacket::Tcp((port_no, tcp_msg))).context(PacketEngineError::Chain { func_name: "listen_port", comment: S("send tcp msg to ca ") + &self.cell_id.get_name()})?
                 },
 
                 // recv from neighbor
                 PortToPePacket::Packet((port_no, packet))  => {
+                    self.set_can_send(port_no);
                     self.process_packet(port_no, packet, pe_from_pe).context(PacketEngineError::Chain { func_name: "listen_port", comment: S("process_packet ") + &self.cell_id.get_name()})?
                 }
             };
@@ -311,7 +333,7 @@ impl PacketEngine {
                 self.send_packet(port_no, packet)?;
             },
             AitState::Entl => {
-                self.port_got_event[port_no.as_usize()] = true; // Safe because array is MAX_PORTS in size
+                self.set_can_send(port_no);
             }
             AitState::Normal => { // Forward packet
                 let uuid = packet.get_tree_uuid().for_lookup();
@@ -441,13 +463,6 @@ impl PacketEngine {
     }
     fn clear_see_packets(&mut self, port_no: PortNo) {
         self.no_seen_packets[port_no.as_usize()] = 0;
-    }
-    fn add_packet(packet_vecs: &mut PacketArray,
-                  port_no: PortNo, packet: Packet) {
-        let default = Some(Box::new(vec![]));
-        let foo = packet_vecs
-            .get(port_no.as_usize())
-            .unwrap_or(&default);
     }
     fn add_sent_packet(&mut self, port_no: PortNo, packet: Packet) {
         PacketEngine::add_packet(&mut self.sent_packets, port_no, packet);

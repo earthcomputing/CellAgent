@@ -37,9 +37,10 @@ impl Packet {
         Packet { header, payload, packet_count: Packet::get_next_count() }
     }
 
-    pub fn make_entl_packet(uuid: &mut Uuid) -> Packet {
+    pub fn make_entl_packet() -> Packet {
+        let mut uuid = Uuid::new();
         uuid.make_entl();
-        Packet::new(get_next_count(), uuid, PacketNo(1),
+        Packet::new(get_next_count(), &uuid, PacketNo(1),
                     false, false, vec![])
     }
     
@@ -65,6 +66,7 @@ impl Packet {
     pub fn make_ait(&mut self) { self.header.make_ait() }
     pub fn make_tock(&mut self) { self.header.make_tock() }
     pub fn is_ait(&self) -> bool { self.header.get_uuid().is_ait() }
+    pub fn is_entl(&self) -> bool { self.header.get_uuid().is_entl() }
     pub fn get_ait_state(&self) -> AitState { self.get_uuid().get_ait_state() }
     pub fn time_reverse(&mut self) { self.header.get_uuid().time_reverse(); }
     pub fn next_ait_state(&mut self) -> Result<AitState, Error> {
