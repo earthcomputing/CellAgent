@@ -32,12 +32,20 @@ lazy_static! {
 pub fn add_to_trace(trace_type: TraceType, trace_params: &TraceHeaderParams,
                     trace_body: &Value, caller: &str) -> Result<(), Error> {
     let _f = "add_to_trace";
-    //let mut buf = String::with_capacity(2);
-    let mut file_handle = OpenOptions::new().append(true).open(OUTPUT_FILE_NAME)
-        .or_else(|_| {
-            println!("Writing output to {}", OUTPUT_FILE_NAME);
-            File::create(OUTPUT_FILE_NAME)
-        })?;
+    let output_file_name = format!("{}.json", OUTPUT_FILE_NAME);
+    let other = json!({"name": "Other"});
+    let cell_id = trace_body
+        .get("cell_id")
+        .unwrap_or(&other)
+        .get("name")
+        .unwrap()
+        .as_str()
+        .unwrap();
+    let cell_file_name = format!("{}-{}.json", OUTPUT_FILE_NAME, cell_id);
+    let mut cell_id_handle = OpenOptions::new().append(true).open(cell_file_name.clone())
+        .or_else(|_| { File::create(cell_file_name) })?;
+    let mut file_handle = OpenOptions::new().append(true).open(output_file_name.clone())
+        .or_else(|_| { File::create(output_file_name.clone()) })?;
     TRACE_HEADER.with(|t| {
         t.borrow_mut().next(trace_type);
         t.borrow_mut().update(trace_params);
@@ -49,6 +57,7 @@ pub fn add_to_trace(trace_type: TraceType, trace_params: &TraceHeaderParams,
     } else {
         format!("{:?}", &trace_record)
     };
+    cell_id_handle.write(&(line.clone() + "\n").into_bytes()).context(DalError::Chain { func_name: "add_to_trace", comment: S("Write cell record") })?;
     file_handle.write(&(line.clone() + "\n").into_bytes()).context(DalError::Chain { func_name: "add_to_trace", comment: S("Write record") })?;
     let _ = PRODUCER_RD.send(FutureRecord::to(KAFKA_TOPIC)
             .payload(&line)
