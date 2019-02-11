@@ -223,7 +223,7 @@ impl PacketEngine {
                     }
                 }
                 for port_no in port_nos.iter().cloned() {
-                    self.send_packet(port_no, packet)?;
+                    self.send_packet(port_no, Some(packet))?;
                 }
             }
             AitState::Normal => {
@@ -250,9 +250,16 @@ impl PacketEngine {
         }
         Ok(())
     }
-    fn send_packet(&mut self, port_no: PortNo, packet: Packet) -> Result<(), Error> {
+    fn send_packet(&mut self, port_no: PortNo, packet_opt: Option<Packet>) -> Result<(), Error> {
         let _f = "send_packet";
-        self.add_to_out_buffer(port_no, packet);
+        match packet_opt {
+            Some(packet) => self.add_to_out_buffer(port_no, packet),
+            None => {
+                if self.out_buffer.len() == 0 {
+                    self.add_to_out_buffer(port_no, Packet::make_entl_packet());
+                }
+            }
+        }
         if let Some(packet) = self.pop_first_outbuf(port_no) {
             if self.can_send(port_no) {
                 self.pe_to_ports.get(port_no.as_usize())
@@ -313,14 +320,14 @@ impl PacketEngine {
                 packet.next_ait_state()?;
 
                 // Send to CM and transition to ENTL if time is FORWARD
-                self.send_packet(port_no, packet)?;
+                self.send_packet(port_no, Some(packet))?;
     
                 packet.make_ait();
                 self.pe_to_cm.send(PeToCmPacket::Packet((port_no, packet))).or_else(|_| -> Result<(), Error> {
                     // Time reverse on error sending to CM
                     packet.make_tock();
                     packet.time_reverse();
-                    self.send_packet(port_no, packet)?;
+                    self.send_packet(port_no, Some(packet))?;
                     Ok(())
                 })?;
             },
@@ -330,7 +337,7 @@ impl PacketEngine {
             AitState::Tack | AitState::Teck => {
                 // Update and send back on same port
                 packet.next_ait_state()?;
-                self.send_packet(port_no, packet)?;
+                self.send_packet(port_no, Some(packet))?;
             },
             AitState::Entl => {
                 self.set_can_send(port_no);
@@ -410,7 +417,7 @@ impl PacketEngine {
                 self.pe_to_cm.send(PeToCmPacket::Packet((recv_port_no, packet)))?;
             } else {
                 // forward rootward
-                self.send_packet(recv_port_no, packet)?;
+                self.send_packet(recv_port_no, Some(packet))?;
     
                 // deliver to CModel
                 let is_up = entry.get_mask().and(user_mask).equal(Mask::port0());
@@ -445,7 +452,7 @@ impl PacketEngine {
                     self.pe_to_cm.send(PeToCmPacket::Packet((recv_port_no, packet))).context(PacketEngineError::Chain { func_name: _f, comment: S("leafcast packet to ca ") + &self.cell_id.get_name() })?;
                 } else {
                     // forward to neighbor
-                    self.send_packet(port_no, packet)?;
+                    self.send_packet(port_no, Some(packet))?;
                 }
             }
         }
