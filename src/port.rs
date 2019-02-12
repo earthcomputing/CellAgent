@@ -17,6 +17,14 @@ pub enum PortStatus {
     Connected,
     Disconnected,
 }
+impl fmt::Display for PortStatus {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            PortStatus::Connected    => write!(f, "Connected"),
+            PortStatus::Disconnected => write!(f, "Disconnected")
+        }
+    }
+}
 
 #[derive(Debug, Clone)]
 pub struct Port {

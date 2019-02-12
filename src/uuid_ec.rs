@@ -64,6 +64,7 @@ impl Uuid {
             TACK => AitState::Tack,
             TECK => AitState::Teck,
             AIT  => AitState::Ait,
+            ENTL => AitState::Entl,
             _    => AitState::Normal, // Bad uuid codes are treated as normal
         }
     }

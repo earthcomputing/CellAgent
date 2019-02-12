@@ -21,6 +21,7 @@ pub type MsgTreeMap = HashMap<String, TreeID>;
 
 #[derive(Debug, Copy, Clone, Hash, Eq, PartialEq, Serialize, Deserialize)]
 pub enum MsgType {
+    Entl,        // Needed for the msg_type hack, otherwise panic
     Application,
     Discover,
     DiscoverD,
@@ -53,6 +54,7 @@ impl MsgType {
             MsgType::StackTree   => Box::new(serde_json::from_str::<StackTreeMsg>(&serialized_msg).context(MessageError::Chain { func_name: _f, comment: S("StackTreeMsg")})?),
             MsgType::StackTreeD  => Box::new(serde_json::from_str::<StackTreeDMsg>(&serialized_msg).context(MessageError::Chain { func_name: _f, comment: S("StackTreeDMsg")})?),
             MsgType::TreeName    => Box::new(serde_json::from_str::<TreeNameMsg>(&serialized_msg).context(MessageError::Chain { func_name: _f, comment: S("TreeNameMsg")})?),
+            _ => panic!("Invalid message type in get_msg")
         })        
     }
     pub fn msg_from_bytes(bytes: &ByteArray) -> Result<Box<dyn Message>, Error> {
@@ -72,6 +74,7 @@ impl MsgType {
             MsgType::StackTree   => Box::new(serde_json::from_str::<StackTreeMsg>(&serialized_msg).context(MessageError::Chain { func_name: _f, comment: S("StackTreeMsg")})?),
             MsgType::StackTreeD  => Box::new(serde_json::from_str::<StackTreeDMsg>(&serialized_msg).context(MessageError::Chain { func_name: _f, comment: S("StackTreeDMsg")})?),
             MsgType::TreeName    => Box::new(serde_json::from_str::<TreeNameMsg>(&serialized_msg).context(MessageError::Chain { func_name: _f, comment: S("TreeNameMsg")})?),
+            _ => panic!("Invalid msg type in msg_from_bytes")
         })
     }
     // A hack for printing debug output only for a specific message type
@@ -90,12 +93,13 @@ impl MsgType {
         else if MsgType::is_type(packet, MsgType::StackTree)   { MsgType::StackTree }
         else if MsgType::is_type(packet, MsgType::StackTreeD)  { MsgType::StackTreeD }
         else if MsgType::is_type(packet, MsgType::TreeName)    { MsgType::TreeName }
-        else { panic!("Invalid message type") }
+        else { MsgType::Entl }
     }
 }
 impl fmt::Display for MsgType {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let s = match *self {
+            MsgType::Entl        => "Entl",
             MsgType::Application => "Application",
             MsgType::Discover    => "Discover",
             MsgType::DiscoverD   => "DiscoverD",
