@@ -349,9 +349,9 @@ impl PacketEngine {
             AitState::Ait => return Err(PacketEngineError::Ait { func_name: _f, ait_state: AitState::Ait }.into()), // Error, should never get from port
             AitState::Tock => {
                 // Send to CM and transition to ENTL if time is FORWARD
-                //packet.next_ait_state()?;
-                //self.add_to_out_buffer(port_no, packet);
-                //self.send_packet(port_no)?;
+                packet.next_ait_state()?;
+                self.add_to_out_buffer(port_no, packet);
+                self.send_packet(port_no)?;
                 packet.make_ait();
                 self.pe_to_cm.send(PeToCmPacket::Packet((port_no, packet)))
                     .or_else(|_| -> Result<(), Error> {
@@ -363,7 +363,6 @@ impl PacketEngine {
                         self.send_packet(port_no)?;
                         Ok(())
                     })?;
-                self.send_next_packet_or_entl(port_no)?;
             },
 
             AitState::Tick => { // Inform CM of success and enter ENTL
