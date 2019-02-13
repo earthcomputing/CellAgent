@@ -97,11 +97,31 @@ impl PacketEngine {
             .get(0)
             .map(|packet| MsgType::msg_type(packet))
     }
+    fn get_outbuf_first_ait_state(&self, port_no: PortNo) -> Option<AitState> {
+        (*self.out_buffer.lock().unwrap())
+            .get(port_no.as_usize())
+            .unwrap()
+            .get(0)
+            .map(|packet| packet.get_ait_state())
+    }
     fn get_inbuf_size(&self, port_no: PortNo) -> usize {
         PacketEngine::get_size(&self.in_buffer, port_no)
     }
     fn get_sent_size(&self, port_no: PortNo) -> usize {
         PacketEngine::get_size(&self.sent_packets, port_no)
+    }
+    fn add_seen_packet(&mut self, port_no: PortNo, packet: Packet) {
+        PacketEngine::add_to_packet_count(&mut self.no_seen_packets, port_no);
+    }
+    fn clear_see_packets(&mut self, port_no: PortNo) {
+        self.no_seen_packets.lock().unwrap()[port_no.as_usize()] = 0;
+    }
+    fn add_sent_packet(&mut self, port_no: PortNo, packet: Packet) {
+        PacketEngine::add_packet(&mut self.sent_packets, port_no, packet);
+        PacketEngine::add_to_packet_count(&mut self.no_sent_packets, port_no);
+    }
+    fn clear_sent_packets(&mut self, port_no: PortNo) {
+        self.no_seen_packets.lock().unwrap()[port_no.as_usize()] = 0;
     }
     fn pop_first(array: &mut PacketArray, port_no: PortNo) -> Option<Packet> {
         let clone = array.lock().unwrap().clone();
@@ -128,10 +148,10 @@ impl PacketEngine {
         let item = locked.get_mut(port_no.as_usize()).unwrap();
         item.push(packet);
     }
-    fn add_to_outbuf(&mut self, port_no: PortNo, packet: Packet) {
+    fn add_to_out_buffer(&mut self, port_no: PortNo, packet: Packet) {
         PacketEngine::add_packet(&mut self.out_buffer, port_no, packet);
     }
-    fn add_to_inbuf(&mut self, port_no: PortNo, packet: Packet) {
+    fn add_to_in_buffer(&mut self, port_no: PortNo, packet: Packet) {
         PacketEngine::add_packet(&mut self.in_buffer, port_no, packet);
     }
     fn add_to_sent(&mut self, port_no: PortNo, packet: Packet) {
@@ -261,15 +281,26 @@ impl PacketEngine {
                 self.pe_to_ports.get(port_no.as_usize())
                     .ok_or::<Error>(PacketEngineError::Sender { cell_id: self.cell_id, func_name: _f, port_no: *port_no }.into())?
                     .send(PeToPortPacket::Packet(packet))?;
-                // Uncomment the next line to turn on flow control
-                //self.set_cannot_send(port_no);
+                match packet.get_ait_state() {
+                    AitState::Entl => self.set_can_send(port_no),
+                    // Use the next line to turn on flow control or the one after to turn it off
+                    //_              => self.set_cannot_send(port_no)
+                    _              => self.set_can_send(port_no)
+                }
+            } else {
+                self.send_next_packet_or_entl(port_no)?;
             }
         } else {
-            //println!("PacketEngine {}: {} port {} out buf size {} {:?}", self.cell_id, _f, *port_no, self.get_outbuf_size(port_no), self.get_outbuf_first_type(port_no));
+            //println!("PacketEngine {}: {} port {} out buf size {} {:?} {:?}", self.cell_id, _f, *port_no, self.get_outbuf_size(port_no), self.get_outbuf_first_type(port_no), self.get_outbuf_first_ait_state(port_no));
         }
         Ok(())
     }
-
+    fn send_next_packet_or_entl(&mut self, port_no: PortNo) -> Result<(), Error> {
+        if self.get_outbuf_size(port_no) == 0 {
+            self.add_to_out_buffer(port_no, Packet::make_entl_packet());
+        }
+        self.send_packet(port_no)
+    }
     // WORKER (PeFromPort)
     fn listen_port_loop(&mut self, pe_from_ports: &PeFromPort, pe_from_pe: &PeFromPe) -> Result<(), Error> {
         let _f = "listen_port_loop";
@@ -317,31 +348,28 @@ impl PacketEngine {
         match packet.get_ait_state() {
             AitState::Ait => return Err(PacketEngineError::Ait { func_name: _f, ait_state: AitState::Ait }.into()), // Error, should never get from port
             AitState::Tock => {
-
                 // Send to CM and transition to ENTL if time is FORWARD
+                //packet.next_ait_state()?;
+                //self.add_to_out_buffer(port_no, packet);
+                //self.send_packet(port_no)?;
                 packet.make_ait();
                 self.pe_to_cm.send(PeToCmPacket::Packet((port_no, packet)))
                     .or_else(|_| -> Result<(), Error> {
                         // Time reverse on error sending to CM
+                        println!("PacketEngine {}: {} error {} {}", self.cell_id, _f, MsgType::msg_type(&packet), packet.get_ait_state());
                         packet.make_tock();
                         packet.time_reverse();
                         self.add_to_out_buffer(port_no, packet);
                         self.send_packet(port_no)?;
                         Ok(())
                     })?;
-                if self.get_outbuf_size(port_no) == 0 {
-                    self.add_to_out_buffer(port_no, Packet::make_entl_packet());
-                }
-                self.send_packet(port_no)?;
+                self.send_next_packet_or_entl(port_no)?;
             },
 
             AitState::Tick => { // Inform CM of success and enter ENTL
                 // TODO: Handle error sending to cm
                 self.pe_to_cm.send(PeToCmPacket::Packet((port_no, packet)))?;
-                if self.get_outbuf_size(port_no) == 0 {
-                    self.add_to_out_buffer(port_no, Packet::make_entl_packet());
-                }
-                self.send_packet(port_no)?;
+                self.send_next_packet_or_entl(port_no)?;
             },
 
             AitState::Tack | AitState::Teck => {
@@ -350,10 +378,14 @@ impl PacketEngine {
                 self.add_to_out_buffer(port_no, packet);
                 self.send_packet(port_no)?;
             },
-            AitState::Entl => self.send_packet(port_no)?, // In real life, send an ENTL
+            AitState::Entl => { // In real life, send an ENTL
+                // Next line only belongs in TICK, but I'm not using that state in the simulator
+                //self.pe_to_cm.send(PeToCmPacket::Packet((port_no, packet)))?;
+                if self.get_outbuf_size(port_no) > 0 { self.send_packet(port_no)?; }
+            },
             AitState::Normal => { // Forward packet
                 let uuid = packet.get_tree_uuid().for_lookup();
-                let entry = {
+                let entry = { // Using this block releases the lock on the routing table
                     match self.routing_table.lock().unwrap().get_entry(uuid) {
                         Ok(e) => e,
                         Err(_) => {
@@ -481,25 +513,6 @@ impl PacketEngine {
             count[port_no.as_usize()] = count[port_no.as_usize()] + 1;
         }
     }
-    fn add_seen_packet(&mut self, port_no: PortNo, packet: Packet) {
-        PacketEngine::add_to_packet_count(&mut self.no_seen_packets, port_no);
-    }
-    fn clear_see_packets(&mut self, port_no: PortNo) {
-        self.no_seen_packets.lock().unwrap()[port_no.as_usize()] = 0;
-    }
-    fn add_sent_packet(&mut self, port_no: PortNo, packet: Packet) {
-        PacketEngine::add_packet(&mut self.sent_packets, port_no, packet);
-        PacketEngine::add_to_packet_count(&mut self.no_sent_packets, port_no);
-    }
-    fn clear_sent_packets(&mut self, port_no: PortNo) {
-        self.no_seen_packets.lock().unwrap()[port_no.as_usize()] = 0;
-    }
-    fn add_to_out_buffer(&mut self, port_no: PortNo, packet: Packet) {
-        PacketEngine::add_packet(&mut self.out_buffer, port_no, packet);
-    }
-    fn add_to_in_buffer(&mut self, port_no: PortNo, packet: Packet) {
-        PacketEngine::add_packet(&mut self.in_buffer, port_no, packet);
-    }
 }
 impl fmt::Display for PacketEngine {
     fn fmt(&self, _f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -519,7 +532,7 @@ pub enum PacketEngineError {
     Buffer { func_name: &'static str, buffer_name: &'static str },
     #[fail(display = "PacketEngineError::Chain {} {}", func_name, comment)]
     Chain { func_name: &'static str, comment: String },
-    #[fail(display = "PacketEngineError::Sender {}: No sender for port {:?} on cell {}", func_name, port_no, cell_id)]
+    #[fail(display = "PacketEngineError::Sender {}: No sender for port {} on cell {}", func_name, port_no, cell_id)]
     Sender { func_name: &'static str, cell_id: CellID, port_no: u8 },
     #[fail(display = "PacketEngineError::Uuid {}: CellID {}: type {} entry uuid {}, packet uuid {}", func_name, cell_id, msg_type, table_uuid, packet_uuid)]
     Uuid { func_name: &'static str, cell_id: CellID, msg_type: MsgType, table_uuid: Uuid, packet_uuid: Uuid }
