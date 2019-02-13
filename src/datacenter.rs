@@ -43,7 +43,7 @@ impl Datacenter {
         let mut border = HashMap::new();
         border.insert(CellNo(2), vec![PortNo(2)]);
         border.insert(CellNo(7), vec![PortNo(2)]);
-        let blueprint = Blueprint::new(ncells, nports, edges.clone(), &exceptions, &border)?;
+        let blueprint = Blueprint::new(ncells, nports, &edges, &exceptions, &border)?;
         println!("{}", blueprint);
         let (outside_to_noc, noc_from_outside): (OutsideToNoc, NocFromOutside) = channel();
         let (noc_to_outside, _outside_from_noc): (NocToOutside, OutsideFromNoc) = channel();
