@@ -11,7 +11,7 @@ pub struct Blueprint {
     edges: Vec<Edge>,
 }
 impl Blueprint {
-    pub fn new(ncells: CellNo, ports_per_cell: PortNo, edges: Vec<Edge>,
+    pub fn new(ncells: CellNo, ports_per_cell: PortNo, edges: &Vec<Edge>,
                exceptions: &HashMap<CellNo, PortNo>, border_cell_map: &HashMap<CellNo, Vec<PortNo>>) ->
                Result<Blueprint, BlueprintError> {
         let _f = "new";
@@ -41,7 +41,7 @@ impl Blueprint {
                 None => interior_cells.push(InteriorCell { cell_no, cell_type: CellType::Interior, interior_ports : port_list })
             }
         }
-        Ok(Blueprint { interior_cells, border_cells, edges })
+        Ok(Blueprint { interior_cells, border_cells, edges:edges.clone() })
     }
     pub fn get_ncells(&self) -> CellNo { CellNo(self.get_n_interior_cells() + self.get_n_border_cells()) }
     pub fn get_n_border_cells(&self) -> usize { self.border_cells.len() }
