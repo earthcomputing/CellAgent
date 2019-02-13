@@ -84,6 +84,25 @@ impl PacketEngine {
     fn set_can_send(&mut self, port_no: PortNo) {
         self.port_got_event.lock().unwrap()[port_no.as_usize()] = true;
     }
+    fn get_size(array: &PacketArray, port_no: PortNo) -> usize {
+        (*array.lock().unwrap())[port_no.as_usize()].len()
+    }
+    fn get_outbuf_size(&self, port_no: PortNo) -> usize {
+        PacketEngine::get_size(&self.out_buffer, port_no)
+    }
+    fn get_outbuf_first_type(&self, port_no: PortNo) -> Option<MsgType> {
+        (*self.out_buffer.lock().unwrap())
+            .get(port_no.as_usize())
+            .unwrap()
+            .get(0)
+            .map(|packet| MsgType::msg_type(packet))
+    }
+    fn get_inbuf_size(&self, port_no: PortNo) -> usize {
+        PacketEngine::get_size(&self.in_buffer, port_no)
+    }
+    fn get_sent_size(&self, port_no: PortNo) -> usize {
+        PacketEngine::get_size(&self.sent_packets, port_no)
+    }
     fn pop_first(array: &mut PacketArray, port_no: PortNo) -> Option<Packet> {
         let clone = array.lock().unwrap().clone();
         let item = clone.get(port_no.as_usize()).unwrap(); // Safe since vector always has MAX_PORTS entries
@@ -237,13 +256,16 @@ impl PacketEngine {
         let _f = "send_packet";
         if self.can_send(port_no) {
             if let Some(packet) = self.pop_first_outbuf(port_no) {
-                //println!("PacketEngine {}: {} port {} is entl {} can send {} outbuf size {}", self.cell_id, _f, *port_no, packet.is_entl(), self.can_send(port_no), self.out_buffer[port_no.as_usize()].len());
+                //let msg_type = MsgType::msg_type(&packet);
+                //println!("PacketEngine {}: {} port {} msg type {} {}", self.cell_id, _f, *port_no, msg_type, packet.get_ait_state());
                 self.pe_to_ports.get(port_no.as_usize())
                     .ok_or::<Error>(PacketEngineError::Sender { cell_id: self.cell_id, func_name: _f, port_no: *port_no }.into())?
                     .send(PeToPortPacket::Packet(packet))?;
                 // Uncomment the next line to turn on flow control
                 //self.set_cannot_send(port_no);
             }
+        } else {
+            //println!("PacketEngine {}: {} port {} out buf size {} {:?}", self.cell_id, _f, *port_no, self.get_outbuf_size(port_no), self.get_outbuf_first_type(port_no));
         }
         Ok(())
     }
@@ -307,7 +329,7 @@ impl PacketEngine {
                         self.send_packet(port_no)?;
                         Ok(())
                     })?;
-                if self.out_buffer.lock().unwrap()[port_no.as_usize()].len() == 0 {
+                if self.get_outbuf_size(port_no) == 0 {
                     self.add_to_out_buffer(port_no, Packet::make_entl_packet());
                 }
                 self.send_packet(port_no)?;
@@ -316,7 +338,7 @@ impl PacketEngine {
             AitState::Tick => { // Inform CM of success and enter ENTL
                 // TODO: Handle error sending to cm
                 self.pe_to_cm.send(PeToCmPacket::Packet((port_no, packet)))?;
-                if self.out_buffer.lock().unwrap()[port_no.as_usize()].len() == 0 {
+                if self.get_outbuf_size(port_no) == 0 {
                     self.add_to_out_buffer(port_no, Packet::make_entl_packet());
                 }
                 self.send_packet(port_no)?;
@@ -383,6 +405,7 @@ impl PacketEngine {
             -> Result<(), Error> {
         let _f = "forward";
         if recv_port_no != entry.get_parent() {
+            // Send to root if recv port is not parent
             let parent = entry.get_parent();
             if *parent == 0 {
                 if DEBUG_OPTIONS.manifest && MsgType::msg_type(&packet) == MsgType::Manifest { println!("PacketEngine {} forwarding manifest leafward mask {} entry {}", self.cell_id, user_mask, entry); };
@@ -405,17 +428,18 @@ impl PacketEngine {
                 // deliver to CModel
                 self.pe_to_cm.send(PeToCmPacket::Packet((recv_port_no, packet)))?;
             } else {
-                // forward rootward
-                self.add_to_out_buffer(recv_port_no, packet);
-                self.send_packet(recv_port_no)?;
-    
-                // deliver to CModel
-                let is_up = entry.get_mask().and(user_mask).equal(Mask::port0());
-                if is_up {
-                    self.pe_to_cm.send(PeToCmPacket::Packet((recv_port_no, packet))).context(PacketEngineError::Chain { func_name: "forward", comment: S("rootcast packet to ca ") + &self.cell_id.get_name() })?;
-                }
+                // Forward rootward
+                self.add_to_out_buffer(parent, packet);
+                self.send_packet(entry.get_parent())?;
+        
+                // deliver to CModel if rootward, but current architecture is root
+                //let is_up = entry.get_mask().and(user_mask).equal(Mask::port0());
+                //if is_up {
+                //    self.pe_to_cm.send(PeToCmPacket::Packet((recv_port_no, packet))).context(PacketEngineError::Chain { func_name: "forward", comment: S("rootcast packet to ca ") + &self.cell_id.get_name() })?;
+                //}
             }
-        } else {  // Leafward
+        } else {
+            // Send leafward if recv port is parent
             let mask = user_mask.and(entry.get_mask());
             let port_nos = mask.get_port_nos();
             {
