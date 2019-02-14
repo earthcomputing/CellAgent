@@ -144,6 +144,61 @@ fn test_sample_ports() {
 }
 
 
+struct DatacenterBorder {
+    expected_border_cell_ports: HashMap<CellNo, Vec<PortNo>>,
+    dc: Datacenter,
+}
+
+impl DatacenterBorder {
+    fn new_sample() -> DatacenterBorder {
+        let (dc, outside_to_noc) = match Datacenter::construct_sample() {
+            Ok(pair) => pair,
+            Err(err) => panic!("Datacenter construction failure: {}", err)
+        };
+        let mut expected_border_cell_ports = HashMap::new();
+        expected_border_cell_ports.insert(CellNo(2), vec![PortNo(2)]);
+        expected_border_cell_ports.insert(CellNo(7), vec![PortNo(2)]);
+	DatacenterBorder {
+            expected_border_cell_ports: expected_border_cell_ports,
+            dc: dc,
+        }
+    }
+}
+
+impl Test for DatacenterBorder {
+    fn test(&mut self) {
+        for cell in self.dc.get_cells() {
+            let mut border_ports: &Vec<PortNo>;
+            let mut is_border_cell: bool = false;
+            match self.expected_border_cell_ports.get(&cell.get_no()) {
+                Some(port_nums) => {
+                    border_ports = port_nums;
+                    is_border_cell = !port_nums.is_empty();
+                }
+                None => {
+                    border_ports = &Vec::new();
+                }
+            }
+            assert_eq!(cell.is_border(), is_border_cell);
+            for no in 0..*cell.get_num_ports() {
+                // Could check that each port in cell is border or not as expected
+            }
+        }
+    }
+}
+
+impl Drop for DatacenterBorder {
+    fn drop(&mut self) {
+        // teardown goes here
+    }
+}
+
+#[test]
+fn test_sample_border() {
+    DatacenterBorder::new_sample().test();
+}
+
+
 // Errors
 use failure::{Error};
 #[derive(Debug, Fail)]
