@@ -38,10 +38,11 @@ mod uuid_ec;
 mod vm;
 
 use std::{io::{stdin, stdout, Read, Write},
+          collections::{HashMap},
           sync::mpsc::channel};
 
-use crate::config::{NCELLS, CellNo,
-                    Edge, get_edges};
+use crate::config::{NCELLS, NPORTS, CellNo,
+                    Edge, PortNo, get_edges};
 use crate::datacenter::Datacenter;
 use crate::utility::{TraceHeader};
 
@@ -90,6 +91,56 @@ impl Drop for DatacenterGraph {
 #[test]
 fn test_sample_graph() {
     DatacenterGraph::new_sample().test();
+}
+
+
+struct DatacenterPorts {
+    default_num_ports_per_cell: PortNo,
+    cell_port_exceptions: HashMap<CellNo, PortNo>,
+    dc: Datacenter,
+}
+
+impl DatacenterPorts {
+    fn new_sample() -> DatacenterPorts {
+        let (dc, outside_to_noc) = match Datacenter::construct_sample() {
+            Ok(pair) => pair,
+            Err(err) => panic!("Datacenter construction failure: {}", err)
+        };
+        let mut cell_port_exceptions = HashMap::new();
+        cell_port_exceptions.insert(CellNo(5), PortNo(7));
+        cell_port_exceptions.insert(CellNo(2), PortNo(6));
+	DatacenterPorts {
+            default_num_ports_per_cell: NPORTS,
+            cell_port_exceptions: cell_port_exceptions,
+            dc: dc,
+        }
+    }
+}
+
+impl Test for DatacenterPorts {
+    fn test(&mut self) {
+        for cell in self.dc.get_cells() {
+            match self.cell_port_exceptions.get(&cell.get_no()) {
+                Some(num_ports) => {
+                    assert_eq!(cell.get_num_ports(), PortNo(**num_ports+1));
+                }
+                None => {
+                    assert_eq!(cell.get_num_ports(), PortNo(*self.default_num_ports_per_cell+1));
+                }
+            }
+        }
+    }
+}
+
+impl Drop for DatacenterPorts {
+    fn drop(&mut self) {
+        // teardown goes here
+    }
+}
+
+#[test]
+fn test_sample_ports() {
+    DatacenterPorts::new_sample().test();
 }
 
 
