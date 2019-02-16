@@ -23,7 +23,8 @@ pub enum Quench { Simple, RootPort }
 pub const QUENCH: Quench = Quench::RootPort;
 pub const PAYLOAD_DEFAULT_ELEMENT: u8 = 0;
 // Place to write output data
-pub const OUTPUT_FILE_NAME: &str = "/tmp/multicell-trace";
+pub const OUTPUT_DIR_NAME: &str = "/tmp/multicell/";
+pub const OUTPUT_FILE_NAME: &str = "/tmp/multicell/trace";
 pub const KAFKA_SERVER: & str = "172.16.1.2";
 pub const KAFKA_TOPIC: & str = "CellAgent";
 //pub const MAX_ENTRIES: TableIndex    = TableIndex(64);  // Max number of active trees
@@ -72,6 +73,7 @@ pub const TRACE_OPTIONS: TraceOptions = TraceOptions {
 
 pub struct DebugOptions {
     pub trace_all:      bool,
+    pub flow_control:   bool,
     pub ca_msg_recv:    bool,
     pub ca_msg_send:    bool,
     pub cm_from_ca:     bool,
@@ -94,6 +96,7 @@ pub struct DebugOptions {
 }
 pub const DEBUG_OPTIONS: DebugOptions = DebugOptions {
     trace_all:      true,
+    flow_control:   true,
     ca_msg_recv:    false,
     ca_msg_send:    false,
     cm_from_ca:     false,

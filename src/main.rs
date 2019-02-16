@@ -43,12 +43,14 @@ mod vm;
 
 use std::{io::{stdin, stdout, Read, Write},
           collections::{HashMap, HashSet},
-          fs::{File, OpenOptions},
+          fs::{File, OpenOptions, create_dir, remove_dir_all},
+          path::Path,
           sync::mpsc::channel};
 
 use crate::blueprint::Blueprint;
-use crate::config::{AUTO_BREAK, NCELLS, NPORTS, NLINKS, OUTPUT_FILE_NAME, QUENCH,
-             get_edges, CellNo, PortNo};
+use crate::config::{AUTO_BREAK, NCELLS, NPORTS, NLINKS,
+                    OUTPUT_DIR_NAME, OUTPUT_FILE_NAME, QUENCH,
+                    get_edges, CellNo, PortNo};
 use crate::datacenter::Datacenter;
 use crate::ecargs::{ECArgs};
 use crate::gvm_equation::{GvmEqn};
@@ -60,6 +62,10 @@ use crate::utility::{print_vec, S, TraceHeader};
 
 fn main() -> Result<(), Error> {
     let _f = "main";
+    if Path::new(OUTPUT_DIR_NAME).exists() {
+        remove_dir_all(OUTPUT_DIR_NAME)?;
+    }
+    create_dir(OUTPUT_DIR_NAME)?;
     println!("Multicell Routing: Output to file {} (set in config.rs)", OUTPUT_FILE_NAME);
     println!("{:?} Quenching of Discover messages", QUENCH);
     /* Can't get records from main() to show up in trace file
