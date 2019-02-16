@@ -42,15 +42,14 @@ mod uuid_ec;
 mod vm;
 
 use std::{io::{stdin, stdout, Read, Write},
-          collections::{HashSet},
+          collections::{HashMap, HashSet},
           fs::{File, OpenOptions, create_dir, remove_dir_all},
           path::Path,
           sync::mpsc::channel};
 
 use crate::blueprint::Blueprint;
-use crate::config::{AUTO_BREAK, NPORTS, NLINKS,
-                    OUTPUT_DIR_NAME, OUTPUT_FILE_NAME, QUENCH,
-                    CellNo};
+use crate::config::{AUTO_BREAK, OUTPUT_DIR_NAME, OUTPUT_FILE_NAME, QUENCH,
+                    CellNo, CellQty, PortNo, PortQty, is2e};
 use crate::datacenter::Datacenter;
 use crate::gvm_equation::{GvmEqn};
 use crate::message_types::{OutsideToNoc};
@@ -77,7 +76,22 @@ fn main() -> Result<(), Error> {
         }
     */
     let _ = OpenOptions::new().write(true).truncate(true).open(OUTPUT_FILE_NAME);
-    let (mut dc, outside_to_noc) = match Datacenter::construct_sample() {
+    let mut cell_port_exceptions = HashMap::new();
+    cell_port_exceptions.insert(CellNo(5), PortQty(7));
+    cell_port_exceptions.insert(CellNo(2), PortQty(6));
+    let mut border_cell_ports = HashMap::new();
+    border_cell_ports.insert(CellNo(2), vec![PortNo(2)]);
+    border_cell_ports.insert(CellNo(7), vec![PortNo(2)]);
+    let (mut dc, outside_to_noc) =
+        match Datacenter::construct(
+            CellQty(10),
+            &vec![is2e(0,1), is2e(1,2), is2e(2,3), is2e(3,4),
+                  is2e(5,6), is2e(6,7), is2e(7,8), is2e(8,9),
+                  is2e(0,5), is2e(1,6), is2e(2,7), is2e(3,8), is2e(4,9)],
+            PortQty(8),
+            &cell_port_exceptions,
+            &border_cell_ports
+        ) {
             Ok(pair) => pair,
             Err(err) => panic!("Datacenter construction failure: {}", err)
         };

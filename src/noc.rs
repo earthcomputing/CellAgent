@@ -4,7 +4,7 @@ use std::{thread,
           collections::{HashMap, HashSet}};
 
 use crate::blueprint::{Blueprint};
-use crate::config::{CONTINUE_ON_ERROR, NCELLS, SCHEMA_VERSION, TRACE_OPTIONS, ByteArray, get_geometry};
+use crate::config::{CONTINUE_ON_ERROR, SCHEMA_VERSION, TRACE_OPTIONS, ByteArray, get_geometry};
 use crate::dal;
 use crate::dal::{fork_trace_header, update_trace_header};
 use crate::datacenter::{Datacenter};
@@ -36,9 +36,9 @@ impl Noc {
         {
             if TRACE_OPTIONS.all || TRACE_OPTIONS.noc {
                 // For reasons I can't understand, the trace record doesn't show up when generated from main.
-                let (rows, cols, _geometry) = get_geometry();
+                let (rows, cols, _geometry) = get_geometry(blueprint.get_ncells());
                 let trace_params = &TraceHeaderParams { module: "src/main.rs", line_no: line!(), function: "MAIN", format: "trace_schema" };
-                let trace = json!({ "schema_version": SCHEMA_VERSION, "ncells": NCELLS, "rows": rows, "cols": cols });
+                let trace = json!({ "schema_version": SCHEMA_VERSION, "ncells": blueprint.get_ncells(), "rows": rows, "cols": cols });
                 let _ = dal::add_to_trace(TraceType::Trace, trace_params, &trace, _f);
             }
         }

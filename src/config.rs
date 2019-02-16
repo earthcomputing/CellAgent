@@ -8,8 +8,6 @@ pub const SCHEMA_VERSION: &str = "0.1";
 pub const REPO: &str = "CellAgent";
 pub const CENTRAL_TREE: & str = "Tree:C:2";
 // Sizes
-pub const NCELLS: CellQty = CellQty(10);
-pub const NPORTS: PortQty = PortQty(8);
 pub const NLINKS: LinkNo = LinkNo(CellNo(40));
 pub const MAX_PORTS: PortQty = PortQty(9);          // Limit on number of ports per cell
 pub const MIN_BORDER_CELLS: CellQty = CellQty(1);   // Minimum acceptable number of border cells
@@ -178,33 +176,8 @@ impl fmt::Display for CellType {
     }
 }
 // Connections
-pub fn get_edges() -> Vec<Edge> {
-    match NCELLS {
-        CellQty(3)  => vec![is2e(0,1), is2e(0,2), is2e(1,2)],
-        CellQty(4)  => vec![is2e(0,1), is2e(0,2), is2e(1,2), is2e(0,3), is2e(1,3)],//, is2e(2,3)],
-        CellQty(10) => vec![is2e(0,1),is2e(1,2),is2e(1,6),is2e(3,4),
-                           is2e(5,6),is2e(6,7),is2e(7,8),is2e(8,9),
-                           is2e(0,5),is2e(2,3),is2e(2,7),is2e(3,8),is2e(4,9)],
-        // blueprint-baran-distributed.gv
-        // 97 edges
-        CellQty(47) => vec![
-            is2e( 0, 1), is2e( 0, 4), is2e( 1, 2), is2e( 1, 5), is2e( 1, 6), is2e( 2, 3), is2e( 2, 6), is2e( 2, 7), is2e( 3, 8),
-            is2e( 4, 5), is2e( 4, 9), is2e( 5, 6), is2e( 5,10), is2e( 5,11), is2e( 6, 7), is2e( 6,12), is2e( 7, 8), is2e( 7,13),
-            is2e( 8,14), is2e( 9,10), is2e( 9,15), is2e(10,11), is2e(10,16), is2e(11,12), is2e(11,16), is2e(11,18), is2e(12,13),
-            is2e(12,18), is2e(13,14), is2e(13,19), is2e(14,19), is2e(14,20), is2e(15,16), is2e(15,17), is2e(15,26), is2e(16,17),
-            is2e(17,18), is2e(17,21), is2e(17,26), is2e(18,19), is2e(18,22), is2e(18,23), is2e(19,20), is2e(19,23), is2e(19,24),
-            is2e(20,25), is2e(21,22), is2e(21,27), is2e(21,28), is2e(22,28), is2e(22,29), is2e(23,24), is2e(23,29), is2e(24,25),
-            is2e(24,30), is2e(25,30), is2e(21,26), is2e(26,27), is2e(26,31), is2e(27,28), is2e(27,32), is2e(28,29), is2e(28,32),
-            is2e(28,33), is2e(29,30), is2e(29,34), is2e(30,34), is2e(30,38), is2e(27,31), is2e(31,35), is2e(32,33), is2e(32,35),
-            is2e(32,36), is2e(33,34), is2e(33,36), is2e(33,37), is2e(34,37), is2e(35,36), is2e(35,39), is2e(35,40), is2e(36,37),
-            is2e(36,41), is2e(37,38), is2e(37,42), is2e(37,43), is2e(38,43), is2e(31,39), is2e(39,40), is2e(40,41), is2e(40,45),
-            is2e(41,42), is2e(41,46), is2e(42,43), is2e(42,46), is2e(39,44), is2e(44,45), is2e(45,46)
-        ],
-        _ => panic!("Invalid number of cells")
-    }
-}
-pub fn get_geometry() -> (usize, usize, Vec<(usize, usize)>) {
-    let geometry = match NCELLS {
+pub fn get_geometry(num_cells: CellQty) -> (usize, usize, Vec<(usize, usize)>) {
+    let geometry = match num_cells {
         CellQty(3)  => vec![(0,0), (0,2), (1,1)],
         CellQty(4)  => vec![(0,0), (0,1), (1,0), (1,1)],
         CellQty(10) => vec![(0,0), (0,1), (0,2), (0,3), (0,4),
@@ -227,7 +200,7 @@ pub fn get_geometry() -> (usize, usize, Vec<(usize, usize)>) {
         .max_by_key(|xy| xy.1)
         .map(|xy| xy.1 + 1)
         .unwrap_or(0);
-    if geometry.len() != *NCELLS { panic!(format!("Topology has {} entries for {} cells", geometry.len(), *NCELLS)) };
+    if geometry.len() != *num_cells { panic!(format!("Topology has {} entries for {} cells", geometry.len(), *num_cells)) };
     (max_x, max_y, geometry)
 }
-fn is2e(i: usize, j: usize) -> Edge { Edge(CellNo(i), CellNo(j)) }
+pub fn is2e(i: usize, j: usize) -> Edge { Edge(CellNo(i), CellNo(j)) }

@@ -11,26 +11,26 @@ pub struct Blueprint {
     edges: Vec<Edge>,
 }
 impl Blueprint {
-    pub fn new(ncells: CellQty, ports_per_cell: PortQty, edges: &Vec<Edge>,
-               exceptions: &HashMap<CellNo, PortQty>, border_cell_map: &HashMap<CellNo, Vec<PortNo>>) ->
+    pub fn new(num_cells: CellQty, edges: &Vec<Edge>, default_ports_per_cell: PortQty,
+               cell_port_exceptions: &HashMap<CellNo, PortQty>, border_cell_ports: &HashMap<CellNo, Vec<PortNo>>) ->
                Result<Blueprint, BlueprintError> {
         let _f = "new";
-        let num_border = border_cell_map.len();
-        if num_border > *ncells {
-            return Err(BlueprintError::CellCount{ func_name: _f, ncells: *ncells, num_border })
+        let num_border = border_cell_ports.len();
+        if num_border > *num_cells {
+            return Err(BlueprintError::CellCount{ func_name: _f, num_cells: *num_cells, num_border })
         };
         if num_border < *MIN_BORDER_CELLS {
             return Err(BlueprintError::BorderCellCount { func_name: _f, num_border, num_reqd: *MIN_BORDER_CELLS})
         }
         let mut interior_cells = Vec::new();
         let mut border_cells = 	Vec::new();
-        for no in 0..*ncells {
+        for no in 0..*num_cells {
             let cell_no = CellNo(no);
-            let nports = *exceptions
+            let num_ports = *cell_port_exceptions
                 .get(&cell_no)
-                .unwrap_or(&ports_per_cell);
-            let port_list = (0..*nports as usize).map(|i| PortNo(i as u8)).collect();
-            match border_cell_map.get(&cell_no) {
+                .unwrap_or(&default_ports_per_cell);
+            let port_list = (0..*num_ports as usize).map(|i| PortNo(i as u8)).collect();
+            match border_cell_ports.get(&cell_no) {
                 Some(ports) => {
                     let border: HashSet<PortNo> = HashSet::from_iter(ports.clone());
                     let all: HashSet<PortNo> = HashSet::from_iter(port_list);
@@ -116,6 +116,6 @@ impl fmt::Display for InteriorCell {
 pub enum BlueprintError {
     #[fail(display = "BlueprintError::BorderCellCount {}: Must have {} border cells but only {} in blueprint", func_name, num_reqd, num_border)]
     BorderCellCount { func_name: &'static str, num_border: usize, num_reqd: usize},
-    #[fail(display = "BlueprintError::CellCount {}: Invalid blueprint has more border cells {} than total cells {}", func_name, ncells, num_border)]
-    CellCount { func_name: &'static str, ncells: usize, num_border: usize}
+    #[fail(display = "BlueprintError::CellCount {}: Invalid blueprint has more border cells {} than total cells {}", func_name, num_cells, num_border)]
+    CellCount { func_name: &'static str, num_cells: usize, num_border: usize}
 }
