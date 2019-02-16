@@ -114,7 +114,7 @@ impl fmt::Display for InteriorCell {
 // Errors
 #[derive(Debug, Fail)]
 pub enum BlueprintError {
-    #[fail(display = "BlueprintError::BorderCellCount {}: Must have {} border cells but only {} in blueprint", func_name, num_border, num_reqd)]
+    #[fail(display = "BlueprintError::BorderCellCount {}: Must have {} border cells but only {} in blueprint", func_name, num_reqd, num_border)]
     BorderCellCount { func_name: &'static str, num_border: usize, num_reqd: usize},
     #[fail(display = "BlueprintError::CellCount {}: Invalid blueprint has more border cells {} than total cells {}", func_name, ncells, num_border)]
     CellCount { func_name: &'static str, ncells: usize, num_border: usize}
