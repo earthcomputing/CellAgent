@@ -5,9 +5,8 @@ use std::{fmt, fmt::Write,
           thread::{JoinHandle}};
 
 use crate::blueprint::{Blueprint, Cell};
-use crate::config::{TRACE_OPTIONS, NCELLS, NPORTS, NLINKS, CellNo, CellQty, CellType, PortNo, PortQty, Edge, LinkNo, get_edges, get_geometry};
+use crate::config::{TRACE_OPTIONS, CellNo, CellQty, CellType, PortNo, PortQty, Edge, LinkNo, get_geometry};
 use crate::dal;
-use crate::ecargs::{ECArgs};
 use crate::message_types::{LinkToPort, PortFromLink, PortToLink, LinkFromPort,
     PortToNoc, PortFromNoc};
 use crate::link::{Link};
@@ -24,26 +23,13 @@ pub struct Datacenter {
 }
 impl Datacenter {
     pub fn new() -> Datacenter { Datacenter { cells: Vec::new(), links: Vec::new() } }
-    pub fn construct_sample() -> Result<(Datacenter, OutsideToNoc), Error> {
+    pub fn construct(num_cells: CellQty, edges: &Vec<Edge>, default_num_ports_per_cell: PortQty, cell_port_exceptions: &HashMap<CellNo, PortQty>, border_cell_ports: &HashMap<CellNo, Vec<PortNo>>) -> Result<(Datacenter, OutsideToNoc), Error> {
         /* Doesn't work when debugging in Eclipse
         let args: Vec<String> = env::args().collect();
         println!("Main: args {:?}",args);
-        let ecargs = match ECArgs::get_args(args) {
-        Ok(e) => e,
-        Err(err) => panic!("Argument Error: {}",err)
-    };
          */
-        let ecargs = ECArgs::new(NCELLS, NPORTS, *NLINKS)?;
-        let (ncells, nports) = ecargs.get_args();
-        println!("\nMain: {} ports for each of {} cells", *nports, *ncells);
-        let edges = get_edges();
-        let mut exceptions = HashMap::new();
-        exceptions.insert(CellNo(5), PortQty(7));
-        exceptions.insert(CellNo(2), PortQty(6));
-        let mut border = HashMap::new();
-        border.insert(CellNo(2), vec![PortNo(2)]);
-        border.insert(CellNo(7), vec![PortNo(2)]);
-        let blueprint = Blueprint::new(ncells, nports, &edges, &exceptions, &border)?;
+        println!("\nMain: {} ports for each of {} cells", *default_num_ports_per_cell, *num_cells);
+        let blueprint = Blueprint::new(num_cells, &edges, default_num_ports_per_cell, &cell_port_exceptions, border_cell_ports)?;
         println!("{}", blueprint);
         let (outside_to_noc, noc_from_outside): (OutsideToNoc, NocFromOutside) = channel();
         let (noc_to_outside, _outside_from_noc): (NocToOutside, OutsideFromNoc) = channel();
@@ -53,11 +39,11 @@ impl Datacenter {
     }
     pub fn initialize(&mut self, blueprint: &Blueprint)  -> Result<Vec<JoinHandle<()>>, Error> {
         let _f = "initialize";
-        let geometry = get_geometry();  // A cheat used for visualization
-        let ncells = blueprint.get_ncells();
+        let num_cells = blueprint.get_ncells();
+        let geometry = get_geometry(num_cells);  // A cheat used for visualization
         let edge_list = blueprint.get_edge_list();
-        if *ncells < 1  { return Err(DatacenterError::Cells{ ncells, func_name: _f }.into()); }
-        if edge_list.len() < *ncells - 1 { return Err(DatacenterError::Edges { nlinks: LinkNo(CellNo(edge_list.len())), func_name: _f }.into() ); }
+        if *num_cells < 1  { return Err(DatacenterError::Cells{ num_cells, func_name: _f }.into()); }
+        if edge_list.len() < *num_cells - 1 { return Err(DatacenterError::Edges { nlinks: LinkNo(CellNo(edge_list.len())), func_name: _f }.into() ); }
         self.cells.append(&mut blueprint.get_border_cells()
                           .iter()
                           .map(|border_cell| -> Result<NalCell, Error> {
@@ -99,7 +85,7 @@ impl Datacenter {
         self.cells.sort_by(|a, b| (*a.get_no()).cmp(&*b.get_no())); // Sort to conform to edge list
         let mut link_handles = Vec::new();
         for edge in edge_list {
-            if (*(edge.0) > ncells.0) | (*(edge.1) >= ncells.0) { return Err(DatacenterError::Wire { edge: *edge, func_name: _f, comment: "greater than ncells test" }.into()); }
+            if (*(edge.0) > num_cells.0) | (*(edge.1) >= num_cells.0) { return Err(DatacenterError::Wire { edge: *edge, func_name: _f, comment: "greater than num_cells test" }.into()); }
             let (e0, e1) = if *(edge.0) >= *(edge.1) {
                 (*(edge.1), *(edge.0))
             } else {
@@ -176,8 +162,8 @@ use failure::{Error, ResultExt};
 pub enum DatacenterError {
     #[fail(display = "DatacenterError::Boundary {}: No boundary cells found", func_name)]
     Boundary { func_name: &'static str },
-    #[fail(display = "DatacenterError::Cells {}: The number of cells {:?} must be at least 1", func_name, ncells)]
-    Cells { ncells: CellQty, func_name: &'static str },
+    #[fail(display = "DatacenterError::Cells {}: The number of cells {:?} must be at least 1", func_name, num_cells)]
+    Cells { num_cells: CellQty, func_name: &'static str },
     #[fail(display = "DatacenterError::Edges {}: {:?} is not enough links to connect all cells", func_name, nlinks)]
     Edges { nlinks: LinkNo, func_name: &'static str },
     #[fail(display = "DatacenterError::Wire {}: {:?} is not a valid edge at {}", func_name, edge, comment)]
