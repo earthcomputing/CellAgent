@@ -5,7 +5,7 @@ use std::{fmt, fmt::Write,
           thread::{JoinHandle}};
 
 use crate::blueprint::{Blueprint, Cell};
-use crate::config::{TRACE_OPTIONS, NCELLS, NPORTS, NLINKS, CellNo, CellType, PortNo, Edge, LinkNo, get_edges, get_geometry};
+use crate::config::{TRACE_OPTIONS, NCELLS, NPORTS, NLINKS, CellNo, CellQty, CellType, PortNo, PortQty, Edge, LinkNo, get_edges, get_geometry};
 use crate::dal;
 use crate::ecargs::{ECArgs};
 use crate::message_types::{LinkToPort, PortFromLink, PortToLink, LinkFromPort,
@@ -38,8 +38,8 @@ impl Datacenter {
         println!("\nMain: {} ports for each of {} cells", *nports, *ncells);
         let edges = get_edges();
         let mut exceptions = HashMap::new();
-        exceptions.insert(CellNo(5), PortNo(7));
-        exceptions.insert(CellNo(2), PortNo(6));
+        exceptions.insert(CellNo(5), PortQty(7));
+        exceptions.insert(CellNo(2), PortQty(6));
         let mut border = HashMap::new();
         border.insert(CellNo(2), vec![PortNo(2)]);
         border.insert(CellNo(7), vec![PortNo(2)]);
@@ -177,7 +177,7 @@ pub enum DatacenterError {
     #[fail(display = "DatacenterError::Boundary {}: No boundary cells found", func_name)]
     Boundary { func_name: &'static str },
     #[fail(display = "DatacenterError::Cells {}: The number of cells {:?} must be at least 1", func_name, ncells)]
-    Cells { ncells: CellNo, func_name: &'static str },
+    Cells { ncells: CellQty, func_name: &'static str },
     #[fail(display = "DatacenterError::Edges {}: {:?} is not enough links to connect all cells", func_name, nlinks)]
     Edges { nlinks: LinkNo, func_name: &'static str },
     #[fail(display = "DatacenterError::Wire {}: {:?} is not a valid edge at {}", func_name, edge, comment)]

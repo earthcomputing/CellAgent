@@ -9,7 +9,7 @@ use serde_json;
 
 use crate::config::{CONNECTED_PORTS_TREE_NAME, CONTINUE_ON_ERROR, CONTROL_TREE_NAME, DEBUG_OPTIONS, QUENCH,
              TRACE_OPTIONS,
-             ByteArray, CellNo, CellType, Quench, PathLength, PortNo};
+             ByteArray, CellNo, CellType, Quench, PathLength, PortNo, PortQty};
 use crate::dal;
 use crate::dal::{fork_trace_header, update_trace_header};
 use crate::gvm_equation::{GvmEquation, GvmEqn};
@@ -62,7 +62,7 @@ pub struct CellAgent {
     cell_type: CellType,
     config: CellConfig,
     cell_info: CellInfo,
-    no_ports: PortNo,
+    no_ports: PortQty,
     my_tree_id: TreeID,
     control_tree_id: TreeID,
     connected_tree_id: TreeID,
@@ -91,7 +91,7 @@ pub struct CellAgent {
     no_packets: [NumberOfPackets; MAX_PORTS.0 as usize],
 }
 impl CellAgent {
-    pub fn new(cell_id: CellID, cell_type: CellType, config: CellConfig, no_ports: PortNo,
+    pub fn new(cell_id: CellID, cell_type: CellType, config: CellConfig, no_ports: PortQty,
                ca_to_cm: CaToCm )
                -> Result<CellAgent, Error> {
         let tenant_masks = vec![BASE_TENANT_MASK];
@@ -172,7 +172,7 @@ impl CellAgent {
         self.listen_cm(ca_from_cm)?;
         Ok(self)
     }
-    fn get_no_ports(&self) -> PortNo { self.no_ports }
+    fn get_no_ports(&self) -> PortQty { self.no_ports }
     pub fn get_cell_id(&self) -> CellID { self.cell_id }
 //    pub fn get_cell_info(&self) -> CellInfo { self.cell_info }
 //    pub fn get_tree_name_map(&self) -> &TreeNameMap { &self.tree_name_map }

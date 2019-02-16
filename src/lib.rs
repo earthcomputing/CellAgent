@@ -41,8 +41,8 @@ use std::{io::{stdin, stdout, Read, Write},
           collections::{HashMap},
           sync::mpsc::channel};
 
-use crate::config::{NCELLS, NPORTS, CellNo,
-                    Edge, PortNo, get_edges};
+use crate::config::{NCELLS, NPORTS, CellNo, CellQty,
+                    Edge, PortNo, PortQty, get_edges};
 use crate::datacenter::Datacenter;
 use crate::utility::{TraceHeader};
 
@@ -52,7 +52,7 @@ trait Test {
 
 
 struct DatacenterGraph {
-    expected_num_cells: CellNo,
+    expected_num_cells: CellQty,
     expected_edges: Vec<Edge>,
     dc: Datacenter,
 }
@@ -95,8 +95,8 @@ fn test_sample_graph() {
 
 
 struct DatacenterPorts {
-    default_num_ports_per_cell: PortNo,
-    cell_port_exceptions: HashMap<CellNo, PortNo>,
+    default_num_ports_per_cell: PortQty,
+    cell_port_exceptions: HashMap<CellNo, PortQty>,
     dc: Datacenter,
 }
 
@@ -107,8 +107,8 @@ impl DatacenterPorts {
             Err(err) => panic!("Datacenter construction failure: {}", err)
         };
         let mut cell_port_exceptions = HashMap::new();
-        cell_port_exceptions.insert(CellNo(5), PortNo(7));
-        cell_port_exceptions.insert(CellNo(2), PortNo(6));
+        cell_port_exceptions.insert(CellNo(5), PortQty(7));
+        cell_port_exceptions.insert(CellNo(2), PortQty(6));
 	DatacenterPorts {
             default_num_ports_per_cell: NPORTS,
             cell_port_exceptions: cell_port_exceptions,
@@ -122,10 +122,10 @@ impl Test for DatacenterPorts {
         for cell in self.dc.get_cells() {
             match self.cell_port_exceptions.get(&cell.get_no()) {
                 Some(num_ports) => {
-                    assert_eq!(cell.get_num_ports(), PortNo(**num_ports+1));
+                    assert_eq!(cell.get_num_ports(), PortQty(**num_ports+1));
                 }
                 None => {
-                    assert_eq!(cell.get_num_ports(), PortNo(*self.default_num_ports_per_cell+1));
+                    assert_eq!(cell.get_num_ports(), PortQty(*self.default_num_ports_per_cell+1));
                 }
             }
         }
@@ -168,7 +168,7 @@ impl DatacenterBorder {
 impl Test for DatacenterBorder {
     fn test(&mut self) {
         for cell in self.dc.get_cells() {
-            let mut border_ports: &Vec<PortNo>;
+            let border_ports: &Vec<PortNo>;
             let mut is_border_cell: bool = false;
             match self.expected_border_cell_ports.get(&cell.get_no()) {
                 Some(port_nums) => {

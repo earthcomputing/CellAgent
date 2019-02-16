@@ -5,7 +5,7 @@ use std::{fmt, fmt::Write,
 
 use crate::cellagent::{CellAgent};
 use crate::cmodel::{Cmodel};
-use crate::config::{CONTINUE_ON_ERROR, MAX_PORTS, TRACE_OPTIONS, CellNo, CellType, PortNo};
+use crate::config::{CONTINUE_ON_ERROR, MAX_PORTS, TRACE_OPTIONS, CellNo, CellType, PortNo, PortQty};
 use crate::dal;
 use crate::dal::{fork_trace_header, update_trace_header};
 use crate::message_types::{PortToPe, PeFromPort, PeToPort,PortFromPe,
@@ -45,7 +45,7 @@ pub struct NalCell {
 }
 
 impl NalCell {
-    pub fn new(cell_no: CellNo, nports: PortNo, cell_type: CellType, config: CellConfig)
+    pub fn new(cell_no: CellNo, nports: PortQty, cell_type: CellType, config: CellConfig)
             -> Result<NalCell, Error> {
         let _f = "new";
         if *nports > *MAX_PORTS { return Err(NalcellError::NumberPorts { nports, func_name: "new", max_ports: MAX_PORTS }.into()) }
@@ -151,7 +151,7 @@ impl NalCell {
 
     pub fn get_id(&self) -> CellID { self.id }
     pub fn get_no(&self) -> CellNo { self.cell_no }
-    pub fn get_num_ports(&self) -> PortNo { PortNo(self.ports.len() as u8) }
+    pub fn get_num_ports(&self) -> PortQty { PortQty(self.ports.len() as u8) }
     pub fn get_cell_agent(&self) -> &CellAgent { &self.cell_agent }
     //pub fn get_cmodel(&self) -> &Cmodel { &self.cmodel }
     pub fn get_packet_engine(&self) -> &PacketEngine { &self.packet_engine }
@@ -207,5 +207,5 @@ pub enum NalcellError {
     #[fail(display = "NalcellError::NoFreePorts {}: All ports have been assigned for cell {}", func_name, cell_id)]
     NoFreePorts { func_name: &'static str, cell_id: CellID },
     #[fail(display = "NalcellError::NumberPorts {}: You asked for {:?} ports, but only {:?} are allowed", func_name, nports, max_ports)]
-    NumberPorts { func_name: &'static str, nports: PortNo, max_ports: PortNo }
+    NumberPorts { func_name: &'static str, nports: PortQty, max_ports: PortQty }
 }
