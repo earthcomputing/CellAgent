@@ -2,18 +2,18 @@ use std::fmt;
 
 use failure::{Error};
 
-use crate::config::{MAX_PORTS, CellNo, LinkNo, PortNo};
+use crate::config::{MAX_PORTS, CellNo, CellQty, LinkNo, PortQty};
 
 #[derive(Debug)]
 pub struct ECArgs {
-    nports: PortNo,
-    ncells: CellNo,
+    nports: PortQty,
+    ncells: CellQty,
     nlinks: LinkNo,
 }
 impl ECArgs {
-    pub fn new(ncells: CellNo, nports: PortNo, nlinks: CellNo) -> Result<ECArgs, Error> {
+    pub fn new(ncells: CellQty, nports: PortQty, nlinks: CellNo) -> Result<ECArgs, Error> {
         if *nports <= (*MAX_PORTS - 1) {
-            Ok(ECArgs { nports: nports as PortNo, ncells, nlinks: LinkNo(CellNo(*nlinks)) })
+            Ok(ECArgs { nports: nports as PortQty, ncells, nlinks: LinkNo(CellNo(*nlinks)) })
         } else {
             Err(EcargsError::NumberPorts { nports, func_name: "new", max: MAX_PORTS }.into())
         }
@@ -21,7 +21,7 @@ impl ECArgs {
 //  pub fn get_nports(&self) -> u8 { return self.nports }
 //  pub fn get_ncells(&self) -> usize { return self.ncells }
 //  pub fn get_nlinks(&self) -> usize { return self.nlinks }
-    pub fn get_args(&self) -> (CellNo, PortNo) { (self.ncells, self.nports) }
+    pub fn get_args(&self) -> (CellQty, PortQty) { (self.ncells, self.nports) }
 /*
     pub fn args(args: Vec<String>)-> Result<ECArgs,ECArgsError> {
         if args.len() != 3 { Err(ECArgsError::NumberArgs(NumberArgsError::new(args.len()-1,2))) }
@@ -64,5 +64,5 @@ impl fmt::Display for ECArgs {
 #[derive(Debug, Fail)]
 pub enum EcargsError {
     #[fail(display = "EcargsError::NumberPorts {}:  You asked for {:?} ports, but only {:?} are allowed", func_name, nports, max)]
-    NumberPorts { func_name: &'static str, nports: PortNo, max: PortNo}
+    NumberPorts { func_name: &'static str, nports: PortQty, max: PortQty}
 }

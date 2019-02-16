@@ -6,7 +6,7 @@ use std::{fmt, fmt::Write,
 use serde_json;
 //use uuid::Uuid;
 
-use crate::config::{PathLength, PortNo};
+use crate::config::{PathLength, PortNo, PortQty};
 //use dumpstack::{dumpstack};
 use crate::gvm_equation::{GvmEquation, GvmVariable, GvmVariableType};
 use crate::name::{Name, CellID, PortTreeID, TreeID};
@@ -30,7 +30,7 @@ pub struct Traph {
     tried_ports: HashMap<PortTreeID,HashSet<PortNo>>
 }
 impl Traph {
-    pub fn new(cell_id: &CellID, no_ports: PortNo, black_tree_id: TreeID, gvm_eqn: &GvmEquation) -> Result<Traph, Error> {
+    pub fn new(cell_id: &CellID, no_ports: PortQty, black_tree_id: TreeID, gvm_eqn: &GvmEquation) -> Result<Traph, Error> {
         let mut elements = Vec::new();
         for i in 0..=*no_ports {
             let port_number = PortNo(i as u8).make_port_number(no_ports).context(TraphError::Chain { func_name: "new", comment: S("")})?;

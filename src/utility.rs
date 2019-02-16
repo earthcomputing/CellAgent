@@ -6,7 +6,7 @@ use serde_json::{Value};
 use lazy_static::lazy_static;
 use time;
 
-use crate::config::{MAX_PORTS, REPO, MaskValue, PortNo};
+use crate::config::{MAX_PORTS, REPO, MaskValue, PortNo, PortQty};
 
 /*
 pub fn get_first_arg(a: Vec<String>) -> Option<i32> {
@@ -39,7 +39,7 @@ impl Mask {
     }
     pub fn port0() -> Mask { Mask { mask: MaskValue(1) } }
     pub fn empty() -> Mask { Mask { mask: MaskValue(0) } }
-    pub fn all_but_zero(no_ports: PortNo) -> Mask {
+    pub fn all_but_zero(no_ports: PortQty) -> Mask {
         Mask { mask: MaskValue((2 as u16).pow((*no_ports) as u32)-2) }
     }
     pub fn equal(self, other: Mask) -> bool { *self.mask == *other.mask }
@@ -82,7 +82,7 @@ impl fmt::Display for Mask {
 #[derive(Debug, Copy, Clone, Hash, PartialEq, Eq, Serialize, Deserialize)]
 pub struct PortNumber { port_no: PortNo }
 impl PortNumber {
-    pub fn new(no: PortNo, no_ports: PortNo) -> Result<PortNumber, Error> {
+    pub fn new(no: PortNo, no_ports: PortQty) -> Result<PortNumber, Error> {
         if *no > *no_ports {
             Err(UtilityError::PortNumber{ port_no: no, func_name: "PortNumber::new", max: no_ports }.into())
         } else {
@@ -99,7 +99,7 @@ impl fmt::Display for PortNumber {
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Hash, Serialize, Deserialize)]
 pub struct Path { port_number: PortNumber }
 impl Path {
-    pub fn new(port_no: PortNo, no_ports: PortNo) -> Result<Path, Error> {
+    pub fn new(port_no: PortNo, no_ports: PortQty) -> Result<Path, Error> {
         let port_number = port_no.make_port_number(no_ports).context(UtilityError::Chain { func_name: "Path::new", comment: S("")})?;
         Ok(Path { port_number })
     }
@@ -257,7 +257,7 @@ pub enum UtilityError {
 //    #[fail(display = "UtilityError::Mask {}: Cell {} has no tenant mask", func_name, cell_id)]
 //    Mask { cell_id: CellID, func_name: &'static str},
     #[fail(display = "UtilityError::PortNumber {}: Port number {:?} is larger than the maximum of {:?}", func_name, port_no, max)]
-    PortNumber { port_no: PortNo, func_name: &'static str, max: PortNo },
+    PortNumber { port_no: PortNo, func_name: &'static str, max: PortQty },
     #[fail(display = "UtilityError::Serialize {}: Cannot serialize in append2file", func_name)]
     Serialize { func_name: &'static str},
     #[fail(display = "UtilityError::Unimplemented {}: {} is not implemented", func_name, feature)]

@@ -8,11 +8,11 @@ pub const SCHEMA_VERSION: &str = "0.1";
 pub const REPO: &str = "CellAgent";
 pub const CENTRAL_TREE: & str = "Tree:C:2";
 // Sizes
-pub const NCELLS: CellNo    = CellNo(10);
-pub const NPORTS: PortNo    = PortNo(8);
-pub const NLINKS: LinkNo    = LinkNo(CellNo(40));
-pub const MAX_PORTS: PortNo = PortNo(9);          // Limit on number of ports per cell
-pub const MIN_BORDER_CELLS: CellNo = CellNo(1);   // Minimum acceptable number of border cells
+pub const NCELLS: CellQty = CellQty(10);
+pub const NPORTS: PortQty = PortQty(8);
+pub const NLINKS: LinkNo = LinkNo(CellNo(40));
+pub const MAX_PORTS: PortQty = PortQty(9);          // Limit on number of ports per cell
+pub const MIN_BORDER_CELLS: CellQty = CellQty(1);   // Minimum acceptable number of border cells
 pub const PACKET_MIN: usize = 64;
 pub const PACKET_MAX: usize = 9000;
 // Control
@@ -121,6 +121,9 @@ pub const DEBUG_OPTIONS: DebugOptions = DebugOptions {
 #[derive(Debug, Clone, Hash, Eq, PartialEq, Serialize, Deserialize)]
 pub struct ByteArray(pub Vec<u8>);
 impl Deref for ByteArray { type Target = Vec<u8>; fn deref(&self) -> &Self::Target { &self.0 } }
+#[derive(Debug, Copy, Clone, Eq, PartialEq, Serialize, Deserialize)]
+pub struct CellQty(pub usize);
+impl Deref for CellQty { type Target = usize; fn deref(&self) -> &Self::Target { &self.0 } }
 #[derive(Debug, Copy, Clone, Hash, Eq, PartialEq, Serialize, Deserialize)]
 pub struct CellNo(pub usize);
 impl Deref for CellNo { type Target = usize; fn deref(&self) -> &Self::Target { &self.0 } }
@@ -148,10 +151,13 @@ impl Deref for PacketNo { type Target = u16; fn deref(&self) -> &Self::Target { 
 pub struct PathLength(pub CellNo);
 impl Deref for PathLength { type Target = CellNo; fn deref(&self) -> &Self::Target { &self.0 } }
 impl fmt::Display for PathLength { fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result { write!(f, "{}", *self.0)} }
+#[derive(Debug, Copy, Clone, Eq, PartialEq, Serialize, Deserialize)]
+pub struct PortQty(pub u8);
+impl Deref for PortQty { type Target = u8; fn deref(&self) -> &Self::Target { &self.0 } }
 #[derive(Debug, Copy, Clone, Hash, Eq, PartialEq, Ord, PartialOrd, Serialize, Deserialize)]
 pub struct PortNo(pub u8);
 impl PortNo {
-    pub fn make_port_number(self, no_ports: PortNo) -> Result<PortNumber, Error> {
+    pub fn make_port_number(self, no_ports: PortQty) -> Result<PortNumber, Error> {
         Ok(PortNumber::new(self, no_ports)?)
     }
     pub fn as_usize(self) -> usize { self.0 as usize }
@@ -174,14 +180,14 @@ impl fmt::Display for CellType {
 // Connections
 pub fn get_edges() -> Vec<Edge> {
     match NCELLS {
-        CellNo(3)  => vec![is2e(0,1), is2e(0,2), is2e(1,2)],
-        CellNo(4)  => vec![is2e(0,1), is2e(0,2), is2e(1,2), is2e(0,3), is2e(1,3)],//, is2e(2,3)],
-        CellNo(10) => vec![is2e(0,1),is2e(1,2),is2e(1,6),is2e(3,4),
+        CellQty(3)  => vec![is2e(0,1), is2e(0,2), is2e(1,2)],
+        CellQty(4)  => vec![is2e(0,1), is2e(0,2), is2e(1,2), is2e(0,3), is2e(1,3)],//, is2e(2,3)],
+        CellQty(10) => vec![is2e(0,1),is2e(1,2),is2e(1,6),is2e(3,4),
                            is2e(5,6),is2e(6,7),is2e(7,8),is2e(8,9),
                            is2e(0,5),is2e(2,3),is2e(2,7),is2e(3,8),is2e(4,9)],
         // blueprint-baran-distributed.gv
         // 97 edges
-        CellNo(47) => vec![
+        CellQty(47) => vec![
             is2e( 0, 1), is2e( 0, 4), is2e( 1, 2), is2e( 1, 5), is2e( 1, 6), is2e( 2, 3), is2e( 2, 6), is2e( 2, 7), is2e( 3, 8),
             is2e( 4, 5), is2e( 4, 9), is2e( 5, 6), is2e( 5,10), is2e( 5,11), is2e( 6, 7), is2e( 6,12), is2e( 7, 8), is2e( 7,13),
             is2e( 8,14), is2e( 9,10), is2e( 9,15), is2e(10,11), is2e(10,16), is2e(11,12), is2e(11,16), is2e(11,18), is2e(12,13),
@@ -199,11 +205,11 @@ pub fn get_edges() -> Vec<Edge> {
 }
 pub fn get_geometry() -> (usize, usize, Vec<(usize, usize)>) {
     let geometry = match NCELLS {
-        CellNo(3)  => vec![(0,0), (0,2), (1,1)],
-        CellNo(4)  => vec![(0,0), (0,1), (1,0), (1,1)],
-        CellNo(10) => vec![(0,0), (0,1), (0,2), (0,3), (0,4),
+        CellQty(3)  => vec![(0,0), (0,2), (1,1)],
+        CellQty(4)  => vec![(0,0), (0,1), (1,0), (1,1)],
+        CellQty(10) => vec![(0,0), (0,1), (0,2), (0,3), (0,4),
                            (1,0), (1,1), (1,2), (1,3), (1,4)],
-        CellNo(47) => vec![(0,2), (0,4), (0,5), (0,7), (0,9), (0,10),
+        CellQty(47) => vec![(0,2), (0,4), (0,5), (0,7), (0,9), (0,10),
                            (1,0), (1,1), (1,2), (1,3), (1,4), (1,5), (1,7), (1,8), (1,9), (1,10),
                            (2,0), (2,1), (2,2), (2,3), (2,4), (2,6), (2,7), (2,8), (2,9),
                            (3,1), (3,2), (3,4), (3,5), (3,8), (3,9), (3,10),

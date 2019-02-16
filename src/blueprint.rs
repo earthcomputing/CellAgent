@@ -2,7 +2,7 @@ use std::{fmt, fmt::Write,
           collections::{HashMap, HashSet},
           iter::FromIterator};
 
-use crate::config::{MIN_BORDER_CELLS, CellNo, CellType, Edge, PortNo};
+use crate::config::{MIN_BORDER_CELLS, CellNo, CellQty, CellType, Edge, PortNo, PortQty};
 
 #[derive(Debug)]
 pub struct Blueprint {
@@ -11,8 +11,8 @@ pub struct Blueprint {
     edges: Vec<Edge>,
 }
 impl Blueprint {
-    pub fn new(ncells: CellNo, ports_per_cell: PortNo, edges: &Vec<Edge>,
-               exceptions: &HashMap<CellNo, PortNo>, border_cell_map: &HashMap<CellNo, Vec<PortNo>>) ->
+    pub fn new(ncells: CellQty, ports_per_cell: PortQty, edges: &Vec<Edge>,
+               exceptions: &HashMap<CellNo, PortQty>, border_cell_map: &HashMap<CellNo, Vec<PortNo>>) ->
                Result<Blueprint, BlueprintError> {
         let _f = "new";
         let num_border = border_cell_map.len();
@@ -43,7 +43,7 @@ impl Blueprint {
         }
         Ok(Blueprint { interior_cells, border_cells, edges:edges.clone() })
     }
-    pub fn get_ncells(&self) -> CellNo { CellNo(self.get_n_interior_cells() + self.get_n_border_cells()) }
+    pub fn get_ncells(&self) -> CellQty { CellQty(self.get_n_interior_cells() + self.get_n_border_cells()) }
     pub fn get_n_border_cells(&self) -> usize { self.border_cells.len() }
     pub fn get_n_interior_cells(&self) -> usize { self.interior_cells.len() }
     pub fn get_edge_list(&self) -> &Vec<Edge> { &self.edges }
@@ -62,7 +62,7 @@ impl fmt::Display for Blueprint {
 pub trait Cell {
     fn get_cell_no(&self) -> CellNo;
     fn get_cell_type(&self) -> CellType;
-    fn get_nports(&self) -> PortNo;
+    fn get_nports(&self) -> PortQty;
     fn get_interior_ports(&self) -> &Vec<PortNo>;
 }
 #[derive(Debug, Clone)]
@@ -75,7 +75,7 @@ pub struct BorderCell {
 impl Cell for BorderCell {
     fn get_cell_no(&self) -> CellNo { self.cell_no }
     fn get_cell_type(&self) -> CellType { self.cell_type }
-    fn get_nports(&self) -> PortNo { PortNo((self.border_ports.len() + self.interior_ports.len()) as u8) }
+    fn get_nports(&self) -> PortQty { PortQty((self.border_ports.len() + self.interior_ports.len()) as u8) }
     fn get_interior_ports(&self) -> &Vec<PortNo> { &self.interior_ports }
 }
 impl BorderCell {
@@ -100,7 +100,7 @@ pub struct InteriorCell {
 impl Cell for InteriorCell {
     fn get_cell_no(&self) -> CellNo { self.cell_no }
     fn get_cell_type(&self) -> CellType { self.cell_type }
-    fn get_nports(&self) -> PortNo { PortNo(self.interior_ports.len() as u8) }
+    fn get_nports(&self) -> PortQty { PortQty(self.interior_ports.len() as u8) }
     fn get_interior_ports(&self) -> &Vec<PortNo> { &self.interior_ports }
 }
 impl fmt::Display for InteriorCell {
