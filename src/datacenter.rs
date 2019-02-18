@@ -1,6 +1,7 @@
 use std::{fmt, fmt::Write,
           cmp::max,
-          collections::{HashMap},
+          collections::{HashMap, HashSet},
+          iter::FromIterator,
           sync::mpsc::channel,
           thread::{JoinHandle}};
 
@@ -48,6 +49,7 @@ impl Datacenter {
                           .iter()
                           .map(|border_cell| -> Result<NalCell, Error> {
                               let nalcell = NalCell::new(border_cell.get_cell_no(), border_cell.get_nports(),
+                                                         &HashSet::from_iter(border_cell.get_border_ports().clone()),
                                                          CellType::Border, CellConfig::Large)?;
                               {
                                   if TRACE_OPTIONS.all || TRACE_OPTIONS.dc {
@@ -67,7 +69,7 @@ impl Datacenter {
                           .iter()
                           .map(|interior_cell| -> Result<NalCell, Error> {
                               let nalcell = NalCell::new(interior_cell.get_cell_no(), interior_cell.get_nports(),
-                                                         CellType::Interior, CellConfig::Large)?;
+                                                         &HashSet::new(), CellType::Interior, CellConfig::Large)?;
                               {
                                   if TRACE_OPTIONS.all || TRACE_OPTIONS.dc {
                                       let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "interior_cell_start" };

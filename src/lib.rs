@@ -213,7 +213,7 @@ impl DatacenterPorts {
         cell_port_exceptions.insert(CellNo(5), PortQty(7));
         cell_port_exceptions.insert(CellNo(2), PortQty(6));
         let mut border_cell_ports = HashMap::new();
-        border_cell_ports.insert(CellNo(0), vec![PortNo(2)]);
+        border_cell_ports.insert(CellNo(0), vec![PortNo(7)]);
         let (dc, outside_to_noc) =
             match Datacenter::construct(
                 CellQty(10),
@@ -267,8 +267,8 @@ struct DatacenterBorder {
 impl DatacenterBorder {
     fn new_partial_border() -> DatacenterBorder {
         let mut border_cell_ports = HashMap::new();
-        border_cell_ports.insert(CellNo(2), vec![PortNo(2)]);
-        border_cell_ports.insert(CellNo(7), vec![PortNo(2)]);
+        border_cell_ports.insert(CellNo(2), vec![PortNo(3)]);
+        border_cell_ports.insert(CellNo(7), vec![PortNo(1)]);
         let (dc, outside_to_noc) =
             match Datacenter::construct(
                 CellQty(10),
