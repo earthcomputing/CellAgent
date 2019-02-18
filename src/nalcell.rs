@@ -45,7 +45,7 @@ pub struct NalCell {
 }
 
 impl NalCell {
-    pub fn new(cell_no: CellNo, nports: PortQty, cell_type: CellType, config: CellConfig)
+    pub fn new(cell_no: CellNo, nports: PortQty, border_port_nos: &HashSet<PortNo>, cell_type: CellType, config: CellConfig)
             -> Result<NalCell, Error> {
         let _f = "new";
         if *nports > *MAX_PORTS { return Err(NalcellError::NumberPorts { nports, func_name: "new", max_ports: MAX_PORTS }.into()) }
@@ -58,7 +58,6 @@ impl NalCell {
         let mut ports = Vec::new();
         let mut pe_to_ports = Vec::new();
         let mut ports_from_pe = HashMap::new(); // So I can remove the item
-        let mut boundary_port_nos = HashSet::new();
         {
             if TRACE_OPTIONS.all || TRACE_OPTIONS.nal {
                 let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "nalcell_port_setup" };
@@ -67,14 +66,7 @@ impl NalCell {
             }
         }
         for i in 0..=*nports {
-            let is_border_port = match cell_type {
-                CellType::Border => {
-                    let is_border_port = i == 2;
-                    if is_border_port { boundary_port_nos.insert(PortNo(i)); }
-                    is_border_port
-                }
-                CellType::Interior => false
-            };
+            let is_border_port = border_port_nos.contains(&PortNo(i));
             let (pe_to_port, port_from_pe): (PeToPort, PortFromPe) = channel();
             pe_to_ports.push(pe_to_port);
             ports_from_pe.insert(PortNo(i), port_from_pe);
@@ -88,7 +80,7 @@ impl NalCell {
         NalCell::start_cell(&cell_agent, ca_from_cm);
         let cmodel = Cmodel::new(cell_id);
         NalCell::start_cmodel(&cmodel, cm_from_ca, cm_to_pe, cm_from_pe, cm_to_ca);
-        let packet_engine = PacketEngine::new(cell_id, pe_to_cm, pe_to_ports, boundary_port_nos).context(NalcellError::Chain { func_name: "new", comment: S("packet engine create")})?;
+        let packet_engine = PacketEngine::new(cell_id, pe_to_cm, pe_to_ports, border_port_nos).context(NalcellError::Chain { func_name: "new", comment: S("packet engine create")})?;
         NalCell::start_packet_engine(&packet_engine, pe_from_cm, pe_from_ports);
         Ok(NalCell { id: cell_id, cell_no, cell_type, config, cmodel,
                 ports: boxed_ports, cell_agent, vms: Vec::new(),

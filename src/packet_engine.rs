@@ -27,7 +27,7 @@ type PacketArray = Arc<Mutex<Vec<VecDeque<Packet>>>>;
 #[derive(Debug, Clone)]
 pub struct PacketEngine {
     cell_id: CellID,
-    boundary_port_nos: HashSet<PortNo>,
+    border_port_nos: HashSet<PortNo>,
     routing_table: Arc<Mutex<RoutingTable>>,
     no_seen_packets: UsizeArray, // Number of packets received since last packet sent
     no_sent_packets: UsizeArray, // Number of packets sent since last packet received
@@ -42,12 +42,12 @@ pub struct PacketEngine {
 impl PacketEngine {
     // NEW
     pub fn new(cell_id: CellID, pe_to_cm: PeToCm, pe_to_ports: Vec<PeToPort>,
-            boundary_port_nos: HashSet<PortNo>) -> Result<PacketEngine, Error> {
+               border_port_nos: &HashSet<PortNo>) -> Result<PacketEngine, Error> {
         let routing_table = Arc::new(Mutex::new(RoutingTable::new(cell_id)));
         let mut array = vec![];
         for _ in 0..MAX_PORTS.0 as usize { array.push(VecDeque::new()); }
         let count_vec = [0; MAX_PORTS.0 as usize].to_vec();
-        Ok(PacketEngine { cell_id, routing_table, boundary_port_nos,
+        Ok(PacketEngine { cell_id, routing_table, border_port_nos: border_port_nos.clone(),
             no_seen_packets: Arc::new(Mutex::new(count_vec.clone())),
             no_sent_packets: Arc::new(Mutex::new(count_vec.clone())),
             sent_packets: Arc::new(Mutex::new(array.clone())),
@@ -528,8 +528,8 @@ impl PacketEngine {
                         pe_from_pe.recv()?;
                         for i in 1..=*MAX_PORTS {
                             {
-                                let is_boundary_port = self.boundary_port_nos.contains(&PortNo(i));
-                                if !is_boundary_port && (i as usize) < self.pe_to_ports.len() {
+                                let is_border_port = self.border_port_nos.contains(&PortNo(i));
+                                if !is_border_port && (i as usize) < self.pe_to_ports.len() {
                                     if DEBUG_OPTIONS.all || DEBUG_OPTIONS.flow_control {
                                         println!("---> PacketEngine {}: {} port {} out buf size {}", self.cell_id, _f, i, self.get_outbuf_size(PortNo(i)));
                                     }
