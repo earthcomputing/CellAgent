@@ -24,13 +24,13 @@ pub struct Datacenter {
 }
 impl Datacenter {
     pub fn new() -> Datacenter { Datacenter { cells: Vec::new(), links: Vec::new() } }
-    pub fn construct(num_cells: CellQty, edges: &Vec<Edge>, default_num_ports_per_cell: PortQty, cell_port_exceptions: &HashMap<CellNo, PortQty>, border_cell_ports: &HashMap<CellNo, Vec<PortNo>>) -> Result<(Datacenter, OutsideToNoc), Error> {
+    pub fn construct(num_cells: CellQty, edges: &Vec<Edge>, default_num_phys_ports_per_cell: PortQty, cell_port_exceptions: &HashMap<CellNo, PortQty>, border_cell_ports: &HashMap<CellNo, Vec<PortNo>>) -> Result<(Datacenter, OutsideToNoc), Error> {
         /* Doesn't work when debugging in Eclipse
         let args: Vec<String> = env::args().collect();
         println!("Main: args {:?}",args);
          */
-        println!("\nMain: {} ports for each of {} cells", *default_num_ports_per_cell, *num_cells);
-        let blueprint = Blueprint::new(num_cells, &edges, default_num_ports_per_cell, &cell_port_exceptions, border_cell_ports)?;
+        println!("\nMain: {} ports for each of {} cells", *default_num_phys_ports_per_cell, *num_cells);
+        let blueprint = Blueprint::new(num_cells, &edges, default_num_phys_ports_per_cell, &cell_port_exceptions, border_cell_ports)?;
         println!("{}", blueprint);
         let (outside_to_noc, noc_from_outside): (OutsideToNoc, NocFromOutside) = channel();
         let (noc_to_outside, _outside_from_noc): (NocToOutside, OutsideFromNoc) = channel();
@@ -48,7 +48,7 @@ impl Datacenter {
         self.cells.append(&mut blueprint.get_border_cells()
                           .iter()
                           .map(|border_cell| -> Result<NalCell, Error> {
-                              let nalcell = NalCell::new(border_cell.get_cell_no(), border_cell.get_nports(),
+                              let nalcell = NalCell::new(border_cell.get_cell_no(), border_cell.get_num_phys_ports(),
                                                          &HashSet::from_iter(border_cell.get_border_ports().clone()),
                                                          CellType::Border, CellConfig::Large)?;
                               {
@@ -68,7 +68,7 @@ impl Datacenter {
         self.cells.append(&mut blueprint.get_interior_cells()
                           .iter()
                           .map(|interior_cell| -> Result<NalCell, Error> {
-                              let nalcell = NalCell::new(interior_cell.get_cell_no(), interior_cell.get_nports(),
+                              let nalcell = NalCell::new(interior_cell.get_cell_no(), interior_cell.get_num_phys_ports(),
                                                          &HashSet::new(), CellType::Interior, CellConfig::Large)?;
                               {
                                   if TRACE_OPTIONS.all || TRACE_OPTIONS.dc {

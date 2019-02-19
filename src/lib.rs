@@ -201,14 +201,14 @@ test_result!(test_graph_fortyseven_cells, DatacenterGraph::new_fortyseven_cells(
 
 
 struct DatacenterPorts {
-    default_num_ports_per_cell: PortQty,
+    default_num_phys_ports_per_cell: PortQty,
     cell_port_exceptions: HashMap<CellNo, PortQty>,
     dc: Datacenter,
 }
 
 impl DatacenterPorts {
     fn new_with_exceptions() -> DatacenterPorts {
-        let default_num_ports_per_cell = PortQty(8);
+        let default_num_phys_ports_per_cell = PortQty(8);
         let mut cell_port_exceptions = HashMap::new();
         cell_port_exceptions.insert(CellNo(5), PortQty(7));
         cell_port_exceptions.insert(CellNo(2), PortQty(6));
@@ -220,7 +220,7 @@ impl DatacenterPorts {
                 &vec![is2e(0,1), is2e(1,2), is2e(2,3), is2e(3,4),
                       is2e(5,6), is2e(6,7), is2e(7,8), is2e(8,9),
                       is2e(0,5), is2e(1,6), is2e(2,7), is2e(3,8), is2e(4,9)],
-                default_num_ports_per_cell,
+                default_num_phys_ports_per_cell,
                 &cell_port_exceptions,
                 &border_cell_ports,
             ) {
@@ -228,7 +228,7 @@ impl DatacenterPorts {
                 Err(err) => panic!("Datacenter construction failure: {}", err)
             };
 	DatacenterPorts {
-            default_num_ports_per_cell: default_num_ports_per_cell,
+            default_num_phys_ports_per_cell: default_num_phys_ports_per_cell,
             cell_port_exceptions: cell_port_exceptions,
             dc: dc,
         }
@@ -239,11 +239,11 @@ impl Test for DatacenterPorts {
     fn test(&mut self) {
         for cell in self.dc.get_cells() {
             match self.cell_port_exceptions.get(&cell.get_no()) {
-                Some(num_ports) => {
-                    assert_eq!(cell.get_num_ports(), PortQty(**num_ports+1));
+                Some(num_phys_ports) => {
+                    assert_eq!(cell.get_num_ports(), PortQty(**num_phys_ports+1));
                 }
                 None => {
-                    assert_eq!(cell.get_num_ports(), PortQty(*self.default_num_ports_per_cell+1));
+                    assert_eq!(cell.get_num_ports(), PortQty(*self.default_num_phys_ports_per_cell+1));
                 }
             }
         }
