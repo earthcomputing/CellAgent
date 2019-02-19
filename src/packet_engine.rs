@@ -287,12 +287,11 @@ impl PacketEngine {
             if let Some(packet) = self.pop_first_outbuf(port_no) {
                 self.set_may_not_send(port_no);
                 //self.set_can_send(port_no);
-                if DEBUG_OPTIONS.flow_control{
-                    if self.cell_id.is_name("C:3") || self.cell_id.is_name("C:4")  {
-                        let msg_type = MsgType::msg_type(&packet);
-                        if *port_no == 1 {
-                            println!("PacketEngine {}: port {} {} msg type {} {}", self.cell_id, *port_no, _f, msg_type, packet.get_ait_state());
-                        }
+                if DEBUG_OPTIONS.all || DEBUG_OPTIONS.flow_control {
+                    let msg_type = MsgType::msg_type(&packet);
+                    match packet.get_ait_state() {
+                        AitState::Normal => println!("PacketEngine {}: port {} {} outbuf size {} {} {}", self.cell_id, *port_no, _f, self.get_outbuf_size(port_no), msg_type, packet.get_ait_state()),
+                        _ => ()
                     }
                 }
                 self.pe_to_ports.get(port_no.as_usize())
@@ -308,11 +307,13 @@ impl PacketEngine {
                 self.send_next_packet_or_entl(port_no)?;
             }
         } else {
-            if DEBUG_OPTIONS.flow_control{
-                if self.cell_id.is_name("C:3") || self.cell_id.is_name("C:4") {
-                    if *port_no == 1 {
-                        println!("PacketEngine {}: port {} {} outbuf size {} {:?} {:?}", self.cell_id, *port_no, _f, self.get_outbuf_size(port_no), self.get_outbuf_first_type(port_no), self.get_outbuf_first_ait_state(port_no));
-                    }
+            if DEBUG_OPTIONS.all || DEBUG_OPTIONS.flow_control {
+                match self.get_outbuf_first_ait_state(port_no) {
+                    Some(ait_state) => match ait_state {
+                        AitState::Normal => println!("PacketEngine {}: port {} {} outbuf size {} {:?} {:?}", self.cell_id, *port_no, _f, self.get_outbuf_size(port_no), self.get_outbuf_first_type(port_no), self.get_outbuf_first_ait_state(port_no)),
+                        _ => ()
+                    },
+                    None => ()
                 }
             }
         }
@@ -335,10 +336,12 @@ impl PacketEngine {
         }
         loop {
             let msg = pe_from_ports.recv().context(PacketEngineError::Chain { func_name: _f, comment: S("receive")})?;
-            if TRACE_OPTIONS.all || TRACE_OPTIONS.pe_port {
-                let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "pl_recv" };
-                let trace = json!({ "cell_id": self.cell_id, "msg": &msg });
-                let _ = dal::add_to_trace(TraceType::Trace, trace_params, &trace, _f);
+            {
+                if TRACE_OPTIONS.all || TRACE_OPTIONS.pe_port {
+                    let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "pl_recv" };
+                    let trace = json!({ "cell_id": self.cell_id, "msg": &msg });
+                    let _ = dal::add_to_trace(TraceType::Trace, trace_params, &trace, _f);
+                }
             }
             match msg {
                 // deliver to CModel
@@ -369,12 +372,12 @@ impl PacketEngine {
         let _f = "process_packet";
     
         self.set_may_send(port_no);
-        if DEBUG_OPTIONS.flow_control {
-            if self.cell_id.is_name("C:3") || self.cell_id.is_name("C:4") {
-                let msg_type = MsgType::msg_type(&packet);
-                if *port_no == 1 {
-                    println!("PacketEngine {}: port {} {} outbuf size {} msg type {} {}", self.cell_id, *port_no, _f, self.get_outbuf_size(port_no), msg_type, packet.get_ait_state());
-                }        }
+        if DEBUG_OPTIONS.all || DEBUG_OPTIONS.flow_control {
+            let msg_type = MsgType::msg_type(&packet);
+            match packet.get_ait_state() {
+                AitState::Normal => println!("PacketEngine {}: port {} {} outbuf size {} msg type {} {}", self.cell_id, *port_no, _f, self.get_outbuf_size(port_no), msg_type, packet.get_ait_state()),
+                _ => ()
+            }
         }
         match packet.get_ait_state() {
             AitState::Ait => return Err(PacketEngineError::Ait { func_name: _f, ait_state: AitState::Ait }.into()), // Error, should never get from port
@@ -382,18 +385,19 @@ impl PacketEngine {
                 // Send to CM and transition to ENTL if time is FORWARD
                 packet.next_ait_state()?;
                 self.add_to_out_buffer_front(port_no, packet);
-                self.send_packet(port_no)?;
                 packet.make_ait();
                 self.pe_to_cm.send(PeToCmPacket::Packet((port_no, packet)))
                     .or_else(|_| -> Result<(), Error> {
                         // Time reverse on error sending to CM
                         //println!("PacketEngine {}: {} error {} {}", self.cell_id, _f, MsgType::msg_type(&packet), packet.get_ait_state());
+                        self.pop_first_outbuf(port_no); // Remove packet just added because I need to send a time reversed one instead
                         packet.make_tock();
                         packet.time_reverse();
+                        packet.next_ait_state()?;
                         self.add_to_out_buffer_back(port_no, packet);
-                        self.send_packet(port_no)?;
                         Ok(())
                     })?;
+                self.send_packet(port_no)?;
             },
 
             AitState::Tick => { // Inform CM of success and enter ENTL
@@ -408,9 +412,7 @@ impl PacketEngine {
                 self.add_to_out_buffer_front(port_no, packet);
                 self.send_packet(port_no)?;
             },
-            AitState::Entl => { // In real life, send an ENTL
-                // Next line only belongs in TICK, but I'm not using that state in the simulator
-                //self.pe_to_cm.send(PeToCmPacket::Packet((port_no, packet)))?;
+            AitState::Entl => { // In real life, always send an ENTL
                 if self.get_outbuf_size(port_no) > 0 { self.send_packet(port_no)?; }
             },
             AitState::Normal => { // Forward packet
@@ -457,6 +459,18 @@ impl PacketEngine {
                     // Wait for permission to proceed if packet is from a port and will result in a tree update
                     if packet.is_blocking() && packet.is_last_packet() {
                         pe_from_pe.recv()?;
+                        // Need to empty outbuf
+                        for i in 1..=*MAX_PORTS {
+                            let is_boundary_port = self.boundary_port_nos.contains(&PortNo(i));
+                            if !is_boundary_port && (i as usize) < self.pe_to_ports.len() {
+                                if DEBUG_OPTIONS.all || DEBUG_OPTIONS.flow_control {
+                                    println!("---> PacketEngine {}: {} port {} out buf size {}", self.cell_id, _f, i, self.get_outbuf_size(PortNo(i)));
+                                }
+                                self.send_packet(PortNo(i))?;
+                            }
+                        }
+                    } else {
+                        self.send_packet(port_no)?;
                     }
                 }
             }
@@ -528,12 +542,12 @@ impl PacketEngine {
                     self.pe_to_cm.send(PeToCmPacket::Packet((recv_port_no, packet))).context(PacketEngineError::Chain { func_name: _f, comment: S("leafcast packet to ca ") + &self.cell_id.get_name() })?;
                 } else {
                     // forward to neighbor
-                    if DEBUG_OPTIONS.flow_control {
-                        if self.cell_id.is_name("C:3") || self.cell_id.is_name("C:4") {
-                            let msg_type = MsgType::msg_type(&packet);
-                            if *port_no == 1 {
-                                println!("PacketEngine {}: port {} {} outbuf size {} msg type {} {}", self.cell_id, *port_no, _f, self.get_outbuf_size(port_no), msg_type, packet.get_ait_state());
-                            }        }
+                    if DEBUG_OPTIONS.all || DEBUG_OPTIONS.flow_control {
+                        let msg_type = MsgType::msg_type(&packet);
+                        match packet.get_ait_state() {
+                            AitState::Normal => println!("PacketEngine {}: port {} {} outbuf size {} msg type {} {}", self.cell_id, *port_no, _f, self.get_outbuf_size(port_no), msg_type, packet.get_ait_state()),
+                            _ => ()
+                        }
                     }
                     self.add_to_out_buffer_back(port_no, packet);
                     self.send_packet(port_no)?;
@@ -561,6 +575,7 @@ impl fmt::Display for PacketEngine {
 struct MyVec<T> { v: Vec<T> }
 // Errors
 use failure::{Error, ResultExt};
+
 #[derive(Debug, Fail)]
 pub enum PacketEngineError {
     #[fail(display = "PacketEngineError::Ait {} {} is not allowed here", func_name, ait_state)]
