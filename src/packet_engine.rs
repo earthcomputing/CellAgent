@@ -5,7 +5,7 @@ use std::{fmt, fmt::Write,
           thread};
 
 use crate::config::{CENTRAL_TREE, CONTINUE_ON_ERROR, DEBUG_OPTIONS,
-                    MAX_PORTS, TRACE_OPTIONS, PortNo};
+                    MAX_NUM_PHYS_PORTS, TRACE_OPTIONS, PortNo};
 use crate::dal;
 use crate::dal::{fork_trace_header, update_trace_header};
 use crate::message::MsgType;
@@ -45,15 +45,15 @@ impl PacketEngine {
                border_port_nos: &HashSet<PortNo>) -> Result<PacketEngine, Error> {
         let routing_table = Arc::new(Mutex::new(RoutingTable::new(cell_id)));
         let mut array = vec![];
-        for _ in 0..MAX_PORTS.0 as usize { array.push(VecDeque::new()); }
-        let count_vec = [0; MAX_PORTS.0 as usize].to_vec();
+        for _ in 0..MAX_NUM_PHYS_PORTS.0 as usize { array.push(VecDeque::new()); }
+        let count_vec = [0; MAX_NUM_PHYS_PORTS.0 as usize].to_vec();
         Ok(PacketEngine { cell_id, routing_table, border_port_nos: border_port_nos.clone(),
             no_seen_packets: Arc::new(Mutex::new(count_vec.clone())),
             no_sent_packets: Arc::new(Mutex::new(count_vec.clone())),
             sent_packets: Arc::new(Mutex::new(array.clone())),
             out_buffer: Arc::new(Mutex::new(array.clone())),
             in_buffer: Arc::new(Mutex::new(array.clone())),
-            port_got_event: Arc::new(Mutex::new([false; MAX_PORTS.0 as usize].to_vec())),
+            port_got_event: Arc::new(Mutex::new([false; MAX_NUM_PHYS_PORTS.0 as usize].to_vec())),
             pe_to_cm, pe_to_ports })
     }
 
@@ -146,7 +146,7 @@ impl PacketEngine {
     }
     fn pop_first(array: &mut PacketArray, port_no: PortNo) -> Option<Packet> {
         let mut locked = array.lock().unwrap();
-        let item = locked.get_mut(port_no.as_usize()).unwrap(); // Safe since vector always has MAX_PORTS entries
+        let item = locked.get_mut(port_no.as_usize()).unwrap(); // Safe since vector always has MAX_NUM_PHYS_PORTS entries
         item.pop_front()
     }
     fn pop_first_outbuf(&mut self, port_no: PortNo) -> Option<Packet> {
@@ -526,7 +526,7 @@ impl PacketEngine {
                     // Wait for permission to proceed if packet is from a port and will result in a tree update
                     if packet.is_blocking() && packet.is_last_packet() {
                         pe_from_pe.recv()?;
-                        for i in 1..=*MAX_PORTS {
+                        for i in 1..=*MAX_NUM_PHYS_PORTS {
                             {
                                 let is_border_port = self.border_port_nos.contains(&PortNo(i));
                                 if !is_border_port && (i as usize) < self.pe_to_ports.len() {

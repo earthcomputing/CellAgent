@@ -11,7 +11,7 @@ pub struct Blueprint {
     edges: Vec<Edge>,
 }
 impl Blueprint {
-    pub fn new(num_cells: CellQty, edges: &Vec<Edge>, default_ports_per_cell: PortQty,
+    pub fn new(num_cells: CellQty, edges: &Vec<Edge>, default_num_phys_ports_per_cell: PortQty,
                cell_port_exceptions: &HashMap<CellNo, PortQty>, border_cell_ports: &HashMap<CellNo, Vec<PortNo>>) ->
                Result<Blueprint, BlueprintError> {
         let _f = "new";
@@ -26,19 +26,19 @@ impl Blueprint {
         let mut border_cells = 	Vec::new();
         for no in 0..*num_cells {
             let cell_no = CellNo(no);
-            let num_ports = *cell_port_exceptions
+            let num_phys_ports = *cell_port_exceptions
                 .get(&cell_no)
-                .unwrap_or(&default_ports_per_cell);
-            let port_list = (0..*num_ports as usize).map(|i| PortNo(i as u8)).collect();
+                .unwrap_or(&default_num_phys_ports_per_cell);
+            let phys_port_list : Vec<PortNo> = (0..*num_phys_ports as usize).map(|i| PortNo(i as u8)).collect();
             match border_cell_ports.get(&cell_no) {
-                Some(ports) => {
-                    let border: HashSet<PortNo> = HashSet::from_iter(ports.clone());
-                    let all: HashSet<PortNo> = HashSet::from_iter(port_list);
+                Some(border_ports) => {
+                    let border: HashSet<PortNo> = HashSet::from_iter(border_ports.clone());
+                    let all: HashSet<PortNo> = HashSet::from_iter(phys_port_list);
                     let mut interior_ports = all.difference(&border).cloned().collect::<Vec<_>>();
                     interior_ports.sort();
-                    border_cells.push(BorderCell { cell_no, cell_type: CellType::Border, interior_ports, border_ports: ports.clone() });
+                    border_cells.push(BorderCell { cell_no, cell_type: CellType::Border, interior_ports, border_ports: border_ports.clone() });
                 },
-                None => interior_cells.push(InteriorCell { cell_no, cell_type: CellType::Interior, interior_ports : port_list })
+                None => interior_cells.push(InteriorCell { cell_no, cell_type: CellType::Interior, interior_ports : phys_port_list })
             }
         }
         Ok(Blueprint { interior_cells, border_cells, edges:edges.clone() })
@@ -62,7 +62,7 @@ impl fmt::Display for Blueprint {
 pub trait Cell {
     fn get_cell_no(&self) -> CellNo;
     fn get_cell_type(&self) -> CellType;
-    fn get_nports(&self) -> PortQty;
+    fn get_num_phys_ports(&self) -> PortQty;
     fn get_interior_ports(&self) -> &Vec<PortNo>;
 }
 #[derive(Debug, Clone)]
@@ -75,7 +75,7 @@ pub struct BorderCell {
 impl Cell for BorderCell {
     fn get_cell_no(&self) -> CellNo { self.cell_no }
     fn get_cell_type(&self) -> CellType { self.cell_type }
-    fn get_nports(&self) -> PortQty { PortQty((self.border_ports.len() + self.interior_ports.len()) as u8) }
+    fn get_num_phys_ports(&self) -> PortQty { PortQty((self.border_ports.len() + self.interior_ports.len()) as u8) }
     fn get_interior_ports(&self) -> &Vec<PortNo> { &self.interior_ports }
 }
 impl BorderCell {
@@ -100,7 +100,7 @@ pub struct InteriorCell {
 impl Cell for InteriorCell {
     fn get_cell_no(&self) -> CellNo { self.cell_no }
     fn get_cell_type(&self) -> CellType { self.cell_type }
-    fn get_nports(&self) -> PortQty { PortQty(self.interior_ports.len() as u8) }
+    fn get_num_phys_ports(&self) -> PortQty { PortQty(self.interior_ports.len() as u8) }
     fn get_interior_ports(&self) -> &Vec<PortNo> { &self.interior_ports }
 }
 impl fmt::Display for InteriorCell {

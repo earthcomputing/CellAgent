@@ -5,7 +5,7 @@ use std::{fmt, fmt::Write,
 
 use crate::cellagent::{CellAgent};
 use crate::cmodel::{Cmodel};
-use crate::config::{CONTINUE_ON_ERROR, MAX_PORTS, TRACE_OPTIONS, CellNo, CellType, PortNo, PortQty};
+use crate::config::{CONTINUE_ON_ERROR, MAX_NUM_PHYS_PORTS, TRACE_OPTIONS, CellNo, CellType, PortNo, PortQty};
 use crate::dal;
 use crate::dal::{fork_trace_header, update_trace_header};
 use crate::message_types::{PortToPe, PeFromPort, PeToPort,PortFromPe,
@@ -45,10 +45,10 @@ pub struct NalCell {
 }
 
 impl NalCell {
-    pub fn new(cell_no: CellNo, nports: PortQty, border_port_nos: &HashSet<PortNo>, cell_type: CellType, config: CellConfig)
+    pub fn new(cell_no: CellNo, num_phys_ports: PortQty, border_port_nos: &HashSet<PortNo>, cell_type: CellType, config: CellConfig)
             -> Result<NalCell, Error> {
         let _f = "new";
-        if *nports > *MAX_PORTS { return Err(NalcellError::NumberPorts { nports, func_name: "new", max_ports: MAX_PORTS }.into()) }
+        if *num_phys_ports > *MAX_NUM_PHYS_PORTS { return Err(NalcellError::NumberPorts { num_phys_ports, func_name: "new", max_num_phys_ports: MAX_NUM_PHYS_PORTS }.into()) }
         let cell_id = CellID::new(cell_no).context(NalcellError::Chain { func_name: "new", comment: S("cell_id")})?;
         let (ca_to_cm, cm_from_ca): (CaToCm, CmFromCa) = channel();
         let (cm_to_ca, ca_from_cm): (CmToCa, CaFromCm) = channel();
@@ -65,18 +65,18 @@ impl NalCell {
                 let _ = dal::add_to_trace(TraceType::Trace, trace_params, &trace, _f);
             }
         }
-        for i in 0..=*nports {
+        for i in 0..=*num_phys_ports {
             let is_border_port = border_port_nos.contains(&PortNo(i));
             let (pe_to_port, port_from_pe): (PeToPort, PortFromPe) = channel();
             pe_to_ports.push(pe_to_port);
             ports_from_pe.insert(PortNo(i), port_from_pe);
             let is_connected = i == 0;
-            let port_number = PortNo(i).make_port_number(nports).context(NalcellError::Chain { func_name: "new", comment: S("port number")})?;
+            let port_number = PortNo(i).make_port_number(num_phys_ports).context(NalcellError::Chain { func_name: "new", comment: S("port number")})?;
             let port = Port::new(cell_id, port_number, is_border_port, is_connected,port_to_pe.clone()).context(NalcellError::Chain { func_name: "new", comment: S("port")})?;
             ports.push(port);
         }
         let boxed_ports: Box<[Port]> = ports.into_boxed_slice();
-        let cell_agent = CellAgent::new(cell_id, cell_type, config, nports, ca_to_cm).context(NalcellError::Chain { func_name: "new", comment: S("cell agent create")})?;
+        let cell_agent = CellAgent::new(cell_id, cell_type, config, num_phys_ports, ca_to_cm).context(NalcellError::Chain { func_name: "new", comment: S("cell agent create")})?;
         NalCell::start_cell(&cell_agent, ca_from_cm);
         let cmodel = Cmodel::new(cell_id);
         NalCell::start_cmodel(&cmodel, cm_from_ca, cm_to_pe, cm_from_pe, cm_to_ca);
@@ -198,6 +198,6 @@ pub enum NalcellError {
     Channel { func_name: &'static str, port_no: PortNo },
     #[fail(display = "NalcellError::NoFreePorts {}: All ports have been assigned for cell {}", func_name, cell_id)]
     NoFreePorts { func_name: &'static str, cell_id: CellID },
-    #[fail(display = "NalcellError::NumberPorts {}: You asked for {:?} ports, but only {:?} are allowed", func_name, nports, max_ports)]
-    NumberPorts { func_name: &'static str, nports: PortQty, max_ports: PortQty }
+    #[fail(display = "NalcellError::NumberPorts {}: You asked for {:?} ports, but only {:?} are allowed", func_name, num_phys_ports, max_num_phys_ports)]
+    NumberPorts { func_name: &'static str, num_phys_ports: PortQty, max_num_phys_ports: PortQty }
 }
