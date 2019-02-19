@@ -72,7 +72,7 @@ pub const TRACE_OPTIONS: TraceOptions = TraceOptions {
 };
 
 pub struct DebugOptions {
-    pub trace_all:      bool,
+    pub all:      bool,
     pub flow_control:   bool,
     pub ca_msg_recv:    bool,
     pub ca_msg_send:    bool,
@@ -95,8 +95,8 @@ pub struct DebugOptions {
     pub traph_entry:    bool,
 }
 pub const DEBUG_OPTIONS: DebugOptions = DebugOptions {
-    trace_all:      true,
-    flow_control:   true,
+    all:            false,
+    flow_control:   false,
     ca_msg_recv:    false,
     ca_msg_send:    false,
     cm_from_ca:     false,
