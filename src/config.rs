@@ -8,7 +8,6 @@ pub const SCHEMA_VERSION: &str = "0.1";
 pub const REPO: &str = "CellAgent";
 pub const CENTRAL_TREE: & str = "Tree:C:2";
 // Sizes
-pub const NLINKS: LinkNo = LinkNo(CellNo(40));
 pub const MAX_NUM_PHYS_PORTS: PortQty = PortQty(9);          // Limit on number of ports per cell
 pub const MIN_BORDER_CELLS: CellQty = CellQty(1);   // Minimum acceptable number of border cells
 pub const PACKET_MIN: usize = 64;
