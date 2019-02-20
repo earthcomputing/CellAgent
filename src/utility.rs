@@ -6,7 +6,7 @@ use serde_json::{Value};
 use lazy_static::lazy_static;
 use time;
 
-use crate::config::{MAX_NUM_PHYS_PORTS, REPO, MaskValue, PortNo, PortQty};
+use crate::config::{MAX_NUM_PHYS_PORTS_PER_CELL, REPO, MaskValue, PortNo, PortQty};
 
 /*
 pub fn get_first_arg(a: Vec<String>) -> Option<i32> {
@@ -64,8 +64,8 @@ impl Mask {
                 mask.or(Mask::new(*port_number)) )
     }
     pub fn get_port_nos(self) -> Vec<PortNo> {
-        (0..*MAX_NUM_PHYS_PORTS)
-            .map(|i| PortNo(i).make_port_number(MAX_NUM_PHYS_PORTS)
+        (0..*MAX_NUM_PHYS_PORTS_PER_CELL)
+            .map(|i| PortNo(i).make_port_number(MAX_NUM_PHYS_PORTS_PER_CELL)
                 .expect("Mask make_port_number cannont generate an error"))
             .map(|port_number| Mask::new(port_number))
             .enumerate()

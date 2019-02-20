@@ -8,7 +8,7 @@ use serde;
 use serde_json;
 
 use crate::config::{CONNECTED_PORTS_TREE_NAME, CONTINUE_ON_ERROR, CONTROL_TREE_NAME, DEBUG_OPTIONS, QUENCH,
-             MAX_NUM_PHYS_PORTS, TRACE_OPTIONS,
+             MAX_NUM_PHYS_PORTS_PER_CELL, TRACE_OPTIONS,
              ByteArray, CellNo, CellType, Quench, PathLength, PortNo, PortQty};
 use crate::dal;
 use crate::dal::{fork_trace_header, update_trace_header};
@@ -87,7 +87,7 @@ pub struct CellAgent {
     up_traphs_clist: HashMap<TreeID, TreeID>,
     neighbors: HashMap<PortNo, (CellID, PortNo)>,
     failover_reply_ports: HashMap<PortTreeID, PortNo>,
-    no_packets: [NumberOfPackets; MAX_NUM_PHYS_PORTS.0 as usize],
+    no_packets: [NumberOfPackets; MAX_NUM_PHYS_PORTS_PER_CELL.0 as usize],
 }
 impl CellAgent {
     pub fn new(cell_id: CellID, cell_type: CellType, config: CellConfig, no_ports: PortQty,
@@ -113,7 +113,7 @@ impl CellAgent {
             connected_tree_entry: RoutingTableEntry::default(),
             tenant_masks, up_tree_senders: HashMap::new(), cell_info: CellInfo::new(),
             up_traphs_clist: HashMap::new(), ca_to_cm, failover_reply_ports: HashMap::new(),
-            no_packets: [NumberOfPackets::new(); MAX_NUM_PHYS_PORTS.0 as usize]
+            no_packets: [NumberOfPackets::new(); MAX_NUM_PHYS_PORTS_PER_CELL.0 as usize]
         })
     }
 

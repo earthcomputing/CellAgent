@@ -5,7 +5,7 @@ use std::{fmt, fmt::Write,
 
 use crate::cellagent::{CellAgent};
 use crate::cmodel::{Cmodel};
-use crate::config::{CONTINUE_ON_ERROR, MAX_NUM_PHYS_PORTS, TRACE_OPTIONS, CellNo, CellType, PortNo, PortQty};
+use crate::config::{CONTINUE_ON_ERROR, MAX_NUM_PHYS_PORTS_PER_CELL, TRACE_OPTIONS, CellNo, CellType, PortNo, PortQty};
 use crate::dal;
 use crate::dal::{fork_trace_header, update_trace_header};
 use crate::message_types::{PortToPe, PeFromPort, PeToPort,PortFromPe,
@@ -48,7 +48,7 @@ impl NalCell {
     pub fn new(cell_no: CellNo, num_phys_ports: PortQty, border_port_nos: &HashSet<PortNo>, cell_type: CellType, config: CellConfig)
             -> Result<NalCell, Error> {
         let _f = "new";
-        if *num_phys_ports > *MAX_NUM_PHYS_PORTS { return Err(NalcellError::NumberPorts { num_phys_ports, func_name: "new", max_num_phys_ports: MAX_NUM_PHYS_PORTS }.into()) }
+        if *num_phys_ports > *MAX_NUM_PHYS_PORTS_PER_CELL { return Err(NalcellError::NumberPorts { num_phys_ports, func_name: "new", max_num_phys_ports: MAX_NUM_PHYS_PORTS_PER_CELL }.into()) }
         let cell_id = CellID::new(cell_no).context(NalcellError::Chain { func_name: "new", comment: S("cell_id")})?;
         let (ca_to_cm, cm_from_ca): (CaToCm, CmFromCa) = channel();
         let (cm_to_ca, ca_from_cm): (CmToCa, CaFromCm) = channel();
