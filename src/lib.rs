@@ -50,6 +50,16 @@ trait Test {
 }
 
 
+macro_rules! test_result {
+    ($name:ident, $testable:expr) => {
+        #[test]
+        fn $name() {
+            $testable.test();
+        }
+    }
+}
+
+
 struct DatacenterGraph {
     expected_num_cells: CellQty,
     expected_edges: Vec<Edge>,
@@ -184,13 +194,10 @@ impl Drop for DatacenterGraph {
     }
 }
 
-#[test]
-fn test_graph() {
-    DatacenterGraph::new_three_cells().test();
-    DatacenterGraph::new_four_cells().test();
-    DatacenterGraph::new_ten_cells().test();
-    DatacenterGraph::new_fortyseven_cells().test();
-}
+test_result!(test_graph_three_cells, DatacenterGraph::new_three_cells());
+test_result!(test_graph_four_cells, DatacenterGraph::new_four_cells());
+test_result!(test_graph_ten_cells, DatacenterGraph::new_ten_cells());
+test_result!(test_graph_fortyseven_cells, DatacenterGraph::new_fortyseven_cells());
 
 
 struct DatacenterPorts {
@@ -249,10 +256,7 @@ impl Drop for DatacenterPorts {
     }
 }
 
-#[test]
-fn test_ports() {
-    DatacenterPorts::new_with_exceptions().test();
-}
+test_result!(test_ports, DatacenterPorts::new_with_exceptions());
 
 
 struct DatacenterBorder {
@@ -313,10 +317,7 @@ impl Drop for DatacenterBorder {
     }
 }
 
-#[test]
-fn test_border() {
-    DatacenterBorder::new_partial_border().test();
-}
+test_result!(test_border, DatacenterBorder::new_partial_border());
 
 
 // Errors
