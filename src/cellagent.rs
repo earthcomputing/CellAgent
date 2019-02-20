@@ -26,6 +26,7 @@ use crate::message_types::{CaToCm, CaFromCm,
                     CaToCmBytes, CmToCaBytes};
 use crate::nalcell::CellConfig;
 use crate::name::{Name, CellID, SenderID, PortTreeID, TreeID, UptreeID, VmID};
+use crate::packet_engine::NumberOfPackets;
 use crate::port;
 use crate::port_tree::PortTree;
 use crate::routing_table_entry::{RoutingTableEntry};
@@ -697,9 +698,9 @@ impl CellAgent {
                 }
             }
             match msg {
-                CmToCaBytes::Status((port_no, is_border, status)) => match status {
+                CmToCaBytes::Status((port_no, is_border, number_of_packets, status)) => match status {
                     port::PortStatus::Connected => self.port_connected(port_no, is_border).context(CellagentError::Chain { func_name: _f, comment: S(self.cell_id) + " port_connected"})?,
-                    port::PortStatus::Disconnected => self.port_disconnected(port_no).context(CellagentError::Chain { func_name: _f, comment: S(self.cell_id) + " port_disconnected"})?
+                    port::PortStatus::Disconnected => self.port_disconnected(port_no, number_of_packets).context(CellagentError::Chain { func_name: _f, comment: S(self.cell_id) + " port_disconnected"})?
                 },
                 CmToCaBytes::Bytes((port_no, is_ait, uuid, bytes)) => {
                     // The index may be pointing to the control tree because the other cell didn't get the StackTree or StackTreeD message in time
@@ -1332,7 +1333,7 @@ impl CellAgent {
             Ok(())
         }
     }
-    fn port_disconnected(&mut self, port_no: PortNo) -> Result<(), Error> {
+    fn port_disconnected(&mut self, port_no: PortNo, number_of_packets: NumberOfPackets) -> Result<(), Error> {
         let _f = "port_disconnected";
         let port_number = port_no.make_port_number(self.no_ports)?;
         self.connected_tree_entry.remove_child(port_number);

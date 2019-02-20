@@ -15,8 +15,8 @@ pub struct RoutingTable {
     connected_ports: Vec<u8>
 }
 impl RoutingTable {
-    pub fn new(id: CellID) -> Result<RoutingTable, Error> {
-        Ok(RoutingTable { id, entries: HashMap::new(), connected_ports: Vec::new(), order: Vec::new() })
+    pub fn new(id: CellID) -> RoutingTable {
+        RoutingTable { id, entries: HashMap::new(), connected_ports: Vec::new(), order: Vec::new() }
     }
     pub fn get_entry(&self, uuid: Uuid) -> Result<RoutingTableEntry, Error> {
         let _f = "get_entry";

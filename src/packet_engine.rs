@@ -40,11 +40,10 @@ pub struct PacketEngine {
 }
 
 impl PacketEngine {
-    //pub fn get_table(&self) -> &Arc<Mutex<RoutingTable>> { &self.routing_table }
     // NEW
     pub fn new(cell_id: CellID, pe_to_cm: PeToCm, pe_to_ports: Vec<PeToPort>,
             boundary_port_nos: HashSet<PortNo>) -> Result<PacketEngine, Error> {
-        let routing_table = Arc::new(Mutex::new(RoutingTable::new(cell_id).context(PacketEngineError::Chain { func_name: "new", comment: S(cell_id.get_name())})?));
+        let routing_table = Arc::new(Mutex::new(RoutingTable::new(cell_id)));
         let mut array = vec![];
         for i in 0..MAX_PORTS.0 as usize { array.push(VecDeque::new()); }
         let count_vec = [0; MAX_PORTS.0 as usize].to_vec();
@@ -63,10 +62,12 @@ impl PacketEngine {
     pub fn initialize(&self, pe_from_cm: PeFromCm, pe_from_ports: PeFromPort) -> Result<(), Error> {
 // FIXME: dal::add_to_trace mutates trace_header, spawners don't ??
         let _f = "initialize";
-        if TRACE_OPTIONS.all || TRACE_OPTIONS.pe {
-            let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "worker" };
-            let trace = json!({ "cell_id": self.cell_id, "thread_name": thread::current().name(), "thread_id": TraceHeader::parse(thread::current().id()) });
-            let _ = dal::add_to_trace(TraceType::Trace, trace_params, &trace, _f);
+        {
+            if TRACE_OPTIONS.all || TRACE_OPTIONS.pe {
+                let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "worker" };
+                let trace = json!({ "cell_id": self.cell_id, "thread_name": thread::current().name(), "thread_id": TraceHeader::parse(thread::current().id()) });
+                let _ = dal::add_to_trace(TraceType::Trace, trace_params, &trace, _f);
+            }
         }
         let (pe_to_pe, pe_from_pe): (PeToPe, PeFromPe) = channel();
         self.listen_cm(pe_from_cm, pe_to_pe)?;
@@ -217,20 +218,25 @@ impl PacketEngine {
     fn listen_cm_loop(&mut self, pe_from_cm: &PeFromCm, pe_to_pe: &PeToPe)
             -> Result<(), Error> {
         let _f = "listen_cm_loop";
-        if TRACE_OPTIONS.all || TRACE_OPTIONS.pe_cm {
-            let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "worker" };
-            let trace = json!({ "cell_id": self.cell_id, "thread_name": thread::current().name(), "thread_id": TraceHeader::parse(thread::current().id()) });
-            let _ = dal::add_to_trace(TraceType::Trace, trace_params, &trace, _f);
+        {
+            if TRACE_OPTIONS.all || TRACE_OPTIONS.pe_cm {
+                let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "worker" };
+                let trace = json!({ "cell_id": self.cell_id, "thread_name": thread::current().name(), "thread_id": TraceHeader::parse(thread::current().id()) });
+                let _ = dal::add_to_trace(TraceType::Trace, trace_params, &trace, _f);
+            }
         }
         loop {
             let msg = pe_from_cm.recv().context(PacketEngineError::Chain { func_name: _f, comment: S("recv entry from cm ") + &self.cell_id.get_name()})?;
-            if TRACE_OPTIONS.all || TRACE_OPTIONS.pe_cm {
-                let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "recv" };
-                let trace = json!({ "cell_id": self.cell_id, "msg": &msg });
-                let _ = dal::add_to_trace(TraceType::Trace, trace_params, &trace, _f);
+            {
+                if TRACE_OPTIONS.all || TRACE_OPTIONS.pe_cm {
+                    let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "recv" };
+                    let trace = json!({ "cell_id": self.cell_id, "msg": &msg });
+                    let _ = dal::add_to_trace(TraceType::Trace, trace_params, &trace, _f);
+                }
             }
             match msg {
                 // control plane from CellAgent
+                CmToPePacket::Failover(number_of_packets) => unimplemented!(),
                 CmToPePacket::Entry(entry) => {
                     self.routing_table.lock().unwrap().set_entry(entry)
                 },
@@ -326,13 +332,15 @@ impl PacketEngine {
                 self.send_next_packet_or_entl(port_no)?;
             }
         } else {
-            if DEBUG_OPTIONS.all || DEBUG_OPTIONS.flow_control {
-                match self.get_outbuf_first_ait_state(port_no) {
-                    Some(ait_state) => match ait_state {
-                        AitState::Normal => println!("PacketEngine {}: port {} {} outbuf size {} {:?} {:?}", self.cell_id, *port_no, _f, self.get_outbuf_size(port_no), self.get_outbuf_first_type(port_no), self.get_outbuf_first_ait_state(port_no)),
-                        _ => ()
-                    },
-                    None => ()
+            {
+                if DEBUG_OPTIONS.all || DEBUG_OPTIONS.flow_control {
+                    match self.get_outbuf_first_ait_state(port_no) {
+                        Some(ait_state) => match ait_state {
+                            AitState::Normal => println!("PacketEngine {}: port {} {} outbuf size {} {:?} {:?}", self.cell_id, *port_no, _f, self.get_outbuf_size(port_no), self.get_outbuf_first_type(port_no), self.get_outbuf_first_ait_state(port_no)),
+                            _ => ()
+                        },
+                        None => ()
+                    }
                 }
             }
         }
@@ -368,11 +376,15 @@ impl PacketEngine {
             match msg {
                 // deliver to CModel
                 PortToPePacket::Status((port_no, is_border, status)) => {
+                    let number_of_packets = NumberOfPackets {
+                        sent: self.get_no_sent_packets(port_no),
+                        recd: self.get_no_seen_packets(port_no)
+                    };
                     match status {
                         PortStatus::Connected    => self.set_may_send(port_no),
                         PortStatus::Disconnected => self.set_may_not_send(port_no)
                     }
-                    self.pe_to_cm.send(PeToCmPacket::Status((port_no, is_border, status))).context(PacketEngineError::Chain { func_name: "listen_port", comment: S("send status to ca ") + &self.cell_id.get_name()})?
+                    self.pe_to_cm.send(PeToCmPacket::Status((port_no, is_border, number_of_packets, status))).context(PacketEngineError::Chain { func_name: "listen_port", comment: S("send status to ca ") + &self.cell_id.get_name()})?
                 },
                 PortToPePacket::Tcp((port_no, tcp_msg)) => {
                     self.pe_to_cm.send(PeToCmPacket::Tcp((port_no, tcp_msg))).context(PacketEngineError::Chain { func_name: "listen_port", comment: S("send tcp msg to ca ") + &self.cell_id.get_name()})?
@@ -407,11 +419,15 @@ impl PacketEngine {
             }
         }
         match packet.get_ait_state() {
-            AitState::Ait => return Err(PacketEngineError::Ait { func_name: _f, ait_state: AitState::Ait }.into()), // Error, should never get from port
+            AitState::Ait => {
+                self.send_next_packet_or_entl(port_no)?; // Don't lock up the port on an error
+                return Err(PacketEngineError::Ait { func_name: _f, ait_state: AitState::Ait }.into())
+            },
             AitState::Tock => {
                 // Send to CM and transition to ENTL if time is FORWARD
                 packet.next_ait_state()?;
                 self.add_to_out_buffer_front(port_no, packet);
+                self.send_packet(port_no)?;
                 packet.make_ait();
                 self.pe_to_cm.send(PeToCmPacket::Packet((port_no, packet)))
                     .or_else(|_| -> Result<(), Error> {
@@ -424,9 +440,7 @@ impl PacketEngine {
                         self.add_to_out_buffer_back(port_no, packet);
                         Ok(())
                     })?;
-                self.send_packet(port_no)?;
             },
-
             AitState::Tick => { // Inform CM of success and enter ENTL
                 // TODO: Handle notifying cell agent of success
                 //self.pe_to_cm.send(PeToCmPacket::Packet((port_no, packet)))?;
@@ -487,15 +501,16 @@ impl PacketEngine {
                     // Wait for permission to proceed if packet is from a port and will result in a tree update
                     if packet.is_blocking() && packet.is_last_packet() {
                         pe_from_pe.recv()?;
-                        // Need to empty outbuf
                         for i in 1..=*MAX_PORTS {
-                            let is_boundary_port = self.boundary_port_nos.contains(&PortNo(i));
-                            if !is_boundary_port && (i as usize) < self.pe_to_ports.len() {
-                                if DEBUG_OPTIONS.all || DEBUG_OPTIONS.flow_control {
-                                    println!("---> PacketEngine {}: {} port {} out buf size {}", self.cell_id, _f, i, self.get_outbuf_size(PortNo(i)));
+                            {
+                                let is_boundary_port = self.boundary_port_nos.contains(&PortNo(i));
+                                if !is_boundary_port && (i as usize) < self.pe_to_ports.len() {
+                                    if DEBUG_OPTIONS.all || DEBUG_OPTIONS.flow_control {
+                                        println!("---> PacketEngine {}: {} port {} out buf size {}", self.cell_id, _f, i, self.get_outbuf_size(PortNo(i)));
+                                    }
                                 }
-                                self.send_packet(PortNo(i))?;
                             }
+                            self.send_packet(PortNo(i))?;
                         }
                     } else {
                         self.send_packet(port_no)?;
@@ -539,12 +554,6 @@ impl PacketEngine {
                 // Forward rootward
                 self.add_to_out_buffer_back(parent, packet);
                 self.send_packet(entry.get_parent())?;
-        
-                // deliver to CModel if rootward, but current architecture is root
-                //let is_up = entry.get_mask().and(user_mask).equal(Mask::port0());
-                //if is_up {
-                //    self.pe_to_cm.send(PeToCmPacket::Packet((recv_port_no, packet))).context(PacketEngineError::Chain { func_name: "forward", comment: S("rootcast packet to ca ") + &self.cell_id.get_name() })?;
-                //}
             }
         } else {
             // Send leafward if recv port is parent
@@ -598,6 +607,16 @@ impl fmt::Display for PacketEngine {
         let mut s = format!("Packet Engine for cell {}", self.cell_id);
         write!(s, "{}", *self.routing_table.lock().unwrap())?;
         write!(_f, "{}", s) }
+}
+#[derive(Debug, Copy, Clone, Serialize, Deserialize)]
+pub struct NumberOfPackets {
+    sent: usize,
+    recd: usize
+}
+impl fmt::Display for NumberOfPackets {
+    fn fmt(&self, _f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(_f, "Number sent {}, Number received {}", self.sent, self.recd)
+    }
 }
 #[derive(Debug, Clone, Default)]
 struct MyVec<T> { v: Vec<T> }
