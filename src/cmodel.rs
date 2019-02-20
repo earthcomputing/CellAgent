@@ -32,10 +32,12 @@ impl Cmodel {
     pub fn initialize(&self, cm_from_ca: CmFromCa, cm_to_pe: CmToPe,
                       cm_from_pe: CmFromPe, cm_to_ca: CmToCa) -> Result<(), Error> {
         let _f = "initialize";
-        if TRACE_OPTIONS.all || TRACE_OPTIONS.cm {
-            let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "worker" };
-            let trace = json!({ "cell_id": &self.cell_id, "thread_name": thread::current().name(), "thread_id": TraceHeader::parse(thread::current().id()) });
-            let _ = dal::add_to_trace(TraceType::Trace, trace_params, &trace, _f);
+        {
+            if TRACE_OPTIONS.all || TRACE_OPTIONS.cm {
+                let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "worker" };
+                let trace = json!({ "cell_id": &self.cell_id, "thread_name": thread::current().name(), "thread_id": TraceHeader::parse(thread::current().id()) });
+                let _ = dal::add_to_trace(TraceType::Trace, trace_params, &trace, _f);
+            }
         }
         self.listen_ca(cm_from_ca, cm_to_pe)?;
         self.listen_pe(cm_from_pe, cm_to_ca)?;
@@ -73,20 +75,24 @@ impl Cmodel {
     // WORKER (CmFromCa)
     fn listen_ca_loop(&self, cm_from_ca: &CmFromCa, cm_to_pe: &CmToPe) -> Result<(), Error> {
         let _f = "listen_ca_loop";
-        if TRACE_OPTIONS.all || TRACE_OPTIONS.cm {
-            let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "worker" };
-            let trace = json!({ "cell_id": &self.cell_id, "thread_name": thread::current().name(), "thread_id": TraceHeader::parse(thread::current().id()) });
-            let _ = dal::add_to_trace(TraceType::Trace, trace_params, &trace, _f);
+        {
+            if TRACE_OPTIONS.all || TRACE_OPTIONS.cm {
+                let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "worker" };
+                let trace = json!({ "cell_id": &self.cell_id, "thread_name": thread::current().name(), "thread_id": TraceHeader::parse(thread::current().id()) });
+                let _ = dal::add_to_trace(TraceType::Trace, trace_params, &trace, _f);
+            }
         }
         loop {
             let msg = cm_from_ca.recv()?;
-            if TRACE_OPTIONS.all || TRACE_OPTIONS.cm {
-                let trace = match &msg {
-                    CaToCmBytes::Bytes(msg) => json!({"cell_id": &self.cell_id, "msg": (&msg.0, &msg.1, &msg.2, &msg.3, &msg.4[0..20])}),
-                    _ => json!({ "cell_id": &self.cell_id, "msg": &msg })
-                };
-                let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "cm_bytes_from_ca" };
-                let _ = dal::add_to_trace(TraceType::Trace, trace_params, &trace, _f);
+            {
+                if TRACE_OPTIONS.all || TRACE_OPTIONS.cm {
+                    let trace = match &msg {
+                        CaToCmBytes::Bytes(msg) => json!({"cell_id": &self.cell_id, "msg": (&msg.0, &msg.1, &msg.2, &msg.3, &msg.4[0..20])}),
+                        _ => json!({ "cell_id": &self.cell_id, "msg": &msg })
+                    };
+                    let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "cm_bytes_from_ca" };
+                    let _ = dal::add_to_trace(TraceType::Trace, trace_params, &trace, _f);
+                }
             }
             match msg {
                 // just forward to PE
@@ -96,17 +102,19 @@ impl Cmodel {
 
                 // packetize
                 CaToCmBytes::Bytes((tree_id, is_ait, user_mask, is_blocking, bytes)) => {
-                    if DEBUG_OPTIONS.cm_from_ca {
-                        let dpi_msg = MsgType::msg_from_bytes(&bytes)?;
-                        let dpi_msg_type = dpi_msg.get_msg_type();
-                        let dpi_tree_id = dpi_msg.get_port_tree_id();
-                        match dpi_msg_type {
-                            MsgType::Discover => (),
-                            MsgType::DiscoverD => {
-                                if dpi_tree_id.is_name(CENTRAL_TREE) { println!("Cmodel {}: {} received {}", self.cell_id, _f, dpi_msg); }
-                            },
-                            _ => {
-                                println!("Cmodel {}: {} received {}", self.cell_id, _f, dpi_msg);
+                    {
+                        if DEBUG_OPTIONS.all || DEBUG_OPTIONS.cm_from_ca {
+                            let dpi_msg = MsgType::msg_from_bytes(&bytes)?;
+                            let dpi_msg_type = dpi_msg.get_msg_type();
+                            let dpi_tree_id = dpi_msg.get_port_tree_id();
+                            match dpi_msg_type {
+                                MsgType::Discover => (),
+                                MsgType::DiscoverD => {
+                                    if dpi_tree_id.is_name(CENTRAL_TREE) { println!("Cmodel {}: {} received {}", self.cell_id, _f, dpi_msg); }
+                                },
+                                _ => {
+                                    println!("Cmodel {}: {} received {}", self.cell_id, _f, dpi_msg);
+                                }
                             }
                         }
                     }
@@ -120,7 +128,11 @@ impl Cmodel {
                         let dpi_is_ait = first.is_ait();
                         let msg_id = first.get_msg_id();
                         let packet_count = first.get_count();
-                        if DEBUG_OPTIONS.cm_from_ca { println!("Cmodel {}: {} packetize - is_ait {} msg_id {} count {}", self.cell_id, _f, dpi_is_ait, *msg_id, packet_count); }
+                        {
+                            if DEBUG_OPTIONS.all || DEBUG_OPTIONS.cm_from_ca {
+                                println!("Cmodel {}: {} packetize - is_ait {} msg_id {} count {}", self.cell_id, _f, dpi_is_ait, *msg_id, packet_count);
+                            }
+                        }
                         for packet in packets {
                             cm_to_pe.send(CmToPePacket::Packet((user_mask, packet)))?;
                         }
@@ -134,17 +146,21 @@ impl Cmodel {
     // WORKER (CmFromPe)
     fn listen_pe_loop(&mut self, cm_from_pe: &CmFromPe, cm_to_ca: &CmToCa) -> Result<(), Error> {
         let _f = "listen_pe_loop";
-        if TRACE_OPTIONS.all || TRACE_OPTIONS.cm {
-            let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "worker" };
-            let trace = json!({ "cell_id": &self.cell_id, "thread_name": thread::current().name(), "thread_id": TraceHeader::parse(thread::current().id()) });
-            let _ = dal::add_to_trace(TraceType::Trace, trace_params, &trace, _f);
+        {
+            if TRACE_OPTIONS.all || TRACE_OPTIONS.cm {
+                let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "worker" };
+                let trace = json!({ "cell_id": &self.cell_id, "thread_name": thread::current().name(), "thread_id": TraceHeader::parse(thread::current().id()) });
+                let _ = dal::add_to_trace(TraceType::Trace, trace_params, &trace, _f);
+            }
         }
         loop {
             let msg = cm_from_pe.recv()?;
-            if TRACE_OPTIONS.all || TRACE_OPTIONS.cm {
-                let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "listen_pe_loop" };
-                let trace = json!({ "cell_id": &self.cell_id, "msg": &msg });
-                let _ = dal::add_to_trace(TraceType::Trace, trace_params, &trace, _f);
+            {
+                if TRACE_OPTIONS.all || TRACE_OPTIONS.cm {
+                    let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "listen_pe_loop" };
+                    let trace = json!({ "cell_id": &self.cell_id, "msg": &msg });
+                    let _ = dal::add_to_trace(TraceType::Trace, trace_params, &trace, _f);
+                }
             }
             match msg {
                 // just forward to CA
@@ -178,27 +194,28 @@ packets: Vec<Packet>,
         let (last_packet, packets) = packet_assembler.add(packet);
 
         if last_packet {
-            if TRACE_OPTIONS.all || TRACE_OPTIONS.cm {
-                let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "cm_bytes_to_ca" };
-                let trace = json!({ "cell_id": &self.cell_id, "packet": &packet });
-                let _ = dal::add_to_trace(TraceType::Trace, trace_params, &trace, _f); // sender side, dup
-            }
             let is_ait = packets[0].is_ait();
             let uuid = packet.get_tree_uuid();
             let bytes = Packetizer::unpacketize(packets).context(CmodelError::Chain { func_name: _f, comment: S("") })?;
-
-            if DEBUG_OPTIONS.cm_from_ca {
-                let packet_count = packets[0].get_count();
-                let dpi_msg = MsgType::msg_from_bytes(&bytes)?;
-                let dpi_msg_type = dpi_msg.get_msg_type();
-                let dpi_tree_id = dpi_msg.get_port_tree_id();
-                match dpi_msg_type {
-                    MsgType::Discover => (),
-                    MsgType::DiscoverD => {
-                        if dpi_tree_id.is_name(CENTRAL_TREE) { println!("Cmodel {}: {} received {}", self.cell_id, _f, dpi_msg); }
-                    },
-                    _ => {
-                        println!("Cmodel {}: {} received {} count {}", self.cell_id, _f, dpi_msg, packet_count);
+            {
+                if TRACE_OPTIONS.all || TRACE_OPTIONS.cm {
+                    let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "cm_bytes_to_ca" };
+                    let trace = json!({ "cell_id": &self.cell_id, "packet": &packet });
+                    let _ = dal::add_to_trace(TraceType::Trace, trace_params, &trace, _f); // sender side, dup
+                }
+                if DEBUG_OPTIONS.all || DEBUG_OPTIONS.cm_from_ca {
+                    let packet_count = packets[0].get_count();
+                    let dpi_msg = MsgType::msg_from_bytes(&bytes)?;
+                    let dpi_msg_type = dpi_msg.get_msg_type();
+                    let dpi_tree_id = dpi_msg.get_port_tree_id();
+                    match dpi_msg_type {
+                        MsgType::Discover => (),
+                        MsgType::DiscoverD => {
+                            if dpi_tree_id.is_name(CENTRAL_TREE) { println!("Cmodel {}: {} received {}", self.cell_id, _f, dpi_msg); }
+                        },
+                        _ => {
+                            println!("Cmodel {}: {} received {} count {}", self.cell_id, _f, dpi_msg, packet_count);
+                        }
                     }
                 }
             }
