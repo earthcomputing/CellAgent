@@ -41,7 +41,7 @@ use std::{io::{stdin, stdout, Read, Write},
           collections::{HashMap},
           sync::mpsc::channel};
 
-use crate::config::{CellNo, CellQty, Edge, PortNo, PortQty, is2e};
+use crate::config::{MAX_NUM_PHYS_PORTS_PER_CELL, MIN_NUM_BORDER_CELLS, CellNo, CellQty, Edge, PortNo, PortQty, is2e};
 use crate::datacenter::Datacenter;
 use crate::utility::{TraceHeader};
 
@@ -59,10 +59,55 @@ macro_rules! test_result {
     }
 }
 
+macro_rules! test_error {
+    ($name:ident, $testable:expr, $message:expr) => {
+        #[test]
+        #[should_panic]
+// Message is currently not matching
+//        #[should_panic(expected = $message($testable))]
+        fn $name() {
+            $testable.test();
+        }
+    }
+}
+
+
+struct DatacenterGraphSpec {
+    num_cells: CellQty,
+    edges: Vec<Edge>,
+}
+
+impl DatacenterGraphSpec {
+    fn new_invalid_edge_endpoint() -> DatacenterGraphSpec {
+        DatacenterGraphSpec {
+            num_cells: CellQty(3),
+            edges: vec![is2e(0,1), is2e(0,2), is2e(1,3)],
+        }
+    }
+}
+
+impl Test for DatacenterGraphSpec {
+    fn test(&mut self) {
+        let mut border_cell_ports = HashMap::new();
+        border_cell_ports.insert(CellNo(0), vec![PortNo(0)]);
+        let (dc, outside_to_noc) =
+            match Datacenter::construct(
+                self.num_cells,
+                &self.edges,
+                MAX_NUM_PHYS_PORTS_PER_CELL,
+                &HashMap::new(),
+                &border_cell_ports,
+            ) {
+                Ok(pair) => pair,
+                Err(err) => panic!("Datacenter construction failure: {}", err)
+            };
+    }
+}
+
+test_error!(test_graph_invalid_edge_endpoint, DatacenterGraphSpec::new_invalid_edge_endpoint(), format!("BlueprintError::EdgeEndpoint: Cell reference 3 in edges should be less than total number of cells {}", |datacenter_graph_spec| datacenter_graph_spec.num_cells));
 
 struct DatacenterGraph {
-    expected_num_cells: CellQty,
-    expected_edges: Vec<Edge>,
+    graph_spec: DatacenterGraphSpec,
     dc: Datacenter,
 }
 
@@ -71,7 +116,7 @@ impl DatacenterGraph {
         let num_cells = CellQty(3);
         let edges = vec![is2e(0,1), is2e(0,2), is2e(1,2)];
         let mut border_cell_ports = HashMap::new();
-        border_cell_ports.insert(CellNo(0), vec![PortNo(3)]);
+        border_cell_ports.insert(CellNo(0), vec![PortNo(2)]);
         let (dc, outside_to_noc) =
             match Datacenter::construct(
                 num_cells,
@@ -84,21 +129,23 @@ impl DatacenterGraph {
                 Err(err) => panic!("Datacenter construction failure: {}", err)
             };
 	DatacenterGraph {
-            expected_num_cells: num_cells,
-            expected_edges: edges,
+            graph_spec: DatacenterGraphSpec {
+                num_cells: num_cells,
+                edges: edges,
+            },
             dc: dc,
         }
     }
     fn new_four_cells() -> DatacenterGraph {
         let num_cells = CellQty(4);
-        let edges = vec![is2e(0,1), is2e(0,2), is2e(1,2), is2e(0,3), is2e(1,3)];//, is2e(2,3)]
+        let edges = vec![is2e(0,1), is2e(0,2), is2e(1,2), is2e(0,3), is2e(1,3), is2e(2,3)];
         let mut border_cell_ports = HashMap::new();
         border_cell_ports.insert(CellNo(0), vec![PortNo(3)]);
         let (dc, outside_to_noc) =
             match Datacenter::construct(
                 num_cells,
                 &edges,
-                PortQty(3),
+                PortQty(4),
                 &HashMap::new(),
                 &border_cell_ports,
             ) {
@@ -106,8 +153,10 @@ impl DatacenterGraph {
                 Err(err) => panic!("Datacenter construction failure: {}", err)
             };
 	DatacenterGraph {
-            expected_num_cells: num_cells,
-            expected_edges: edges,
+            graph_spec: DatacenterGraphSpec {
+                num_cells: num_cells,
+                edges: edges,
+            },
             dc: dc,
         }
     }
@@ -120,7 +169,7 @@ impl DatacenterGraph {
                 is2e(0,5), is2e(1,6), is2e(2,7), is2e(3,8), is2e(4,9)
             ];
         let mut border_cell_ports = HashMap::new();
-        border_cell_ports.insert(CellNo(0), vec![PortNo(5)]);
+        border_cell_ports.insert(CellNo(0), vec![PortNo(4)]);
         let (dc, outside_to_noc) =
             match Datacenter::construct(
                 CellQty(10),
@@ -133,8 +182,10 @@ impl DatacenterGraph {
                 Err(err) => panic!("Datacenter construction failure: {}", err)
             };
 	DatacenterGraph {
-            expected_num_cells: num_cells,
-            expected_edges: edges,
+            graph_spec: DatacenterGraphSpec {
+                num_cells: num_cells,
+                edges: edges,
+            },
             dc: dc,
         }
     }
@@ -157,7 +208,7 @@ impl DatacenterGraph {
                 is2e(41,42), is2e(41,46), is2e(42,43), is2e(42,46), is2e(39,44), is2e(44,45), is2e(45,46)
             ];
         let mut border_cell_ports = HashMap::new();
-        border_cell_ports.insert(CellNo(0), vec![PortNo(8)]);
+        border_cell_ports.insert(CellNo(0), vec![PortNo(7)]);
         let (dc, outside_to_noc) =
             match Datacenter::construct(
                 num_cells,
@@ -170,8 +221,10 @@ impl DatacenterGraph {
                 Err(err) => panic!("Datacenter construction failure: {}", err)
             };
 	DatacenterGraph {
-            expected_num_cells: num_cells,
-            expected_edges: edges,
+            graph_spec: DatacenterGraphSpec {
+                num_cells: num_cells,
+                edges: edges,
+            },
             dc: dc,
         }
     }
@@ -179,11 +232,11 @@ impl DatacenterGraph {
 
 impl Test for DatacenterGraph {
     fn test(&mut self) {
-        assert_eq!(self.dc.get_cells().len(), *self.expected_num_cells);
-        assert_eq!(self.dc.get_cell_ids().len(), *self.expected_num_cells);
-        assert_eq!(self.dc.get_links_mut().len(), self.expected_edges.len());
+        assert_eq!(self.dc.get_cells().len(), *self.graph_spec.num_cells);
+        assert_eq!(self.dc.get_cell_ids().len(), *self.graph_spec.num_cells);
+        assert_eq!(self.dc.get_links_mut().len(), self.graph_spec.edges.len());
         for link in self.dc.get_links_mut() {
-            // Could check that each link is in expected_edges (or vice versa)
+            // Could check that each link is in edges (or vice versa)
         }
     }
 }
@@ -200,14 +253,92 @@ test_result!(test_graph_ten_cells, DatacenterGraph::new_ten_cells());
 test_result!(test_graph_fortyseven_cells, DatacenterGraph::new_fortyseven_cells());
 
 
-struct DatacenterPorts {
+struct DatacenterPortsSpec {
     default_num_phys_ports_per_cell: PortQty,
     cell_port_exceptions: HashMap<CellNo, PortQty>,
+    graph_spec: DatacenterGraphSpec,
+}
+
+impl DatacenterPortsSpec {
+    fn new_invalid_default_num_phys_ports_per_cell() -> DatacenterPortsSpec {
+        let num_cells = CellQty(3);
+        let edges = vec![is2e(0,1), is2e(0,2), is2e(1,2)];
+        let default_num_phys_ports_per_cell = PortQty(*MAX_NUM_PHYS_PORTS_PER_CELL+1);
+        let cell_port_exceptions = HashMap::new();
+        DatacenterPortsSpec {
+            default_num_phys_ports_per_cell: default_num_phys_ports_per_cell,
+            cell_port_exceptions: cell_port_exceptions,
+            graph_spec: DatacenterGraphSpec {
+                num_cells: num_cells,
+                edges: edges,
+            },
+        }
+    }
+    fn new_invalid_cell_ports_exception_cell() -> DatacenterPortsSpec {
+        let num_cells = CellQty(3);
+        let edges = vec![is2e(0,1), is2e(0,2), is2e(1,2)];
+        let default_num_phys_ports_per_cell = PortQty(3);
+        let mut cell_port_exceptions = HashMap::new();
+        cell_port_exceptions.insert(CellNo(3), PortQty(2));
+        DatacenterPortsSpec {
+            default_num_phys_ports_per_cell: default_num_phys_ports_per_cell,
+            cell_port_exceptions: cell_port_exceptions,
+            graph_spec: DatacenterGraphSpec {
+                num_cells: num_cells,
+                edges: edges,
+            },
+        }
+    }
+    fn new_invalid_cell_ports_exception_ports() -> DatacenterPortsSpec {
+        let num_cells = CellQty(3);
+        let edges = vec![is2e(0,1), is2e(0,2), is2e(1,2)];
+        let default_num_phys_ports_per_cell = PortQty(3);
+        let mut cell_port_exceptions = HashMap::new();
+        cell_port_exceptions.insert(CellNo(2), PortQty(3));
+        DatacenterPortsSpec {
+            default_num_phys_ports_per_cell: default_num_phys_ports_per_cell,
+            cell_port_exceptions: cell_port_exceptions,
+            graph_spec: DatacenterGraphSpec {
+                num_cells: num_cells,
+                edges: edges,
+            },
+        }
+    }
+}
+
+impl Test for DatacenterPortsSpec {
+    fn test(&mut self) {
+        let mut border_cell_ports = HashMap::new();
+        border_cell_ports.insert(CellNo(0), vec![PortNo(0)]);
+        let (dc, outside_to_noc) =
+            match Datacenter::construct(
+                self.graph_spec.num_cells,
+                &self.graph_spec.edges,
+                self.default_num_phys_ports_per_cell,
+                &self.cell_port_exceptions,
+                &border_cell_ports,
+            ) {
+                Ok(pair) => pair,
+                Err(err) => panic!("Datacenter construction failure: {}", err)
+            };
+    }
+}
+
+test_error!(test_ports_invalid_default_num_phys_ports_per_cell, DatacenterPortsSpec::new_invalid_default_num_phys_ports_per_cell(), format!("BlueprintError::DefaultNumPhysPortsPerCell: Default number of physical ports per cell {} is greater than the maximum allowed {}", |datacenter_ports_spec| datacenter_ports_spec.default_num_phys_ports_per_cell, |datacenter_ports_spec| MAX_NUM_PHYS_PORTS_PER_CELL));
+test_error!(test_ports_invalid_cell_ports_exception_cell, DatacenterPortsSpec::new_invalid_cell_ports_exception_cell(), format!("BlueprintError::CellPortsExceptionCell: Port exception requested for cell {}; number of cells is {}", |datacenter_ports_spec| datacenter_ports_spec.cell_ports_exceptions.keys().max(), |datacenter_ports_spec| datacenter_ports_spec.graph_spec.num_cells));
+test_error!(test_ports_invalid_cell_ports_exception_ports, DatacenterPortsSpec::new_invalid_cell_ports_exception_ports(), format!("BlueprintError::CellPortsExceptionPorts: {} ports exception requested for cell {}; maximum number of ports is {}", |datacenter_ports_spec| {let mut cell_port_exceptions_vec: Vec<(&CellNo, &PortQty)> = datacenter_ports_spec.cell_port_exceptions.iter().collect(); cell_port_exceptions_vec.sort_by(|a, b| b.1.cmp(a.1)); cell_port_exceptions_vec[0].1}, |datacenter_ports_spec| {let mut cell_port_exceptions_vec: Vec<(&CellNo, &PortQty)> = datacenter_ports_spec.cell_port_exceptions.iter().collect(); cell_port_exceptions_vec.sort_by(|a, b| b.1.cmp(a.1)); cell_port_exceptions_vec[0].0}, |datacenter_ports_spec| MAX_NUM_PHYS_PORTS_PER_CELL));
+
+struct DatacenterPorts {
+    ports_spec: DatacenterPortsSpec,
     dc: Datacenter,
 }
 
 impl DatacenterPorts {
     fn new_with_exceptions() -> DatacenterPorts {
+        let num_cells = CellQty(10);
+        let edges = vec![is2e(0,1), is2e(1,2), is2e(2,3), is2e(3,4),
+                         is2e(5,6), is2e(6,7), is2e(7,8), is2e(8,9),
+                         is2e(0,5), is2e(1,6), is2e(2,7), is2e(3,8), is2e(4,9)];
         let default_num_phys_ports_per_cell = PortQty(8);
         let mut cell_port_exceptions = HashMap::new();
         cell_port_exceptions.insert(CellNo(5), PortQty(7));
@@ -216,10 +347,8 @@ impl DatacenterPorts {
         border_cell_ports.insert(CellNo(0), vec![PortNo(7)]);
         let (dc, outside_to_noc) =
             match Datacenter::construct(
-                CellQty(10),
-                &vec![is2e(0,1), is2e(1,2), is2e(2,3), is2e(3,4),
-                      is2e(5,6), is2e(6,7), is2e(7,8), is2e(8,9),
-                      is2e(0,5), is2e(1,6), is2e(2,7), is2e(3,8), is2e(4,9)],
+                num_cells,
+                &edges,
                 default_num_phys_ports_per_cell,
                 &cell_port_exceptions,
                 &border_cell_ports,
@@ -228,8 +357,14 @@ impl DatacenterPorts {
                 Err(err) => panic!("Datacenter construction failure: {}", err)
             };
 	DatacenterPorts {
-            default_num_phys_ports_per_cell: default_num_phys_ports_per_cell,
-            cell_port_exceptions: cell_port_exceptions,
+            ports_spec: DatacenterPortsSpec {
+                default_num_phys_ports_per_cell: default_num_phys_ports_per_cell,
+                cell_port_exceptions: cell_port_exceptions,
+                graph_spec: DatacenterGraphSpec {
+                    num_cells: num_cells,
+                    edges: edges,
+                },
+            },
             dc: dc,
         }
     }
@@ -238,12 +373,12 @@ impl DatacenterPorts {
 impl Test for DatacenterPorts {
     fn test(&mut self) {
         for cell in self.dc.get_cells() {
-            match self.cell_port_exceptions.get(&cell.get_no()) {
+            match self.ports_spec.cell_port_exceptions.get(&cell.get_no()) {
                 Some(num_phys_ports) => {
                     assert_eq!(cell.get_num_ports(), PortQty(**num_phys_ports+1));
                 }
                 None => {
-                    assert_eq!(cell.get_num_ports(), PortQty(*self.default_num_phys_ports_per_cell+1));
+                    assert_eq!(cell.get_num_ports(), PortQty(*self.ports_spec.default_num_phys_ports_per_cell+1));
                 }
             }
         }
@@ -259,31 +394,166 @@ impl Drop for DatacenterPorts {
 test_result!(test_ports, DatacenterPorts::new_with_exceptions());
 
 
+struct DatacenterBorderSpec {
+    border_cell_ports: HashMap<CellNo, Vec<PortNo>>,
+    ports_spec: DatacenterPortsSpec,
+}
+
+impl DatacenterBorderSpec {
+    fn new_invalid_num_border_cells() -> DatacenterBorderSpec {
+        let num_cells = CellQty(3);
+        let edges = vec![is2e(0,1), is2e(0,2), is2e(1,2)];
+        let default_num_phys_ports_per_cell = PortQty(3);
+        let cell_port_exceptions = HashMap::new();
+        let border_cell_ports = HashMap::new();
+        // Assume at least one border cell required; none supplied
+        DatacenterBorderSpec {
+            border_cell_ports: border_cell_ports,
+            ports_spec: DatacenterPortsSpec {
+                default_num_phys_ports_per_cell: default_num_phys_ports_per_cell,
+                cell_port_exceptions: cell_port_exceptions,
+                graph_spec: DatacenterGraphSpec {
+                    num_cells: num_cells,
+                    edges: edges,
+                },
+            },
+        }
+    }
+    fn new_invalid_border_cell_ports_cell() -> DatacenterBorderSpec {
+        let num_cells = CellQty(3);
+        let edges = vec![is2e(0,1), is2e(0,2), is2e(1,2)];
+        let default_num_phys_ports_per_cell = PortQty(3);
+        let mut border_cell_ports = HashMap::new();
+        border_cell_ports.insert(CellNo(3), vec![PortNo(2)]);
+        DatacenterBorderSpec {
+            border_cell_ports: border_cell_ports,
+            ports_spec: DatacenterPortsSpec {
+                default_num_phys_ports_per_cell: default_num_phys_ports_per_cell,
+                cell_port_exceptions: HashMap::new(),
+                graph_spec: DatacenterGraphSpec {
+                    num_cells: num_cells,
+                    edges: edges,
+                },
+            },
+        }
+    }
+    fn new_invalid_border_cell_ports_port() -> DatacenterBorderSpec {
+        let num_cells = CellQty(3);
+        let edges = vec![is2e(0,1), is2e(0,2), is2e(1,2)];
+        let default_num_phys_ports_per_cell = PortQty(3);
+        let mut cell_port_exceptions = HashMap::new();
+        cell_port_exceptions.insert(CellNo(0), PortQty(2));
+        let mut border_cell_ports = HashMap::new();
+        border_cell_ports.insert(CellNo(0), vec![PortNo(2)]);
+        DatacenterBorderSpec {
+            border_cell_ports: border_cell_ports,
+            ports_spec: DatacenterPortsSpec {
+                default_num_phys_ports_per_cell: default_num_phys_ports_per_cell,
+                cell_port_exceptions: cell_port_exceptions,
+                graph_spec: DatacenterGraphSpec {
+                    num_cells: num_cells,
+                    edges: edges,
+                },
+            },
+        }
+    }
+}
+
+impl Test for DatacenterBorderSpec {
+    fn test(&mut self) {
+        let (dc, outside_to_noc) =
+            match Datacenter::construct(
+                self.ports_spec.graph_spec.num_cells,
+                &self.ports_spec.graph_spec.edges,
+                self.ports_spec.default_num_phys_ports_per_cell,
+                &self.ports_spec.cell_port_exceptions,
+                &self.border_cell_ports,
+            ) {
+                Ok(pair) => pair,
+                Err(err) => panic!("Datacenter construction failure: {}", err)
+            };
+    }
+}
+
+test_error!(test_border_cell_ports_invalid_num_cells, DatacenterBorderSpec::new_invalid_num_border_cells(), format!("BlueprintError::BorderCellCount: Must have {} border cells but only {} supplied", |datacenter_border_spec| MIN_NUM_BORDER_PORTS, |datacenter_border_spec| datacenter_border_spec.border_cell_ports.len()));
+test_error!(test_border_cell_ports_invalid_cell, DatacenterBorderSpec::new_invalid_border_cell_ports_cell(), format!("BlueprintError::BorderCellPortsCell: Border port requested for cell {}; number of cells is {}", |datacenter_border_spec| {let mut border_cell_ports_vec: Vec<(&CellNo, &Vec<PortNo>)> = datacenter_border_spec.borer_cell_ports.iter().collect(); border_cell_ports_vec[0].0}, |datacenter_border_spec| datacenter_border_spec.ports_spec.graph_spec.num_cells));
+test_error!(test_border_cell_ports_invalid_port, DatacenterBorderSpec::new_invalid_border_cell_ports_port(), format!("BlueprintError::BorderCellPortsPort: Border port {} requested for cell {}; number of ports is {}", |datacenter_border_spec| datacenter_border_spec.border_cell_ports[{let mut border_cell_ports_vec: Vec<(&CellNo, &Vec<PortNo>)> = datacenter_border_spec.borer_cell_ports.iter().collect(); border_cell_ports_vec[0].0}], |datacenter_border_spec| {let mut border_cell_ports_vec: Vec<(&CellNo, &Vec<PortNo>)> = datacenter_border_spec.borer_cell_ports.iter().collect(); border_cell_ports_vec[0].0}, |datacenter_border_spec| datacenter_border_spec.ports_spec.graph_spec.num_cells));
+
 struct DatacenterBorder {
-    expected_border_cell_ports: HashMap<CellNo, Vec<PortNo>>,
+    border_spec: DatacenterBorderSpec,
     dc: Datacenter,
 }
 
 impl DatacenterBorder {
-    fn new_partial_border() -> DatacenterBorder {
+    fn new_default_port_border() -> DatacenterBorder {
+        let num_cells = CellQty(10);
+        let edges = vec![is2e(0,1), is2e(1,2), is2e(2,3), is2e(3,4),
+                         is2e(5,6), is2e(6,7), is2e(7,8), is2e(8,9),
+                         is2e(0,5), is2e(1,6), is2e(2,7), is2e(3,8), is2e(4,9)];
+        let default_num_phys_ports_per_cell = PortQty(4);
+        let cell_port_exceptions = HashMap::new();
         let mut border_cell_ports = HashMap::new();
         border_cell_ports.insert(CellNo(2), vec![PortNo(3)]);
         border_cell_ports.insert(CellNo(7), vec![PortNo(1)]);
         let (dc, outside_to_noc) =
             match Datacenter::construct(
-                CellQty(10),
-                &vec![is2e(0,1), is2e(1,2), is2e(2,3), is2e(3,4),
-                      is2e(5,6), is2e(6,7), is2e(7,8), is2e(8,9),
-                      is2e(0,5), is2e(1,6), is2e(2,7), is2e(3,8), is2e(4,9)],
-                PortQty(4),
-                &HashMap::new(),
+                num_cells,
+                &edges,
+                default_num_phys_ports_per_cell,
+                &cell_port_exceptions,
                 &border_cell_ports,
             ) {
                 Ok(pair) => pair,
                 Err(err) => panic!("Datacenter construction failure: {}", err)
             };
 	DatacenterBorder {
-            expected_border_cell_ports: border_cell_ports,
+            border_spec: DatacenterBorderSpec {
+                border_cell_ports: border_cell_ports,
+                ports_spec: DatacenterPortsSpec {
+                    default_num_phys_ports_per_cell: default_num_phys_ports_per_cell,
+                    cell_port_exceptions: cell_port_exceptions,
+                    graph_spec: DatacenterGraphSpec {
+                        num_cells: num_cells,
+                        edges: edges,
+                    },
+                },
+            },
+            dc: dc,
+        }
+    }
+    fn new_exception_port_border() -> DatacenterBorder {
+        let num_cells = CellQty(10);
+        let edges = vec![is2e(0,1), is2e(1,2), is2e(2,3), is2e(3,4),
+                         is2e(5,6), is2e(6,7), is2e(7,8), is2e(8,9),
+                         is2e(0,5), is2e(1,6), is2e(2,7), is2e(3,8), is2e(4,9)];
+        let default_num_phys_ports_per_cell = PortQty(4);
+        let mut cell_port_exceptions = HashMap::new();
+        cell_port_exceptions.insert(CellNo(5), PortQty(5));
+        let mut border_cell_ports = HashMap::new();
+        border_cell_ports.insert(CellNo(5), vec![PortNo(4)]);
+        let (dc, outside_to_noc) =
+            match Datacenter::construct(
+                num_cells,
+                &edges,
+                default_num_phys_ports_per_cell,
+                &cell_port_exceptions,
+                &border_cell_ports,
+            ) {
+                Ok(pair) => pair,
+                Err(err) => panic!("Datacenter construction failure: {}", err)
+            };
+	DatacenterBorder {
+            border_spec: DatacenterBorderSpec {
+                border_cell_ports: border_cell_ports,
+                ports_spec: DatacenterPortsSpec {
+                    default_num_phys_ports_per_cell: default_num_phys_ports_per_cell,
+                    cell_port_exceptions: cell_port_exceptions,
+                    graph_spec: DatacenterGraphSpec {
+                        num_cells: num_cells,
+                        edges: edges,
+                    },
+                },
+            },
             dc: dc,
         }
     }
@@ -294,10 +564,10 @@ impl Test for DatacenterBorder {
         for cell in self.dc.get_cells() {
             let border_ports: &Vec<PortNo>;
             let mut is_border_cell: bool = false;
-            match self.expected_border_cell_ports.get(&cell.get_no()) {
-                Some(port_nums) => {
-                    border_ports = port_nums;
-                    is_border_cell = !port_nums.is_empty();
+            match self.border_spec.border_cell_ports.get(&cell.get_no()) {
+                Some(specified_border_ports) => {
+                    border_ports = specified_border_ports;
+                    is_border_cell = !border_ports.is_empty();
                 }
                 None => {
                     border_ports = &Vec::new();
@@ -317,7 +587,8 @@ impl Drop for DatacenterBorder {
     }
 }
 
-test_result!(test_border, DatacenterBorder::new_partial_border());
+test_result!(test_default_port_border, DatacenterBorder::new_default_port_border());
+test_result!(test_exception_port_border, DatacenterBorder::new_exception_port_border());
 
 
 // Errors

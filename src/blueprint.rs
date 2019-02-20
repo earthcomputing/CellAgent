@@ -2,7 +2,7 @@ use std::{fmt, fmt::Write,
           collections::{HashMap, HashSet},
           iter::FromIterator};
 
-use crate::config::{MIN_BORDER_CELLS, CellNo, CellQty, CellType, Edge, PortNo, PortQty};
+use crate::config::{MAX_NUM_PHYS_PORTS_PER_CELL, MIN_NUM_BORDER_CELLS, CellNo, CellQty, CellType, Edge, PortNo, PortQty};
 
 #[derive(Debug)]
 pub struct Blueprint {
@@ -15,21 +15,83 @@ impl Blueprint {
                cell_port_exceptions: &HashMap<CellNo, PortQty>, border_cell_ports: &HashMap<CellNo, Vec<PortNo>>) ->
                Result<Blueprint, BlueprintError> {
         let _f = "new";
+        for edge in edges {
+            if *edge.0 > *num_cells {
+                return Err(BlueprintError::EdgeEndpoint{
+                    func_name: _f,
+                    num_cells: *num_cells,
+                    invalid_endpoint: *edge.0,
+                });
+            }
+            if *edge.1 > *num_cells {
+                return Err(BlueprintError::EdgeEndpoint{
+                    func_name: _f,
+                    num_cells: *num_cells,
+                    invalid_endpoint: *edge.1,
+                });
+            }
+        }
+        let mut cell_num_phys_ports: HashMap<CellNo, PortQty> = HashMap::new();
+        if *default_num_phys_ports_per_cell > *MAX_NUM_PHYS_PORTS_PER_CELL {
+            return Err(BlueprintError::DefaultNumPhysPortsPerCell {
+                func_name: _f,
+                default_num_phys_ports_per_cell: *default_num_phys_ports_per_cell,
+                max_num_phys_ports_per_cell: *MAX_NUM_PHYS_PORTS_PER_CELL,
+            }.into());
+        }
+        for (cell_no, num_phys_ports) in cell_port_exceptions {
+            if **cell_no >= *num_cells {
+                return Err(BlueprintError::CellPortsExceptionsCell {
+                    func_name: _f,
+                    cell_no: **cell_no,
+                    num_cells: *num_cells,
+                }.into());
+            }
+            if **num_phys_ports > *MAX_NUM_PHYS_PORTS_PER_CELL {
+                return Err(BlueprintError::CellPortsExceptionsPorts {
+                    func_name: _f,
+                    cell_no: **cell_no,
+                    num_phys_ports: **num_phys_ports,
+                    max_num_phys_ports_per_cell: *MAX_NUM_PHYS_PORTS_PER_CELL,
+                }.into());
+            }
+        }
+        for no in 0..*num_cells {
+            let cell_no = CellNo(no);
+            cell_num_phys_ports.insert(cell_no,
+                                       *cell_port_exceptions
+                                       .get(&cell_no)
+                                       .unwrap_or(&default_num_phys_ports_per_cell));
+        }
+        for (cell_no, port_nos) in border_cell_ports {
+            if **cell_no >= *num_cells {
+                return Err(BlueprintError::BorderCellPortsCell {
+                    func_name: _f,
+                    cell_no: **cell_no,
+                    num_cells: *num_cells,
+                }.into());
+            }
+            for port_no in port_nos {
+                let num_phys_ports: PortQty = cell_num_phys_ports[cell_no];
+                if **port_no >= *num_phys_ports {
+                    return Err(BlueprintError::BorderCellPortsPort {
+                        func_name: _f,
+                        cell_no: **cell_no,
+                        port_no: **port_no,
+                        num_phys_ports: *num_phys_ports,
+                    }.into());
+                }
+            }
+        }
         let num_border = border_cell_ports.len();
-        if num_border > *num_cells {
-            return Err(BlueprintError::CellCount{ func_name: _f, num_cells: *num_cells, num_border })
-        };
-        if num_border < *MIN_BORDER_CELLS {
-            return Err(BlueprintError::BorderCellCount { func_name: _f, num_border, num_reqd: *MIN_BORDER_CELLS})
+        if num_border < *MIN_NUM_BORDER_CELLS {
+            return Err(BlueprintError::BorderCellCount { func_name: _f, num_border, num_reqd: *MIN_NUM_BORDER_CELLS})
         }
         let mut interior_cells = Vec::new();
         let mut border_cells = 	Vec::new();
         for no in 0..*num_cells {
             let cell_no = CellNo(no);
-            let num_phys_ports = *cell_port_exceptions
-                .get(&cell_no)
-                .unwrap_or(&default_num_phys_ports_per_cell);
-            let phys_port_list : Vec<PortNo> = (0..*num_phys_ports as usize).map(|i| PortNo(i as u8)).collect();
+            let phys_port_list : Vec<PortNo> = (0..*cell_num_phys_ports[&cell_no] as usize).map(|i| PortNo(i as u8)).collect();
             match border_cell_ports.get(&cell_no) {
                 Some(border_ports) => {
                     let border: HashSet<PortNo> = HashSet::from_iter(border_ports.clone());
@@ -114,8 +176,18 @@ impl fmt::Display for InteriorCell {
 // Errors
 #[derive(Debug, Fail)]
 pub enum BlueprintError {
-    #[fail(display = "BlueprintError::BorderCellCount {}: Must have {} border cells but only {} in blueprint", func_name, num_reqd, num_border)]
+    #[fail(display = "BlueprintError::EdgeEndpoint {}: Cell reference {} in edges should be less than total number of cells {}", func_name, num_cells, invalid_endpoint)]
+    EdgeEndpoint { func_name: &'static str, num_cells: usize, invalid_endpoint: usize},
+    #[fail(display = "BlueprintError::DefaultNumPhysPortsPerCell {}:  Default number of physical ports per cell {} is greater than the maximum allowed {}", func_name, default_num_phys_ports_per_cell, max_num_phys_ports_per_cell)]
+    DefaultNumPhysPortsPerCell { func_name: &'static str, default_num_phys_ports_per_cell: u8, max_num_phys_ports_per_cell: u8},
+    #[fail(display = "BlueprintError::CellPortsExceptionsCell {}:  Can't create ports exception for invalid cell {}; number of cells is {}", func_name, cell_no, num_cells)]
+    CellPortsExceptionsCell { func_name: &'static str, cell_no: usize, num_cells: usize},
+    #[fail(display = "BlueprintError::CellPortsExceptionsPorts {}:  Ports exception {} is greater than maximum number allowed {} for cell {}", func_name, num_phys_ports, max_num_phys_ports_per_cell, cell_no)]
+    CellPortsExceptionsPorts { func_name: &'static str, num_phys_ports: u8, max_num_phys_ports_per_cell: u8, cell_no: usize},
+    #[fail(display = "BlueprintError::BorderCellPortsCell {}:  Border ports requested for cell {}; number of cells is {}", func_name, cell_no, num_cells)]
+    BorderCellPortsCell { func_name: &'static str, cell_no: usize, num_cells: usize},
+    #[fail(display = "BlueprintError::BorderCellPortsPort {}:  Border port {} requested for cell {}; number of ports is {}", func_name, port_no, cell_no, num_phys_ports)]
+    BorderCellPortsPort { func_name: &'static str, port_no: u8, cell_no: usize, num_phys_ports: u8},
+    #[fail(display = "BlueprintError::BorderCellCount {}: Must have {} border cells but only {} supplied", func_name, num_reqd, num_border)]
     BorderCellCount { func_name: &'static str, num_border: usize, num_reqd: usize},
-    #[fail(display = "BlueprintError::CellCount {}: Invalid blueprint has more border cells {} than total cells {}", func_name, num_cells, num_border)]
-    CellCount { func_name: &'static str, num_cells: usize, num_border: usize}
 }
