@@ -84,14 +84,20 @@ impl PacketEngine {
     fn set_may_send(&mut self, port_no: PortNo) {
         self.port_got_event.lock().unwrap()[port_no.as_usize()] = true;
     }
-    fn get_size(array: &PacketArray, port_no: PortNo) -> usize {
-        (*array.lock().unwrap())[port_no.as_usize()].len()
-    }
     fn get_outbuf(&self, port_no: PortNo) -> VecDeque<Packet> {
         self.out_buffer.lock().unwrap().get(port_no.as_usize()).unwrap().clone()
     }
+    fn get_size(array: &PacketArray, port_no: PortNo) -> usize {
+        (*array.lock().unwrap())[port_no.as_usize()].len()
+    }
     fn get_outbuf_size(&self, port_no: PortNo) -> usize {
         PacketEngine::get_size(&self.out_buffer, port_no)
+    }
+    fn get_inbuf_size(&self, port_no: PortNo) -> usize {
+        PacketEngine::get_size(&self.in_buffer, port_no)
+    }
+    fn get_sent_size(&self, port_no: PortNo) -> usize {
+        PacketEngine::get_size(&self.sent_packets, port_no)
     }
     fn get_outbuf_first_type(&self, port_no: PortNo) -> Option<MsgType> {
         (*self.out_buffer.lock().unwrap())
@@ -107,16 +113,27 @@ impl PacketEngine {
             .get(0)
             .map(|packet| packet.get_ait_state())
     }
-    fn get_inbuf_size(&self, port_no: PortNo) -> usize {
-        PacketEngine::get_size(&self.in_buffer, port_no)
+    fn add_to_packet_count(packet_count: &mut UsizeArray, port_no: PortNo) {
+        let mut count = packet_count.lock().unwrap();
+        if count.len() == 1 { // Replace 1 with PACKET_PIPELINE_SIZE when adding pipelining
+            count[port_no.as_usize()] = 0;
+        } else {
+            count[port_no.as_usize()] = count[port_no.as_usize()] + 1;
+        }
     }
-    fn get_sent_size(&self, port_no: PortNo) -> usize {
-        PacketEngine::get_size(&self.sent_packets, port_no)
+    fn get_packet_count(packet_count: &UsizeArray, port_no: PortNo) -> usize {
+        packet_count.lock().unwrap()[port_no.as_usize()]
     }
-    fn add_seen_packet(&mut self, port_no: PortNo, packet: Packet) {
+    fn get_no_sent_packets(&self, port_no: PortNo) -> usize {
+        PacketEngine::get_packet_count(&self.no_sent_packets, port_no)
+    }
+    fn get_no_seen_packets(&self, port_no: PortNo) -> usize {
+        PacketEngine::get_packet_count(&self.no_seen_packets, port_no)
+    }
+    fn add_seen_packet_count(&mut self, port_no: PortNo) {
         PacketEngine::add_to_packet_count(&mut self.no_seen_packets, port_no);
     }
-    fn clear_see_packets(&mut self, port_no: PortNo) {
+    fn clear_seen_packet_count(&mut self, port_no: PortNo) {
         self.no_seen_packets.lock().unwrap()[port_no.as_usize()] = 0;
     }
     fn add_sent_packet(&mut self, port_no: PortNo, packet: Packet) {
@@ -263,15 +280,17 @@ impl PacketEngine {
                     let msg_type = MsgType::msg_type(&packet);
                     let port_tree_id = packet.get_port_tree_id();
                     let ait_state = packet.get_ait_state();
-                    if TRACE_OPTIONS.all || TRACE_OPTIONS.pe_cm {
-                        let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "pe_packet_from_cm" };
-                        let trace = json!({ "cell_id": self.cell_id, "port_tree_id": port_tree_id, "ait_state": ait_state, "msg_type": &msg_type });
-                        let _ = dal::add_to_trace(TraceType::Trace, trace_params, &trace, _f);
-                    }
-                    if DEBUG_OPTIONS.pe_pkt_recv {
-                        match msg_type {
-                            MsgType::DiscoverD => { if port_tree_id.is_name(CENTRAL_TREE) { println!("PacketEngine {}: {} got from cm {} {}", self.cell_id, _f, msg_type, port_tree_id); } },
-                            _ => (),
+                    {
+                        if TRACE_OPTIONS.all || TRACE_OPTIONS.pe_cm {
+                            let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "pe_packet_from_cm" };
+                            let trace = json!({ "cell_id": self.cell_id, "port_tree_id": port_tree_id, "ait_state": ait_state, "msg_type": &msg_type });
+                            let _ = dal::add_to_trace(TraceType::Trace, trace_params, &trace, _f);
+                        }
+                        if DEBUG_OPTIONS.pe_pkt_recv {
+                            match msg_type {
+                                MsgType::DiscoverD => { if port_tree_id.is_name(CENTRAL_TREE) { println!("PacketEngine {}: {} got from cm {} {}", self.cell_id, _f, msg_type, port_tree_id); } },
+                                _ => (),
+                            }
                         }
                     }
                 }
@@ -286,22 +305,22 @@ impl PacketEngine {
         if self.may_send(port_no) {
             if let Some(packet) = self.pop_first_outbuf(port_no) {
                 self.set_may_not_send(port_no);
-                //self.set_can_send(port_no);
-                if DEBUG_OPTIONS.all || DEBUG_OPTIONS.flow_control {
-                    let msg_type = MsgType::msg_type(&packet);
-                    match packet.get_ait_state() {
-                        AitState::Normal => println!("PacketEngine {}: port {} {} outbuf size {} {} {}", self.cell_id, *port_no, _f, self.get_outbuf_size(port_no), msg_type, packet.get_ait_state()),
-                        _ => ()
+                {
+                    if DEBUG_OPTIONS.all || DEBUG_OPTIONS.flow_control {
+                        let msg_type = MsgType::msg_type(&packet);
+                        match packet.get_ait_state() {
+                            AitState::Normal => println!("PacketEngine {}: port {} {} outbuf size {} {} {}", self.cell_id, *port_no, _f, self.get_outbuf_size(port_no), msg_type, packet.get_ait_state()),
+                            _ => ()
+                        }
                     }
                 }
                 self.pe_to_ports.get(port_no.as_usize())
                     .ok_or::<Error>(PacketEngineError::Sender { cell_id: self.cell_id, func_name: _f, port_no: *port_no }.into())?
                     .send(PeToPortPacket::Packet(packet))?;
+                self.add_sent_packet(port_no, packet);
                 match packet.get_ait_state() {
                     AitState::Entl => self.set_may_send(port_no),
-                    // Use the next line to turn on flow control or the one after to turn it off
                     _              => self.set_may_not_send(port_no)
-                    //_              => self.set_can_send(port_no)
                 }
             } else {
                 self.send_next_packet_or_entl(port_no)?;
@@ -321,6 +340,7 @@ impl PacketEngine {
     }
     fn send_next_packet_or_entl(&mut self, port_no: PortNo) -> Result<(), Error> {
         let _f = "send_next_packet_or_entl";
+        // TOCTTOU race here, but the only cost is sending an extra ENTL packet
         if self.get_outbuf_size(port_no) == 0 {
             self.add_to_out_buffer_back(port_no, Packet::make_entl_packet());
         }
@@ -329,10 +349,12 @@ impl PacketEngine {
     // WORKER (PeFromPort)
     fn listen_port_loop(&mut self, pe_from_ports: &PeFromPort, pe_from_pe: &PeFromPe) -> Result<(), Error> {
         let _f = "listen_port_loop";
-        if TRACE_OPTIONS.all || TRACE_OPTIONS.pe_port {
-            let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "worker" };
-            let trace = json!({ "cell_id": self.cell_id, "thread_name": thread::current().name(), "thread_id": TraceHeader::parse(thread::current().id()) });
-            let _ = dal::add_to_trace(TraceType::Trace, trace_params, &trace, _f);
+        {
+            if TRACE_OPTIONS.all || TRACE_OPTIONS.pe_port {
+                let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "worker" };
+                let trace = json!({ "cell_id": self.cell_id, "thread_name": thread::current().name(), "thread_id": TraceHeader::parse(thread::current().id()) });
+                let _ = dal::add_to_trace(TraceType::Trace, trace_params, &trace, _f);
+            }
         }
         loop {
             let msg = pe_from_ports.recv().context(PacketEngineError::Chain { func_name: _f, comment: S("receive")})?;
@@ -370,13 +392,18 @@ impl PacketEngine {
     fn process_packet(&mut self, port_no: PortNo, mut packet: Packet, pe_from_pe: &PeFromPe)
             -> Result<(), Error> {
         let _f = "process_packet";
-    
-        self.set_may_send(port_no);
-        if DEBUG_OPTIONS.all || DEBUG_OPTIONS.flow_control {
-            let msg_type = MsgType::msg_type(&packet);
-            match packet.get_ait_state() {
-                AitState::Normal => println!("PacketEngine {}: port {} {} outbuf size {} msg type {} {}", self.cell_id, *port_no, _f, self.get_outbuf_size(port_no), msg_type, packet.get_ait_state()),
-                _ => ()
+        { // Got a packet from the other side, so clear state
+            self.set_may_send(port_no);
+            self.add_seen_packet_count(port_no);
+            self.clear_sent_packets(port_no);
+        }
+        {
+            if DEBUG_OPTIONS.all || DEBUG_OPTIONS.flow_control {
+                let msg_type = MsgType::msg_type(&packet);
+                match packet.get_ait_state() {
+                    AitState::Normal => println!("PacketEngine {}: port {} {} outbuf size {} msg type {} {}", self.cell_id, *port_no, _f, self.get_outbuf_size(port_no), msg_type, packet.get_ait_state()),
+                    _ => ()
+                }
             }
         }
         match packet.get_ait_state() {
@@ -413,6 +440,7 @@ impl PacketEngine {
                 self.send_packet(port_no)?;
             },
             AitState::Entl => { // In real life, always send an ENTL
+                // TOCTTOU race here, but the only cost is sending an extra ENTL packet
                 if self.get_outbuf_size(port_no) > 0 { self.send_packet(port_no)?; }
             },
             AitState::Normal => { // Forward packet
@@ -484,21 +512,25 @@ impl PacketEngine {
             // Send to root if recv port is not parent
             let parent = entry.get_parent();
             if *parent == 0 {
-                if DEBUG_OPTIONS.manifest && MsgType::msg_type(&packet) == MsgType::Manifest { println!("PacketEngine {} forwarding manifest leafward mask {} entry {}", self.cell_id, user_mask, entry); };
-                if DEBUG_OPTIONS.pe_pkt_send {
-                    let msg_type = MsgType::msg_type(&packet);
-                    match msg_type {
-                        MsgType::Discover => (),
-                        _ => {
-                            let tree_name = packet.get_port_tree_id();
-                            {
-                                let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "pe_forward_to_cm" };
-                                let trace = json!({ "cell_id": self.cell_id, "tree_name": &tree_name, "msg_type": &msg_type, "parent_port": &parent });
-                                let _ = dal::add_to_trace(TraceType::Debug, trace_params, &trace, _f);
-                            }
-                            if msg_type == MsgType::Manifest { println!("PacketEngine {} forwarding manifest rootward", self.cell_id); }
-                            println!("PacketEngine {}: {} [{}] {} {}", self.cell_id, _f, *parent, msg_type, tree_name);
-                        },
+                {
+                    if DEBUG_OPTIONS.all || DEBUG_OPTIONS.manifest && MsgType::msg_type(&packet) == MsgType::Manifest {
+                        println!("PacketEngine {} forwarding manifest leafward mask {} entry {}", self.cell_id, user_mask, entry);
+                    };
+                    if DEBUG_OPTIONS.all || DEBUG_OPTIONS.pe_pkt_send {
+                        let msg_type = MsgType::msg_type(&packet);
+                        match msg_type {
+                            MsgType::Discover => (),
+                            _ => {
+                                let tree_name = packet.get_port_tree_id();
+                                {
+                                    let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "pe_forward_to_cm" };
+                                    let trace = json!({ "cell_id": self.cell_id, "tree_name": &tree_name, "msg_type": &msg_type, "parent_port": &parent });
+                                    let _ = dal::add_to_trace(TraceType::Debug, trace_params, &trace, _f);
+                                }
+                                if msg_type == MsgType::Manifest { println!("PacketEngine {} forwarding manifest rootward", self.cell_id); }
+                                println!("PacketEngine {}: {} [{}] {} {}", self.cell_id, _f, *parent, msg_type, tree_name);
+                            },
+                        }
                     }
                 }
                 // deliver to CModel
@@ -521,18 +553,20 @@ impl PacketEngine {
             {
                 let msg_type = MsgType::msg_type(&packet);
                 let port_tree_id = packet.get_port_tree_id();
-                if TRACE_OPTIONS.all || TRACE_OPTIONS.pe_port {
-                    let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "pe_forward_leafward" };
-                    let trace = json!({ "cell_id": self.cell_id, "port_tree_id": &port_tree_id, "msg_type": &msg_type, "port_nos": &port_nos });
-                    let _ = dal::add_to_trace(TraceType::Trace, trace_params, &trace, _f);
-                }
-                if DEBUG_OPTIONS.pe_pkt_send {
-                    match msg_type {
-                        MsgType::Discover => (),
-                        MsgType::DiscoverD => if port_tree_id.is_name(CENTRAL_TREE) { println!("PacketEngine {}: {} on {:?} {} {}", self.cell_id, _f, port_nos, msg_type, port_tree_id); },
-                        MsgType::Manifest => { println!("PacketEngine {} forwarding manifest leafward mask {} entry {}", self.cell_id, mask, entry); },
-                        _ => { println!("PacketEngine {}: {} on {:?} {} {}", self.cell_id, _f, port_nos, msg_type, port_tree_id); }
-                    };
+                {
+                    if TRACE_OPTIONS.all || TRACE_OPTIONS.pe_port {
+                        let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "pe_forward_leafward" };
+                        let trace = json!({ "cell_id": self.cell_id, "port_tree_id": &port_tree_id, "msg_type": &msg_type, "port_nos": &port_nos });
+                        let _ = dal::add_to_trace(TraceType::Trace, trace_params, &trace, _f);
+                    }
+                    if DEBUG_OPTIONS.all || DEBUG_OPTIONS.pe_pkt_send {
+                        match msg_type {
+                            MsgType::Discover => (),
+                            MsgType::DiscoverD => if port_tree_id.is_name(CENTRAL_TREE) { println!("PacketEngine {}: {} on {:?} {} {}", self.cell_id, _f, port_nos, msg_type, port_tree_id); },
+                            MsgType::Manifest => { println!("PacketEngine {} forwarding manifest leafward mask {} entry {}", self.cell_id, mask, entry); },
+                            _ => { println!("PacketEngine {}: {} on {:?} {} {}", self.cell_id, _f, port_nos, msg_type, port_tree_id); }
+                        };
+                    }
                 }
             }
             // Only side effects so use explicit loop instead of map
@@ -542,11 +576,13 @@ impl PacketEngine {
                     self.pe_to_cm.send(PeToCmPacket::Packet((recv_port_no, packet))).context(PacketEngineError::Chain { func_name: _f, comment: S("leafcast packet to ca ") + &self.cell_id.get_name() })?;
                 } else {
                     // forward to neighbor
-                    if DEBUG_OPTIONS.all || DEBUG_OPTIONS.flow_control {
-                        let msg_type = MsgType::msg_type(&packet);
-                        match packet.get_ait_state() {
-                            AitState::Normal => println!("PacketEngine {}: port {} {} outbuf size {} msg type {} {}", self.cell_id, *port_no, _f, self.get_outbuf_size(port_no), msg_type, packet.get_ait_state()),
-                            _ => ()
+                    {
+                        if DEBUG_OPTIONS.all || DEBUG_OPTIONS.flow_control {
+                            let msg_type = MsgType::msg_type(&packet);
+                            match packet.get_ait_state() {
+                                AitState::Normal => println!("PacketEngine {}: port {} {} outbuf size {} msg type {} {}", self.cell_id, *port_no, _f, self.get_outbuf_size(port_no), msg_type, packet.get_ait_state()),
+                                _ => ()
+                            }
                         }
                     }
                     self.add_to_out_buffer_back(port_no, packet);
@@ -555,14 +591,6 @@ impl PacketEngine {
             }
         }
         Ok(())
-    }
-    fn add_to_packet_count(packet_count: &mut UsizeArray, port_no: PortNo) {
-        let mut count = packet_count.lock().unwrap();
-        if count.len() == 1 { // Replace 1 with PACKET_PIPELINE_SIZE when adding pipelining
-            count[port_no.as_usize()] = 0;
-        } else {
-            count[port_no.as_usize()] = count[port_no.as_usize()] + 1;
-        }
     }
 }
 impl fmt::Display for PacketEngine {
