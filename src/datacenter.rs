@@ -32,12 +32,14 @@ impl Datacenter {
             .map(|border_cell| -> Result<NalCell, Error> {
                 let nalcell = NalCell::new(border_cell.get_cell_no(), border_cell.get_nports(),
                                            CellType::Border,CellConfig::Large)?;
-                if TRACE_OPTIONS.all || TRACE_OPTIONS.dc {
-                    let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "border_cell_start" };
-                    let cell_no = border_cell.get_cell_no();
-                    let cell_id = nalcell.get_id();
-                    let trace = json!({ "cell_id": cell_id, "cell_number": cell_no, "location":  geometry.2.get(*cell_no)});
-                    let _ = dal::add_to_trace(TraceType::Trace, trace_params,&trace, _f);
+                {
+                    if TRACE_OPTIONS.all || TRACE_OPTIONS.dc {
+                        let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "border_cell_start" };
+                        let cell_no = border_cell.get_cell_no();
+                        let cell_id = nalcell.get_id();
+                        let trace = json!({ "cell_id": cell_id, "cell_number": cell_no, "location":  geometry.2.get(*cell_no)});
+                        let _ = dal::add_to_trace(TraceType::Trace, trace_params, &trace, _f);
+                    }
                 }
                 Ok(nalcell)
             })
@@ -49,12 +51,14 @@ impl Datacenter {
             .map(|interior_cell| -> Result<NalCell, Error> {
                 let nalcell = NalCell::new(interior_cell.get_cell_no(), interior_cell.get_nports(),
                              CellType::Interior,CellConfig::Large)?;
-                if TRACE_OPTIONS.all || TRACE_OPTIONS.dc {
-                    let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "interior_cell_start" };
-                    let cell_no = interior_cell.get_cell_no();
-                    let cell_id = nalcell.get_id();
-                    let trace = json!({ "cell_id": cell_id, "cell_number": cell_no, "location": geometry.2.get(*cell_no as usize) });
-                    let _ = dal::add_to_trace(TraceType::Trace, trace_params,&trace, _f);
+                {
+                    if TRACE_OPTIONS.all || TRACE_OPTIONS.dc {
+                        let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "interior_cell_start" };
+                        let cell_no = interior_cell.get_cell_no();
+                        let cell_id = nalcell.get_id();
+                        let trace = json!({ "cell_id": cell_id, "cell_number": cell_no, "location": geometry.2.get(*cell_no as usize) });
+                        let _ = dal::add_to_trace(TraceType::Trace, trace_params, &trace, _f);
+                    }
                 }
                 Ok(nalcell)
             })
@@ -87,10 +91,12 @@ impl Datacenter {
             left_port.link_channel(left_to_link, left_from_link, left_from_pe);
             rite_port.link_channel(rite_to_link, rite_from_link, rite_from_pe);
             let mut link = Link::new(left_port.get_id(), rite_port.get_id())?;
-            if TRACE_OPTIONS.all || TRACE_OPTIONS.dc {
-                let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "connect_link" };
-                let trace = json!({ "left_cell": left_cell_id, "rite_cell": rite_cell_id, "left_port": left_port.get_port_no(), "rite_port": rite_port.get_port_no(), "link_id": link.get_id() });
-                let _ = dal::add_to_trace(TraceType::Trace, trace_params, &trace, _f);
+            {
+                if TRACE_OPTIONS.all || TRACE_OPTIONS.dc {
+                    let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "connect_link" };
+                    let trace = json!({ "left_cell": left_cell_id, "rite_cell": rite_cell_id, "left_port": left_port.get_port_no(), "rite_port": rite_port.get_port_no(), "link_id": link.get_id() });
+                    let _ = dal::add_to_trace(TraceType::Trace, trace_params, &trace, _f);
+                }
             }
             let mut handle_pair = link.start_threads(link_to_left, link_from_left, link_to_rite, link_from_rite)?;
             link_handles.append(&mut handle_pair);

@@ -4,6 +4,7 @@ use crate::config::{ByteArray, PortNo};
 use crate::message::{MsgDirection, TcpMsgType};
 use crate::name::{TreeID};
 use crate::packet::{Packet};
+use crate::packet_engine::NumberOfPackets;
 use crate::port::{PortStatus};
 use crate::routing_table_entry::{RoutingTableEntry};
 use crate::uptree_spec::AllowedTree;
@@ -22,13 +23,13 @@ pub type PeFromPe = mpsc::Receiver<PeToPePacket>;
 //pub type PePeError = mpsc::SendError<PeToPePacket>;
 // CellAgent to Cmodel (index, tree_uuid, user_mask, direction, is_blocking, bytes)
 #[derive(Debug, Clone, Serialize)]
-pub enum CaToCmBytes { Entry(RoutingTableEntry), Bytes(CATOCM), Tcp((PortNumber, TCP)),  Unblock }
+pub enum CaToCmBytes { Entry(RoutingTableEntry), Bytes(CATOCM), Tcp((PortNumber, TCP)),  Failover(NumberOfPackets), Unblock }
 pub type CaToCm = mpsc::Sender<CaToCmBytes>;
 pub type CmFromCa = mpsc::Receiver<CaToCmBytes>;
 //pub type CaCmError = mpsc::SendError<CaToCmBytes>;
 // Cmodel to PacketEngine
 #[derive(Debug, Clone, Serialize)]
-pub enum CmToPePacket { Entry(RoutingTableEntry), Packet((Mask, Packet)), Tcp((PortNumber, TCP)),  Unblock }
+pub enum CmToPePacket { Entry(RoutingTableEntry), Packet((Mask, Packet)), Tcp((PortNumber, TCP)),  Failover(NumberOfPackets),  Unblock }
 pub type CmToPe = mpsc::Sender<CmToPePacket>;
 pub type PeFromCm = mpsc::Receiver<CmToPePacket>;
 //pub type CmPeError = mpsc::SendError<CmToPePacket>;
@@ -57,13 +58,13 @@ pub type PeFromPort = mpsc::Receiver<PortToPePacket>;
 //pub type PortPeError = mpsc::SendError<PortToPePacket>;
 // PacketEngine to Cmodel
 #[derive(Debug, Clone, Serialize)]
-pub enum PeToCmPacket { Status((PortNo, bool, PortStatus)), Packet((PortNo, Packet)), Tcp((PortNo, TCP)) }
+pub enum PeToCmPacket { Status((PortNo, bool, NumberOfPackets, PortStatus)), Packet((PortNo, Packet)), Tcp((PortNo, TCP)) }
 pub type PeToCm = mpsc::Sender<PeToCmPacket>;
 pub type CmFromPe = mpsc::Receiver<PeToCmPacket>;
 //pub type PeCmError = mpsc::SendError<PeToCmPacket>;
 // Cmodel to CellAgent
 #[derive(Debug, Clone, Serialize)]
-pub enum CmToCaBytes { Status((PortNo, bool, PortStatus)), Bytes((PortNo, bool, Uuid, ByteArray)), Tcp((PortNo, TCP)) }
+pub enum CmToCaBytes { Status((PortNo, bool, NumberOfPackets, PortStatus)), Bytes((PortNo, bool, Uuid, ByteArray)), Tcp((PortNo, TCP)) }
 pub type CmToCa = mpsc::Sender<CmToCaBytes>;
 pub type CaFromCm = mpsc::Receiver<CmToCaBytes>;
 //pub type CmCaError = mpsc::SendError<CmToCaBytes>;

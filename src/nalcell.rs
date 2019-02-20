@@ -59,10 +59,12 @@ impl NalCell {
         let mut pe_to_ports = Vec::new();
         let mut ports_from_pe = HashMap::new(); // So I can remove the item
         let mut boundary_port_nos = HashSet::new();
-        if TRACE_OPTIONS.all || TRACE_OPTIONS.nal {
-            let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "nalcell_port_setup" };
-            let trace = json!({ "cell_number": cell_no });
-            let _ = dal::add_to_trace(TraceType::Trace, trace_params, &trace, _f);
+        {
+            if TRACE_OPTIONS.all || TRACE_OPTIONS.nal {
+                let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "nalcell_port_setup" };
+                let trace = json!({ "cell_number": cell_no });
+                let _ = dal::add_to_trace(TraceType::Trace, trace_params, &trace, _f);
+            }
         }
         for i in 0..=*nports {
             let is_border_port = match cell_type {
@@ -96,10 +98,12 @@ impl NalCell {
     // SPAWN THREAD (ca.initialize)
     fn start_cell(cell_agent: &CellAgent, ca_from_cm: CaFromCm) {
         let _f = "start_cell";
-        if TRACE_OPTIONS.all || TRACE_OPTIONS.nal {
-            let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "nalcell_start_ca" };
-            let trace = json!({ "cell_id": &cell_agent.get_cell_id() });
-            let _ = dal::add_to_trace(TraceType::Trace, trace_params, &trace, _f);
+        {
+            if TRACE_OPTIONS.all || TRACE_OPTIONS.nal {
+                let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "nalcell_start_ca" };
+                let trace = json!({ "cell_id": &cell_agent.get_cell_id() });
+                let _ = dal::add_to_trace(TraceType::Trace, trace_params, &trace, _f);
+            }
         }
         let mut ca = cell_agent.clone();
         let child_trace_header = fork_trace_header();
@@ -128,10 +132,12 @@ impl NalCell {
     // SPAWN THREAD (pe.initialize)
     fn start_packet_engine(packet_engine: &PacketEngine, pe_from_cm: PeFromCm, pe_from_ports: PeFromPort) {
         let _f = "start_packet_engine";
-        if TRACE_OPTIONS.all || TRACE_OPTIONS.nal {
-            let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "nalcell_start_pe" };
-            let trace = json!({ "cell_id": packet_engine.get_cell_id() });
-            let _ = dal::add_to_trace(TraceType::Trace, trace_params, &trace, _f);
+        {
+            if TRACE_OPTIONS.all || TRACE_OPTIONS.nal {
+                let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "nalcell_start_pe" };
+                let trace = json!({ "cell_id": packet_engine.get_cell_id() });
+                let _ = dal::add_to_trace(TraceType::Trace, trace_params, &trace, _f);
+            }
         }
         let pe = packet_engine.clone();
         let child_trace_header = fork_trace_header();
