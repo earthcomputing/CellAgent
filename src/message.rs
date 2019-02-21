@@ -401,6 +401,7 @@ impl FailoverMsg {
     pub fn get_payload(&self) -> &FailoverMsgPayload { &self.payload }
     pub fn get_rw_port_tree_id(&self) -> PortTreeID { self.payload.get_rw_port_tree_id() }
     pub fn get_lw_port_tree_id(&self) -> PortTreeID { self.payload.get_lw_port_tree_id() }
+    pub fn get_number_of_packets(&self) -> NumberOfPackets { self.payload.get_number_of_packets() }
 }
 impl Message for FailoverMsg {
     fn get_header(&self) -> &MsgHeader { &self.header }
@@ -458,16 +459,18 @@ pub struct FailoverDMsg {
 }
 impl FailoverDMsg {
     pub fn new(in_reply_to: MsgID, sender_id: SenderID, response: FailoverResponse,
-               failover_payload: &FailoverMsgPayload) -> FailoverDMsg {
+               no_packets: NumberOfPackets, failover_payload: &FailoverMsgPayload) -> FailoverDMsg {
         // Note that direction is leafward so we can use the connected ports tree
         // If we send rootward, then the first recipient forwards the FailoverMsg
         let header = MsgHeader::new(sender_id, true,MsgType::FailoverD, MsgDirection::Leafward);
-        let payload = FailoverDMsgPayload::new(in_reply_to, response, failover_payload);
+        let payload = FailoverDMsgPayload::new(in_reply_to, response,
+                                               no_packets, failover_payload);
         FailoverDMsg { header, payload }
     }
     pub fn get_payload(&self) -> &FailoverDMsgPayload { &self.payload }
     pub fn get_rw_port_tree_id(&self) -> PortTreeID { self.payload.get_rw_port_tree_id() }
     pub fn get_lw_port_tree_id(&self) -> PortTreeID { self.payload.get_lw_port_tree_id() }
+    pub fn get_number_of_packets(&self) -> NumberOfPackets { self.payload.get_number_of_packets() }
 }
 impl Message for FailoverDMsg {
     fn get_header(&self) -> &MsgHeader { &self.header }
@@ -493,13 +496,16 @@ impl fmt::Display for FailoverDMsg {
 pub struct FailoverDMsgPayload {
     in_reply_to: MsgID,
     response: FailoverResponse,
+    no_packets: NumberOfPackets,
     failover_payload: FailoverMsgPayload
 }
 impl FailoverDMsgPayload {
-    fn new(in_reply_to: MsgID, response: FailoverResponse, failover_payload: &FailoverMsgPayload) -> FailoverDMsgPayload {
-        FailoverDMsgPayload { in_reply_to, response, failover_payload: failover_payload.clone() }
+    fn new(in_reply_to: MsgID, response: FailoverResponse, no_packets: NumberOfPackets,
+           failover_payload: &FailoverMsgPayload) -> FailoverDMsgPayload {
+        FailoverDMsgPayload { in_reply_to, response, no_packets, failover_payload: failover_payload.clone() }
     }
     pub fn get_response(&self) -> FailoverResponse { self.response }
+    pub fn get_number_of_packets(&self) -> NumberOfPackets { self.no_packets }
     pub fn get_failover_payload(&self) -> &FailoverMsgPayload { &self.failover_payload }
     pub fn get_rw_port_tree_id(&self) -> PortTreeID { self.failover_payload.get_rw_port_tree_id() }
     pub fn get_lw_port_tree_id(&self) -> PortTreeID { self.failover_payload.get_lw_port_tree_id() }

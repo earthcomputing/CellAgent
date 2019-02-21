@@ -613,13 +613,14 @@ pub struct NumberOfPackets {
     sent: usize,
     recd: usize
 }
+impl NumberOfPackets {
+    pub fn new() -> NumberOfPackets { NumberOfPackets { sent: 0, recd: 0 }}
+}
 impl fmt::Display for NumberOfPackets {
     fn fmt(&self, _f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(_f, "Number sent {}, Number received {}", self.sent, self.recd)
     }
 }
-#[derive(Debug, Clone, Default)]
-struct MyVec<T> { v: Vec<T> }
 // Errors
 use failure::{Error, ResultExt};
 
