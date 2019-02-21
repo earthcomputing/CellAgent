@@ -885,7 +885,6 @@ impl CellAgent {
         let port_number = port_no.make_port_number(self.no_ports)?;
         if rw_tree_id == self.my_tree_id {
             println!("Cellagent {}: {} found path to rootward for port tree {}", self.cell_id, _f, rw_port_tree_id);
-            let broken_port_tree_ids = payload.get_broken_port_tree_ids();
             let lw_traph = self.get_traph(lw_port_tree_id).context(CellagentError::Chain { func_name: _f, comment: S("lw_traph") })?;
             let broken_port_number = {
                 let broken_element = lw_traph.get_parent_element().context(CellagentError::Chain { func_name: _f, comment: S("lw element") })?;
@@ -999,6 +998,7 @@ impl CellAgent {
         if save { self.add_saved_msg(tree_id.to_tree_id(), user_mask, Right(msg.clone()))?; }
         Ok(())
     }
+    pub fn process_reroute_msg(&self) -> Result<(), Error> { panic!("Should never get here") }
     pub fn process_stack_tree_msg(&mut self, msg: &StackTreeMsg, port_no: PortNo, msg_port_tree_id: PortTreeID)
             -> Result<(), Error> {
         let _f = "process_stack_tree_msg";
@@ -1080,7 +1080,6 @@ impl CellAgent {
     fn find_new_parent(&mut self, header: &MsgHeader, payload: &FailoverMsgPayload, port_no: PortNo)
             -> Result<(), Error> {
         let _f = "find_new_parent";
-        let cell_id = self.cell_id;
         let sender_id = header.get_sender_id();
         let rw_port_tree_id = payload.get_rw_port_tree_id();
         let lw_port_tree_id = payload.get_lw_port_tree_id();
@@ -1092,7 +1091,6 @@ impl CellAgent {
         rw_traph.add_tried_port(rw_port_tree_id, port_no);
         match rw_traph.find_new_parent_port(rw_port_tree_id, broken_path) {
             None => {
-                //println!("Cellagent {}: {} Failover failure for rootward port tree {}", cell_id, _f, rw_port_tree_id);
                 rw_traph.clear_tried_ports(rw_port_tree_id);
                 let mask = Mask::new(port_number);
                 let in_reply_to = header.get_msg_id();
@@ -1102,9 +1100,9 @@ impl CellAgent {
                 self.send_msg(self.connected_tree_id, &failover_d_msg, mask)?;
             },
             Some(trial_port_no) => {
-                //println!("Cellagent {}: {} Forward failover on port {} for tree {}", self.cell_id, _f, *trial_port_no, rw_port_tree_id);
+                let no_packets = payload.get_number_of_packets();
                 let failover_msg = FailoverMsg::new(sender_id, rw_port_tree_id, lw_port_tree_id,
-                                                    broken_path, &broken_tree_ids);
+                                                    no_packets, broken_path, &broken_tree_ids);
                 let mask = Mask::new(trial_port_no.make_port_number(self.no_ports)?);
                 self.send_msg(self.connected_tree_id, &failover_msg, mask)?;
             }
@@ -1333,7 +1331,7 @@ impl CellAgent {
             Ok(())
         }
     }
-    fn port_disconnected(&mut self, port_no: PortNo, number_of_packets: NumberOfPackets) -> Result<(), Error> {
+    fn port_disconnected(&mut self, port_no: PortNo, no_packets: NumberOfPackets) -> Result<(), Error> {
         let _f = "port_disconnected";
         let port_number = port_no.make_port_number(self.no_ports)?;
         self.connected_tree_entry.remove_child(port_number);
@@ -1372,7 +1370,7 @@ impl CellAgent {
             let port_number = trial_parent_port.make_port_number(self.no_ports)?;
             let mask = Mask::new(port_number);
             let failover_msg = FailoverMsg::new(sender_id, rw_port_tree_id, lw_port_tree_id,
-                                                broken_path, &broken_port_tree_ids);
+                                                no_packets, broken_path, &broken_port_tree_ids);
             println!("Cellagent {}: {} candidate parent for tree {} is port {}", self.cell_id, _f, rw_traph.get_base_tree_id(), *trial_parent_port);
             self.send_msg(self.connected_tree_id, &failover_msg, mask).context(CellagentError::Chain { func_name: _f, comment: S(self.cell_id) })?;
         } else {

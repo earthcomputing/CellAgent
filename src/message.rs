@@ -11,6 +11,7 @@ use crate::config::{ByteArray, CellNo, MsgID, PathLength, PortNo};
 use crate::gvm_equation::{GvmEquation, GvmEqn};
 use crate::name::{Name, CellID, PortTreeID, SenderID, TreeID};
 use crate::packet::{Packet, Packetizer, Serializer};
+use crate::packet_engine::NumberOfPackets;
 use crate::uptree_spec::{AllowedTree, Manifest};
 use crate::utility::{S, Path};
 
@@ -389,12 +390,12 @@ pub struct FailoverMsg {
 }
 impl FailoverMsg {
     pub fn new(sender_id: SenderID, rw_port_tree_id: PortTreeID, lw_port_tree_id: PortTreeID,
-               path: Path, broken_tree_ids: &HashSet<PortTreeID>) -> FailoverMsg {
+               no_packets: NumberOfPackets, path: Path, broken_tree_ids: &HashSet<PortTreeID>) -> FailoverMsg {
         // Note that direction is leafward so we can use the connected ports tree
         // If we send rootward, then the first recipient forwards the FailoverMsg
         let header = MsgHeader::new(sender_id, true,MsgType::Failover, MsgDirection::Leafward);
         let payload = FailoverMsgPayload::new(rw_port_tree_id, lw_port_tree_id,
-                                              broken_tree_ids, path);
+                                              no_packets, broken_tree_ids, path);
         FailoverMsg { header, payload }
     }
     pub fn get_payload(&self) -> &FailoverMsgPayload { &self.payload }
@@ -426,20 +427,23 @@ pub struct FailoverMsgPayload {
     rw_port_tree_id: PortTreeID,
     lw_port_tree_id: PortTreeID,
     broken_tree_ids: HashSet<PortTreeID>,
-    broken_path: Path
+    broken_path: Path,
+    no_packets: NumberOfPackets
 }
 impl FailoverMsgPayload {
-    fn new(rw_port_tree_id: PortTreeID, lw_port_tree_id: PortTreeID, broken_tree_ids: &HashSet<PortTreeID>, path: Path)
-            -> FailoverMsgPayload {
+    fn new(rw_port_tree_id: PortTreeID, lw_port_tree_id: PortTreeID,
+           no_packets: NumberOfPackets, broken_tree_ids: &HashSet<PortTreeID>, path: Path)
+                -> FailoverMsgPayload {
         FailoverMsgPayload { rw_port_tree_id: rw_port_tree_id.clone(), lw_port_tree_id: lw_port_tree_id.clone(),
             broken_tree_ids: broken_tree_ids.clone(),
-            broken_path: path
+            broken_path: path, no_packets
         }
     }
     pub fn get_rw_port_tree_id(&self) -> PortTreeID { self.rw_port_tree_id }
     pub fn get_lw_port_tree_id(&self) -> PortTreeID { self.lw_port_tree_id }
     pub fn get_broken_port_tree_ids(&self) -> &HashSet<PortTreeID> { &self.broken_tree_ids }
     pub fn get_broken_path(&self) -> Path { self.broken_path }
+    pub fn get_number_of_packets(&self) -> NumberOfPackets { self.no_packets }
 }
 impl MsgPayload for FailoverMsgPayload {}
 impl fmt::Display for FailoverMsgPayload {
@@ -504,6 +508,65 @@ impl MsgPayload for FailoverDMsgPayload {}
 impl fmt::Display for FailoverDMsgPayload {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "Response {} Failover payload {}", self.response, self.failover_payload)
+    }
+}
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RerouteMsg {
+    header: MsgHeader,
+    payload: RerouteMsgPayload
+}
+impl RerouteMsg {
+    pub fn new(sender_id: SenderID, broken_port: PortNo, new_parent: PortNo, no_packets: NumberOfPackets) -> RerouteMsg {
+        // Note that direction is leafward so we can use the connected ports tree
+        // If we send rootward, then the first recipient forwards the FailoverMsg
+        let header = MsgHeader::new(sender_id, true,MsgType::FailoverD, MsgDirection::Leafward);
+        let payload = RerouteMsgPayload::new(broken_port, new_parent, no_packets);
+        RerouteMsg { header, payload }
+    }
+    pub fn get_payload(&self) -> &RerouteMsgPayload { &self.payload }
+    pub fn get_broken_port(&self) -> PortNo { self.payload.get_broken_port() }
+    pub fn get_new_parent(&self) -> PortNo { self.payload.get_new_parent() }
+    pub fn get_number_of_packets(&self) -> NumberOfPackets { self.payload.get_number_of_packets() }
+}
+impl Message for RerouteMsg {
+    fn get_header(&self) -> &MsgHeader { &self.header }
+    fn get_payload(&self) -> &dyn MsgPayload { &self.payload }
+    fn get_msg_type(&self) -> MsgType { self.get_header().msg_type }
+    fn is_blocking(&self) -> bool { false }
+    fn value(&self) -> serde_json::Value {
+        serde_json::to_value(self).expect("I don't know how to handle errors in msg.value()")
+    }
+    fn process_ca(&mut self, cell_agent: &mut CellAgent, port_no: PortNo,
+                  _msg_tree_id: PortTreeID, _is_ait: bool) -> Result<(), Error> {
+        let _f = "process_ca";
+        cell_agent.process_reroute_msg()
+    }
+}
+impl fmt::Display for RerouteMsg {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let s = format!("{}: {}", self.get_header(), self.get_payload());
+        write!(f, "{}", s)
+    }
+}
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RerouteMsgPayload {
+    broken_port: PortNo,
+    new_parent: PortNo,
+    no_packets: NumberOfPackets
+}
+impl RerouteMsgPayload {
+    fn new(broken_port: PortNo, new_parent: PortNo, no_packets: NumberOfPackets) -> RerouteMsgPayload {
+        RerouteMsgPayload { broken_port, new_parent, no_packets }
+    }
+    pub fn get_broken_port(&self) -> PortNo { self.broken_port }
+    pub fn get_new_parent(&self) -> PortNo { self.new_parent }
+    pub fn get_number_of_packets(&self) -> NumberOfPackets { self.no_packets }
+}
+impl MsgPayload for RerouteMsgPayload {}
+impl fmt::Display for RerouteMsgPayload {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "Broken port {}, new parent {}, number of packets {}", *self.broken_port,
+               *self.new_parent, self.no_packets)
     }
 }
 #[derive(Debug, Copy, Clone, Serialize, Deserialize)]
