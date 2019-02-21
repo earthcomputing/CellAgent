@@ -14,6 +14,7 @@ use crate::uuid_ec::Uuid;
 type ISAIT = bool;
 type ISBLOCKING = bool;
 type CATOCM = (TreeID, ISAIT, Mask, ISBLOCKING, ByteArray);
+type REROUTE = (PortNo, PortNo, NumberOfPackets);
 pub type PACKET = Packet;
 pub type TCP = (ISAIT, AllowedTree, TcpMsgType, MsgDirection, ByteArray);
 // PacketEngine to PacketEngine to unblock
@@ -23,13 +24,15 @@ pub type PeFromPe = mpsc::Receiver<PeToPePacket>;
 //pub type PePeError = mpsc::SendError<PeToPePacket>;
 // CellAgent to Cmodel (index, tree_uuid, user_mask, direction, is_blocking, bytes)
 #[derive(Debug, Clone, Serialize)]
-pub enum CaToCmBytes { Entry(RoutingTableEntry), Bytes(CATOCM), Tcp((PortNumber, TCP)),  Failover(NumberOfPackets), Unblock }
+pub enum CaToCmBytes { Entry(RoutingTableEntry), Bytes(CATOCM), Tcp((PortNumber, TCP)),
+    Reroute(REROUTE), Unblock }
 pub type CaToCm = mpsc::Sender<CaToCmBytes>;
 pub type CmFromCa = mpsc::Receiver<CaToCmBytes>;
 //pub type CaCmError = mpsc::SendError<CaToCmBytes>;
 // Cmodel to PacketEngine
 #[derive(Debug, Clone, Serialize)]
-pub enum CmToPePacket { Entry(RoutingTableEntry), Packet((Mask, Packet)), Tcp((PortNumber, TCP)),  Failover(NumberOfPackets),  Unblock }
+pub enum CmToPePacket { Entry(RoutingTableEntry), Packet((Mask, Packet)), Tcp((PortNumber, TCP)),
+    Reroute(REROUTE),  Unblock }
 pub type CmToPe = mpsc::Sender<CmToPePacket>;
 pub type PeFromCm = mpsc::Receiver<CmToPePacket>;
 //pub type CmPeError = mpsc::SendError<CmToPePacket>;

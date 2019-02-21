@@ -96,7 +96,7 @@ impl Cmodel {
             }
             match msg {
                 // just forward to PE
-                CaToCmBytes::Failover(msg) => unimplemented!(),
+                CaToCmBytes::Reroute(msg) => unimplemented!(),
                 CaToCmBytes::Entry(entry) => cm_to_pe.send(CmToPePacket::Entry(entry)),
                 CaToCmBytes::Tcp(msg) => cm_to_pe.send(CmToPePacket::Tcp(msg)),
                 CaToCmBytes::Unblock => cm_to_pe.send(CmToPePacket::Unblock),

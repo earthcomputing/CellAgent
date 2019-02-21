@@ -236,7 +236,7 @@ impl PacketEngine {
             }
             match msg {
                 // control plane from CellAgent
-                CmToPePacket::Failover(number_of_packets) => unimplemented!(),
+                CmToPePacket::Reroute(msg) => unimplemented!(),
                 CmToPePacket::Entry(entry) => {
                     self.routing_table.lock().unwrap().set_entry(entry)
                 },
