@@ -236,7 +236,28 @@ impl PacketEngine {
             }
             match msg {
                 // control plane from CellAgent
-                CmToPePacket::Reroute(msg) => unimplemented!(),
+                CmToPePacket::Reroute((broken_port_no, new_parent, no_packets)) => {
+                    { // Need this block so I can clear the broken port buffer without two mutable shares of self.out_buffer
+                        let mut locked_outbuf = self.out_buffer.lock().unwrap();
+                        let mut locked_sent = self.sent_packets.lock().unwrap();
+                        let broken_outbuf = &mut locked_outbuf[broken_port_no.as_usize()].clone();
+                        let new_parent_outbuf = &mut locked_outbuf[new_parent.as_usize()];
+                        let sent_buf = &mut locked_sent[broken_port_no.as_usize()];
+                        let no_my_sent_packets = self.get_no_sent_packets(broken_port_no);
+                        let no_her_seen_packets = no_packets.get_number_seen();
+                        let no_resend = no_my_sent_packets - no_her_seen_packets;
+                        for _ in 0..(no_resend) {
+                            sent_buf.pop_front();
+                        }
+                        for _ in 0..sent_buf.len() {
+                            new_parent_outbuf.push_back(sent_buf.pop_front().unwrap());
+                        }
+                        for _ in 0..broken_outbuf.len() {
+                            new_parent_outbuf.push_back(broken_outbuf.pop_front().unwrap());
+                        }
+                    }
+                    self.out_buffer.lock().unwrap()[broken_port_no.as_usize()].clear()
+                },
                 CmToPePacket::Entry(entry) => {
                     self.routing_table.lock().unwrap().set_entry(entry)
                 },
@@ -615,6 +636,8 @@ pub struct NumberOfPackets {
 }
 impl NumberOfPackets {
     pub fn new() -> NumberOfPackets { NumberOfPackets { sent: 0, recd: 0 }}
+    pub fn get_number_sent(&self) -> usize { self.sent }
+    pub fn get_number_seen(&self) -> usize { self.recd }
 }
 impl fmt::Display for NumberOfPackets {
     fn fmt(&self, _f: &mut fmt::Formatter<'_>) -> fmt::Result {
