@@ -888,8 +888,11 @@ impl CellAgent {
         let port_number = port_no.make_port_number(self.no_ports)?;
         if rw_tree_id == self.my_tree_id {
             println!("Cellagent {}: {} found path to rootward for port tree {}", self.cell_id, _f, rw_port_tree_id);
-            let lw_traph = self.get_traph(lw_port_tree_id).context(CellagentError::Chain { func_name: _f, comment: S("lw_traph") })?;
-            let broken_port_number = payload.get_broken_path().get_port_number();
+            let rw_traph = self.get_traph(rw_port_tree_id).context(CellagentError::Chain { func_name: _f, comment: S("lw_traph") })?;
+            let broken_port_number = {
+                let broken_element = rw_traph.get_parent_element().context(CellagentError::Chain { func_name: _f, comment: S("lw element") })?;
+                broken_element.get_port_no().make_port_number(self.no_ports)?
+            };
             let my_traph = self.get_traph_mut(self.my_tree_id.to_port_tree_id_0()).context(CellagentError::Chain { func_name: _f, comment: S("my_traph") })?;
             my_traph.mark_broken(broken_port_number);
             let changed_entries = my_traph.change_child(rw_port_tree_id, broken_port_number, port_number)?;
@@ -922,10 +925,14 @@ impl CellAgent {
         self.tree_id_map.insert(rw_port_tree_id.get_uuid(), rw_port_tree_id);
         if self.my_tree_id == lw_port_tree_id.to_tree_id() {
             println!("---> Cellagent {}: {} reached leafward node for port tree {}", self.cell_id, _f, rw_port_tree_id);
-            self.repair_traph(broken_port_tree_ids, port_number)?;
-            let broken_port_no = failover_payload.get_broken_path().get_port_no();
+            let broken_port_no = {
+                let rw_traph = self.get_traph(rw_port_tree_id).context(CellagentError::Chain { func_name: _f, comment: S("lw_traph") })?;
+                let broken_element = rw_traph.get_parent_element().context(CellagentError::Chain { func_name: _f, comment: S("lw element") })?;
+                broken_element.get_port_no()
+            };
             let no_packets = payload.get_number_of_packets();
             self.ca_to_cm.send(CaToCmBytes::Reroute((broken_port_no, port_no, no_packets)))?;
+            self.repair_traph(broken_port_tree_ids, port_number)?;
         } else {
             match payload.get_response() {
                 FailoverResponse::Success => {

@@ -45,7 +45,7 @@ impl PacketEngine {
             boundary_port_nos: HashSet<PortNo>) -> Result<PacketEngine, Error> {
         let routing_table = Arc::new(Mutex::new(RoutingTable::new(cell_id)));
         let mut array = vec![];
-        for i in 0..MAX_PORTS.0 as usize { array.push(VecDeque::new()); }
+        for _ in 0..MAX_PORTS.0 as usize { array.push(VecDeque::new()); }
         let count_vec = [0; MAX_PORTS.0 as usize].to_vec();
         Ok(PacketEngine { cell_id, routing_table, boundary_port_nos,
             no_seen_packets: Arc::new(Mutex::new(count_vec.clone())),
@@ -237,26 +237,30 @@ impl PacketEngine {
             match msg {
                 // control plane from CellAgent
                 CmToPePacket::Reroute((broken_port_no, new_parent, no_packets)) => {
-                    { // Need this block so I can clear the broken port buffer without two mutable shares of self.out_buffer
-                        let mut locked_outbuf = self.out_buffer.lock().unwrap();
-                        let mut locked_sent = self.sent_packets.lock().unwrap();
-                        let broken_outbuf = &mut locked_outbuf[broken_port_no.as_usize()].clone();
-                        let new_parent_outbuf = &mut locked_outbuf[new_parent.as_usize()];
-                        let sent_buf = &mut locked_sent[broken_port_no.as_usize()];
-                        let no_my_sent_packets = self.get_no_sent_packets(broken_port_no);
-                        let no_her_seen_packets = no_packets.get_number_seen();
-                        let no_resend = no_my_sent_packets - no_her_seen_packets;
-                        for _ in 0..(no_resend) {
-                            sent_buf.pop_front();
-                        }
-                        for _ in 0..sent_buf.len() {
-                            new_parent_outbuf.push_back(sent_buf.pop_front().unwrap());
-                        }
-                        for _ in 0..broken_outbuf.len() {
-                            new_parent_outbuf.push_back(broken_outbuf.pop_front().unwrap());
-                        }
+                    let mut locked_outbuf = self.out_buffer.lock().unwrap();
+                    println!("PacketEngine {}: {} broken port no {} outbuf len {}", self.cell_id, _f, *broken_port_no, locked_outbuf[broken_port_no.as_usize()].len());
+                    let mut broken_outbuf = locked_outbuf[broken_port_no.as_usize()]
+                        .drain(..)
+                        .map(|packet| {
+                            println!("PacketEngine {}: {} msg type {}", self.cell_id, _f, MsgType::msg_type(&packet));
+                            packet
+                        })
+                        .collect::<VecDeque<Packet>>();
+                    let mut locked_sent = self.sent_packets.lock().unwrap();
+                    let new_parent_outbuf = &mut locked_outbuf[new_parent.as_usize()];
+                    let sent_buf = &mut locked_sent[broken_port_no.as_usize()];
+                    let no_my_sent_packets = self.get_no_sent_packets(broken_port_no);
+                    let no_her_seen_packets = no_packets.get_number_seen();
+                    let no_resend = no_my_sent_packets - no_her_seen_packets;
+                    for _ in 0..(no_resend) {
+                        sent_buf.pop_front();
                     }
-                    self.out_buffer.lock().unwrap()[broken_port_no.as_usize()].clear()
+                    for _ in 0..sent_buf.len() {
+                        new_parent_outbuf.push_back(sent_buf.pop_front().unwrap());
+                    }
+                    for _ in 0..broken_outbuf.len() {
+                        new_parent_outbuf.push_back(broken_outbuf.pop_front().unwrap());
+                    }
                 },
                 CmToPePacket::Entry(entry) => {
                     self.routing_table.lock().unwrap().set_entry(entry)
