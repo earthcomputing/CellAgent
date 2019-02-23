@@ -13,7 +13,6 @@ mod container;
 mod dal;
 mod datacenter;
 mod dumpstack;
-mod ecargs;
 mod errors;
 mod gvm_equation;
 mod link;
