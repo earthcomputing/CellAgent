@@ -127,11 +127,11 @@ impl Cmodel {
                         let packets = Packetizer::packetize(&uuid, &bytes, is_blocking);
                         let first = packets[0];
                         let dpi_is_ait = first.is_ait();
-                        let msg_id = first.get_msg_id();
+                        let sender_msg_seq_no = first.get_sender_msg_seq_no();
                         let packet_count = first.get_count();
                         {
                             if DEBUG_OPTIONS.all || DEBUG_OPTIONS.cm_from_ca {
-                                println!("Cmodel {}: {} packetize - is_ait {} msg_id {} count {}", self.cell_id, _f, dpi_is_ait, *msg_id, packet_count);
+                                println!("Cmodel {}: {} packetize - is_ait {} sender_msg_seq_no {} count {}", self.cell_id, _f, dpi_is_ait, *sender_msg_seq_no, packet_count);
                             }
                         }
                         for packet in packets {
@@ -178,7 +178,7 @@ impl Cmodel {
 
 /*
 header.uuid
-payload.msg_id
+payload.sender_msg_seq_no
 payload.size
 payload.is_last
 payload.is_blocking
@@ -186,14 +186,14 @@ payload.bytes
 packet_count
 
 packet_assembler::
-msg_id: MsgID,
+sender_msg_seq_no: SenderMsgSeqNo,
 packets: Vec<Packet>,
 */
 
     fn process_packet(&mut self, cm_to_ca: &CmToCa, port_no: PortNo, packet: Packet) -> Result<(), Error> {
         let _f = "process_packet";
-        let msg_id = packet.get_msg_id();
-        let mut packet_assembler = self.packet_assemblers.remove(&msg_id).unwrap_or(PacketAssembler::new(msg_id)); // autovivification
+        let sender_msg_seq_no = packet.get_sender_msg_seq_no();
+        let mut packet_assembler = self.packet_assemblers.remove(&sender_msg_seq_no).unwrap_or(PacketAssembler::new(sender_msg_seq_no)); // autovivification
         let (last_packet, packets) = packet_assembler.add(packet);
 
         if last_packet {

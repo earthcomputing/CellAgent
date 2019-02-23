@@ -827,7 +827,7 @@ impl CellAgent {
         // Send DiscoverD to sender first time this tree is seen
         if !tree_seen {
             let sender_id = SenderID::new(self.cell_id, "CellAgent")?;
-            let in_reply_to = msg.get_msg_id();
+            let in_reply_to = msg.get_sender_msg_seq_no();
             let discoverd_msg = DiscoverDMsg::new(in_reply_to, sender_id, self.cell_id, new_port_tree_id, path);
             let mask = Mask::new(port_number);
             self.send_msg(self.get_connected_tree_id(),
@@ -896,8 +896,9 @@ impl CellAgent {
             let changed_entries = my_traph.change_child(rw_port_tree_id, broken_port_number, port_number)?;
             self.update_entries(&changed_entries)?;
             let mask = Mask::new(port_number);
-            let in_reply_to = msg.get_msg_id();
+            let in_reply_to = msg.get_sender_msg_seq_no();
             let no_packets = self.no_packets[broken_port_number.as_usize()];
+
             let failover_d_msg = FailoverDMsg::new(in_reply_to, sender_id,
                                                    FailoverResponse::Success,
                                                    no_packets, payload);
@@ -940,7 +941,7 @@ impl CellAgent {
                             let failover_port_number = failover_port_no.make_port_number(self.no_ports)?;
                             self.repair_traph(broken_port_tree_ids, failover_port_number)?;
                             let mask = Mask::new(failover_port_no.make_port_number(self.no_ports)?);
-                            let in_reply_to = msg.get_msg_id();
+                            let in_reply_to = msg.get_sender_msg_seq_no();
                             let sender_id = header.get_sender_id();
                             let broken_port_number = payload
                                 .get_failover_payload()
@@ -1038,7 +1039,7 @@ impl CellAgent {
             self.update_entry(&entry)?;
             // Send StackTreeDMsg
             let mask = Mask::new(port_number);
-            let in_reply_to = msg.get_msg_id();
+            let in_reply_to = msg.get_sender_msg_seq_no();
             let new_msg = StackTreeDMsg::new(in_reply_to, sender_id, new_port_tree_id);
             self.send_msg(self.get_connected_tree_id(), &new_msg, mask)?;
             let parent_tree_id = payload.get_parent_port_tree_id();
@@ -1110,7 +1111,7 @@ impl CellAgent {
             None => {
                 rw_traph.clear_tried_ports(rw_port_tree_id);
                 let mask = Mask::new(port_number);
-                let in_reply_to = header.get_msg_id();
+                let in_reply_to = header.get_sender_msg_seq_no();
                 let broken_port_number = broken_path.get_port_no().as_usize();
                 let no_packets = self.no_packets[broken_port_number];
                 let failover_d_msg = FailoverDMsg::new(in_reply_to, sender_id,
