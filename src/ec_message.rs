@@ -6,12 +6,12 @@ use serde;
 use serde_json;
 
 use crate::cellagent::{CellAgent};
-use crate::config::{ByteArray, CellNo, MsgID, PathLength, PortNo};
+use crate::config::{ByteArray, CellNo, PathLength, PortNo};
 use crate::gvm_equation::{GvmEquation, GvmEqn};
 use crate::name::{Name, CellID, PortTreeID, SenderID, TreeID};
 use crate::packet::{Packet, Packetizer, Serializer};
 use crate::packet_engine::NumberOfPackets;
-use crate::tcp_message::{get_next_count, TcpMsgDirection};
+use crate::tcp_message::{SenderMsgSeqNo, TcpMsgDirection, get_next_count};
 use crate::uptree_spec::{AllowedTree, Manifest};
 use crate::utility::{S, Path};
 
@@ -166,7 +166,7 @@ pub trait Message {
     fn is_ait(&self) -> bool { self.get_header().get_ait() }
     fn is_blocking(&self) -> bool;
     fn value(&self) -> serde_json::Value;
-    fn get_msg_id(&self) -> MsgID { self.get_header().get_msg_id() }
+    fn get_sender_msg_seq_no(&self) -> SenderMsgSeqNo { self.get_header().get_sender_msg_seq_no() }
     fn to_bytes(&self) -> Result<ByteArray, Error> where Self: serde::Serialize + Sized {
         let _f = "to_bytes";
         let bytes = Serializer::serialize(self).context(MessageError::Chain { func_name: _f, comment: S("")})?;
@@ -193,7 +193,7 @@ impl fmt::Display for dyn Message {
 pub trait MsgPayload: fmt::Display {}
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct MsgHeader {
-    msg_id: MsgID, // Debugging only?
+    sender_msg_seq_no: SenderMsgSeqNo, // Debugging only?
     is_ait: bool,
     sender_id: SenderID, // Used to find set of AllowedTrees
     msg_type: MsgType,
@@ -203,10 +203,10 @@ pub struct MsgHeader {
 impl MsgHeader {
     pub fn new(sender_id: SenderID, is_ait: bool, msg_type: MsgType, direction: MsgDirection) -> MsgHeader {
         let msg_count = get_next_count();
-        MsgHeader { sender_id, is_ait, msg_type, direction, msg_id: msg_count, tree_map: HashMap::new() }
+        MsgHeader { sender_id, is_ait, msg_type, direction, sender_msg_seq_no: msg_count, tree_map: HashMap::new() }
     }
     pub fn get_msg_type(&self) -> MsgType { self.msg_type }
-    pub fn get_msg_id(&self) -> MsgID { self.msg_id }
+    pub fn get_sender_msg_seq_no(&self) -> SenderMsgSeqNo { self.sender_msg_seq_no }
     pub fn get_ait(&self) -> bool { self.is_ait }
     pub fn get_direction(&self) -> MsgDirection { self.direction }
     pub fn get_sender_id(&self) -> SenderID { self.sender_id }
@@ -216,7 +216,7 @@ impl MsgHeader {
 }
 impl fmt::Display for MsgHeader { 
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result { 
-        let s = format!("Message {} {} '{}'", *self.msg_id, self.msg_type, self.direction);
+        let s = format!("Message {} {} '{}'", *self.sender_msg_seq_no, self.msg_type, self.direction);
         write!(f, "{}", s) 
     }
 }
@@ -313,7 +313,7 @@ pub struct DiscoverDMsg {
     payload: DiscoverDPayload
 }
 impl DiscoverDMsg {
-    pub fn new(in_reply_to: MsgID, sender_id: SenderID, sending_cell_id: CellID, tree_id: PortTreeID, path: Path) -> DiscoverDMsg {
+    pub fn new(in_reply_to: SenderMsgSeqNo, sender_id: SenderID, sending_cell_id: CellID, tree_id: PortTreeID, path: Path) -> DiscoverDMsg {
         // Note that direction is leafward so we can use the connected ports tree
         // If we send rootward, then the first recipient forwards the DiscoverD
         let header = MsgHeader::new(sender_id, true,MsgType::DiscoverD, MsgDirection::Leafward);
@@ -345,14 +345,14 @@ impl fmt::Display for DiscoverDMsg {
 }
 #[derive(Debug, Clone, Hash, Serialize, Deserialize)]
 pub struct DiscoverDPayload {
-    in_reply_to: MsgID,
+    in_reply_to: SenderMsgSeqNo,
     sending_cell_id: CellID,
     port_tree_id: PortTreeID,
     root_port_no: PortNo,
     path: Path
 }
 impl DiscoverDPayload {
-    fn new(in_reply_to: MsgID, sending_cell_id: CellID, port_tree_id: PortTreeID, path: Path) -> DiscoverDPayload {
+    fn new(in_reply_to: SenderMsgSeqNo, sending_cell_id: CellID, port_tree_id: PortTreeID, path: Path) -> DiscoverDPayload {
         let root_port_no = port_tree_id.get_port_no();
         DiscoverDPayload { in_reply_to, sending_cell_id: sending_cell_id.clone(), port_tree_id: port_tree_id.clone(),
             path, root_port_no }
@@ -438,7 +438,7 @@ pub struct FailoverDMsg {
     payload: FailoverDMsgPayload
 }
 impl FailoverDMsg {
-    pub fn new(in_reply_to: MsgID, sender_id: SenderID, response: FailoverResponse,
+    pub fn new(in_reply_to: SenderMsgSeqNo, sender_id: SenderID, response: FailoverResponse,
                no_packets: NumberOfPackets, failover_payload: &FailoverMsgPayload) -> FailoverDMsg {
         // Note that direction is leafward so we can use the connected ports tree
         // If we send rootward, then the first recipient forwards the FailoverMsg
@@ -474,13 +474,13 @@ impl fmt::Display for FailoverDMsg {
 }
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct FailoverDMsgPayload {
-    in_reply_to: MsgID,
+    in_reply_to: SenderMsgSeqNo,
     response: FailoverResponse,
     no_packets: NumberOfPackets,
     failover_payload: FailoverMsgPayload
 }
 impl FailoverDMsgPayload {
-    fn new(in_reply_to: MsgID, response: FailoverResponse, no_packets: NumberOfPackets,
+    fn new(in_reply_to: SenderMsgSeqNo, response: FailoverResponse, no_packets: NumberOfPackets,
            failover_payload: &FailoverMsgPayload) -> FailoverDMsgPayload {
         FailoverDMsgPayload { in_reply_to, response, no_packets, failover_payload: failover_payload.clone() }
     }
@@ -626,7 +626,7 @@ pub struct StackTreeDMsg {
     payload: StackTreeMsgDPayload
 }
 impl StackTreeDMsg {
-    pub fn new(in_reply_to: MsgID, sender_id: SenderID, port_tree_id: PortTreeID) -> StackTreeDMsg {
+    pub fn new(in_reply_to: SenderMsgSeqNo, sender_id: SenderID, port_tree_id: PortTreeID) -> StackTreeDMsg {
         let header = MsgHeader::new(sender_id, true,MsgType::StackTreeD, MsgDirection::Leafward);
         let payload = StackTreeMsgDPayload::new(in_reply_to, port_tree_id);
         StackTreeDMsg { header, payload}
@@ -656,11 +656,11 @@ impl fmt::Display for StackTreeDMsg {
 }
 #[derive(Debug, Clone, Hash, Serialize, Deserialize)]
 pub struct StackTreeMsgDPayload {
-    in_reply_to: MsgID,
+    in_reply_to: SenderMsgSeqNo,
     port_tree_id: PortTreeID,
 }
 impl StackTreeMsgDPayload {
-    fn new(in_reply_to: MsgID, port_tree_id: PortTreeID) -> StackTreeMsgDPayload {
+    fn new(in_reply_to: SenderMsgSeqNo, port_tree_id: PortTreeID) -> StackTreeMsgDPayload {
         StackTreeMsgDPayload { in_reply_to, port_tree_id }
     }
     fn get_port_tree_id(&self) -> PortTreeID { self.port_tree_id }

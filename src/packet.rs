@@ -9,10 +9,10 @@ use serde;
 use serde_json;
 
 use crate::config::{PACKET_MIN, PACKET_MAX, PAYLOAD_DEFAULT_ELEMENT, 
-    ByteArray, MsgID, PacketNo};
+    ByteArray, PacketNo};
 use crate::ec_message::{Message, MsgType, TypePlusMsg};
 use crate::name::{PortTreeID};
-use crate::tcp_message::{get_next_count};
+use crate::tcp_message::{SenderMsgSeqNo, get_next_count};
 use crate::utility::S;
 use crate::uuid_ec::{Uuid, AitState};
  
@@ -21,7 +21,7 @@ const PACKET_HEADER_SIZE: usize = 16; // PacketHeader / Uuid
 const PAYLOAD_MIN: usize = PACKET_MAX - PACKET_HEADER_SIZE;
 const PAYLOAD_MAX: usize = PACKET_MAX - PACKET_HEADER_SIZE;
 
-pub type PacketAssemblers = HashMap<MsgID, PacketAssembler>;
+pub type PacketAssemblers = HashMap<SenderMsgSeqNo, PacketAssembler>;
 
 static PACKET_COUNT: AtomicUsize = ATOMIC_USIZE_INIT;
 #[derive(Debug, Copy, Serialize)]
@@ -31,10 +31,10 @@ pub struct Packet {
     packet_count: usize
 }
 impl Packet {
-    fn new(msg_id: MsgID, uuid: &Uuid, size: PacketNo,
+    fn new(sender_msg_seq_no: SenderMsgSeqNo, uuid: &Uuid, size: PacketNo,
            is_last_packet: bool, is_blocking: bool, data_bytes: Vec<u8>) -> Packet {
         let header = PacketHeader::new(uuid);
-        let payload = Payload::new(msg_id, size, is_last_packet, is_blocking, data_bytes);
+        let payload = Payload::new(sender_msg_seq_no, size, is_last_packet, is_blocking, data_bytes);
         Packet { header, payload, packet_count: Packet::get_next_count() }
     }
     pub fn make(header: PacketHeader, payload: Payload, packet_count: usize) -> Packet {
@@ -59,7 +59,7 @@ impl Packet {
     // Payload (delegate)
     pub fn is_blocking(&self) -> bool { self.payload.is_blocking() }
     pub fn is_last_packet(&self) -> bool { self.payload.is_last_packet() }
-    pub fn get_msg_id(&self) -> MsgID { self.payload.get_msg_id() }
+    pub fn get_sender_msg_seq_no(&self) -> SenderMsgSeqNo { self.payload.get_sender_msg_seq_no() }
     pub fn get_size(&self) -> PacketNo { self.payload.get_size() }
     pub fn get_bytes(&self) -> Vec<u8> { self.payload.bytes.iter().cloned().collect() }
     pub fn get_wrapped_header(&self) -> Option<PacketHeader> { self.payload.get_wrapped_header() }
@@ -124,7 +124,7 @@ impl fmt::Display for PacketHeader {
 
 #[derive(Copy)]
 pub struct Payload {
-    msg_id: MsgID,  // Unique identifier of this message
+    sender_msg_seq_no: SenderMsgSeqNo,  // Unique identifier of this message
     size: PacketNo, // Number of packets remaining in message if not last packet
                     // Number of bytes in last packet if last packet, 0 => Error
     is_last: bool,
@@ -133,16 +133,16 @@ pub struct Payload {
     bytes: [u8; PAYLOAD_MAX],
 }
 impl Payload {
-    pub fn new(msg_id: MsgID, size: PacketNo,
+    pub fn new(sender_msg_seq_no: SenderMsgSeqNo, size: PacketNo,
                is_last: bool, is_blocking: bool, data_bytes: Vec<u8>) -> Payload {
         let mut bytes = [0 as u8; PAYLOAD_MAX];
         // Next line recommended by clippy, but I think the loop is clearer
         //bytes[..min(data_bytes.len(), PAYLOAD_MAX)].clone_from_slice(&data_bytes[..min(data_bytes.len(), PAYLOAD_MAX)]);
         for i in 0..min(data_bytes.len(), PAYLOAD_MAX) { bytes[i] = data_bytes[i]; }
-        Payload { msg_id, size, is_last, is_blocking, bytes, wrapped_header: None }
+        Payload { sender_msg_seq_no, size, is_last, is_blocking, bytes, wrapped_header: None }
     }
     fn get_bytes(&self) -> Vec<u8> { self.bytes.iter().cloned().collect() }
-    fn get_msg_id(&self) -> MsgID { self.msg_id }
+    fn get_sender_msg_seq_no(&self) -> SenderMsgSeqNo { self.sender_msg_seq_no }
     fn get_size(&self) -> PacketNo { self.size }
     fn is_last_packet(&self) -> bool { self.is_last }
     fn is_blocking(&self) -> bool { self.is_blocking }
@@ -150,7 +150,7 @@ impl Payload {
 }
 impl fmt::Display for Payload {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let mut s = format!("Message ID {}", *self.msg_id);
+        let mut s = format!("Sender Msg Seq No {}", *self.sender_msg_seq_no);
         if self.is_last_packet() { s = s + ", Last packet"; }
         else                     { s = s + ", Not last packet"; }
         s = s + &format!(", Size {}", *self.size);
@@ -167,7 +167,7 @@ impl Serialize for Payload {
     {
         let body = self.bytes.to_hex();
         let mut state = serializer.serialize_struct("Payload", 5)?;
-        state.serialize_field("msg_id", &self.msg_id)?;
+        state.serialize_field("sender_msg_seq_no", &self.sender_msg_seq_no)?;
         state.serialize_field("size", &self.size)?;
         state.serialize_field("is_last", &self.is_last)?;
         state.serialize_field("is_blocking", &self.is_blocking)?;
@@ -200,7 +200,7 @@ impl Packetizer {
         let mtu = Packetizer::packet_payload_size(msg_bytes.len());
         let num_packets = (msg_bytes.len() + mtu - 1)/ mtu; // Poor man's ceiling
         let frag = msg_bytes.len() - (num_packets - 1) * mtu;
-        let msg_id = MsgID(rand::random()); // Can't use hash in case two cells send the same message
+        let sender_msg_seq_no = SenderMsgSeqNo(rand::random()); // Can't use hash in case two cells send the same message
         let mut packets = Vec::new();
         for i in 0..num_packets {
             let (size, is_last_packet) = if i == (num_packets-1) {
@@ -214,7 +214,7 @@ impl Packetizer {
                 if i*mtu + j == msg_bytes.len() { break; }
                 packet_bytes[j] = msg_bytes[i*mtu + j];
             }
-            let packet = Packet::new(msg_id, uuid, PacketNo(size as u16),
+            let packet = Packet::new(sender_msg_seq_no, uuid, PacketNo(size as u16),
                                      is_last_packet, is_blocking, packet_bytes);
             //println!("Packet: packet {} for msg {}", packet.get_packet_count(), msg.get_count());
             packets.push(packet);
@@ -243,18 +243,18 @@ impl Packetizer {
 }
 #[derive(Debug, Clone)]
 pub struct PacketAssembler {
-    msg_id: MsgID,
+    sender_msg_seq_no: SenderMsgSeqNo,
     packets: Vec<Packet>,
 }
 impl PacketAssembler {
-    pub fn new(msg_id: MsgID) -> PacketAssembler {
-        PacketAssembler { msg_id, packets: Vec::new() }
+    pub fn new(sender_msg_seq_no: SenderMsgSeqNo) -> PacketAssembler {
+        PacketAssembler { sender_msg_seq_no, packets: Vec::new() }
     }
-//    pub fn create(msg_id: MsgID, packets: &Vec<Packet>) -> PacketAssembler {
-//        PacketAssembler { msg_id, packets: packets.clone() }
+//    pub fn create(sender_msg_seq_no: SenderMsgSeqNo, packets: &Vec<Packet>) -> PacketAssembler {
+//        PacketAssembler { sender_msg_seq_no, packets: packets.clone() }
 //    }
 /*
-    pub fn get_msg_id(&self) -> MsgID { self.msg_id }
+    pub fn get_sender_msg_seq_no(&self) -> SenderMsgSeqNo { self.sender_msg_seq_no }
     pub fn get_packets(&self) -> &Vec<Packet> { &self.packets }
     pub fn get_tree_uuid(&self) -> Option<Uuid> {
         if let Some(packet) = self.packets.get(0) {

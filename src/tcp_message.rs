@@ -1,4 +1,5 @@
 use std::{fmt,
+          ops::{Deref},
           sync::atomic::{ATOMIC_USIZE_INIT, AtomicUsize, Ordering},
           sync::mpsc,
 };
@@ -6,14 +7,18 @@ use std::{fmt,
 use serde;
 use serde_json;
 
-use crate::config::{ByteArray, MsgID};
+use crate::config::{ByteArray};
 use crate::gvm_equation::{GvmEquation, GvmEqn};
 use crate::name::{SenderID};
 use crate::uptree_spec::{AllowedTree, Manifest};
 use crate::utility::{S};
 
+// This is currently at the cell level, but could be placed at the up-tree level.
+#[derive(Debug, Copy, Clone, Hash, Eq, PartialEq, Serialize, Deserialize)]
+pub struct SenderMsgSeqNo(pub u64);
+impl Deref for SenderMsgSeqNo { type Target = u64; fn deref(&self) -> &Self::Target { &self.0 } }
 static MESSAGE_COUNT: AtomicUsize = ATOMIC_USIZE_INIT;
-pub fn get_next_count() -> MsgID { MsgID(MESSAGE_COUNT.fetch_add(1, Ordering::SeqCst) as u64) }
+pub fn get_next_count() -> SenderMsgSeqNo { SenderMsgSeqNo(MESSAGE_COUNT.fetch_add(1, Ordering::SeqCst) as u64) }
 
 #[derive(Debug, Copy, Clone, Hash, Eq, PartialEq, Serialize, Deserialize)]
 pub enum TcpMsgType {
@@ -82,12 +87,12 @@ pub trait TcpMessage {
     fn is_ait(&self) -> bool { self.get_header().get_ait() }
     fn is_blocking(&self) -> bool;
     fn value(&self) -> serde_json::Value;
-    fn get_msg_id(&self) -> MsgID { self.get_header().get_msg_id() } // Should prepend self.get_header().get_sender_id()
+    fn get_sender_msg_seq_no(&self) -> SenderMsgSeqNo { self.get_header().get_sender_msg_seq_no() } // Should prepend self.get_header().get_sender_id()
 }
 pub trait TcpMsgPayload: fmt::Display {}
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TcpMsgHeader {
-    msg_id: MsgID, // Debugging only?
+    sender_msg_seq_no: SenderMsgSeqNo, // Debugging only?
     is_ait: bool,
     sender_id: SenderID, // Used to find set of AllowedTrees
     msg_type: TcpMsgType,
@@ -97,10 +102,10 @@ pub struct TcpMsgHeader {
 impl TcpMsgHeader {
     pub fn new(sender_id: SenderID, is_ait: bool, msg_type: TcpMsgType, direction: TcpMsgDirection) -> TcpMsgHeader {
         let msg_count = get_next_count();
-        TcpMsgHeader { sender_id: sender_id.clone(), is_ait, msg_type, direction, msg_id: msg_count, allowed_tree_names: Vec::<AllowedTree>::new() }
+        TcpMsgHeader { sender_id: sender_id.clone(), is_ait, msg_type, direction, sender_msg_seq_no: msg_count, allowed_tree_names: Vec::<AllowedTree>::new() }
     }
     pub fn get_msg_type(&self) -> TcpMsgType { self.msg_type }
-    pub fn get_msg_id(&self) -> MsgID { self.msg_id }
+    pub fn get_sender_msg_seq_no(&self) -> SenderMsgSeqNo { self.sender_msg_seq_no }
     pub fn get_ait(&self) -> bool { self.is_ait }
     pub fn get_direction(&self) -> TcpMsgDirection { self.direction }
     pub fn get_sender_id(&self) -> &SenderID { &self.sender_id }
@@ -110,7 +115,7 @@ impl TcpMsgHeader {
 }
 impl fmt::Display for TcpMsgHeader { 
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result { 
-        let s = format!("Message {} {} '{}'", *self.msg_id, self.msg_type, self.direction);
+        let s = format!("Message {} {} '{}'", *self.sender_msg_seq_no, self.msg_type, self.direction);
         write!(f, "{}", s) 
     }
 }
