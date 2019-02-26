@@ -376,8 +376,8 @@ impl<'a> DatacenterPorts<'a> {
 
 impl<'a> Test for DatacenterPorts<'a> {
     fn test(&mut self) {
-        for cell in self.dc.get_cells() {
-            match self.ports_spec.cell_port_exceptions.get(&cell.get_no()) {
+        for (cell_no, cell) in self.dc.get_cells() {
+            match self.ports_spec.cell_port_exceptions.get(&CellNo(cell.get_name().trim_start_matches("C:").parse().unwrap())) {
                 Some(num_phys_ports) => {
                     assert_eq!(cell.get_num_ports(), PortQty(**num_phys_ports+1));
                 }
@@ -505,10 +505,10 @@ impl<'a, 'b> DatacenterBorder<'a, 'b> {
 
 impl<'a, 'b> Test for DatacenterBorder<'a, 'b> {
     fn test(&mut self) {
-        for cell in self.dc.get_cells() {
+        for (cell_no, cell) in self.dc.get_cells() {
             let border_ports: &Vec<PortNo>;
             let mut is_border_cell: bool = false;
-            match self.border_spec.border_cell_ports.get(&cell.get_no()) {
+            match self.border_spec.border_cell_ports.get(&CellNo(cell.get_name().trim_start_matches("C:").parse().unwrap())) {
                 Some(specified_border_ports) => {
                     border_ports = specified_border_ports;
                     is_border_cell = !border_ports.is_empty();

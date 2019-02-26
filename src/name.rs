@@ -3,7 +3,7 @@ use std::string::String;
 
 use serde::{Deserialize, Deserializer, Serializer};
 
-use crate::config::{MAX_CHARS, SEPARATOR, CellNo, PortNo};
+use crate::config::{MAX_CHARS, SEPARATOR, PortNo};
 use crate::utility::{PortNumber, S};
 use crate::uuid_ec::Uuid;
 
@@ -67,9 +67,11 @@ pub struct CellID {
     uuid: Uuid
 }
 impl CellID {
-    pub fn new(CellNo(n): CellNo) -> Result<CellID, NameError> {
-        let name = str_to_chars(&format!("C:{}",n));
-        Ok(CellID { name, uuid: Uuid::new() })
+    pub fn new(name: &str) -> Result<CellID, NameError> {
+        Ok(CellID { name: str_to_chars(name), uuid: Uuid::new() })
+    }
+    pub fn get_name(&self) -> String {
+        str_from_chars(self.name)
     }
 }
 impl Name for CellID {

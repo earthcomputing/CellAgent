@@ -1,3 +1,6 @@
+extern crate multi_mut;
+use multi_mut::{HashMapMultiMut};
+
 use std::{fmt, fmt::Write,
           cmp::max,
           collections::{HashMap, HashSet},
@@ -10,20 +13,21 @@ use crate::app_message_formats::{ApplicationFromNoc, ApplicationToNoc, NocFromAp
 use crate::blueprint::{Blueprint, Cell};
 use crate::config::{TRACE_OPTIONS, CellNo, CellQty, CellType, CellConfig, PortNo, PortQty, Edge, LinkNo, get_geometry};
 use crate::dal;
-use crate::ec_message_formats::{LinkToPort, PortFromLink, PortToLink, LinkFromPort};
+use crate::ec_message_formats::{LinkToPort, PortFromLink, PortToLink, LinkFromPort, PortFromPe};
 use crate::link::{Link};
 use crate::nalcell::{NalCell};
 use crate::name::{CellID, LinkID};
 use crate::noc::{Noc};
+use crate::port::{Port};
 use crate::utility::{S, TraceHeaderParams, TraceType};
 
 #[derive(Debug)]
 pub struct Datacenter {
-    cells: Vec<NalCell>,
-    links: Vec<Link>,
+    cells: HashMap<CellNo, NalCell>,
+    links: HashMap<Edge, Link>,
 }
 impl Datacenter {
-    pub fn new() -> Datacenter { Datacenter { cells: Vec::new(), links: Vec::new() } }
+    pub fn new() -> Datacenter { Datacenter { cells: HashMap::new(), links: HashMap::new() } }
     pub fn construct(num_cells: CellQty, edges: &Vec<Edge>, default_num_phys_ports_per_cell: PortQty, cell_port_exceptions: &HashMap<CellNo, PortQty>, border_cell_ports: &HashMap<CellNo, Vec<PortNo>>) -> Result<(Datacenter, ApplicationToNoc, ApplicationFromNoc), Error> {
         /* Doesn't work when debugging in Eclipse
         let args: Vec<String> = env::args().collect();
@@ -47,46 +51,51 @@ impl Datacenter {
         let edge_list = blueprint.get_edge_list();
         if *num_cells < 1  { return Err(DatacenterError::Cells{ num_cells, func_name: _f }.into()); }
         if edge_list.len() < *num_cells - 1 { return Err(DatacenterError::Edges { nlinks: LinkNo(CellNo(edge_list.len())), func_name: _f }.into() ); }
-        self.cells.append(&mut blueprint.get_border_cells()
-                          .iter()
-                          .map(|border_cell| -> Result<NalCell, Error> {
-                              let nalcell = NalCell::new(border_cell.get_cell_no(), border_cell.get_num_phys_ports(),
-                                                         &HashSet::from_iter(border_cell.get_border_ports().clone()),
-                                                         CellConfig::Large)?;
-                              {
-                                  if TRACE_OPTIONS.all || TRACE_OPTIONS.dc {
-                                      let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "border_cell_start" };
-                                      let cell_no = border_cell.get_cell_no();
-                                      let cell_id = nalcell.get_id();
-                                      let trace = json!({ "cell_id": cell_id, "cell_number": cell_no, "location":  geometry.2.get(*cell_no)});
-                                      let _ = dal::add_to_trace(TraceType::Trace, trace_params, &trace, _f);
-                                  }
-                              }
-                              Ok(nalcell)
-                          })
-                          .filter(|cell| cell.is_ok())
-                          .map(|cell| cell.unwrap())
-                          .collect::<Vec<_>>());
-        self.cells.append(&mut blueprint.get_interior_cells()
-                          .iter()
-                          .map(|interior_cell| -> Result<NalCell, Error> {
-                              let nalcell = NalCell::new(interior_cell.get_cell_no(), interior_cell.get_num_phys_ports(),
-                                                         &HashSet::new(), CellConfig::Large)?;
-                              {
-                                  if TRACE_OPTIONS.all || TRACE_OPTIONS.dc {
-                                      let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "interior_cell_start" };
-                                      let cell_no = interior_cell.get_cell_no();
-                                      let cell_id = nalcell.get_id();
-                                      let trace = json!({ "cell_id": cell_id, "cell_number": cell_no, "location": geometry.2.get(*cell_no as usize) });
-                                      let _ = dal::add_to_trace(TraceType::Trace, trace_params, &trace, _f);
-                                  }
-                              }
-                              Ok(nalcell)
-                          })
-                          .filter(|cell| cell.is_ok())
-                          .map(|cell| cell.unwrap())
-                          .collect::<Vec<_>>());
-        self.cells.sort_by(|a, b| (*a.get_no()).cmp(&*b.get_no())); // Sort to conform to edge list
+        let labeled_border_nal_cells  =
+            blueprint
+            .get_border_cells()
+            .iter()
+            .map(|border_cell| -> Result<(CellNo, NalCell), Error> {
+                let cell_no = border_cell.get_cell_no();
+                let nal_cell = NalCell::new(&border_cell.get_name(), border_cell.get_num_phys_ports(),
+                                            &HashSet::from_iter(border_cell.get_border_ports().clone()),
+                                            CellConfig::Large)?;
+                {
+                    if TRACE_OPTIONS.all || TRACE_OPTIONS.dc {
+                        let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "border_cell_start" };
+                        let cell_id = nal_cell.get_id();
+                        let trace = json!({ "cell_id": cell_id, "cell_number": cell_no, "location":  geometry.2.get(*cell_no)});
+                        let _ = dal::add_to_trace(TraceType::Trace, trace_params, &trace, _f);
+                    }
+                }
+                Ok((cell_no, nal_cell))
+            })
+            .collect::<Result<Vec<(CellNo, NalCell)>, Error>>().context(DatacenterError::Chain { func_name: "initialize", comment: S("border")})?;
+        for (cell_no, border_nal_cell) in labeled_border_nal_cells {
+            self.cells.insert(cell_no, border_nal_cell);
+        }
+        let labeled_interior_nal_cells =
+            blueprint
+            .get_interior_cells()
+            .iter()
+            .map(|interior_cell| -> Result<(CellNo, NalCell), Error> {
+                let cell_no = interior_cell.get_cell_no();
+                let nal_cell = NalCell::new(&interior_cell.get_name(), interior_cell.get_num_phys_ports(),
+                                            &HashSet::new(), CellConfig::Large)?;
+                {
+                    if TRACE_OPTIONS.all || TRACE_OPTIONS.dc {
+                        let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "interior_cell_start" };
+                        let cell_id = nal_cell.get_id();
+                        let trace = json!({ "cell_id": cell_id, "cell_number": cell_no, "location": geometry.2.get(*cell_no as usize) });
+                        let _ = dal::add_to_trace(TraceType::Trace, trace_params, &trace, _f);
+                    }
+                }
+                Ok((cell_no, nal_cell))
+            })
+            .collect::<Result<Vec<(CellNo, NalCell)>, Error>>().context(DatacenterError::Chain { func_name: "initialize", comment: S("interior")})?;
+        for (cell_no, interior_nal_cell) in labeled_interior_nal_cells {
+            self.cells.insert(cell_no, interior_nal_cell);
+        }
         let mut link_handles = Vec::new();
         for edge in edge_list {
             if (*(edge.0) > num_cells.0) | (*(edge.1) >= num_cells.0) { return Err(DatacenterError::Wire { edge: *edge, func_name: _f, comment: "greater than num_cells test" }.into()); }
@@ -95,19 +104,21 @@ impl Datacenter {
             } else {
                 (*(edge.0), *(edge.1))
             };
-            let split = self.cells.split_at_mut(max(e0,e1));
-            let left_cell = split.0.get_mut(e0)
-                .ok_or::<Error>(DatacenterError::Wire { edge: *edge, func_name: _f, comment: "split left" }.into())?;
-            let left_cell_id = left_cell.get_id(); // For Trace
-            let (left_port,left_from_pe) = left_cell.get_free_ec_port_mut()?;
-            let rite_cell = split.1.first_mut()
-                .ok_or::<Error>(DatacenterError::Wire { edge: *edge, func_name: _f, comment: "split rite" }.into())?;
-            let rite_cell_id = rite_cell.get_id(); // For Trace
-            let (rite_port, rite_from_pe) = rite_cell.get_free_ec_port_mut()?;
-            //println!("Datacenter: edge {:?} {} {}", edge, *left_port.get_id(), *rite_port.get_id());
+            let (left_cell, rite_cell) = self.cells
+                .get_pair_mut(&edge.0, &edge.1)
+                .unwrap();
+            let left_cell_id: CellID = left_cell.get_id(); // For Trace
+            let left_pair: (&mut Port, PortFromPe) = left_cell.get_free_ec_port_mut()?;
+            let left_port: &mut Port = left_pair.0;
+            let left_from_pe: PortFromPe = left_pair.1;
+            let rite_cell_id: CellID = rite_cell.get_id(); // For Trace
+            let rite_pair: (&mut Port, PortFromPe) = rite_cell.get_free_ec_port_mut()?;
+            let rite_port: &mut Port = rite_pair.0;
+            let rite_from_pe: PortFromPe = rite_pair.1;
+                //println!("Datacenter: edge {:?} {} {}", edge, *left_port.get_id(), *rite_port.get_id());
             let (link_to_left, left_from_link): (LinkToPort, PortFromLink) = channel();
-            let (link_to_rite, rite_from_link): (LinkToPort, PortFromLink) = channel();
             let (left_to_link, link_from_left): (PortToLink, LinkFromPort) = channel();
+            let (link_to_rite, rite_from_link): (LinkToPort, PortFromLink) = channel();
             let (rite_to_link, link_from_rite): (PortToLink, LinkFromPort) = channel();
             left_port.link_channel(left_to_link, left_from_link, left_from_pe);
             rite_port.link_channel(rite_to_link, rite_from_link, rite_from_pe);
@@ -121,25 +132,26 @@ impl Datacenter {
             }
             let mut handle_pair = link.start_threads(link_to_left, link_from_left, link_to_rite, link_from_rite)?;
             link_handles.append(&mut handle_pair);
-            self.links.push(link); 
+            self.links.insert(*edge, link);
         } 
         Ok(link_handles)
     }
     //pub fn get_links(&self) -> &Vec<Link> { &self.links }
-    pub fn get_cells(&self) -> &Vec<NalCell> { &self.cells }
-    pub fn get_links_mut(&mut self) -> &mut Vec<Link> { &mut self.links }
-    pub fn get_cell_ids(&self) -> Vec<CellID> {
-        self.cells.iter().map(|cell| cell.get_id()).collect::<Vec<_>>()
+    pub fn get_cells(&self) -> &HashMap<CellNo, NalCell> { &self.cells }
+    pub fn get_links_mut(&mut self) -> &mut HashMap<Edge, Link> { &mut self.links }
+    pub fn get_cell_ids(&self) -> HashMap<CellNo, CellID> {
+        self.cells.iter().map(|cell_no_and_cell| (*cell_no_and_cell.0, cell_no_and_cell.1.get_id())).collect::<HashMap<CellNo, _>>()
     }
-    pub fn get_link_ids(&self) -> Vec<LinkID> {
-        self.links.iter().map(|link| link.get_id()).collect::<Vec<_>>()
+    pub fn get_link_ids(&self) -> HashMap<Edge, LinkID> {
+        self.links.iter().map(|edge_and_link| (*edge_and_link.0, edge_and_link.1.get_id())).collect::<HashMap<Edge,  _>>()
     }
     pub fn connect_to_noc(&mut self, port_to_noc: PortToNoc, port_from_noc: PortFromNoc)
             -> Result<(), Error> {
         let _f = "connect_to_noc";
         let (port, port_from_pe) = self.cells
             .iter_mut()
-            .filter(|cell| cell.is_border())
+            .filter(|binding| binding.1.is_border())
+            .map(|binding| binding.1)
             .nth(0)
             .ok_or::<Error>(DatacenterError::Boundary { func_name: _f }.into())?
             .get_free_boundary_port_mut()?;
@@ -155,12 +167,12 @@ fn build_datacenter(blueprint: &Blueprint) -> Result<(Datacenter, Vec<JoinHandle
 impl fmt::Display for Datacenter {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let mut s = format!("Links");
-        for l in &self.links {
-            write!(s, "{}",l)?;
+        for (edge, link) in &self.links {
+            write!(s, "{}", link)?;
         }
         s = s + "\nCells";
         for i in 0..self.cells.len() {
-            if i < 30 { write!(s, "\n{}", self.cells[i])?; }
+            if i < 30 { write!(s, "\n{}", self.cells[&CellNo(i)])?; }
         }
         write!(f, "{}", s)
     }

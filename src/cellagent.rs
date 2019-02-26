@@ -93,7 +93,7 @@ impl CellAgent {
                ca_to_cm: CaToCm )
                -> Result<CellAgent, Error> {
         let tenant_masks = vec![BASE_TENANT_MASK];
-        let my_tree_id = TreeID::new(&cell_id.get_name())?;
+        let my_tree_id = TreeID::new(&cell_id.get_name()).context(CellagentError::Chain { func_name: "new", comment: S("my_tree_id")})?;
         let control_tree_id = TreeID::new(&cell_id.get_name())?.
             add_component(CONTROL_TREE_NAME)?;
         let connected_tree_id = TreeID::new(&cell_id.get_name())?
