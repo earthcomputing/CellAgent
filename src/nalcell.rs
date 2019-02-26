@@ -23,7 +23,6 @@ pub struct NalCell {
     id: CellID,
     cell_type: CellType,
     config: CellConfig,
-    cell_no: CellNo,
     ports: Box<[Port]>,
     cell_agent: CellAgent,
     cmodel: Cmodel,
@@ -33,11 +32,11 @@ pub struct NalCell {
 }
 
 impl NalCell {
-    pub fn new(cell_no: CellNo, num_phys_ports: PortQty, border_port_nos: &HashSet<PortNo>, config: CellConfig)
+    pub fn new(name: &str, num_phys_ports: PortQty, border_port_nos: &HashSet<PortNo>, config: CellConfig)
             -> Result<NalCell, Error> {
         let _f = "new";
         if *num_phys_ports > *MAX_NUM_PHYS_PORTS_PER_CELL { return Err(NalcellError::NumberPorts { num_phys_ports, func_name: "new", max_num_phys_ports: MAX_NUM_PHYS_PORTS_PER_CELL }.into()) }
-        let cell_id = CellID::new(cell_no).context(NalcellError::Chain { func_name: "new", comment: S("cell_id")})?;
+        let cell_id = CellID::new(name).context(NalcellError::Chain { func_name: "new", comment: S("cell_id")})?;
         let (ca_to_cm, cm_from_ca): (CaToCm, CmFromCa) = channel();
         let (cm_to_ca, ca_from_cm): (CmToCa, CaFromCm) = channel();
         let (cm_to_pe, pe_from_cm): (CmToPe, PeFromCm) = channel();
@@ -58,7 +57,7 @@ impl NalCell {
         {
             if TRACE_OPTIONS.all || TRACE_OPTIONS.nal {
                 let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "nalcell_port_setup" };
-                let trace = json!({ "cell_number": cell_no });
+                let trace = json!({ "cell_name": name });
                 let _ = dal::add_to_trace(TraceType::Trace, trace_params, &trace, _f);
             }
         }
@@ -80,7 +79,7 @@ impl NalCell {
         NalCell::start_cmodel(&cmodel, cm_from_ca, cm_to_pe, cm_from_pe, cm_to_ca);
         let packet_engine = PacketEngine::new(cell_id, pe_to_cm, pe_to_ports, border_port_nos).context(NalcellError::Chain { func_name: "new", comment: S("packet engine create")})?;
         NalCell::start_packet_engine(&packet_engine, pe_from_cm, pe_from_ports);
-        Ok(NalCell { id: cell_id, cell_no, cell_type, config, cmodel,
+        Ok(NalCell { id: cell_id, cell_type, config, cmodel,
                 ports: boxed_ports, cell_agent, vms: Vec::new(),
                 packet_engine, ports_from_pe })
     }
@@ -140,7 +139,7 @@ impl NalCell {
     }
 
     pub fn get_id(&self) -> CellID { self.id }
-    pub fn get_no(&self) -> CellNo { self.cell_no }
+    pub fn get_name(&self) -> String { self.id.get_name() }
     pub fn get_num_ports(&self) -> PortQty { PortQty(self.ports.len() as u8) }
     pub fn get_cell_agent(&self) -> &CellAgent { &self.cell_agent }
     //pub fn get_cmodel(&self) -> &Cmodel { &self.cmodel }

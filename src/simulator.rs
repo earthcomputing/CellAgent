@@ -49,13 +49,15 @@ use std::{io::{stdin, stdout, Read, Write},
           sync::mpsc::channel,
           thread::{JoinHandle}};
 
-use crate::config::{AUTO_BREAK, OUTPUT_DIR_NAME, OUTPUT_FILE_NAME, QUENCH,
-                    CellNo, CellConfig, CellQty, PortNo, PortQty, is2e};
-use crate::datacenter::Datacenter;
+use crate::config::{OUTPUT_DIR_NAME, OUTPUT_FILE_NAME, QUENCH,
+                    CellNo, Edge, CellConfig, CellQty, PortNo, PortQty, is2e};
+use crate::datacenter::{Datacenter};
 use crate::gvm_equation::{GvmEqn};
 use crate::app_message_formats::{ApplicationToNoc, ApplicationFromNoc};
 use crate::uptree_spec::{AllowedTree, ContainerSpec, Manifest, UpTreeSpec, VmSpec};
-use crate::utility::{print_vec, S, TraceHeader};
+use crate::utility::{print_hash_map, S, TraceHeader};
+
+pub const AUTO_BREAK: Option<Edge> = None;//  Some(Edge(CellNo(0), CellNo(1))); // Set to edge to break when debugging broken link with VSCode, else 0
 
 fn main() -> Result<(), Error> {
     let _f = "main";
@@ -96,9 +98,13 @@ fn main() -> Result<(), Error> {
             Err(err) => panic!("Datacenter construction failure: {}", err)
         };
     if false { deployment_demo()?; }    // Demonstrate features of deployment spec
-    if AUTO_BREAK != 0 {
-        println!("---> Automatically break link");
-        break_link(&mut dc)?;
+    match AUTO_BREAK {
+        Some(edge) => {
+            println!("---> Automatically break link");
+            break_link(&mut dc)?;
+        },
+        None => {
+        }
     }
     loop {
         stdout().write(b"\nType:
@@ -131,10 +137,10 @@ fn main() -> Result<(), Error> {
 }
 fn show_ca(dc: &Datacenter) -> Result<(), Error> {
     let cells = dc.get_cells();
-    print_vec(&dc.get_cell_ids());
+    print_hash_map(&dc.get_cell_ids());
     let _ = stdout().write(b"Enter cell to display cell\n")?;
     let cell_no = read_int()?;
-    cells.get(cell_no)
+    cells.get(&CellNo(cell_no))
         .map_or_else(|| println!("{} is not a valid input", cell_no),
                      |cell| {
                          println!("{}", cell);
@@ -143,10 +149,10 @@ fn show_ca(dc: &Datacenter) -> Result<(), Error> {
 }
 fn show_pe(dc: &Datacenter) -> Result<(), Error> {
     let cells = dc.get_cells();
-    print_vec(&dc.get_cell_ids());
+    print_hash_map(&dc.get_cell_ids());
     let _ = stdout().write(b"Enter cell to display forwarding table\n")?;
     let cell_no = read_int()?;
-    cells.get(cell_no)
+    cells.get(&CellNo(cell_no))
         .map_or_else(|| println!("{} is not a valid input", cell_no),
                      |cell| {
                          println!("{}", cell.get_packet_engine());
@@ -154,20 +160,26 @@ fn show_pe(dc: &Datacenter) -> Result<(), Error> {
     Ok(())
 }
 fn break_link(dc: &mut Datacenter) -> Result<(), Error> {
-    let link_no = if AUTO_BREAK != 0 {
-        // TODO: Wait until discover is done before automatically breaking link, should be removed
-        crate::utility::sleep(4);
-        println!("---> Automatically break link {}", AUTO_BREAK);
-        AUTO_BREAK
-    } else {
-        let link_ids = dc.get_link_ids();
-        print_vec(&link_ids);
-        let _ = stdout().write(b"Enter link to break or null\n")?;
-        read_int()?
+    let edge: Edge = match AUTO_BREAK {
+        Some(edge) => {
+            // TODO: Wait until discover is done before automatically breaking link, should be removed
+            crate::utility::sleep(4);
+            println!("---> Automatically break link {}", edge);
+            edge
+        },
+        None => {
+            let link_ids = dc.get_link_ids();
+            print_hash_map(&link_ids);
+            let _ = stdout().write(b"Enter first cell number of link to break\n")?;
+            let left: usize = read_int()?;
+            let _ = stdout().write(b"Enter second cell number of link to break\n")?;
+            let right: usize = read_int()?;
+            Edge(CellNo(left), CellNo(right))
+        },
     };
     let links = dc.get_links_mut();
-    links.get_mut(link_no)
-        .map_or_else(|| -> Result<(), Error> { println!("{} is not a valid input", link_no); Ok(()) },
+    links.get_mut(&edge)
+        .map_or_else(|| -> Result<(), Error> { println!("{} is not a valid input", edge); Ok(()) },
                      |link: &mut crate::link::Link| -> Result<(), Error> { link.break_link()?; Ok(()) }
         )?;
     Ok(())

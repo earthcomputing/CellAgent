@@ -14,7 +14,6 @@ pub const PACKET_MIN: usize = 64;
 pub const PACKET_MAX: usize = 9000;
 // Control
 pub const CONTINUE_ON_ERROR: bool = false; // Don't close channel following an error if true
-pub const AUTO_BREAK: usize = 0; // Set to index of link to break when debugging broken link with VSCode, else 0
 #[derive(Debug, Copy, Clone, Hash, Serialize, Deserialize)]
 pub enum CellConfig { Small, Medium, Large }
 impl fmt::Display for CellConfig {
@@ -137,14 +136,24 @@ impl Deref for CellQty { type Target = usize; fn deref(&self) -> &Self::Target {
 #[derive(Debug, Copy, Clone, Hash, Eq, PartialEq, Serialize, Deserialize)]
 pub struct CellNo(pub usize);
 impl Deref for CellNo { type Target = usize; fn deref(&self) -> &Self::Target { &self.0 } }
+impl fmt::Display for CellNo {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "C:{}", self.0)
+    }
+}
 #[derive(Debug, Copy, Clone)]
 pub struct ContainerNo(pub usize);
 impl Deref for ContainerNo { type Target = usize; fn deref(&self) -> &Self::Target { &self.0 } }
 #[derive(Debug, Copy, Clone)]
 pub struct DatacenterNo(pub u16);
 impl Deref for DatacenterNo { type Target = u16; fn deref(&self) -> &Self::Target { &self.0 } }
-#[derive(Debug, Copy, Clone, Serialize, Deserialize)]
+#[derive(Debug, Copy, Clone, Hash, Eq, PartialEq, Serialize, Deserialize)]
 pub struct Edge(pub CellNo, pub CellNo);
+impl fmt::Display for Edge {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "E: ({}, {})", *self.0, *self.1)
+    }
+}
 #[derive(Debug, Copy, Clone)]
 pub struct LinkNo(pub CellNo);
 impl Deref for LinkNo { type Target = CellNo; fn deref(&self) -> &Self::Target { &self.0 } }
@@ -174,6 +183,11 @@ impl Deref for PortNo { type Target = u8; fn deref(&self) -> &Self::Target { &se
 pub enum CellType {
     Border,
     Interior
+}
+impl fmt::Display for PortNo {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "P:{}", *self)
+    }
 }
 impl fmt::Display for CellType {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {

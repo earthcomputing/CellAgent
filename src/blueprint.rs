@@ -123,6 +123,9 @@ impl fmt::Display for Blueprint {
 }
 pub trait Cell {
     fn get_cell_no(&self) -> CellNo;
+    fn get_name(&self) -> String {
+        return format!("{}", self.get_cell_no());
+    }
     fn get_cell_type(&self) -> CellType;
     fn get_num_phys_ports(&self) -> PortQty;
     fn get_interior_ports(&self) -> &Vec<PortNo>;
@@ -181,6 +184,10 @@ impl fmt::Display for InteriorCell {
         write!(f, "{}", s)
     }
 }
+
+pub const AUTO_BREAK: Option<Edge> = None;//  Some(Edge(CellNo(0), CellNo(1))); // Set to edge to break when debugging broken link with VSCode, else 0
+
+
 // Errors
 #[derive(Debug, Fail)]
 pub enum BlueprintError {
