@@ -30,6 +30,7 @@ futures = "0.1.23" # used in dal.rs
 #internment = "0.3.6"
 lazy_static = "1.1.0"
 #log = {version = "0.4.6", features = ["std", "serde"]} # Should use instead of my trace approach
+multi_mut = "0.1"
 rand = "*" # Or a specific version
 rdkafka = "0.17.0"
 #rusoto_s3 = "0.36.0" # Library for AWS S3

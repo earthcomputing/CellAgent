@@ -41,8 +41,8 @@ use std::{io::{stdin, stdout, Read, Write},
           sync::mpsc::channel,
 	  iter::FromIterator};
 
-use crate::config::{AUTO_BREAK, OUTPUT_FILE_NAME, QUENCH,
-                    CellNo, CellType, CellConfig, PortNo, PortQty};
+use crate::config::{OUTPUT_FILE_NAME, QUENCH,
+                    CellType, CellConfig, PortNo, PortQty};
 use crate::gvm_equation::{GvmEqn};
 use crate::nalcell::{NalCell};
 use crate::uptree_spec::{AllowedTree, ContainerSpec, Manifest, UpTreeSpec, VmSpec};
@@ -56,12 +56,13 @@ fn main() -> Result<(), Error> {
         .write(true)
         .truncate(true)
 	.open(OUTPUT_FILE_NAME);
-    let cell_no = CellNo(0);
-    let border_port_list : Vec<PortNo> = vec![0u8]
+    let cell_name = "Alice"; /* if needed, can read cell name from config file */
+    let num_phys_ports = PortQty(3);
+    let border_port_list : Vec<PortNo> = vec![2u8]
         .iter()
         .map(|i| PortNo(*i as u8))
 	.collect();
-    let nal_cell = NalCell::new(cell_no, PortQty(5), &HashSet::from_iter(border_port_list.clone()), CellConfig::Large);
+    let nal_cell = NalCell::new(cell_name, PortQty(5), &HashSet::from_iter(border_port_list.clone()), CellConfig::Large);
     Ok(())
 }
 

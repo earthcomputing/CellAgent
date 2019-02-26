@@ -1,4 +1,7 @@
-use std::{fmt, collections::{HashSet}, thread::ThreadId};
+use std::{fmt,
+          collections::{HashSet, HashMap},
+          thread::ThreadId
+};
 
 use serde_json;
 use serde_json::{Value};
@@ -224,6 +227,9 @@ pub fn print_vec<T: fmt::Display>(vector: &[T]) {
 }
 pub fn print_hash_set<T: fmt::Display + Eq + std::hash::Hash>(hashset: &HashSet<T>) {
     for v in hashset.iter() { println!("{}", v); }
+}
+pub fn print_hash_map<K: fmt::Display + Eq + std::hash::Hash, T: fmt::Display + Eq + std::hash::Hash>(hashmap: &HashMap<K, T>) {
+    for (k, v) in hashmap.iter() { println!("{}: {}", k, v); }
 }
 pub fn new_hash_set<T: Clone + Eq + std::hash::Hash>(values: Box<[T]>) -> HashSet<T> {
     values.iter().cloned().collect::<HashSet<T>>()

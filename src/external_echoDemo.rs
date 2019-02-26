@@ -29,7 +29,7 @@ use std::{io::{stdin, stdout, Read, Write},
 
 use crate::app_message_formats::{ApplicationFromNoc, ApplicationToNoc, NocFromApplication, NocToApplication};
 use crate::blueprint::Blueprint;
-use crate::config::{AUTO_BREAK, OUTPUT_FILE_NAME, QUENCH,
+use crate::config::{OUTPUT_FILE_NAME, QUENCH,
                     CellNo, CellQty, CellConfig, PortNo, PortQty, is2e};
 use crate::gvm_equation::{GvmEqn};
 use crate::noc::Noc;
