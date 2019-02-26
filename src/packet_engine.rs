@@ -515,7 +515,7 @@ impl PacketEngine {
                     }
                 }
                 if entry.is_in_use() {
-                    if entry.get_uuid() == packet.get_uuid() {
+                    if entry.get_uuid() == packet.get_tree_uuid() {
                         let mask = entry.get_mask();
                         self.forward(port_no, entry, mask, packet).context(PacketEngineError::Chain { func_name: "process_packet", comment: S("forward ") + &self.cell_id.get_name() })?;
                     } else {

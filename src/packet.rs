@@ -36,7 +36,9 @@ impl Packet {
         let payload = Payload::new(msg_id, size, is_last_packet, is_blocking, data_bytes);
         Packet { header, payload, packet_count: Packet::get_next_count() }
     }
-
+    pub fn make(header: PacketHeader, payload: Payload, packet_count: usize) -> Packet {
+        Packet { header, payload, packet_count }
+    }
     pub fn make_entl_packet() -> Packet {
         let mut uuid = Uuid::new();
         uuid.make_entl();
@@ -46,11 +48,11 @@ impl Packet {
     
     pub fn get_next_count() -> usize { PACKET_COUNT.fetch_add(1, Ordering::SeqCst) }
 
-    //pub fn get_header(&self) -> PacketHeader { self.header }
+    pub fn get_header(&self) -> PacketHeader { self.header }
+    pub fn get_payload(&self) -> Payload { self.payload }
     pub fn get_count(&self) -> usize { self.packet_count }
 
     // PacketHeader (delegate)
-    pub fn get_uuid(&self) -> Uuid { self.header.get_uuid() }
     pub fn get_tree_uuid(&self) -> Uuid { self.header.get_uuid() }
 
     // Payload (delegate)
@@ -59,6 +61,7 @@ impl Packet {
     pub fn get_msg_id(&self) -> MsgID { self.payload.get_msg_id() }
     pub fn get_size(&self) -> PacketNo { self.payload.get_size() }
     pub fn get_bytes(&self) -> Vec<u8> { self.payload.bytes.iter().cloned().collect() }
+    pub fn get_wrapped_header(&self) -> Option<PacketHeader> { self.payload.get_wrapped_header() }
     // pub fn get_payload_bytes(&self) -> Vec<u8> { self.get_payload().get_bytes() }
     // pub fn get_payload_size(&self) -> usize { self.payload.get_no_bytes() }
 
@@ -67,7 +70,7 @@ impl Packet {
     pub fn make_tock(&mut self) { self.header.make_tock() }
     pub fn is_ait(&self) -> bool { self.header.get_uuid().is_ait() }
     pub fn is_entl(&self) -> bool { self.header.get_uuid().is_entl() }
-    pub fn get_ait_state(&self) -> AitState { self.get_uuid().get_ait_state() }
+    pub fn get_ait_state(&self) -> AitState { self.get_tree_uuid().get_ait_state() }
     pub fn time_reverse(&mut self) { self.header.get_uuid().time_reverse(); }
     pub fn next_ait_state(&mut self) -> Result<AitState, Error> {
         let mut uuid = self.header.get_uuid();
@@ -126,6 +129,7 @@ pub struct Payload {
                     // Number of bytes in last packet if last packet, 0 => Error
     is_last: bool,
     is_blocking: bool,
+    wrapped_header: Option<PacketHeader>,
     bytes: [u8; PAYLOAD_MAX],
 }
 impl Payload {
@@ -135,13 +139,14 @@ impl Payload {
         // Next line recommended by clippy, but I think the loop is clearer
         //bytes[..min(data_bytes.len(), PAYLOAD_MAX)].clone_from_slice(&data_bytes[..min(data_bytes.len(), PAYLOAD_MAX)]);
         for i in 0..min(data_bytes.len(), PAYLOAD_MAX) { bytes[i] = data_bytes[i]; }
-        Payload { msg_id, size, is_last, is_blocking, bytes}
+        Payload { msg_id, size, is_last, is_blocking, bytes, wrapped_header: None }
     }
     fn get_bytes(&self) -> Vec<u8> { self.bytes.iter().cloned().collect() }
     fn get_msg_id(&self) -> MsgID { self.msg_id }
     fn get_size(&self) -> PacketNo { self.size }
     fn is_last_packet(&self) -> bool { self.is_last }
     fn is_blocking(&self) -> bool { self.is_blocking }
+    fn get_wrapped_header(&self) -> Option<PacketHeader> { self.wrapped_header }
 }
 impl fmt::Display for Payload {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
