@@ -1,0 +1,168 @@
+diff --git a/src/datacenter.rs b/src/datacenter.rs
+index b0669ad..0349420 100644
+--- a/src/datacenter.rs
++++ b/src/datacenter.rs
+@@ -12,9 +12,9 @@ use crate::ec_message_types::{LinkToPort, PortFromLink, PortToLink, LinkFromPort
+ use crate::link::{Link};
+ use crate::nalcell::{NalCell};
+ use crate::name::{CellID, LinkID};
+-use crate::noc::Noc;
+-use crate::tcp_message_types::{PortToNoc, PortFromNoc};
+-use crate::utility::{TraceHeaderParams, TraceType};
++use crate::noc::{Noc, NocError};
++use crate::tcp_message_types::{OutsideFromNoc, OutsideToNoc, NocFromOutside, NocToOutside, PortToNoc, PortFromNoc};
++use crate::utility::{S, TraceHeaderParams, TraceType};
+ 
+ #[derive(Debug)]
+ pub struct Datacenter {
+@@ -47,7 +47,9 @@ impl Datacenter {
+         let (outside_to_noc, noc_from_outside): (OutsideToNoc, NocFromOutside) = channel();
+         let (noc_to_outside, _outside_from_noc): (NocToOutside, OutsideFromNoc) = channel();
+         let mut noc = Noc::new(noc_to_outside)?;
+-        let (dc, _) = noc.initialize(&blueprint, noc_from_outside)?;
++        let (mut dc, join_handles) = build_datacenter(&blueprint).context(DatacenterError::Chain { func_name: "initialize", comment: S("")})?;
++        let (port_to_noc, port_from_noc) = noc.initialize(&blueprint, noc_from_outside).context(NocError::Chain { func_name: "run", comment: S("") })?;
++        dc.connect_to_noc(port_to_noc, port_from_noc).context(NocError::Chain { func_name: "initialize", comment: S("")})?;
+         return Ok((dc, outside_to_noc));
+     }
+     pub fn initialize(&mut self, blueprint: &Blueprint)  -> Result<Vec<JoinHandle<()>>, Error> {
+@@ -146,6 +148,11 @@ impl Datacenter {
+         Ok(())
+     }
+ }
++fn build_datacenter(blueprint: &Blueprint) -> Result<(Datacenter, Vec<JoinHandle<()>>), Error> {
++    let mut dc = Datacenter::new();
++    let join_handles = dc.initialize(blueprint).context(NocError::Chain { func_name: "build_datacenter", comment: S("")})?;
++    Ok((dc, join_handles))
++}
+ impl fmt::Display for Datacenter {
+     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+         let mut s = format!("Links");
+@@ -167,6 +174,8 @@ pub enum DatacenterError {
+     Boundary { func_name: &'static str },
+     #[fail(display = "DatacenterError::Cells {}: The number of cells {:?} must be at least 1", func_name, ncells)]
+     Cells { ncells: CellNo, func_name: &'static str },
++    #[fail(display = "DatacenterError::Chain {} {}", func_name, comment)]
++    Chain { func_name: &'static str, comment: String },
+     #[fail(display = "DatacenterError::Edges {}: {:?} is not enough links to connect all cells", func_name, nlinks)]
+     Edges { nlinks: LinkNo, func_name: &'static str },
+     #[fail(display = "DatacenterError::Wire {}: {:?} is not a valid edge at {}", func_name, edge, comment)]
+diff --git a/src/external_echoDemo.rs b/src/external_echoDemo.rs
+index 9947a58..1d3e3f2 100644
+--- a/src/external_echoDemo.rs
++++ b/src/external_echoDemo.rs
+@@ -47,7 +47,7 @@ fn main() -> Result<(), Error> {
+     let mut exceptions = HashMap::new();
+     let mut border_cell_map = HashMap::new();
+     border_cell_map.insert(CellNo(0), vec![PortNo(2)]);
+-    let blueprint = Blueprint::new(ncells, nports, edges, &exceptions, &border_cell_map).context(MainError::Chain { func_name: "run", comment: S("") })?;
++    let blueprint = Blueprint::new(ncells, nports, &edges, &exceptions, &border_cell_map).context(MainError::Chain { func_name: "run", comment: S("") })?;
+     println!("{}", blueprint);
+     if false { deployment_demo()?; }    // Demonstrate features of deployment spec
+     let (outside_to_noc, noc_from_outside): (OutsideToNoc, NocFromOutside) = channel();
+diff --git a/src/lib.rs b/src/lib.rs
+index c5e7c3d..107fa6c 100644
+--- a/src/lib.rs
++++ b/src/lib.rs
+@@ -12,12 +12,12 @@ mod container;
+ mod dal;
+ mod datacenter;
+ mod dumpstack;
++mod ec_message;
++mod ec_message_types;
+ mod ecargs;
+ mod errors;
+ mod gvm_equation;
+ mod link;
+-mod message;
+-mod message_types;
+ mod nalcell;
+ mod name;
+ mod noc;
+@@ -28,6 +28,8 @@ mod port_tree;
+ mod routing_table;
+ mod routing_table_entry;
+ mod service;
++mod tcp_message;
++mod tcp_message_types;
+ mod tenant;
+ mod traph;
+ mod traph_element;
+@@ -43,11 +45,10 @@ use std::{io::{stdin, stdout, Read, Write},
+ 
+ use crate::blueprint::Blueprint;
+ use crate::config::{AUTO_BREAK, NCELLS, NPORTS, Edge, OUTPUT_FILE_NAME, QUENCH,
+-             CellNo, PortNo, LinkNo, get_edges};
++             CellNo, CellConfig, PortNo, LinkNo, get_edges};
+ use crate::datacenter::Datacenter;
+ use crate::gvm_equation::{GvmEqn};
+-use crate::message_types::{OutsideToNoc};
+-use crate::nalcell::CellConfig;
++use crate::tcp_message_types::{OutsideToNoc};
+ use crate::uptree_spec::{AllowedTree, ContainerSpec, Manifest, UpTreeSpec, VmSpec};
+ use crate::utility::{print_vec, TraceHeader};
+ 
+@@ -107,7 +108,10 @@ struct DatacenterPorts {
+ 
+ impl DatacenterPorts {
+     fn new_sample() -> DatacenterPorts {
+-        let (dc, outside_to_noc) = Datacenter::construct_sample();
++        let (dc, outside_to_noc) = match Datacenter::construct_sample() {
++            Ok(pair) => pair,
++            Err(err) => panic!("Datacenter construction failure: {}", err)
++        };
+         let mut cell_port_exceptions = HashMap::new();
+         cell_port_exceptions.insert(CellNo(5), PortNo(7));
+         cell_port_exceptions.insert(CellNo(2), PortNo(6));
+@@ -153,7 +157,10 @@ struct DatacenterBorder {
+ 
+ impl DatacenterBorder {
+     fn new_sample() -> DatacenterBorder {
+-        let (dc, outside_to_noc) = Datacenter::construct_sample();
++        let (dc, outside_to_noc) = match Datacenter::construct_sample() {
++            Ok(pair) => pair,
++            Err(err) => panic!("Datacenter construction failure: {}", err)
++        };
+         let mut expected_border_cell_ports = HashMap::new();
+         expected_border_cell_ports.insert(CellNo(2), vec![PortNo(2)]);
+         expected_border_cell_ports.insert(CellNo(7), vec![PortNo(2)]);
+@@ -167,7 +174,7 @@ impl DatacenterBorder {
+ impl Test for DatacenterBorder {
+     fn test(&mut self) {
+         for cell in self.dc.get_cells() {
+-            let mut border_ports: &Vec<PortNo>;
++            let border_ports: &Vec<PortNo>;
+             let mut is_border_cell: bool = false;
+             match self.expected_border_cell_ports.get(&cell.get_no()) {
+                 Some(port_nums) => {
+diff --git a/src/simulator.rs b/src/simulator.rs
+index b5df24a..7938465 100644
+--- a/src/simulator.rs
++++ b/src/simulator.rs
+@@ -13,12 +13,12 @@ mod container;
+ mod dal;
+ mod datacenter;
+ mod dumpstack;
++mod ec_message;
++mod ec_message_types;
+ mod ecargs;
+ mod errors;
+ mod gvm_equation;
+ mod link;
+-mod ec_message;
+-mod ec_message_types;
+ mod nalcell;
+ mod name;
+ mod noc;
+@@ -109,11 +109,6 @@ fn main() -> Result<(), Error> {
+         }
+     }
+ }
+-fn build_datacenter(blueprint: &Blueprint) -> Result<(Datacenter, Vec<JoinHandle<()>>), Error> {
+-    let mut dc = Datacenter::new();
+-    let join_handles = dc.initialize(blueprint).context(NocError::Chain { func_name: "build_datacenter", comment: S("")})?;
+-    Ok((dc, join_handles))
+-}
+ fn show_ca(dc: &Datacenter) -> Result<(), Error> {
+     let cells = dc.get_cells();
+     print_vec(&dc.get_cell_ids());

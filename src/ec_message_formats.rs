@@ -6,7 +6,7 @@ use crate::packet::{Packet};
 use crate::packet_engine::NumberOfPackets;
 use crate::port::{PortStatus};
 use crate::routing_table_entry::{RoutingTableEntry};
-use crate::tcp_message_types::{ISAIT, TCP};
+use crate::tcp_message_formats::{ISAIT, TCP};
 use crate::utility::{Mask, PortNumber};
 use crate::uuid_ec::Uuid;
 

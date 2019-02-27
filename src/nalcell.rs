@@ -9,9 +9,9 @@ use crate::cmodel::{Cmodel};
 use crate::config::{CONTINUE_ON_ERROR, MAX_NUM_PHYS_PORTS_PER_CELL, TRACE_OPTIONS, CellNo, CellType, CellConfig, PortNo, PortQty};
 use crate::dal;
 use crate::dal::{fork_trace_header, update_trace_header};
-use crate::ec_message_types::{PortToPe, PeFromPort, PeToPort,PortFromPe,
-                    CaToCm, CmFromCa, CmToCa, CaFromCm,
-                    CmToPe, PeFromCm, PeToCm, CmFromPe};
+use crate::ec_message_formats::{PortToPe, PeFromPort, PeToPort,PortFromPe,
+                                CaToCm, CmFromCa, CmToCa, CaFromCm,
+                                CmToPe, PeFromCm, PeToCm, CmFromPe};
 use crate::name::{CellID};
 use crate::packet_engine::{PacketEngine};
 use crate::port::{Port};

@@ -16,7 +16,7 @@ mod name;
 mod noc;
 mod service;
 mod tcp_message;
-mod tcp_message_types;
+mod tcp_message_formats;
 mod tenant;
 mod uptree_spec;
 mod utility;
@@ -32,7 +32,7 @@ use crate::config::{AUTO_BREAK, OUTPUT_FILE_NAME, QUENCH,
                     CellNo, CellQty, CellConfig, PortNo, PortQty, is2e};
 use crate::gvm_equation::{GvmEqn};
 use crate::noc::Noc;
-use crate::tcp_message_types::{OutsideFromNoc, OutsideToNoc, NocFromOutside, NocToOutside};
+use crate::tcp_message_formats::{OutsideFromNoc, OutsideToNoc, NocFromOutside, NocToOutside};
 use crate::uptree_spec::{AllowedTree, ContainerSpec, Manifest, UpTreeSpec, VmSpec};
 use crate::utility::{print_vec, S, TraceHeader};
 

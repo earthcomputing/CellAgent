@@ -3,7 +3,7 @@ use failure::Error;
 
 use crate::name::{ContainerID, UptreeID};
 use crate::service::{Service};
-use crate::tcp_message_types::{ContainerToVm, ContainerFromVm};
+use crate::tcp_message_formats::{ContainerToVm, ContainerFromVm};
 use crate::uptree_spec::AllowedTree;
 
 #[derive(Debug, Clone)]
