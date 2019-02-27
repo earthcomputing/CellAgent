@@ -24,7 +24,7 @@ const PAYLOAD_MAX: usize = PACKET_MAX - PACKET_HEADER_SIZE;
 pub type PacketAssemblers = HashMap<SenderMsgSeqNo, PacketAssembler>;
 
 static PACKET_COUNT: AtomicUsize = ATOMIC_USIZE_INIT;
-#[derive(Debug, Copy, Serialize)]
+#[derive(Debug, Clone, Serialize)]
 pub struct Packet {
     header: PacketHeader,
     payload: Payload,
@@ -50,7 +50,7 @@ impl Packet {
     pub fn get_next_count() -> usize { PACKET_COUNT.fetch_add(1, Ordering::SeqCst) }
 
     pub fn get_header(&self) -> PacketHeader { self.header }
-    pub fn get_payload(&self) -> Payload { self.payload }
+    pub fn get_payload(&self) -> &Payload { &self.payload }
     pub fn get_count(&self) -> usize { self.packet_count }
 
     // PacketHeader (delegate)
@@ -62,7 +62,7 @@ impl Packet {
     pub fn get_sender_msg_seq_no(&self) -> SenderMsgSeqNo { self.payload.get_sender_msg_seq_no() }
     pub fn get_size(&self) -> PacketNo { self.payload.get_size() }
     pub fn get_bytes(&self) -> Vec<u8> { self.payload.bytes.iter().cloned().collect() }
-    pub fn get_wrapped_header(&self) -> Option<PacketHeader> { self.payload.get_wrapped_header() }
+    pub fn get_wrapped_header(&self) -> &Vec<PacketHeader> { self.payload.get_wrapped_header() }
     // pub fn get_payload_bytes(&self) -> Vec<u8> { self.get_payload().get_bytes() }
     // pub fn get_payload_size(&self) -> usize { self.payload.get_no_bytes() }
 
@@ -81,8 +81,8 @@ impl Packet {
     }
     // Payload (Deep Packet Inspection)
     // Debug hack to get tree name out of packets.  Assumes msg is one packet
-    pub fn get_port_tree_id(self) -> PortTreeID {
-        let msg = MsgType::get_msg(&[self]).unwrap();
+    pub fn get_port_tree_id(&self) -> PortTreeID {
+        let msg = MsgType::get_msg(&vec![self.clone()]).unwrap();
         msg.get_port_tree_id().clone()
     }
 }
@@ -97,9 +97,6 @@ impl fmt::Display for Packet {
         let s = format!("Packet {}: Header: {}, Payload: {:?}", self.packet_count, self.header, str::from_utf8(&bytes[0..len]));
         write!(f, "{}", s)
     }
-}
-impl Clone for Packet {
-    fn clone(&self) -> Packet { *self }
 }
 #[derive(Debug, Copy, Clone, Serialize)]
 pub struct PacketHeader {
@@ -122,14 +119,14 @@ impl fmt::Display for PacketHeader {
     }
 }
 
-#[derive(Copy)]
+#[derive(Clone)]
 pub struct Payload {
     sender_msg_seq_no: SenderMsgSeqNo,  // Unique identifier of this message
     size: PacketNo, // Number of packets remaining in message if not last packet
                     // Number of bytes in last packet if last packet, 0 => Error
     is_last: bool,
     is_blocking: bool,
-    wrapped_header: Option<PacketHeader>,
+    wrapped_header: Vec<PacketHeader>,
     bytes: [u8; PAYLOAD_MAX],
 }
 impl Payload {
@@ -139,14 +136,14 @@ impl Payload {
         // Next line recommended by clippy, but I think the loop is clearer
         //bytes[..min(data_bytes.len(), PAYLOAD_MAX)].clone_from_slice(&data_bytes[..min(data_bytes.len(), PAYLOAD_MAX)]);
         for i in 0..min(data_bytes.len(), PAYLOAD_MAX) { bytes[i] = data_bytes[i]; }
-        Payload { sender_msg_seq_no, size, is_last, is_blocking, bytes, wrapped_header: None }
+        Payload { sender_msg_seq_no, size, is_last, is_blocking, bytes, wrapped_header: vec![] }
     }
     fn get_bytes(&self) -> Vec<u8> { self.bytes.iter().cloned().collect() }
     fn get_sender_msg_seq_no(&self) -> SenderMsgSeqNo { self.sender_msg_seq_no }
     fn get_size(&self) -> PacketNo { self.size }
     fn is_last_packet(&self) -> bool { self.is_last }
     fn is_blocking(&self) -> bool { self.is_blocking }
-    fn get_wrapped_header(&self) -> Option<PacketHeader> { self.wrapped_header }
+    fn get_wrapped_header(&self) -> &Vec<PacketHeader> { &self.wrapped_header }
 }
 impl fmt::Display for Payload {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -157,9 +154,6 @@ impl fmt::Display for Payload {
         s = s + &format!("{:?}", &self.bytes[0..10]);
         write!(f, "{}", s)
     }
-}
-impl Clone for Payload {
-    fn clone(&self) -> Payload { *self }
 }
 impl Serialize for Payload {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
@@ -221,9 +215,9 @@ impl Packetizer {
         }
         packets
     }
-    pub fn unpacketize(packets: &[Packet]) -> Result<ByteArray, Error> {
+    pub fn unpacketize(packets: &Vec<Packet>) -> Result<ByteArray, Error> {
         let mut msg = Vec::new();
-        for packet in packets {
+        for packet in packets.iter() {
             let mut bytes = packet.get_bytes();
             let frag = *packet.get_size() as usize;
             let is_last_packet = packet.is_last_packet();
@@ -265,8 +259,9 @@ impl PacketAssembler {
     }
 */
     pub fn add(&mut self, packet: Packet) -> (bool, &Vec<Packet>) {
+        let is_last = packet.is_last_packet(); // Because I move packet on next line
         self.packets.push(packet);
-        (packet.is_last_packet(), &self.packets)
+        (is_last, &self.packets)
     }
 }
 pub trait ToHex {
