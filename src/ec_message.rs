@@ -5,13 +5,13 @@ use std::{fmt,
 use serde;
 use serde_json;
 
+use crate::app_message::{SenderMsgSeqNo, AppMsgDirection, get_next_count};
 use crate::cellagent::{CellAgent};
 use crate::config::{ByteArray, CellNo, PathLength, PortNo};
 use crate::gvm_equation::{GvmEquation, GvmEqn};
 use crate::name::{Name, CellID, PortTreeID, SenderID, TreeID};
 use crate::packet::{Packet, Packetizer, Serializer};
 use crate::packet_engine::NumberOfPackets;
-use crate::tcp_message::{SenderMsgSeqNo, TcpMsgDirection, get_next_count};
 use crate::uptree_spec::{AllowedTree, Manifest};
 use crate::utility::{S, Path};
 
@@ -20,7 +20,7 @@ pub type MsgTreeMap = HashMap<String, TreeID>;
 #[derive(Debug, Copy, Clone, Hash, Eq, PartialEq, Serialize, Deserialize)]
 pub enum MsgType {
     Entl,        // Needed for the msg_type hack, otherwise panic
-    Application,
+    Interapplication,
     Discover,
     DiscoverD,
     Failover,
@@ -42,7 +42,7 @@ impl MsgType {
         let msg_type = type_msg.get_type();
         let serialized_msg = type_msg.get_serialized_msg();
         Ok(match msg_type {
-            MsgType::Application => Box::new(serde_json::from_str::<ApplicationMsg>(&serialized_msg).context(MessageError::Chain { func_name: _f, comment: S("ApplicationMsg")})?),
+            MsgType::Interapplication => Box::new(serde_json::from_str::<InterapplicationMsg>(&serialized_msg).context(MessageError::Chain { func_name: _f, comment: S("InterapplicationMsg")})?),
             MsgType::Discover    => Box::new(serde_json::from_str::<DiscoverMsg>(&serialized_msg).context(MessageError::Chain { func_name: _f, comment: S("DiscoverMsg")})?),
             MsgType::DiscoverD   => Box::new(serde_json::from_str::<DiscoverDMsg>(&serialized_msg).context(MessageError::Chain { func_name: _f, comment: S("DiscoverDMsg")})?),
             MsgType::Failover    => Box::new(serde_json::from_str::<FailoverMsg>(&serialized_msg).context(MessageError::Chain { func_name: _f, comment: S("FailoverMsg")})?),
@@ -62,7 +62,7 @@ impl MsgType {
         let msg_type = type_msg.get_type();
         let serialized_msg = type_msg.get_serialized_msg();
         Ok(match msg_type {
-            MsgType::Application => Box::new(serde_json::from_str::<ApplicationMsg>(&serialized_msg).context(MessageError::Chain { func_name: _f, comment: S("ApplicationMsg")})?),
+            MsgType::Interapplication => Box::new(serde_json::from_str::<InterapplicationMsg>(&serialized_msg).context(MessageError::Chain { func_name: _f, comment: S("InterapplicationMsg")})?),
             MsgType::Discover    => Box::new(serde_json::from_str::<DiscoverMsg>(&serialized_msg).context(MessageError::Chain { func_name: _f, comment: S("DiscoverMsg")})?),
             MsgType::DiscoverD   => Box::new(serde_json::from_str::<DiscoverDMsg>(&serialized_msg).context(MessageError::Chain { func_name: _f, comment: S("DiscoverDMsg")})?),
             MsgType::Failover    => Box::new(serde_json::from_str::<FailoverMsg>(&serialized_msg).context(MessageError::Chain { func_name: _f, comment: S("FailoverMsg")})?),
@@ -81,7 +81,7 @@ impl MsgType {
     }
     // A hack for finding the message type
     pub fn msg_type(packet: &Packet) -> MsgType {
-        if      MsgType::is_type(packet, MsgType::Application) { MsgType::Application }
+        if      MsgType::is_type(packet, MsgType::Interapplication) { MsgType::Interapplication }
         else if MsgType::is_type(packet, MsgType::Discover)    { MsgType::Discover }
         else if MsgType::is_type(packet, MsgType::DiscoverD)   { MsgType::DiscoverD }
         else if MsgType::is_type(packet, MsgType::Failover)    { MsgType::Failover }
@@ -97,17 +97,17 @@ impl MsgType {
 impl fmt::Display for MsgType {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let s = match *self {
-            MsgType::Entl         => "Entl",
-            MsgType::Application  => "Application",
-            MsgType::Discover     => "Discover",
-            MsgType::DiscoverD    => "DiscoverD",
-            MsgType::Failover     => "Failover",
-            MsgType::FailoverD    => "FailoverD",
-            MsgType::Hello        => "Hello",
-            MsgType::Manifest     => "Manifest",
-            MsgType::StackTree    => "StackTree",
-            MsgType::StackTreeD   => "StackTreeD",
-            MsgType::TreeName     => "TreeName",
+            MsgType::Entl              => "Entl",
+            MsgType::Interapplication  => "Interapplication",
+            MsgType::Discover          => "Discover",
+            MsgType::DiscoverD         => "DiscoverD",
+            MsgType::Failover          => "Failover",
+            MsgType::FailoverD         => "FailoverD",
+            MsgType::Hello             => "Hello",
+            MsgType::Manifest          => "Manifest",
+            MsgType::StackTree         => "StackTree",
+            MsgType::StackTreeD        => "StackTreeD",
+            MsgType::TreeName          => "TreeName",
         };
         write!(f, "{}", s)
     }
@@ -118,10 +118,10 @@ pub enum MsgDirection {
     Leafward
 }
 impl MsgDirection {
-    pub fn from_tcp(direction: TcpMsgDirection) -> MsgDirection {
+    pub fn from_app(direction: AppMsgDirection) -> MsgDirection {
         match direction {
-            TcpMsgDirection::Rootward => MsgDirection::Rootward,
-            TcpMsgDirection::Leafward => MsgDirection::Leafward,
+            AppMsgDirection::Rootward => MsgDirection::Rootward,
+            AppMsgDirection::Leafward => MsgDirection::Leafward,
         }
     }
 }
@@ -730,20 +730,20 @@ impl fmt::Display for ManifestMsgPayload {
     }
 }
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ApplicationMsg {
+pub struct InterapplicationMsg {
     header: MsgHeader,
-    payload: ApplicationMsgPayload
+    payload: InterapplicationMsgPayload
 }
-impl ApplicationMsg {
-    pub fn new(sender_id: SenderID, is_ait: bool, tree_id: TreeID, direction: MsgDirection, body: &str) -> ApplicationMsg {
-        let header = MsgHeader::new(sender_id, is_ait,MsgType::Application, direction);
-        let payload = ApplicationMsgPayload::new(&tree_id.to_port_tree_id_0(), body);
-        ApplicationMsg { header, payload }
+impl InterapplicationMsg {
+    pub fn new(sender_id: SenderID, is_ait: bool, tree_id: TreeID, direction: MsgDirection, body: &str) -> InterapplicationMsg {
+        let header = MsgHeader::new(sender_id, is_ait,MsgType::Interapplication, direction);
+        let payload = InterapplicationMsgPayload::new(&tree_id.to_port_tree_id_0(), body);
+        InterapplicationMsg { header, payload }
     }
-    pub fn get_payload(&self) -> &ApplicationMsgPayload { &self.payload }
+    pub fn get_payload(&self) -> &InterapplicationMsgPayload { &self.payload }
     pub fn get_port_tree_id(&self) -> PortTreeID { self.payload.get_port_tree_id() }
 }
-impl Message for ApplicationMsg {
+impl Message for InterapplicationMsg {
     fn get_header(&self) -> &MsgHeader { &self.header }
     fn get_payload(&self) -> &dyn MsgPayload { &self.payload }
     fn get_msg_type(&self) -> MsgType { self.get_header().msg_type }
@@ -753,33 +753,33 @@ impl Message for ApplicationMsg {
     }
     fn process_ca(&mut self, cell_agent: &mut CellAgent, port_no: PortNo,
                   msg_tree_id: PortTreeID, is_ait: bool) -> Result<(), Error> {
-        cell_agent.process_application_msg(self, port_no, msg_tree_id, is_ait)
+        cell_agent.process_interapplication_msg(self, port_no, msg_tree_id, is_ait)
     }
 }
-impl fmt::Display for ApplicationMsg {
+impl fmt::Display for InterapplicationMsg {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let s = format!("{}: tree {}", self.get_header(), self.get_payload());
         write!(f, "{}", s)
     }
 }
 #[derive(Debug, Clone, Hash, Serialize, Deserialize)]
-pub struct ApplicationMsgPayload {
+pub struct InterapplicationMsgPayload {
     port_tree_id: PortTreeID,
     body: ByteArray,
 }
-impl ApplicationMsgPayload {
-    fn new(port_tree_id: &PortTreeID, body: &str) -> ApplicationMsgPayload {
-        ApplicationMsgPayload { port_tree_id: port_tree_id.clone(), body: ByteArray(S(body).into_bytes()) }
+impl InterapplicationMsgPayload {
+    fn new(port_tree_id: &PortTreeID, body: &str) -> InterapplicationMsgPayload {
+        InterapplicationMsgPayload { port_tree_id: port_tree_id.clone(), body: ByteArray(S(body).into_bytes()) }
     }
     pub fn get_body(&self) -> &ByteArray { &self.body }
     pub fn get_tree_id(&self) -> &PortTreeID { &self.port_tree_id }
     pub fn get_port_tree_id(&self) -> PortTreeID { self.port_tree_id }
 }
-impl MsgPayload for ApplicationMsgPayload {}
-impl fmt::Display for ApplicationMsgPayload {
+impl MsgPayload for InterapplicationMsgPayload {}
+impl fmt::Display for InterapplicationMsgPayload {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         if let Ok(body) = ::std::str::from_utf8(&self.body) {
-            let s = format!("Application message {}", body);
+            let s = format!("Interapplication message {}", body);
             write!(f, "{}", s)
         } else {
             write!(f, "Error converting application message body from bytes to string")
@@ -841,19 +841,19 @@ pub enum MessageError {
     #[fail(display = "MessageError::Chain {} {}", func_name, comment)]
     Chain { func_name: &'static str, comment: String },
 //    #[fail(display = "MessageError::Gvm {}: No GVM for this message type {}", func_name, msg_type)]
-//    Gvm { func_name: &'static str, msg_type: TcpMsgType },
-//    #[fail(display = "MessageError::InvalidTcpMsgType {}: Invalid message type {} from packet assembler", func_name, msg_type)]
-//    InvalidTcpMsgType { func_name: &'static str, msg_type: TcpMsgType },
+//    Gvm { func_name: &'static str, msg_type: AppMsgType },
+//    #[fail(display = "MessageError::InvalidAppMsgType {}: Invalid message type {} from packet assembler", func_name, msg_type)]
+//    InvalidAppMsgType { func_name: &'static str, msg_type: AppMsgType },
 //    #[fail(display = "MessageError::Message {}: Message error from {}", func_name, handler)]
 //    Message { func_name: &'static str, handler: &'static str },
 //    #[fail(display = "MessageError::NoGmv {}: No GVM in StackTreeMsg", func_name)]
 //    NoGvm { func_name: &'static str },
 //    #[fail(display = "MessageError::Payload {}: Wrong payload for type {}", func_name, msg_type)]
-//    Payload { func_name: &'static str, msg_type: TcpMsgType },
+//    Payload { func_name: &'static str, msg_type: AppMsgType },
     #[fail(display = "MessageError::Process {}: Wrong message process function called", func_name)]
     Process { func_name: &'static str },
-//    #[fail(display = "MessageError::TreeID {}: No TreeID ", func_name, msg_type: TcpMsgType)]
-//    TreeID { func_name: &'static str, msg_type: TcpMsgType },
+//    #[fail(display = "MessageError::TreeID {}: No TreeID ", func_name, msg_type: AppMsgType)]
+//    TreeID { func_name: &'static str, msg_type: AppMsgType },
 //    #[fail(display = "MessageError::TreeMapEntry {}: No tree named {} in map", func_name, tree_name)]
 //    TreeMapEntry { func_name: &'static str, tree_name: String }
 }

@@ -5,6 +5,8 @@ use std::{fmt, fmt::Write,
           sync::mpsc::channel,
           thread::{JoinHandle}};
 
+use crate::app_message_formats::{ApplicationFromNoc, ApplicationToNoc, NocFromApplication, NocToApplication,
+                                 PortToNoc, PortFromNoc};
 use crate::blueprint::{Blueprint, Cell};
 use crate::config::{TRACE_OPTIONS, CellNo, CellQty, CellType, CellConfig, PortNo, PortQty, Edge, LinkNo, get_geometry};
 use crate::dal;
@@ -13,8 +15,6 @@ use crate::link::{Link};
 use crate::nalcell::{NalCell};
 use crate::name::{CellID, LinkID};
 use crate::noc::{Noc};
-use crate::tcp_message_formats::{OutsideFromNoc, OutsideToNoc, NocFromOutside, NocToOutside,
-                                 PortToNoc, PortFromNoc};
 use crate::utility::{S, TraceHeaderParams, TraceType};
 
 #[derive(Debug)]
@@ -24,7 +24,7 @@ pub struct Datacenter {
 }
 impl Datacenter {
     pub fn new() -> Datacenter { Datacenter { cells: Vec::new(), links: Vec::new() } }
-    pub fn construct(num_cells: CellQty, edges: &Vec<Edge>, default_num_phys_ports_per_cell: PortQty, cell_port_exceptions: &HashMap<CellNo, PortQty>, border_cell_ports: &HashMap<CellNo, Vec<PortNo>>) -> Result<(Datacenter, OutsideToNoc, OutsideFromNoc), Error> {
+    pub fn construct(num_cells: CellQty, edges: &Vec<Edge>, default_num_phys_ports_per_cell: PortQty, cell_port_exceptions: &HashMap<CellNo, PortQty>, border_cell_ports: &HashMap<CellNo, Vec<PortNo>>) -> Result<(Datacenter, ApplicationToNoc, ApplicationFromNoc), Error> {
         /* Doesn't work when debugging in Eclipse
         let args: Vec<String> = env::args().collect();
         println!("Main: args {:?}",args);
@@ -33,12 +33,12 @@ impl Datacenter {
         let blueprint = Blueprint::new(num_cells, &edges, default_num_phys_ports_per_cell, &cell_port_exceptions, border_cell_ports)?;
         println!("{}", blueprint);
         let (mut dc, join_handles) = build_datacenter(&blueprint).context(DatacenterError::Chain { func_name: "initialize", comment: S("")})?;
-        let (outside_to_noc, noc_from_outside): (OutsideToNoc, NocFromOutside) = channel();
-        let (noc_to_outside, outside_from_noc): (NocToOutside, OutsideFromNoc) = channel();
-        let mut noc = Noc::new(noc_to_outside)?;
-        let (port_to_noc, port_from_noc) = noc.initialize(&blueprint, noc_from_outside)?;
+        let (application_to_noc, noc_from_application): (ApplicationToNoc, NocFromApplication) = channel();
+        let (noc_to_application, application_from_noc): (NocToApplication, ApplicationFromNoc) = channel();
+        let mut noc = Noc::new(noc_to_application)?;
+        let (port_to_noc, port_from_noc) = noc.initialize(&blueprint, noc_from_application)?;
         dc.connect_to_noc(port_to_noc, port_from_noc).context(DatacenterError::Chain { func_name: "initialize", comment: S("")})?;
-        return Ok((dc, outside_to_noc, outside_from_noc));
+        return Ok((dc, application_to_noc, application_from_noc));
     }
     pub fn initialize(&mut self, blueprint: &Blueprint)  -> Result<Vec<JoinHandle<()>>, Error> {
         let _f = "initialize";

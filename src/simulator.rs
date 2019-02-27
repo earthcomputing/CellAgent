@@ -8,6 +8,8 @@
 #[macro_use] extern crate serde_derive;
 #[macro_use] extern crate serde_json;
 
+mod app_message;
+mod app_message_formats;
 mod blueprint;
 mod cellagent;
 mod cmodel;
@@ -31,8 +33,6 @@ mod port_tree;
 mod routing_table;
 mod routing_table_entry;
 mod service;
-mod tcp_message;
-mod tcp_message_formats;
 mod tenant;
 mod traph;
 mod traph_element;
@@ -53,7 +53,7 @@ use crate::config::{AUTO_BREAK, OUTPUT_DIR_NAME, OUTPUT_FILE_NAME, QUENCH,
                     CellNo, CellConfig, CellQty, PortNo, PortQty, is2e};
 use crate::datacenter::Datacenter;
 use crate::gvm_equation::{GvmEqn};
-use crate::tcp_message_formats::{OutsideToNoc, OutsideFromNoc};
+use crate::app_message_formats::{ApplicationToNoc, ApplicationFromNoc};
 use crate::uptree_spec::{AllowedTree, ContainerSpec, Manifest, UpTreeSpec, VmSpec};
 use crate::utility::{print_vec, S, TraceHeader};
 
@@ -82,7 +82,7 @@ fn main() -> Result<(), Error> {
     let mut border_cell_ports = HashMap::new();
     border_cell_ports.insert(CellNo(2), vec![PortNo(2)]);
     border_cell_ports.insert(CellNo(7), vec![PortNo(2)]);
-    let (mut dc, outside_to_noc, outside_from_noc) =
+    let (mut dc, application_to_noc, application_from_noc) =
         match Datacenter::construct(
             CellQty(10),
             &vec![is2e(0,1), is2e(1,2), is2e(2,3), is2e(3,4),
@@ -119,7 +119,7 @@ fn main() -> Result<(), Error> {
                 "c" => show_ca(&dc),
                 "l" => break_link(&mut dc),
                 "p" => show_pe(&dc),
-                "m" => deploy(&outside_to_noc.clone()),
+                "m" => deploy(&application_to_noc.clone()),
                 "x" => std::process::exit(0),
                 _   => {
                     println!("Invalid input {}", print_opt);
@@ -184,14 +184,14 @@ fn read_int() -> Result<usize, Error> {
         }
     }
 }
-fn deploy(outside_to_noc: &OutsideToNoc) -> Result<(), Error> {
+fn deploy(application_to_noc: &ApplicationToNoc) -> Result<(), Error> {
     stdout().write(b"Enter the name of a file containing a manifest\n").context(MainError::Chain { func_name: "run", comment: S("") })?;
     let mut filename = String::new();
     stdin().read_line(&mut filename).context(MainError::Chain { func_name: "run", comment: S("") })?;
     let mut f = File::open(filename.trim()).context(MainError::Chain { func_name: "run", comment: S("") })?;
     let mut manifest = String::new();
     f.read_to_string(&mut manifest).context(MainError::Chain { func_name: "run", comment: S("") })?;
-    outside_to_noc.send(manifest)?;
+    application_to_noc.send(manifest)?;
     Ok(())
 }
 fn deployment_demo() -> Result<(), Error> {

@@ -3,10 +3,10 @@ use std::{fmt,
           thread::JoinHandle,
           sync::{atomic::AtomicBool, Arc, atomic::Ordering::SeqCst}};
 
+use crate::app_message_formats::{PortToNoc, PortFromNoc};
 use crate::config::{CONTINUE_ON_ERROR, TRACE_OPTIONS, PortNo};
 use crate::dal;
 use crate::dal::{fork_trace_header, update_trace_header};
-use crate::tcp_message_formats::{PortToNoc, PortFromNoc};
 use crate::ec_message_formats::{PortToLink, PortFromLink, PortToPe, PortFromPe, LinkToPortPacket, PortToPePacket,
                                 PeToPortPacket};
 use crate::name::{Name, PortID, CellID};
@@ -53,7 +53,7 @@ impl Port {
     pub fn is_border(&self) -> bool { self.is_border }
     pub fn noc_channel(&self, port_to_noc: PortToNoc,
             port_from_noc: PortFromNoc, port_from_pe: PortFromPe) -> Result<JoinHandle<()>, Error> {
-        self.port_to_pe.send(PortToPePacket::Status((self.get_port_no(), self.is_border, PortStatus::Connected))).context(PortError::Chain { func_name: "outside_channel", comment: S(self.id.get_name()) + " send to pe"})?;
+        self.port_to_pe.send(PortToPePacket::Status((self.get_port_no(), self.is_border, PortStatus::Connected))).context(PortError::Chain { func_name: "noc_channel", comment: S(self.id.get_name()) + " send to pe"})?;
         self.listen_noc_for_pe(port_from_noc)?;
         let join_handle = self.listen_pe_for_noc(port_to_noc, port_from_pe)?;
         Ok(join_handle)
@@ -93,7 +93,7 @@ impl Port {
                 }
             }
             //println!("Port to pe other_index {}", *other_index);
-            self.port_to_pe.send(PortToPePacket::Tcp((self.port_number.get_port_no(), msg))).context(PortError::Chain { func_name: "listen_outside_for_pe", comment: S(self.id.get_name()) + " send to pe"})?;
+            self.port_to_pe.send(PortToPePacket::App((self.port_number.get_port_no(), msg))).context(PortError::Chain { func_name: "listen_noc_for_pe", comment: S(self.id.get_name()) + " send to pe"})?;
         }
     }
 
@@ -124,7 +124,7 @@ impl Port {
             }
         }
         loop {
-            let msg = port_from_pe.recv().context(PortError::Chain { func_name: "listen_pe_for_outside", comment: S(self.id.get_name()) + " recv from pe"})?;
+            let msg = port_from_pe.recv().context(PortError::Chain { func_name: "listen_pe_for_noc", comment: S(self.id.get_name()) + " recv from pe"})?;
             {
                 if TRACE_OPTIONS.all || TRACE_OPTIONS.port_noc {
                     let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "recv" };
@@ -134,11 +134,11 @@ impl Port {
             }
             //println!("Port {}: waiting for packet from pe", port.id);
             let tuple = match msg {
-                PeToPortPacket::Tcp(tuple) => tuple,
-                _ => return Err(PortError::NonTcp { func_name: "listen_pe_for_noc", port_no: *self.port_number.get_port_no() }.into())
+                PeToPortPacket::App(tuple) => tuple,
+                _ => return Err(PortError::NonApp { func_name: "listen_pe_for_noc", port_no: *self.port_number.get_port_no() }.into())
             };
             //println!("Port to Noc other_index {}", *tuple.0);
-            port_to_noc.send(tuple).context(PortError::Chain { func_name: "listen_pe_for_outside", comment: S(self.id.get_name()) + " send to noc"})?;
+            port_to_noc.send(tuple).context(PortError::Chain { func_name: "listen_pe_for_noc", comment: S(self.id.get_name()) + " send to noc"})?;
         }
     }
 
@@ -192,11 +192,11 @@ impl Port {
                         PortStatus::Connected => self.set_connected(),
                         PortStatus::Disconnected => self.set_disconnected()
                     };
-                    self.port_to_pe.send(PortToPePacket::Status((self.port_number.get_port_no(), self.is_border, status))).context(PortError::Chain { func_name: "listen_pe_for_outside", comment: S(self.id.get_name()) + " send status to pe"})?;
+                    self.port_to_pe.send(PortToPePacket::Status((self.port_number.get_port_no(), self.is_border, status))).context(PortError::Chain { func_name: "listen_link", comment: S(self.id.get_name()) + " send status to pe"})?;
                 }
                 LinkToPortPacket::Packet(packet) => {
                     //println!("Port {}: got from link {} {}", self.id, *my_index, packet);
-                    self.port_to_pe.send(PortToPePacket::Packet((self.port_number.get_port_no(), packet))).context(PortError::Chain { func_name: "listen_pe_for_outside", comment: S(self.id.get_name()) + " send packet to pe"})?;
+                    self.port_to_pe.send(PortToPePacket::Packet((self.port_number.get_port_no(), packet))).context(PortError::Chain { func_name: "listen_link", comment: S(self.id.get_name()) + " send packet to pe"})?;
                     //println!("Port {}: sent from link to pe {}", self.id, packet);
                 }
             }
@@ -225,7 +225,7 @@ impl Port {
             }
             let packet = match msg {
                 PeToPortPacket::Packet(packet) => packet,
-                _ => return Err(PortError::Tcp { func_name: "listen_pe", port_no: *self.port_number.get_port_no() }.into())
+                _ => return Err(PortError::App { func_name: "listen_pe", port_no: *self.port_number.get_port_no() }.into())
             };
             //println!("Port {}: got other_index from pe {}", self.id, *packet.0);
             port_to_link.send(packet).context(PortError::Chain { func_name: "listen_pe", comment: S(self.id.get_name()) + " send to link"})?;
@@ -250,8 +250,8 @@ use failure::{Error, ResultExt};
 pub enum PortError {
     #[fail(display = "PortError::Chain {} {}", func_name, comment)]
     Chain { func_name: &'static str, comment: String },
-    #[fail(display = "PortError::NonTcp {}: Non TCP message received on port {}, with is a border port", func_name, port_no)]
-    NonTcp { func_name: &'static str, port_no: u8 },
-    #[fail(display = "PortError::Tcp {}: TCP message received on port {}, with is not a border port", func_name, port_no)]
-    Tcp { func_name: &'static str, port_no: u8 }
+    #[fail(display = "PortError::NonApp {}: Non APP message received on port {}, with is a border port", func_name, port_no)]
+    NonApp { func_name: &'static str, port_no: u8 },
+    #[fail(display = "PortError::App {}: APP message received on port {}, with is not a border port", func_name, port_no)]
+    App { func_name: &'static str, port_no: u8 }
 }

@@ -3,13 +3,13 @@ use std::{thread,
           sync::mpsc::channel,
           collections::{HashMap, HashSet}};
 
+use crate::app_message::{AppMsgType, AppMsgDirection, AppTreeNameMsg};
+use crate::app_message_formats::{NocToPort, NocFromPort, PortToNoc, PortFromNoc, NocFromApplication, NocToApplication};
 use crate::blueprint::{Blueprint};
 use crate::config::{CONTINUE_ON_ERROR, SCHEMA_VERSION, TRACE_OPTIONS, ByteArray, CellConfig, get_geometry};
 use crate::dal;
 use crate::dal::{fork_trace_header, update_trace_header};
 use crate::gvm_equation::{GvmEquation, GvmEqn, GvmVariable, GvmVariableType};
-use crate::tcp_message::{TcpMsgType, TcpMsgDirection, TcpTreeNameMsg};
-use crate::tcp_message_formats::{NocToPort, NocFromPort, PortToNoc, PortFromNoc, NocFromOutside, NocToOutside};
 use crate::uptree_spec::{AllowedTree, ContainerSpec, Manifest, UpTreeSpec, VmSpec};
 use crate::utility::{S, TraceHeader, TraceHeaderParams, TraceType, write_err};
 
@@ -21,14 +21,14 @@ const NOC_LISTEN_TREE_NAME:         &str = "NocAgentMaster";
 #[derive(Debug, Clone)]
 pub struct Noc {
     allowed_trees: HashSet<AllowedTree>,
-    noc_to_outside: NocToOutside,
+    noc_to_application: NocToApplication,
 }
 impl Noc {
     pub fn get_name(&self) -> &str { "NOC" }
-    pub fn new(noc_to_outside: NocToOutside) -> Result<Noc, Error> {
-        Ok(Noc { allowed_trees: HashSet::new(), noc_to_outside })
+    pub fn new(noc_to_application: NocToApplication) -> Result<Noc, Error> {
+        Ok(Noc { allowed_trees: HashSet::new(), noc_to_application })
     }
-    pub fn initialize(&mut self, blueprint: &Blueprint, noc_from_outside: NocFromOutside)
+    pub fn initialize(&mut self, blueprint: &Blueprint, noc_from_application: NocFromApplication)
             -> Result<(PortToNoc, PortFromNoc), Error> {
         let _f = "initialize";
         {
@@ -42,7 +42,7 @@ impl Noc {
         }
         let (noc_to_port, port_from_noc): (NocToPort, NocFromPort) = channel();
         let (port_to_noc, noc_from_port): (PortToNoc, PortFromNoc) = channel();
-        self.listen_outside(noc_from_outside, noc_to_port.clone())?;
+        self.listen_application(noc_from_application, noc_to_port.clone())?;
         self.listen_port(noc_to_port, noc_from_port)?;
         //::utility::sleep(1);
         Ok((port_to_noc, port_from_noc))
@@ -90,9 +90,9 @@ impl Noc {
             }
             let (_is_ait, _allowed_tree, msg_type, _direction, bytes) = cmd;
             match msg_type {
-                TcpMsgType::TreeName => {
+                AppMsgType::TreeName => {
                     let serialized = ::std::str::from_utf8(&bytes)?;
-                    let msg = serde_json::from_str::<TcpTreeNameMsg>(&serialized).context(NocError::Chain { func_name: "listen_port", comment: S("") })?;
+                    let msg = serde_json::from_str::<AppTreeNameMsg>(&serialized).context(NocError::Chain { func_name: "listen_port", comment: S("") })?;
                     let tree_name = msg.get_tree_name();
                     self.allowed_trees.insert(AllowedTree::new(tree_name));
                     // If this is the first tree, set up NocMaster and NocAgent
@@ -105,24 +105,24 @@ impl Noc {
         }
     }
 
-    // SPAWN THREAD (listen_outside_loop)
-    fn listen_outside(&mut self, noc_from_outside: NocFromOutside, noc_to_port: NocToPort)
+    // SPAWN THREAD (listen_application_loop)
+    fn listen_application(&mut self, noc_from_application: NocFromApplication, noc_to_port: NocToPort)
             -> Result<JoinHandle<()>,Error> {
         let mut noc = self.clone();
         let child_trace_header = fork_trace_header();
-        let thread_name = format!("{} listen_outside_loop", self.get_name()); // NOC NOC
-        let join_outside = thread::Builder::new().name(thread_name).spawn( move || {
+        let thread_name = format!("{} listen_application_loop", self.get_name()); // NOC NOC
+        let join_application = thread::Builder::new().name(thread_name).spawn( move || {
             update_trace_header(child_trace_header);
-            let _ = noc.listen_outside_loop(&noc_from_outside, &noc_to_port).map_err(|e| write_err("outside", &e));
+            let _ = noc.listen_application_loop(&noc_from_application, &noc_to_port).map_err(|e| write_err("application", &e));
             if CONTINUE_ON_ERROR { }
         });
-        Ok(join_outside?)
+        Ok(join_application?)
     }
 
-    // WORKER (NocFromOutside)
-    fn listen_outside_loop(&mut self, noc_from_outside: &NocFromOutside, _: &NocToPort)
+    // WORKER (NocFromApplication)
+    fn listen_application_loop(&mut self, noc_from_application: &NocFromApplication, _: &NocToPort)
             -> Result<(), Error> {
-        let _f = "listen_outside_loop";
+        let _f = "listen_application_loop";
         {
             if TRACE_OPTIONS.all || TRACE_OPTIONS.noc {
                 let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "worker" };
@@ -131,7 +131,7 @@ impl Noc {
             }
         }
         loop {
-            let input = &noc_from_outside.recv()?;
+            let input = &noc_from_application.recv()?;
             {
                 if TRACE_OPTIONS.all || TRACE_OPTIONS.noc {
                     let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "worker" };
@@ -140,7 +140,7 @@ impl Noc {
                 }
             }
             println!("Noc: {}", input);
-            let manifest = serde_json::from_str::<Manifest>(input).context(NocError::Chain { func_name: "listen_outside", comment: S("")})?;
+            let manifest = serde_json::from_str::<Manifest>(input).context(NocError::Chain { func_name: "listen_application", comment: S("")})?;
             println!("Noc: {}", manifest);
         }
     }
@@ -174,7 +174,7 @@ impl Noc {
         let manifest_msg = serde_json::to_string(&params).context(NocError::Chain { func_name: "create_noc", comment: S("NocMaster")})?;
         println!("Noc: deploy {} on tree {}", manifest.get_id(), noc_master_deploy_tree);
         let bytes = ByteArray(manifest_msg.into_bytes());
-        noc_to_port.send((is_ait, noc_master_deploy_tree.clone(), TcpMsgType::Manifest, TcpMsgDirection::Leafward, bytes)).context(NocError::Chain { func_name: "create_noc", comment: S("NocMaster")})?;
+        noc_to_port.send((is_ait, noc_master_deploy_tree.clone(), AppMsgType::Manifest, AppMsgDirection::Leafward, bytes)).context(NocError::Chain { func_name: "create_noc", comment: S("NocMaster")})?;
         // Deploy NocAgent
         let up_tree = UpTreeSpec::new("NocAgent", vec![0]).context(NocError::Chain { func_name: "create_noc", comment: S("NocAgent") })?;
         let service = ContainerSpec::new("NocAgent", "NocAgent", vec![], &allowed_trees).context(NocError::Chain { func_name: "create_noc", comment: S("NocAgent") })?;
@@ -190,7 +190,7 @@ impl Noc {
         let manifest_msg = serde_json::to_string(&params).context(NocError::Chain { func_name: "create_noc", comment: S("NocAgent")})?;
         println!("Noc: deploy {} on tree {}", manifest.get_id(), noc_master_deploy_tree);
         let bytes = ByteArray(manifest_msg.into_bytes());
-        noc_to_port.send((is_ait, noc_agent_deploy_tree.clone(), TcpMsgType::Manifest, TcpMsgDirection::Leafward, bytes)).context(NocError::Chain { func_name: "create_noc", comment: S("NocAgent")})?;
+        noc_to_port.send((is_ait, noc_agent_deploy_tree.clone(), AppMsgType::Manifest, AppMsgDirection::Leafward, bytes)).context(NocError::Chain { func_name: "create_noc", comment: S("NocAgent")})?;
         Ok(())
     }
     // Because of packet forwarding, this tree gets stacked on all cells even though only one of them can receive the deployment message
@@ -212,7 +212,7 @@ impl Noc {
         println!("Noc: stack {} on tree {}", NOC_MASTER_DEPLOY_TREE_NAME, tree_name);
         let bytes = ByteArray(stack_tree_msg.into_bytes());
 
-        noc_to_port.send((is_ait, noc_master_deploy_tree.clone(), TcpMsgType::StackTree, TcpMsgDirection::Leafward, bytes)).context(NocError::Chain { func_name: "noc_master_deploy_tree", comment: S("")})?;
+        noc_to_port.send((is_ait, noc_master_deploy_tree.clone(), AppMsgType::StackTree, AppMsgDirection::Leafward, bytes)).context(NocError::Chain { func_name: "noc_master_deploy_tree", comment: S("")})?;
         Ok(())
     }
     // For the reasons given in the comments to the following two functions, the agent does not run
@@ -234,7 +234,7 @@ impl Noc {
         let stack_tree_msg = serde_json::to_string(&params).context(NocError::Chain { func_name: "noc_agent_deploy_tree", comment: S("")})?;
         println!("Noc: stack {} on tree {}", NOC_AGENT_DEPLOY_TREE_NAME, tree_name);
         let bytes = ByteArray(stack_tree_msg.into_bytes());
-        noc_to_port.send((is_ait, noc_agent_deploy_tree.clone(), TcpMsgType::StackTree, TcpMsgDirection::Leafward, bytes)).context(NocError::Chain { func_name: "noc_agent_deploy_tree", comment: S("")})?;
+        noc_to_port.send((is_ait, noc_agent_deploy_tree.clone(), AppMsgType::StackTree, AppMsgDirection::Leafward, bytes)).context(NocError::Chain { func_name: "noc_agent_deploy_tree", comment: S("")})?;
         Ok(())
     }
     // I need a more comprehensive GVM to express the fact that the agent running on the same cell as the master
@@ -255,7 +255,7 @@ impl Noc {
         let stack_tree_msg = serde_json::to_string(&params).context(NocError::Chain { func_name: "noc_master_tree", comment: S("")})?;
         println!("Noc: stack {} on tree {}", NOC_CONTROL_TREE_NAME, tree_name);
         let bytes = ByteArray(stack_tree_msg.into_bytes());
-        noc_to_port.send((is_ait, noc_master_agent.clone(), TcpMsgType::StackTree, TcpMsgDirection::Leafward, bytes)).context(NocError::Chain { func_name: "noc_master_tree", comment: S("")})?;
+        noc_to_port.send((is_ait, noc_master_agent.clone(), AppMsgType::StackTree, AppMsgDirection::Leafward, bytes)).context(NocError::Chain { func_name: "noc_master_tree", comment: S("")})?;
         Ok(())
     }
     // I need a more comprehensive GVM to express the fact that the agent running on the same cell as the master
@@ -276,7 +276,7 @@ impl Noc {
         let stack_tree_msg = serde_json::to_string(&params).context(NocError::Chain { func_name: "noc_master_tree", comment: S("")})?;
         println!("Noc: stack {} on tree {}", NOC_LISTEN_TREE_NAME, tree_name);
         let bytes = ByteArray(stack_tree_msg.into_bytes());
-        noc_to_port.send((is_ait, noc_agent_master.clone(), TcpMsgType::StackTree, TcpMsgDirection::Leafward, bytes)).context(NocError::Chain { func_name: "noc_master_tree", comment: S("")})?;
+        noc_to_port.send((is_ait, noc_agent_master.clone(), AppMsgType::StackTree, AppMsgDirection::Leafward, bytes)).context(NocError::Chain { func_name: "noc_master_tree", comment: S("")})?;
         Ok(())
     }
 }
@@ -291,7 +291,7 @@ pub enum NocError {
 //    #[fail(display = "NocError::Message {}: Message type {} is malformed {}", func_name, msg_type, message)]
 //    Message { func_name: &'static str, msg_type: MsgType, message: String },
     #[fail(display = "NocError::MsgType {}: {} is not a valid message type for the NOC", func_name, msg_type)]
-    MsgType { func_name: &'static str, msg_type: TcpMsgType },
+    MsgType { func_name: &'static str, msg_type: AppMsgType },
 //    #[fail(display = "NocError::Tree {}: {} is not a valid index in the NOC's list of tree names", func_name, index)]
 //    Tree { func_name: &'static str, index: usize }
 }
