@@ -1,6 +1,6 @@
 use std::{fmt, thread};
 
-use crate::config::{ByteArray,CONTINUE_ON_ERROR, TRACE_OPTIONS};
+use crate::config::{ByteArray, CONTINUE_ON_ERROR, TRACE_OPTIONS};
 use crate::dal;
 use crate::dal::{fork_trace_header, update_trace_header};
 use crate::message::{MsgDirection, TcpMsgType};
