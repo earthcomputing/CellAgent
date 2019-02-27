@@ -33,7 +33,7 @@ pub enum MsgType {
 }
 impl MsgType {
     // Used for debug hack in packet_engine
-    pub fn get_msg(packets: &[Packet]) -> Result<Box<dyn Message>, Error> {
+    pub fn get_msg(packets: &Vec<Packet>) -> Result<Box<dyn Message>, Error> {
         let _f = "get_msg";
         let bytes = Packetizer::unpacketize(packets).context(MessageError::Chain { func_name: _f, comment: S("unpacketize")})?;
         //println!("Message get_msg: serialized {}, packets {:?}", serialized, packets);
