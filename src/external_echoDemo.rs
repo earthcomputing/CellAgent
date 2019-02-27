@@ -5,6 +5,8 @@
 #[macro_use] extern crate serde_derive;
 #[macro_use] extern crate serde_json;
 
+mod app_message;
+mod app_message_formats;
 mod blueprint;
 mod config;
 mod container;
@@ -15,8 +17,6 @@ mod gvm_equation;
 mod name;
 mod noc;
 mod service;
-mod tcp_message;
-mod tcp_message_formats;
 mod tenant;
 mod uptree_spec;
 mod utility;
@@ -27,12 +27,12 @@ use std::{io::{stdin, stdout, Read, Write},
           fs::{File, OpenOptions},
           sync::mpsc::channel};
 
+use crate::app_message_formats::{ApplicationFromNoc, ApplicationToNoc, NocFromApplication, NocToApplication};
 use crate::blueprint::Blueprint;
 use crate::config::{AUTO_BREAK, OUTPUT_FILE_NAME, QUENCH,
                     CellNo, CellQty, CellConfig, PortNo, PortQty, is2e};
 use crate::gvm_equation::{GvmEqn};
 use crate::noc::Noc;
-use crate::tcp_message_formats::{OutsideFromNoc, OutsideToNoc, NocFromOutside, NocToOutside};
 use crate::uptree_spec::{AllowedTree, ContainerSpec, Manifest, UpTreeSpec, VmSpec};
 use crate::utility::{print_vec, S, TraceHeader};
 
@@ -47,11 +47,11 @@ fn main() -> Result<(), Error> {
     let blueprint = Blueprint::new(CellQty(3), &vec![is2e(0,1), is2e(1,2), is2e(0,2)], PortQty(3), &cell_port_exceptions, &border_cell_ports).context(MainError::Chain { func_name: "run", comment: S("") })?;
     println!("{}", blueprint);
     if false { deployment_demo()?; }    // Demonstrate features of deployment spec
-    let (outside_to_noc, noc_from_outside): (OutsideToNoc, NocFromOutside) = channel();
-    let (noc_to_outside, _outside_from_noc): (NocToOutside, OutsideFromNoc) = channel();
-    let mut noc = Noc::new(noc_to_outside)?;
-    let (port_to_noc, port_from_noc) = noc.initialize(&blueprint, noc_from_outside).context(MainError::Chain { func_name: "run", comment: S("") })?;
-    deploy(&outside_to_noc.clone())?; /* Deploy Echo */
+    let (application_to_noc, noc_from_application): (ApplicationToNoc, NocFromApplication) = channel();
+    let (noc_to_application, _application_from_noc): (NocToApplication, ApplicationFromNoc) = channel();
+    let mut noc = Noc::new(noc_to_application)?;
+    let (port_to_noc, port_from_noc) = noc.initialize(&blueprint, noc_from_application).context(MainError::Chain { func_name: "run", comment: S("") })?;
+    deploy(&application_to_noc.clone())?; /* Deploy Echo */
     /* Send Ping request */
     Ok(())
 }
@@ -68,14 +68,14 @@ fn read_int() -> Result<usize, Error> {
         }
     }
 }
-fn deploy(outside_to_noc: &OutsideToNoc) -> Result<(), Error> {
+fn deploy(application_to_noc: &ApplicationToNoc) -> Result<(), Error> {
     stdout().write(b"Enter the name of a file containing a manifest\n").context(MainError::Chain { func_name: "run", comment: S("") })?;
     let mut filename = String::new();
     stdin().read_line(&mut filename).context(MainError::Chain { func_name: "run", comment: S("") })?;
     let mut f = File::open(filename.trim()).context(MainError::Chain { func_name: "run", comment: S("") })?;
     let mut manifest = String::new();
     f.read_to_string(&mut manifest).context(MainError::Chain { func_name: "run", comment: S("") })?;
-    outside_to_noc.send(manifest)?;
+    application_to_noc.send(manifest)?;
     Ok(())
 }
 fn deployment_demo() -> Result<(), Error> {

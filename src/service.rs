@@ -1,11 +1,11 @@
 use std::{fmt, thread};
 
+use crate::app_message_formats::{ContainerToVm, ContainerFromVm};
+use crate::app_message::{AppMsgDirection, AppMsgType};
 use crate::config::{ByteArray, CONTINUE_ON_ERROR, TRACE_OPTIONS};
 use crate::dal;
 use crate::dal::{fork_trace_header, update_trace_header};
 use crate::name::{ContainerID, UptreeID};
-use crate::tcp_message_formats::{ContainerToVm, ContainerFromVm};
-use crate::tcp_message::{TcpMsgDirection, TcpMsgType};
 use crate::uptree_spec::{AllowedTree};
 use crate::utility::{S, write_err, TraceHeader, TraceHeaderParams, TraceType};
 
@@ -65,7 +65,7 @@ impl NocMaster {
         let msg = S("Hello From Master");
         let bytes = ByteArray(msg.into_bytes());
         let is_ait = false;
-        self.container_to_vm.send((is_ait, AllowedTree::new("NocMasterAgent"), TcpMsgType::Application, TcpMsgDirection::Leafward, bytes))?;
+        self.container_to_vm.send((is_ait, AllowedTree::new("NocMasterAgent"), AppMsgType::Interapplication, AppMsgDirection::Leafward, bytes))?;
         Ok(())
     }
     // SPAWN THREAD (listen_vm_loop)
@@ -172,7 +172,7 @@ impl NocAgent {
             //println!("Service {} sending {}", self.container_id, msg);
             let bytes = ByteArray(msg.into_bytes());
             let is_ait = false;
-            self.container_to_vm.send((is_ait, AllowedTree::new("NocAgentMaster"), TcpMsgType::Application, TcpMsgDirection::Rootward, bytes))?;
+            self.container_to_vm.send((is_ait, AllowedTree::new("NocAgentMaster"), AppMsgType::Interapplication, AppMsgDirection::Rootward, bytes))?;
         }
     }
 }

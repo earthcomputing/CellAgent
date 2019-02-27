@@ -269,11 +269,11 @@ impl PacketEngine {
                     pe_to_pe.send(S("Unblock"))?;
                 },
 
-                // encapsulated TCP
-                CmToPePacket::Tcp((port_number, msg)) => {
+                // encapsulated APP
+                CmToPePacket::App((port_number, msg)) => {
                     let port_no = port_number.get_port_no();
                     match self.pe_to_ports.get(port_no.as_usize()) {
-                        Some(sender) => sender.send(PeToPortPacket::Tcp(msg)).context(PacketEngineError::Chain { func_name: _f, comment: S("send TCP to port ") + &self.cell_id.get_name() })?,
+                        Some(sender) => sender.send(PeToPortPacket::App(msg)).context(PacketEngineError::Chain { func_name: _f, comment: S("send APP to port ") + &self.cell_id.get_name() })?,
                         _ => return Err(PacketEngineError::Sender { func_name: _f, cell_id: self.cell_id, port_no: *port_no }.into())
                     }
                 },
@@ -411,8 +411,8 @@ impl PacketEngine {
                     }
                     self.pe_to_cm.send(PeToCmPacket::Status((port_no, is_border, number_of_packets, status))).context(PacketEngineError::Chain { func_name: "listen_port", comment: S("send status to ca ") + &self.cell_id.get_name()})?
                 },
-                PortToPePacket::Tcp((port_no, tcp_msg)) => {
-                    self.pe_to_cm.send(PeToCmPacket::Tcp((port_no, tcp_msg))).context(PacketEngineError::Chain { func_name: "listen_port", comment: S("send tcp msg to ca ") + &self.cell_id.get_name()})?
+                PortToPePacket::App((port_no, app_msg)) => {
+                    self.pe_to_cm.send(PeToCmPacket::App((port_no, app_msg))).context(PacketEngineError::Chain { func_name: "listen_port", comment: S("send app msg to ca ") + &self.cell_id.get_name()})?
                 },
 
                 // recv from neighbor
