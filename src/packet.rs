@@ -8,11 +8,11 @@ use rand;
 use serde;
 use serde_json;
 
+use crate::app_message::{SenderMsgSeqNo, get_next_count};
 use crate::config::{PACKET_MIN, PACKET_MAX, PAYLOAD_DEFAULT_ELEMENT, 
     ByteArray, PacketNo};
 use crate::ec_message::{Message, MsgType, TypePlusMsg};
 use crate::name::{PortTreeID};
-use crate::tcp_message::{SenderMsgSeqNo, get_next_count};
 use crate::utility::S;
 use crate::uuid_ec::{Uuid, AitState};
  

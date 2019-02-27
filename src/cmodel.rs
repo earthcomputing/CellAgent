@@ -98,7 +98,7 @@ impl Cmodel {
                 // just forward to PE
                 CaToCmBytes::Reroute(msg) => cm_to_pe.send(CmToPePacket::Reroute(msg)),
                 CaToCmBytes::Entry(entry) => cm_to_pe.send(CmToPePacket::Entry(entry)),
-                CaToCmBytes::Tcp(msg) => cm_to_pe.send(CmToPePacket::Tcp(msg)),
+                CaToCmBytes::App(msg) => cm_to_pe.send(CmToPePacket::App(msg)),
                 CaToCmBytes::Unblock => cm_to_pe.send(CmToPePacket::Unblock),
 
                 // packetize
@@ -168,7 +168,7 @@ impl Cmodel {
                 PeToCmPacket::Status(msg) => {
                     cm_to_ca.send(CmToCaBytes::Status(msg))?
                 },
-                PeToCmPacket::Tcp(msg) => cm_to_ca.send(CmToCaBytes::Tcp(msg))?,
+                PeToCmPacket::App(msg) => cm_to_ca.send(CmToCaBytes::App(msg))?,
 
                 // de-packetize
                 PeToCmPacket::Packet((port_no, packet)) => self.process_packet(cm_to_ca, port_no, packet)?
