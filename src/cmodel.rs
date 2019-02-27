@@ -125,7 +125,7 @@ impl Cmodel {
                         if is_ait { uuid.make_ait(); }
 
                         let packets = Packetizer::packetize(&uuid, &bytes, is_blocking);
-                        let first = packets[0];
+                        let first = packets.get(0).expect("No packets from packetizer");
                         let dpi_is_ait = first.is_ait();
                         let sender_msg_seq_no = first.get_sender_msg_seq_no();
                         let packet_count = first.get_count();
@@ -194,12 +194,12 @@ packets: Vec<Packet>,
         let _f = "process_packet";
         let sender_msg_seq_no = packet.get_sender_msg_seq_no();
         let mut packet_assembler = self.packet_assemblers.remove(&sender_msg_seq_no).unwrap_or(PacketAssembler::new(sender_msg_seq_no)); // autovivification
-        let (last_packet, packets) = packet_assembler.add(packet);
+        let (last_packet, packets) = packet_assembler.add(packet.clone()); // Need clone only because of trace
 
         if last_packet {
             let is_ait = packets[0].is_ait();
             let uuid = packet.get_tree_uuid();
-            let bytes = Packetizer::unpacketize(packets).context(CmodelError::Chain { func_name: _f, comment: S("") })?;
+            let bytes = Packetizer::unpacketize(&packets).context(CmodelError::Chain { func_name: _f, comment: S("") })?;
             {
                 if TRACE_OPTIONS.all || TRACE_OPTIONS.cm {
                     let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "cm_bytes_to_ca" };

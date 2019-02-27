@@ -304,7 +304,7 @@ impl PacketEngine {
             AitState::Ait => { // Update state and send on ports from entry
                 packet.next_ait_state()?;
                 let port_no = PortNo(0);
-                self.forward(port_no, entry, user_mask, packet).context(PacketEngineError::Chain { func_name: _f, comment: S(self.cell_id.get_name()) })?;
+                self.forward(port_no, entry, user_mask, &packet).context(PacketEngineError::Chain { func_name: _f, comment: S(self.cell_id.get_name()) })?;
             }
             AitState::Normal => {
                 {
@@ -326,7 +326,7 @@ impl PacketEngine {
                     }
                 }
                 let port_no = PortNo(0);
-                self.forward(port_no, entry, user_mask, packet).context(PacketEngineError::Chain { func_name: _f, comment: S(self.cell_id.get_name()) })?;
+                self.forward(port_no, entry, user_mask, &packet).context(PacketEngineError::Chain { func_name: _f, comment: S(self.cell_id.get_name()) })?;
             }
         }
         Ok(())
@@ -345,14 +345,14 @@ impl PacketEngine {
                         }
                     }
                 }
-                self.pe_to_ports.get(port_no.as_usize())
-                    .ok_or::<Error>(PacketEngineError::Sender { cell_id: self.cell_id, func_name: _f, port_no: *port_no }.into())?
-                    .send(PeToPortPacket::Packet(packet))?;
-                self.add_sent_packet(port_no, packet);
                 match packet.get_ait_state() {
                     AitState::Entl => self.set_may_send(port_no),
                     _              => self.set_may_not_send(port_no)
                 }
+                self.pe_to_ports.get(port_no.as_usize())
+                    .ok_or::<Error>(PacketEngineError::Sender { cell_id: self.cell_id, func_name: _f, port_no: *port_no }.into())?
+                    .send(PeToPortPacket::Packet(packet.clone()))?;
+                self.add_sent_packet(port_no, packet);
             } else {
                 self.send_next_packet_or_entl(port_no)?;
             }
@@ -451,10 +451,10 @@ impl PacketEngine {
             AitState::Tock => {
                 // Send to CM and transition to ENTL if time is FORWARD
                 packet.next_ait_state()?;
-                self.add_to_out_buffer_front(port_no, packet);
+                self.add_to_out_buffer_front(port_no, packet.clone());
                 self.send_packet(port_no)?;
                 packet.make_ait();
-                self.pe_to_cm.send(PeToCmPacket::Packet((port_no, packet)))
+                self.pe_to_cm.send(PeToCmPacket::Packet((port_no, packet.clone())))
                     .or_else(|_| -> Result<(), Error> {
                         // Time reverse on error sending to CM
                         //println!("PacketEngine {}: {} error {} {}", self.cell_id, _f, MsgType::msg_type(&packet), packet.get_ait_state());
@@ -517,7 +517,7 @@ impl PacketEngine {
                 if entry.is_in_use() {
                     if entry.get_uuid() == packet.get_tree_uuid() {
                         let mask = entry.get_mask();
-                        self.forward(port_no, entry, mask, packet).context(PacketEngineError::Chain { func_name: "process_packet", comment: S("forward ") + &self.cell_id.get_name() })?;
+                        self.forward(port_no, entry, mask, &packet).context(PacketEngineError::Chain { func_name: "process_packet", comment: S("forward ") + &self.cell_id.get_name() })?;
                         port_no.make_port_number(MAX_NUM_PHYS_PORTS_PER_CELL).context(PacketEngineError::Chain { func_name: "process_packet", comment: S("port number ") + &self.cell_id.get_name() })?; // Verify that port_no is valid
                     } else {
                         let msg_type = MsgType::msg_type(&packet);
@@ -546,9 +546,10 @@ impl PacketEngine {
         }
         Ok(())
     }
-    fn forward(&mut self, recv_port_no: PortNo, entry: RoutingTableEntry, user_mask: Mask, packet: Packet)
+    fn forward(&mut self, recv_port_no: PortNo, entry: RoutingTableEntry, user_mask: Mask, packet_ref: &Packet)
             -> Result<(), Error> {
         let _f = "forward";
+        let packet = packet_ref.clone();
         if recv_port_no != entry.get_parent() {
             // Send to root if recv port is not parent
             let parent = entry.get_parent();
@@ -608,7 +609,7 @@ impl PacketEngine {
             for port_no in port_nos.iter().cloned() {
                 if *port_no == 0 {
                     // deliver to CModel
-                    self.pe_to_cm.send(PeToCmPacket::Packet((recv_port_no, packet))).context(PacketEngineError::Chain { func_name: _f, comment: S("leafcast packet to ca ") + &self.cell_id.get_name() })?;
+                    self.pe_to_cm.send(PeToCmPacket::Packet((recv_port_no, packet.clone()))).context(PacketEngineError::Chain { func_name: _f, comment: S("leafcast packet to ca ") + &self.cell_id.get_name() })?;
                 } else {
                     // forward to neighbor
                     {
@@ -620,7 +621,7 @@ impl PacketEngine {
                             }
                         }
                     }
-                    self.add_to_out_buffer_back(port_no, packet);
+                    self.add_to_out_buffer_back(port_no, packet.clone());
                     self.send_packet(port_no)?;
                 }
             }
