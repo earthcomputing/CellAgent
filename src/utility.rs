@@ -113,7 +113,18 @@ impl Path {
 impl fmt::Display for Path {
     fn fmt(&self, f:&mut fmt::Formatter<'_>) -> fmt::Result { write!(f, "{}", self.port_number) }
 }
-use std::thread;
+// I could just use Vec, but this way I'm sure I don't do anything other than push, pop, and len
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Stack<T: fmt::Display + Sized> {
+    elements: Vec<T>
+}
+impl<T: fmt::Display + Sized> Stack<T> {
+    pub fn new() -> Stack<T> { Stack { elements: vec![] } }
+    pub fn len(&self) -> usize { self.elements.len() }
+    pub fn push(&mut self, element: T) { self.elements.push(element); }
+    pub fn pop(&mut self) -> Option<T> { self.elements.pop() }
+    pub fn iter(&self) -> core::slice::Iter<T> { self.elements.iter() }
+}
 /*
 
 THDR - "trace_header":{"thread_id":[0-9]*,"event_id":[[0-9]*]*,"trace_type":["Trace","Debug"]},
@@ -133,6 +144,7 @@ PORT - "port_no":{"v":[0-9]*},"is_border":[a-z]*
 lazy_static!{
     static ref STARTING_EPOCH: u64 = timestamp();
 }
+use std::thread;
 #[derive(Debug, Clone, Serialize)]
 pub struct TraceHeader {
     starting_epoch: u64,

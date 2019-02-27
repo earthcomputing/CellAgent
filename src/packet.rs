@@ -13,7 +13,7 @@ use crate::config::{PACKET_MIN, PACKET_MAX, PAYLOAD_DEFAULT_ELEMENT,
     ByteArray, PacketNo};
 use crate::ec_message::{Message, MsgType, TypePlusMsg};
 use crate::name::{PortTreeID};
-use crate::utility::S;
+use crate::utility::{S, Stack};
 use crate::uuid_ec::{Uuid, AitState};
  
 //const LARGEST_MSG: usize = std::u32::MAX as usize;
@@ -62,7 +62,7 @@ impl Packet {
     pub fn get_sender_msg_seq_no(&self) -> SenderMsgSeqNo { self.payload.get_sender_msg_seq_no() }
     pub fn get_size(&self) -> PacketNo { self.payload.get_size() }
     pub fn get_bytes(&self) -> Vec<u8> { self.payload.bytes.iter().cloned().collect() }
-    pub fn get_wrapped_header(&self) -> &Vec<PacketHeader> { self.payload.get_wrapped_header() }
+    pub fn get_wrapped_header(&self) -> &Stack<PacketHeader> { self.payload.get_wrapped_header() }
     // pub fn get_payload_bytes(&self) -> Vec<u8> { self.get_payload().get_bytes() }
     // pub fn get_payload_size(&self) -> usize { self.payload.get_no_bytes() }
 
@@ -126,7 +126,7 @@ pub struct Payload {
                     // Number of bytes in last packet if last packet, 0 => Error
     is_last: bool,
     is_blocking: bool,
-    wrapped_header: Vec<PacketHeader>,
+    wrapped_header: Stack<PacketHeader>,
     bytes: [u8; PAYLOAD_MAX],
 }
 impl Payload {
@@ -136,14 +136,14 @@ impl Payload {
         // Next line recommended by clippy, but I think the loop is clearer
         //bytes[..min(data_bytes.len(), PAYLOAD_MAX)].clone_from_slice(&data_bytes[..min(data_bytes.len(), PAYLOAD_MAX)]);
         for i in 0..min(data_bytes.len(), PAYLOAD_MAX) { bytes[i] = data_bytes[i]; }
-        Payload { sender_msg_seq_no, size, is_last, is_blocking, bytes, wrapped_header: vec![] }
+        Payload { sender_msg_seq_no, size, is_last, is_blocking, bytes, wrapped_header: Stack::new() }
     }
     fn get_bytes(&self) -> Vec<u8> { self.bytes.iter().cloned().collect() }
     fn get_sender_msg_seq_no(&self) -> SenderMsgSeqNo { self.sender_msg_seq_no }
     fn get_size(&self) -> PacketNo { self.size }
     fn is_last_packet(&self) -> bool { self.is_last }
     fn is_blocking(&self) -> bool { self.is_blocking }
-    fn get_wrapped_header(&self) -> &Vec<PacketHeader> { &self.wrapped_header }
+    fn get_wrapped_header(&self) -> &Stack<PacketHeader> { &self.wrapped_header }
 }
 impl fmt::Display for Payload {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -151,6 +151,10 @@ impl fmt::Display for Payload {
         if self.is_last_packet() { s = s + ", Last packet"; }
         else                     { s = s + ", Not last packet"; }
         s = s + &format!(", Size {}", *self.size);
+        s = s + &format!(", Wrapped headers: ");
+        for w in self.wrapped_header.iter() {
+            s = s + &format!("{}", w);
+        }
         s = s + &format!("{:?}", &self.bytes[0..10]);
         write!(f, "{}", s)
     }
