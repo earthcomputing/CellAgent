@@ -9,7 +9,7 @@ use crate::dal;
 use crate::dal::{fork_trace_header, update_trace_header};
 use crate::gvm_equation::{GvmEquation, GvmEqn, GvmVariable, GvmVariableType};
 use crate::tcp_message::{TcpMsgType, TcpMsgDirection, TcpTreeNameMsg};
-use crate::tcp_message_types::{NocToPort, NocFromPort, PortToNoc, PortFromNoc, NocFromOutside, NocToOutside};
+use crate::tcp_message_formats::{NocToPort, NocFromPort, PortToNoc, PortFromNoc, NocFromOutside, NocToOutside};
 use crate::uptree_spec::{AllowedTree, ContainerSpec, Manifest, UpTreeSpec, VmSpec};
 use crate::utility::{S, TraceHeader, TraceHeaderParams, TraceType, write_err};
 
