@@ -8,8 +8,8 @@ use crate::config::{CENTRAL_TREE, CONTINUE_ON_ERROR, DEBUG_OPTIONS, TRACE_OPTION
 use crate::dal;
 use crate::dal::{fork_trace_header, update_trace_header};
 use crate::ec_message::MsgType;
-use crate::ec_message_types::{CaToCmBytes, CmToCa, CmFromCa, CmToPe, CmFromPe, PeToCmPacket,
-                    CmToPePacket, CmToCaBytes};
+use crate::ec_message_formats::{CaToCmBytes, CmToCa, CmFromCa, CmToPe, CmFromPe, PeToCmPacket,
+                                CmToPePacket, CmToCaBytes};
 use crate::name::{Name, CellID};
 use crate::packet::{Packet, PacketAssembler, PacketAssemblers, Packetizer};
 use crate::utility::{S, TraceHeader, TraceHeaderParams, TraceType, write_err};

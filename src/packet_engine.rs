@@ -9,9 +9,9 @@ use crate::config::{CENTRAL_TREE, CONTINUE_ON_ERROR, DEBUG_OPTIONS,
 use crate::dal;
 use crate::dal::{fork_trace_header, update_trace_header};
 use crate::ec_message::{MsgType};
-use crate::ec_message_types::{PeFromCm, PeToCm,
-                    PeToPort, PeFromPort, PortToPePacket, PeToPortPacket,
-                    PeToPe, PeFromPe, CmToPePacket, PeToCmPacket};
+use crate::ec_message_formats::{PeFromCm, PeToCm,
+                                PeToPort, PeFromPort, PortToPePacket, PeToPortPacket,
+                                PeToPe, PeFromPe, CmToPePacket, PeToCmPacket};
 use crate::name::{Name, CellID};
 use crate::packet::{Packet};
 use crate::port::PortStatus;

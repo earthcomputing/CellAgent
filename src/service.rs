@@ -4,7 +4,7 @@ use crate::config::{ByteArray, CONTINUE_ON_ERROR, TRACE_OPTIONS};
 use crate::dal;
 use crate::dal::{fork_trace_header, update_trace_header};
 use crate::name::{ContainerID, UptreeID};
-use crate::tcp_message_types::{ContainerToVm, ContainerFromVm};
+use crate::tcp_message_formats::{ContainerToVm, ContainerFromVm};
 use crate::tcp_message::{TcpMsgDirection, TcpMsgType};
 use crate::uptree_spec::{AllowedTree};
 use crate::utility::{S, write_err, TraceHeader, TraceHeaderParams, TraceType};

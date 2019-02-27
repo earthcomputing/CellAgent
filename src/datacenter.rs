@@ -8,13 +8,13 @@ use std::{fmt, fmt::Write,
 use crate::blueprint::{Blueprint, Cell};
 use crate::config::{TRACE_OPTIONS, CellNo, CellQty, CellType, CellConfig, PortNo, PortQty, Edge, LinkNo, get_geometry};
 use crate::dal;
-use crate::ec_message_types::{LinkToPort, PortFromLink, PortToLink, LinkFromPort};
+use crate::ec_message_formats::{LinkToPort, PortFromLink, PortToLink, LinkFromPort};
 use crate::link::{Link};
 use crate::nalcell::{NalCell};
 use crate::name::{CellID, LinkID};
 use crate::noc::{Noc};
-use crate::tcp_message_types::{OutsideFromNoc, OutsideToNoc, NocFromOutside, NocToOutside,
-                               PortToNoc, PortFromNoc};
+use crate::tcp_message_formats::{OutsideFromNoc, OutsideToNoc, NocFromOutside, NocToOutside,
+                                 PortToNoc, PortFromNoc};
 use crate::utility::{S, TraceHeaderParams, TraceType};
 
 #[derive(Debug)]

@@ -20,7 +20,7 @@ mod errors;
 mod gvm_equation;
 mod link;
 mod ec_message;
-mod ec_message_types;
+mod ec_message_formats;
 mod nalcell;
 mod name;
 mod noc;
@@ -32,7 +32,7 @@ mod routing_table;
 mod routing_table_entry;
 mod service;
 mod tcp_message;
-mod tcp_message_types;
+mod tcp_message_formats;
 mod tenant;
 mod traph;
 mod traph_element;
@@ -53,7 +53,7 @@ use crate::config::{AUTO_BREAK, OUTPUT_DIR_NAME, OUTPUT_FILE_NAME, QUENCH,
                     CellNo, CellConfig, CellQty, PortNo, PortQty, is2e};
 use crate::datacenter::Datacenter;
 use crate::gvm_equation::{GvmEqn};
-use crate::tcp_message_types::{OutsideToNoc, OutsideFromNoc};
+use crate::tcp_message_formats::{OutsideToNoc, OutsideFromNoc};
 use crate::uptree_spec::{AllowedTree, ContainerSpec, Manifest, UpTreeSpec, VmSpec};
 use crate::utility::{print_vec, S, TraceHeader};
 

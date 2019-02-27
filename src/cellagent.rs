@@ -20,7 +20,7 @@ use crate::ec_message::{Message, MsgHeader, MsgDirection, MsgTreeMap, MsgType,
               ManifestMsg,
               StackTreeMsg, StackTreeDMsg,
               TreeNameMsg};
-use crate::ec_message_types::{CaToCm, CaFromCm, CaToCmBytes, CmToCaBytes};
+use crate::ec_message_formats::{CaToCm, CaFromCm, CaToCmBytes, CmToCaBytes};
 use crate::gvm_equation::{GvmEquation, GvmEqn};
 use crate::name::{Name, CellID, SenderID, PortTreeID, TreeID, UptreeID, VmID};
 use crate::packet_engine::NumberOfPackets;
@@ -28,7 +28,7 @@ use crate::port;
 use crate::port_tree::PortTree;
 use crate::routing_table_entry::{RoutingTableEntry};
 use crate::tcp_message::{TcpMsgType, TcpMsgDirection, TcpTreeNameMsg};
-use crate::tcp_message_types::{CaToVm, VmFromCa, VmToCa, CaFromVm};
+use crate::tcp_message_formats::{CaToVm, VmFromCa, VmToCa, CaFromVm};
 use crate::traph;
 use crate::traph::{Traph};
 use crate::tree::Tree;
