@@ -121,10 +121,10 @@ VMID - "vm_id":{"name":"VM:C:[0-9]*+vm[0-9]*","uuid":{"uuid":[[0-9]*,0]}},
 SENDER - "sender_id":{"name":"Sender:C:[0-9]*+VM:C:[0-9]*+vm[0-9]*","uuid":{"uuid":[[0-9]*,0]}},
 PORT - "port_no":{"v":[0-9]*},"is_border":[a-z]*
 
-{THDR,FCN,CELLID,COMMENT}
-{THDR,FCN,CELLID,PORT}
-{THDR,FCN,CELLID,VMID,SENDER,COMMENT}
-{THDR,FCN,COMMENT}
+{THDR, FCN, CELLID, COMMENT}
+{THDR, FCN, CELLID, PORT}
+{THDR, FCN, CELLID, VMID, SENDER, COMMENT}
+{THDR, FCN, COMMENT}
 
 */
 lazy_static!{

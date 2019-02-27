@@ -56,7 +56,7 @@ impl MsgType {
             MsgType::StackTreeD  => Box::new(serde_json::from_str::<StackTreeDMsg>(&serialized_msg).context(MessageError::Chain { func_name: _f, comment: S("StackTreeDMsg")})?),
             MsgType::TreeName    => Box::new(serde_json::from_str::<TreeNameMsg>(&serialized_msg).context(MessageError::Chain { func_name: _f, comment: S("TreeNameMsg")})?),
             _ => panic!("Invalid message type in get_msg")
-        })        
+        })
     }
     pub fn msg_from_bytes(bytes: &ByteArray) -> Result<Box<dyn Message>, Error> {
         let _f = "msg_from_bytes";

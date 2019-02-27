@@ -224,4 +224,4 @@ pub fn get_geometry() -> (usize, usize, Vec<(usize, usize)>) {
     if geometry.len() != *NCELLS { panic!(format!("Topology has {} entries for {} cells", geometry.len(), *NCELLS)) };
     (max_x, max_y, geometry)
 }
-fn is2e(i: usize, j: usize) -> Edge { Edge(CellNo(i),CellNo(j)) }
+fn is2e(i: usize, j: usize) -> Edge { Edge(CellNo(i), CellNo(j)) }
