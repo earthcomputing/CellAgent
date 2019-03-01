@@ -5,8 +5,8 @@ authors = ["Alan Karp <alan@earthcomputing.io>"]
 edition = "2018"
 
 [[bin]]
-name = "simulator"
-path = "src/simulator.rs"
+name = "main"
+path = "src/main.rs"
 
 [[bin]]
 name = "cell"
