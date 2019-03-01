@@ -57,12 +57,11 @@ fn main() -> Result<(), Error> {
         .truncate(true)
 	.open(OUTPUT_FILE_NAME);
     let cell_no = CellNo(0);
-    let num_phys_ports = PortQty(3);
-    let border_port_list : Vec<PortNo> = vec![2u8]
+    let border_port_list : Vec<PortNo> = vec![0u8]
         .iter()
         .map(|i| PortNo(*i as u8))
 	.collect();
-    let nal_cell = NalCell::new(cell_no, num_phys_ports, &HashSet::from_iter(border_port_list.clone()), CellConfig::Large);
+    let nal_cell = NalCell::new(cell_no, PortQty(5), &HashSet::from_iter(border_port_list.clone()), CellConfig::Large);
     Ok(())
 }
 
