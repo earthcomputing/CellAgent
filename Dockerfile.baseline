@@ -12,7 +12,7 @@ RUN USER=root cargo new --bin /usr/src/CellAgent
 WORKDIR /usr/src/CellAgent
 
 #COPY Cargo.lock Cargo.lock
-COPY Cargo.toml Cargo.toml
+COPY Cargo.toml.baseline Cargo.toml
 
 ENV RUSTFLAGS "-C debuginfo=2 -A dead_code -A unused-variables -A unused-imports -A non-snake-case"
 
