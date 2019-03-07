@@ -172,6 +172,8 @@ impl CellAgent {
     }
     fn get_no_ports(&self) -> PortQty { self.no_ports }
     pub fn get_cell_id(&self) -> CellID { self.cell_id }
+    pub fn get_connected_tree_id(&self) -> TreeID { self. connected_tree_id }
+    pub fn get_control_tree_id(&self) -> TreeID { self.control_tree_id }
 //    pub fn get_cell_info(&self) -> CellInfo { self.cell_info }
 //    pub fn get_tree_name_map(&self) -> &TreeNameMap { &self.tree_name_map }
     fn get_vm_senders(&self, tree_id: TreeID) -> Result<Vec<CaToVm>, Error> {
@@ -323,7 +325,6 @@ impl CellAgent {
             .cloned()
             .ok_or(CellagentError::BaseTree { func_name: _f, cell_id: self.cell_id, tree_id: port_tree_id }.into())
     }
-    fn get_connected_tree_id(&self) -> TreeID { self.connected_tree_id }
     //pub fn get_control_tree_id(&self) -> &TreeID { &self.control_tree_id }
     // These functions specify the Discover quenching algorithms
     fn quench_simple(&self, tree_id: TreeID) -> bool {
