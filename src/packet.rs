@@ -12,7 +12,7 @@ use crate::app_message::{SenderMsgSeqNo, get_next_count};
 use crate::config::{PACKET_MIN, PACKET_MAX, PAYLOAD_DEFAULT_ELEMENT, 
     ByteArray, PacketNo};
 use crate::ec_message::{Message, MsgType, TypePlusMsg};
-use crate::name::{PortTreeID};
+use crate::name::{PortTreeID, Name};
 use crate::utility::{S, Stack};
 use crate::uuid_ec::{Uuid, AitState};
  
@@ -62,7 +62,6 @@ impl Packet {
     pub fn get_sender_msg_seq_no(&self) -> SenderMsgSeqNo { self.payload.get_sender_msg_seq_no() }
     pub fn get_size(&self) -> PacketNo { self.payload.get_size() }
     pub fn get_bytes(&self) -> Vec<u8> { self.payload.bytes.iter().cloned().collect() }
-    pub fn get_wrapped_header(&self) -> &Stack<PacketHeader> { self.payload.get_wrapped_header() }
     // pub fn get_payload_bytes(&self) -> Vec<u8> { self.get_payload().get_bytes() }
     // pub fn get_payload_size(&self) -> usize { self.payload.get_no_bytes() }
 
@@ -78,6 +77,19 @@ impl Packet {
         uuid.next()?;
         self.header = PacketHeader::new(&uuid);
         Ok(uuid.get_ait_state())
+    }
+    // Wrapping and unwrapping following failover
+    pub fn wrap(&mut self, rw_port_tree_id: PortTreeID) {
+        self.payload.wrapped_header.push(self.header);
+        self.header = PacketHeader::new(&rw_port_tree_id.get_uuid());
+    }
+    pub fn unwrap(&mut self) -> bool {
+        if let Some(wrapped_header) = self.payload.wrapped_header.pop(){
+            self.header = wrapped_header;
+            true
+        } else {
+            false
+        }
     }
     // Payload (Deep Packet Inspection)
     // Debug hack to get tree name out of packets.  Assumes msg is one packet

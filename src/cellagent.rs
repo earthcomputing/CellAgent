@@ -924,7 +924,7 @@ impl CellAgent {
         let port_number = port_no.make_port_number(self.no_ports)?;
         self.tree_id_map.insert(rw_port_tree_id.get_uuid(), rw_port_tree_id);
         if self.my_tree_id == lw_port_tree_id.to_tree_id() {
-            println!("---> Cellagent {}: {} reached leafward node for port tree {}", self.cell_id, _f, rw_port_tree_id);
+            println!("Cellagent {}: {} reached leafward node for port tree {}", self.cell_id, _f, rw_port_tree_id);
             let broken_port_no = {
                 let rw_traph = self.get_traph(rw_port_tree_id).context(CellagentError::Chain { func_name: _f, comment: S("lw_traph") })?;
                 let broken_element = rw_traph.get_parent_element().context(CellagentError::Chain { func_name: _f, comment: S("lw element") })?;
