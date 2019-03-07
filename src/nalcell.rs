@@ -77,7 +77,8 @@ impl NalCell {
         NalCell::start_cell(&cell_agent, ca_from_cm);
         let cmodel = Cmodel::new(cell_id);
         NalCell::start_cmodel(&cmodel, cm_from_ca, cm_to_pe, cm_from_pe, cm_to_ca);
-        let packet_engine = PacketEngine::new(cell_id, pe_to_cm, pe_to_ports, border_port_nos).context(NalcellError::Chain { func_name: "new", comment: S("packet engine create")})?;
+        let packet_engine = PacketEngine::new(cell_id, cell_agent.get_connected_tree_id(),
+                                              pe_to_cm, pe_to_ports, border_port_nos).context(NalcellError::Chain { func_name: "new", comment: S("packet engine create")})?;
         NalCell::start_packet_engine(&packet_engine, pe_from_cm, pe_from_ports);
         Ok(NalCell { id: cell_id, cell_type, config, cmodel,
                 ports: boxed_ports, cell_agent, vms: Vec::new(),

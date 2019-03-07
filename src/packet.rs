@@ -83,7 +83,7 @@ impl Packet {
     // Debug hack to get tree name out of packets.  Assumes msg is one packet
     pub fn get_port_tree_id(&self) -> PortTreeID {
         let msg = MsgType::get_msg(&vec![self.clone()]).unwrap();
-        msg.get_port_tree_id().clone()
+        msg.get_port_tree_id()
     }
 }
 impl fmt::Display for Packet {
@@ -126,8 +126,8 @@ pub struct Payload {
                     // Number of bytes in last packet if last packet, 0 => Error
     is_last: bool,
     is_blocking: bool,
-    wrapped_header: Stack<PacketHeader>,
     bytes: [u8; PAYLOAD_MAX],
+    wrapped_header: Stack<PacketHeader>,
 }
 impl Payload {
     pub fn new(sender_msg_seq_no: SenderMsgSeqNo, size: PacketNo,
@@ -277,9 +277,9 @@ impl ToHex for [u8] {
             .split(", ")
             .collect::<Vec<_>>()
             .join("")
-            .trim_left_matches('[')
-            .trim_right_matches(']')
-            .trim_right_matches("00").to_string()
+            .trim_start_matches('[')
+            .trim_end_matches(']')
+            .trim_end_matches("00").to_string()
     }
 }
 use serde::ser::{Serialize, Serializer as Funky, SerializeStruct};
