@@ -115,12 +115,11 @@ impl fmt::Display for Path {
 }
 // I could just use Vec, but this way I'm sure I don't do anything other than push, pop, and len
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct Stack<T: fmt::Display + Sized> {
+pub struct Stack<T: Sized> {
     elements: Vec<T>
 }
-impl<T: fmt::Display + Sized> Stack<T> {
+impl<T: Sized> Stack<T> {
     pub fn new() -> Stack<T> { Stack { elements: vec![] } }
-    pub fn len(&self) -> usize { self.elements.len() }
     pub fn push(&mut self, element: T) { self.elements.push(element); }
     pub fn pop(&mut self) -> Option<T> { self.elements.pop() }
     pub fn iter(&self) -> core::slice::Iter<T> { self.elements.iter() }
