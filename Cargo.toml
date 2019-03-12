@@ -23,7 +23,7 @@ backtrace = "0.3" # used in dumpstack.rs
 #ditto = "0.2.0" # CRDT library
 either = "1.5"
 eval = "^0.4.1"
-failure = "0.1.1"
+failure = "0.1.5"
 #failure_derive = "0.1.0"
 futures = "0.1.23" # used in dal.rs
 #indexmap = "1.0.1" # HashMap and HashSet that preserve order
@@ -31,8 +31,9 @@ futures = "0.1.23" # used in dal.rs
 lazy_static = "1.1.0"
 #log = {version = "0.4.6", features = ["std", "serde"]} # Should use instead of my trace approach
 multi_mut = "0.1"
-rand = "*" # Or a specific version
+rand = "0.5.4"
 rdkafka = "0.17.0"
+#reqwest = "0.9.11"
 #rusoto_s3 = "0.36.0" # Library for AWS S3
 #schema = { path = "/Users/alan/Documents/Eclipse/schema" }  # JSON schema
 #schema_derive = { path = "/Users/alan/Documents/Eclipse/schema-derive" }
@@ -40,5 +41,4 @@ serde = { version = "1.0.27", features = ["rc"] }
 serde_derive = "1.0.27"
 serde_json = "1.0.9"
 time = "0.1"
-#tokio = "*"
 uuid = { version = "0.7.0", features = ["serde", "v4"] }

@@ -1,5 +1,7 @@
 use std::{fmt, thread};
 
+//use reqwest::*;
+
 use crate::app_message_formats::{ContainerToVm, ContainerFromVm};
 use crate::app_message::{AppMsgDirection, AppMsgType};
 use crate::config::{ByteArray, CONTINUE_ON_ERROR, TRACE_OPTIONS};
@@ -102,7 +104,12 @@ impl NocMaster {
                     let _ = dal::add_to_trace(TraceType::Trace, trace_params, &trace, _f);
                 }
             }
-            println!("NocMaster on container {} got msg {}", self.container_id, ::std::str::from_utf8(&msg)?);
+            let post = format!("NocMaster on container {} got msg {}", self.container_id, ::std::str::from_utf8(&msg)?);
+            println!("{}", post);
+//            reqwest::Client::new()
+//                .post(&post)
+//                .send()
+//                .unwrap();
         }
     }
 }

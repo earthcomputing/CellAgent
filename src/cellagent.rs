@@ -20,8 +20,7 @@ use crate::ec_message::{Message, MsgHeader, MsgDirection, MsgTreeMap, MsgType,
               FailoverMsg, FailoverDMsg, FailoverMsgPayload, FailoverResponse,
               HelloMsg,
               ManifestMsg,
-              StackTreeMsg, StackTreeDMsg,
-              TreeNameMsg};
+              StackTreeMsg, StackTreeDMsg};
 use crate::ec_message_formats::{CaToCm, CaFromCm, CaToCmBytes, CmToCaBytes};
 use crate::gvm_equation::{GvmEquation, GvmEqn};
 use crate::name::{Name, CellID, SenderID, PortTreeID, TreeID, UptreeID, VmID};
@@ -877,13 +876,11 @@ impl CellAgent {
     pub fn process_failover_msg(&mut self, msg: &FailoverMsg, port_no: PortNo) -> Result<(), Error> {
         let _f = "process_failover_msg";
         let _cell_id = self.cell_id; // Needed for debug printouts
-        let no_ports = self.no_ports;
         let header = msg.get_header();
         let payload = msg.get_payload();
         let sender_id = header.get_sender_id();
         let rw_port_tree_id = payload.get_rw_port_tree_id();
         let rw_tree_id = rw_port_tree_id.to_tree_id();
-        let lw_port_tree_id = payload.get_lw_port_tree_id();
         let port_number = port_no.make_port_number(self.no_ports)?;
         if rw_tree_id == self.my_tree_id {
             println!("Cellagent {}: {} found path to rootward for port tree {}", self.cell_id, _f, rw_port_tree_id);
@@ -921,7 +918,6 @@ impl CellAgent {
         let rw_port_tree_id = failover_payload.get_rw_port_tree_id();
         let lw_port_tree_id = failover_payload.get_lw_port_tree_id();
         let broken_port_tree_ids = failover_payload.get_broken_port_tree_ids();
-        let port_number = port_no.make_port_number(self.no_ports)?;
         self.tree_id_map.insert(rw_port_tree_id.get_uuid(), rw_port_tree_id);
         if self.my_tree_id == lw_port_tree_id.to_tree_id() {
             println!("Cellagent {}: {} reached leafward node for port tree {}", self.cell_id, _f, rw_port_tree_id);

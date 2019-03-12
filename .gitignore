@@ -4,3 +4,4 @@ out
 target
 test.json
 .idea/workspace.xml
+node_modules
