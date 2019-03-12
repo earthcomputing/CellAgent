@@ -31,6 +31,7 @@ mod packet;
 mod packet_engine;
 mod port;
 mod port_tree;
+mod rack;
 mod routing_table;
 mod routing_table_entry;
 mod service;
@@ -85,7 +86,7 @@ fn main() -> Result<(), Error> {
     let mut border_cell_ports = HashMap::new();
     border_cell_ports.insert(CellNo(2), vec![PortNo(2)]);
     border_cell_ports.insert(CellNo(7), vec![PortNo(2)]);
-    let (mut dc, application_to_noc, application_from_noc) =
+    let mut dc =
         match Datacenter::construct(
             CellQty(10),
             &vec![is2e(0,1), is2e(1,2), is2e(2,3), is2e(3,4),
@@ -95,7 +96,7 @@ fn main() -> Result<(), Error> {
             &cell_port_exceptions,
             &border_cell_ports
         ) {
-            Ok(pair) => pair,
+            Ok(dc) => dc,
             Err(err) => panic!("Datacenter construction failure: {}", err)
         };
     if false { deployment_demo()?; }    // Demonstrate features of deployment spec
@@ -120,13 +121,13 @@ fn main() -> Result<(), Error> {
         if print_opt.len() > 1 {
             match print_opt.trim() {
                 "d" => {
-                    println!("{}", dc);
+                    println!("{}", dc.get_rack());
                     Ok(())
                 },
                 "c" => show_ca(&dc),
                 "l" => break_link(&mut dc),
                 "p" => show_pe(&dc),
-                "m" => deploy(&application_to_noc.clone()),
+                "m" => deploy(&dc.get_application_to_noc().clone()),
                 "x" => std::process::exit(0),
                 _   => {
                     println!("Invalid input {}", print_opt);
@@ -137,8 +138,9 @@ fn main() -> Result<(), Error> {
     }
 }
 fn show_ca(dc: &Datacenter) -> Result<(), Error> {
-    let cells = dc.get_cells();
-    print_hash_map(&dc.get_cell_ids());
+    let rack = dc.get_rack();
+    let cells = rack.get_cells();
+    print_hash_map(&rack.get_cell_ids());
     let _ = stdout().write(b"Enter cell to display cell\n")?;
     let cell_no = read_int()?;
     cells.get(&CellNo(cell_no))
@@ -149,8 +151,9 @@ fn show_ca(dc: &Datacenter) -> Result<(), Error> {
     Ok(())
 }
 fn show_pe(dc: &Datacenter) -> Result<(), Error> {
-    let cells = dc.get_cells();
-    print_hash_map(&dc.get_cell_ids());
+    let rack = dc.get_rack();
+    let cells = rack.get_cells();
+    print_hash_map(&rack.get_cell_ids());
     let _ = stdout().write(b"Enter cell to display forwarding table\n")?;
     let cell_no = read_int()?;
     cells.get(&CellNo(cell_no))
@@ -161,6 +164,7 @@ fn show_pe(dc: &Datacenter) -> Result<(), Error> {
     Ok(())
 }
 fn break_link(dc: &mut Datacenter) -> Result<(), Error> {
+    let rack = dc.get_rack_mut();
     let edge: Edge = match AUTO_BREAK {
         Some(edge) => {
             // TODO: Wait until discover is done before automatically breaking link, should be removed
@@ -169,7 +173,7 @@ fn break_link(dc: &mut Datacenter) -> Result<(), Error> {
             edge
         },
         None => {
-            let link_ids = dc.get_link_ids();
+            let link_ids = rack.get_link_ids();
             print_hash_map(&link_ids);
             let _ = stdout().write(b"Enter first cell number of link to break\n")?;
             let left: usize = read_int()?;
@@ -178,7 +182,7 @@ fn break_link(dc: &mut Datacenter) -> Result<(), Error> {
             Edge(CellNo(left), CellNo(right))
         },
     };
-    let links = dc.get_links_mut();
+    let links = rack.get_links_mut();
     links.get_mut(&edge)
         .map_or_else(|| -> Result<(), Error> { println!("{} is not a valid input", edge); Ok(()) },
                      |link: &mut Link| -> Result<(), Error> { link.break_link()?; Ok(()) }
