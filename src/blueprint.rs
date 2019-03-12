@@ -145,7 +145,7 @@ impl Cell for BorderCell {
 }
 impl BorderCell {
     pub fn new(cell_no: CellNo, cell_type: CellType, interior_ports: Vec<PortNo>, border_ports: Vec<PortNo>) -> BorderCell {
-	BorderCell { cell_no, cell_type, interior_ports, border_ports }
+	    BorderCell { cell_no, cell_type, interior_ports, border_ports }
     }
     pub fn get_border_ports(&self) -> &Vec<PortNo> { &self.border_ports }
 }

@@ -1,4 +1,3 @@
-extern crate multi_mut;
 use multi_mut::{HashMapMultiMut};
 
 use std::{fmt, fmt::Write,
@@ -29,10 +28,6 @@ pub struct Datacenter {
 impl Datacenter {
     pub fn new() -> Datacenter { Datacenter { cells: HashMap::new(), links: HashMap::new() } }
     pub fn construct(num_cells: CellQty, edges: &Vec<Edge>, default_num_phys_ports_per_cell: PortQty, cell_port_exceptions: &HashMap<CellNo, PortQty>, border_cell_ports: &HashMap<CellNo, Vec<PortNo>>) -> Result<(Datacenter, ApplicationToNoc, ApplicationFromNoc), Error> {
-        /* Doesn't work when debugging in Eclipse
-        let args: Vec<String> = env::args().collect();
-        println!("Main: args {:?}",args);
-         */
         println!("\nMain: {} ports for each of {} cells", *default_num_phys_ports_per_cell, *num_cells);
         let blueprint = Blueprint::new(num_cells, &edges, default_num_phys_ports_per_cell, &cell_port_exceptions, border_cell_ports)?;
         println!("{}", blueprint);
