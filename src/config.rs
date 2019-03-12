@@ -155,8 +155,8 @@ impl fmt::Display for Edge {
     }
 }
 #[derive(Debug, Copy, Clone)]
-pub struct LinkNo(pub CellNo);
-impl Deref for LinkNo { type Target = CellNo; fn deref(&self) -> &Self::Target { &self.0 } }
+pub struct LinkQty(pub usize);
+impl Deref for LinkQty { type Target = usize; fn deref(&self) -> &Self::Target { &self.0 } }
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Hash, Serialize, Deserialize)]
 pub struct MaskValue(pub u16);
 impl Deref for MaskValue { type Target = u16; fn deref(&self) -> &Self::Target { &self.0 } }
