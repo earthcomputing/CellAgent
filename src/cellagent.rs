@@ -11,7 +11,7 @@ use crate::app_message::{AppMsgType, AppMsgDirection, AppTreeNameMsg};
 use crate::app_message_formats::{CaToVm, VmFromCa, VmToCa, CaFromVm};
 use crate::config::{CONNECTED_PORTS_TREE_NAME, CONTINUE_ON_ERROR, CONTROL_TREE_NAME, DEBUG_OPTIONS, QUENCH,
              MAX_NUM_PHYS_PORTS_PER_CELL, TRACE_OPTIONS,
-             ByteArray, CellNo, CellType, CellConfig, Quench, PathLength, PortNo, PortQty};
+             ByteArray, CellQty, CellType, CellConfig, Quench, PathLength, PortNo, PortQty};
 use crate::dal;
 use crate::dal::{fork_trace_header, update_trace_header};
 use crate::ec_message::{Message, MsgHeader, MsgDirection, MsgTreeMap, MsgType,
@@ -125,7 +125,7 @@ impl CellAgent {
         }
         // Set up predefined trees - Must be first two in this order
         let port_number_0 = PortNumber::new0();
-        let hops = PathLength(CellNo(0));
+        let hops = PathLength(CellQty(0));
         let path = Path::new0();
         let control_tree_id = self.control_tree_id;
         let connected_tree_id = self.connected_tree_id;
@@ -856,7 +856,7 @@ impl CellAgent {
         eqns.insert(GvmEqn::Save("false"));
         let gvm_eqn = GvmEquation::new(&eqns, &Vec::new());
         let _ = self.update_traph(base_port_tree_id, port_number, traph::PortStatus::Child, &gvm_eqn,
-                              children, PathLength(CellNo(0)), path)?;
+                              children, PathLength(CellQty(0)), path)?;
         let mask = Mask::new(port_number);
         self.forward_stacked_trees(base_port_tree_id, mask)?;
         {
@@ -1331,7 +1331,7 @@ impl CellAgent {
             let new_tree_id = self.my_tree_id.add_component("Noc").context(CellagentError::Chain { func_name: "port_connected", comment: S(self.cell_id) })?;
             self.tree_id_map.insert(new_tree_id.get_uuid(), new_tree_id.to_port_tree_id_0());
             let _ = self.update_traph(new_tree_id.to_port_tree_id(port_number), port_number, traph::PortStatus::Parent,
-                                          &gvm_eqn, HashSet::new(), PathLength(CellNo(1)), Path::new0(), ).context(CellagentError::Chain { func_name: "port_connected", comment: S(self.cell_id) })?;
+                                          &gvm_eqn, HashSet::new(), PathLength(CellQty(1)), Path::new0(), ).context(CellagentError::Chain { func_name: "port_connected", comment: S(self.cell_id) })?;
             let base_tree = AllowedTree::new("Base");
             let my_tree_id = self.my_tree_id;
             let sender_id = SenderID::new(self.cell_id, &format!("BorderPort+{}", *port_no))?;
@@ -1350,7 +1350,7 @@ impl CellAgent {
             let hello_msg = HelloMsg::new(sender_id, self.cell_id, port_no);
             self.send_msg(self.connected_tree_id, &hello_msg, port_no_mask)?;
             let path = Path::new(port_no, self.no_ports)?;
-            let hops = PathLength(CellNo(1));
+            let hops = PathLength(CellQty(1));
             let my_port_tree_id = self.my_tree_id.to_port_tree_id(port_number);
             self.update_base_tree_map(my_port_tree_id, self.my_tree_id);
             let discover_msg = DiscoverMsg::new(sender_id, my_port_tree_id,

@@ -7,7 +7,7 @@ use serde_json;
 
 use crate::app_message::{SenderMsgSeqNo, AppMsgDirection, get_next_count};
 use crate::cellagent::{CellAgent};
-use crate::config::{ByteArray, CellNo, PathLength, PortNo};
+use crate::config::{ByteArray, CellQty, PathLength, PortNo};
 use crate::gvm_equation::{GvmEquation, GvmEqn};
 use crate::name::{Name, CellID, PortTreeID, SenderID, TreeID};
 use crate::packet::{Packet, Packetizer, Serializer};
@@ -291,7 +291,7 @@ impl DiscoverPayload {
     }
     //fn get_sending_cell(&self) -> CellID { self.sending_cell_id.clone() }
     pub fn get_hops(&self) -> PathLength { self.hops }
-    pub fn hops_plus_one(&self) -> PathLength { PathLength(CellNo(**self.hops + 1)) }
+    pub fn hops_plus_one(&self) -> PathLength { PathLength(CellQty(**self.hops + 1)) }
     pub fn get_path(&self) -> Path { self.path }
     pub fn get_port_tree_id(&self) -> PortTreeID { self.port_tree_id }
     pub fn get_root_port_no(&self) -> PortNo { self.root_port_no }
