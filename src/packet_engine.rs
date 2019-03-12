@@ -13,9 +13,9 @@ use crate::ec_message_formats::{PeFromCm, PeToCm,
                                 PeToPort, PeFromPort, PortToPePacket, PeToPortPacket,
                                 PeToPe, PeFromPe, CmToPePacket, PeToCmPacket};
 use crate::name::{Name, CellID};
-use crate::packet::{Packet};
+use crate::packet::Packet;
 use crate::port::PortStatus;
-use crate::routing_table::{RoutingTable};
+use crate::routing_table::RoutingTable;
 use crate::routing_table_entry::{RoutingTableEntry};
 use crate::utility::{Mask, S, TraceHeader, TraceHeaderParams, TraceType, write_err};
 use crate::uuid_ec::{AitState, Uuid};
@@ -333,21 +333,21 @@ impl PacketEngine {
     }
     fn send_packet(&self, port_no: PortNo, packet: &Packet) -> Result<(), Error> {
         let _f = "send_packet";
-        let mut reroute_port = self.reroute.lock().unwrap()[port_no.as_usize()];
-        if reroute_port == PortNo(0) {
-            reroute_port = port_no;
+        let mut reroute_port_no = self.reroute.lock().unwrap()[port_no.as_usize()];
+        if reroute_port_no == PortNo(0) {
+            reroute_port_no = port_no;
         } else {
             let mut locked_outbuf = self.out_buffers.lock().unwrap();
             let broken_outbuf = &mut locked_outbuf[port_no.as_usize()];
             if broken_outbuf.len() > 0 {
                 // Only clone if there are packets in the broken out buffer
                 let broken_outbuf = &mut locked_outbuf[port_no.as_usize()].clone();
-                let reroute_outbuf = &mut locked_outbuf[reroute_port.as_usize()];
+                let reroute_outbuf = &mut locked_outbuf[reroute_port_no.as_usize()];
                 reroute_outbuf.append(broken_outbuf);
             }
         }
-        self.pe_to_ports.get(reroute_port.as_usize())
-            .ok_or::<Error>(PacketEngineError::Sender { cell_id: self.cell_id, func_name: _f, port_no: *reroute_port }.into())?
+        self.pe_to_ports.get(reroute_port_no.as_usize())
+            .ok_or::<Error>(PacketEngineError::Sender { cell_id: self.cell_id, func_name: _f, port_no: *reroute_port_no }.into())?
             .send(PeToPortPacket::Packet(packet.clone()))?;
         Ok(())
     }
@@ -685,7 +685,6 @@ impl fmt::Display for NumberOfPackets {
 // Errors
 use failure::{Error, ResultExt};
 use crate::name::TreeID;
-use std::collections::HashMap;
 
 #[derive(Debug, Fail)]
 pub enum PacketEngineError {
