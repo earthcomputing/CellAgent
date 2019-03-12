@@ -1,14 +1,12 @@
 use std::{fmt,
           ops::{Deref},
           sync::atomic::{ATOMIC_USIZE_INIT, AtomicUsize, Ordering},
-          sync::mpsc,
 };
 
-use serde;
 use serde_json;
 
 use crate::config::{ByteArray};
-use crate::gvm_equation::{GvmEquation, GvmEqn};
+use crate::gvm_equation::{GvmEquation};
 use crate::name::{SenderID};
 use crate::uptree_spec::{AllowedTree, Manifest};
 use crate::utility::{S};
@@ -62,11 +60,11 @@ pub struct TypePlusAppMsg {
     serialized_msg: String
 }
 impl TypePlusAppMsg {
-    pub fn new(msg_type: AppMsgType, serialized_msg: String) -> TypePlusAppMsg {
+    pub fn _new(msg_type: AppMsgType, serialized_msg: String) -> TypePlusAppMsg {
         TypePlusAppMsg { msg_type, serialized_msg }
     }
-    fn get_type(&self) -> AppMsgType { self.msg_type }
-    fn get_serialized_msg(&self) -> &str { &self.serialized_msg }
+    fn _et_type(&self) -> AppMsgType { self.msg_type }
+    fn _get_serialized_msg(&self) -> &str { &self.serialized_msg }
 }
 impl fmt::Display for TypePlusAppMsg {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -104,12 +102,12 @@ impl AppMsgHeader {
         let msg_count = get_next_count();
         AppMsgHeader { sender_id: sender_id.clone(), is_ait, msg_type, direction, sender_msg_seq_no: msg_count, allowed_tree_names: Vec::<AllowedTree>::new() }
     }
-    pub fn get_msg_type(&self) -> AppMsgType { self.msg_type }
+    pub fn _get_msg_type(&self) -> AppMsgType { self.msg_type }
     pub fn get_sender_msg_seq_no(&self) -> SenderMsgSeqNo { self.sender_msg_seq_no }
     pub fn get_ait(&self) -> bool { self.is_ait }
     pub fn get_direction(&self) -> AppMsgDirection { self.direction }
-    pub fn get_sender_id(&self) -> &SenderID { &self.sender_id }
-    pub fn get_allowed_tree_names(&self) -> &Vec<AllowedTree> { &self.allowed_tree_names }
+    pub fn _get_sender_id(&self) -> &SenderID { &self.sender_id }
+    pub fn _get_allowed_tree_names(&self) -> &Vec<AllowedTree> { &self.allowed_tree_names }
     pub fn set_allowed_tree_names(&mut self, allowed_tree_names: Vec<AllowedTree>) { self.allowed_tree_names = allowed_tree_names; } // Should this be set in new()?
     //pub fn set_direction(&mut self, direction: MsgDirection) { self.direction = direction; }
 }
@@ -427,7 +425,7 @@ impl fmt::Display for AppTreeNameMsgPayload {
 }
 
 // Errors
-use failure::{Error, ResultExt};
+use failure::{Error};
 #[derive(Debug, Fail)]
 pub enum AppMessageError {
     #[fail(display = "AppMessageError::Chain {} {}", func_name, comment)]

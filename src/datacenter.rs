@@ -1,7 +1,6 @@
 use multi_mut::{HashMapMultiMut};
 
 use std::{fmt, fmt::Write,
-          cmp::max,
           collections::{HashMap, HashSet},
           iter::FromIterator,
           sync::mpsc::channel,
@@ -10,7 +9,7 @@ use std::{fmt, fmt::Write,
 use crate::app_message_formats::{ApplicationFromNoc, ApplicationToNoc, NocFromApplication, NocToApplication,
                                  PortToNoc, PortFromNoc};
 use crate::blueprint::{Blueprint, Cell};
-use crate::config::{TRACE_OPTIONS, CellNo, CellQty, CellType, CellConfig, PortNo, PortQty, Edge, LinkNo, get_geometry};
+use crate::config::{TRACE_OPTIONS, CellNo, CellQty, CellConfig, PortNo, PortQty, Edge, LinkNo, get_geometry};
 use crate::dal;
 use crate::ec_message_formats::{LinkToPort, PortFromLink, PortToLink, LinkFromPort, PortFromPe};
 use crate::link::{Link};
@@ -31,7 +30,7 @@ impl Datacenter {
         println!("\nMain: {} ports for each of {} cells", *default_num_phys_ports_per_cell, *num_cells);
         let blueprint = Blueprint::new(num_cells, &edges, default_num_phys_ports_per_cell, &cell_port_exceptions, border_cell_ports)?;
         println!("{}", blueprint);
-        let (mut dc, join_handles) = build_datacenter(&blueprint).context(DatacenterError::Chain { func_name: "initialize", comment: S("")})?;
+        let (mut dc, _join_handles) = build_datacenter(&blueprint).context(DatacenterError::Chain { func_name: "initialize", comment: S("")})?;
         let (application_to_noc, noc_from_application): (ApplicationToNoc, NocFromApplication) = channel();
         let (noc_to_application, application_from_noc): (NocToApplication, ApplicationFromNoc) = channel();
         let mut noc = Noc::new(noc_to_application)?;
@@ -94,11 +93,6 @@ impl Datacenter {
         let mut link_handles = Vec::new();
         for edge in edge_list {
             if (*(edge.0) > num_cells.0) | (*(edge.1) >= num_cells.0) { return Err(DatacenterError::Wire { edge: *edge, func_name: _f, comment: "greater than num_cells test" }.into()); }
-            let (e0, e1) = if *(edge.0) >= *(edge.1) {
-                (*(edge.1), *(edge.0))
-            } else {
-                (*(edge.0), *(edge.1))
-            };
             let (left_cell, rite_cell) = self.cells
                 .get_pair_mut(&edge.0, &edge.1)
                 .unwrap();
@@ -162,7 +156,7 @@ fn build_datacenter(blueprint: &Blueprint) -> Result<(Datacenter, Vec<JoinHandle
 impl fmt::Display for Datacenter {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let mut s = format!("Links");
-        for (edge, link) in &self.links {
+        for (_edge, link) in &self.links {
             write!(s, "{}", link)?;
         }
         s = s + "\nCells";
