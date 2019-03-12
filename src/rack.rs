@@ -9,7 +9,7 @@ use std::{fmt, fmt::Write,
 
 use crate::app_message_formats::{PortToNoc, PortFromNoc};
 use crate::blueprint::{Blueprint, Cell};
-use crate::config::{TRACE_OPTIONS, CellNo, CellQty, CellConfig, Edge, LinkNo, get_geometry};
+use crate::config::{TRACE_OPTIONS, CellNo, CellQty, CellConfig, Edge, LinkQty, get_geometry};
 use crate::dal;
 use crate::ec_message_formats::{LinkToPort, PortFromLink, PortToLink, LinkFromPort, PortFromPe};
 use crate::link::{Link};
@@ -31,7 +31,7 @@ impl Rack {
         let geometry = get_geometry(num_cells);  // A cheat used for visualization
         let edge_list = blueprint.get_edge_list();
         if *num_cells < 1  { return Err(RackError::Cells{ num_cells, func_name: _f }.into()); }
-        if edge_list.len() < *num_cells - 1 { return Err(RackError::Edges { nlinks: LinkNo(CellNo(edge_list.len())), func_name: _f }.into() ); }
+        if edge_list.len() < *num_cells - 1 { return Err(RackError::Edges { nlinks: LinkQty(edge_list.len()), func_name: _f }.into() ); }
         let labeled_border_nal_cells  =
             blueprint
             .get_border_cells()
@@ -164,7 +164,7 @@ pub enum RackError {
     #[fail(display = "RackError::Cells {}: The number of cells {:?} must be at least 1", func_name, num_cells)]
     Cells { num_cells: CellQty, func_name: &'static str },
     #[fail(display = "RackError::Edges {}: {:?} is not enough links to connect all cells", func_name, nlinks)]
-    Edges { nlinks: LinkNo, func_name: &'static str },
+    Edges { nlinks: LinkQty, func_name: &'static str },
     #[fail(display = "RackError::Wire {}: {:?} is not a valid edge at {}", func_name, edge, comment)]
     Wire { edge: Edge, func_name: &'static str, comment: &'static str }
 }
