@@ -1,6 +1,6 @@
 use std::fmt;
 
-use crate::config::{CellNo, PathLength, PortNo};
+use crate::config::{CellQty, PathLength, PortNo};
 use crate::traph::{PortStatus};
 use crate::utility::{Path, PortNumber};
 
@@ -23,11 +23,11 @@ impl TraphElement {
         let _f = "default";
         let port_no = port_number.get_port_no();
         TraphElement::new(false, port_no, PortStatus::Pruned,
-                    PathLength(CellNo(0)), Path::new0())
+                    PathLength(CellQty(0)), Path::new0())
     }
     pub fn get_port_no(&self) -> PortNo { self.port_no }
     pub fn get_hops(&self) -> PathLength { self.hops }
-    pub fn hops_plus_one(&self) -> PathLength { PathLength(CellNo((self.hops.0).0 + 1)) }
+    pub fn hops_plus_one(&self) -> PathLength { PathLength(CellQty((self.hops.0).0 + 1)) }
     pub fn get_path(&self) -> Path { self.path }
     pub fn get_status(&self) -> PortStatus { self.status }
     pub fn is_status(&self, status: PortStatus) -> bool { self.status == status }

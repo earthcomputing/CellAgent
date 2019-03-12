@@ -130,7 +130,7 @@ pub const DEBUG_OPTIONS: DebugOptions = DebugOptions {
 #[derive(Debug, Clone, Hash, Eq, PartialEq, Serialize, Deserialize)]
 pub struct ByteArray(pub Vec<u8>);
 impl Deref for ByteArray { type Target = Vec<u8>; fn deref(&self) -> &Self::Target { &self.0 } }
-#[derive(Debug, Copy, Clone, Eq, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Copy, Clone, Eq, Hash, PartialEq, Serialize, Deserialize)]
 pub struct CellQty(pub usize);
 impl Deref for CellQty { type Target = usize; fn deref(&self) -> &Self::Target { &self.0 } }
 #[derive(Debug, Copy, Clone, Hash, Eq, PartialEq, Serialize, Deserialize)]
@@ -164,8 +164,8 @@ impl Deref for MaskValue { type Target = u16; fn deref(&self) -> &Self::Target {
 pub struct PacketNo(pub u16);
 impl Deref for PacketNo { type Target = u16; fn deref(&self) -> &Self::Target { &self.0 } }
 #[derive(Debug, Copy, Clone, Hash, Eq, PartialEq, Serialize, Deserialize)]
-pub struct PathLength(pub CellNo);
-impl Deref for PathLength { type Target = CellNo; fn deref(&self) -> &Self::Target { &self.0 } }
+pub struct PathLength(pub CellQty);
+impl Deref for PathLength { type Target = CellQty; fn deref(&self) -> &Self::Target { &self.0 } }
 impl fmt::Display for PathLength { fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result { write!(f, "{}", *self.0)} }
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Serialize, Deserialize)]
 pub struct PortQty(pub u8);
