@@ -932,7 +932,10 @@ impl CellAgent {
             };
             let no_packets = payload.get_number_of_packets();
             self.ca_to_cm.send(CaToCmBytes::Reroute((broken_port_no, port_no, no_packets)))?;
-            self.repair_traph(broken_port_tree_ids, port_number)?;
+            // Following line is commented out because the packet engine does rerouting.
+            // Packets still go the out queue for the broken link, but the packet engine reroutes them
+            // to the failover port.  The traph will need to be repaired if another strategy is used.
+            //self.repair_traph(broken_port_tree_ids, port_number)?; // Must be done after Reroute
         } else {
             match payload.get_response() {
                 FailoverResponse::Success => {

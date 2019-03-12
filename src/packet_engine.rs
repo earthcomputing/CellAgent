@@ -23,6 +23,7 @@ use crate::uuid_ec::{AitState, Uuid};
 type BoolArray = Arc<Mutex<Vec<bool>>>;
 type UsizeArray = Arc<Mutex<Vec<usize>>>;
 type PacketArray = Arc<Mutex<Vec<VecDeque<Packet>>>>;
+type Reroute = Arc<Mutex<[PortNo; MAX_NUM_PHYS_PORTS_PER_CELL.0 as usize]>>;
 
 #[derive(Debug, Clone)]
 pub struct PacketEngine {
@@ -33,9 +34,10 @@ pub struct PacketEngine {
     no_seen_packets: UsizeArray, // Number of packets received since last packet sent
     no_sent_packets: UsizeArray, // Number of packets sent since last packet received
     sent_packets: PacketArray, // Packets that may need to be resent
-    out_buffer: PacketArray,   // Packets waiting to go on the out port
+    out_buffers: PacketArray,   // Packets waiting to go on the out port
     in_buffer: PacketArray,    // Packets on the in port waiting to into out_buf on the out port
     port_got_event: BoolArray,
+    reroute: Reroute,
     pe_to_cm: PeToCm,
     pe_to_ports: Vec<PeToPort>,
 }
@@ -53,9 +55,10 @@ impl PacketEngine {
             no_seen_packets: Arc::new(Mutex::new(count_vec.clone())),
             no_sent_packets: Arc::new(Mutex::new(count_vec.clone())),
             sent_packets: Arc::new(Mutex::new(array.clone())),
-            out_buffer: Arc::new(Mutex::new(array.clone())),
+            out_buffers: Arc::new(Mutex::new(array.clone())),
             in_buffer: Arc::new(Mutex::new(array.clone())),
             port_got_event: Arc::new(Mutex::new([false; MAX_NUM_PHYS_PORTS_PER_CELL.0 as usize].to_vec())),
+            reroute: Arc::new(Mutex::new([PortNo(0); MAX_NUM_PHYS_PORTS_PER_CELL.0 as usize])),
             pe_to_cm, pe_to_ports })
     }
 
@@ -88,13 +91,13 @@ impl PacketEngine {
         self.port_got_event.lock().unwrap()[port_no.as_usize()] = true;
     }
     fn get_outbuf(&self, port_no: PortNo) -> VecDeque<Packet> {
-        self.out_buffer.lock().unwrap().get(port_no.as_usize()).unwrap().clone()
+        self.out_buffers.lock().unwrap().get(port_no.as_usize()).unwrap().clone()
     }
     fn get_size(array: &PacketArray, port_no: PortNo) -> usize {
         (*array.lock().unwrap())[port_no.as_usize()].len()
     }
     fn get_outbuf_size(&self, port_no: PortNo) -> usize {
-        PacketEngine::get_size(&self.out_buffer, port_no)
+        PacketEngine::get_size(&self.out_buffers, port_no)
     }
     fn get_inbuf_size(&self, port_no: PortNo) -> usize {
         PacketEngine::get_size(&self.in_buffer, port_no)
@@ -103,14 +106,14 @@ impl PacketEngine {
         PacketEngine::get_size(&self.sent_packets, port_no)
     }
     fn get_outbuf_first_type(&self, port_no: PortNo) -> Option<MsgType> {
-        (*self.out_buffer.lock().unwrap())
+        (*self.out_buffers.lock().unwrap())
             .get(port_no.as_usize())
             .unwrap()
             .get(0)
             .map(|packet| MsgType::msg_type(packet))
     }
     fn get_outbuf_first_ait_state(&self, port_no: PortNo) -> Option<AitState> {
-        (*self.out_buffer.lock().unwrap())
+        (*self.out_buffers.lock().unwrap())
             .get(port_no.as_usize())
             .unwrap()
             .get(0)
@@ -152,7 +155,7 @@ impl PacketEngine {
         item.pop_front()
     }
     fn pop_first_outbuf(&mut self, port_no: PortNo) -> Option<Packet> {
-        PacketEngine::pop_first(&mut self.out_buffer, port_no)
+        PacketEngine::pop_first(&mut self.out_buffers, port_no)
     }
     fn pop_first_inbuf(&mut self, port_no: PortNo) -> Option<Packet> {
         PacketEngine::pop_first(&mut self.in_buffer, port_no)
@@ -174,11 +177,11 @@ impl PacketEngine {
     }
     fn add_to_out_buffer_front(&mut self, port_no: PortNo, packet: Packet) {
         let _f = "add_to_out_buffer_front";
-        PacketEngine::add_packet_to_front(&mut self.out_buffer, port_no, packet);
+        PacketEngine::add_packet_to_front(&mut self.out_buffers, port_no, packet);
     }
     fn add_to_out_buffer_back(&mut self, port_no: PortNo, packet: Packet) {
         let _f = "add_to_out_buffer_back";
-        PacketEngine::add_packet_to_back(&mut self.out_buffer, port_no, packet);
+        PacketEngine::add_packet_to_back(&mut self.out_buffers, port_no, packet);
     }
     fn add_to_in_buffer_back(&mut self, port_no: PortNo, packet: Packet) {
         PacketEngine::add_packet_to_back(&mut self.in_buffer, port_no, packet);
@@ -239,30 +242,7 @@ impl PacketEngine {
             match msg {
                 // control plane from CellAgent
                 CmToPePacket::Reroute((broken_port_no, new_parent, no_packets)) => {
-                    let mut locked_outbuf = self.out_buffer.lock().unwrap();
-                    println!("PacketEngine {}: {} broken port no {} outbuf len {}", self.cell_id, _f, *broken_port_no, locked_outbuf[broken_port_no.as_usize()].len());
-                    let mut broken_outbuf = locked_outbuf[broken_port_no.as_usize()]
-                        .drain(..)
-                        .map(|packet| {
-                            println!("PacketEngine {}: {} msg type {}", self.cell_id, _f, MsgType::msg_type(&packet));
-                            packet
-                        })
-                        .collect::<VecDeque<Packet>>();
-                    let mut locked_sent = self.sent_packets.lock().unwrap();
-                    let new_parent_outbuf = &mut locked_outbuf[new_parent.as_usize()];
-                    let sent_buf = &mut locked_sent[broken_port_no.as_usize()];
-                    let no_my_sent_packets = self.get_no_sent_packets(broken_port_no);
-                    let no_her_seen_packets = no_packets.get_number_seen();
-                    let no_resend = no_my_sent_packets - no_her_seen_packets;
-                    for _ in 0..(no_resend) {
-                        sent_buf.pop_front();
-                    }
-                    for _ in 0..sent_buf.len() {
-                        new_parent_outbuf.push_back(sent_buf.pop_front().unwrap());
-                    }
-                    for _ in 0..broken_outbuf.len() {
-                        new_parent_outbuf.push_back(broken_outbuf.pop_front().unwrap());
-                    }
+                    self.reroute_packets(broken_port_no, new_parent, no_packets);
                 },
                 CmToPePacket::Entry(entry) => {
                     self.routing_table.lock().unwrap().set_entry(entry)
@@ -287,7 +267,25 @@ impl PacketEngine {
             };
         }
     }
-
+    fn reroute_packets(&mut self, broken_port_no: PortNo, new_parent: PortNo, no_packets: NumberOfPackets) {
+        let _f = "reroute_packets";
+        {
+            let mut locked_reroute = self.reroute.lock().unwrap();
+            locked_reroute[broken_port_no.as_usize()] = new_parent;
+            println!("PacketEngine {}: {} broken port no {} to {:?}", self.cell_id, _f, *broken_port_no, *locked_reroute);
+        }
+        let mut locked_outbuf = self.out_buffers.lock().unwrap();
+        let mut locked_sent = self.sent_packets.lock().unwrap();
+        let sent_buf = &mut locked_sent[broken_port_no.as_usize()];
+        let no_my_sent_packets = self.get_no_sent_packets(broken_port_no);
+        let no_her_seen_packets = no_packets.get_number_seen();
+        let no_resend = no_my_sent_packets - no_her_seen_packets;
+        let mut remaining_sent = sent_buf.split_off(no_resend);
+        let broken_outbuf = &mut locked_outbuf[broken_port_no.as_usize()].clone();
+        let new_parent_outbuf = &mut locked_outbuf[new_parent.as_usize()];
+        new_parent_outbuf.append(&mut remaining_sent);
+        new_parent_outbuf.append(broken_outbuf);
+    }
     fn route_cm_packet(&mut self, user_mask: Mask, mut packet: Packet) -> Result<(), Error> {
         let _f = "route_packet";
         let uuid = packet.get_tree_uuid().for_lookup();  // Strip AIT info for lookup
@@ -335,8 +333,21 @@ impl PacketEngine {
     }
     fn send_packet(&self, port_no: PortNo, packet: &Packet) -> Result<(), Error> {
         let _f = "send_packet";
-        self.pe_to_ports.get(port_no.as_usize())
-            .ok_or::<Error>(PacketEngineError::Sender { cell_id: self.cell_id, func_name: _f, port_no: *port_no }.into())?
+        let mut reroute_port = self.reroute.lock().unwrap()[port_no.as_usize()];
+        if reroute_port == PortNo(0) {
+            reroute_port = port_no;
+        } else {
+            let mut locked_outbuf = self.out_buffers.lock().unwrap();
+            let broken_outbuf = &mut locked_outbuf[port_no.as_usize()];
+            if broken_outbuf.len() > 0 {
+                // Only clone if there are packets in the broken out buffer
+                let broken_outbuf = &mut locked_outbuf[port_no.as_usize()].clone();
+                let reroute_outbuf = &mut locked_outbuf[reroute_port.as_usize()];
+                reroute_outbuf.append(broken_outbuf);
+            }
+        }
+        self.pe_to_ports.get(reroute_port.as_usize())
+            .ok_or::<Error>(PacketEngineError::Sender { cell_id: self.cell_id, func_name: _f, port_no: *reroute_port }.into())?
             .send(PeToPortPacket::Packet(packet.clone()))?;
         Ok(())
     }
@@ -363,7 +374,7 @@ impl PacketEngine {
             } else {
                 self.send_next_packet_or_entl(port_no)?;
             }
-        } else {
+        } else { // Debug only
             {
                 if DEBUG_OPTIONS.all || DEBUG_OPTIONS.flow_control {
                     match self.get_outbuf_first_ait_state(port_no) {
@@ -469,7 +480,7 @@ impl PacketEngine {
                         packet.make_tock();
                         packet.time_reverse();
                         packet.next_ait_state()?;
-                        self.add_to_out_buffer_back(port_no, packet);
+                        self.send_packet(port_no, &packet)?;
                         Ok(())
                     })?;
             },
@@ -479,11 +490,16 @@ impl PacketEngine {
                 self.send_next_packet_or_entl(port_no)?;
             },
 
-            AitState::Tack | AitState::Teck => {
+            AitState::Tack => {
+                // Update and send back on same port
+                packet.next_ait_state()?;
+                self.send_packet(port_no, &packet)?;
+            },
+            AitState::Teck => {
                 // Update and send back on same port
                 packet.next_ait_state()?;
                 self.add_to_out_buffer_front(port_no, packet);
-                self.send_packet_flow_control(port_no)?;
+                self.send_packet_flow_control(port_no)?;  // Flow control on TECH to enforce packet order
             },
             AitState::Entl => { // In real life, always send an ENTL
                 // TOCTTOU race here, but the only cost is sending an extra ENTL packet
@@ -491,16 +507,17 @@ impl PacketEngine {
             },
             AitState::Normal => { // Forward packet
                 let uuid = packet.get_tree_uuid().for_lookup();
-                let entry = { // Using this block releases the lock on the routing table
-                    match self.routing_table.lock().unwrap().get_entry(uuid) {
-                        Ok(e) => e,
-                        Err(_) => {
-                            // deliver to CellAgent when tree not recognized
-                            self.pe_to_cm.send(PeToCmPacket::Packet((port_no, packet))).context(PacketEngineError::Chain { func_name: "forward", comment: S("rootcast packet to ca ") + &self.cell_id.get_name() })?;
-                            return Ok(())
+                let entry =
+                    { // Using this block releases the lock on the routing table
+                        match self.routing_table.lock().unwrap().get_entry(uuid) {
+                            Ok(e) => e,
+                            Err(_) => {
+                                // deliver to CellAgent when tree not recognized
+                                self.pe_to_cm.send(PeToCmPacket::Packet((port_no, packet))).context(PacketEngineError::Chain { func_name: "forward", comment: S("rootcast packet to ca ") + &self.cell_id.get_name() })?;
+                                return Ok(())
+                            }
                         }
-                    }
-                };
+                    };
                 {
                     let msg_type = MsgType::msg_type(&packet);
                     let port_tree_id = packet.get_port_tree_id();
@@ -525,7 +542,6 @@ impl PacketEngine {
                     if entry.get_uuid() == packet.get_tree_uuid() {
                         let mask = entry.get_mask();
                         self.forward(port_no, entry, mask, &packet).context(PacketEngineError::Chain { func_name: "process_packet", comment: S("forward ") + &self.cell_id.get_name() })?;
-                        port_no.make_port_number(MAX_NUM_PHYS_PORTS_PER_CELL).context(PacketEngineError::Chain { func_name: "process_packet", comment: S("port number ") + &self.cell_id.get_name() })?; // Verify that port_no is valid
                     } else {
                         let msg_type = MsgType::msg_type(&packet);
                         return Err(PacketEngineError::Uuid { cell_id: self.cell_id, func_name: _f, msg_type, packet_uuid: packet.get_tree_uuid(), table_uuid: entry.get_uuid() }.into());
@@ -669,6 +685,7 @@ impl fmt::Display for NumberOfPackets {
 // Errors
 use failure::{Error, ResultExt};
 use crate::name::TreeID;
+use std::collections::HashMap;
 
 #[derive(Debug, Fail)]
 pub enum PacketEngineError {
