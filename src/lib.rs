@@ -27,6 +27,7 @@ mod packet;
 mod packet_engine;
 mod port;
 mod port_tree;
+mod rack;
 mod routing_table;
 mod routing_table_entry;
 mod service;
@@ -42,7 +43,7 @@ mod vm;
 use std::{collections::{HashMap}};
 
 use crate::config::{MAX_NUM_PHYS_PORTS_PER_CELL, CellNo, CellQty, Edge, PortNo, PortQty, is2e};
-use crate::datacenter::Datacenter;
+use crate::datacenter::{Datacenter};
 use crate::utility::{TraceHeader};
 
 trait Test {
@@ -133,9 +134,9 @@ impl DatacenterGraphSpec {
 
 impl Test for DatacenterGraphSpec {
     fn test(&mut self) {
-        let mut border_cell_ports = HashMap::new();
-        border_cell_ports.insert(CellNo(0), vec![PortNo(0)]);
-        let (_dc, _application_to_noc, _application_from_noc) =
+        let _dc = {
+            let mut border_cell_ports = HashMap::new();
+            border_cell_ports.insert(CellNo(0), vec![PortNo(0)]);
             match Datacenter::construct(
                 self.num_cells,
                 &self.edges,
@@ -143,9 +144,10 @@ impl Test for DatacenterGraphSpec {
                 &HashMap::new(),
                 &border_cell_ports,
             ) {
-                Ok(pair) => pair,
+                Ok(dc) => dc,
                 Err(err) => panic!("Datacenter construction failure: {}", err)
-            };
+            }
+        };
     }
 }
 
@@ -160,58 +162,52 @@ impl DatacenterGraph {
     fn new_three_cells() -> DatacenterGraph {
         let mut border_cell_ports = HashMap::new();
         border_cell_ports.insert(CellNo(0), vec![PortNo(2)]);
-        let (dc, _application_to_noc, _application_from_noc) =
-            match Datacenter::construct(
-                TRIANGLE_GRAPH_SPEC.num_cells,
-                &TRIANGLE_GRAPH_SPEC.edges,
-                PortQty(3),
-                &HashMap::new(),
-                &border_cell_ports,
-            ) {
-                Ok(pair) => pair,
-                Err(err) => panic!("Datacenter construction failure: {}", err)
-            };
-	DatacenterGraph {
-            graph_spec: TRIANGLE_GRAPH_SPEC.clone(),
-            dc: dc,
+        match Datacenter::construct(
+            TRIANGLE_GRAPH_SPEC.num_cells,
+            &TRIANGLE_GRAPH_SPEC.edges,
+            PortQty(3),
+            &HashMap::new(),
+            &border_cell_ports,
+        ) {
+            Ok(dc) => DatacenterGraph {
+                graph_spec: TRIANGLE_GRAPH_SPEC.clone(),
+                dc: dc,
+            },
+            Err(err) => panic!("Datacenter construction failure: {}", err)
         }
     }
     fn new_four_cells() -> DatacenterGraph {
         let mut border_cell_ports = HashMap::new();
         border_cell_ports.insert(CellNo(0), vec![PortNo(3)]);
-        let (dc, _application_to_noc, _application_from_noc) =
-            match Datacenter::construct(
-                TWO_BY_TWO_WITH_DIAGONALS_GRAPH_SPEC.num_cells,
-                &TWO_BY_TWO_WITH_DIAGONALS_GRAPH_SPEC.edges,
-                PortQty(4),
-                &HashMap::new(),
-                &border_cell_ports,
-            ) {
-                Ok(pair) => pair,
-                Err(err) => panic!("Datacenter construction failure: {}", err)
-            };
-	DatacenterGraph {
-            graph_spec: TWO_BY_TWO_WITH_DIAGONALS_GRAPH_SPEC.clone(),
-            dc: dc,
+        match Datacenter::construct(
+            TWO_BY_TWO_WITH_DIAGONALS_GRAPH_SPEC.num_cells,
+            &TWO_BY_TWO_WITH_DIAGONALS_GRAPH_SPEC.edges,
+            PortQty(4),
+            &HashMap::new(),
+            &border_cell_ports,
+        ) {
+            Ok(dc) => DatacenterGraph {
+                graph_spec: TWO_BY_TWO_WITH_DIAGONALS_GRAPH_SPEC.clone(),
+                dc: dc,
+            },
+            Err(err) => panic!("Datacenter construction failure: {}", err)
         }
     }
     fn new_ten_cells() -> DatacenterGraph {
         let mut border_cell_ports = HashMap::new();
         border_cell_ports.insert(CellNo(0), vec![PortNo(4)]);
-        let (dc, _application_to_noc, _outside_from_noc) =
-            match Datacenter::construct(
-                FIVE_BY_TWO_GRAPH_SPEC.num_cells,
-                &FIVE_BY_TWO_GRAPH_SPEC.edges,
-                PortQty(5),
-                &HashMap::new(),
-                &border_cell_ports,
-            ) {
-                Ok(pair) => pair,
-                Err(err) => panic!("Datacenter construction failure: {}", err)
-            };
-	DatacenterGraph {
-            graph_spec: FIVE_BY_TWO_GRAPH_SPEC.clone(),
-            dc: dc,
+        match Datacenter::construct(
+            FIVE_BY_TWO_GRAPH_SPEC.num_cells,
+            &FIVE_BY_TWO_GRAPH_SPEC.edges,
+            PortQty(5),
+            &HashMap::new(),
+            &border_cell_ports,
+        ) {
+            Ok(dc) => DatacenterGraph {
+                graph_spec: FIVE_BY_TWO_GRAPH_SPEC.clone(),
+                dc: dc,
+            },
+            Err(err) => panic!("Datacenter construction failure: {}", err)
         }
     }
     // blueprint-baran-distributed.gv
@@ -219,30 +215,28 @@ impl DatacenterGraph {
     fn new_fortyseven_cells() -> DatacenterGraph {
         let mut border_cell_ports = HashMap::new();
         border_cell_ports.insert(CellNo(0), vec![PortNo(7)]);
-        let (dc, _application_to_noc, _application_from_noc) =
-            match Datacenter::construct(
-                FORTYSEVEN_GRAPH_SPEC.num_cells,
-                &FORTYSEVEN_GRAPH_SPEC.edges,
-                PortQty(8),
-                &HashMap::new(),
-                &border_cell_ports,
-            ) {
-                Ok(pair) => pair,
-                Err(err) => panic!("Datacenter construction failure: {}", err)
-            };
-	DatacenterGraph {
-            graph_spec: FORTYSEVEN_GRAPH_SPEC.clone(),
-            dc: dc,
+        match Datacenter::construct(
+            FORTYSEVEN_GRAPH_SPEC.num_cells,
+            &FORTYSEVEN_GRAPH_SPEC.edges,
+            PortQty(8),
+            &HashMap::new(),
+            &border_cell_ports,
+        ) {
+            Ok(dc) => DatacenterGraph {
+                graph_spec: FORTYSEVEN_GRAPH_SPEC.clone(),
+                dc: dc,
+            },
+            Err(err) => panic!("Datacenter construction failure: {}", err)
         }
     }
 }
 
 impl Test for DatacenterGraph {
     fn test(&mut self) {
-        assert_eq!(self.dc.get_cells().len(), *self.graph_spec.num_cells);
-        assert_eq!(self.dc.get_cell_ids().len(), *self.graph_spec.num_cells);
-        assert_eq!(self.dc.get_links_mut().len(), self.graph_spec.edges.len());
-        for _link in self.dc.get_links_mut() {
+        assert_eq!(self.dc.get_rack().get_cells().len(), *self.graph_spec.num_cells);
+        assert_eq!(self.dc.get_rack().get_cell_ids().len(), *self.graph_spec.num_cells);
+        assert_eq!(self.dc.get_rack().get_links().len(), self.graph_spec.edges.len());
+        for _link in self.dc.get_rack().get_links() {
             // Could check that each link is in edges (or vice versa)
         }
     }
@@ -327,7 +321,7 @@ impl<'a> Test for DatacenterPortsSpec<'a> {
     fn test(&mut self) {
         let mut border_cell_ports = HashMap::new();
         border_cell_ports.insert(CellNo(0), vec![PortNo(0)]);
-        let (_dc, _application_to_noc, _application_from_noc) =
+        let _dc =
             match Datacenter::construct(
                 self.graph_spec.num_cells,
                 &self.graph_spec.edges,
@@ -335,7 +329,7 @@ impl<'a> Test for DatacenterPortsSpec<'a> {
                 &self.cell_port_exceptions,
                 &border_cell_ports,
             ) {
-                Ok(pair) => pair,
+                Ok(dc) => dc,
                 Err(err) => panic!("Datacenter construction failure: {}", err)
             };
     }
@@ -354,27 +348,25 @@ impl<'a> DatacenterPorts<'a> {
     fn new_with_exceptions() -> DatacenterPorts<'static> {
         let mut border_cell_ports = HashMap::new();
         border_cell_ports.insert(CellNo(0), vec![PortNo(2)]);
-        let (dc, _application_to_noc, _application_from_noc) =
-            match Datacenter::construct(
-                FIVE_BY_TWO_PORTS_SPEC.graph_spec.num_cells,
-                &FIVE_BY_TWO_PORTS_SPEC.graph_spec.edges,
-                FIVE_BY_TWO_PORTS_SPEC.default_num_phys_ports_per_cell,
-                &FIVE_BY_TWO_PORTS_SPEC.cell_port_exceptions,
-                &border_cell_ports,
-            ) {
-                Ok(pair) => pair,
-                Err(err) => panic!("Datacenter construction failure: {}", err)
-            };
-	DatacenterPorts {
-            ports_spec: FIVE_BY_TWO_PORTS_SPEC.clone(),
-            dc: dc,
+        match Datacenter::construct(
+            FIVE_BY_TWO_PORTS_SPEC.graph_spec.num_cells,
+            &FIVE_BY_TWO_PORTS_SPEC.graph_spec.edges,
+            FIVE_BY_TWO_PORTS_SPEC.default_num_phys_ports_per_cell,
+            &FIVE_BY_TWO_PORTS_SPEC.cell_port_exceptions,
+            &border_cell_ports,
+        ) {
+            Ok(dc) => DatacenterPorts {
+                ports_spec: FIVE_BY_TWO_PORTS_SPEC.clone(),
+                dc: dc,
+            },
+            Err(err) => panic!("Datacenter construction failure: {}", err)
         }
     }
 }
 
 impl<'a> Test for DatacenterPorts<'a> {
     fn test(&mut self) {
-        for (_cell_no, cell) in self.dc.get_cells() {
+        for (_cell_no, cell) in self.dc.get_rack().get_cells() {
             match self.ports_spec.cell_port_exceptions.get(&CellNo(cell.get_name().trim_start_matches("C:").parse().unwrap())) {
                 Some(num_phys_ports) => {
                     assert_eq!(cell.get_num_ports(), PortQty(**num_phys_ports+1));
@@ -430,7 +422,7 @@ impl<'a, 'b> DatacenterBorderSpec<'a, 'b> {
 
 impl<'a, 'b> Test for DatacenterBorderSpec<'a, 'b> {
     fn test(&mut self) {
-        let (_dc, _application_to_noc, _application_from_noc) =
+        let _dc =
             match Datacenter::construct(
                 self.ports_spec.graph_spec.num_cells,
                 &self.ports_spec.graph_spec.edges,
@@ -458,52 +450,48 @@ impl<'a, 'b> DatacenterBorder<'a, 'b> {
         let mut border_cell_ports = HashMap::new();
         border_cell_ports.insert(CellNo(0), vec![PortNo(2)]);
         border_cell_ports.insert(CellNo(7), vec![PortNo(2)]);
-        let (dc, _application_to_noc, _application_from_noc) =
-            match Datacenter::construct(
-                FIVE_BY_TWO_PORTS_SPEC.graph_spec.num_cells,
-                &FIVE_BY_TWO_PORTS_SPEC.graph_spec.edges,
-                FIVE_BY_TWO_PORTS_SPEC.default_num_phys_ports_per_cell,
-                &FIVE_BY_TWO_PORTS_SPEC.cell_port_exceptions,
-                &border_cell_ports,
-            ) {
-                Ok(pair) => pair,
-                Err(err) => panic!("Datacenter construction failure: {}", err)
-            };
-	DatacenterBorder {
-            border_spec: DatacenterBorderSpec {
-                border_cell_ports: border_cell_ports,
-                ports_spec: &FIVE_BY_TWO_PORTS_SPEC,
+        match Datacenter::construct(
+            FIVE_BY_TWO_PORTS_SPEC.graph_spec.num_cells,
+            &FIVE_BY_TWO_PORTS_SPEC.graph_spec.edges,
+            FIVE_BY_TWO_PORTS_SPEC.default_num_phys_ports_per_cell,
+            &FIVE_BY_TWO_PORTS_SPEC.cell_port_exceptions,
+            &border_cell_ports,
+        ) {
+            Ok(dc) => DatacenterBorder {
+                border_spec: DatacenterBorderSpec {
+                    border_cell_ports: border_cell_ports,
+                    ports_spec: &FIVE_BY_TWO_PORTS_SPEC,
+                },
+                dc: dc,
             },
-            dc: dc,
+            Err(err) => panic!("Datacenter construction failure: {}", err)
         }
     }
     fn new_exception_port_border() -> DatacenterBorder<'static, 'static> {
         let mut border_cell_ports = HashMap::new();
         border_cell_ports.insert(CellNo(0), vec![PortNo(2)]);
-        let (dc, _application_to_noc, _application_from_noc) =
-            match Datacenter::construct(
-                TRIANGLE_PORTS_SPEC.graph_spec.num_cells,
-                &TRIANGLE_PORTS_SPEC.graph_spec.edges,
-                TRIANGLE_PORTS_SPEC.default_num_phys_ports_per_cell,
-                &TRIANGLE_PORTS_SPEC.cell_port_exceptions,
-                &border_cell_ports,
-            ) {
-                Ok(pair) => pair,
-                Err(err) => panic!("Datacenter construction failure: {}", err)
-            };
-	DatacenterBorder {
-            border_spec: DatacenterBorderSpec {
-                border_cell_ports: border_cell_ports,
-                ports_spec: &TRIANGLE_PORTS_SPEC,
+        match Datacenter::construct(
+            TRIANGLE_PORTS_SPEC.graph_spec.num_cells,
+            &TRIANGLE_PORTS_SPEC.graph_spec.edges,
+            TRIANGLE_PORTS_SPEC.default_num_phys_ports_per_cell,
+            &TRIANGLE_PORTS_SPEC.cell_port_exceptions,
+            &border_cell_ports,
+        ) {
+            Ok(dc) => DatacenterBorder {
+                border_spec: DatacenterBorderSpec {
+                    border_cell_ports: border_cell_ports,
+                    ports_spec: &TRIANGLE_PORTS_SPEC,
+                },
+                dc: dc,
             },
-            dc: dc,
+            Err(err) => panic!("Datacenter construction failure: {}", err)
         }
     }
 }
 
 impl<'a, 'b> Test for DatacenterBorder<'a, 'b> {
     fn test(&mut self) {
-        for (_cell_no, cell) in self.dc.get_cells() {
+        for (cell_no, cell) in self.dc.get_rack().get_cells() {
             let border_ports: &Vec<PortNo>;
             let mut is_border_cell: bool = false;
             match self.border_spec.border_cell_ports.get(&CellNo(cell.get_name().trim_start_matches("C:").parse().unwrap())) {
