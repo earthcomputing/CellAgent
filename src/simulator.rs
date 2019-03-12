@@ -55,8 +55,9 @@ use crate::config::{OUTPUT_DIR_NAME, OUTPUT_FILE_NAME, QUENCH,
 use crate::datacenter::{Datacenter};
 use crate::gvm_equation::{GvmEqn};
 use crate::app_message_formats::{ApplicationToNoc, ApplicationFromNoc};
+use crate::link::Link;
 use crate::uptree_spec::{AllowedTree, ContainerSpec, Manifest, UpTreeSpec, VmSpec};
-use crate::utility::{print_hash_map, S, TraceHeader};
+use crate::utility::{print_hash_map, sleep, S, TraceHeader};
 
 pub const AUTO_BREAK: Option<Edge> = None;//  Some(Edge(CellNo(0), CellNo(1))); // Set to edge to break when debugging broken link with VSCode, else 0
 
@@ -164,7 +165,7 @@ fn break_link(dc: &mut Datacenter) -> Result<(), Error> {
     let edge: Edge = match AUTO_BREAK {
         Some(edge) => {
             // TODO: Wait until discover is done before automatically breaking link, should be removed
-            crate::utility::sleep(4);
+            sleep(4);
             println!("---> Automatically break link {}", edge);
             edge
         },
@@ -181,7 +182,7 @@ fn break_link(dc: &mut Datacenter) -> Result<(), Error> {
     let links = dc.get_links_mut();
     links.get_mut(&edge)
         .map_or_else(|| -> Result<(), Error> { println!("{} is not a valid input", edge); Ok(()) },
-                     |link: &mut crate::link::Link| -> Result<(), Error> { link.break_link()?; Ok(()) }
+                     |link: &mut Link| -> Result<(), Error> { link.break_link()?; Ok(()) }
         )?;
     Ok(())
 }
