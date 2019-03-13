@@ -1,19 +1,19 @@
 //use std::fmt;
 use std::collections::HashMap;
 
-use crate::config::CellNo;
+use crate::config::CellQty;
 use crate::name::{TenantID};
 //use utility::S;
 
 #[derive(Clone)]
 pub struct Tenant { 
     id: TenantID,
-    ncells: CellNo,
+    ncells: CellQty,
     children: HashMap<TenantID,Box<Tenant>>,
 }
 /*
 impl Tenant {
-    pub fn new(id: &'static str, n: CellNo, parent_id: Option<TenantID>) -> Result<Tenant, Error> {
+    pub fn new(id: &'static str, n: CellQty, parent_id: Option<TenantID>) -> Result<Tenant, Error> {
         let name = match parent_id {
             Some(p) => Ok(p.add_component(id).context(TenantError::Chain { func_name: "new", comment: S("")})?),
             None => TenantID::new(id)
@@ -30,7 +30,7 @@ impl Tenant {
 //  pub fn get_mut_subtenant(&mut self, id: TenantID) -> Option<&mut Box<Tenant>> {
 //       self.children.get_mut(&id)
 //  }
-    pub fn create_subtenant(&mut self, id: &'static str, n: CellNo) -> Result<Tenant, Error> {
+    pub fn create_subtenant(&mut self, id: &'static str, n: CellQty) -> Result<Tenant, Error> {
         if *self.ncells < *n {
             Err(TenantError::Quota { request: n, func_name: "create_subtenant", available: self.ncells }.into())
         } else {
@@ -60,7 +60,7 @@ impl fmt::Debug for Tenant {
 */
 // Errors
 /*
-use config::CellNo;
+use config::CellQty;
 #[derive(Debug, Fail)]
 pub enum TenantError {
     #[fail(display = "TenantError::Chain {} {}", func_name, comment)]
@@ -68,6 +68,6 @@ pub enum TenantError {
     #[fail(display = "TenantError::DuplicateName {}: A tenant named '{}' already exists.", func_name, tenant_name)]
     DuplicateName { func_name: &'static str, tenant_name: String },
     #[fail(display = "TenantError::Quota {}: You asked for {:?} cells, but only {:?} are available", func_name, request, available)]
-    Quota { func_name: &'static str, request: CellNo, available: CellNo }
+    Quota { func_name: &'static str, request: CellQty, available: CellQty }
 }
 */
