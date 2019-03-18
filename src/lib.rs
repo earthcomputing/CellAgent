@@ -234,11 +234,19 @@ impl DatacenterGraph {
 
 impl Test for DatacenterGraph {
     fn test(&mut self) {
-        assert_eq!(self.dc.get_rack().get_cells().len(), *self.graph_spec.num_cells);
-        assert_eq!(self.dc.get_rack().get_cell_ids().len(), *self.graph_spec.num_cells);
-        assert_eq!(self.dc.get_rack().get_links().len(), self.graph_spec.edges.len());
-        for _link in self.dc.get_rack().get_links() {
-            // Could check that each link is in edges (or vice versa)
+        let rack = self.dc.get_rack();
+        assert_eq!(rack.get_cells().len(), *self.graph_spec.num_cells);
+        assert_eq!(rack.get_cell_ids().len(), *self.graph_spec.num_cells);
+        // Check that each numbered cell exists in datacenter
+        for i in 0..*self.graph_spec.num_cells {
+            &rack.get_cells()[&CellNo(i)];
+            ()
+        }
+        assert_eq!(rack.get_links().len(), self.graph_spec.edges.len());
+        // Check that each edge exists as link in datacenter
+        for edge in &self.graph_spec.edges {
+            &rack.get_links()[&edge];
+            ()
         }
     }
 }
