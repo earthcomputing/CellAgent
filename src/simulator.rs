@@ -48,10 +48,12 @@ use std::{io::{stdin, stdout, Read, Write},
           collections::{HashMap, HashSet},
           fs::{File, OpenOptions, create_dir, remove_dir_all},
           path::Path,
-          thread::{JoinHandle}};
+          thread::{JoinHandle},
+};
 
+use crate::blueprint::{CellNo, Edge, is2e};
 use crate::config::{OUTPUT_DIR_NAME, OUTPUT_FILE_NAME, QUENCH,
-                    CellNo, Edge, CellConfig, CellQty, PortNo, PortQty, is2e};
+                    CellConfig, CellQty, PortNo, PortQty};
 use crate::datacenter::{Datacenter};
 use crate::gvm_equation::{GvmEqn};
 use crate::app_message_formats::{ApplicationToNoc, ApplicationFromNoc};

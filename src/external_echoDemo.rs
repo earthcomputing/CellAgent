@@ -28,9 +28,9 @@ use std::{io::{stdin, stdout, Read, Write},
           sync::mpsc::channel};
 
 use crate::app_message_formats::{ApplicationFromNoc, ApplicationToNoc, NocFromApplication, NocToApplication};
-use crate::blueprint::Blueprint;
+use crate::blueprint::{Blueprint, CellNo, is2e};
 use crate::config::{OUTPUT_FILE_NAME, QUENCH,
-                    CellNo, CellQty, CellConfig, PortNo, PortQty, is2e};
+                    CellQty, CellConfig, PortNo, PortQty};
 use crate::gvm_equation::{GvmEqn};
 use crate::noc::Noc;
 use crate::uptree_spec::{AllowedTree, ContainerSpec, Manifest, UpTreeSpec, VmSpec};

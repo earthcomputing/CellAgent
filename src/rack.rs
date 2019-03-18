@@ -8,8 +8,8 @@ use std::{fmt, fmt::Write,
           thread::{JoinHandle}};
 
 use crate::app_message_formats::{PortToNoc, PortFromNoc};
-use crate::blueprint::{Blueprint, Cell};
-use crate::config::{TRACE_OPTIONS, CellNo, CellQty, CellConfig, Edge, LinkQty, get_geometry};
+use crate::blueprint::{Blueprint, Cell, CellNo, Edge};
+use crate::config::{TRACE_OPTIONS, CellQty, CellConfig, LinkQty, get_geometry};
 use crate::dal;
 use crate::ec_message_formats::{LinkToPort, PortFromLink, PortToLink, LinkFromPort, PortFromPe};
 use crate::link::{Link};

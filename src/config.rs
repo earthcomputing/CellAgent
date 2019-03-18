@@ -134,27 +134,12 @@ impl Deref for ByteArray { type Target = Vec<u8>; fn deref(&self) -> &Self::Targ
 #[derive(Debug, Copy, Clone, Eq, Hash, PartialEq, Serialize, Deserialize)]
 pub struct CellQty(pub usize);
 impl Deref for CellQty { type Target = usize; fn deref(&self) -> &Self::Target { &self.0 } }
-#[derive(Debug, Copy, Clone, Hash, Eq, PartialEq, Serialize, Deserialize)]
-pub struct CellNo(pub usize);
-impl Deref for CellNo { type Target = usize; fn deref(&self) -> &Self::Target { &self.0 } }
-impl fmt::Display for CellNo {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "C:{}", self.0)
-    }
-}
 #[derive(Debug, Copy, Clone)]
 pub struct ContainerNo(pub usize);
 impl Deref for ContainerNo { type Target = usize; fn deref(&self) -> &Self::Target { &self.0 } }
 #[derive(Debug, Copy, Clone)]
 pub struct DatacenterNo(pub u16);
 impl Deref for DatacenterNo { type Target = u16; fn deref(&self) -> &Self::Target { &self.0 } }
-#[derive(Debug, Copy, Clone, Hash, Eq, PartialEq, Serialize, Deserialize)]
-pub struct Edge(pub CellNo, pub CellNo);
-impl fmt::Display for Edge {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "E: ({}, {})", *self.0, *self.1)
-    }
-}
 #[derive(Debug, Copy, Clone)]
 pub struct LinkQty(pub usize);
 impl Deref for LinkQty { type Target = usize; fn deref(&self) -> &Self::Target { &self.0 } }
@@ -227,7 +212,6 @@ pub fn get_geometry(num_cells: CellQty) -> (usize, usize, Vec<(usize, usize)>) {
     if geometry.len() != *num_cells { panic!(format!("Topology has {} entries for {} cells", geometry.len(), *num_cells)) };
     (max_x, max_y, geometry)
 }
-pub fn is2e(i: usize, j: usize) -> Edge { Edge(CellNo(i), CellNo(j)) }
 
 #[derive(Debug, Copy, Clone, Serialize, Deserialize)]
 pub struct CellInfo {   // Any data the cell agent wants to expose to applications

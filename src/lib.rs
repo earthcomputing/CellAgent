@@ -42,7 +42,8 @@ mod vm;
 
 use std::{collections::{HashMap}};
 
-use crate::config::{MAX_NUM_PHYS_PORTS_PER_CELL, CellNo, CellQty, Edge, PortNo, PortQty, is2e};
+use crate::blueprint::{CellNo, Edge, is2e};
+use crate::config::{MAX_NUM_PHYS_PORTS_PER_CELL, CellQty, PortNo, PortQty};
 use crate::datacenter::{Datacenter};
 use crate::utility::{TraceHeader};
 
