@@ -5,8 +5,8 @@ use std::{collections::{HashMap},
           sync::mpsc::channel};
 
 use crate::app_message_formats::{ApplicationFromNoc, ApplicationToNoc, NocFromApplication, NocToApplication};
-use crate::blueprint::{Blueprint};
-use crate::config::{CellNo, CellQty, PortNo, PortQty, Edge};
+use crate::blueprint::{Blueprint, CellNo, Edge};
+use crate::config::{CellQty, PortNo, PortQty};
 use crate::noc::{Noc};
 use crate::rack::{Rack};
 use crate::utility::{S};
