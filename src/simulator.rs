@@ -51,7 +51,7 @@ use std::{io::{stdin, stdout, Read, Write},
           thread::{JoinHandle},
 };
 
-use crate::blueprint::{CellNo, Edge, is2e};
+use crate::blueprint::{Blueprint, CellNo, Edge, is2e};
 use crate::config::{OUTPUT_DIR_NAME, OUTPUT_FILE_NAME, QUENCH,
                     CellConfig, CellQty, PortNo, PortQty};
 use crate::datacenter::{Datacenter};
@@ -88,15 +88,19 @@ fn main() -> Result<(), Error> {
     let mut border_cell_ports = HashMap::new();
     border_cell_ports.insert(CellNo(2), vec![PortNo(2)]);
     border_cell_ports.insert(CellNo(7), vec![PortNo(2)]);
+    let num_cells = CellQty(10);
+    let default_num_phys_ports_per_cell = PortQty(8);
+    println!("\nMain: {} ports for each of {} cells", *default_num_phys_ports_per_cell, *num_cells);
     let mut dc =
         match Datacenter::construct(
-            CellQty(10),
-            &vec![is2e(0,1), is2e(1,2), is2e(2,3), is2e(3,4),
-                  is2e(5,6), is2e(6,7), is2e(7,8), is2e(8,9),
-                  is2e(0,5), is2e(1,6), is2e(2,7), is2e(3,8), is2e(4,9)],
-            PortQty(8),
-            &cell_port_exceptions,
-            &border_cell_ports
+            Blueprint::new(
+                num_cells,
+                &vec![is2e(0,1), is2e(1,2), is2e(2,3), is2e(3,4),
+                      is2e(5,6), is2e(6,7), is2e(7,8), is2e(8,9),
+                      is2e(0,5), is2e(1,6), is2e(2,7), is2e(3,8), is2e(4,9)],
+                default_num_phys_ports_per_cell,
+                &cell_port_exceptions, &border_cell_ports,
+            )?
         ) {
             Ok(dc) => dc,
             Err(err) => panic!("Datacenter construction failure: {}", err)

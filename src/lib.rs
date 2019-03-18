@@ -42,7 +42,7 @@ mod vm;
 
 use std::{collections::{HashMap}};
 
-use crate::blueprint::{CellNo, Edge, is2e};
+use crate::blueprint::{Blueprint, CellNo, Edge, is2e};
 use crate::config::{MAX_NUM_PHYS_PORTS_PER_CELL, CellQty, PortNo, PortQty};
 use crate::datacenter::{Datacenter};
 use crate::utility::{TraceHeader};
@@ -139,11 +139,16 @@ impl Test for DatacenterGraphSpec {
             let mut border_cell_ports = HashMap::new();
             border_cell_ports.insert(CellNo(0), vec![PortNo(0)]);
             match Datacenter::construct(
-                self.num_cells,
-                &self.edges,
-                MAX_NUM_PHYS_PORTS_PER_CELL,
-                &HashMap::new(),
-                &border_cell_ports,
+                match Blueprint::new(
+                    self.num_cells,
+                    &self.edges,
+                    MAX_NUM_PHYS_PORTS_PER_CELL,
+                    &HashMap::new(),
+                    &border_cell_ports,
+                ) {
+                    Ok(blueprint) => blueprint,
+                    Err(err) => panic!("Blueprint construction failure: {}", err)
+                }
             ) {
                 Ok(dc) => dc,
                 Err(err) => panic!("Datacenter construction failure: {}", err)
@@ -164,13 +169,18 @@ impl DatacenterGraph {
         let mut border_cell_ports = HashMap::new();
         border_cell_ports.insert(CellNo(0), vec![PortNo(2)]);
         match Datacenter::construct(
-            TRIANGLE_GRAPH_SPEC.num_cells,
-            &TRIANGLE_GRAPH_SPEC.edges,
-            PortQty(3),
-            &HashMap::new(),
-            &border_cell_ports,
+            match Blueprint::new(
+                TRIANGLE_GRAPH_SPEC.num_cells,
+                &TRIANGLE_GRAPH_SPEC.edges,
+                PortQty(3),
+                &HashMap::new(),
+                &border_cell_ports,
+            ) {
+                Ok(blueprint) => blueprint,
+                Err(err) => panic!("Blueprint construction failure: {}", err)
+            }
         ) {
-            Ok(dc) => DatacenterGraph {
+        Ok(dc) => DatacenterGraph {
                 graph_spec: TRIANGLE_GRAPH_SPEC.clone(),
                 dc: dc,
             },
@@ -181,11 +191,16 @@ impl DatacenterGraph {
         let mut border_cell_ports = HashMap::new();
         border_cell_ports.insert(CellNo(0), vec![PortNo(3)]);
         match Datacenter::construct(
-            TWO_BY_TWO_WITH_DIAGONALS_GRAPH_SPEC.num_cells,
-            &TWO_BY_TWO_WITH_DIAGONALS_GRAPH_SPEC.edges,
-            PortQty(4),
-            &HashMap::new(),
-            &border_cell_ports,
+            match Blueprint::new(
+                TWO_BY_TWO_WITH_DIAGONALS_GRAPH_SPEC.num_cells,
+                &TWO_BY_TWO_WITH_DIAGONALS_GRAPH_SPEC.edges,
+                PortQty(4),
+                &HashMap::new(),
+                &border_cell_ports,
+            ) {
+                Ok(blueprint) => blueprint,
+                Err(err) => panic!("Blueprint construction failure: {}", err)
+            }
         ) {
             Ok(dc) => DatacenterGraph {
                 graph_spec: TWO_BY_TWO_WITH_DIAGONALS_GRAPH_SPEC.clone(),
@@ -198,11 +213,16 @@ impl DatacenterGraph {
         let mut border_cell_ports = HashMap::new();
         border_cell_ports.insert(CellNo(0), vec![PortNo(4)]);
         match Datacenter::construct(
-            FIVE_BY_TWO_GRAPH_SPEC.num_cells,
-            &FIVE_BY_TWO_GRAPH_SPEC.edges,
-            PortQty(5),
-            &HashMap::new(),
-            &border_cell_ports,
+            match Blueprint::new(
+                FIVE_BY_TWO_GRAPH_SPEC.num_cells,
+                &FIVE_BY_TWO_GRAPH_SPEC.edges,
+                PortQty(5),
+                &HashMap::new(),
+                &border_cell_ports,
+            ) {
+                Ok(blueprint) => blueprint,
+                Err(err) => panic!("Blueprint construction failure: {}", err)
+            }
         ) {
             Ok(dc) => DatacenterGraph {
                 graph_spec: FIVE_BY_TWO_GRAPH_SPEC.clone(),
@@ -217,11 +237,16 @@ impl DatacenterGraph {
         let mut border_cell_ports = HashMap::new();
         border_cell_ports.insert(CellNo(0), vec![PortNo(7)]);
         match Datacenter::construct(
-            FORTYSEVEN_GRAPH_SPEC.num_cells,
-            &FORTYSEVEN_GRAPH_SPEC.edges,
-            PortQty(8),
-            &HashMap::new(),
-            &border_cell_ports,
+            match Blueprint::new(
+                FORTYSEVEN_GRAPH_SPEC.num_cells,
+                &FORTYSEVEN_GRAPH_SPEC.edges,
+                PortQty(8),
+                &HashMap::new(),
+                &border_cell_ports,
+            ) {
+                Ok(blueprint) => blueprint,
+                Err(err) => panic!("Blueprint construction failure: {}", err)
+            }
         ) {
             Ok(dc) => DatacenterGraph {
                 graph_spec: FORTYSEVEN_GRAPH_SPEC.clone(),
@@ -332,11 +357,16 @@ impl<'a> Test for DatacenterPortsSpec<'a> {
         border_cell_ports.insert(CellNo(0), vec![PortNo(0)]);
         let _dc =
             match Datacenter::construct(
-                self.graph_spec.num_cells,
-                &self.graph_spec.edges,
-                self.default_num_phys_ports_per_cell,
-                &self.cell_port_exceptions,
-                &border_cell_ports,
+                match Blueprint::new(
+                    self.graph_spec.num_cells,
+                    &self.graph_spec.edges,
+                    self.default_num_phys_ports_per_cell,
+                    &self.cell_port_exceptions,
+                    &border_cell_ports,
+                ) {
+                    Ok(blueprint) => blueprint,
+                    Err(err) => panic!("Blueprint construction failure: {}", err)
+                }
             ) {
                 Ok(dc) => dc,
                 Err(err) => panic!("Datacenter construction failure: {}", err)
@@ -358,11 +388,16 @@ impl<'a> DatacenterPorts<'a> {
         let mut border_cell_ports = HashMap::new();
         border_cell_ports.insert(CellNo(0), vec![PortNo(2)]);
         match Datacenter::construct(
-            FIVE_BY_TWO_PORTS_SPEC.graph_spec.num_cells,
-            &FIVE_BY_TWO_PORTS_SPEC.graph_spec.edges,
-            FIVE_BY_TWO_PORTS_SPEC.default_num_phys_ports_per_cell,
-            &FIVE_BY_TWO_PORTS_SPEC.cell_port_exceptions,
-            &border_cell_ports,
+            match Blueprint::new(
+                FIVE_BY_TWO_PORTS_SPEC.graph_spec.num_cells,
+                &FIVE_BY_TWO_PORTS_SPEC.graph_spec.edges,
+                FIVE_BY_TWO_PORTS_SPEC.default_num_phys_ports_per_cell,
+                &FIVE_BY_TWO_PORTS_SPEC.cell_port_exceptions,
+                &border_cell_ports,
+            ) {
+                Ok(blueprint) => blueprint,
+                Err(err) => panic!("Blueprint construction failure: {}", err)
+            }
         ) {
             Ok(dc) => DatacenterPorts {
                 ports_spec: FIVE_BY_TWO_PORTS_SPEC.clone(),
@@ -433,11 +468,16 @@ impl<'a, 'b> Test for DatacenterBorderSpec<'a, 'b> {
     fn test(&mut self) {
         let _dc =
             match Datacenter::construct(
-                self.ports_spec.graph_spec.num_cells,
-                &self.ports_spec.graph_spec.edges,
-                self.ports_spec.default_num_phys_ports_per_cell,
-                &self.ports_spec.cell_port_exceptions,
-                &self.border_cell_ports,
+                match Blueprint::new(
+                    self.ports_spec.graph_spec.num_cells,
+                    &self.ports_spec.graph_spec.edges,
+                    self.ports_spec.default_num_phys_ports_per_cell,
+                    &self.ports_spec.cell_port_exceptions,
+                    &self.border_cell_ports,
+                ) {
+                    Ok(blueprint) => blueprint,
+                    Err(err) => panic!("Blueprint construction failure: {}", err)
+                }
             ) {
                 Ok(pair) => pair,
                 Err(err) => panic!("Datacenter construction failure: {}", err)
@@ -460,11 +500,16 @@ impl<'a, 'b> DatacenterBorder<'a, 'b> {
         border_cell_ports.insert(CellNo(0), vec![PortNo(2)]);
         border_cell_ports.insert(CellNo(7), vec![PortNo(2)]);
         match Datacenter::construct(
-            FIVE_BY_TWO_PORTS_SPEC.graph_spec.num_cells,
-            &FIVE_BY_TWO_PORTS_SPEC.graph_spec.edges,
-            FIVE_BY_TWO_PORTS_SPEC.default_num_phys_ports_per_cell,
-            &FIVE_BY_TWO_PORTS_SPEC.cell_port_exceptions,
-            &border_cell_ports,
+            match Blueprint::new(
+                FIVE_BY_TWO_PORTS_SPEC.graph_spec.num_cells,
+                &FIVE_BY_TWO_PORTS_SPEC.graph_spec.edges,
+                FIVE_BY_TWO_PORTS_SPEC.default_num_phys_ports_per_cell,
+                &FIVE_BY_TWO_PORTS_SPEC.cell_port_exceptions,
+                &border_cell_ports,
+            ) {
+                Ok(blueprint) => blueprint,
+                Err(err) => panic!("Blueprint construction failure: {}", err)
+            }
         ) {
             Ok(dc) => DatacenterBorder {
                 border_spec: DatacenterBorderSpec {
@@ -480,11 +525,16 @@ impl<'a, 'b> DatacenterBorder<'a, 'b> {
         let mut border_cell_ports = HashMap::new();
         border_cell_ports.insert(CellNo(0), vec![PortNo(2)]);
         match Datacenter::construct(
-            TRIANGLE_PORTS_SPEC.graph_spec.num_cells,
-            &TRIANGLE_PORTS_SPEC.graph_spec.edges,
-            TRIANGLE_PORTS_SPEC.default_num_phys_ports_per_cell,
-            &TRIANGLE_PORTS_SPEC.cell_port_exceptions,
-            &border_cell_ports,
+            match Blueprint::new(
+                TRIANGLE_PORTS_SPEC.graph_spec.num_cells,
+                &TRIANGLE_PORTS_SPEC.graph_spec.edges,
+                TRIANGLE_PORTS_SPEC.default_num_phys_ports_per_cell,
+                &TRIANGLE_PORTS_SPEC.cell_port_exceptions,
+                &border_cell_ports,
+            ) {
+                Ok(blueprint) => blueprint,
+                Err(err) => panic!("Blueprint construction failure: {}", err)
+            }
         ) {
             Ok(dc) => DatacenterBorder {
                 border_spec: DatacenterBorderSpec {

@@ -5,7 +5,7 @@ use std::{collections::{HashMap},
           sync::mpsc::channel};
 
 use crate::app_message_formats::{ApplicationFromNoc, ApplicationToNoc, NocFromApplication, NocToApplication};
-use crate::blueprint::{Blueprint, CellNo, Edge};
+use crate::blueprint::{Blueprint, BlueprintError, CellNo, Edge};
 use crate::config::{CellQty, PortNo, PortQty};
 use crate::noc::{Noc};
 use crate::rack::{Rack};
@@ -18,9 +18,7 @@ pub struct Datacenter {
     application_from_noc: ApplicationFromNoc,
 }
 impl Datacenter {
-    pub fn construct(num_cells: CellQty, edges: &Vec<Edge>, default_num_phys_ports_per_cell: PortQty, cell_port_exceptions: &HashMap<CellNo, PortQty>, border_cell_ports: &HashMap<CellNo, Vec<PortNo>>) -> Result<Datacenter, Error> {
-        println!("\nMain: {} ports for each of {} cells", *default_num_phys_ports_per_cell, *num_cells);
-        let blueprint = Blueprint::new(num_cells, &edges, default_num_phys_ports_per_cell, &cell_port_exceptions, border_cell_ports)?;
+    pub fn construct(blueprint: Blueprint) -> Result<Datacenter, Error> {
         println!("{}", blueprint);
         let (mut rack, _join_handles) = Rack::construct(&blueprint).context(DatacenterError::Chain { func_name: "initialize", comment: S("")})?;
         let (application_to_noc, noc_from_application): (ApplicationToNoc, NocFromApplication) = channel();
