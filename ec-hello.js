@@ -1,12 +1,15 @@
 var express = require('express');
+var url = require('url');
 var app = express();
 
 app.get('/', function (req, res) {
-   res.send('EARTH Computing Hello World');
+   res.send("EARTH Computing Hello World");
 })
 
-app.post('/', function(req, res) {
-    console.log(JSON.stringify(req));
+app.post('/', function(req, res, body) {
+    console.log("Got req 3")
+    console.log(req.body);
+    res.send("Response");
 })                
 
 // This responds with "Hello World" on the homepage

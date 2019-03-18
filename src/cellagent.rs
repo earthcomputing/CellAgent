@@ -763,11 +763,6 @@ impl CellAgent {
                                    is_ait: bool) -> Result<(), Error> {
         let _f = "process_interapplication_msg";
         let port_tree_id = msg.get_port_tree_id();
-        let senders = self.get_vm_senders(port_tree_id.to_tree_id()).context(CellagentError::Chain { func_name: _f, comment: S("") })?;
-        for sender in senders {
-            sender.send((is_ait, msg.get_payload().get_body().clone())).context(CellagentError::Chain { func_name: _f, comment: S("") })?;
-        }
-        let user_mask = self.get_mask(port_tree_id)?;
         let gvm_eqn = self.get_gvm_eqn(port_tree_id)?;
         let save = self.gvm_eval_save(msg_tree_id, &gvm_eqn).context(CellagentError::Chain { func_name: _f, comment: S(self.cell_id)})?;
         {
@@ -780,6 +775,11 @@ impl CellAgent {
                 println!("Cellagent {}: {} tree {} port {} save {} msg {}", self.cell_id, _f, port_tree_id, *port_no, save, msg);
             }
         }
+        let senders = self.get_vm_senders(port_tree_id.to_tree_id()).context(CellagentError::Chain { func_name: _f, comment: S("") })?;
+        for sender in senders {
+            sender.send((is_ait, msg.get_payload().get_body().clone())).context(CellagentError::Chain { func_name: _f, comment: S("") })?;
+        }
+        let user_mask = self.get_mask(port_tree_id)?;
         if save && msg.is_leafward() { self.add_saved_msg(port_tree_id.to_tree_id(), user_mask, Left(msg.clone()))?; }
         Ok(())
     }
@@ -881,6 +881,7 @@ impl CellAgent {
         let sender_id = header.get_sender_id();
         let rw_port_tree_id = payload.get_rw_port_tree_id();
         let rw_tree_id = rw_port_tree_id.to_tree_id();
+        let lw_port_tree_id = payload.get_lw_port_tree_id();
         let port_number = port_no.make_port_number(self.no_ports)?;
         if rw_tree_id == self.my_tree_id {
             println!("Cellagent {}: {} found path to rootward for port tree {}", self.cell_id, _f, rw_port_tree_id);
@@ -921,17 +922,26 @@ impl CellAgent {
         self.tree_id_map.insert(rw_port_tree_id.get_uuid(), rw_port_tree_id);
         if self.my_tree_id == lw_port_tree_id.to_tree_id() {
             println!("Cellagent {}: {} reached leafward node for port tree {}", self.cell_id, _f, rw_port_tree_id);
-            let broken_port_no = {
-                let rw_traph = self.get_traph(rw_port_tree_id).context(CellagentError::Chain { func_name: _f, comment: S("lw_traph") })?;
-                let broken_element = rw_traph.get_parent_element().context(CellagentError::Chain { func_name: _f, comment: S("lw element") })?;
-                broken_element.get_port_no()
-            };
-            let no_packets = payload.get_number_of_packets();
-            self.ca_to_cm.send(CaToCmBytes::Reroute((broken_port_no, port_no, no_packets)))?;
-            // Following line is commented out because the packet engine does rerouting.
-            // Packets still go the out queue for the broken link, but the packet engine reroutes them
-            // to the failover port.  The traph will need to be repaired if another strategy is used.
-            //self.repair_traph(broken_port_tree_ids, port_number)?; // Must be done after Reroute
+            match payload.get_response() {
+                FailoverResponse::Failure => {
+                    let lw_tree_id = lw_port_tree_id.to_tree_id();
+                    let rw_tree_id = rw_port_tree_id.to_tree_id();
+                    return Err(CellagentError::Partition { func_name: _f, lw_tree_id, rw_tree_id }.into())
+                },
+                FailoverResponse::Success => {
+                    let broken_port_no = {
+                        let rw_traph = self.get_traph(rw_port_tree_id).context(CellagentError::Chain { func_name: _f, comment: S("lw_traph") })?;
+                        let broken_element = rw_traph.get_parent_element().context(CellagentError::Chain { func_name: _f, comment: S("lw element") })?;
+                        broken_element.get_port_no()
+                    };
+                    let no_packets = payload.get_number_of_packets();
+                    self.ca_to_cm.send(CaToCmBytes::Reroute((broken_port_no, port_no, no_packets)))?;
+                    // Following line is commented out because the packet engine does rerouting.
+                    // Packets still go the out queue for the broken link, but the packet engine reroutes them
+                    // to the failover port.  The traph will need to be repaired if another strategy is used.
+                    //self.repair_traph(broken_port_tree_ids, port_number)?; // Must be done after Reroute
+                }
+            }
         } else {
             match payload.get_response() {
                 FailoverResponse::Success => {
@@ -1564,6 +1574,8 @@ impl fmt::Display for CellInfo {
 pub enum CellagentError {
     #[fail(display = "CellagentError::Chain {} {}", func_name, comment)]
     Chain { func_name: &'static str, comment: String },
+    #[fail(display = "CellagentError::AppMessageType {}: Unsupported request {:?} from border port on cell {}", func_name, msg, cell_id)]
+    AppMessageType { func_name: &'static str, cell_id: CellID, msg: AppMsgType },
     #[fail(display = "CellagentError::BaseTree {}: No base tree for tree {} on cell {}", func_name, tree_id, cell_id)]
     BaseTree { func_name: &'static str, cell_id: CellID, tree_id: PortTreeID },
     #[fail(display = "CellagentError::Border {}: Port {} is not a border port on cell {}", func_name, port_no, cell_id)]
@@ -1584,10 +1596,10 @@ pub enum CellagentError {
     NoTraph { cell_id: CellID, func_name: &'static str, tree_id: TreeID },
 //    #[fail(display = "CellagentError::SavedMsgType {}: Message type {} does not support saving", func_name, msg_type)]
 //    SavedMsgType { func_name: &'static str, msg_type: MsgType },
+    #[fail(display = "CellAgentError::Partition {}: No path from {} to {}", func_name, lw_tree_id, rw_tree_id)]
+    Partition { func_name: &'static str, lw_tree_id: TreeID, rw_tree_id: TreeID },
     #[fail(display = "CellAgentError::StackTree {}: Problem stacking tree {} on cell {}", func_name, tree_id, cell_id)]
     StackTree { func_name: &'static str, tree_id: PortTreeID, cell_id: CellID },
-    #[fail(display = "CellagentError::AppMessageType {}: Unsupported request {:?} from border port on cell {}", func_name, msg, cell_id)]
-    AppMessageType { func_name: &'static str, cell_id: CellID, msg: AppMsgType },
 //    #[fail(display = "CellAgentError::TenantMask {}: Cell {} has no tenant mask", func_name, cell_id)]
 //    TenantMask { func_name: &'static str, cell_id: CellID },
     #[fail(display = "CellAgentError::TreeNameMap {}: Cell {} has no tree name map entry for {:?}", func_name, cell_id, sender_id)]

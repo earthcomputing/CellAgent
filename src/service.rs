@@ -1,6 +1,6 @@
 use std::{fmt, thread};
 
-//use reqwest::*;
+//use reqwest::Client::*;
 
 use crate::app_message_formats::{ContainerToVm, ContainerFromVm};
 use crate::app_message::{AppMsgDirection, AppMsgType};
@@ -84,7 +84,6 @@ impl NocMaster {
         })?;
         Ok(())
     }
-
     // WORKER (ContainerFromVm)
     fn listen_vm_loop(&self, container_from_vm: &ContainerFromVm) -> Result<(), Error> {
         let _f = "listen_vm_loop";
@@ -104,12 +103,14 @@ impl NocMaster {
                     let _ = dal::add_to_trace(TraceType::Trace, trace_params, &trace, _f);
                 }
             }
-            let post = format!("NocMaster on container {} got msg {}", self.container_id, ::std::str::from_utf8(&msg)?);
-            println!("{}", post);
-//            reqwest::Client::new()
-//                .post(&post)
-//                .send()
-//                .unwrap();
+            let msg = format!("NocMaster on container {} got msg {}", self.container_id, ::std::str::from_utf8(&msg)?);
+            println!("{}", msg);
+            let foo = reqwest::Client::new()
+                .post("http://localhost:8081/")
+                .body(msg)
+                .send()
+                .and_then(|res| { Ok(()/*println!("Response {:?}", res.status())*/)})
+                .map_err(|e| { println!("HTTP {:?}", e) });
         }
     }
 }
