@@ -11,7 +11,7 @@ use crate::app_message::{AppMsgType, AppMsgDirection, AppTreeNameMsg};
 use crate::app_message_formats::{CaToVm, VmFromCa, VmToCa, CaFromVm};
 use crate::config::{CONNECTED_PORTS_TREE_NAME, CONTINUE_ON_ERROR, CONTROL_TREE_NAME, DEBUG_OPTIONS, QUENCH,
              MAX_NUM_PHYS_PORTS_PER_CELL, TRACE_OPTIONS,
-             ByteArray, CellQty, CellType, CellConfig, Quench, PathLength, PortNo, PortQty};
+             ByteArray, CellQty, CellType, CellConfig, CellInfo, Quench, PathLength, PortNo, PortQty};
 use crate::dal;
 use crate::dal::{fork_trace_header, update_trace_header};
 use crate::ec_message::{Message, MsgHeader, MsgDirection, MsgTreeMap, MsgType,
@@ -1554,20 +1554,6 @@ impl fmt::Display for CellAgent {
             write!(s, "\n{}", traph)?;
         }
         write!(_f, "{}", s) }
-}
-#[derive(Debug, Copy, Clone, Serialize, Deserialize)]
-pub struct CellInfo {   // Any data the cell agent wants to expose to applications
-    external_id: Uuid   // An externally visible identifier so applications can talk about individual cells
-}
-impl CellInfo {
-    fn new() -> CellInfo {
-        CellInfo { external_id: Uuid::new() }
-    }
-}
-impl fmt::Display for CellInfo {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "External ID {}", self.external_id)
-    }
 }
 // Errors
 #[derive(Debug, Fail)]
