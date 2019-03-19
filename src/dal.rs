@@ -58,7 +58,7 @@ pub fn add_to_trace(trace_type: TraceType, trace_params: &TraceHeaderParams,
         format!("{:?}", &trace_record)
     };
     cell_id_handle.write(&(line.clone() + "\n").into_bytes()).context(DalError::Chain { func_name: "add_to_trace", comment: S("Write cell record") })?;
-    file_handle.write(&(line.clone() + "\n").into_bytes()).context(DalError::Chain { func_name: "add_to_trace", comment: S("Write record") })?;
+    file_handle.write(&(line.clone() + ",\n").into_bytes()).context(DalError::Chain { func_name: "add_to_trace", comment: S("Write record") })?;
     let _ = PRODUCER_RD.send(FutureRecord::to(KAFKA_TOPIC)
             .payload(&line)
             .key(&format!("{:?}", trace_header.get_event_id())),
