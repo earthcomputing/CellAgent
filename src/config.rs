@@ -3,6 +3,7 @@ use std::{fmt,
 
 use failure::Error;
 use crate::utility::PortNumber;
+use crate::uuid_ec::Uuid;
 
 pub const SCHEMA_VERSION: &str = "0.1";
 pub const REPO: &str = "CellAgent";
@@ -227,3 +228,21 @@ pub fn get_geometry(num_cells: CellQty) -> (usize, usize, Vec<(usize, usize)>) {
     (max_x, max_y, geometry)
 }
 pub fn is2e(i: usize, j: usize) -> Edge { Edge(CellNo(i), CellNo(j)) }
+
+#[derive(Debug, Copy, Clone, Serialize, Deserialize)]
+pub struct CellInfo {   // Any data the cell agent wants to expose to applications
+    external_id: Uuid   // An externally visible identifier so applications can talk about individual cells
+}
+impl CellInfo {
+    pub fn new() -> CellInfo {
+        CellInfo { external_id: Uuid::new() }
+    }
+    pub fn get_external_id(&self) -> Uuid {
+        return self.external_id;
+    }
+}
+impl fmt::Display for CellInfo {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "External ID {}", self.external_id)
+    }
+}

@@ -5,7 +5,7 @@ use eval::{Expr, to_value};
 use serde_json;
 use failure::{Error, ResultExt};
 
-use crate::config::{PathLength};
+use crate::config::{CellInfo, PathLength};
 use crate::utility::S;
 
 #[derive(Debug, Clone, Hash, Eq, PartialEq)]
@@ -60,6 +60,11 @@ impl GvmEquation {
             let var_name = S(variable.get_var_name());
             let str_val = S(variable.get_value());
             match *var_type {
+                GvmVariableType::CellInfo => {
+                    let value = serde_json::from_str::<CellInfo>(&str_val).context(GvmEquationError::Deserialize { func_name: "evaluate", var_type: var_type.clone(), expr: S(str_val) })?;
+                    expr = expr.value(var_name, value.get_external_id());
+                    //println!("GvmEquation: expr {:?}, variable {}, second {}, result {:?}", expr, variable, *value.0, expr.exec());
+                },
                 GvmVariableType::PathLength => {
                     let value = serde_json::from_str::<PathLength>(&str_val).context(GvmEquationError::Deserialize { func_name: "evaluate", var_type: var_type.clone(), expr: S(str_val) })?;
                     expr = expr.value(var_name, *value.0);
@@ -83,11 +88,13 @@ impl fmt::Display for GvmEquation {
 }
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize)]
 pub enum GvmVariableType {
+    CellInfo,
     PathLength,
 }
 impl fmt::Display for GvmVariableType {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let s = match *self {
+            GvmVariableType::CellInfo => "CellInfo",
             GvmVariableType::PathLength => "PathLength",
         };
         write!(f, "{}", s)
