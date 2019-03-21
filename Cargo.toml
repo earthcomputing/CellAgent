@@ -3,17 +3,26 @@ name = "multicell"
 version = "0.1.0"
 authors = ["Alan Karp <alan@earthcomputing.io>"]
 edition = "2018"
+build = "build.rs"
+
+[features]
+cell = []
+simulator = []
+noc = []
 
 [[bin]]
 name = "simulator"
+required-features = ["simulator"]
 path = "src/simulator.rs"
 
 [[bin]]
 name = "cell"
+required-features = ["cell"]
 path = "src/cell.rs"
 
 [[bin]]
 name = "external_echoDemo"
+required-features = ["noc"]
 path = "src/external_echoDemo.rs"
 
 [dependencies]
@@ -32,6 +41,7 @@ futures = "0.1.23" # used in dal.rs
 #indexmap = "1.0.1" # HashMap and HashSet that preserve order
 #internment = "0.3.6"
 lazy_static = "1.1.0"
+libc = "0.2.50"
 #log = {version = "0.4.6", features = ["std", "serde"]} # Should use instead of my trace approach
 multi_mut = "0.1"
 rand = "0.5.4"

@@ -1,8 +1,17 @@
+#[cfg(feature = "cell")]
+#[link(name = ":ecnl.a")]
+extern {
+    pub fn get_num_phys_ports_c() -> c_uchar;
+}
+
 use std::{fmt, fmt::Write,
+          ffi::CStr,
           collections::{HashMap, HashSet},
+	  os::raw::{c_char, c_int, c_uchar},
           sync::mpsc::channel,
           thread,
-          iter::FromIterator};
+          iter::FromIterator
+};
 
 use crate::cellagent::{CellAgent};
 use crate::cmodel::{Cmodel};
@@ -31,10 +40,17 @@ pub struct NalCell {
 }
 
 impl NalCell {
-    pub fn new(name: &str, num_phys_ports: PortQty, border_port_nos: &HashSet<PortNo>, config: CellConfig)
+    pub fn new(name: &str, simulated_options: Option<PortQty>, border_port_nos: &HashSet<PortNo>, config: CellConfig)
             -> Result<NalCell, Error> {
         let _f = "new";
-        if *num_phys_ports > *CONFIG.max_num_phys_ports_per_cell { return Err(NalcellError::NumberPorts { num_phys_ports, func_name: "new", max_num_phys_ports: CONFIG.max_num_phys_ports_per_cell }.into()) }
+	let num_phys_ports =
+	    match simulated_options {
+	        Some(num_phys_ports) => num_phys_ports,
+		None => get_num_phys_ports(),
+            };
+        if *num_phys_ports > *CONFIG.max_num_phys_ports_per_cell {
+            return Err(NalcellError::NumberPorts { num_phys_ports, func_name: "new", max_num_phys_ports: CONFIG.max_num_phys_ports_per_cell }.into())
+        }
         let cell_id = CellID::new(name).context(NalcellError::Chain { func_name: "new", comment: S("cell_id")})?;
         let (ca_to_cm, cm_from_ca): (CaToCm, CmFromCa) = channel();
         let (cm_to_ca, ca_from_cm): (CmToCa, CaFromCm) = channel();
@@ -48,7 +64,7 @@ impl NalCell {
         let mut interior_port_list = all
             .difference(&border_port_nos)
             .cloned()
-	    .collect::<Vec<_>>();
+            .collect::<Vec<_>>();
         interior_port_list.sort();
         let mut ports = Vec::new();
         let mut pe_to_ports = Vec::new();
@@ -80,10 +96,9 @@ impl NalCell {
                                               pe_to_cm, pe_to_ports, border_port_nos).context(NalcellError::Chain { func_name: "new", comment: S("packet engine create")})?;
         NalCell::start_packet_engine(&packet_engine, pe_from_cm, pe_from_ports);
         Ok(NalCell { id: cell_id, cell_type, config, cmodel,
-                ports: boxed_ports, cell_agent, vms: Vec::new(),
-                packet_engine, ports_from_pe })
+                     ports: boxed_ports, cell_agent, vms: Vec::new(),
+                     packet_engine, ports_from_pe })
     }
-
     // SPAWN THREAD (ca.initialize)
     fn start_cell(cell_agent: &CellAgent, ca_from_cm: CaFromCm) {
         let _f = "start_cell";
@@ -185,6 +200,21 @@ impl fmt::Display for NalCell {
         write!(s, "\n{}", self.packet_engine)?;
         write!(f, "{}", s) }
 }
+
+fn get_num_phys_ports() -> PortQty {
+    let num_phys_ports:c_uchar;
+    #[cfg(feature = "cell")]
+    unsafe {
+        num_phys_ports = get_num_phys_ports_c();
+    }
+    #[cfg(feature = "simulator")]
+    {
+        num_phys_ports = 0;
+    }
+    return PortQty(num_phys_ports);
+}
+
+
 // Errors
 use failure::{Error, ResultExt};
 #[derive(Debug, Fail)]

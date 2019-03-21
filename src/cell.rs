@@ -66,7 +66,7 @@ fn main() -> Result<(), Error> {
         .iter()
         .map(|i| PortNo(*i as u8))
 	.collect();
-    let nal_cell = NalCell::new(cell_name, PortQty(5), &HashSet::from_iter(border_port_list.clone()), CellConfig::Large);
+    let nal_cell = NalCell::new(cell_name, None, &HashSet::from_iter(border_port_list.clone()), CellConfig::Large);
     Ok(())
 }
 
