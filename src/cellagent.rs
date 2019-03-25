@@ -180,7 +180,7 @@ impl CellAgent {
         self.tree_vm_map
             .get(&tree_id)
             .cloned()
-            .ok_or(CellagentError::Tree { func_name: _f, cell_id: self.cell_id, tree_uuid: tree_id.get_uuid() }.into())
+            .ok_or(CellagentError::TreeVmMap { func_name: _f, cell_id: self.cell_id, tree_id }.into())
     }
     fn get_mask(&self, port_tree_id: PortTreeID) -> Result<Mask, Error> {
         let _f = "get_mask";
@@ -490,7 +490,8 @@ impl CellAgent {
                         allowed_trees.insert(vm_allowed_tree.clone());
                         self.add_tree_name_map_item(sender_id, vm_allowed_tree, allowed_tree_id.clone());
                         self.add_tree_name_map_item(vm_sender_id, vm_allowed_tree, allowed_tree_id.clone());
-                        match self.tree_vm_map.clone().get_mut(allowed_tree_id) {
+                        // Functional style runs into a borrow problem
+                        match self.tree_vm_map.get_mut(allowed_tree_id) {
                             Some(senders) => senders.push(ca_to_vm.clone()),
                             None => { self.tree_vm_map.insert(allowed_tree_id.clone(), vec![ca_to_vm.clone()]); }
                         }
@@ -1596,4 +1597,6 @@ pub enum CellagentError {
     Tree { func_name: &'static str, cell_id: CellID, tree_uuid: Uuid },
 //    #[fail(display = "CellAgentError::TreeUuid {}: No tree associated with uuid {:?} on cell {}", func_name, uuid, cell_id)]
 //    TreeUuid { func_name: &'static str, uuid: Uuid, cell_id: CellID },
+    #[fail(display = "CellAgentError::TreeVmMap {} Cell {} has no tree map entry for {}", func_name, cell_id, tree_id)]
+    TreeVmMap { func_name: &'static str, cell_id: CellID, tree_id: TreeID }
 }
