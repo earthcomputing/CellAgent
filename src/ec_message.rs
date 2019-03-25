@@ -327,7 +327,7 @@ impl Message for DiscoverDMsg {
     fn get_header(&self) -> &MsgHeader { &self.header }
     fn get_payload(&self) -> &dyn MsgPayload { &self.payload }
     fn get_msg_type(&self) -> MsgType { self.get_header().msg_type }
-    fn is_blocking(&self) -> bool { true }
+    fn is_blocking(&self) -> bool { false }
     fn value(&self) -> serde_json::Value {
         serde_json::to_value(self).expect("I don't know how to handle errors in msg.value()")
     }
@@ -581,7 +581,7 @@ impl Message for StackTreeMsg {
     fn get_header(&self) -> &MsgHeader { &self.header }
     fn get_payload(&self) -> &dyn MsgPayload { &self.payload }
     fn get_msg_type(&self) -> MsgType { self.header.msg_type }
-    fn is_blocking(&self) -> bool { true }
+    fn is_blocking(&self) -> bool { false }
     fn value(&self) -> serde_json::Value {
         serde_json::to_value(self).expect("I don't know how to handle errors in msg.value()")
     }
@@ -639,7 +639,7 @@ impl Message for StackTreeDMsg {
     fn get_payload(&self) -> &dyn MsgPayload { &self.payload }
     fn get_msg_type(&self) -> MsgType { self.header.msg_type }
     fn get_port_tree_id(&self) -> PortTreeID { self.payload.get_port_tree_id().clone() }
-    fn is_blocking(&self) -> bool { true }
+    fn is_blocking(&self) -> bool { false }
     fn value(&self) -> serde_json::Value {
         serde_json::to_value(self).expect("I don't know how to handle errors in msg.value()")
     }

@@ -105,12 +105,14 @@ impl NocMaster {
             }
             let msg = format!("NocMaster on container {} got msg {}", self.container_id, ::std::str::from_utf8(&msg)?);
             println!("{}", msg);
+            /*
             let foo = reqwest::Client::new()
                 .post("http://localhost:8081/")
                 .body(msg)
                 .send()
                 .and_then(|res| { Ok(()/*println!("Response {:?}", res.status())*/)})
                 .map_err(|e| { println!("HTTP {:?}", e) });
+                */
         }
     }
 }

@@ -174,6 +174,7 @@ fn break_link(dc: &mut Datacenter) -> Result<(), Error> {
     let edge: Edge = match AUTO_BREAK {
         Some(edge) => {
             // TODO: Wait until discover is done before automatically breaking link, should be removed
+            println!("---> Sleeping to let discover finish before automatically breaking link");
             sleep(4);
             println!("---> Automatically break link {}", edge);
             edge
