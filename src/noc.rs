@@ -11,7 +11,7 @@ use crate::dal;
 use crate::dal::{fork_trace_header, update_trace_header};
 use crate::gvm_equation::{GvmEquation, GvmEqn, GvmVariable, GvmVariableType};
 use crate::uptree_spec::{AllowedTree, ContainerSpec, Manifest, UpTreeSpec, VmSpec};
-use crate::utility::{S, TraceHeader, TraceHeaderParams, TraceType, write_err};
+use crate::utility::{S, TraceHeader, TraceHeaderParams, TraceType, sleep, write_err};
 
 const NOC_MASTER_DEPLOY_TREE_NAME:  &str = "NocMasterDeploy";
 const NOC_AGENT_DEPLOY_TREE_NAME:   &str = "NocAgentDeploy";
@@ -147,7 +147,8 @@ impl Noc {
     // Sets up the NOC Master and NOC Agent services on up trees
     fn create_noc(&mut self, tree_name: &str, noc_to_port: &NocToPort) -> Result<(), Error> {
         // TODO: Avoids race condition of deployment with Discover, remove to debug
-        //::utility::sleep(4);
+        if crate::config::RACE_SLEEP > 0 { println!("---> Sleeping to let discover finish"); }
+        sleep(crate::config::RACE_SLEEP);
         let is_ait = false;
         // Stack the trees needed to deploy the master and agent and for them to talk master->agent and agent->master
         let noc_master_deploy_tree = AllowedTree::new(NOC_MASTER_DEPLOY_TREE_NAME);
@@ -159,6 +160,10 @@ impl Noc {
         Noc::noc_master_agent_tree(&noc_master_agent, tree_name, noc_to_port).context(NocError::Chain { func_name: "create_noc", comment: S("noc master tree")})?;
         Noc::noc_agent_master_tree(&noc_agent_master, tree_name, noc_to_port).context(NocError::Chain { func_name: "create_noc", comment: S("noc agent tree")})?;
         let allowed_trees = vec![&noc_master_agent, &noc_agent_master];
+        // Sleep to allow tree stacking to finish
+        // TODO: Sleep to let stack tree msgs finish before sending application msgs; should be removed
+        if crate::config::RACE_SLEEP > 0 { println!("---> Sleeping to let tree stacking finish"); }
+        sleep(crate::config::RACE_SLEEP);
         // Deploy NocMaster
         let up_tree = UpTreeSpec::new("NocMaster", vec![0]).context(NocError::Chain { func_name: "create_noc", comment: S("NocMaster") })?;
         let service = ContainerSpec::new("NocMaster", "NocMaster", vec![], &allowed_trees).context(NocError::Chain { func_name: "create_noc", comment: S("NocMaster") })?;
