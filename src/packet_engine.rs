@@ -20,10 +20,14 @@ use crate::routing_table_entry::{RoutingTableEntry};
 use crate::utility::{Mask, S, TraceHeader, TraceHeaderParams, TraceType, write_err};
 use crate::uuid_ec::{AitState, Uuid};
 
-type BoolArray = Arc<Mutex<Vec<bool>>>;
-type UsizeArray = Arc<Mutex<Vec<usize>>>;
+// I need one slot per port, but ports use 1-based indexing.  I could subtract 1 all the time,
+// but it's safer to waste slot 0.
+const MAX_SLOTS: usize = MAX_NUM_PHYS_PORTS_PER_CELL.0 as usize + 1;
+
+type BoolArray = Arc<Mutex<[bool; MAX_SLOTS]>>;
+type UsizeArray = Arc<Mutex<[usize; MAX_SLOTS]>>;
 type PacketArray = Arc<Mutex<Vec<VecDeque<Packet>>>>;
-type Reroute = Arc<Mutex<[PortNo; MAX_NUM_PHYS_PORTS_PER_CELL.0 as usize]>>;
+type Reroute = Arc<Mutex<[PortNo; MAX_SLOTS]>>;
 
 #[derive(Debug, Clone)]
 pub struct PacketEngine {
@@ -48,17 +52,17 @@ impl PacketEngine {
                border_port_nos: &HashSet<PortNo>) -> Result<PacketEngine, Error> {
         let routing_table = Arc::new(Mutex::new(RoutingTable::new(cell_id)));
         let mut array = vec![];
-        for _ in 0..MAX_NUM_PHYS_PORTS_PER_CELL.0 as usize { array.push(VecDeque::new()); }
-        let count_vec = [0; MAX_NUM_PHYS_PORTS_PER_CELL.0 as usize].to_vec();
+        for _ in 0..MAX_SLOTS { array.push(VecDeque::new()); }
+        let count = [0; MAX_SLOTS];
         Ok(PacketEngine { cell_id, connected_tree_uuid: connected_tree_id.get_uuid(),
             routing_table, border_port_nos: border_port_nos.clone(),
-            no_seen_packets: Arc::new(Mutex::new(count_vec.clone())),
-            no_sent_packets: Arc::new(Mutex::new(count_vec.clone())),
+            no_seen_packets: Arc::new(Mutex::new(count)),
+            no_sent_packets: Arc::new(Mutex::new(count)),
             sent_packets: Arc::new(Mutex::new(array.clone())),
             out_buffers: Arc::new(Mutex::new(array.clone())),
-            in_buffer: Arc::new(Mutex::new(array.clone())),
-            port_got_event: Arc::new(Mutex::new([false; MAX_NUM_PHYS_PORTS_PER_CELL.0 as usize].to_vec())),
-            reroute: Arc::new(Mutex::new([PortNo(0); MAX_NUM_PHYS_PORTS_PER_CELL.0 as usize])),
+            in_buffer: Arc::new(Mutex::new(array)),
+            port_got_event: Arc::new(Mutex::new([false; MAX_SLOTS])),
+            reroute: Arc::new(Mutex::new([PortNo(0); MAX_SLOTS])),
             pe_to_cm, pe_to_ports })
     }
 
@@ -74,9 +78,8 @@ impl PacketEngine {
                 let _ = dal::add_to_trace(TraceType::Trace, trace_params, &trace, _f);
             }
         }
-        let (pe_to_pe, pe_from_pe): (PeToPe, PeFromPe) = channel();
-        self.listen_cm(pe_from_cm, pe_to_pe)?;
-        self.listen_port(pe_from_ports, pe_from_pe)?;
+        self.listen_cm(pe_from_cm)?;
+        self.listen_port(pe_from_ports)?;
         Ok(())
     }
     pub fn get_cell_id(&self) -> CellID { self.cell_id }
@@ -190,22 +193,22 @@ impl PacketEngine {
         PacketEngine::add_packet_to_back(&mut self.sent_packets, port_no, packet);
     }
     // SPAWN THREAD (listen_cm_loop)
-    fn listen_cm(&self, pe_from_cm: PeFromCm, pe_to_pe: PeToPe) -> Result<(), Error> {
+    fn listen_cm(&self, pe_from_cm: PeFromCm) -> Result<(), Error> {
         let _f = "listen_cm";
         let mut pe = self.clone();
         let child_trace_header = fork_trace_header();
         let thread_name = format!("PacketEngine {} listen_cm_loop", self.cell_id);
         thread::Builder::new().name(thread_name).spawn( move || {
             update_trace_header(child_trace_header);
-            let _ = pe.listen_cm_loop(&pe_from_cm, &pe_to_pe).map_err(|e| write_err("packet_engine", &e));
-            if CONTINUE_ON_ERROR { let _ = pe.listen_cm(pe_from_cm, pe_to_pe); }
+            let _ = pe.listen_cm_loop(&pe_from_cm).map_err(|e| write_err("packet_engine", &e));
+            if CONTINUE_ON_ERROR { let _ = pe.listen_cm(pe_from_cm); }
         })?;
         Ok(())
     }
 
     // SPAWN THREAD (listen_port)
     // TODO: One thread for all ports; should be a different thread for each port
-    fn listen_port(&self, pe_from_ports: PeFromPort, pe_from_pe: PeFromPe)
+    fn listen_port(&self, pe_from_ports: PeFromPort)
             -> Result<(),Error> {
         let _f = "listen_port";
         let mut pe = self.clone();
@@ -213,14 +216,14 @@ impl PacketEngine {
         let thread_name = format!("PacketEngine {} listen_port_loop", self.cell_id);
         thread::Builder::new().name(thread_name).spawn( move || {
             update_trace_header(child_trace_header);
-            let _ = pe.listen_port_loop(&pe_from_ports, &pe_from_pe).map_err(|e| write_err("packet_engine", &e));
-            if CONTINUE_ON_ERROR { let _ = pe.listen_port(pe_from_ports, pe_from_pe); }
+            let _ = pe.listen_port_loop(&pe_from_ports).map_err(|e| write_err("packet_engine", &e));
+            if CONTINUE_ON_ERROR { let _ = pe.listen_port(pe_from_ports); }
         })?;
         Ok(())
     }
 
     // WORKER (PeFromCm)
-    fn listen_cm_loop(&mut self, pe_from_cm: &PeFromCm, pe_to_pe: &PeToPe)
+    fn listen_cm_loop(&mut self, pe_from_cm: &PeFromCm)
             -> Result<(), Error> {
         let _f = "listen_cm_loop";
         {
@@ -248,7 +251,6 @@ impl PacketEngine {
                     self.routing_table.lock().unwrap().set_entry(entry)
                 },
                 CmToPePacket::Unblock => {
-                    pe_to_pe.send(S("Unblock"))?;
                 },
 
                 // encapsulated APP
@@ -398,7 +400,7 @@ impl PacketEngine {
         self.send_packet_flow_control(port_no)
     }
     // WORKER (PeFromPort)
-    fn listen_port_loop(&mut self, pe_from_ports: &PeFromPort, pe_from_pe: &PeFromPe) -> Result<(), Error> {
+    fn listen_port_loop(&mut self, pe_from_ports: &PeFromPort) -> Result<(), Error> {
         let _f = "listen_port_loop";
         {
             if TRACE_OPTIONS.all || TRACE_OPTIONS.pe_port {
@@ -435,7 +437,7 @@ impl PacketEngine {
 
                 // recv from neighbor
                 PortToPePacket::Packet((port_no, packet))  => {
-                    self.process_packet(port_no, packet, pe_from_pe).context(PacketEngineError::Chain { func_name: "listen_port", comment: S("process_packet ") + &self.cell_id.get_name()})?
+                    self.process_packet(port_no, packet).context(PacketEngineError::Chain { func_name: "listen_port", comment: S("process_packet ") + &self.cell_id.get_name()})?
                 }
             };
         }
@@ -444,7 +446,7 @@ impl PacketEngine {
     // TODO: Make sure I don't have a race condition because I'm dropping the lock on the routing table
     // Potential hazard here; CA may have sent a routing table update.  I can't just hold the lock on the table
     // when I block waiting for a tree update because of a deadlock with listen_cm_loop.
-    fn process_packet(&mut self, port_no: PortNo, mut packet: Packet, pe_from_pe: &PeFromPe)
+    fn process_packet(&mut self, port_no: PortNo, mut packet: Packet)
             -> Result<(), Error> {
         let _f = "process_packet";
         { // Got a packet from the other side, so clear state
@@ -540,30 +542,15 @@ impl PacketEngine {
                 }
                 if entry.is_in_use() {
                     if entry.get_uuid() == packet.get_tree_uuid() {
+                        // Put packets on the right port's queue
                         let mask = entry.get_mask();
                         self.forward(port_no, entry, mask, &packet).context(PacketEngineError::Chain { func_name: "process_packet", comment: S("forward ") + &self.cell_id.get_name() })?;
                     } else {
                         let msg_type = MsgType::msg_type(&packet);
                         return Err(PacketEngineError::Uuid { cell_id: self.cell_id, func_name: _f, msg_type, packet_uuid: packet.get_tree_uuid(), table_uuid: entry.get_uuid() }.into());
                     }
-                    // TODO: Fix to block only the parent port of the specific tree
-                    // Wait for permission to proceed if packet is from a port and will result in a tree update
-                    if packet.is_blocking() && packet.is_last_packet() {
-                        pe_from_pe.recv()?;
-                        for i in 1..=*MAX_NUM_PHYS_PORTS_PER_CELL {
-                            {
-                                let is_border_port = self.border_port_nos.contains(&PortNo(i));
-                                if !is_border_port && (i as usize) < self.pe_to_ports.len() {
-                                    if DEBUG_OPTIONS.all || DEBUG_OPTIONS.flow_control {
-                                        println!("---> PacketEngine {}: {} port {} out buf size {}", self.cell_id, _f, i, self.get_outbuf_size(PortNo(i)));
-                                    }
-                                }
-                            }
-                            self.send_packet_flow_control(PortNo(i))?;
-                        }
-                    } else {
-                        self.send_packet_flow_control(port_no)?;
-                    }
+                    // Send the packet at the head of the port's queue
+                    self.send_packet_flow_control(port_no)?;
                 }
             }
         }
