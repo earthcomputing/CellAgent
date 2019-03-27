@@ -74,7 +74,7 @@ impl PacketEngine {
             if TRACE_OPTIONS.all || TRACE_OPTIONS.pe {
                 let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "worker" };
                 let trace = json!({ "cell_id": self.cell_id, "thread_name": thread::current().name(), "thread_id": TraceHeader::parse(thread::current().id()) });
-                let _ = dal::add_to_trace(TraceType::Trace, trace_params, &trace, _f);
+                let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
             }
         }
         self.listen_cm(pe_from_cm)?;

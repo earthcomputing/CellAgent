@@ -5,8 +5,7 @@ use std::{fmt,
 use failure::{Error, ResultExt};
 
 use crate::config::{CENTRAL_TREE, CONTINUE_ON_ERROR, DEBUG_OPTIONS, TRACE_OPTIONS, PortNo};
-use crate::dal;
-use crate::dal::{fork_trace_header, update_trace_header};
+use crate::dal::{add_to_trace, fork_trace_header, update_trace_header};
 use crate::ec_message::MsgType;
 use crate::ec_message_formats::{CaToCmBytes, CmToCa, CmFromCa, CmToPe, CmFromPe, PeToCmPacket,
                                 CmToPePacket, CmToCaBytes};
@@ -36,7 +35,7 @@ impl Cmodel {
             if TRACE_OPTIONS.all || TRACE_OPTIONS.cm {
                 let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "worker" };
                 let trace = json!({ "cell_id": &self.cell_id, "thread_name": thread::current().name(), "thread_id": TraceHeader::parse(thread::current().id()) });
-                let _ = dal::add_to_trace(TraceType::Trace, trace_params, &trace, _f);
+                let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
             }
         }
         self.listen_ca(cm_from_ca, cm_to_pe)?;
@@ -79,7 +78,7 @@ impl Cmodel {
             if TRACE_OPTIONS.all || TRACE_OPTIONS.cm {
                 let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "worker" };
                 let trace = json!({ "cell_id": &self.cell_id, "thread_name": thread::current().name(), "thread_id": TraceHeader::parse(thread::current().id()) });
-                let _ = dal::add_to_trace(TraceType::Trace, trace_params, &trace, _f);
+                let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
             }
         }
         loop {
@@ -87,11 +86,11 @@ impl Cmodel {
             {
                 if TRACE_OPTIONS.all || TRACE_OPTIONS.cm {
                     let trace = match &msg {
-                        CaToCmBytes::Bytes(msg) => json!({"cell_id": &self.cell_id, "msg": (&msg.0, &msg.1, &msg.2, &msg.3, &msg.4[0..20])}),
+                        CaToCmBytes::Bytes(msg) => json!({"cell_id": &self.cell_id, "msg": (&msg.0, &msg.1, &msg.2, &msg.3[0..20])}),
                         _ => json!({ "cell_id": &self.cell_id, "msg": &msg })
                     };
                     let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "cm_bytes_from_ca" };
-                    let _ = dal::add_to_trace(TraceType::Trace, trace_params, &trace, _f);
+                    let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
                 }
             }
             match msg {
@@ -102,7 +101,7 @@ impl Cmodel {
                 CaToCmBytes::Unblock => cm_to_pe.send(CmToPePacket::Unblock),
 
                 // packetize
-                CaToCmBytes::Bytes((tree_id, is_ait, user_mask, is_blocking, bytes)) => {
+                CaToCmBytes::Bytes((tree_id, is_ait, user_mask, bytes)) => {
                     {
                         if DEBUG_OPTIONS.all || DEBUG_OPTIONS.cm_from_ca {
                             let dpi_msg = MsgType::msg_from_bytes(&bytes)?;
@@ -124,7 +123,7 @@ impl Cmodel {
                         let mut uuid = tree_id.get_uuid();
                         if is_ait { uuid.make_ait(); }
 
-                        let packets = Packetizer::packetize(&uuid, &bytes, is_blocking);
+                        let packets = Packetizer::packetize(&uuid, &bytes);
                         let first = packets.get(0).expect("No packets from packetizer");
                         let dpi_is_ait = first.is_ait();
                         let sender_msg_seq_no = first.get_sender_msg_seq_no();
@@ -151,7 +150,7 @@ impl Cmodel {
             if TRACE_OPTIONS.all || TRACE_OPTIONS.cm {
                 let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "worker" };
                 let trace = json!({ "cell_id": &self.cell_id, "thread_name": thread::current().name(), "thread_id": TraceHeader::parse(thread::current().id()) });
-                let _ = dal::add_to_trace(TraceType::Trace, trace_params, &trace, _f);
+                let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
             }
         }
         loop {
@@ -160,7 +159,7 @@ impl Cmodel {
                 if TRACE_OPTIONS.all || TRACE_OPTIONS.cm {
                     let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "listen_pe_loop" };
                     let trace = json!({ "cell_id": &self.cell_id, "msg": &msg });
-                    let _ = dal::add_to_trace(TraceType::Trace, trace_params, &trace, _f);
+                    let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
                 }
             }
             match msg {
@@ -181,7 +180,6 @@ header.uuid
 payload.sender_msg_seq_no
 payload.size
 payload.is_last
-payload.is_blocking
 payload.bytes
 packet_count
 
@@ -204,7 +202,7 @@ packets: Vec<Packet>,
                 if TRACE_OPTIONS.all || TRACE_OPTIONS.cm {
                     let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "cm_bytes_to_ca" };
                     let trace = json!({ "cell_id": &self.cell_id, "packet": &packet });
-                    let _ = dal::add_to_trace(TraceType::Trace, trace_params, &trace, _f); // sender side, dup
+                    let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f); // sender side, dup
                 }
                 if DEBUG_OPTIONS.all || DEBUG_OPTIONS.cm_from_ca {
                     let packet_count = packets[0].get_count();
