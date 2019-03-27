@@ -83,7 +83,6 @@ pub trait AppMessage {
     }
     fn is_leafward(&self) -> bool { !self.is_rootward() }
     fn is_ait(&self) -> bool { self.get_header().get_ait() }
-    fn is_blocking(&self) -> bool;
     fn value(&self) -> serde_json::Value;
     fn get_sender_msg_seq_no(&self) -> SenderMsgSeqNo { self.get_header().get_sender_msg_seq_no() } // Should prepend self.get_header().get_sender_id()
 }
@@ -135,7 +134,6 @@ impl AppMessage for AppInterapplicationMsg {
     fn get_header(&self) -> &AppMsgHeader { &self.header }
     fn get_payload(&self) -> &dyn AppMsgPayload { &self.payload }
     fn get_msg_type(&self) -> AppMsgType { self.get_header().msg_type }
-    fn is_blocking(&self) -> bool { false }
     fn value(&self) -> serde_json::Value {
         serde_json::to_value(self).expect("I don't know how to handle errors in msg.value()")
     }
@@ -187,7 +185,6 @@ impl AppMessage for AppDeleteTreeMsg {
     fn get_header(&self) -> &AppMsgHeader { &self.header }
     fn get_payload(&self) -> &dyn AppMsgPayload { &self.payload }
     fn get_msg_type(&self) -> AppMsgType { self.get_header().msg_type }
-    fn is_blocking(&self) -> bool { false }
     fn value(&self) -> serde_json::Value {
         serde_json::to_value(self).expect("I don't know how to handle errors in msg.value()")
     }
@@ -241,7 +238,6 @@ impl AppMessage for AppManifestMsg {
     fn get_header(&self) -> &AppMsgHeader { &self.header }
     fn get_payload(&self) -> &dyn AppMsgPayload { &self.payload }
     fn get_msg_type(&self) -> AppMsgType { self.get_header().msg_type }
-    fn is_blocking(&self) -> bool { false }
     fn value(&self) -> serde_json::Value {
         serde_json::to_value(self).expect("I don't know how to handle errors in msg.value()")
     }
@@ -292,7 +288,6 @@ impl AppMessage for AppQueryMsg {
     fn get_header(&self) -> &AppMsgHeader { &self.header }
     fn get_payload(&self) -> &dyn AppMsgPayload { &self.payload }
     fn get_msg_type(&self) -> AppMsgType { self.get_header().msg_type }
-    fn is_blocking(&self) -> bool { false }
     fn value(&self) -> serde_json::Value {
         serde_json::to_value(self).expect("I don't know how to handle errors in msg.value()")
     }
@@ -344,7 +339,6 @@ impl AppMessage for AppStackTreeMsg {
     fn get_header(&self) -> &AppMsgHeader { &self.header }
     fn get_payload(&self) -> &dyn AppMsgPayload { &self.payload }
     fn get_msg_type(&self) -> AppMsgType { self.header.msg_type }
-    fn is_blocking(&self) -> bool { true }
     fn value(&self) -> serde_json::Value {
         serde_json::to_value(self).expect("I don't know how to handle errors in msg.value()")
     }
@@ -395,7 +389,6 @@ impl AppMessage for AppTreeNameMsg {
     fn get_header(&self) -> &AppMsgHeader { &self.header }
     fn get_payload(&self) -> &dyn AppMsgPayload { &self.payload }
     fn get_msg_type(&self) -> AppMsgType { self.get_header().msg_type }
-    fn is_blocking(&self) -> bool { false }
     fn value(&self) -> serde_json::Value {
         serde_json::to_value(self).expect("I don't know how to handle errors in msg.value()")
     }

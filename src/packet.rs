@@ -32,9 +32,9 @@ pub struct Packet {
 }
 impl Packet {
     fn new(sender_msg_seq_no: SenderMsgSeqNo, uuid: &Uuid, size: PacketNo,
-           is_last_packet: bool, is_blocking: bool, data_bytes: Vec<u8>) -> Packet {
+           is_last_packet: bool, data_bytes: Vec<u8>) -> Packet {
         let header = PacketHeader::new(uuid);
-        let payload = Payload::new(sender_msg_seq_no, size, is_last_packet, is_blocking, data_bytes);
+        let payload = Payload::new(sender_msg_seq_no, size, is_last_packet, data_bytes);
         Packet { header, payload, packet_count: Packet::get_next_count() }
     }
     pub fn make(header: PacketHeader, payload: Payload, packet_count: usize) -> Packet {
@@ -44,7 +44,7 @@ impl Packet {
         let mut uuid = Uuid::new();
         uuid.make_entl();
         Packet::new(get_next_count(), &uuid, PacketNo(1),
-                    false, false, vec![])
+                    false, vec![])
     }
     
     pub fn get_next_count() -> usize { PACKET_COUNT.fetch_add(1, Ordering::SeqCst) }
@@ -57,7 +57,6 @@ impl Packet {
     pub fn get_tree_uuid(&self) -> Uuid { self.header.get_uuid() }
 
     // Payload (delegate)
-    pub fn is_blocking(&self) -> bool { self.payload.is_blocking() }
     pub fn is_last_packet(&self) -> bool { self.payload.is_last_packet() }
     pub fn get_sender_msg_seq_no(&self) -> SenderMsgSeqNo { self.payload.get_sender_msg_seq_no() }
     pub fn get_size(&self) -> PacketNo { self.payload.get_size() }
@@ -137,24 +136,22 @@ pub struct Payload {
     size: PacketNo, // Number of packets remaining in message if not last packet
                     // Number of bytes in last packet if last packet, 0 => Error
     is_last: bool,
-    is_blocking: bool,
     bytes: [u8; PAYLOAD_MAX],
     wrapped_header: Stack<PacketHeader>,
 }
 impl Payload {
     pub fn new(sender_msg_seq_no: SenderMsgSeqNo, size: PacketNo,
-               is_last: bool, is_blocking: bool, data_bytes: Vec<u8>) -> Payload {
+               is_last: bool, data_bytes: Vec<u8>) -> Payload {
         let mut bytes = [0 as u8; PAYLOAD_MAX];
         // Next line recommended by clippy, but I think the loop is clearer
         //bytes[..min(data_bytes.len(), PAYLOAD_MAX)].clone_from_slice(&data_bytes[..min(data_bytes.len(), PAYLOAD_MAX)]);
         for i in 0..min(data_bytes.len(), PAYLOAD_MAX) { bytes[i] = data_bytes[i]; }
-        Payload { sender_msg_seq_no, size, is_last, is_blocking, bytes, wrapped_header: Stack::new() }
+        Payload { sender_msg_seq_no, size, is_last, bytes, wrapped_header: Stack::new() }
     }
     fn get_bytes(&self) -> Vec<u8> { self.bytes.iter().cloned().collect() }
     fn get_sender_msg_seq_no(&self) -> SenderMsgSeqNo { self.sender_msg_seq_no }
     fn get_size(&self) -> PacketNo { self.size }
     fn is_last_packet(&self) -> bool { self.is_last }
-    fn is_blocking(&self) -> bool { self.is_blocking }
     fn get_wrapped_header(&self) -> &Stack<PacketHeader> { &self.wrapped_header }
 }
 impl fmt::Display for Payload {
@@ -180,7 +177,6 @@ impl Serialize for Payload {
         state.serialize_field("sender_msg_seq_no", &self.sender_msg_seq_no)?;
         state.serialize_field("size", &self.size)?;
         state.serialize_field("is_last", &self.is_last)?;
-        state.serialize_field("is_blocking", &self.is_blocking)?;
         state.serialize_field("bytes", &body)?;
         state.end()
     }
@@ -205,7 +201,7 @@ impl Serializer {
 }
 pub struct Packetizer {}
 impl Packetizer {
-    pub fn packetize(uuid: &Uuid, msg_bytes: &ByteArray, is_blocking: bool)
+    pub fn packetize(uuid: &Uuid, msg_bytes: &ByteArray)
             -> Vec<Packet> {
         let mtu = Packetizer::packet_payload_size(msg_bytes.len());
         let num_packets = (msg_bytes.len() + mtu - 1)/ mtu; // Poor man's ceiling
@@ -225,7 +221,7 @@ impl Packetizer {
                 packet_bytes[j] = msg_bytes[i*mtu + j];
             }
             let packet = Packet::new(sender_msg_seq_no, uuid, PacketNo(size as u16),
-                                     is_last_packet, is_blocking, packet_bytes);
+                                     is_last_packet, packet_bytes);
             //println!("Packet: packet {} for msg {}", packet.get_packet_count(), msg.get_count());
             packets.push(packet);
         }

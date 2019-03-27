@@ -164,7 +164,6 @@ pub trait Message {
     }
     fn is_leafward(&self) -> bool { !self.is_rootward() }
     fn is_ait(&self) -> bool { self.get_header().get_ait() }
-    fn is_blocking(&self) -> bool { false }
     fn value(&self) -> serde_json::Value;
     fn get_sender_msg_seq_no(&self) -> SenderMsgSeqNo { self.get_header().get_sender_msg_seq_no() }
     fn to_bytes(&self) -> Result<ByteArray, Error> where Self: serde::Serialize + Sized {
@@ -176,7 +175,7 @@ pub trait Message {
             where Self:std::marker::Sized + serde::Serialize {
         let _f = "to_packets";
         let bytes = Serializer::serialize(self).context(MessageError::Chain { func_name: _f, comment: S("")})?;
-        let packets = Packetizer::packetize(&tree_id.get_uuid(), &ByteArray(bytes), self.is_blocking());
+        let packets = Packetizer::packetize(&tree_id.get_uuid(), &ByteArray(bytes));
         Ok(packets)
     }
     fn process_ca(&mut self, _cell_agent: &mut CellAgent, _port_no: PortNo,

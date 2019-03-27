@@ -1529,12 +1529,11 @@ impl CellAgent {
                 }
             }
         }
-        let is_blocking = msg.is_blocking();
         let bytes = msg.to_bytes()?;
-        self.send_bytes(tree_id, msg.is_ait(), is_blocking, user_mask, bytes)?;
+        self.send_bytes(tree_id, msg.is_ait(), user_mask, bytes)?;
         Ok(())
     }
-    fn send_bytes(&self, tree_id: TreeID, is_ait: bool, is_blocking: bool, user_mask: Mask,
+    fn send_bytes(&self, tree_id: TreeID, is_ait: bool, user_mask: Mask,
                   bytes: ByteArray) -> Result<(), Error> {
         let _f = "send_bytes";
         let tree_uuid = tree_id.get_uuid();
@@ -1542,7 +1541,7 @@ impl CellAgent {
         self.tree_map
             .get(&tree_uuid)
             .ok_or::<Error>(CellagentError::Tree { func_name: _f, cell_id: self.cell_id, tree_uuid }.into())?;
-        let msg = CaToCmBytes::Bytes((tree_id, is_ait, user_mask, is_blocking, bytes));
+        let msg = CaToCmBytes::Bytes((tree_id, is_ait, user_mask, bytes));
         self.ca_to_cm.send(msg)?;
         Ok(())
     }
