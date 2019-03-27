@@ -170,7 +170,7 @@ impl Traph {
         self.elements[index].set_broken();
         self.elements[index].mark_broken();
     }
-    pub fn get_port_status(&self, port_number: PortNumber) -> PortStatus {
+    pub fn get_port_status(&self, port_number: PortNumber) -> PortState {
         self.elements[*port_number.get_port_no() as usize].get_status()
     }
     pub fn get_parent_port(&self) -> Result<PortNo, Error> {
@@ -183,7 +183,7 @@ impl Traph {
         // dumpstack();
         self.elements
             .iter()
-            .find(|&element| element.get_status() == PortStatus::Parent)
+            .find(|&element| element.get_status() == PortState::Parent)
             .ok_or(TraphError::ParentElement { cell_id: self.cell_id, func_name: _f, tree_id: self.base_tree_id }.into())
     }
     pub fn get_parent_element_mut(&mut self) -> Result<&mut TraphElement, Error> {
@@ -192,7 +192,7 @@ impl Traph {
         // dumpstack();
         self.elements
             .iter_mut()
-            .find(|element| element.get_status() == PortStatus::Parent)
+            .find(|element| element.get_status() == PortState::Parent)
             .ok_or(TraphError::ParentElement { cell_id: self.cell_id, func_name: _f, tree_id: self.base_tree_id }.into())
     }
     pub fn find_new_parent_port(&mut self, rw_port_tree_id: PortTreeID, broken_path: Path) -> Option<PortNo> {
@@ -230,7 +230,7 @@ impl Traph {
         self.elements
             .iter()
             .filter(|&element| element.is_connected())
-            .filter(|&element| element.is_status(PortStatus::Pruned))
+            .filter(|&element| element.is_status(PortState::Pruned))
             .filter(|&element| !self.tried_ports_contains(rw_port_tree_id, element.get_port_no()))
             .filter(|&element| !element.is_on_broken_path(broken_path))
             .filter(|&element| !element.is_broken())
@@ -244,7 +244,7 @@ impl Traph {
         self.elements
             .iter()
             .filter(|&element| element.is_connected())
-            .find(|&element| element.is_status(PortStatus::Child))
+            .find(|&element| element.is_status(PortState::Child))
             .filter(|&element| !self.tried_ports_contains(rw_port_tree_id, element.get_port_no()))
             .filter(|&element| !element.is_broken())
     }
@@ -331,7 +331,7 @@ impl Traph {
         self.apply_update(PortTree::make_child_parent, Tree::make_child_parent,
             port_tree_id, child)
     }
-    pub fn update_element(&mut self, tree_id: TreeID, port_number: PortNumber, port_status: PortStatus,
+    pub fn update_element(&mut self, tree_id: TreeID, port_number: PortNumber, port_status: PortState,
                           children: &HashSet<PortNumber>, hops: PathLength, path: Path)
                           -> Result<RoutingTableEntry, Error> {
         let _f = "update_element";
@@ -346,7 +346,7 @@ impl Traph {
         table_entry.set_tree_id(tree_id.to_port_tree_id_0());
         table_entry.add_children(&children);
         table_entry.set_inuse();
-        if port_status == PortStatus::Parent {
+        if port_status == PortState::Parent {
             table_entry.set_parent(port_number);
         };
         tree.set_table_entry(table_entry);
@@ -411,19 +411,19 @@ impl fmt::Display for Traph {
     }
 }
 #[derive(Debug, Copy, Clone, PartialEq, Serialize)]
-pub enum PortStatus {
+pub enum PortState {
     Parent,
     Child,
     Pruned,
     Broken
 }
-impl fmt::Display for PortStatus {
+impl fmt::Display for PortState {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let s = match *self {
-            PortStatus::Parent => "Parent",
-            PortStatus::Child  => "Child ",
-            PortStatus::Pruned => "Pruned",
-            PortStatus::Broken => "Broken"
+            PortState::Parent => "Parent",
+            PortState::Child  => "Child ",
+            PortState::Pruned => "Pruned",
+            PortState::Broken => "Broken"
         };
         write!(f, "{}", s)
     }
