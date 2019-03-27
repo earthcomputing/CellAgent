@@ -6,13 +6,12 @@ use std::{fmt, fmt::Write,
 
 use crate::config::{CENTRAL_TREE, CONTINUE_ON_ERROR, DEBUG_OPTIONS,
                     MAX_NUM_PHYS_PORTS_PER_CELL, TRACE_OPTIONS, PortNo};
-use crate::dal;
-use crate::dal::{fork_trace_header, update_trace_header};
+use crate::dal::{add_to_trace, fork_trace_header, update_trace_header};
 use crate::ec_message::{MsgType};
 use crate::ec_message_formats::{PeFromCm, PeToCm,
                                 PeToPort, PeFromPort, PortToPePacket, PeToPortPacket,
                                 PeToPe, PeFromPe, CmToPePacket, PeToCmPacket};
-use crate::name::{Name, CellID};
+use crate::name::{Name, CellID, TreeID};
 use crate::packet::Packet;
 use crate::port::PortStatus;
 use crate::routing_table::RoutingTable;
@@ -230,7 +229,7 @@ impl PacketEngine {
             if TRACE_OPTIONS.all || TRACE_OPTIONS.pe_cm {
                 let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "worker" };
                 let trace = json!({ "cell_id": self.cell_id, "thread_name": thread::current().name(), "thread_id": TraceHeader::parse(thread::current().id()) });
-                let _ = dal::add_to_trace(TraceType::Trace, trace_params, &trace, _f);
+                let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
             }
         }
         loop {
@@ -239,7 +238,7 @@ impl PacketEngine {
                 if TRACE_OPTIONS.all || TRACE_OPTIONS.pe_cm {
                     let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "recv" };
                     let trace = json!({ "cell_id": self.cell_id, "msg": &msg });
-                    let _ = dal::add_to_trace(TraceType::Trace, trace_params, &trace, _f);
+                    let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
                 }
             }
             match msg {
@@ -317,7 +316,7 @@ impl PacketEngine {
                         if TRACE_OPTIONS.all || TRACE_OPTIONS.pe_cm {
                             let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "pe_packet_from_cm" };
                             let trace = json!({ "cell_id": self.cell_id, "port_tree_id": port_tree_id, "ait_state": ait_state, "msg_type": &msg_type });
-                            let _ = dal::add_to_trace(TraceType::Trace, trace_params, &trace, _f);
+                            let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
                         }
                         if DEBUG_OPTIONS.pe_pkt_recv {
                             match msg_type {
@@ -406,7 +405,7 @@ impl PacketEngine {
             if TRACE_OPTIONS.all || TRACE_OPTIONS.pe_port {
                 let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "worker" };
                 let trace = json!({ "cell_id": self.cell_id, "thread_name": thread::current().name(), "thread_id": TraceHeader::parse(thread::current().id()) });
-                let _ = dal::add_to_trace(TraceType::Trace, trace_params, &trace, _f);
+                let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
             }
         }
         loop {
@@ -415,7 +414,7 @@ impl PacketEngine {
                 if TRACE_OPTIONS.all || TRACE_OPTIONS.pe_port {
                     let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "pl_recv" };
                     let trace = json!({ "cell_id": self.cell_id, "msg": &msg });
-                    let _ = dal::add_to_trace(TraceType::Trace, trace_params, &trace, _f);
+                    let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
                 }
             }
             match msg {
@@ -529,7 +528,7 @@ impl PacketEngine {
                             let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "pe_process_packet" };
                             let trace = json!({ "cell_id": self.cell_id, "port_tree_id": port_tree_id, "ait_state": ait_state,
                             "msg_type": &msg_type, "port_no": &port_no, "entry": &entry });
-                            let _ = dal::add_to_trace(TraceType::Trace, trace_params, &trace, _f);
+                            let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
                         }
                         if DEBUG_OPTIONS.pe_process_pkt {
                             match msg_type {
@@ -585,7 +584,7 @@ impl PacketEngine {
                                     {
                                         let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "pe_forward_to_cm" };
                                         let trace = json!({ "cell_id": self.cell_id, "tree_name": &tree_name, "msg_type": &msg_type, "parent_port": &parent });
-                                        let _ = dal::add_to_trace(TraceType::Debug, trace_params, &trace, _f);
+                                        let _ = add_to_trace(TraceType::Debug, trace_params, &trace, _f);
                                     }
                                     if msg_type == MsgType::Manifest { println!("PacketEngine {} forwarding manifest rootward", self.cell_id); }
                                     println!("PacketEngine {}: {} [{}] {} {}", self.cell_id, _f, *parent, msg_type, tree_name);
@@ -611,7 +610,7 @@ impl PacketEngine {
                         if TRACE_OPTIONS.all || TRACE_OPTIONS.pe_port {
                             let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "pe_forward_leafward" };
                             let trace = json!({ "cell_id": self.cell_id, "port_tree_id": &port_tree_id, "msg_type": &msg_type, "port_nos": &port_nos });
-                            let _ = dal::add_to_trace(TraceType::Trace, trace_params, &trace, _f);
+                            let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
                         }
                         if DEBUG_OPTIONS.all || DEBUG_OPTIONS.pe_pkt_send {
                             match msg_type {
@@ -671,7 +670,6 @@ impl fmt::Display for NumberOfPackets {
 }
 // Errors
 use failure::{Error, ResultExt};
-use crate::name::TreeID;
 
 #[derive(Debug, Fail)]
 pub enum PacketEngineError {
