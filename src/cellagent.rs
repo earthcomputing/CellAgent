@@ -15,7 +15,7 @@ use crate::config::{CONNECTED_PORTS_TREE_NAME, CONTINUE_ON_ERROR, CONTROL_TREE_N
 use crate::dal::{add_to_trace, fork_trace_header, update_trace_header};
 use crate::ec_message::{Message, MsgHeader, MsgDirection, MsgTreeMap, MsgType,
               InterapplicationMsg,
-              DiscoverMsg, DiscoverDMsg,
+              DiscoverMsg, DiscoverDMsg, DiscoverDType,
               FailoverMsg, FailoverDMsg, FailoverMsgPayload, FailoverResponse,
               HelloMsg,
               ManifestMsg,
@@ -828,7 +828,8 @@ impl CellAgent {
         if !tree_seen {
             let sender_id = SenderID::new(self.cell_id, "CellAgent")?;
             let in_reply_to = msg.get_sender_msg_seq_no();
-            let discoverd_msg = DiscoverDMsg::new(in_reply_to, sender_id, self.cell_id, new_port_tree_id, path);
+            let discoverd_msg = DiscoverDMsg::new(in_reply_to, sender_id,
+                   self.cell_id, new_port_tree_id, path, DiscoverDType::First);
             let mask = Mask::new(port_number);
             self.send_msg(self.get_connected_tree_id(),
                           &discoverd_msg, mask).context(CellagentError::Chain { func_name: "process_ca", comment: S("DiscoverMsg") })?;

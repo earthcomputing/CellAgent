@@ -311,11 +311,13 @@ pub struct DiscoverDMsg {
     payload: DiscoverDPayload
 }
 impl DiscoverDMsg {
-    pub fn new(in_reply_to: SenderMsgSeqNo, sender_id: SenderID, sending_cell_id: CellID, tree_id: PortTreeID, path: Path) -> DiscoverDMsg {
+    pub fn new(in_reply_to: SenderMsgSeqNo, sender_id: SenderID, sending_cell_id: CellID,
+               tree_id: PortTreeID, path: Path, discover_type: DiscoverDType) -> DiscoverDMsg {
         // Note that direction is leafward so we can use the connected ports tree
         // If we send rootward, then the first recipient forwards the DiscoverD
         let header = MsgHeader::new(sender_id, true,MsgType::DiscoverD, MsgDirection::Leafward);
-        let payload = DiscoverDPayload::new(in_reply_to, sending_cell_id, tree_id, path);
+        let payload = DiscoverDPayload::new(in_reply_to, sending_cell_id,
+                                            tree_id, path, discover_type);
         DiscoverDMsg { header, payload }
     }
     pub fn get_payload(&self) -> &DiscoverDPayload { &self.payload }
@@ -340,27 +342,43 @@ impl fmt::Display for DiscoverDMsg {
         write!(f, "{}", s)
     }
 }
-#[derive(Debug, Clone, Hash, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DiscoverDPayload {
     in_reply_to: SenderMsgSeqNo,
     sending_cell_id: CellID,
     port_tree_id: PortTreeID,
     root_port_no: PortNo,
-    path: Path
+    path: Path,
+    discover_type: DiscoverDType
 }
 impl DiscoverDPayload {
-    fn new(in_reply_to: SenderMsgSeqNo, sending_cell_id: CellID, port_tree_id: PortTreeID, path: Path) -> DiscoverDPayload {
+    fn new(in_reply_to: SenderMsgSeqNo, sending_cell_id: CellID, port_tree_id: PortTreeID,
+           path: Path, discover_type: DiscoverDType) -> DiscoverDPayload {
         let root_port_no = port_tree_id.get_port_no();
         DiscoverDPayload { in_reply_to, sending_cell_id: sending_cell_id.clone(), port_tree_id: port_tree_id.clone(),
-            path, root_port_no }
+            path, root_port_no, discover_type }
     }
     pub fn get_port_tree_id(&self) -> PortTreeID { self.port_tree_id }
     pub fn get_path(&self) -> Path { self.path }
+    pub fn get_discover_type(&self) -> DiscoverDType { self.discover_type }
 }
 impl MsgPayload for DiscoverDPayload {}
 impl fmt::Display for DiscoverDPayload {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "My Tree {}", self.port_tree_id)
+    }
+}
+#[derive(Debug, Copy, Clone, Serialize, Deserialize)]
+pub enum DiscoverDType {
+    First,
+    Subsequent
+}
+impl fmt::Display for DiscoverDType {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            DiscoverDType::First      => write!(f, "First"),
+            DiscoverDType::Subsequent => write!(f, "Subsequent")
+        }
     }
 }
 #[derive(Debug, Clone, Serialize, Deserialize)]

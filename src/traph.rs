@@ -412,6 +412,7 @@ impl fmt::Display for Traph {
 }
 #[derive(Debug, Copy, Clone, PartialEq, Serialize)]
 pub enum PortState {
+    Unknown,
     Parent,
     Child,
     Pruned,
@@ -420,10 +421,11 @@ pub enum PortState {
 impl fmt::Display for PortState {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let s = match *self {
-            PortState::Parent => "Parent",
-            PortState::Child  => "Child ",
-            PortState::Pruned => "Pruned",
-            PortState::Broken => "Broken"
+            PortState::Unknown => "Unknown",
+            PortState::Parent  => "Parent",
+            PortState::Child   => "Child ",
+            PortState::Pruned  => "Pruned",
+            PortState::Broken  => "Broken"
         };
         write!(f, "{}", s)
     }

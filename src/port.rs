@@ -5,8 +5,7 @@ use std::{fmt,
 
 use crate::app_message_formats::{PortToNoc, PortFromNoc};
 use crate::config::{CONTINUE_ON_ERROR, TRACE_OPTIONS, PortNo};
-use crate::dal;
-use crate::dal::{fork_trace_header, update_trace_header};
+use crate::dal::{add_to_trace, fork_trace_header, update_trace_header};
 use crate::ec_message_formats::{PortToLink, PortFromLink, PortToPe, PortFromPe, LinkToPortPacket, PortToPePacket,
                                 PeToPortPacket};
 use crate::name::{Name, PortID, CellID};
@@ -80,7 +79,7 @@ impl Port {
             if TRACE_OPTIONS.all || TRACE_OPTIONS.port {
                 let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "worker" };
                 let trace = json!({ "id": self.get_id().get_name(), "thread_name": thread::current().name(), "thread_id": TraceHeader::parse(thread::current().id()) });
-                let _ = dal::add_to_trace(TraceType::Trace, trace_params, &trace, _f);
+                let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
             }
         }
         loop {
@@ -89,7 +88,7 @@ impl Port {
                 if TRACE_OPTIONS.all || TRACE_OPTIONS.port {
                     let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "recv" };
                     let trace = json!({ "id": self.get_id().get_name(), "msg": msg });
-                    let _ = dal::add_to_trace(TraceType::Trace, trace_params, &trace, _f);
+                    let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
                 }
             }
             //println!("Port to pe other_index {}", *other_index);
@@ -120,7 +119,7 @@ impl Port {
             if TRACE_OPTIONS.all || TRACE_OPTIONS.port_noc {
                 let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "worker" };
                 let trace = json!({ "id": self.get_id().get_name(), "thread_name": thread::current().name(), "thread_id": TraceHeader::parse(thread::current().id()) });
-                let _ = dal::add_to_trace(TraceType::Trace, trace_params, &trace, _f);
+                let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
             }
         }
         loop {
@@ -129,7 +128,7 @@ impl Port {
                 if TRACE_OPTIONS.all || TRACE_OPTIONS.port_noc {
                     let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "recv" };
                     let trace = json!({ "id": self.get_id().get_name(), "msg": msg });
-                    let _ = dal::add_to_trace(TraceType::Trace, trace_params, &trace, _f);
+                    let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
                 }
             }
             //println!("Port {}: waiting for packet from pe", port.id);
@@ -172,7 +171,7 @@ impl Port {
             if TRACE_OPTIONS.all || TRACE_OPTIONS.port {
                 let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "worker" };
                 let trace = json!({ "id": self.get_id().get_name(), "thread_name": thread::current().name(), "thread_id": TraceHeader::parse(thread::current().id()) });
-                let _ = dal::add_to_trace(TraceType::Trace, trace_params, &trace, _f);
+                let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
             }
         }
         //println!("PortID {}: port_no {}", self.id, port_no);
@@ -183,7 +182,7 @@ impl Port {
                 if TRACE_OPTIONS.all || TRACE_OPTIONS.port {
                     let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "recv" };
                     let trace = json!({ "id": self.get_id().get_name(), "msg": msg });
-                    let _ = dal::add_to_trace(TraceType::Trace, trace_params, &trace, _f);
+                    let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
                 }
             }
             match msg {
@@ -210,7 +209,7 @@ impl Port {
             if TRACE_OPTIONS.all || TRACE_OPTIONS.port {
                 let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "worker" };
                 let trace = json!({ "id": self.get_id().get_name(), "thread_name": thread::current().name(), "thread_id": TraceHeader::parse(thread::current().id()) });
-                let _ = dal::add_to_trace(TraceType::Trace, trace_params, &trace, _f);
+                let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
             }
         }
         loop {
@@ -220,7 +219,7 @@ impl Port {
                 if TRACE_OPTIONS.all || TRACE_OPTIONS.port {
                     let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "recv" };
                     let trace = json!({ "id": self.get_id().get_name(), "msg": msg });
-                    let _ = dal::add_to_trace(TraceType::Trace, trace_params, &trace, _f);
+                    let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
                 }
             }
             let packet = match msg {
