@@ -6,9 +6,9 @@ use std::{thread,
 use crate::app_message::{AppMsgType, AppMsgDirection, AppTreeNameMsg};
 use crate::app_message_formats::{NocToPort, NocFromPort, PortToNoc, PortFromNoc, NocFromApplication, NocToApplication};
 use crate::blueprint::{Blueprint};
-use crate::config::{CONTINUE_ON_ERROR, SCHEMA_VERSION, TRACE_OPTIONS, ByteArray, CellConfig, get_geometry};
-use crate::dal;
-use crate::dal::{fork_trace_header, update_trace_header};
+use crate::config::{CONTINUE_ON_ERROR, RACE_SLEEP, SCHEMA_VERSION, TRACE_OPTIONS,
+                    ByteArray, CellConfig, get_geometry};
+use crate::dal::{add_to_trace, fork_trace_header, update_trace_header};
 use crate::gvm_equation::{GvmEquation, GvmEqn, GvmVariable, GvmVariableType};
 use crate::uptree_spec::{AllowedTree, ContainerSpec, Manifest, UpTreeSpec, VmSpec};
 use crate::utility::{S, TraceHeader, TraceHeaderParams, TraceType, sleep, write_err};
@@ -37,7 +37,7 @@ impl Noc {
                 let (rows, cols, _geometry) = get_geometry(blueprint.get_ncells());
                 let trace_params = &TraceHeaderParams { module: "src/main.rs", line_no: line!(), function: "MAIN", format: "trace_schema" };
                 let trace = json!({ "schema_version": SCHEMA_VERSION, "ncells": blueprint.get_ncells(), "rows": rows, "cols": cols });
-                let _ = dal::add_to_trace(TraceType::Trace, trace_params, &trace, _f);
+                let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
             }
         }
         let (noc_to_port, port_from_noc): (NocToPort, NocFromPort) = channel();
@@ -76,7 +76,7 @@ impl Noc {
             if TRACE_OPTIONS.all || TRACE_OPTIONS.noc {
                 let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "worker" };
                 let trace = json!({ "id": self.get_name(), "thread_name": thread::current().name(), "thread_id": TraceHeader::parse(thread::current().id()) });
-                let _ = dal::add_to_trace(TraceType::Trace, trace_params, &trace, _f);
+                let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
             }
         }
         loop {
@@ -85,7 +85,7 @@ impl Noc {
                 if TRACE_OPTIONS.all || TRACE_OPTIONS.noc {
                     let trace_params = &TraceHeaderParams { module: "src/noc.rs", line_no: line!(), function: _f, format: "noc_from_port" };
                     let trace = json!({ "id": self.get_name(), "cmd": cmd });
-                    let _ = dal::add_to_trace(TraceType::Trace, trace_params, &trace, _f);
+                    let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
                 }
             }
             let (_is_ait, _allowed_tree, msg_type, _direction, bytes) = cmd;
@@ -127,7 +127,7 @@ impl Noc {
             if TRACE_OPTIONS.all || TRACE_OPTIONS.noc {
                 let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "worker" };
                 let trace = json!({ "id": self.get_name(), "thread_name": thread::current().name(), "thread_id": TraceHeader::parse(thread::current().id()) });
-                let _ = dal::add_to_trace(TraceType::Trace, trace_params, &trace, _f);
+                let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
             }
         }
         loop {
@@ -136,7 +136,7 @@ impl Noc {
                 if TRACE_OPTIONS.all || TRACE_OPTIONS.noc {
                     let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "worker" };
                     let trace = json!({ "id": self.get_name(), "thread_name": thread::current().name(), "thread_id": TraceHeader::parse(thread::current().id()) });
-                    let _ = dal::add_to_trace(TraceType::Trace, trace_params, &trace, _f);
+                    let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
                 }
             }
             println!("Noc: {}", input);
@@ -147,8 +147,8 @@ impl Noc {
     // Sets up the NOC Master and NOC Agent services on up trees
     fn create_noc(&mut self, tree_name: &str, noc_to_port: &NocToPort) -> Result<(), Error> {
         // TODO: Avoids race condition of deployment with Discover, remove to debug
-        if crate::config::RACE_SLEEP > 0 { println!("---> Sleeping to let discover finish"); }
-        sleep(crate::config::RACE_SLEEP);
+        if RACE_SLEEP > 0 { println!("---> Sleeping to let discover finish"); }
+        sleep(RACE_SLEEP);
         let is_ait = false;
         // Stack the trees needed to deploy the master and agent and for them to talk master->agent and agent->master
         let noc_master_deploy_tree = AllowedTree::new(NOC_MASTER_DEPLOY_TREE_NAME);
@@ -162,8 +162,8 @@ impl Noc {
         let allowed_trees = vec![&noc_master_agent, &noc_agent_master];
         // Sleep to allow tree stacking to finish
         // TODO: Sleep to let stack tree msgs finish before sending application msgs; should be removed
-        if crate::config::RACE_SLEEP > 0 { println!("---> Sleeping to let tree stacking finish"); }
-        sleep(crate::config::RACE_SLEEP);
+        if RACE_SLEEP > 0 { println!("---> Sleeping to let tree stacking finish"); }
+        sleep(RACE_SLEEP);
         // Deploy NocMaster
         let up_tree = UpTreeSpec::new("NocMaster", vec![0]).context(NocError::Chain { func_name: "create_noc", comment: S("NocMaster") })?;
         let service = ContainerSpec::new("NocMaster", "NocMaster", vec![], &allowed_trees).context(NocError::Chain { func_name: "create_noc", comment: S("NocMaster") })?;

@@ -171,7 +171,7 @@ impl Traph {
         self.elements[index].mark_broken();
     }
     pub fn get_port_status(&self, port_number: PortNumber) -> PortState {
-        self.elements[*port_number.get_port_no() as usize].get_status()
+        self.elements[*port_number.get_port_no() as usize].get_state()
     }
     pub fn get_parent_port(&self) -> Result<PortNo, Error> {
         self.get_parent_element()
@@ -183,7 +183,7 @@ impl Traph {
         // dumpstack();
         self.elements
             .iter()
-            .find(|&element| element.get_status() == PortState::Parent)
+            .find(|&element| element.get_state() == PortState::Parent)
             .ok_or(TraphError::ParentElement { cell_id: self.cell_id, func_name: _f, tree_id: self.base_tree_id }.into())
     }
     pub fn get_parent_element_mut(&mut self) -> Result<&mut TraphElement, Error> {
@@ -192,7 +192,7 @@ impl Traph {
         // dumpstack();
         self.elements
             .iter_mut()
-            .find(|element| element.get_status() == PortState::Parent)
+            .find(|element| element.get_state() == PortState::Parent)
             .ok_or(TraphError::ParentElement { cell_id: self.cell_id, func_name: _f, tree_id: self.base_tree_id }.into())
     }
     pub fn find_new_parent_port(&mut self, rw_port_tree_id: PortTreeID, broken_path: Path) -> Option<PortNo> {
@@ -230,7 +230,7 @@ impl Traph {
         self.elements
             .iter()
             .filter(|&element| element.is_connected())
-            .filter(|&element| element.is_status(PortState::Pruned))
+            .filter(|&element| element.is_state(PortState::Pruned))
             .filter(|&element| !self.tried_ports_contains(rw_port_tree_id, element.get_port_no()))
             .filter(|&element| !element.is_on_broken_path(broken_path))
             .filter(|&element| !element.is_broken())
@@ -244,7 +244,7 @@ impl Traph {
         self.elements
             .iter()
             .filter(|&element| element.is_connected())
-            .find(|&element| element.is_status(PortState::Child))
+            .find(|&element| element.is_state(PortState::Child))
             .filter(|&element| !self.tried_ports_contains(rw_port_tree_id, element.get_port_no()))
             .filter(|&element| !element.is_broken())
     }

@@ -340,7 +340,7 @@ impl CellAgent {
                     .any(|b| b)
                 })
     }
-    fn update_traph(&mut self, base_port_tree_id: PortTreeID, port_number: PortNumber, port_status: PortState,
+    fn update_traph(&mut self, base_port_tree_id: PortTreeID, port_number: PortNumber, port_state: PortState,
                     gvm_eqn: &GvmEquation, mut children: HashSet<PortNumber>,
                     hops: PathLength, path: Path)
                     -> Result<RoutingTableEntry, Error> {
@@ -351,7 +351,7 @@ impl CellAgent {
                 let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "ca_update_traph" };
                 let trace = json!({ "cell_id": &self.cell_id,
                 "base_tree_id": base_port_tree_id, "port_number": &port_number, "hops": &hops,
-                "port_status": &port_status,
+                "port_state": &port_state,
                 "children": children, "gvm": &gvm_eqn });
                 let _ = add_to_trace(TraceType::Debug, trace_params, &trace, _f);
             }
@@ -367,7 +367,7 @@ impl CellAgent {
                 let save = gvm_eqn.eval_save(&variables).context(CellagentError::Chain { func_name: _f, comment: S("eval_save") })?;
                 (recv, send, xtnd, save)
         };
-        let (updated_hops, _) = match port_status {
+        let (updated_hops, _) = match port_state {
             PortState::Child => {
                 let element = traph.get_parent_element().context(CellagentError::Chain { func_name: _f, comment: S("") })?;
                 // Need to coordinate the following with DiscoverMsg.update_discover_msg
@@ -377,7 +377,7 @@ impl CellAgent {
         };
         let traph_status = traph.get_port_status(port_number);
         let entry_port_status = match traph_status {
-            PortState::Pruned => port_status,
+            PortState::Pruned | PortState::Unknown => port_state,
             _ => traph_status  // Don't replace if Parent or Child
         };
         if gvm_recv { children.insert(PortNumber::new0()); }
@@ -794,9 +794,22 @@ impl CellAgent {
         let new_tree_id = new_port_tree_id.to_tree_id();
         self.tree_id_map.insert(new_port_tree_id.get_uuid(), new_port_tree_id);
         let tree_seen = self.quench_simple(new_tree_id);
+        // Send DiscoverD::First to sender first time this tree is seen, otherwise DiscoverD::Subsequent
+        let discover_type = if !tree_seen {
+            DiscoverDType::First
+        } else {
+            DiscoverDType::Subsequent
+        };
+        let sender_id = SenderID::new(self.cell_id, "CellAgent")?;
+        let in_reply_to = msg.get_sender_msg_seq_no();
+        let discoverd_msg = DiscoverDMsg::new(in_reply_to, sender_id,
+                                              self.cell_id, new_port_tree_id, path, discover_type);
+        let mask = Mask::new(port_number);
+        self.send_msg(self.get_connected_tree_id(),
+                          &discoverd_msg, mask).context(CellagentError::Chain { func_name: "process_ca", comment: S("DiscoverMsg") })?;
         let port_tree_seen = self.quench_root_port(new_tree_id, path);
         let quench = match QUENCH {
-            Quench::Simple   => tree_seen,     // Must see this tree once
+            Quench::Simple => tree_seen,     // Must see this tree once
             Quench::RootPort => port_tree_seen // Must see every root port for this tree once
         };
         let mut eqns = HashSet::new();
@@ -816,29 +829,22 @@ impl CellAgent {
             }
         }
         if !port_tree_seen {
-            let status = if tree_seen { PortState::Pruned } else { PortState::Parent };
-            self.update_traph(new_port_tree_id, port_number, status, &gvm_equation,
+            let port_state = match discover_type {
+                DiscoverDType::First => PortState::Parent,
+                DiscoverDType::Subsequent => PortState::Pruned
+            };
+            self.update_traph(new_port_tree_id, port_number, port_state, &gvm_equation,
                               HashSet::new(), hops, path).context(CellagentError::Chain { func_name: "process_ca", comment: S("DiscoverMsg") })?;
         }
         self.update_base_tree_map(new_port_tree_id, new_tree_id);
         // The following is needed until I get port trees and trees straighened out.
         self.update_base_tree_map(new_tree_id.to_port_tree_id_0(), new_tree_id);
         if quench { return Ok(()); }
-        // Send DiscoverD to sender first time this tree is seen
-        if !tree_seen {
-            let sender_id = SenderID::new(self.cell_id, "CellAgent")?;
-            let in_reply_to = msg.get_sender_msg_seq_no();
-            let discoverd_msg = DiscoverDMsg::new(in_reply_to, sender_id,
-                   self.cell_id, new_port_tree_id, path, DiscoverDType::First);
-            let mask = Mask::new(port_number);
-            self.send_msg(self.get_connected_tree_id(),
-                          &discoverd_msg, mask).context(CellagentError::Chain { func_name: "process_ca", comment: S("DiscoverMsg") })?;
-        }
         // Forward Discover on all except port_no with updated hops and path
         let updated_msg = msg.update(self.cell_id);
-        let user_mask = DEFAULT_USER_MASK.all_but_port(port_no.make_port_number(self.no_ports).context(CellagentError::Chain { func_name: "process_ca", comment: S("DiscoverMsg")})?);
+        let user_mask = DEFAULT_USER_MASK.all_but_port(port_no.make_port_number(self.no_ports).context(CellagentError::Chain { func_name: "process_ca", comment: S("DiscoverMsg") })?);
         self.send_msg(self.get_connected_tree_id(),
-                      &updated_msg, user_mask).context(CellagentError::Chain {func_name: "process_ca", comment: S("DiscoverMsg")})?;
+                      &updated_msg, user_mask).context(CellagentError::Chain { func_name: "process_ca", comment: S("DiscoverMsg") })?;
         self.add_saved_discover(&msg); // Discover message are always saved for late port connect
         Ok(())
     }
@@ -847,16 +853,26 @@ impl CellAgent {
         let _f = "process_discoverd_msg";
         let payload = msg.get_payload();
         let base_port_tree_id = payload.get_port_tree_id();
+        let discover_type = payload.get_discover_type();
+        if discover_type == DiscoverDType::Subsequent {
+            let traph = self.get_traph_mut(base_port_tree_id)?;
+            let element = traph.get_element_mut(port_no)?;
+            if element.is_state(PortState::Unknown) {
+                element.mark_pruned();
+            }
+            return Ok(());
+        }
         let path = payload.get_path();
         let port_number = port_no.make_port_number(self.no_ports)?;
         let children = new_hash_set(Box::new([port_number]));
+        let port_state = PortState::Child;
         let mut eqns = HashSet::new();
         eqns.insert(GvmEqn::Recv("true"));
         eqns.insert(GvmEqn::Send("true"));
         eqns.insert(GvmEqn::Xtnd("false"));
         eqns.insert(GvmEqn::Save("false"));
         let gvm_eqn = GvmEquation::new(&eqns, &Vec::new());
-        let _ = self.update_traph(base_port_tree_id, port_number, PortState::Child, &gvm_eqn,
+        let _ = self.update_traph(base_port_tree_id, port_number, port_state, &gvm_eqn,
                                   children, PathLength(CellQty(0)), path)?;
         let mask = Mask::new(port_number);
         self.forward_stacked_trees(base_port_tree_id, mask)?;
