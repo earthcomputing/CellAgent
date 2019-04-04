@@ -5,8 +5,7 @@ use std::{fmt, thread};
 use crate::app_message_formats::{ContainerToVm, ContainerFromVm};
 use crate::app_message::{AppMsgDirection, AppMsgType};
 use crate::config::{ByteArray, CONTINUE_ON_ERROR, TRACE_OPTIONS};
-use crate::dal;
-use crate::dal::{fork_trace_header, update_trace_header};
+use crate::dal::{add_to_trace, fork_trace_header, update_trace_header};
 use crate::name::{ContainerID, UptreeID};
 use crate::uptree_spec::{AllowedTree};
 use crate::utility::{S, write_err, TraceHeader, TraceHeaderParams, TraceType};
@@ -91,7 +90,7 @@ impl NocMaster {
             if TRACE_OPTIONS.all || TRACE_OPTIONS.svc {
                 let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "worker" };
                 let trace = json!({ "NocMaster": self.get_name(), "thread_name": thread::current().name(), "thread_id": TraceHeader::parse(thread::current().id()) });
-                let _ = dal::add_to_trace(TraceType::Trace, trace_params, &trace, _f);
+                let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
             }
         }
         loop {
@@ -100,7 +99,7 @@ impl NocMaster {
                 if TRACE_OPTIONS.all || TRACE_OPTIONS.svc {
                     let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "recv" };
                     let trace = json!({ "NocMaster": self.get_name(), "msg": msg });
-                    let _ = dal::add_to_trace(TraceType::Trace, trace_params, &trace, _f);
+                    let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
                 }
             }
             let msg = format!("NocMaster on container {} got msg {}", self.container_id, ::std::str::from_utf8(&msg)?);
@@ -165,7 +164,7 @@ impl NocAgent {
             if TRACE_OPTIONS.all || TRACE_OPTIONS.svc {
                 let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "worker" };
                 let trace = json!({ "NocAgent": self.get_name(), "thread_name": thread::current().name(), "thread_id": TraceHeader::parse(thread::current().id()) });
-                let _ = dal::add_to_trace(TraceType::Trace, trace_params, &trace, _f);
+                let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
             }
         }
         loop {
@@ -174,7 +173,7 @@ impl NocAgent {
                 if TRACE_OPTIONS.all || TRACE_OPTIONS.svc {
                     let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "recv" };
                     let trace = json!({ "NocAgent": self.get_name(), "msg": msg });
-                    let _ = dal::add_to_trace(TraceType::Trace, trace_params, &trace, _f);
+                    let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
                 }
             }
             println!("NocAgent on container {} got msg {}", self.container_id, ::std::str::from_utf8(&msg)?);

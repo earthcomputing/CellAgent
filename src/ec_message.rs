@@ -365,10 +365,10 @@ impl DiscoverDPayload {
 impl MsgPayload for DiscoverDPayload {}
 impl fmt::Display for DiscoverDPayload {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "My Tree {}", self.port_tree_id)
+        write!(f, "My Tree {} {}", self.port_tree_id, self.discover_type)
     }
 }
-#[derive(Debug, Copy, Clone, Serialize, Deserialize)]
+#[derive(Debug, Copy, Clone, Eq, PartialEq, Serialize, Deserialize)]
 pub enum DiscoverDType {
     First,
     Subsequent
