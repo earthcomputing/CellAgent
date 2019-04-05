@@ -30,7 +30,8 @@ pub struct Traph {
     tried_ports: HashMap<PortTreeID,HashSet<PortNo>>
 }
 impl Traph {
-    pub fn new(cell_id: &CellID, no_ports: PortQty, black_tree_id: TreeID, gvm_eqn: &GvmEquation) -> Result<Traph, Error> {
+    pub fn new(cell_id: &CellID, no_ports: PortQty, black_tree_id: TreeID, gvm_eqn: &GvmEquation)
+            -> Result<Traph, Error> {
         let mut elements = Vec::new();
         for i in 0..=*no_ports {
             let port_number = PortNo(i as u8).make_port_number(no_ports).context(TraphError::Chain { func_name: "new", comment: S("")})?;
@@ -405,7 +406,9 @@ impl fmt::Display for Traph {
         write!(s, "\n Port Connected Broken Status Hops Path")?;
         // Can't replace with map() because s gets moved into closure
         for element in self.elements.iter() {
-            if element.is_connected() { write!(s, "\n{}",element)?; }
+            if element.is_connected() && *element.get_port_no() > 0 {
+                write!(s, "\n{}",element)?;
+            }
         }
         write!(f, "{}", s)
     }

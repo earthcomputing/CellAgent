@@ -857,6 +857,7 @@ impl CellAgent {
         if discover_type == DiscoverDType::Subsequent {
             let traph = self.get_traph_mut(base_port_tree_id)?;
             let element = traph.get_element_mut(port_no)?;
+            element.set_connected();
             if element.is_state(PortState::Unknown) {
                 element.mark_pruned();
             }
