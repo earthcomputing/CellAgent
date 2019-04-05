@@ -34,7 +34,7 @@ impl TraphElement {
     pub fn is_connected(&self) -> bool { self.is_connected }
     pub fn is_broken(&self) -> bool { self.is_broken }
     pub fn set_broken(&mut self) { self.is_broken = true; }
-//  pub fn set_connected(&mut self) { self.is_connected = true; }
+    pub fn set_connected(&mut self) { self.is_connected = true; }
 //  pub fn set_disconnected(&mut self) { self.is_connected = false; }
     fn set_state(&mut self, state: PortState) { self.state = state; }
     pub fn is_on_broken_path(&self, broken_path: Path) -> bool { self.path == broken_path }
