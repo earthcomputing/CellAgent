@@ -249,8 +249,6 @@ impl PacketEngine {
                 CmToPePacket::Entry(entry) => {
                     self.routing_table.lock().unwrap().set_entry(entry)
                 },
-                CmToPePacket::Unblock => {
-                },
 
                 // encapsulated APP
                 CmToPePacket::App((port_number, msg)) => {

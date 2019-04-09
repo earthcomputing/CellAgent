@@ -98,7 +98,6 @@ impl Cmodel {
                 CaToCmBytes::Reroute(msg) => cm_to_pe.send(CmToPePacket::Reroute(msg)),
                 CaToCmBytes::Entry(entry) => cm_to_pe.send(CmToPePacket::Entry(entry)),
                 CaToCmBytes::App(msg) => cm_to_pe.send(CmToPePacket::App(msg)),
-                CaToCmBytes::Unblock => cm_to_pe.send(CmToPePacket::Unblock),
 
                 // packetize
                 CaToCmBytes::Bytes((tree_id, is_ait, user_mask, bytes)) => {
