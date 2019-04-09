@@ -22,8 +22,8 @@
 #include <pthread.h>
 #include <time.h>   // for nanosleep
 
-//#include <netlink/netlink.h>
-//#include <netlink/socket.h>
+//#include <linux/netlink.h>
+//#include <linux/socket.h>
 //#include <netlink/msg.h>
 //#include <netlink/genl/genl.h>
 #include <linux/genetlink.h>
@@ -45,7 +45,7 @@ struct nlattr *nl_na; //pointer to netlink attributes structure within the paylo
 struct { //memory for netlink request and response messages - headers are included
     struct nlmsghdr n;
     struct genlmsghdr g;
-    char buf[256];
+    char buf[4096];
 } nl_request_msg, nl_response_msg;
 
 unsigned char get_num_phys_ports_c(void) {
@@ -69,11 +69,11 @@ unsigned char get_num_phys_ports_c(void) {
 
 	//Step 3. Resolve the family ID corresponding to the string "CONTROL_EXMPL"
     //Populate the netlink header
+    nl_request_msg.n.nlmsg_len = NLMSG_LENGTH(GENL_HDRLEN);
     nl_request_msg.n.nlmsg_type = GENL_ID_CTRL;
     nl_request_msg.n.nlmsg_flags = NLM_F_REQUEST;
     nl_request_msg.n.nlmsg_seq = 0;
     nl_request_msg.n.nlmsg_pid = getpid();
-    nl_request_msg.n.nlmsg_len = NLMSG_LENGTH(GENL_HDRLEN);
     //Populate the payload's "family header" : which in our case is genlmsghdr
     nl_request_msg.g.cmd = CTRL_CMD_GETFAMILY;
     nl_request_msg.g.version = 0x1;
@@ -105,6 +105,10 @@ unsigned char get_num_phys_ports_c(void) {
     }
 
     //Validate response message
+    fprintf(stdout, "nlmsg length: %d\n", nl_response_msg.n.nlmsg_len);
+    fprintf(stdout, "struct length: %ld\n", sizeof(struct nlmsghdr));
+    fprintf(stdout, "response length: %d\n", nl_rxtx_length);
+    fflush(stdout); fflush(stderr);
     if (!NLMSG_OK((&nl_response_msg.n), nl_rxtx_length)) {
         fprintf(stderr, "family ID request : invalid message\n");
         return -1;
@@ -119,7 +123,10 @@ unsigned char get_num_phys_ports_c(void) {
     nl_na = (struct nlattr *) ((char *) nl_na + NLA_ALIGN(nl_na->nla_len));
     if (nl_na->nla_type == CTRL_ATTR_FAMILY_ID) {
         nl_family_id = *(__u16 *) NLA_DATA(nl_na);
+	fprintf(stdout, "family id: %d\n", nl_family_id);
     }
+    fprintf(stdout, "got family id.\n");
+    fflush(stdout); fflush(stderr);
 
 	//Step 4. Send own custom message
  	memset(&nl_request_msg, 0, sizeof(nl_request_msg));
@@ -139,18 +146,37 @@ unsigned char get_num_phys_ports_c(void) {
     *t = 0 ; 
     nl_request_msg.n.nlmsg_len += NLMSG_ALIGN(nl_na->nla_len);
 
+    // Try recreating the socket
     memset(&nl_address, 0, sizeof(nl_address));
  	nl_address.nl_family = AF_NETLINK;
+        close(nl_fd);
+    nl_fd = socket(AF_NETLINK, SOCK_RAW, NETLINK_GENERIC);
+    if (nl_fd < 0) {
+		perror("socket()");
+		return -1;
+    }
+    if (bind(nl_fd, (struct sockaddr *) &nl_address, sizeof(nl_address)) < 0) {
+		perror("bind()");
+		close(nl_fd);
+		return -1;
+    }
+    ////////////////////////////
+
 
  	//Send the custom message
+        fprintf(stdout, "ready to send.\n");
+        fflush(stdout); fflush(stderr);
  	nl_rxtx_length = sendto(nl_fd, (char *) &nl_request_msg, nl_request_msg.n.nlmsg_len,
   		0, (struct sockaddr *) &nl_address, sizeof(nl_address));
+        fprintf(stdout, "just sent.\n");
+        fflush(stdout); fflush(stderr);
  	if (nl_rxtx_length != nl_request_msg.n.nlmsg_len) {
   		perror("sendto()");
   		close(nl_fd);
   		return -1;
     }
     printf("Sent to kernel: %s\n",MESSAGE_TO_KERNEL);
+    fflush(stdout); fflush(stderr);
 
     //Receive reply from kernel
     nl_rxtx_length = recv(nl_fd, &nl_response_msg, sizeof(nl_response_msg), 0);
@@ -158,6 +184,8 @@ unsigned char get_num_phys_ports_c(void) {
         perror("recv()");
         return -1;
     }
+    printf("Received from kernel: %d\n", nl_rxtx_length);
+    fflush(stdout); fflush(stderr);
 
  	//Validate response message
     if (nl_response_msg.n.nlmsg_type == NLMSG_ERROR) { //Error
@@ -176,6 +204,8 @@ unsigned char get_num_phys_ports_c(void) {
      	return -1;
  	}
 
+    printf("About to parse reply\n");
+    fflush(stdout); fflush(stderr);
     //Parse the reply message
     nl_rxtx_length = GENLMSG_PAYLOAD(&nl_response_msg.n);
     nl_na = (struct nlattr *) GENLMSG_DATA(&nl_response_msg);
