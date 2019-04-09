@@ -42,11 +42,7 @@ use failure::{Error, ResultExt};
 type BorderTreeIDMap = HashMap<PortNumber, (SenderID, TreeID)>;
 pub type PortTreeIDMap = HashMap<Uuid, PortTreeID>;
 pub type SavedDiscover = DiscoverMsg;
-// The following is a hack, because I can't get thread::spawn to accept Box<Message>
-pub type SavedMsg = Either<InterapplicationMsg, ManifestMsg>;
-pub type SavedStack = StackTreeMsg;
-pub type SavedMsgs = HashMap<TreeID, Vec<SavedMsg>>;
-pub type SavedStackMsgs = HashMap<TreeID, Vec<SavedStack>>;
+pub type SavedStackMsgs = HashMap<TreeID, Vec<StackTreeMsg>>;
 pub type Traphs = HashMap<Uuid, Traph>;
 pub type TreeMap = HashMap<Uuid, Uuid>;
 pub type TreeNameMap = HashMap<SenderID, MsgTreeMap>;
@@ -66,7 +62,6 @@ pub struct CellAgent {
     connected_tree_entry: RoutingTableEntry,
     saved_discover: Vec<SavedDiscover>,
     // Next 2 items shared between listen_uptree and listen_cmodel
-    saved_msgs: Arc<Mutex<SavedMsgs>>,
     tree_name_map: Arc<Mutex<TreeNameMap>>,
     saved_stack: SavedStackMsgs,
     traphs: Traphs,
@@ -104,8 +99,7 @@ impl CellAgent {
             traphs: HashMap::new(), traphs_mutex: Arc::new(Mutex::new(HashMap::new())),
             vm_id_no: 0, tree_id_map: HashMap::new(), tree_map: HashMap::new(),
             tree_name_map: Arc::new(Mutex::new(HashMap::new())), border_port_tree_id_map: HashMap::new(),
-            saved_msgs: Arc::new(Mutex::new(HashMap::new())), saved_discover: Vec::new(),
-            saved_stack: HashMap::new(),
+            saved_discover: Vec::new(), saved_stack: HashMap::new(),
             my_entry, base_tree_map, neighbors: HashMap::new(),
             connected_tree_entry: RoutingTableEntry::default(),
             tenant_masks, up_tree_senders: HashMap::new(), cell_info: CellInfo::new(),
@@ -200,54 +194,22 @@ impl CellAgent {
         Ok(gvm_eqn.clone())
     }
     fn get_saved_discover(&self) -> &Vec<SavedDiscover> { &self.saved_discover }
-    fn get_saved_msgs(&self, tree_id: TreeID) -> Vec<SavedMsg> {
-        let _f = "get_saved_msgs";
-        let locked = self.saved_msgs.lock().unwrap();
-        let saved_msgs = locked
-            .get(&tree_id)
-            .cloned()
-            .unwrap_or_default();
+    fn add_saved_discover(&mut self, discover_msg: &SavedDiscover) {
+        let _f = "add_saved_discover";
+        let port_tree_id = discover_msg.get_port_tree_id();
         {
             if TRACE_OPTIONS.all || TRACE_OPTIONS.ca {
-                let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "ca_get_saved_msgs" };
-                let trace = json!({ "cell_id": &self.cell_id, "tree_id": tree_id, "no_saved_msgs": saved_msgs.len() });
+                let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "ca_save_discover_msg" };
+                let trace = json!({ "cell_id": &self.cell_id, "tree_id": port_tree_id, "msg": &discover_msg });
                 let _ = add_to_trace(TraceType::Debug, trace_params, &trace, _f);
             }
-            if DEBUG_OPTIONS.all || DEBUG_OPTIONS.saved_msgs {
-                println!("Cellagent {}: {} for tree {} {}", self.cell_id, _f, tree_id, saved_msgs.len());
+            if DEBUG_OPTIONS.all || DEBUG_OPTIONS.saved_discover {
+                println!("Cell {}: save discover {}", self.cell_id, discover_msg);
             }
         }
-        saved_msgs
+        self.saved_discover.push(discover_msg.clone());
     }
-    // The either argument is a hack, because I can't get thread::spawn to accept Box<Message>
-    fn add_saved_msg(&mut self, tree_id: TreeID, _: Mask, either: Either<InterapplicationMsg, ManifestMsg>    )
-            -> Result<(), Error> {
-        let _f = "add_saved_msg";
-        let mut locked = self.saved_msgs.lock().unwrap();
-        let mut saved_msgs = locked.
-            get(&tree_id)
-            .cloned()
-            .unwrap_or(Vec::new());
-        saved_msgs.push(either.clone()); // Clone needed for trace
-        {
-            let actual = if either.clone().left().is_some() {
-                Box::new(either.clone().left().unwrap()) as Box<dyn Message>
-            } else {
-                Box::new(either.clone().right().unwrap()) as Box<dyn Message>
-            };
-            if TRACE_OPTIONS.all || TRACE_OPTIONS.ca {
-                let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "ca_add_saved_msg" };
-                let trace = json!({ "cell_id": &self.cell_id, "tree_id": tree_id, "no_saved": saved_msgs.len(), "msg": &(either.clone().left(), either.right()) });
-                let _ = add_to_trace(TraceType::Debug, trace_params, &trace, _f);
-            }
-            if DEBUG_OPTIONS.all || DEBUG_OPTIONS.saved_msgs {
-                println!("Cellagent {}: {} saved_msgs {} for tree {} msg {}", self.cell_id, _f, saved_msgs.len(), tree_id, &*actual);
-            }
-        }
-        locked.insert(tree_id, saved_msgs);
-        Ok(())
-    }
-    fn add_saved_stack_tree(&mut self, port_tree_id: PortTreeID, stack_tree_msg: &SavedStack) {
+    fn add_saved_stack_tree(&mut self, port_tree_id: PortTreeID, stack_tree_msg: &StackTreeMsg) {
         let _f = "add_saved_stack_tree";
         let mut saved_msgs = self.saved_stack
                 .get_mut(&port_tree_id.to_tree_id())
@@ -265,21 +227,6 @@ impl CellAgent {
             }
         }
         self.saved_stack.insert(port_tree_id.to_tree_id(), saved_msgs);
-    }
-    fn add_saved_discover(&mut self, discover_msg: &SavedDiscover) {
-            let _f = "add_saved_discover";
-            let port_tree_id = discover_msg.get_port_tree_id();
-        {
-            if TRACE_OPTIONS.all || TRACE_OPTIONS.ca {
-                let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "ca_save_discover_msg" };
-                let trace = json!({ "cell_id": &self.cell_id, "tree_id": port_tree_id, "msg": &discover_msg });
-                let _ = add_to_trace(TraceType::Debug, trace_params, &trace, _f);
-            }
-            if DEBUG_OPTIONS.all || DEBUG_OPTIONS.saved_discover {
-                println!("Cell {}: save discover {}", self.cell_id, discover_msg);
-            }
-        }
-        self.saved_discover.push(discover_msg.clone());
     }
     fn add_tree_name_map_item(&mut self, sender_id: SenderID, allowed_tree: &AllowedTree, allowed_tree_id: TreeID) {
         let _f = "add_tree_name_map_item";
@@ -779,8 +726,6 @@ impl CellAgent {
         for sender in senders {
             sender.send((is_ait, msg.get_payload().get_body().clone())).context(CellagentError::Chain { func_name: _f, comment: S("") })?;
         }
-        let user_mask = self.get_mask(port_tree_id)?;
-        if save && msg.is_leafward() { self.add_saved_msg(port_tree_id.to_tree_id(), user_mask, Left(msg.clone()))?; }
         Ok(())
     }
     pub fn process_discover_msg(&mut self, msg: &DiscoverMsg, port_no: PortNo)
@@ -888,7 +833,6 @@ impl CellAgent {
                 println!("Cellagent {}: {} send unblock", self.cell_id, _f);
             }
         }
-        self.ca_to_cm.send(CaToCmBytes::Unblock)?;
         Ok(())
     }
     pub fn process_failover_msg(&mut self, msg: &FailoverMsg, port_no: PortNo) -> Result<(), Error> {
@@ -1041,7 +985,6 @@ impl CellAgent {
                 println!("Cellagent {}: {} tree {} save {} port {} manifest {}", self.cell_id, _f, msg_port_tree_id, save, *port_no, manifest.get_id());
             }
         }
-        if save { self.add_saved_msg(tree_id.to_tree_id(), user_mask, Right(msg.clone()))?; }
         Ok(())
     }
     pub fn process_reroute_msg(&self) -> Result<(), Error> { panic!("Should never get here") }
@@ -1086,7 +1029,6 @@ impl CellAgent {
                 }
             }
         }
-        self.ca_to_cm.send(CaToCmBytes::Unblock)?;
         (*self.traphs_mutex.lock().unwrap()) = self.traphs.clone();
         Ok(())
 
@@ -1103,15 +1045,6 @@ impl CellAgent {
         entry.set_mask(mask);
         traph.set_tree_entry(&tree_uuid, entry)?;
         self.update_entry(&entry).context(CellagentError::Chain { func_name: _f, comment: S(self.cell_id) })?;
-        //if !entry.may_receive() {
-        //    let sender_id = msg.get_header().get_sender_id();
-        //    let new_tree_id = msg.get_payload().get_tree_id();
-        //    self.ca_to_cm.send(CaToPePacket::Entry(fwd_entry))?;
-            self.forward_saved(port_tree_id.to_tree_id(), user_mask)?;
-        //    let mask = Mask::new(port_number);
-        //    let new_msg = StackTreeDMsg::new(sender_id, new_tree_id, entry.get_index(), my_fwd_index);
-        //    self.send_msg(self.get_connected_ports_tree_id(), &new_msg, mask)?;
-        //}
         {
             if TRACE_OPTIONS.all || TRACE_OPTIONS.ca {
                 let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "ca_process_stack_tree_d_msg" };
@@ -1119,7 +1052,6 @@ impl CellAgent {
                 let _ = add_to_trace(TraceType::Debug, trace_params, &trace, _f);
             }
         }
-        self.ca_to_cm.send(CaToCmBytes::Unblock)?;
         (*self.traphs_mutex.lock().unwrap()) = self.traphs.clone();
         Ok(())
     }
@@ -1191,7 +1123,6 @@ impl CellAgent {
             }
         }
         self.send_msg(*tree_id, &msg, DEFAULT_USER_MASK)?;
-        if msg.is_leafward() { self.add_saved_msg(port_tree_id.to_tree_id(), DEFAULT_USER_MASK, Left(msg))?; }
         Ok(tree_map.clone())
     }
     fn app_delete_tree(&self, _sender_id: SenderID, _serialized: &str, _direction: AppMsgDirection,
@@ -1233,7 +1164,6 @@ impl CellAgent {
         }
         let mask = self.get_mask(deploy_port_tree_id)?;
         self.send_msg(*deploy_tree_id, &msg, mask.or(Mask::port0())).context(CellagentError::Chain { func_name: _f, comment: S(self.cell_id) + " send manifest" })?;
-        self.add_saved_msg(deploy_port_tree_id.to_tree_id(), mask, Right(msg))?;
         Ok(tree_map.clone())
     }
     fn app_query(&self, _sender_id: SenderID, _serialized: &str, _direction: AppMsgDirection,
@@ -1473,54 +1403,6 @@ impl CellAgent {
                 }
                 Ok(())
             });
-        Ok(())
-    }
-    // Continuation of the hack due thread::spawn not accepting Box<Message>
-    fn forward_saved(&self, tree_id: TreeID, mask: Mask) -> Result<(), Error> {
-        let _f = "forward_saved";
-        let saved_msgs = self.get_saved_msgs(tree_id);
-        for saved_msg in saved_msgs {
-            if saved_msg.is_left() { // TODO: Make sure unwrap() is safe
-                self.forward_saved_interapplication(tree_id, mask, &saved_msg.left().unwrap())?;
-            } else {
-                self.forward_saved_manifest(tree_id, mask, &saved_msg.right().unwrap())?;
-            }
-        }
-        Ok(())
-    }
-    fn forward_saved_interapplication(&self, tree_id: TreeID, mask: Mask, msg: &InterapplicationMsg)
-            -> Result<(), Error> {
-        let _f = "forward_saved_interapplication";
-        {
-            if TRACE_OPTIONS.all || TRACE_OPTIONS.ca {
-                let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "ca_forward_saved_msg" };
-                let trace = json!({ "cell_id": &self.cell_id, "port_nos": mask.get_port_nos(), "msg_type": MsgType::Interapplication });
-                let _ = add_to_trace(TraceType::Debug, trace_params, &trace, _f);
-            }
-            if DEBUG_OPTIONS.all || DEBUG_OPTIONS.saved_msgs {   // Debug print
-                println!("Cellagent {}: {} on ports {:?} {}", self.cell_id, _f, mask.get_port_nos(), MsgType::Interapplication);
-            }
-        }
-        //self.send_packets_by_index(fwd_index, mask, &packets)?;
-        self.send_msg(tree_id, msg, mask)?;
-        Ok(())
-    }
-    fn forward_saved_manifest(&self, tree_id: TreeID, mask: Mask, msg: &ManifestMsg)
-                                 -> Result<(), Error> {
-        let _f = "forward_saved_manifest";
-        //println!("Cellagent {}: {} {} msgs on tree {}", self.cell_id, _f, saved.len(), tree_id);
-        {
-            if TRACE_OPTIONS.all || TRACE_OPTIONS.ca {
-                let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "ca_forward_saved_msg" };
-                let trace = json!({ "cell_id": &self.cell_id, "port_nos": mask.get_port_nos(), "msg_type": MsgType::Manifest });
-                let _ = add_to_trace(TraceType::Debug, trace_params, &trace, _f);
-            }
-            if DEBUG_OPTIONS.all || DEBUG_OPTIONS.saved_msgs {
-                println!("Cellagent {}: {} on ports {:?} {}", self.cell_id, _f, mask.get_port_nos(), MsgType::Manifest);
-            }
-        }
-        //self.send_packets_by_index(fwd_index, mask, &packets)?;
-        self.send_msg(tree_id, msg, mask)?;
         Ok(())
     }
     fn send_msg<T: Message>(&self, tree_id: TreeID, msg: &T, user_mask: Mask) -> Result<(), Error>

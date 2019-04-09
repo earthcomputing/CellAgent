@@ -21,14 +21,14 @@ pub type PeFromPe = mpsc::Receiver<PeToPePacket>;
 // CellAgent to Cmodel (index, tree_uuid, user_mask, direction, bytes)
 #[derive(Debug, Clone, Serialize)]
 pub enum CaToCmBytes { Entry(RoutingTableEntry), Bytes(CATOCM), App((PortNumber, APP)),
-    Reroute(REROUTE), Unblock }
+    Reroute(REROUTE) }
 pub type CaToCm = mpsc::Sender<CaToCmBytes>;
 pub type CmFromCa = mpsc::Receiver<CaToCmBytes>;
 //pub type CaCmError = mpsc::SendError<CaToCmBytes>;
 // Cmodel to PacketEngine
 #[derive(Debug, Clone, Serialize)]
 pub enum CmToPePacket { Entry(RoutingTableEntry), Packet((Mask, Packet)), App((PortNumber, APP)),
-    Reroute(REROUTE),  Unblock }
+    Reroute(REROUTE) }
 pub type CmToPe = mpsc::Sender<CmToPePacket>;
 pub type PeFromCm = mpsc::Receiver<CmToPePacket>;
 //pub type CmPeError = mpsc::SendError<CmToPePacket>;
