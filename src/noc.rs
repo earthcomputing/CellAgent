@@ -146,11 +146,6 @@ impl Noc {
     }
     // Sets up the NOC Master and NOC Agent services on up trees
     fn create_noc(&mut self, base_tree_name: &str, noc_to_port: &NocToPort) -> Result<(), Error> {
-        // TODO: Avoids race condition of deployment with Discover, remove to debug
-        if RACE_SLEEP > 0 {
-            println!("---> Sleeping to let discover finish");
-            sleep(RACE_SLEEP);
-        }
         let is_ait = false;
         // Stack the trees needed to deploy the master and agent and for them to talk master->agent and agent->master
         let noc_master_deploy_tree = AllowedTree::new(NOC_MASTER_DEPLOY_TREE_NAME);
