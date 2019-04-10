@@ -1048,7 +1048,7 @@ impl CellAgent {
         {
             if TRACE_OPTIONS.all || TRACE_OPTIONS.ca {
                 let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "ca_process_stack_tree_d_msg" };
-                let trace = json!({ "cell_id": &self.cell_id });
+                let trace = json!({ "cell_id": &self.cell_id, "msg": msg, "port": port_no });
                 let _ = add_to_trace(TraceType::Debug, trace_params, &trace, _f);
             }
         }
