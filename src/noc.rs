@@ -194,7 +194,7 @@ impl Noc {
         let manifest_msg = serde_json::to_string(&params).context(NocError::Chain { func_name: "create_noc", comment: S("NocAgent")})?;
         println!("Noc: deploy {} on tree {}", manifest.get_id(), noc_agent_deploy_tree);
         let bytes = ByteArray(manifest_msg.into_bytes());
-        noc_to_port.send((is_ait, noc_agent_deploy_tree.clone(), AppMsgType::Manifest, AppMsgDirection::Leafward, bytes)).context(NocError::Chain { func_name: "create_noc", comment: S("NocAgent")})?;
+        noc_to_port.send((is_ait, noc_agent_deploy_tree, AppMsgType::Manifest, AppMsgDirection::Leafward, bytes)).context(NocError::Chain { func_name: "create_noc", comment: S("NocAgent")})?;
         Ok(())
     }
     // Because of packet forwarding, this tree gets stacked on all cells even though only one of them can receive the deployment message

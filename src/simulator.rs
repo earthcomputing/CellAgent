@@ -48,11 +48,10 @@ use std::{io::{stdin, stdout, Read, Write},
           collections::{HashMap, HashSet},
           fs::{File, OpenOptions, create_dir, remove_dir_all},
           path::Path,
-          thread::{JoinHandle},
 };
 
 use crate::blueprint::{Blueprint, CellNo, Edge, is2e};
-use crate::config::{OUTPUT_DIR_NAME, OUTPUT_FILE_NAME, QUENCH,
+use crate::config::{AUTO_BREAK, OUTPUT_DIR_NAME, OUTPUT_FILE_NAME, QUENCH,
                     CellConfig, CellQty, PortNo, PortQty};
 use crate::datacenter::{Datacenter};
 use crate::gvm_equation::{GvmEqn};
@@ -60,8 +59,6 @@ use crate::app_message_formats::{ApplicationToNoc, ApplicationFromNoc};
 use crate::link::Link;
 use crate::uptree_spec::{AllowedTree, ContainerSpec, Manifest, UpTreeSpec, VmSpec};
 use crate::utility::{print_hash_map, sleep, S, TraceHeader};
-
-pub const AUTO_BREAK: Option<Edge> = None;//  Some(Edge(CellNo(0), CellNo(1))); // Set to edge to break when debugging broken link with VSCode, else 0
 
 fn main() -> Result<(), Error> {
     let _f = "main";
@@ -106,14 +103,7 @@ fn main() -> Result<(), Error> {
             Err(err) => panic!("Datacenter construction failure: {}", err)
         };
     if false { deployment_demo()?; }    // Demonstrate features of deployment spec
-    match AUTO_BREAK {
-        Some(edge) => {
-            println!("---> Automatically break link");
-            break_link(&mut dc)?;
-        },
-        None => {
-        }
-    }
+    if AUTO_BREAK.is_some() { break_link(&mut dc)?; }
     loop {
         stdout().write(b"\nType:
             d to print datacenter
@@ -175,7 +165,7 @@ fn break_link(dc: &mut Datacenter) -> Result<(), Error> {
         Some(edge) => {
             // TODO: Wait until discover is done before automatically breaking link, should be removed
             println!("---> Sleeping to let discover finish before automatically breaking link");
-            sleep(4);
+            sleep(6);
             println!("---> Automatically break link {}", edge);
             edge
         },

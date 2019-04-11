@@ -1,4 +1,3 @@
-extern crate multi_mut;
 use multi_mut::{HashMapMultiMut};
 
 use std::{fmt, fmt::Write,

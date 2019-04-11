@@ -187,9 +187,6 @@ impl fmt::Display for InteriorCell {
     }
 }
 
-pub const AUTO_BREAK: Option<Edge> = None;//  Some(Edge(CellNo(0), CellNo(1))); // Set to edge to break when debugging broken link with VSCode, else 0
-
-
 #[derive(Debug, Copy, Clone, Hash, Eq, PartialEq, Serialize, Deserialize)]
 pub struct CellNo(pub usize);
 impl Deref for CellNo { type Target = usize; fn deref(&self) -> &Self::Target { &self.0 } }

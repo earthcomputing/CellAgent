@@ -122,7 +122,7 @@ impl<T: Sized> Stack<T> {
     pub fn new() -> Stack<T> { Stack { elements: vec![] } }
     pub fn push(&mut self, element: T) { self.elements.push(element); }
     pub fn pop(&mut self) -> Option<T> { self.elements.pop() }
-    pub fn iter(&self) -> core::slice::Iter<T> { self.elements.iter() }
+    pub fn iter(&self) -> core::slice::Iter<'_, T> { self.elements.iter() }
 }
 /*
 
