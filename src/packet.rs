@@ -1,7 +1,7 @@
 use std::{fmt,
           collections::HashMap,
           cmp::min,
-          sync::atomic::{ATOMIC_USIZE_INIT, AtomicUsize, Ordering},
+          sync::atomic::{AtomicUsize, Ordering},
           str};
 
 use rand;
@@ -23,7 +23,7 @@ const PAYLOAD_MAX: usize = PACKET_MAX - PACKET_HEADER_SIZE;
 
 pub type PacketAssemblers = HashMap<SenderMsgSeqNo, PacketAssembler>;
 
-static PACKET_COUNT: AtomicUsize = ATOMIC_USIZE_INIT;
+static PACKET_COUNT: AtomicUsize = AtomicUsize::new(0);
 #[derive(Debug, Clone, Serialize)]
 pub struct Packet {
     header: PacketHeader,
@@ -78,11 +78,11 @@ impl Packet {
         Ok(uuid.get_ait_state())
     }
     // Wrapping and unwrapping following failover
-    pub fn wrap(&mut self, rw_port_tree_id: PortTreeID) {
+    pub fn _wrap(&mut self, rw_port_tree_id: PortTreeID) {
         self.payload.wrapped_header.push(self.header);
         self.header = PacketHeader::new(&rw_port_tree_id.get_uuid());
     }
-    pub fn unwrap(&mut self) -> bool {
+    pub fn _unwrap(&mut self) -> bool {
         if let Some(wrapped_header) = self.payload.wrapped_header.pop(){
             self.header = wrapped_header;
             true

@@ -1,6 +1,5 @@
 use std::{fmt, fmt::Write,
           sync::{Arc, Mutex},
-          sync::mpsc::channel,
           collections::{HashSet, VecDeque},
           thread};
 
@@ -10,7 +9,7 @@ use crate::dal::{add_to_trace, fork_trace_header, update_trace_header};
 use crate::ec_message::{MsgType};
 use crate::ec_message_formats::{PeFromCm, PeToCm,
                                 PeToPort, PeFromPort, PortToPePacket, PeToPortPacket,
-                                PeToPe, PeFromPe, CmToPePacket, PeToCmPacket};
+                                CmToPePacket, PeToCmPacket};
 use crate::name::{Name, CellID, TreeID};
 use crate::packet::Packet;
 use crate::port::PortStatus;

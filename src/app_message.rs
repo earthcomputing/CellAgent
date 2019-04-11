@@ -1,6 +1,6 @@
 use std::{fmt,
           ops::{Deref},
-          sync::atomic::{ATOMIC_USIZE_INIT, AtomicUsize, Ordering},
+          sync::atomic::{AtomicUsize, Ordering},
 };
 
 use serde_json;
@@ -15,7 +15,7 @@ use crate::utility::{S};
 #[derive(Debug, Copy, Clone, Hash, Eq, PartialEq, Serialize, Deserialize)]
 pub struct SenderMsgSeqNo(pub u64);
 impl Deref for SenderMsgSeqNo { type Target = u64; fn deref(&self) -> &Self::Target { &self.0 } }
-static MESSAGE_COUNT: AtomicUsize = ATOMIC_USIZE_INIT;
+static MESSAGE_COUNT: AtomicUsize = AtomicUsize::new(0);
 pub fn get_next_count() -> SenderMsgSeqNo { SenderMsgSeqNo(MESSAGE_COUNT.fetch_add(1, Ordering::SeqCst) as u64) }
 
 #[derive(Debug, Copy, Clone, Hash, Eq, PartialEq, Serialize, Deserialize)]
@@ -105,8 +105,8 @@ impl AppMsgHeader {
     pub fn get_sender_msg_seq_no(&self) -> SenderMsgSeqNo { self.sender_msg_seq_no }
     pub fn get_ait(&self) -> bool { self.is_ait }
     pub fn get_direction(&self) -> AppMsgDirection { self.direction }
-    pub fn _get_sender_id(&self) -> &SenderID { &self.sender_id }
-    pub fn _get_allowed_tree_names(&self) -> &Vec<AllowedTree> { &self.allowed_tree_names }
+    pub fn get_sender_id(&self) -> &SenderID { &self.sender_id }
+    pub fn get_allowed_tree_names(&self) -> &Vec<AllowedTree> { &self.allowed_tree_names }
     pub fn set_allowed_tree_names(&mut self, allowed_tree_names: Vec<AllowedTree>) { self.allowed_tree_names = allowed_tree_names; } // Should this be set in new()?
     //pub fn set_direction(&mut self, direction: MsgDirection) { self.direction = direction; }
 }
@@ -224,7 +224,8 @@ pub struct AppManifestMsg {
     payload: AppManifestMsgPayload
 }
 impl AppManifestMsg {
-    pub fn new(sender_id: SenderID, is_ait: bool, deploy_tree_name: &AllowedTree, allowed_tree_names: &Vec<AllowedTree>, manifest: &Manifest) -> AppManifestMsg {
+    pub fn new(sender_id: SenderID, is_ait: bool, deploy_tree_name: &AllowedTree,
+               allowed_tree_names: &Vec<AllowedTree>, manifest: &Manifest) -> AppManifestMsg {
         // Note that direction is leafward so cell agent will get the message
         let mut header = AppMsgHeader::new(sender_id, is_ait, AppMsgType::Manifest, AppMsgDirection::Leafward);
         header.set_allowed_tree_names(allowed_tree_names.clone());

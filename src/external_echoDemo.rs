@@ -1,6 +1,9 @@
 #![deny(unused_must_use)]
 //#![warn(rust_2018_idioms)]
 #![recursion_limit="1024"]
+#![allow(dead_code)]
+#![allow(unused_variables)]
+#![allow(unused_imports)]
 #[macro_use] extern crate failure;
 #[macro_use] extern crate serde_derive;
 #[macro_use] extern crate serde_json;

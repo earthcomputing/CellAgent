@@ -1,12 +1,7 @@
-use multi_mut::{HashMapMultiMut};
-
-use std::{collections::{HashMap},
-          iter::FromIterator,
-          sync::mpsc::channel};
+use std::{sync::mpsc::channel};
 
 use crate::app_message_formats::{ApplicationFromNoc, ApplicationToNoc, NocFromApplication, NocToApplication};
-use crate::blueprint::{Blueprint, BlueprintError, CellNo, Edge};
-use crate::config::{CellQty, PortNo, PortQty};
+use crate::blueprint::{Blueprint};
 use crate::noc::{Noc};
 use crate::rack::{Rack};
 use crate::utility::{S};

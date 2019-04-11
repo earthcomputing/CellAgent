@@ -3,7 +3,6 @@ use std::{fmt, fmt::Write,
           thread,
           collections::{HashMap, HashSet}};
 
-use either::{Either, Left, Right};
 use serde;
 use serde_json;
 
@@ -27,7 +26,6 @@ use crate::packet_engine::NumberOfPackets;
 use crate::port::{PortStatus};
 use crate::port_tree::PortTree;
 use crate::routing_table_entry::{RoutingTableEntry};
-use crate::traph;
 use crate::traph::{PortState, Traph};
 use crate::tree::Tree;
 use crate::uptree_spec::{AllowedTree, Manifest};
@@ -65,7 +63,7 @@ pub struct CellAgent {
     tree_name_map: Arc<Mutex<TreeNameMap>>,
     saved_stack: SavedStackMsgs,
     traphs: Traphs,
-    traphs_mutex: Arc<Mutex<Traphs>>,
+    traphs_mutex: Arc<Mutex<Traphs>>, // Needed so I can print from main() because I have to clone to get self.traphs into the thread
     tree_map: TreeMap, // Base tree for given stacked tree
     border_port_tree_id_map: BorderTreeIDMap, // Find the tree id associated with a border port
     base_tree_map: HashMap<PortTreeID, TreeID>, // Find the black tree associated with any tree, needed for stacking
@@ -843,7 +841,6 @@ impl CellAgent {
         let sender_id = header.get_sender_id();
         let rw_port_tree_id = payload.get_rw_port_tree_id();
         let rw_tree_id = rw_port_tree_id.to_tree_id();
-        let lw_port_tree_id = payload.get_lw_port_tree_id();
         let port_number = port_no.make_port_number(self.no_ports)?;
         if rw_tree_id == self.my_tree_id {
             println!("Cellagent {}: {} found path to rootward for port tree {}", self.cell_id, _f, rw_port_tree_id);
@@ -972,7 +969,6 @@ impl CellAgent {
         let tree_id = payload.get_deploy_port_tree_id();
         let traph = self.get_traph(tree_id).context(CellagentError::Chain { func_name: _f, comment: S("") })?;
         let entry = traph.get_tree_entry(&tree_id.get_uuid()).context(CellagentError::Chain { func_name: _f, comment: S("") })?;
-        let user_mask = entry.get_mask();
         let gvm_eqn = self.get_gvm_eqn(tree_id)?;
         let save = self.gvm_eval_save(msg_port_tree_id, &gvm_eqn).context(CellagentError::Chain { func_name: _f, comment: S(self.cell_id)})?;
         {

@@ -13,10 +13,6 @@ use crate::uuid_ec::Uuid;
 type CATOCM = (TreeID, ISAIT, Mask, ByteArray);
 type REROUTE = (PortNo, PortNo, NumberOfPackets);
 pub type PACKET = Packet;
-// PacketEngine to PacketEngine to unblock
-pub type PeToPePacket = String;
-pub type PeToPe = mpsc::Sender<PeToPePacket>;
-pub type PeFromPe = mpsc::Receiver<PeToPePacket>;
 //pub type PePeError = mpsc::SendError<PeToPePacket>;
 // CellAgent to Cmodel (index, tree_uuid, user_mask, direction, bytes)
 #[derive(Debug, Clone, Serialize)]
