@@ -691,7 +691,7 @@ impl ManifestMsg {
     pub fn get_payload(&self) -> &ManifestMsgPayload { &self.payload }
     pub fn _get_port_tree_id(&self) -> PortTreeID { self.payload._get_port_tree_id() }
 }
-impl Message for ManifestMsg
+impl Message for ManifestMsg {
     fn get_header(&self) -> &MsgHeader { &self.header }
     fn get_payload(&self) -> &dyn MsgPayload { &self.payload }
     fn get_msg_type(&self) -> MsgType { self.get_header().msg_type }
