@@ -58,11 +58,11 @@ use crate::gvm_equation::{GvmEqn};
 use crate::app_message_formats::{ApplicationToNoc, ApplicationFromNoc};
 use crate::link::Link;
 use crate::uptree_spec::{AllowedTree, ContainerSpec, Manifest, UpTreeSpec, VmSpec};
-use crate::utility::{print_hash_map, sleep, S, TraceHeader};
+use crate::utility::{_print_hash_map, sleep, S, TraceHeader};
 
 fn main() -> Result<(), Error> {
     let _f = "main";
-    if Path::new(OUTPUT_DIR_NAME).exists() {
+    if Path::new(OUTPUT_DIR_NAME).exists() { 
         remove_dir_all(OUTPUT_DIR_NAME)?;
     }
     create_dir(OUTPUT_DIR_NAME)?;
@@ -136,7 +136,7 @@ fn main() -> Result<(), Error> {
 fn show_ca(dc: &Datacenter) -> Result<(), Error> {
     let rack = dc.get_rack();
     let cells = rack.get_cells();
-    print_hash_map(&rack.get_cell_ids());
+    _print_hash_map(&rack.get_cell_ids());
     let _ = stdout().write(b"Enter cell to display cell\n")?;
     let cell_no = read_int()?;
     cells.get(&CellNo(cell_no))
@@ -149,7 +149,7 @@ fn show_ca(dc: &Datacenter) -> Result<(), Error> {
 fn show_pe(dc: &Datacenter) -> Result<(), Error> {
     let rack = dc.get_rack();
     let cells = rack.get_cells();
-    print_hash_map(&rack.get_cell_ids());
+    _print_hash_map(&rack.get_cell_ids());
     let _ = stdout().write(b"Enter cell to display forwarding table\n")?;
     let cell_no = read_int()?;
     cells.get(&CellNo(cell_no))
@@ -171,7 +171,7 @@ fn break_link(dc: &mut Datacenter) -> Result<(), Error> {
         },
         None => {
             let link_ids = rack.get_link_ids();
-            print_hash_map(&link_ids);
+            _print_hash_map(&link_ids);
             let _ = stdout().write(b"Enter first cell number of link to break\n")?;
             let left: usize = read_int()?;
             let _ = stdout().write(b"Enter second cell number of link to break\n")?;

@@ -53,13 +53,13 @@ impl Traph {
         // dumpstack();
         Ok(cloth)
     }
-    pub fn get_cell_id(&self) -> &CellID { &self.cell_id }
+    pub fn _get_cell_id(&self) -> &CellID { &self.cell_id }
     pub fn get_tree(&self, tree_uuid: &Uuid) -> Result<Tree, Error> {
         let _f = "get_tree";
          self.stacked_trees.lock().unwrap().get(tree_uuid).cloned()
             .ok_or(TraphError::Tree { cell_id: self.cell_id.clone(), func_name: _f, tree_uuid: *tree_uuid }.into())
     }
-    pub fn get_port_tree(&self, port_tree_id: PortTreeID) -> Result<&PortTree, Error> {
+    pub fn _get_port_tree(&self, port_tree_id: PortTreeID) -> Result<&PortTree, Error> {
         let _f = "get_port_tree";
         let port_no = port_tree_id.get_port_no();
         self.port_trees
@@ -77,8 +77,8 @@ impl Traph {
         self.port_trees.insert(port_tree.get_port_tree_id().clone(), port_tree.clone()); // Duplicate inserts do no harm
         self.port_tree_id.clone().unwrap() // Unwrap is guaranteed to be safe by first line
     }
-    pub fn get_elements(&self) -> Iter<'_, TraphElement> { self.elements.iter() }
-    pub fn set_element(&mut self, traph_element: TraphElement) {
+    pub fn _get_elements(&self) -> Iter<'_, TraphElement> { self.elements.iter() }
+    pub fn _set_element(&mut self, traph_element: TraphElement) {
         self.elements[*traph_element.get_port_no() as usize] = traph_element;
     }
     pub fn get_element(&self, port_no: PortNo) -> Result<&TraphElement, Error> {
@@ -135,7 +135,7 @@ impl Traph {
             .map(|tree| tree.set_table_entry(entry))
             .ok_or(TraphError::Tree { func_name: _f, cell_id: self.cell_id, tree_uuid: *tree_uuid }.into())
     }
-    pub fn set_port_tree_entry(&mut self, port_tree_id: PortTreeID, entry: RoutingTableEntry)
+    pub fn _set_port_tree_entry(&mut self, port_tree_id: PortTreeID, entry: RoutingTableEntry)
             -> Result<(), Error> {
         let _f = "set_port_tree_entry";
         self.port_trees
@@ -147,23 +147,23 @@ impl Traph {
     pub fn has_tree(&self, tree_id: PortTreeID) -> bool {
         self.stacked_trees.lock().unwrap().contains_key(&tree_id.get_uuid())
     }
-    pub fn is_port_connected(&self, port_number: PortNumber) -> bool {
+    pub fn _is_port_connected(&self, port_number: PortNumber) -> bool {
         self.elements[*port_number.get_port_no() as usize].is_connected()
     }
-    pub fn is_port_broken(&self, port_number: PortNumber) -> bool {
+    pub fn _is_port_broken(&self, port_number: PortNumber) -> bool {
         self.elements[*port_number.get_port_no() as usize].is_broken()
     }
     pub fn set_broken(&mut self, port_number: PortNumber) {
         // Cannont set port status to pruned here because I subsequently use port status to find broken parent links
         self.elements[*port_number.get_port_no() as usize].set_broken();
     }
-    pub fn mark_parent(&mut self, port_number: PortNumber) {
+    pub fn _mark_parent(&mut self, port_number: PortNumber) {
         self.elements[*port_number.get_port_no() as usize].mark_parent();
     }
-    pub fn mark_child(&mut self, port_number: PortNumber) {
-        self.elements[*port_number.get_port_no() as usize].mark_child();
+    pub fn _mark_child(&mut self, port_number: PortNumber) {
+        self.elements[*port_number.get_port_no() as usize]._mark_child();
     }
-    pub fn mark_pruned(&mut self, port_number: PortNumber) {
+    pub fn _mark_pruned(&mut self, port_number: PortNumber) {
         self.elements[*port_number.get_port_no() as usize].mark_pruned();
     }
     pub fn mark_broken(&mut self, port_number: PortNumber) {
@@ -174,7 +174,7 @@ impl Traph {
     pub fn get_port_status(&self, port_number: PortNumber) -> PortState {
         self.elements[*port_number.get_port_no() as usize].get_state()
     }
-    pub fn get_parent_port(&self) -> Result<PortNo, Error> {
+    pub fn _get_parent_port(&self) -> Result<PortNo, Error> {
         self.get_parent_element()
             .map(|element| element.get_port_no())
     }
@@ -326,13 +326,13 @@ impl Traph {
         let _f = "remove_child";
         self.apply_update(PortTree::remove_child, Tree::remove_child, port_tree_id, child)
     }
-    pub fn make_child_parent(&mut self, port_tree_id: PortTreeID, child: PortNumber)
+    pub fn _make_child_parent(&mut self, port_tree_id: PortTreeID, child: PortNumber)
             -> Result<Vec<RoutingTableEntry>, Error> {
         let _f = "make_child_parent";
-        self.apply_update(PortTree::make_child_parent, Tree::make_child_parent,
-            port_tree_id, child)
+        self.apply_update(PortTree::_make_child_parent, Tree::_make_child_parent,
+                          port_tree_id, child)
     }
-    pub fn update_element(&mut self, tree_id: TreeID, port_number: PortNumber, port_status: PortState,
+    pub fn update_element(&mut self, tree_id: TreeID, port_number: PortNumber, port_state: PortState,
                           children: &HashSet<PortNumber>, hops: PathLength, path: Path)
                           -> Result<RoutingTableEntry, Error> {
         let _f = "update_element";
@@ -347,11 +347,11 @@ impl Traph {
         table_entry.set_tree_id(tree_id.to_port_tree_id_0());
         table_entry.add_children(&children);
         table_entry.set_inuse();
-        if port_status == PortState::Parent {
+        if port_state == PortState::Parent {
             table_entry.set_parent(port_number);
         };
         tree.set_table_entry(table_entry);
-        let element = TraphElement::new(true, port_no, port_status, hops, path);
+        let element = TraphElement::new(true, port_no, port_state, hops, path);
         // println!("update_element2 - {}", element);
         self.elements[*port_no as usize] = element; // Cannot fail because self.elements has MAX_PORTS elements
         Ok(table_entry)

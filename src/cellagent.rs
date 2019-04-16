@@ -163,7 +163,7 @@ impl CellAgent {
     fn get_no_ports(&self) -> PortQty { self.no_ports }
     pub fn get_cell_id(&self) -> CellID { self.cell_id }
     pub fn get_connected_tree_id(&self) -> TreeID { self. connected_tree_id }
-    pub fn get_control_tree_id(&self) -> TreeID { self.control_tree_id }
+    pub fn _get_control_tree_id(&self) -> TreeID { self.control_tree_id }
 //    pub fn get_cell_info(&self) -> CellInfo { self.cell_info }
 //    pub fn get_tree_name_map(&self) -> &TreeNameMap { &self.tree_name_map }
     fn get_vm_senders(&self, tree_id: TreeID) -> Result<Vec<CaToVm>, Error> {
@@ -968,7 +968,7 @@ impl CellAgent {
         self.deploy(sender_id, deployment_tree_id, msg_port_tree_id, msg_tree_map, manifest).context(CellagentError::Chain { func_name: "process_ca", comment: S("ManifestMsg")})?;
         let tree_id = payload.get_deploy_port_tree_id();
         let traph = self.get_traph(tree_id).context(CellagentError::Chain { func_name: _f, comment: S("") })?;
-        let entry = traph.get_tree_entry(&tree_id.get_uuid()).context(CellagentError::Chain { func_name: _f, comment: S("") })?;
+        traph.get_tree_entry(&tree_id.get_uuid()).context(CellagentError::Chain { func_name: _f, comment: S("") })?;
         let gvm_eqn = self.get_gvm_eqn(tree_id)?;
         let save = self.gvm_eval_save(msg_port_tree_id, &gvm_eqn).context(CellagentError::Chain { func_name: _f, comment: S(self.cell_id)})?;
         {
@@ -983,7 +983,7 @@ impl CellAgent {
         }
         Ok(())
     }
-    pub fn process_reroute_msg(&self) -> Result<(), Error> { panic!("Should never get here") }
+    pub fn _process_reroute_msg(&self) -> Result<(), Error> { panic!("Should never get here") }
     pub fn process_stack_tree_msg(&mut self, msg: &StackTreeMsg, port_no: PortNo, msg_port_tree_id: PortTreeID)
             -> Result<(), Error> {
         let _f = "process_stack_tree_msg";

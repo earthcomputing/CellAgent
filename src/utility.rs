@@ -45,7 +45,7 @@ impl Mask {
     pub fn all_but_zero(no_ports: PortQty) -> Mask {
         Mask { mask: MaskValue((2 as u16).pow((*no_ports) as u32)-2) }
     }
-    pub fn equal(self, other: Mask) -> bool { *self.mask == *other.mask }
+    pub fn _equal(self, other: Mask) -> bool { *self.mask == *other.mask }
     //pub fn get_as_value(&self) -> MaskValue { self.mask }
     pub fn or(self, mask: Mask) -> Mask {
         Mask { mask: MaskValue(*self.mask | *mask.mask) }
@@ -120,8 +120,8 @@ pub struct Stack<T: Sized> {
 }
 impl<T: Sized> Stack<T> {
     pub fn new() -> Stack<T> { Stack { elements: vec![] } }
-    pub fn push(&mut self, element: T) { self.elements.push(element); }
-    pub fn pop(&mut self) -> Option<T> { self.elements.pop() }
+    pub fn _push(&mut self, element: T) { self.elements.push(element); }
+    pub fn _pop(&mut self) -> Option<T> { self.elements.pop() }
     pub fn iter(&self) -> core::slice::Iter<'_, T> { self.elements.iter() }
 }
 /*
@@ -233,13 +233,13 @@ impl fmt::Display for TraceType {
         })
     }
 }
-pub fn print_vec<T: fmt::Display>(vector: &[T]) {
+pub fn _print_vec<T: fmt::Display>(vector: &[T]) {
     for (count, v) in vector.iter().enumerate() { println!("{:3}: {}", count, v) }
 }
-pub fn print_hash_set<T: fmt::Display + Eq + std::hash::Hash>(hashset: &HashSet<T>) {
+pub fn _print_hash_set<T: fmt::Display + Eq + std::hash::Hash>(hashset: &HashSet<T>) {
     for v in hashset.iter() { println!("{}", v); }
 }
-pub fn print_hash_map<K: fmt::Display + Eq + std::hash::Hash, T: fmt::Display + Eq + std::hash::Hash>(hashmap: &HashMap<K, T>) {
+pub fn _print_hash_map<K: fmt::Display + Eq + std::hash::Hash, T: fmt::Display + Eq + std::hash::Hash>(hashmap: &HashMap<K, T>) {
     for (k, v) in hashmap.iter() { println!("{}: {}", k, v); }
 }
 pub fn new_hash_set<T: Clone + Eq + std::hash::Hash>(values: Box<[T]>) -> HashSet<T> {
@@ -258,7 +258,7 @@ pub fn write_err(caller: &str, e: &Error) {
         // let _ = writeln!(stderr, "Backtrace: {:?}", backtrace);
     }
 }
-pub fn string_to_object(string: &str) -> Result<Value, Error> {
+pub fn _string_to_object(string: &str) -> Result<Value, Error> {
     let v = serde_json::from_str(string)?;
     Ok(v)
 }
@@ -275,8 +275,8 @@ pub enum UtilityError {
 //    Mask { cell_id: CellID, func_name: &'static str},
     #[fail(display = "UtilityError::PortNumber {}: Port number {:?} is larger than the maximum of {:?}", func_name, port_no, max)]
     PortNumber { port_no: PortNo, func_name: &'static str, max: PortQty },
-    #[fail(display = "UtilityError::Serialize {}: Cannot serialize in append2file", func_name)]
-    Serialize { func_name: &'static str},
+//    #[fail(display = "UtilityError::Serialize {}: Cannot serialize in append2file", func_name)]
+//    Serialize { func_name: &'static str},
     #[fail(display = "UtilityError::Unimplemented {}: {} is not implemented", func_name, feature)]
     Unimplemented { feature: String, func_name: &'static str }
 }

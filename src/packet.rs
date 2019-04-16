@@ -37,7 +37,7 @@ impl Packet {
         let payload = Payload::new(sender_msg_seq_no, size, is_last_packet, data_bytes);
         Packet { header, payload, packet_count: Packet::get_next_count() }
     }
-    pub fn make(header: PacketHeader, payload: Payload, packet_count: usize) -> Packet {
+    pub fn _make(header: PacketHeader, payload: Payload, packet_count: usize) -> Packet {
         Packet { header, payload, packet_count }
     }
     pub fn make_entl_packet() -> Packet {
@@ -49,8 +49,8 @@ impl Packet {
     
     pub fn get_next_count() -> usize { PACKET_COUNT.fetch_add(1, Ordering::SeqCst) }
 
-    pub fn get_header(&self) -> PacketHeader { self.header }
-    pub fn get_payload(&self) -> &Payload { &self.payload }
+    pub fn _get_header(&self) -> PacketHeader { self.header }
+    pub fn _get_payload(&self) -> &Payload { &self.payload }
     pub fn get_count(&self) -> usize { self.packet_count }
 
     // PacketHeader (delegate)
@@ -68,7 +68,7 @@ impl Packet {
     pub fn make_ait(&mut self) { self.header.make_ait() }
     pub fn make_tock(&mut self) { self.header.make_tock() }
     pub fn is_ait(&self) -> bool { self.header.get_uuid().is_ait() }
-    pub fn is_entl(&self) -> bool { self.header.get_uuid().is_entl() }
+    pub fn _is_entl(&self) -> bool { self.header.get_uuid()._is_entl() }
     pub fn get_ait_state(&self) -> AitState { self.get_tree_uuid().get_ait_state() }
     pub fn time_reverse(&mut self) { self.header.get_uuid().time_reverse(); }
     pub fn next_ait_state(&mut self) -> Result<AitState, Error> {
@@ -79,11 +79,11 @@ impl Packet {
     }
     // Wrapping and unwrapping following failover
     pub fn _wrap(&mut self, rw_port_tree_id: PortTreeID) {
-        self.payload.wrapped_header.push(self.header);
+        self.payload.wrapped_header._push(self.header);
         self.header = PacketHeader::new(&rw_port_tree_id.get_uuid());
     }
     pub fn _unwrap(&mut self) -> bool {
-        if let Some(wrapped_header) = self.payload.wrapped_header.pop(){
+        if let Some(wrapped_header) = self.payload.wrapped_header._pop(){
             self.header = wrapped_header;
             true
         } else {
@@ -152,7 +152,7 @@ impl Payload {
     fn get_sender_msg_seq_no(&self) -> SenderMsgSeqNo { self.sender_msg_seq_no }
     fn get_size(&self) -> PacketNo { self.size }
     fn is_last_packet(&self) -> bool { self.is_last }
-    fn get_wrapped_header(&self) -> &Stack<PacketHeader> { &self.wrapped_header }
+    fn _get_wrapped_header(&self) -> &Stack<PacketHeader> { &self.wrapped_header }
 }
 impl fmt::Display for Payload {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {

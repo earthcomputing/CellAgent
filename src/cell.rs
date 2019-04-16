@@ -50,7 +50,7 @@ use crate::config::{OUTPUT_FILE_NAME, QUENCH,
 use crate::gvm_equation::{GvmEqn};
 use crate::nalcell::{NalCell};
 use crate::uptree_spec::{AllowedTree, ContainerSpec, Manifest, UpTreeSpec, VmSpec};
-use crate::utility::{print_vec, S, TraceHeader};
+use crate::utility::{_print_vec, S, TraceHeader};
 
 fn main() -> Result<(), Error> {
     let _f = "main";
