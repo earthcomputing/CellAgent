@@ -72,7 +72,7 @@ impl RoutingTableEntry {
         self.parent = port_number.get_port_no();
         *self
     }
-    pub fn has_child(&self, port_number: PortNumber) -> bool {
+    pub fn _has_child(&self, port_number: PortNumber) -> bool {
         self.get_mask().and(Mask::new(port_number)) != Mask::empty()
     }
 }

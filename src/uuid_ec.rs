@@ -30,7 +30,7 @@ impl Uuid {
         uuid.make_normal();
         uuid
     }
-    pub fn new_ait() -> Uuid {
+    pub fn _new_ait() -> Uuid {
         let mut uuid = Uuid { uuid: uuid::Uuid::new_v4() };
         uuid.make_ait();
         uuid
@@ -53,7 +53,7 @@ impl Uuid {
     pub fn is_ait(&self) -> bool {
         self.get_ait_state() == AitState::Ait
     }
-    pub fn is_entl(&self) -> bool {
+    pub fn _is_entl(&self) -> bool {
         self.get_ait_state() == AitState::Entl
     }
     pub fn get_ait_state(&self) -> AitState {
@@ -75,13 +75,13 @@ impl Uuid {
             _ => panic!("0xC0 & code is not 0 or 1")
         }
     }
-    fn is_forward(&self) -> bool {
+    fn _is_forward(&self) -> bool {
         match self.get_direction() {
             TimeDirection::Forward => true,
             TimeDirection::Reverse => false
         }
     }
-    fn is_reverse(&self) -> bool { !self.is_forward() }
+    fn _is_reverse(&self) -> bool { !self._is_forward() }
     pub fn for_lookup(&self) -> Uuid {
         let mut bytes = self.mask_ait_byte();
         bytes[AIT_BYTE] = NORMAL;
@@ -119,7 +119,7 @@ impl Uuid {
         let bytes = self.get_bytes();
         PortNo(bytes[PORT_NO_BYTE])
     }
-    pub fn has_port_no(&self) -> bool {
+    pub fn _has_port_no(&self) -> bool {
         let bytes = self.get_bytes();
         bytes[PORT_NO_BYTE] != 0
     }
@@ -213,10 +213,10 @@ impl fmt::Display for TimeDirection {
 use failure::{Error,};
 #[derive(Debug, Fail)]
 pub enum UuidError {
-    #[fail(display = "UuidError::Chain {}: {}", func_name, comment)]
-    Chain { func_name: &'static str, comment: String },
+//    #[fail(display = "UuidError::Chain {}: {}", func_name, comment)]
+//    Chain { func_name: &'static str, comment: String },
     #[fail(display = "UuidError::AitState: Can't do {} from state {}", func_name, ait_state)]
     AitState { func_name: &'static str, ait_state: AitState },
-    #[fail(display = "UuidError::Code {}: {} is an invalid UUID code", func_name, code)]
-    Code { func_name: &'static str, code: u8 }
+//    #[fail(display = "UuidError::Code {}: {} is an invalid UUID code", func_name, code)]
+//    Code { func_name: &'static str, code: u8 }
 }

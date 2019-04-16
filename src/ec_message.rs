@@ -157,7 +157,7 @@ pub trait Message {
     fn get_msg_type(&self) -> MsgType;
     fn get_port_tree_id(&self) -> PortTreeID { TreeID::default().to_port_tree_id_0() }
     fn is_rootward(&self) -> bool {
-        match self.get_header().get_direction() {
+        match self.get_header()._get_direction() {
             MsgDirection::Rootward => true,
             MsgDirection::Leafward => false
         }
@@ -207,7 +207,7 @@ impl MsgHeader {
     pub fn get_msg_type(&self) -> MsgType { self.msg_type }
     pub fn get_sender_msg_seq_no(&self) -> SenderMsgSeqNo { self.sender_msg_seq_no }
     pub fn get_ait(&self) -> bool { self.is_ait }
-    pub fn get_direction(&self) -> MsgDirection { self.direction }
+    pub fn _get_direction(&self) -> MsgDirection { self.direction }
     pub fn get_sender_id(&self) -> SenderID { self.sender_id }
     pub fn get_tree_map(&self) -> &MsgTreeMap { &self.tree_map }
     pub fn set_tree_map(&mut self, tree_map: MsgTreeMap) { self.tree_map = tree_map; } // Should this be set in new()?
@@ -292,7 +292,7 @@ impl DiscoverPayload {
     pub fn hops_plus_one(&self) -> PathLength { PathLength(CellQty(**self.hops + 1)) }
     pub fn get_path(&self) -> Path { self.path }
     pub fn get_port_tree_id(&self) -> PortTreeID { self.port_tree_id }
-    pub fn get_root_port_no(&self) -> PortNo { self.root_port_no }
+    pub fn _get_root_port_no(&self) -> PortNo { self.root_port_no }
     pub fn set_hops(&mut self, hops: PathLength) { self.hops = hops; }
     pub fn set_path(&mut self, path: Path) { self.path = path; }
     pub fn set_sending_cell(&mut self, sending_cell_id: CellID) { self.sending_cell_id = sending_cell_id; }
@@ -321,7 +321,6 @@ impl DiscoverDMsg {
         DiscoverDMsg { header, payload }
     }
     pub fn get_payload(&self) -> &DiscoverDPayload { &self.payload }
-    fn get_port_tree_id(&self) -> PortTreeID { self.payload.get_port_tree_id() }
 }
 impl Message for DiscoverDMsg {
     fn get_header(&self) -> &MsgHeader { &self.header }
@@ -397,8 +396,6 @@ impl FailoverMsg {
         FailoverMsg { header, payload }
     }
     pub fn get_payload(&self) -> &FailoverMsgPayload { &self.payload }
-    pub fn get_rw_port_tree_id(&self) -> PortTreeID { self.payload.get_rw_port_tree_id() }
-    pub fn get_lw_port_tree_id(&self) -> PortTreeID { self.payload.get_lw_port_tree_id() }
 }
 impl Message for FailoverMsg {
     fn get_header(&self) -> &MsgHeader { &self.header }
@@ -462,9 +459,6 @@ impl FailoverDMsg {
         FailoverDMsg { header, payload }
     }
     pub fn get_payload(&self) -> &FailoverDMsgPayload { &self.payload }
-    pub fn get_rw_port_tree_id(&self) -> PortTreeID { self.payload.get_rw_port_tree_id() }
-    pub fn get_lw_port_tree_id(&self) -> PortTreeID { self.payload.get_lw_port_tree_id() }
-    pub fn get_number_of_packets(&self) -> NumberOfPackets { self.payload.get_number_of_packets() }
 }
 impl Message for FailoverDMsg {
     fn get_header(&self) -> &MsgHeader { &self.header }
@@ -500,8 +494,8 @@ impl FailoverDMsgPayload {
     pub fn get_response(&self) -> FailoverResponse { self.response }
     pub fn get_number_of_packets(&self) -> NumberOfPackets { self.no_packets }
     pub fn get_failover_payload(&self) -> &FailoverMsgPayload { &self.failover_payload }
-    pub fn get_rw_port_tree_id(&self) -> PortTreeID { self.failover_payload.get_rw_port_tree_id() }
-    pub fn get_lw_port_tree_id(&self) -> PortTreeID { self.failover_payload.get_lw_port_tree_id() }
+    pub fn _get_rw_port_tree_id(&self) -> PortTreeID { self.failover_payload.get_rw_port_tree_id() }
+    pub fn _get_lw_port_tree_id(&self) -> PortTreeID { self.failover_payload.get_lw_port_tree_id() }
 }
 impl MsgPayload for FailoverDMsgPayload {}
 impl fmt::Display for FailoverDMsgPayload {
@@ -587,7 +581,7 @@ impl StackTreeMsg {
         StackTreeMsg { header, payload}
     }
     pub fn get_payload(&self) -> &StackTreeMsgPayload { &self.payload }
-    fn get_port_tree_id(&self) -> PortTreeID { self.payload.get_port_tree_id() }
+    fn _get_port_tree_id(&self) -> PortTreeID { self.payload._get_port_tree_id() }
 }
 impl Message for StackTreeMsg {
     fn get_header(&self) -> &MsgHeader { &self.header }
@@ -623,7 +617,7 @@ impl StackTreeMsgPayload {
     pub fn get_new_port_tree_id(&self) -> PortTreeID { self.new_port_tree_id }
     pub fn get_parent_port_tree_id(&self) -> PortTreeID { self.parent_port_tree_id }
     pub fn get_gvm_eqn(&self) -> &GvmEquation { &self.gvm_eqn }
-    fn get_port_tree_id(&self) -> PortTreeID { self.new_port_tree_id }
+    fn _get_port_tree_id(&self) -> PortTreeID { self.new_port_tree_id }
 }
 impl MsgPayload for StackTreeMsgPayload {}
 impl fmt::Display for StackTreeMsgPayload {
@@ -695,9 +689,9 @@ impl ManifestMsg {
         ManifestMsg { header, payload }
     }
     pub fn get_payload(&self) -> &ManifestMsgPayload { &self.payload }
-    pub fn get_port_tree_id(&self) -> PortTreeID { self.payload.get_port_tree_id() }
+    pub fn _get_port_tree_id(&self) -> PortTreeID { self.payload._get_port_tree_id() }
 }
-impl Message for ManifestMsg {
+impl Message for ManifestMsg
     fn get_header(&self) -> &MsgHeader { &self.header }
     fn get_payload(&self) -> &dyn MsgPayload { &self.payload }
     fn get_msg_type(&self) -> MsgType { self.get_header().msg_type }
@@ -729,7 +723,7 @@ impl ManifestMsgPayload {
     }
     pub fn get_manifest(&self) -> &Manifest { &self.manifest }
     pub fn get_deploy_port_tree_id(&self) -> PortTreeID { self.deploy_port_tree_id }
-    pub fn get_port_tree_id(&self) -> PortTreeID { self.deploy_port_tree_id }
+    pub fn _get_port_tree_id(&self) -> PortTreeID { self.deploy_port_tree_id }
 }
 impl MsgPayload for ManifestMsgPayload {}
 impl fmt::Display for ManifestMsgPayload {
@@ -780,7 +774,7 @@ impl InterapplicationMsgPayload {
         InterapplicationMsgPayload { port_tree_id: port_tree_id.clone(), body: ByteArray(S(body).into_bytes()) }
     }
     pub fn get_body(&self) -> &ByteArray { &self.body }
-    pub fn get_tree_id(&self) -> &PortTreeID { &self.port_tree_id }
+    pub fn _get_tree_id(&self) -> &PortTreeID { &self.port_tree_id }
     pub fn get_port_tree_id(&self) -> PortTreeID { self.port_tree_id }
 }
 impl MsgPayload for InterapplicationMsgPayload {}
@@ -800,14 +794,14 @@ pub struct TreeNameMsg {
     payload: TreeNameMsgPayload
 }
 impl TreeNameMsg {
-    pub fn new(sender_id: SenderID, tree_name: &str) -> TreeNameMsg {
+    pub fn _new(sender_id: SenderID, tree_name: &str) -> TreeNameMsg {
         // Note that direction is rootward so cell agent will get the message
         let header = MsgHeader::new(sender_id, false, MsgType::TreeName, MsgDirection::Rootward);
-        let payload = TreeNameMsgPayload::new(tree_name);
+        let payload = TreeNameMsgPayload::_new(tree_name);
         TreeNameMsg { header, payload }
     }
     pub fn get_payload(&self) -> &TreeNameMsgPayload { &self.payload }
-    pub fn get_tree_name(&self) -> &String { self.payload.get_tree_name() }
+    pub fn _get_tree_name(&self) -> &String { self.payload._get_tree_name() }
 }
 impl Message for TreeNameMsg {
     fn get_header(&self) -> &MsgHeader { &self.header }
@@ -828,10 +822,10 @@ pub struct TreeNameMsgPayload {
     tree_name: String,
 }
 impl TreeNameMsgPayload {
-    fn new(tree_name: &str) -> TreeNameMsgPayload {
+    fn _new(tree_name: &str) -> TreeNameMsgPayload {
         TreeNameMsgPayload { tree_name: S(tree_name) }
     }
-    fn get_tree_name(&self) -> &String { &self.tree_name }
+    fn _get_tree_name(&self) -> &String { &self.tree_name }
 }
 impl MsgPayload for TreeNameMsgPayload {}
 impl fmt::Display for TreeNameMsgPayload {

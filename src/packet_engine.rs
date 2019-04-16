@@ -91,7 +91,7 @@ impl PacketEngine {
     fn set_may_send(&mut self, port_no: PortNo) {
         self.port_got_event.lock().unwrap()[port_no.as_usize()] = true;
     }
-    fn get_outbuf(&self, port_no: PortNo) -> VecDeque<Packet> {
+    fn _get_outbuf(&self, port_no: PortNo) -> VecDeque<Packet> {
         self.out_buffers.lock().unwrap().get(port_no.as_usize()).unwrap().clone()
     }
     fn get_size(array: &PacketArray, port_no: PortNo) -> usize {
@@ -100,10 +100,10 @@ impl PacketEngine {
     fn get_outbuf_size(&self, port_no: PortNo) -> usize {
         PacketEngine::get_size(&self.out_buffers, port_no)
     }
-    fn get_inbuf_size(&self, port_no: PortNo) -> usize {
+    fn _get_inbuf_size(&self, port_no: PortNo) -> usize {
         PacketEngine::get_size(&self.in_buffer, port_no)
     }
-    fn get_sent_size(&self, port_no: PortNo) -> usize {
+    fn _get_sent_size(&self, port_no: PortNo) -> usize {
         PacketEngine::get_size(&self.sent_packets, port_no)
     }
     fn get_outbuf_first_type(&self, port_no: PortNo) -> Option<MsgType> {
@@ -140,7 +140,7 @@ impl PacketEngine {
     fn add_seen_packet_count(&mut self, port_no: PortNo) {
         PacketEngine::add_to_packet_count(&mut self.no_seen_packets, port_no);
     }
-    fn clear_seen_packet_count(&mut self, port_no: PortNo) {
+    fn _clear_seen_packet_count(&mut self, port_no: PortNo) {
         self.no_seen_packets.lock().unwrap()[port_no.as_usize()] = 0;
     }
     fn add_sent_packet(&mut self, port_no: PortNo, packet: Packet) {
@@ -155,13 +155,13 @@ impl PacketEngine {
         let item = locked.get_mut(port_no.as_usize()).unwrap(); // Safe since vector always has MAX_NUM_PHYS_PORTS_PER_CELL entries
         item.pop_front()
     }
-    fn pop_first_outbuf(&mut self, port_no: PortNo) -> Option<Packet> {
+    fn _pop_first_outbuf(&mut self, port_no: PortNo) -> Option<Packet> {
         PacketEngine::pop_first(&mut self.out_buffers, port_no)
     }
-    fn pop_first_inbuf(&mut self, port_no: PortNo) -> Option<Packet> {
+    fn _pop_first_inbuf(&mut self, port_no: PortNo) -> Option<Packet> {
         PacketEngine::pop_first(&mut self.in_buffer, port_no)
     }
-    fn pop_first_sent(&mut self, port_no: PortNo) -> Option<Packet> {
+    fn _pop_first_sent(&mut self, port_no: PortNo) -> Option<Packet> {
         PacketEngine::pop_first(&mut self.sent_packets, port_no)
     }
     fn add_packet(to_end: bool, array: &mut PacketArray, port_no: PortNo, packet: Packet) {
@@ -184,10 +184,10 @@ impl PacketEngine {
         let _f = "add_to_out_buffer_back";
         PacketEngine::add_packet_to_back(&mut self.out_buffers, port_no, packet);
     }
-    fn add_to_in_buffer_back(&mut self, port_no: PortNo, packet: Packet) {
+    fn _add_to_in_buffer_back(&mut self, port_no: PortNo, packet: Packet) {
         PacketEngine::add_packet_to_back(&mut self.in_buffer, port_no, packet);
     }
-    fn add_to_sent_back(&mut self, port_no: PortNo, packet: Packet) {
+    fn _add_to_sent_back(&mut self, port_no: PortNo, packet: Packet) {
         PacketEngine::add_packet_to_back(&mut self.sent_packets, port_no, packet);
     }
     // SPAWN THREAD (listen_cm_loop)
@@ -352,7 +352,7 @@ impl PacketEngine {
     fn send_packet_flow_control(&mut self, port_no: PortNo) -> Result<(), Error> {
         let _f = "send_packet";
         if self.may_send(port_no) {
-            if let Some(packet) = self.pop_first_outbuf(port_no) {
+            if let Some(packet) = self._pop_first_outbuf(port_no) {
                 self.set_may_not_send(port_no);
                 {
                     if DEBUG_OPTIONS.all || DEBUG_OPTIONS.flow_control {
@@ -474,7 +474,7 @@ impl PacketEngine {
                     .or_else(|_| -> Result<(), Error> {
                         // Time reverse on error sending to CM
                         //println!("PacketEngine {}: {} error {} {}", self.cell_id, _f, MsgType::msg_type(&packet), packet.get_ait_state());
-                        self.pop_first_outbuf(port_no); // Remove packet just added because I need to send a time reversed one instead
+                        self._pop_first_outbuf(port_no); // Remove packet just added because I need to send a time reversed one instead
                         packet.make_tock();
                         packet.time_reverse();
                         packet.next_ait_state()?;
@@ -657,7 +657,7 @@ pub struct NumberOfPackets {
 }
 impl NumberOfPackets {
     pub fn new() -> NumberOfPackets { NumberOfPackets { sent: 0, recd: 0 }}
-    pub fn get_number_sent(&self) -> usize { self.sent }
+    pub fn _get_number_sent(&self) -> usize { self.sent }
     pub fn get_number_seen(&self) -> usize { self.recd }
 }
 impl fmt::Display for NumberOfPackets {
@@ -672,8 +672,8 @@ use failure::{Error, ResultExt};
 pub enum PacketEngineError {
     #[fail(display = "PacketEngineError::Ait {} {} is not allowed here", func_name, ait_state)]
     Ait { func_name: &'static str, ait_state: AitState },
-    #[fail(display = "PacketEngineError::Buffer {} no room for packet in {}", func_name, buffer_name)]
-    Buffer { func_name: &'static str, buffer_name: &'static str },
+    //#[fail(display = "PacketEngineError::Buffer {} no room for packet in {}", func_name, buffer_name)]
+    //Buffer { func_name: &'static str, buffer_name: &'static str },
     #[fail(display = "PacketEngineError::Chain {} {}", func_name, comment)]
     Chain { func_name: &'static str, comment: String },
     #[fail(display = "PacketEngineError::Sender {}: No sender for port {} on cell {}", func_name, port_no, cell_id)]

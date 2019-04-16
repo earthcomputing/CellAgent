@@ -146,7 +146,7 @@ impl Cell for BorderCell {
     fn get_interior_ports(&self) -> &Vec<PortNo> { &self.interior_ports }
 }
 impl BorderCell {
-    pub fn new(cell_no: CellNo, cell_type: CellType, interior_ports: Vec<PortNo>, border_ports: Vec<PortNo>) -> BorderCell {
+    pub fn _new(cell_no: CellNo, cell_type: CellType, interior_ports: Vec<PortNo>, border_ports: Vec<PortNo>) -> BorderCell {
 	    BorderCell { cell_no, cell_type, interior_ports, border_ports }
     }
     pub fn get_border_ports(&self) -> &Vec<PortNo> { &self.border_ports }
@@ -174,7 +174,7 @@ impl Cell for InteriorCell {
     fn get_interior_ports(&self) -> &Vec<PortNo> { &self.interior_ports }
 }
 impl InteriorCell {
-    pub fn new(cell_no: CellNo, cell_type: CellType, interior_ports: Vec<PortNo>) -> InteriorCell {
+    pub fn _new(cell_no: CellNo, cell_type: CellType, interior_ports: Vec<PortNo>) -> InteriorCell {
 	InteriorCell { cell_no, cell_type, interior_ports }
     }
 }

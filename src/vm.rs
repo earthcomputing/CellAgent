@@ -45,7 +45,7 @@ impl VirtualMachine {
         self.listen_ca(vm_from_ca).context(VmError::Chain { func_name: "initialize", comment: S(self.id.get_name()) + " listen_ca"})?;
         Ok(())
     }
-    pub fn get_id(&self) -> &VmID { &self.id }
+    pub fn _get_id(&self) -> &VmID { &self.id }
 
     // SPAWN THREAD (listen_ca_loop)
     fn listen_ca(&self, vm_from_ca: VmFromCa) -> Result<(), Error> {

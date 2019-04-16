@@ -39,7 +39,7 @@ impl TraphElement {
     fn set_state(&mut self, state: PortState) { self.state = state; }
     pub fn is_on_broken_path(&self, broken_path: Path) -> bool { self.path == broken_path }
     pub fn mark_parent(&mut self) { self.set_state(PortState::Parent) }
-    pub fn mark_child(&mut self)  { self.set_state(PortState::Child) }
+    pub fn _mark_child(&mut self)  { self.set_state(PortState::Child) }
     pub fn mark_pruned(&mut self) { self.set_state(PortState::Pruned) }
     pub fn mark_broken(&mut self) { self.set_state(PortState::Broken) }
 }

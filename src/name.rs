@@ -122,11 +122,6 @@ impl TreeID {
         PortTreeID { name: str_to_chars(&self.get_name()), uuid }
     }
     pub fn to_port_tree_id_0(&self) -> PortTreeID { self.to_port_tree_id(PortNumber::new0()) }
-    pub fn without_root_port_number(&self) -> TreeID {
-        let mut uuid = self.uuid; // Copy so next line doesn't change self.uuid
-        uuid.remove_port_no();
-        TreeID { name: str_to_chars(&self.get_name()), uuid }
-    }
     pub fn _get_port_no(&self) -> PortNo { self.uuid.get_port_no() }
     pub fn _transfer_port_number(&mut self, other: TreeID) {
         self.uuid.set_port_no(other._get_port_no());

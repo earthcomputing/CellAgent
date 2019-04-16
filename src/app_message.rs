@@ -1,3 +1,4 @@
+#![allow(dead_code)]
 use std::{fmt,
           ops::{Deref},
           sync::atomic::{AtomicUsize, Ordering},
