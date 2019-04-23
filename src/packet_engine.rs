@@ -270,7 +270,7 @@ impl PacketEngine {
         {
             let mut locked_reroute = self.reroute.lock().unwrap();
             locked_reroute[broken_port_no.as_usize()] = new_parent;
-            println!("PacketEngine {}: {} broken port no {} to {:?}", self.cell_id, _f, *broken_port_no, *locked_reroute);
+            //println!("PacketEngine {}: {} broken port {} to {:?}", self.cell_id, _f, *broken_port_no, *locked_reroute);
         }
         let mut locked_outbuf = self.out_buffers.lock().unwrap();
         let mut locked_sent = self.sent_packets.lock().unwrap();
@@ -366,8 +366,6 @@ impl PacketEngine {
                 }
                 self.send_packet(port_no, &packet)?;
                 self.add_sent_packet(port_no, packet);
-            } else {
-                self.send_next_packet_or_entl(port_no)?;
             }
         } else { // Debug only
             {
@@ -442,11 +440,10 @@ impl PacketEngine {
     fn process_packet(&mut self, port_no: PortNo, packet: Packet)
             -> Result<(), Error> {
         let _f = "process_packet";
-        { // Got a packet from the other side, so clear state
-            self.set_may_send(port_no);
-            self.add_seen_packet_count(port_no);
-            self.clear_sent_packets(port_no);
-        }
+        // Got a packet from the other side, so clear state
+        self.set_may_send(port_no);
+        self.add_seen_packet_count(port_no);
+        self.clear_sent_packets(port_no);
         {
             if DEBUG_OPTIONS.all || DEBUG_OPTIONS.flow_control {
                 let msg_type = MsgType::msg_type(&packet);
@@ -510,7 +507,7 @@ impl PacketEngine {
                         return Err(PacketEngineError::Uuid { cell_id: self.cell_id, func_name: _f, msg_type, packet_uuid: packet.get_tree_uuid(), table_uuid: entry.get_uuid() }.into());
                     }
                     // Send the packet at the head of the port's queue
-                    self.send_packet_flow_control(port_no)?;
+                    self.send_next_packet_or_entl(port_no)?;
                 }
             }
         }
@@ -558,7 +555,7 @@ impl PacketEngine {
                 } else {
                     // Forward rootward
                     self.add_to_out_buffer_back(parent, packet);
-                    self.send_packet_flow_control(entry.get_parent())?;
+                    self.send_next_packet_or_entl(entry.get_parent())?;
                 }
             } else {
                 // Send leafward if recv port is parent
@@ -600,7 +597,7 @@ impl PacketEngine {
                             }
                         }
                         self.add_to_out_buffer_back(port_no, packet.clone());
-                        self.send_packet_flow_control(port_no)?;
+                        self.send_next_packet_or_entl(port_no)?;
                     }
                 }
             }
