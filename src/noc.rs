@@ -160,7 +160,7 @@ impl Noc {
         // Sleep to allow tree stacking to finish
         // TODO: Sleep to let stack tree msgs finish before sending application msgs; should be removed
         if RACE_SLEEP > 0 {
-            println!("---> Sleeping to let tree stacking finish");
+            println!("---> Sleeping {} seconds to let tree stacking finish", RACE_SLEEP);
             sleep(RACE_SLEEP);
         }
         // Deploy NocMaster

@@ -109,10 +109,12 @@ impl CellAgent {
     // WORKER (CellAgent)
     pub fn initialize(&mut self, ca_from_cm: CaFromCm) -> Result<&mut Self, Error> {
         let _f = "initialize";
-        if TRACE_OPTIONS.all || TRACE_OPTIONS.ca {
-            let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "worker" };
-            let trace = json!({ "cell_id": &self.cell_id, "thread_name": thread::current().name(), "thread_id": TraceHeader::parse(thread::current().id()) });
-            let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
+        {
+            if TRACE_OPTIONS.all || TRACE_OPTIONS.ca {
+                let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "worker" };
+                let trace = json!({ "cell_id": &self.cell_id, "thread_name": thread::current().name(), "thread_id": TraceHeader::parse(thread::current().id()) });
+                let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
+            }
         }
         // Set up predefined trees - Must be first two in this order
         let port_number_0 = PortNumber::new0();
@@ -665,12 +667,12 @@ impl CellAgent {
                         }
                         if DEBUG_OPTIONS.all || DEBUG_OPTIONS.ca_msg_recv {   //Debug print
                             match msg.get_msg_type() {
-                                MsgType::Discover => (),
+                                /*MsgType::Discover  |
                                 MsgType::DiscoverD => {
                                     if msg.get_port_tree_id().is_name("Tree:C:2") {
                                         println!("Cellagent {}: {} Port {} received {}", self.cell_id, _f, *port_no, msg);
                                     }
-                                },
+                                }, */
                                 _ => {
                                     println!("Cellagent {}: {} Port {} received {}", self.cell_id, _f, *port_no, msg);
                                 }
@@ -1148,17 +1150,17 @@ impl CellAgent {
                 .ok_or::<Error>(CellagentError::TreeMap { func_name: "listen_cm_loop 5", cell_id: self.cell_id, tree_name: allowed_tree.clone() }.into())?;
         }
         let msg = ManifestMsg::new(sender_id, false, deploy_tree_id.clone(), &msg_tree_map, &manifest);
+        let mask = self.get_mask(deploy_port_tree_id)?;
         {
             if TRACE_OPTIONS.all || TRACE_OPTIONS.ca {
                 let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "ca_got_manifest_app_msg" };
-                let trace = json!({ "cell_id": &self.cell_id, "deploy_tree_id": deploy_tree_id, "msg": msg.value() });
+                let trace = json!({ "cell_id": &self.cell_id, "deploy_tree_id": deploy_tree_id, "mask": mask, "msg": msg.value() });
                 let _ = add_to_trace(TraceType::Debug, trace_params, &trace, _f);
             }
             if DEBUG_OPTIONS.all || DEBUG_OPTIONS.process_msg {   // Debug
-                println!("Cellagent {}: {} sending on tree {} manifest app_msg {}", self.cell_id, _f, deploy_tree_id, msg);
+                println!("Cellagent {}: {} sending on tree {} with mask {} manifest app_msg {}", self.cell_id, _f, deploy_tree_id, mask, msg);
             }
         }
-        let mask = self.get_mask(deploy_port_tree_id)?;
         self.send_msg(*deploy_tree_id, &msg, mask.or(Mask::port0())).context(CellagentError::Chain { func_name: _f, comment: S(self.cell_id) + " send manifest" })?;
         Ok(tree_map.clone())
     }
@@ -1417,7 +1419,7 @@ impl CellAgent {
             }
             if DEBUG_OPTIONS.all || DEBUG_OPTIONS.ca_msg_send {
                 match msg_type {
-                    MsgType::Discover => (),
+                    MsgType::Discover  |
                     MsgType::DiscoverD => println!("Cellagent {}: {} send on ports {:?} msg {}", self.cell_id, _f, ports, msg),
                     _ => {
                         println!("Cellagent {}: {} send on ports {:?} msg {}", self.cell_id, _f, ports, msg)
