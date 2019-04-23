@@ -284,8 +284,8 @@ impl PacketEngine {
         new_parent_outbuf.append(&mut remaining_sent);
         new_parent_outbuf.append(broken_outbuf);
     }
-    fn route_cm_packet(&mut self, user_mask: Mask, mut packet: Packet) -> Result<(), Error> {
-        let _f = "route_packet";
+    fn route_cm_packet(&mut self, user_mask: Mask, packet: Packet) -> Result<(), Error> {
+        let _f = "route_cm_packet";
         let uuid = packet.get_tree_uuid().for_lookup();  // Strip AIT info for lookup
         let entry = {
             let locked = self.routing_table.lock().unwrap();
@@ -293,19 +293,16 @@ impl PacketEngine {
         };
 
         match packet.get_ait_state() {
+            AitState::AitD |
             AitState::Entl |
             AitState::Tick |
             AitState::Tock |
             AitState::Tack |
             AitState::Teck => return Err(PacketEngineError::Ait { func_name: _f, ait_state: packet.get_ait_state() }.into()), // Not allowed here
 
-            AitState::Ait => { // Update state and send on ports from entry
-                packet.next_ait_state()?;
-                let port_no = PortNo(0);
-                self.forward(port_no, entry, user_mask, &packet).context(PacketEngineError::Chain { func_name: _f, comment: S(self.cell_id.get_name()) })?;
-            }
-            AitState::Normal => {
-                {
+            AitState::Normal |
+            AitState::Ait => {
+                { // Debug block
                     let msg_type = MsgType::msg_type(&packet);
                     let port_tree_id = packet.get_port_tree_id();
                     let ait_state = packet.get_ait_state();
@@ -409,7 +406,7 @@ impl PacketEngine {
             let msg = pe_from_ports.recv().context(PacketEngineError::Chain { func_name: _f, comment: S("receive")})?;
             {
                 if TRACE_OPTIONS.all || TRACE_OPTIONS.pe_port {
-                    let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "pl_recv" };
+                    let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "pe_recv" };
                     let trace = json!({ "cell_id": self.cell_id, "msg": &msg });
                     let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
                 }
@@ -442,7 +439,7 @@ impl PacketEngine {
     // TODO: Make sure I don't have a race condition because I'm dropping the lock on the routing table
     // Potential hazard here; CA may have sent a routing table update.  I can't just hold the lock on the table
     // when I block waiting for a tree update because of a deadlock with listen_cm_loop.
-    fn process_packet(&mut self, port_no: PortNo, mut packet: Packet)
+    fn process_packet(&mut self, port_no: PortNo, packet: Packet)
             -> Result<(), Error> {
         let _f = "process_packet";
         { // Got a packet from the other side, so clear state
@@ -460,49 +457,16 @@ impl PacketEngine {
             }
         }
         match packet.get_ait_state() {
-            AitState::Ait => {
+            AitState::Teck |
+            AitState::Tack |
+            AitState::Tock |
+            AitState::Tick => {
                 self.send_next_packet_or_entl(port_no)?; // Don't lock up the port on an error
-                return Err(PacketEngineError::Ait { func_name: _f, ait_state: AitState::Ait }.into())
+                return Err(PacketEngineError::Ait { func_name: _f, ait_state: packet.get_ait_state() }.into())
             },
-            AitState::Tock => {
-                // Send to CM and transition to ENTL if time is FORWARD
-                packet.next_ait_state()?;
-                self.add_to_out_buffer_front(port_no, packet.clone());
-                self.send_packet_flow_control(port_no)?;
-                packet.make_ait();
-                self.pe_to_cm.send(PeToCmPacket::Packet((port_no, packet.clone())))
-                    .or_else(|_| -> Result<(), Error> {
-                        // Time reverse on error sending to CM
-                        //println!("PacketEngine {}: {} error {} {}", self.cell_id, _f, MsgType::msg_type(&packet), packet.get_ait_state());
-                        self._pop_first_outbuf(port_no); // Remove packet just added because I need to send a time reversed one instead
-                        packet.make_tock();
-                        packet.time_reverse();
-                        packet.next_ait_state()?;
-                        self.send_packet(port_no, &packet)?;
-                        Ok(())
-                    })?;
-            },
-            AitState::Tick => { // Inform CM of success and enter ENTL
-                // TODO: Handle notifying cell agent of success
-                //self.pe_to_cm.send(PeToCmPacket::Packet((port_no, packet)))?;
-                self.send_next_packet_or_entl(port_no)?;
-            },
-
-            AitState::Tack => {
-                // Update and send back on same port
-                packet.next_ait_state()?;
-                self.send_packet(port_no, &packet)?;
-            },
-            AitState::Teck => {
-                // Update and send back on same port
-                packet.next_ait_state()?;
-                self.add_to_out_buffer_front(port_no, packet);
-                self.send_packet_flow_control(port_no)?;  // Flow control on TECH to enforce packet order
-            },
-            AitState::Entl => { // In real life, always send an ENTL
-                // TOCTTOU race here, but the only cost is sending an extra ENTL packet
-                if self.get_outbuf_size(port_no) > 0 { self.send_packet_flow_control(port_no)?; }
-            },
+            AitState::Entl => self.send_packet_flow_control(port_no)?,
+            AitState::Ait  => self.pe_to_cm.send(PeToCmPacket::Packet((port_no, packet)))?,
+            AitState::AitD => (), // TODO: Send to cm once cell agent knows how to handle it
             AitState::Normal => { // Forward packet
                 let uuid = packet.get_tree_uuid().for_lookup();
                 let entry =
@@ -516,7 +480,7 @@ impl PacketEngine {
                             }
                         }
                     };
-                {
+                { // Debug block
                     let msg_type = MsgType::msg_type(&packet);
                     let port_tree_id = packet.get_port_tree_id();
                     let ait_state = packet.get_ait_state();
@@ -537,7 +501,7 @@ impl PacketEngine {
                     }
                 }
                 if entry.is_in_use() {
-                    if entry.get_uuid() == packet.get_tree_uuid() {
+                    if entry.get_uuid() == uuid {
                         // Put packets on the right port's queue
                         let mask = entry.get_mask();
                         self.forward(port_no, entry, mask, &packet).context(PacketEngineError::Chain { func_name: "process_packet", comment: S("forward ") + &self.cell_id.get_name() })?;
@@ -600,7 +564,7 @@ impl PacketEngine {
                 // Send leafward if recv port is parent
                 let mask = user_mask.and(entry.get_mask());
                 let port_nos = mask.get_port_nos();
-                {
+                { // Debug block
                     let msg_type = MsgType::msg_type(&packet);
                     let port_tree_id = packet.get_port_tree_id();
                     {

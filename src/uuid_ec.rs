@@ -8,7 +8,8 @@ use crate::utility::PortNumber;
 
 const NORMAL:   u8 = 0b0000_0000;  // Used for all Name UUIDs, including TreeIDs and for normal packets
 const ENTL:     u8 = 0b0000_1111;  // Used just to generate a recv event
-const AIT:      u8 = 0b0000_1001;  // All AIT packets decode as odd numbers, i.e., lsb = 1
+const AITD:     u8 = 0b0000_1011;  // AIT packet delivered or not (ACK/NACK depending on time reversal)
+const AIT:      u8 = 0b0000_1001;  // Sent AIT packet
 const TECK:     u8 = 0b0000_0111;
 const TACK:     u8 = 0b0000_0101;
 const TOCK:     u8 = 0b0000_0011;
@@ -32,7 +33,7 @@ impl Uuid {
     }
     pub fn _new_ait() -> Uuid {
         let mut uuid = Uuid { uuid: uuid::Uuid::new_v4() };
-        uuid.make_ait();
+        uuid.make_ait_send();
         uuid
     }
     fn get_bytes(&self) -> Bytes { *self.uuid.as_bytes() }
@@ -51,6 +52,12 @@ impl Uuid {
         self.set_bytes(bytes);
     }
     pub fn is_ait(&self) -> bool {
+        self.is_ait_send() || self.is_ait_recv()
+    }
+    pub fn is_ait_send(&self) -> bool {
+        self.get_ait_state() == AitState::Ait
+    }
+    pub fn is_ait_recv(&self) -> bool {
         self.get_ait_state() == AitState::Ait
     }
     pub fn _is_entl(&self) -> bool {
@@ -63,7 +70,8 @@ impl Uuid {
             TOCK => AitState::Tock,
             TACK => AitState::Tack,
             TECK => AitState::Teck,
-            AIT  => AitState::Ait,
+            AITD => AitState::AitD,
+            AIT => AitState::Ait,
             ENTL => AitState::Entl,
             _    => AitState::Normal, // Bad uuid codes are treated as normal
         }
@@ -98,9 +106,14 @@ impl Uuid {
         self.set_code(ENTL);
         AitState::Entl
     }
-    pub fn make_ait(&mut self) -> AitState {
+    pub fn make_ait_send(&mut self) -> AitState {
         self.set_code(AIT);
         AitState::Ait
+    }
+    // Tell sender if transfer succeeded or not
+    pub fn make_ait_reply(&mut self) -> AitState {
+        self.set_code(AITD);
+        AitState::AitD
     }
     pub fn make_tock(&mut self) -> AitState {
         self.set_code(TOCK);
@@ -145,7 +158,7 @@ impl Uuid {
             TOCK => { self.set_code(TICK); AitState::Tick },
             TACK => { self.set_code(TOCK); AitState::Tock },
             TECK => { self.set_code(TACK); AitState::Tack },
-            AIT  => { self.set_code(TECK); AitState::Teck },
+            AIT => { self.set_code(TECK); AitState::Teck },
             NORMAL => AitState::Normal,
             _ => return Err(UuidError::AitState { func_name: _f, ait_state: self.get_ait_state() }.into())
         })
@@ -156,7 +169,7 @@ impl Uuid {
             TICK => { self.set_code(TOCK); self.time_reverse(); AitState::Tock },
             TOCK => { self.set_code(TACK); AitState::Tack },
             TACK => { self.set_code(TECK); AitState::Teck },
-            TECK => { self.set_code(AIT);  AitState::Tick },
+            TECK => { self.set_code(AIT); AitState::Ait },
             NORMAL => AitState::Normal,
             _ => return Err(UuidError::AitState { func_name: _f, ait_state: self.get_ait_state() }.into())
         })
@@ -164,7 +177,7 @@ impl Uuid {
 }
 impl fmt::Display for Uuid {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        if self.is_ait() { write!(f, "{} in time {}", self.get_direction(), self.uuid ) }
+        if self.is_ait_send() { write!(f, "{} in time {}", self.get_direction(), self.uuid ) }
         else             { write!(f, "{}", self.uuid) }
     }
 }
@@ -180,14 +193,16 @@ impl PartialEq for Uuid {
 }
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum AitState {
-    Normal, Entl, Ait, Teck, Tack, Tock, Tick
+    Normal, Entl, AitD,
+    Ait, Teck, Tack, Tock, Tick
 }
 impl fmt::Display for AitState {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let s = match *self {
             AitState::Normal => "Normal",
             AitState::Entl   => "Entl",
-            AitState::Ait    => "AIT",
+            AitState::Ait    => "Ait",
+            AitState::AitD   => "AitD",
             AitState::Teck   => "TECK",
             AitState::Tack   => "TACK",
             AitState::Tock   => "TOCK",

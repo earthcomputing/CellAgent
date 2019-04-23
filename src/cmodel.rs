@@ -120,7 +120,7 @@ impl Cmodel {
                     // xmit msg
                     {
                         let mut uuid = tree_id.get_uuid();
-                        if is_ait { uuid.make_ait(); }
+                        if is_ait { uuid.make_ait_send(); }
 
                         let packets = Packetizer::packetize(&uuid, &bytes);
                         let first = packets.get(0).expect("No packets from packetizer");
