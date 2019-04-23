@@ -209,6 +209,7 @@ impl Port {
                     match ait_state {
                         AitState::AitD |
                         AitState::Ait => return Err(PortError::Ait { func_name: _f, ait_state }.into()),
+                        
                         AitState::Tick => (), // TODO: Send AitD to packet engine
                         AitState::Entl |
                         AitState::Normal => {
