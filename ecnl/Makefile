@@ -1,11 +1,9 @@
-user-build:
-	@tput setaf 1
-	@echo "    user-build"
-	@tput sgr0
-	gcc -c -fPIC -I../../NALDD/entl_drivers/ecnl_device ecnl.c -o ecnl.a
 
-user-clean:
-	@tput setaf 1
-	@echo "    user-clean"
-	@tput sgr0
-	rm -rf *.out
+CFLAGS += -I/usr/include/libnl3
+LDLIBS += -lnl-genl-3 -lnl-3
+CFLAGS += -I/home/demouser/earthcomputing/bj-NALDD/entl_drivers/ecnl_device
+
+all: genl_sample
+
+# sudo insmod ecnl_device.ko
+# sudo env NLCB=debug ./genl_sample
