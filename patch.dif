@@ -214,7 +214,7 @@ diff -u intel-e1000e-3.3.4/src/netdev.c e1000e-3.3.4/src/netdev.c
  					  round_jiffies(jiffies + 2 * HZ));
 +#ifdef ENTL
 +			if (adapter->entl_flag) {
-+				entl_device_link_down( &adapter->entl_dev ) ;
++				entl_device_link_down(&adapter->entl_dev);
 +			}
 +#endif
  
