@@ -23,11 +23,13 @@
 #include "entl_user_api.h"
 
 typedef struct entl_state_machine {
-} entl_state_machine_t ;
+} entl_state_machine_t;
 
-static void entl_new_AIT_message(entl_state_machine_t *mcn, struct entt_ioctl_ait_data *data);
 static int entl_next_send(entl_state_machine_t *mcn, __u16 *u_addr, __u32 *l_addr); // ENTL_ACTION
 static int entl_received(entl_state_machine_t *mcn, __u16 u_saddr, __u32 l_saddr, __u16 u_daddr, __u32 l_daddr); // ENTL_ACTION
 static void entl_state_error(entl_state_machine_t *mcn, __u32 error_flag); // enter error state
+
+static void entl_new_AIT_message(entl_state_machine_t *mcn, struct entt_ioctl_ait_data *data);
+struct entt_ioctl_ait_data *entl_next_AIT_message(entl_state_machine_t *mcn);
 
 #endif
