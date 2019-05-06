@@ -1,0 +1,22 @@
+diff -u intel-e1000e-3.3.4/src/Makefile e1000e-3.3.4/src/Makefile
+--- intel-e1000e-3.3.4/src/Makefile   2016-05-10 10:10:28.000000000 +0000
++++ e1000e-3.3.4/src/Makefile     2019-05-06 00:09:45.292780516 +0000
+@@ -27,11 +27,16 @@
+ FAMILYC = 82571.c ich8lan.c 80003es2lan.c
+ FAMILYH = 82571.h ich8lan.h 80003es2lan.h
+ 
++# Earth Computing additions
++EARTHC = entl_state_machine.c
++EARTHH = entl_user_api.h entl_state_machine.h entl_device.h entl_device.c
++EXTRA_CFLAGS += -Wno-error=date-time
++
+ # core driver files
+ CFILES = netdev.c ethtool.c param.c $(FAMILYC) \
+-         mac.c nvm.c phy.c manage.c kcompat.c
++         mac.c nvm.c phy.c manage.c kcompat.c $(EARTHC)
+ HFILES = e1000.h hw.h regs.h defines.h \
+-         mac.h nvm.h phy.h manage.h $(FAMILYH) kcompat.h
++         mac.h nvm.h phy.h manage.h $(FAMILYH) kcompat.h $(EARTHH)
+ ifeq (,$(BUILD_KERNEL))
+ BUILD_KERNEL=$(shell uname -r)
+ endif

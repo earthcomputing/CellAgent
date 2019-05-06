@@ -9,7 +9,8 @@ expand:
 	tar xf $(MEDIA)
 
 patch: expand patch.dif
-	patch -Np1 < patch.dif
+	patch -Np0 < patch.dif
+	cp src/* $(EARTH_CUSTOM)/src/
 
 build: patch
 	$(MAKE) -C $(EARTH_CUSTOM)/src
