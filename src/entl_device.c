@@ -15,7 +15,7 @@ static int entl_do_ioctl(struct net_device *netdev, struct ifreq *ifr, int cmd) 
 }
 
 static void entl_e1000_configure(struct e1000_adapter *adapter) { }
-static void entl_e1000_set_my_addr(entl_device_t *dev, const u8 *addr) { }
+static void entl_e1000_set_my_addr(entl_device_t *dev, const uint8_t *addr) { }
 
 #ifdef ENTL_TX_ON_ENTL_ENABLE
 // returns NETDEV_TX_BUSY when

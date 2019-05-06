@@ -23,6 +23,7 @@
 typedef struct entl_state_machine {
 } entl_state_machine_t;
 
+void entl_link_up(entl_state_machine_t *mcn);
 int entl_next_send(entl_state_machine_t *mcn, uint16_t *u_addr, uint32_t *l_addr); // ENTL_ACTION
 int entl_received(entl_state_machine_t *mcn, uint16_t u_saddr, uint32_t l_saddr, uint16_t u_daddr, uint32_t l_daddr); // ENTL_ACTION
 void entl_state_error(entl_state_machine_t *mcn, uint32_t error_flag); // enter error state
