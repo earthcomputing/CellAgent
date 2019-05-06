@@ -255,7 +255,7 @@ diff -u intel-e1000e-3.3.4/src/netdev.c e1000e-3.3.4/src/netdev.c
 +	if (e1000_maybe_stop_tx(tx_ring, count + 2)) {
 +#ifdef ENTL
 +		if (adapter->entl_flag) {
-+			spin_unlock_irqrestore(&adapter->tx_ring_lock, flags);
++			spin_unlock_irqrestore(&adapter->entl_txring_lock, flags);
 +		}
 +#endif
  		return NETDEV_TX_BUSY;
@@ -270,7 +270,7 @@ diff -u intel-e1000e-3.3.4/src/netdev.c e1000e-3.3.4/src/netdev.c
  #endif
 +#ifdef ENTL
 +	if (adapter->entl_flag) {
-+		spin_lock_irqsave(&adapter->tx_ring_lock, flags);
++		spin_lock_irqsave(&adapter->entl_txring_lock, flags);
 +	}
 +#endif
  	first = tx_ring->next_to_use;
@@ -282,7 +282,7 @@ diff -u intel-e1000e-3.3.4/src/netdev.c e1000e-3.3.4/src/netdev.c
  
 +#ifdef ENTL
 +	if (adapter->entl_flag) {
-+		spin_unlock_irqrestore(&adapter->tx_ring_lock, flags);
++		spin_unlock_irqrestore(&adapter->entl_txring_lock, flags);
 +	}
 +#endif
 +
@@ -323,7 +323,7 @@ diff -u intel-e1000e-3.3.4/src/netdev.c e1000e-3.3.4/src/netdev.c
  	adapter->max_hw_frame_size = ei->max_hw_frame_size;
  	adapter->msg_enable = netif_msg_init(debug, DEFAULT_MSG_ENABLE);
 +#ifdef ENTL
-+	spin_lock_init(&adapter->tx_ring_lock);
++	spin_lock_init(&adapter->entl_txring_lock);
 +	entl_device_init(&adapter->entl_dev);
 +	adapter->entl_flag = 1;
 +#endif
