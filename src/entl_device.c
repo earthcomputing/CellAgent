@@ -1,4 +1,6 @@
 
+#include "entl_skb_queue.h"
+
 static bool entl_device_process_rx_packet(entl_device_t *dev, struct sk_buff *skb) {
     return true;
 }
