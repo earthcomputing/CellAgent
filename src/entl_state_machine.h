@@ -30,6 +30,6 @@ void entl_state_error(entl_state_machine_t *mcn, uint32_t error_flag); // enter 
 #include "entl_user_api.h"
 
 void entl_new_AIT_message(entl_state_machine_t *mcn, struct entt_ioctl_ait_data *data);
-entt_ioctl_ait_data *entl_next_AIT_message(entl_state_machine_t *mcn);
+struct entt_ioctl_ait_data *entl_next_AIT_message(entl_state_machine_t *mcn);
 
 #endif
