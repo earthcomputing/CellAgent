@@ -20,3 +20,28 @@ diff -u intel-e1000e-3.3.4/src/Makefile e1000e-3.3.4/src/Makefile
  ifeq (,$(BUILD_KERNEL))
  BUILD_KERNEL=$(shell uname -r)
  endif
+
+diff -u intel-e1000e-3.3.4/src/e1000.h e1000e-3.3.4/src/e1000.h
+--- intel-e1000e-3.3.4/src/e1000.h	2016-05-10 10:10:28.000000000 +0000
++++ e1000e-3.3.4/src/e1000.h	2019-05-06 00:37:07.387213339 +0000
+@@ -48,6 +48,8 @@
+ #endif
+ #include "hw.h"
+ 
++#include "entl_device.h"
++
+ struct e1000_info;
+ 
+ #define e_dbg(format, arg...) \
+@@ -406,6 +408,10 @@
+ 	struct pm_qos_request_list pm_qos_req;
+ #endif
+ 	u16 eee_advert;
++
++	u32 entl_flag;
++	entl_device_t entl_dev;
++	spinlock_t entl_txring_lock;
+ };
+ 
+ struct e1000_info {
+
