@@ -1,8 +1,17 @@
 #ifndef _ENTL_DEVICE_H_
 #define _ENTL_DEVICE_H_
 
+#define ENTL_DEVICE_FLAG_HELLO   0x0001
+#define ENTL_DEVICE_FLAG_SIGNAL  0x0002
+#define ENTL_DEVICE_FLAG_RETRY   0x0004
+#define ENTL_DEVICE_FLAG_WAITING 0x0008
+#define ENTL_DEVICE_FLAG_SIGNAL2 0x0010
+#define ENTL_DEVICE_FLAG_FATAL   0x8000
+
+
 typedef struct entl_device {
 } entl_device_t;
+
 
 #ifdef _IN_NETDEV_C_
 
