@@ -14,10 +14,11 @@ typedef struct entl_device {
 
 #ifdef _IN_NETDEV_C_
 
-// FIXME: netdev.c
+// FIXME: directly include from netdev.c in patched code
 #include "entl_user_api.h"
 
 // forward declarations (static)
+// references from netdev.c patch into (included) entl_device.c
 static void entl_device_init(entl_device_t *dev);
 static void entl_device_link_down(entl_device_t *dev);
 static void entl_device_link_up(entl_device_t *dev);

@@ -4,13 +4,14 @@
 // ref: xx
 #define ENTL_DEFAULT_TXD   256
 typedef struct ENTL_skb_queue {
-    u16 size;
-    u16 count;
-    u16 head;
-    u16 tail;
+    uint16_t size;
+    uint16_t count;
+    uint16_t head;
+    uint16_t tail;
     struct sk_buff *data[ENTL_DEFAULT_TXD];
 } ENTL_skb_queue_t ;
 
+// FIXME: add these as inline methods
 static void init_ENTL_skb_queue(ENTL_skb_queue_t *q);
 static int ENTL_skb_queue_full(ENTL_skb_queue_t *q);
 static int ENTL_skb_queue_has_data(ENTL_skb_queue_t *q);
@@ -19,7 +20,6 @@ static struct sk_buff *front_ENTL_skb_queue(ENTL_skb_queue_t *q);
 static struct sk_buff *pop_front_ENTL_skb_queue(ENTL_skb_queue_t *q);
 static int push_back_ENTL_skb_queue(ENTL_skb_queue_t *q, struct sk_buff *dt);
 
-// FIXME: add inline methods
 #if 0
 static void init_ENTL_skb_queue(ENTL_skb_queue_t *q) {
     q->size = E1000_DEFAULT_TXD;
