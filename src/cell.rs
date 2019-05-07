@@ -23,6 +23,7 @@ mod ec_message;
 mod ec_message_formats;
 mod nalcell;
 mod name;
+mod noc;
 mod packet;
 mod packet_engine;
 mod port;

@@ -11,7 +11,7 @@
 
 mod app_message;
 mod app_message_formats;
-mod blueprint;
+pub mod blueprint;
 mod cellagent;
 mod cmodel;
 mod config;
@@ -62,7 +62,7 @@ use crate::utility::{_print_hash_map, sleep, S, TraceHeader};
 
 fn main() -> Result<(), Error> {
     let _f = "main";
-    if Path::new(OUTPUT_DIR_NAME).exists() { 
+    if Path::new(OUTPUT_DIR_NAME).exists() {
         remove_dir_all(OUTPUT_DIR_NAME)?;
     }
     create_dir(OUTPUT_DIR_NAME)?;
@@ -217,20 +217,20 @@ fn deployment_demo() -> Result<(), Error> {
 //  let ref gvm_eqn = GvmEquation::new(eqns, vec![GvmVariable::new(GvmVariableType::PathLength, "hops")]);
     let up_tree1 = UpTreeSpec::new("test1", vec![0, 0, 0, 2, 2]).context(MainError::Chain { func_name: "deployment_demo", comment: S("")})?;
     let up_tree2 = UpTreeSpec::new("test2", vec![1, 1, 0, 1]).context(MainError::Chain { func_name: "deployment_demo", comment: S("")})?;
-    let allowed_tree1 = &AllowedTree::new("foo");
-    let allowed_tree2 = &AllowedTree::new("bar");
-    let c1 = ContainerSpec::new("c1", "D1", vec!["param1"], &[allowed_tree1, allowed_tree2]).context(MainError::Chain { func_name: "deployment_demo", comment: S("")})?;
-    let c2 = ContainerSpec::new("c2", "D1", vec!["param1","param2"], &[allowed_tree1]).context(MainError::Chain { func_name: "deployment_demo", comment: S("")})?;
-    let c3 = ContainerSpec::new("c3", "D3", vec!["param3"], &[allowed_tree1]).context(MainError::Chain { func_name: "deployment_demo", comment: S("")})?;
-    let c4 = ContainerSpec::new("c4", "D2", vec![], &[allowed_tree1, allowed_tree2]).context(MainError::Chain { func_name: "deployment_demo", comment: S("")})?;
+    let allowed_tree1 = AllowedTree::new("foo");
+    let allowed_tree2 = AllowedTree::new("bar");
+    let c1 = ContainerSpec::new("c1", "D1", vec!["param1"], &[allowed_tree1.clone(), allowed_tree2.clone()]).context(MainError::Chain { func_name: "deployment_demo", comment: S("")})?;
+    let c2 = ContainerSpec::new("c2", "D1", vec!["param1","param2"], &[allowed_tree1.clone()]).context(MainError::Chain { func_name: "deployment_demo", comment: S("")})?;
+    let c3 = ContainerSpec::new("c3", "D3", vec!["param3"], &[allowed_tree1.clone()]).context(MainError::Chain { func_name: "deployment_demo", comment: S("")})?;
+    let c4 = ContainerSpec::new("c4", "D2", vec![], &[allowed_tree1.clone(), allowed_tree2.clone()]).context(MainError::Chain { func_name: "deployment_demo", comment: S("")})?;
     let c5 = ContainerSpec::new("c5", "D2", vec![], &[]).context(MainError::Chain { func_name: "deployment_demo", comment: S("")})?;
-    let c6 = ContainerSpec::new("c6", "D3", vec!["param4"], &[allowed_tree1]).context(MainError::Chain { func_name: "deployment_demo", comment: S("")})?;
+    let c6 = ContainerSpec::new("c6", "D3", vec!["param4"], &[allowed_tree1.clone()]).context(MainError::Chain { func_name: "deployment_demo", comment: S("")})?;
     let vm_spec1 = VmSpec::new("vm1", "Ubuntu", CellConfig::Large,
-                               &vec![allowed_tree1, allowed_tree2], vec![&c1, &c2, &c4, &c5, &c5], vec![&up_tree1, &up_tree2]).context(MainError::Chain { func_name: "deployment_demo", comment: S("")})?;
+                               &vec![allowed_tree1.clone(), allowed_tree2.clone()], vec![&c1, &c2, &c4, &c5, &c5], vec![&up_tree1, &up_tree2]).context(MainError::Chain { func_name: "deployment_demo", comment: S("")})?;
     let up_tree3 = UpTreeSpec::new("test3", vec![0, 0]).context(MainError::Chain { func_name: "deployment_demo", comment: S("")})?;
     let up_tree4 = UpTreeSpec::new("test4", vec![1, 1, 0]).context(MainError::Chain { func_name: "deployment_demo", comment: S("")})?;
     let vm_spec2 = VmSpec::new("vm2", "RedHat",  CellConfig::Large,
-                               &vec![allowed_tree1], vec![&c5, &c3, &c6], vec![&up_tree3, &up_tree4]).context(MainError::Chain { func_name: "deployment_demo", comment: S("")})?;
+                               &vec![allowed_tree1.clone()], vec![&c5, &c3, &c6], vec![&up_tree3, &up_tree4]).context(MainError::Chain { func_name: "deployment_demo", comment: S("")})?;
     let up_tree_def = Manifest::new("mytest", CellConfig::Large,
                                     &AllowedTree::new("cell_tree"),
                                     &[allowed_tree1, allowed_tree2],

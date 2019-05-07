@@ -105,7 +105,7 @@ pub struct DebugOptions {
     pub pe_process_pkt: bool,
     pub port:           bool,
     pub saved_discover: bool,
-    pub saved_msgs:     bool,
+    pub saved_stack:    bool,
     pub stack_tree:     bool,
     pub traph_entry:    bool,
 }
@@ -129,7 +129,7 @@ pub const DEBUG_OPTIONS: DebugOptions = DebugOptions {
     pe_process_pkt: false,
     port:           false,
     saved_discover: false,
-    saved_msgs:     false,
+    saved_stack:    false,
     stack_tree:     false,
     traph_entry:    false,
 };

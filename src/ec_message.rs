@@ -5,7 +5,7 @@ use std::{fmt,
 use serde;
 use serde_json;
 
-use crate::app_message::{SenderMsgSeqNo, AppMsgDirection, get_next_count};
+use crate::app_message::{SenderMsgSeqNo, AppMsgDirection, AppInterapplicationMsg, get_next_count};
 use crate::cellagent::{CellAgent};
 use crate::config::{ByteArray, CellQty, PathLength, PortNo};
 use crate::gvm_equation::{GvmEquation, GvmEqn};
@@ -15,7 +15,7 @@ use crate::packet_engine::NumberOfPackets;
 use crate::uptree_spec::{AllowedTree, Manifest};
 use crate::utility::{S, Path};
 
-pub type MsgTreeMap = HashMap<String, TreeID>;
+pub type MsgTreeMap = HashMap<String, TreeID>; // Must be String for serialization
 
 #[derive(Debug, Copy, Clone, Hash, Eq, PartialEq, Serialize, Deserialize)]
 pub enum MsgType {
@@ -117,11 +117,11 @@ pub enum MsgDirection {
     Rootward,
     Leafward
 }
-impl MsgDirection {
-    pub fn from_app(direction: AppMsgDirection) -> MsgDirection {
-        match direction {
+impl From<AppMsgDirection> for MsgDirection {
+    fn from(d: AppMsgDirection) -> Self {
+        match d {
             AppMsgDirection::Rootward => MsgDirection::Rootward,
-            AppMsgDirection::Leafward => MsgDirection::Leafward,
+            AppMsgDirection::Leafward => MsgDirection::Leafward
         }
     }
 }
@@ -738,9 +738,10 @@ pub struct InterapplicationMsg {
     payload: InterapplicationMsgPayload
 }
 impl InterapplicationMsg {
-    pub fn new(sender_id: SenderID, is_ait: bool, tree_id: TreeID, direction: MsgDirection, body: &str) -> InterapplicationMsg {
+    pub fn new(sender_id: SenderID, is_ait: bool, tree_id: TreeID, direction: MsgDirection,
+               app_msg: &AppInterapplicationMsg) -> InterapplicationMsg {
         let header = MsgHeader::new(sender_id, is_ait,MsgType::Interapplication, direction);
-        let payload = InterapplicationMsgPayload::new(&tree_id.to_port_tree_id_0(), body);
+        let payload = InterapplicationMsgPayload::new(&tree_id.to_port_tree_id_0(), app_msg);
         InterapplicationMsg { header, payload }
     }
     pub fn get_payload(&self) -> &InterapplicationMsgPayload { &self.payload }
@@ -755,7 +756,7 @@ impl Message for InterapplicationMsg {
     }
     fn process_ca(&mut self, cell_agent: &mut CellAgent, port_no: PortNo,
                   msg_tree_id: PortTreeID, is_ait: bool) -> Result<(), Error> {
-        cell_agent.process_interapplication_msg(self, port_no, msg_tree_id, is_ait)
+        cell_agent.process_interapplication_msg(self, port_no)
     }
 }
 impl fmt::Display for InterapplicationMsg {
@@ -767,25 +768,20 @@ impl fmt::Display for InterapplicationMsg {
 #[derive(Debug, Clone, Hash, Serialize, Deserialize)]
 pub struct InterapplicationMsgPayload {
     port_tree_id: PortTreeID,
-    body: ByteArray,
+    app_msg: AppInterapplicationMsg,
 }
 impl InterapplicationMsgPayload {
-    fn new(port_tree_id: &PortTreeID, body: &str) -> InterapplicationMsgPayload {
-        InterapplicationMsgPayload { port_tree_id: port_tree_id.clone(), body: ByteArray(S(body).into_bytes()) }
+    fn new(port_tree_id: &PortTreeID, app_msg: &AppInterapplicationMsg) -> InterapplicationMsgPayload {
+        InterapplicationMsgPayload { port_tree_id: port_tree_id.clone(), app_msg: app_msg.clone() }
     }
-    pub fn get_body(&self) -> &ByteArray { &self.body }
+    pub fn get_app_msg(&self) -> &AppInterapplicationMsg { &self.app_msg }
     pub fn _get_tree_id(&self) -> &PortTreeID { &self.port_tree_id }
     pub fn get_port_tree_id(&self) -> PortTreeID { self.port_tree_id }
 }
 impl MsgPayload for InterapplicationMsgPayload {}
 impl fmt::Display for InterapplicationMsgPayload {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        if let Ok(body) = ::std::str::from_utf8(&self.body) {
-            let s = format!("Interapplication message {}", body);
-            write!(f, "{}", s)
-        } else {
-            write!(f, "Error converting application message body from bytes to string")
-        }
+        write!(f, "Sending application message on tree {}: {}", self.port_tree_id, self.app_msg)
     }
 }
 #[derive(Debug, Clone, Serialize, Deserialize)]
