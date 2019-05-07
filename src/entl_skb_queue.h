@@ -1,17 +1,17 @@
 #ifndef _ENTL_SKB_QUEUE_H_
 #define _ENTL_SKB_QUEUE_H_
 
-#define ENTL_DEFAULT_TXD   256
+#define ENTL_DEFAULT_TXD 256
 typedef struct ENTL_skb_queue {
     uint16_t size;
     uint16_t count;
     uint16_t head;
     uint16_t tail;
     struct sk_buff *data[ENTL_DEFAULT_TXD];
-} ENTL_skb_queue_t ;
+} ENTL_skb_queue_t;
 
 static inline void ENTL_skb_queue_init(ENTL_skb_queue_t *q) {
-    q->size = E1000_DEFAULT_TXD;
+    q->size = ENTL_DEFAULT_TXD;
     q->count = 0;
     q->head = q->tail = 0;
 }
