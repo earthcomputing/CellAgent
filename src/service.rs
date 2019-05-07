@@ -67,7 +67,7 @@ impl NocMaster {
         let app_msg = AppInterapplicationMsg::new(&self.get_name(),
             false, target_tree, AppMsgDirection::Leafward, &Vec::new(), body);
         let serialized = serde_json::to_string(&app_msg as &dyn AppMessage)?;
-        let bytes:ByteArray = ByteArray(serialized.into_bytes());
+        let bytes:ByteArray = ByteArray::new(&serialized);
         self.container_to_vm.send(bytes)?;
         Ok(())
     }
@@ -97,7 +97,7 @@ impl NocMaster {
         }
         loop {
             let bytes = container_from_vm.recv().context(ServiceError::Chain { func_name: _f, comment: S("NocMaster from vm")})?;
-            let serialized = ::std::str::from_utf8(&bytes)?;
+            let serialized = bytes.as_str()?;
             let app_msg: Box<dyn AppMessage> = serde_json::from_str(serialized).context(ServiceError::Chain { func_name: _f, comment: S("NocMaster from vm")})?;
             {
                 if TRACE_OPTIONS.all || TRACE_OPTIONS.svc {
@@ -172,7 +172,7 @@ impl NocAgent {
         }
         loop {
             let bytes = container_from_vm.recv().context(ServiceError::Chain { func_name: _f, comment: S("Agent recv from vm") })?;
-            let serialized = ::std::str::from_utf8(&bytes)?;
+            let serialized = bytes.as_str()?;
             let app_msg: Box<dyn AppMessage> = serde_json::from_str(serialized).context(ServiceError::Chain { func_name: _f, comment: S("NocMaster from vm") })?;
             {
                 if TRACE_OPTIONS.all || TRACE_OPTIONS.svc {
@@ -190,7 +190,7 @@ impl NocAgent {
                                                     &vec![], &msg);
             //println!("Service {} sending {}", self.container_id, msg);
             let serialized = serde_json::to_string(&reply as &dyn AppMessage)?;
-            let bytes = ByteArray(serialized.into_bytes());
+            let bytes = ByteArray::new(&serialized);
             self.container_to_vm.send(bytes)?;
         }
     }

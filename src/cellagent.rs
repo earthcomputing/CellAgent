@@ -488,7 +488,7 @@ impl CellAgent {
                 .get(&sender_id)
                 .cloned()
                 .ok_or::<Error>(CellagentError::TreeNameMap { func_name: _f, cell_id: self.cell_id, sender_id }.into())?;
-            let serialized = ::std::str::from_utf8(&bytes)?;
+            let serialized = bytes.as_str()?;
             let app_msg: Box<dyn AppMessage> = serde_json::from_str(serialized).context(CellagentError::Chain { func_name: _f, comment: S("") })?;
             {
                 if TRACE_OPTIONS.all || TRACE_OPTIONS.ca {
@@ -677,7 +677,7 @@ impl CellAgent {
                         .get(&sender_id)
                         .cloned()
                         .ok_or::<Error>(CellagentError::TreeNameMap { func_name: _f, cell_id: self.cell_id,  sender_id }.into())?);
-                    let serialized = ::std::str::from_utf8(&bytes)?;
+                    let serialized = bytes.as_str()?;
                     let app_msg: Box<dyn AppMessage> = serde_json::from_str(serialized).context(CellagentError::Chain { func_name: _f, comment: S("") })?;
                     app_msg.process_ca(self, sender_id)?;
                 }
@@ -701,7 +701,7 @@ impl CellAgent {
             }
         }
         let serialized = serde_json::to_string(app_msg)?;
-        let bytes = ByteArray(serialized.into_bytes());
+        let bytes = ByteArray::new(&serialized);
         let senders = self.get_vm_senders(port_tree_id.to_tree_id()).context(CellagentError::Chain { func_name: _f, comment: S("") })?;
         for sender in senders {
             sender.send(bytes.clone()).context(CellagentError::Chain { func_name: _f, comment: S("") })?;
@@ -1279,7 +1279,7 @@ impl CellAgent {
             let tree_name_msg = AppTreeNameMsg::new("noc",
                              &base_tree, base_tree.get_name());
             let serialized = serde_json::to_string(&tree_name_msg as &dyn AppMessage).context(CellagentError::Chain { func_name: "port_connected", comment: S(self.cell_id) })?;
-            let bytes = ByteArray(serialized.into_bytes());
+            let bytes = ByteArray::new(&serialized);
             self.ca_to_cm.send(CaToCmBytes::App((port_number, bytes)))?;
             Ok(())
         } else {

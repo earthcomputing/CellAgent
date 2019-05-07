@@ -37,7 +37,7 @@ impl MsgType {
         let _f = "get_msg";
         let bytes = Packetizer::unpacketize(packets).context(MessageError::Chain { func_name: _f, comment: S("unpacketize")})?;
         //println!("Message get_msg: serialized {}, packets {:?}", serialized, packets);
-        let serialized = ::std::str::from_utf8(&bytes)?;
+        let serialized = bytes.as_str()?;
         let type_msg = serde_json::from_str::<TypePlusMsg>(&serialized).context(MessageError::Chain { func_name: "get_msg", comment: S("deserialize MsgType")})?;
         let msg_type = type_msg.get_type();
         let serialized_msg = type_msg.get_serialized_msg();
@@ -57,7 +57,7 @@ impl MsgType {
     }
     pub fn msg_from_bytes(bytes: &ByteArray) -> Result<Box<dyn Message>, Error> {
         let _f = "msg_from_bytes";
-        let serialized = ::std::str::from_utf8(bytes)?;
+        let serialized = bytes.as_str()?;
         let type_msg = serde_json::from_str::<TypePlusMsg>(serialized).context(MessageError::Chain { func_name: _f, comment: S("deserialize MsgType")})?;
         let msg_type = type_msg.get_type();
         let serialized_msg = type_msg.get_serialized_msg();
@@ -169,13 +169,13 @@ pub trait Message {
     fn to_bytes(&self) -> Result<ByteArray, Error> where Self: serde::Serialize + Sized {
         let _f = "to_bytes";
         let bytes = Serializer::serialize(self).context(MessageError::Chain { func_name: _f, comment: S("")})?;
-        Ok(ByteArray(bytes))
+        Ok(ByteArray::new(&bytes))
     }
     fn to_packets(&self, tree_id: TreeID) -> Result<Vec<Packet>, Error>
             where Self:std::marker::Sized + serde::Serialize {
         let _f = "to_packets";
         let bytes = Serializer::serialize(self).context(MessageError::Chain { func_name: _f, comment: S("")})?;
-        let packets = Packetizer::packetize(&tree_id.get_uuid(), &ByteArray(bytes));
+        let packets = Packetizer::packetize(&tree_id.get_uuid(), &ByteArray::new(&bytes));
         Ok(packets)
     }
     fn process_ca(&mut self, _cell_agent: &mut CellAgent, _port_no: PortNo,

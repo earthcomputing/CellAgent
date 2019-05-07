@@ -170,7 +170,7 @@ pub struct AppInterapplicationMsgPayload {
 }
 impl AppInterapplicationMsgPayload {
     fn new(body: &str) -> AppInterapplicationMsgPayload {
-        AppInterapplicationMsgPayload { body: ByteArray(S(body).into_bytes()) }
+        AppInterapplicationMsgPayload { body: ByteArray::new(body) }
     }
     pub fn get_body(&self) -> &ByteArray { &self.body }
 }
@@ -178,12 +178,7 @@ impl AppInterapplicationMsgPayload {
 impl AppMsgPayload for AppInterapplicationMsgPayload {}
 impl fmt::Display for AppInterapplicationMsgPayload {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        if let Ok(body) = ::std::str::from_utf8(&self.body) {
-            let s = format!("Interapplication message {}", body);
-            write!(f, "{}", s)
-        } else {
-            write!(f, "Error converting application message body from bytes to string")
-        }
+        write!(f, "{}", self.body)
     }
 }
 #[derive(Debug, Clone, Serialize, Deserialize)]
