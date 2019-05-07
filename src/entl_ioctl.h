@@ -24,4 +24,18 @@ typedef struct entt_ioctl_ait_data {
     char data[MAX_AIT_MESSAGE_SIZE];
 } entt_ioctl_ait_data_t;
 
+#include "entl_state.h"
+
+// FIXME: entl_state_t
+typedef struct entl_ioctl_data {
+    int pid;
+    int link_state; // 0: down, 1: up
+    entl_state_t state;
+    entl_state_t error_state;
+    uint32_t icr;
+    uint32_t ctrl;
+    uint32_t ims;
+    uint32_t num_queued;
+} entl_ioctl_data_t;
+
 #endif
