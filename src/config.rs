@@ -4,7 +4,7 @@ use std::{fmt,
 use failure::Error;
 
 use crate::blueprint::{CellNo, Edge};
-use crate::utility::{PortNumber};
+use crate::utility::{PortNumber, S};
 use crate::uuid_ec::Uuid;
 
 pub const SCHEMA_VERSION: &str = "0.1";
@@ -133,10 +133,25 @@ pub const DEBUG_OPTIONS: DebugOptions = DebugOptions {
     stack_tree:     false,
     traph_entry:    false,
 };
-// Size of various fields
 #[derive(Debug, Clone, Hash, Eq, PartialEq, Serialize, Deserialize)]
-pub struct ByteArray(pub Vec<u8>);
-impl Deref for ByteArray { type Target = Vec<u8>; fn deref(&self) -> &Self::Target { &self.0 } }
+pub struct ByteArray { bytes: Vec<u8> }
+impl ByteArray {
+    pub fn new(str_ref: &str) -> ByteArray {
+        ByteArray { bytes: S(str_ref).into_bytes() }
+    }
+    pub fn get_bytes(&self) -> &Vec<u8> { &self.bytes }
+    pub fn as_str(&self) -> Result<&str, Error> {
+        let string = std::str::from_utf8(&self.bytes)?;
+        Ok(string)
+    }
+}
+impl fmt::Display for ByteArray {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let bytes = std::str::from_utf8(&self.bytes).expect("ByteArray: Error converting bytes to str");
+        write!(f, "{}", bytes)
+    }
+}
+// Size of various fields
 #[derive(Debug, Copy, Clone, Eq, Hash, PartialEq, Serialize, Deserialize)]
 pub struct CellQty(pub usize);
 impl Deref for CellQty { type Target = usize; fn deref(&self) -> &Self::Target { &self.0 } }

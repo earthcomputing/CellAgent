@@ -83,7 +83,7 @@ impl Noc {
         }
         loop {
             let bytes = noc_from_port.recv().context(NocError::Chain { func_name: _f, comment: S("")})?;
-            let serialized = ::std::str::from_utf8(&bytes)?;
+            let serialized = bytes.as_str()?;
             let app_msg: Box<dyn AppMessage> = serde_json::from_str(serialized).context(NocError::Chain { func_name: _f, comment: S("") })?;
             {
                 if TRACE_OPTIONS.all || TRACE_OPTIONS.noc {
@@ -188,7 +188,7 @@ impl Noc {
                                               &allowed_trees);
         println!("Noc: deploy {} on tree {}", manifest.get_id(), noc_master_deploy_tree);
         let serialized = serde_json::to_string(&deploy_msg as &dyn AppMessage)?;
-        let bytes = ByteArray(serialized.into_bytes());
+        let bytes = ByteArray::new(&serialized);
         noc_to_port.send(bytes).context(NocError::Chain { func_name: "create_noc", comment: S("NocMaster")})?;
         // Deploy NocAgent
         let up_tree = UpTreeSpec::new("NocAgent", vec![0]).context(NocError::Chain { func_name: "create_noc", comment: S("NocAgent") })?;
@@ -202,7 +202,7 @@ impl Noc {
                                              &allowed_trees);
         println!("Noc: deploy {} on tree {}", manifest.get_id(), noc_agent_deploy_tree);
         let serialized = serde_json::to_string(&deploy_msg as &dyn AppMessage)?;
-        let bytes = ByteArray(serialized.into_bytes());
+        let bytes = ByteArray::new(&serialized);
         noc_to_port.send(bytes).context(NocError::Chain { func_name: "create_noc", comment: S("NocMaster")})?;
         Ok(())
     }
@@ -223,7 +223,7 @@ impl Noc {
                       noc_master_deploy_tree, parent_tree_name,
                                                   AppMsgDirection::Leafward, &gvm_eqn);
         let serialized = serde_json::to_string(&stack_tree_msg as &dyn AppMessage)?;
-        let bytes = ByteArray(serialized.into_bytes());
+        let bytes = ByteArray::new(&serialized);
         noc_to_port.send(bytes).context(NocError::Chain { func_name: "noc_master_deploy_tree", comment: S("")})?;
         Ok(())
     }
@@ -242,7 +242,7 @@ impl Noc {
                                                   AppMsgDirection::Leafward, &gvm_eqn);
         println!("Noc: stack {} on tree {}", NOC_AGENT_DEPLOY_TREE_NAME, parent_tree_name);
         let serialized = serde_json::to_string(&stack_tree_msg as &dyn AppMessage)?;
-        let bytes = ByteArray(serialized.into_bytes());
+        let bytes = ByteArray::new(&serialized);
         noc_to_port.send(bytes).context(NocError::Chain { func_name: "noc_agent_deploy_tree", comment: S("")})?;
         Ok(())
     }
@@ -261,7 +261,7 @@ impl Noc {
                                  AppMsgDirection::Leafward, &gvm_eqn);
         println!("Noc: stack {} on tree {}", NOC_CONTROL_TREE_NAME, parent_tree_name);
         let serialized = serde_json::to_string(&stack_tree_msg as &dyn AppMessage)?;
-        let bytes = ByteArray(serialized.into_bytes());
+        let bytes = ByteArray::new(&serialized);
         noc_to_port.send(bytes).context(NocError::Chain { func_name: "noc_agent_deploy_tree", comment: S("")})?;
         Ok(())
     }
@@ -279,7 +279,7 @@ impl Noc {
                                                   AppMsgDirection::Leafward, &gvm_eqn);
         println!("Noc: stack {} on tree {}", NOC_LISTEN_TREE_NAME, parent_tree_name);
         let serialized = serde_json::to_string(&stack_tree_msg as &dyn AppMessage)?;
-        let bytes = ByteArray(serialized.into_bytes());
+        let bytes = ByteArray::new(&serialized);
         noc_to_port.send(bytes).context(NocError::Chain { func_name: "noc_agent_deploy_tree", comment: S("")})?;
         Ok(())
     }

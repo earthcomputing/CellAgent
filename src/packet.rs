@@ -9,7 +9,7 @@ use serde;
 use serde_json;
 
 use crate::app_message::{SenderMsgSeqNo, get_next_count};
-use crate::config::{PACKET_MIN, PACKET_MAX, PAYLOAD_DEFAULT_ELEMENT, 
+use crate::config::{PACKET_MIN, PACKET_MAX, PAYLOAD_DEFAULT_ELEMENT,
     ByteArray, PacketNo};
 use crate::ec_message::{Message, MsgType, TypePlusMsg};
 use crate::name::{PortTreeID, Name};
@@ -193,20 +193,20 @@ impl fmt::Debug for Payload {
 }
 pub struct Serializer {}
 impl Serializer {
-    pub fn serialize<M>(msg: &M) -> Result<Vec<u8>, Error>
+    pub fn serialize<M>(msg: &M) -> Result<String, Error>
             where M: Message + serde::Serialize {
         let msg_type = msg.get_header().get_msg_type();
         let serialized_msg = serde_json::to_string(msg).context(PacketError::Chain { func_name: "serialize", comment: S("msg")})?;
         let msg_obj = TypePlusMsg::new(msg_type, serialized_msg);
         let serialized = serde_json::to_string(&msg_obj).context(PacketError::Chain { func_name: "serialize", comment: S("msg_obj")})?;
-        let msg_bytes = serialized.clone().into_bytes();
-        Ok(msg_bytes)
+        Ok(serialized)
     }
 }
 pub struct Packetizer {}
 impl Packetizer {
-    pub fn packetize(uuid: &Uuid, msg_bytes: &ByteArray)
+    pub fn packetize(uuid: &Uuid, msg: &ByteArray)
             -> Vec<Packet> {
+        let msg_bytes = msg.get_bytes();
         let mtu = Packetizer::packet_payload_size(msg_bytes.len());
         let num_packets = (msg_bytes.len() + mtu - 1)/ mtu; // Poor man's ceiling
         let frag = msg_bytes.len() - (num_packets - 1) * mtu;
@@ -240,7 +240,8 @@ impl Packetizer {
             if is_last_packet { bytes.truncate(frag) };
             msg.extend_from_slice(&bytes);
         }
-        Ok(ByteArray(msg))
+        let msg = std::str::from_utf8(&msg)?;
+        Ok(ByteArray::new(msg))
         //Ok(str::from_utf8(&msg).context(PacketError::Chain { func_name: "unpacketize", comment: S("")})?.to_string())
     }
     fn packet_payload_size(len: usize) -> usize {

@@ -86,7 +86,7 @@ impl Cmodel {
             {
                 if TRACE_OPTIONS.all || TRACE_OPTIONS.cm {
                     let trace = match &msg {
-                        CaToCmBytes::Bytes(msg) => json!({"cell_id": &self.cell_id, "msg": (&msg.0, &msg.1, &msg.2, &msg.3[0..20])}),
+                        CaToCmBytes::Bytes(msg) => json!({"cell_id": &self.cell_id, "msg": (&msg.0, &msg.1, &msg.2, &msg.3.as_str()?[0..20])}),
                         _ => json!({ "cell_id": &self.cell_id, "msg": &msg })
                     };
                     let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "cm_bytes_from_ca" };
