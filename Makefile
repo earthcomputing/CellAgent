@@ -4,6 +4,7 @@ MEDIA=media/intel-$(EARTH_CUSTOM).tar.gz
 
 ccflags-y += -std=gnu99
 ccflags-y += -Wno-declaration-after-statement
+ccflags-y += -Wno-unused-variable
 
 CFLAGS_EXTRA="-DENTL"
 
