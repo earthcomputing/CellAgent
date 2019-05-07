@@ -5,7 +5,7 @@ use crate::config::{ByteArray};
 use crate::uptree_spec::AllowedTree;
 
 pub type ISAIT = bool;
-pub type APP = (ISAIT, AllowedTree, AppMsgType, AppMsgDirection, ByteArray);
+pub type APP = ByteArray;
 // Port to Noc World
 pub type PortToNocMsg = APP;
 pub type PortToNoc = mpsc::Sender<PortToNocMsg>;
@@ -28,12 +28,12 @@ pub type ApplicationFromNoc = mpsc::Receiver<NocToApplicationMsg>;
 //pub type NocApplicationError = mpsc::SendError<NocToApplicationMsg>;
 
 // Cell agent to VM
-pub type CaToVmMsg = (ISAIT, ByteArray);
+pub type CaToVmMsg = ByteArray;
 pub type CaToVm = mpsc::Sender<CaToVmMsg>;
 pub type VmFromCa = mpsc::Receiver<CaToVmMsg>;
 //pub type CaVmError = mpsc::SendError<CaToVmMsg>;
 // VM to Cell agent
-pub type VmToCaMsg = (ISAIT, AllowedTree, AppMsgType, AppMsgDirection, ByteArray);
+pub type VmToCaMsg = ByteArray;
 pub type VmToCa = mpsc::Sender<VmToCaMsg>;
 pub type CaFromVm = mpsc::Receiver<VmToCaMsg>;
 //pub type VmCaError = mpsc::SendError<VmToCaMsg>;
@@ -48,12 +48,12 @@ pub type CaFromVm = mpsc::Receiver<VmToCaMsg>;
 //pub type VmFromTree = mpsc::Receiver<TreeToVmMsg>;
 //pub type TreeVmError = mpsc::SendError<TreeToVmMsg>;
 // Vm to Container
-pub type VmToContainerMsg = (ISAIT, ByteArray);
+pub type VmToContainerMsg = ByteArray;
 pub type VmToContainer = mpsc::Sender<VmToContainerMsg>;
 pub type ContainerFromVm = mpsc::Receiver<VmToContainerMsg>;
 //pub type VmContainerError = mpsc::SendError<VmToContainerMsg>;
 // Container to VM
-pub type ContainerToVmMsg = (ISAIT, AllowedTree, AppMsgType, AppMsgDirection, ByteArray);
+pub type ContainerToVmMsg = ByteArray;
 pub type ContainerToVm = mpsc::Sender<ContainerToVmMsg>;
 pub type VmFromContainer = mpsc::Receiver<ContainerToVmMsg>;
 //pub type ContainerVmError = mpsc::SendError<ContainerToVmMsg>;

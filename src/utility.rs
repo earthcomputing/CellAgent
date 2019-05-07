@@ -259,7 +259,8 @@ pub fn write_err(caller: &str, e: &Error) {
     }
 }
 pub fn _string_to_object(string: &str) -> Result<Value, Error> {
-    let v = serde_json::from_str(string)?;
+    let _f = "_string_to_object";
+    let v = serde_json::from_str(string).context(UtilityError::Chain { func_name: _f, comment: S("") })?;
     Ok(v)
 }
 // There are so many places in my code where it's more convenient

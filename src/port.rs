@@ -94,7 +94,6 @@ impl Port {
                     let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
                 }
             }
-            //println!("Port to pe other_index {}", *other_index);
             self.port_to_pe.send(PortToPePacket::App((self.port_number.get_port_no(), msg))).context(PortError::Chain { func_name: "listen_noc_for_pe", comment: S(self.id.get_name()) + " send to pe"})?;
         }
     }

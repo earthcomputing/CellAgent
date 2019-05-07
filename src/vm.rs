@@ -5,8 +5,7 @@ use crate::app_message_formats::{VmToCa, VmFromCa,
                                  ContainerToVm, VmFromContainer};
 use crate::config::{CONTINUE_ON_ERROR, TRACE_OPTIONS};
 use crate::container::{Container};
-use crate::dal;
-use crate::dal::{fork_trace_header, update_trace_header};
+use crate::dal::{add_to_trace, fork_trace_header, update_trace_header};
 use crate::name::{Name, ContainerID, UptreeID, VmID};
 use crate::uptree_spec::{AllowedTree, ContainerSpec};
 use crate::utility::{S, write_err, TraceHeader, TraceHeaderParams, TraceType};
@@ -85,7 +84,7 @@ impl VirtualMachine {
             if TRACE_OPTIONS.all || TRACE_OPTIONS.vm {
                 let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "worker" };
                 let trace = json!({ "id": self.id, "thread_name": thread::current().name(), "thread_id": TraceHeader::parse(thread::current().id()) });
-                let _ = dal::add_to_trace(TraceType::Trace, trace_params, &trace, _f);
+                let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
             }
         }
         loop {
@@ -94,7 +93,7 @@ impl VirtualMachine {
                 if TRACE_OPTIONS.all || TRACE_OPTIONS.vm {
                     let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "recv" };
                     let trace = json!({ "id": self.id, "msg": msg });
-                    let _ = dal::add_to_trace(TraceType::Trace, trace_params, &trace, _f);
+                    let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
                 }
             }
             //println!("VM {} send to {} containers msg from ca: {}", self.id,  self.vm_to_containers.len(), msg);
@@ -112,20 +111,20 @@ impl VirtualMachine {
             if TRACE_OPTIONS.all || TRACE_OPTIONS.vm {
                 let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "worker" };
                 let trace = json!({ "id": self.id, "thread_name": thread::current().name(), "thread_id": TraceHeader::parse(thread::current().id()) });
-                let _ = dal::add_to_trace(TraceType::Trace, trace_params, &trace, _f);
+                let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
             }
         }
         loop {
-            let (is_ait, allowed_tree, msg_type, direction, msg) = vm_from_container.recv().context("listen_container_loop").context(VmError::Chain { func_name: "listen_container_loop", comment: S(self.id.get_name()) + " recv from container"})?;
+            let msg = vm_from_container.recv().context("listen_container_loop").context(VmError::Chain { func_name: "listen_container_loop", comment: S(self.id.get_name()) + " recv from container"})?;
             {
                 if TRACE_OPTIONS.all || TRACE_OPTIONS.vm {
                     let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "recv" };
                     let trace = json!({ "id": self.id, "msg": msg });
-                    let _ = dal::add_to_trace(TraceType::Trace, trace_params, &trace, _f);
+                    let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
                 }
             }
             //println!("VM {} got from container {} msg {} {} {} {}", self.id, container_id, msg.0, msg.1, msg.2, msg.3);
-            vm_to_ca.send((is_ait, allowed_tree, msg_type, direction, msg)).context(VmError::Chain { func_name: "listen_container_loop", comment: S(self.id.get_name()) + " send to ca"})?;
+            vm_to_ca.send(msg).context(VmError::Chain { func_name: "listen_container_loop", comment: S(self.id.get_name()) + " send to ca"})?;
         }
     }
 }

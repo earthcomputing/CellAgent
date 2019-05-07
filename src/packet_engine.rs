@@ -314,7 +314,7 @@ impl PacketEngine {
                         }
                         if DEBUG_OPTIONS.pe_pkt_recv {
                             match msg_type {
-                                MsgType::DiscoverD => { if port_tree_id.is_name(CENTRAL_TREE) { println!("PacketEngine {}: {} got from cm {} {}", self.cell_id, _f, msg_type, port_tree_id); } },
+                                MsgType::Manifest => println!("PacketEngine {}: {} got from cm {} {}", self.cell_id, _f, msg_type, user_mask),
                                 _ => (),
                             }
                         }
