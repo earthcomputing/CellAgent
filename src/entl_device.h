@@ -8,8 +8,21 @@
 #define ENTL_DEVICE_FLAG_SIGNAL2 0x0010
 #define ENTL_DEVICE_FLAG_FATAL   0x8000
 
+#include "entl_skb_queue.h"
+#include "entl_state_machine.h"
 
 typedef struct entl_device {
+    int edev_action;
+    uint32_t edev_flag; // ENTL_DEVICE_FLAG
+    uint32_t edev_l_addr;
+    char edev_name[ENTL_DEVICE_NAME_LEN]; // 15
+    int edev_queue_stopped;
+    entl_state_machine_t edev_stm;
+    ENTL_skb_queue_t edev_tx_skb_queue;
+    uint16_t edev_u_addr;
+    int edev_user_pid;
+    struct timer_list edev_watchdog_timer;
+    struct work_struct edev_watchdog_task;
 } entl_device_t;
 
 #ifdef _IN_NETDEV_C_
