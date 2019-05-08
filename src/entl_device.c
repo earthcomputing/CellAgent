@@ -682,6 +682,8 @@ static void dump_state(char *type, entl_state_t *st, int flag) {
 }
 #endif
 
+// deriviate work - ref: orig-frag-netdev.c, copied-frag-entl_device.c
+
 /**
  * entl_e1000e_set_rx_mode - ENTL versin, always set Promiscuous mode
  * @netdev: network interface device structure
