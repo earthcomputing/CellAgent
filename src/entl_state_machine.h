@@ -33,9 +33,56 @@
 
 // uint32_t entl_state = FETCH_STATE(stm);
 
+#include "entt_queue.h"
+#include "entl_state.h"
+
 #define ENTL_DEVICE_NAME_LEN 15
 typedef struct entl_state_machine {
+    spinlock_t state_lock;
+    uint32_t state_count;
+    entl_state_t current_state;
+    entl_state_t error_state;
+    entl_state_t return_state;
+    int user_pid;
+    struct entt_ioctl_ait_data *receive_buffer;
+    ENTT_queue_t send_ATI_queue;
+    ENTT_queue_t receive_ATI_queue;
+    char name[ENTL_DEVICE_NAME_LEN];
+
+    uint16_t my_u_addr; // MAC addr for Hello message
+    uint32_t my_l_addr; // MAC addr for Hello message
+    uint8_t my_addr_valid;
+    uint16_t hello_u_addr;
+    uint32_t hello_l_addr;
+    uint8_t hello_addr_valid;
 } entl_state_machine_t;
+
+static inline void set_update_time(entl_state_machine_t *mcn, struct timespec ts) { memcpy(&mcn->current_state.update_time, &ts, sizeof(struct timespec)); }
+static inline int get_atomic_state(entl_state_machine_t *mcn) { return mcn->current_state.current_state; }
+static inline void set_atomic_state(entl_state_machine_t *mcn, int value) { mcn->current_state.current_state = value; }
+static inline int get_i_know(entl_state_machine_t *mcn) { return mcn->current_state.event_i_know; }
+static inline void set_i_know(entl_state_machine_t *mcn, int value) { mcn->current_state.event_i_know = value; }
+static inline int get_send_next(entl_state_machine_t *mcn) { return mcn->current_state.event_send_next; }
+static inline void set_send_next(entl_state_machine_t *mcn, int value) { mcn->current_state.event_send_next = value; }
+static inline void advance_send_next(entl_state_machine_t *mcn) { mcn->current_state.event_send_next += 2; }
+static inline int get_i_sent(entl_state_machine_t *mcn) { return mcn->current_state.event_i_sent; }
+static inline void set_i_sent(entl_state_machine_t *mcn, int value) { mcn->current_state.event_i_sent = value; }
+
+static inline void zebra(entl_state_machine_t *mcn) { set_i_sent(mcn, get_send_next(mcn)); }
+
+static inline void clear_intervals(entl_state_machine_t *mcn) {
+#ifdef ENTL_SPEED_CHECK
+    memset(&mcn->current_state.interval_time, 0, sizeof(struct timespec));
+    memset(&mcn->current_state.max_interval_time, 0, sizeof(struct timespec));
+    memset(&mcn->current_state.min_interval_time, 0, sizeof(struct timespec));
+#endif
+}
+
+static inline void clear_error(entl_state_machine_t *mcn) {
+    mcn->current_state.error_flag = 0;
+    mcn->current_state.error_count = 0;
+}
+
 
 void entl_link_up(entl_state_machine_t *mcn);
 int entl_next_send(entl_state_machine_t *mcn, uint16_t *u_addr, uint32_t *l_addr); // ENTL_ACTION
