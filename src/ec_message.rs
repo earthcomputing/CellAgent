@@ -38,42 +38,14 @@ impl MsgType {
         let bytes = Packetizer::unpacketize(packets).context(MessageError::Chain { func_name: _f, comment: S("unpacketize")})?;
         //println!("Message get_msg: serialized {}, packets {:?}", serialized, packets);
         let serialized = bytes.as_str()?;
-        let type_msg = serde_json::from_str::<TypePlusMsg>(&serialized).context(MessageError::Chain { func_name: "get_msg", comment: S("deserialize MsgType")})?;
-        let msg_type = type_msg.get_type();
-        let serialized_msg = type_msg.get_serialized_msg();
-        Ok(match msg_type {
-            MsgType::Interapplication => Box::new(serde_json::from_str::<InterapplicationMsg>(&serialized_msg).context(MessageError::Chain { func_name: _f, comment: S("InterapplicationMsg")})?),
-            MsgType::Discover    => Box::new(serde_json::from_str::<DiscoverMsg>(&serialized_msg).context(MessageError::Chain { func_name: _f, comment: S("DiscoverMsg")})?),
-            MsgType::DiscoverD   => Box::new(serde_json::from_str::<DiscoverDMsg>(&serialized_msg).context(MessageError::Chain { func_name: _f, comment: S("DiscoverDMsg")})?),
-            MsgType::Failover    => Box::new(serde_json::from_str::<FailoverMsg>(&serialized_msg).context(MessageError::Chain { func_name: _f, comment: S("FailoverMsg")})?),
-            MsgType::FailoverD   => Box::new(serde_json::from_str::<FailoverDMsg>(&serialized_msg).context(MessageError::Chain { func_name: _f, comment: S("FailDoverMsg")})?),
-            MsgType::Hello       => Box::new(serde_json::from_str::<HelloMsg>(&serialized_msg).context(MessageError::Chain { func_name: _f, comment: S("HelloMsg")})?),
-            MsgType::Manifest    => Box::new(serde_json::from_str::<ManifestMsg>(&serialized_msg).context(MessageError::Chain { func_name: _f, comment: S("ManifestMsg")})?),
-            MsgType::StackTree   => Box::new(serde_json::from_str::<StackTreeMsg>(&serialized_msg).context(MessageError::Chain { func_name: _f, comment: S("StackTreeMsg")})?),
-            MsgType::StackTreeD  => Box::new(serde_json::from_str::<StackTreeDMsg>(&serialized_msg).context(MessageError::Chain { func_name: _f, comment: S("StackTreeDMsg")})?),
-            MsgType::TreeName    => Box::new(serde_json::from_str::<TreeNameMsg>(&serialized_msg).context(MessageError::Chain { func_name: _f, comment: S("TreeNameMsg")})?),
-            _ => panic!("Invalid message type in get_msg")
-        })
+        let msg = serde_json::from_str(serialized)?;
+        Ok(msg)
     }
     pub fn msg_from_bytes(bytes: &ByteArray) -> Result<Box<dyn Message>, Error> {
         let _f = "msg_from_bytes";
         let serialized = bytes.as_str()?;
-        let type_msg = serde_json::from_str::<TypePlusMsg>(serialized).context(MessageError::Chain { func_name: _f, comment: S("deserialize MsgType")})?;
-        let msg_type = type_msg.get_type();
-        let serialized_msg = type_msg.get_serialized_msg();
-        Ok(match msg_type {
-            MsgType::Interapplication => Box::new(serde_json::from_str::<InterapplicationMsg>(&serialized_msg).context(MessageError::Chain { func_name: _f, comment: S("InterapplicationMsg")})?),
-            MsgType::Discover    => Box::new(serde_json::from_str::<DiscoverMsg>(&serialized_msg).context(MessageError::Chain { func_name: _f, comment: S("DiscoverMsg")})?),
-            MsgType::DiscoverD   => Box::new(serde_json::from_str::<DiscoverDMsg>(&serialized_msg).context(MessageError::Chain { func_name: _f, comment: S("DiscoverDMsg")})?),
-            MsgType::Failover    => Box::new(serde_json::from_str::<FailoverMsg>(&serialized_msg).context(MessageError::Chain { func_name: _f, comment: S("FailoverMsg")})?),
-            MsgType::FailoverD   => Box::new(serde_json::from_str::<FailoverDMsg>(&serialized_msg).context(MessageError::Chain { func_name: _f, comment: S("FailoverDMsg")})?),
-            MsgType::Hello       => Box::new(serde_json::from_str::<HelloMsg>(&serialized_msg).context(MessageError::Chain { func_name: _f, comment: S("HelloMsg")})?),
-            MsgType::Manifest    => Box::new(serde_json::from_str::<ManifestMsg>(&serialized_msg).context(MessageError::Chain { func_name: _f, comment: S("ManifestMsg")})?),
-            MsgType::StackTree   => Box::new(serde_json::from_str::<StackTreeMsg>(&serialized_msg).context(MessageError::Chain { func_name: _f, comment: S("StackTreeMsg")})?),
-            MsgType::StackTreeD  => Box::new(serde_json::from_str::<StackTreeDMsg>(&serialized_msg).context(MessageError::Chain { func_name: _f, comment: S("StackTreeDMsg")})?),
-            MsgType::TreeName    => Box::new(serde_json::from_str::<TreeNameMsg>(&serialized_msg).context(MessageError::Chain { func_name: _f, comment: S("TreeNameMsg")})?),
-            _ => panic!("Invalid msg type in msg_from_bytes")
-        })
+        let msg = serde_json::from_str(serialized)?;
+        Ok(msg)
     }
     // A hack for printing debug output only for a specific message type
     pub fn is_type(packet: &Packet, type_of_msg: MsgType) -> bool {
@@ -134,23 +106,7 @@ impl fmt::Display for MsgDirection {
         write!(f, "{}", s)
     }
 }
-#[derive(Debug, Clone, Hash, Serialize, Deserialize)]
-pub struct TypePlusMsg {
-    msg_type: MsgType,
-    serialized_msg: String
-}
-impl TypePlusMsg {
-    pub fn new(msg_type: MsgType, serialized_msg: String) -> TypePlusMsg {
-        TypePlusMsg { msg_type, serialized_msg }
-    }
-    fn get_type(&self) -> MsgType { self.msg_type }
-    fn get_serialized_msg(&self) -> &str { &self.serialized_msg }
-}
-impl fmt::Display for TypePlusMsg {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}: {}", self.msg_type, self.serialized_msg)
-    }
-}
+#[typetag::serde(tag = "ec_msg_type")]
 pub trait Message {
     fn get_header(&self) -> &MsgHeader;
     fn get_payload(&self) -> &dyn MsgPayload;
@@ -189,6 +145,7 @@ impl fmt::Display for dyn Message {
         write!(f, "{}", s)
     }
 }
+#[typetag::serde(tag = "app_msg_payload_type")]
 pub trait MsgPayload: fmt::Display {}
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct MsgHeader {
@@ -246,6 +203,7 @@ impl DiscoverMsg {
     pub fn get_payload(&self) -> &DiscoverPayload { &self.payload }
     pub fn get_port_tree_id(&self) -> PortTreeID { self.payload.get_port_tree_id() }
 }
+#[typetag::serde]
 impl Message for DiscoverMsg {
     fn get_header(&self) -> &MsgHeader { &self.header }
     fn get_payload(&self) -> &dyn MsgPayload { &self.payload }
@@ -297,6 +255,7 @@ impl DiscoverPayload {
     pub fn set_path(&mut self, path: Path) { self.path = path; }
     pub fn set_sending_cell(&mut self, sending_cell_id: CellID) { self.sending_cell_id = sending_cell_id; }
 }
+#[typetag::serde]
 impl MsgPayload for DiscoverPayload {}
 impl fmt::Display for DiscoverPayload {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -322,6 +281,7 @@ impl DiscoverDMsg {
     }
     pub fn get_payload(&self) -> &DiscoverDPayload { &self.payload }
 }
+#[typetag::serde]
 impl Message for DiscoverDMsg {
     fn get_header(&self) -> &MsgHeader { &self.header }
     fn get_payload(&self) -> &dyn MsgPayload { &self.payload }
@@ -361,6 +321,7 @@ impl DiscoverDPayload {
     pub fn get_path(&self) -> Path { self.path }
     pub fn get_discover_type(&self) -> DiscoverDType { self.discover_type }
 }
+#[typetag::serde]
 impl MsgPayload for DiscoverDPayload {}
 impl fmt::Display for DiscoverDPayload {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -397,6 +358,7 @@ impl FailoverMsg {
     }
     pub fn get_payload(&self) -> &FailoverMsgPayload { &self.payload }
 }
+#[typetag::serde]
 impl Message for FailoverMsg {
     fn get_header(&self) -> &MsgHeader { &self.header }
     fn get_payload(&self) -> &dyn MsgPayload { &self.payload }
@@ -437,6 +399,7 @@ impl FailoverMsgPayload {
     pub fn get_broken_port_tree_ids(&self) -> &HashSet<PortTreeID> { &self.broken_tree_ids }
     pub fn get_broken_path(&self) -> Path { self.broken_path }
 }
+#[typetag::serde]
 impl MsgPayload for FailoverMsgPayload {}
 impl fmt::Display for FailoverMsgPayload {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -460,6 +423,7 @@ impl FailoverDMsg {
     }
     pub fn get_payload(&self) -> &FailoverDMsgPayload { &self.payload }
 }
+#[typetag::serde]
 impl Message for FailoverDMsg {
     fn get_header(&self) -> &MsgHeader { &self.header }
     fn get_payload(&self) -> &dyn MsgPayload { &self.payload }
@@ -497,6 +461,7 @@ impl FailoverDMsgPayload {
     pub fn _get_rw_port_tree_id(&self) -> PortTreeID { self.failover_payload.get_rw_port_tree_id() }
     pub fn _get_lw_port_tree_id(&self) -> PortTreeID { self.failover_payload.get_lw_port_tree_id() }
 }
+#[typetag::serde]
 impl MsgPayload for FailoverDMsgPayload {}
 impl fmt::Display for FailoverDMsgPayload {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -531,6 +496,7 @@ impl HelloMsg {
     }
     pub fn get_payload(&self) -> &HelloMsgPayload { &self.payload }
 }
+#[typetag::serde]
 impl Message for HelloMsg {
     fn get_header(&self) -> &MsgHeader { &self.header }
     fn get_payload(&self) -> &dyn MsgPayload { &self.payload }
@@ -562,6 +528,7 @@ impl HelloMsgPayload {
     pub fn get_cell_id(&self) -> CellID { self.cell_id }
     pub fn get_port_no(&self) -> &PortNo { &self.port_no }
 }
+#[typetag::serde]
 impl MsgPayload for HelloMsgPayload {}
 impl fmt::Display for HelloMsgPayload {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -583,6 +550,7 @@ impl StackTreeMsg {
     pub fn get_payload(&self) -> &StackTreeMsgPayload { &self.payload }
     fn _get_port_tree_id(&self) -> PortTreeID { self.payload._get_port_tree_id() }
 }
+#[typetag::serde]
 impl Message for StackTreeMsg {
     fn get_header(&self) -> &MsgHeader { &self.header }
     fn get_payload(&self) -> &dyn MsgPayload { &self.payload }
@@ -619,6 +587,7 @@ impl StackTreeMsgPayload {
     pub fn get_gvm_eqn(&self) -> &GvmEquation { &self.gvm_eqn }
     fn _get_port_tree_id(&self) -> PortTreeID { self.new_port_tree_id }
 }
+#[typetag::serde]
 impl MsgPayload for StackTreeMsgPayload {}
 impl fmt::Display for StackTreeMsgPayload {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -639,6 +608,7 @@ impl StackTreeDMsg {
     pub fn get_payload(&self) -> &StackTreeMsgDPayload { &self.payload }
     pub fn get_port_tree_id(&self) -> PortTreeID { self.payload.get_port_tree_id() }
 }
+#[typetag::serde]
 impl Message for StackTreeDMsg {
     fn get_header(&self) -> &MsgHeader { &self.header }
     fn get_payload(&self) -> &dyn MsgPayload { &self.payload }
@@ -669,6 +639,7 @@ impl StackTreeMsgDPayload {
     }
     fn get_port_tree_id(&self) -> PortTreeID { self.port_tree_id }
 }
+#[typetag::serde]
 impl MsgPayload for StackTreeMsgDPayload {}
 impl fmt::Display for StackTreeMsgDPayload {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -691,6 +662,7 @@ impl ManifestMsg {
     pub fn get_payload(&self) -> &ManifestMsgPayload { &self.payload }
     pub fn _get_port_tree_id(&self) -> PortTreeID { self.payload._get_port_tree_id() }
 }
+#[typetag::serde]
 impl Message for ManifestMsg {
     fn get_header(&self) -> &MsgHeader { &self.header }
     fn get_payload(&self) -> &dyn MsgPayload { &self.payload }
@@ -725,6 +697,7 @@ impl ManifestMsgPayload {
     pub fn get_deploy_port_tree_id(&self) -> PortTreeID { self.deploy_port_tree_id }
     pub fn _get_port_tree_id(&self) -> PortTreeID { self.deploy_port_tree_id }
 }
+#[typetag::serde]
 impl MsgPayload for ManifestMsgPayload {}
 impl fmt::Display for ManifestMsgPayload {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -747,6 +720,7 @@ impl InterapplicationMsg {
     pub fn get_payload(&self) -> &InterapplicationMsgPayload { &self.payload }
     pub fn get_port_tree_id(&self) -> PortTreeID { self.payload.get_port_tree_id() }
 }
+#[typetag::serde]
 impl Message for InterapplicationMsg {
     fn get_header(&self) -> &MsgHeader { &self.header }
     fn get_payload(&self) -> &dyn MsgPayload { &self.payload }
@@ -778,6 +752,7 @@ impl InterapplicationMsgPayload {
     pub fn _get_tree_id(&self) -> &PortTreeID { &self.port_tree_id }
     pub fn get_port_tree_id(&self) -> PortTreeID { self.port_tree_id }
 }
+#[typetag::serde]
 impl MsgPayload for InterapplicationMsgPayload {}
 impl fmt::Display for InterapplicationMsgPayload {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -799,6 +774,7 @@ impl TreeNameMsg {
     pub fn get_payload(&self) -> &TreeNameMsgPayload { &self.payload }
     pub fn _get_tree_name(&self) -> &String { self.payload._get_tree_name() }
 }
+#[typetag::serde]
 impl Message for TreeNameMsg {
     fn get_header(&self) -> &MsgHeader { &self.header }
     fn get_payload(&self) -> &dyn MsgPayload { &self.payload }
@@ -823,6 +799,7 @@ impl TreeNameMsgPayload {
     }
     fn _get_tree_name(&self) -> &String { &self.tree_name }
 }
+#[typetag::serde]
 impl MsgPayload for TreeNameMsgPayload {}
 impl fmt::Display for TreeNameMsgPayload {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
