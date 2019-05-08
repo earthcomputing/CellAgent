@@ -36,13 +36,12 @@
 #include "entt_queue.h"
 #include "entl_state.h"
 
-#define ENTL_DEVICE_NAME_LEN 15
 typedef struct entl_state_machine {
     spinlock_t state_lock;
     uint32_t state_count;
     entl_state_t current_state;
     entl_state_t error_state;
-    entl_state_t return_state;
+    entl_state_t return_state; // unused
     int user_pid;
     struct entt_ioctl_ait_data *receive_buffer;
     ENTT_queue_t send_ATI_queue;
@@ -83,6 +82,79 @@ static inline void clear_error(entl_state_machine_t *mcn) {
     mcn->current_state.error_count = 0;
 }
 
+// when the 3 members (event_i_sent, event_i_know, event_send_next) are all zero, things are fresh out of Hello handshake
+static inline void entl_state_machine_init(entl_state_machine_t *mcn) {
+    mcn->state_count = 0;
+    // current_state
+        set_i_know(mcn, 0);
+        set_i_sent(mcn, 0);
+        set_send_next(mcn, 0);
+        set_atomic_state(mcn, 0);
+        clear_error(mcn); // error_flag, error_count
+        mcn->current_state.p_error_flag = 0;
+        memset(&mcn->current_state.update_time, 0, sizeof(struct timespec));
+        memset(&mcn->current_state.error_time, 0, sizeof(struct timespec));
+        clear_intervals(); //  interval_time, max_interval_time, min_interval_time
+    // error_state
+    mcn->error_state.current_state = 0;
+    mcn->error_state.error_flag = 0;
+    // return_state
+    mcn->user_pid = 0;
+    // AIT mesage handling
+    mcn->receive_buffer = NULL;
+    ENTT_queue_init(&mcn->send_ATI_queue);
+    ENTT_queue_init(&mcn->receive_ATI_queue);
+    // hello
+    mcn->my_addr_valid = 0;
+    mcn->hello_addr_valid = 0;
+    spin_lock_init(&mcn->state_lock);
+}
+
+// Record first error state, acculate error flags
+static inline void set_error(entl_state_machine_t *mcn, uint32_t error_flag) {
+    entl_state_t *ep = &mcn->error_state;
+
+    ep->error_count++;
+
+    // FIXME: assumes we never wrap
+    if (ep->error_count > 1) {
+        ep->p_error_flag |= error_flag;
+        return;
+    }
+
+    struct timespec ts = current_kernel_time();
+    ep->event_i_know = get_i_know(mcn);
+    ep->event_i_sent = get_i_sent(mcn);
+    ep->current_state = get_atomic_state(mcn);
+    ep->error_flag = error_flag;
+    memcpy(&ep->update_time, &mcn->current_state.update_time, sizeof(struct timespec));
+    memcpy(&ep->error_time, &ts, sizeof(struct timespec));
+}
+
+static inline void calc_intervals(entl_state_machine_t *mcn) {
+#ifdef ENTL_SPEED_CHECK
+    entl_state_t *cs = &mcn->current_state;
+    struct timespec *ts_update = &cs->update_time;
+
+    if (ts_update->tv_sec > 0 || ts_update->tv_nsec > 0) {
+        struct timespec now = current_kernel_time();
+        struct timespec *duration = &cs->interval_time;
+        *duration = timespec_sub(*now - *ts_update);
+
+        struct timespec *ts_max = &cs->max_interval_time;
+        if (timespec_compare(ts_max, duration) < 0) {
+            *ts_max = *duration;
+        }
+
+        struct timespec *ts_min = &cs->min_interval_time;
+        if ((ts_min->tv_sec == 0 && ts_min->tv_nsec == 0)
+        ||  (timespec_compare(duration, ts_min) < 0)) {
+            *ts_min = *duration;
+        }
+    }
+#endif
+}
+
 
 void entl_link_up(entl_state_machine_t *mcn);
 int entl_next_send(entl_state_machine_t *mcn, uint16_t *u_addr, uint32_t *l_addr); // ENTL_ACTION
@@ -95,7 +167,7 @@ void entl_state_error(entl_state_machine_t *mcn, uint32_t error_flag); // enter 
 void entl_new_AIT_message(entl_state_machine_t *mcn, struct entt_ioctl_ait_data *data);
 int entl_send_AIT_message(entl_state_machine_t *mcn, struct entt_ioctl_ait_data *data);
 struct entt_ioctl_ait_data *entl_next_AIT_message(entl_state_machine_t *mcn);
-struct entt_ioctl_ait_data *entl_read_AIT_message(entl_state_machine_t *mcn); 
+struct entt_ioctl_ait_data *entl_read_AIT_message(entl_state_machine_t *mcn);
 
 #include "entl_state.h"
 
@@ -105,7 +177,7 @@ void entl_read_error_state(entl_state_machine_t *mcn, entl_state_t *st, entl_sta
 uint16_t entl_num_queued(entl_state_machine_t *mcn);
 
 void entl_state_machine_init(entl_state_machine_t *mcn);
-void entl_set_my_adder(entl_state_machine_t *mcn, uint16_t u_addr, uint32_t l_addr); 
+void entl_set_my_adder(entl_state_machine_t *mcn, uint16_t u_addr, uint32_t l_addr);
 
 // algorithm:
 int entl_get_hello(entl_state_machine_t *mcn, uint16_t *u_addr, uint32_t *l_addr);
