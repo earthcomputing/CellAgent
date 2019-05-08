@@ -6,7 +6,8 @@
 #include "entt_queue.h"
 
 
-// #define ENTL_DEBUG(fmt, args...) printk(KERN_ALERT "ENTL:" fmt, ## args)
+// FIXME: duplicate defn
+#define ENTL_DEBUG(fmt, args...) printk(KERN_ALERT "ENTL:" fmt, ## args)
 #define STM_TDEBUG(fmt, args...) ENTL_DEBUG("%s @ %ld sec " fmt "\n", mcn->name, ts.tv_sec, ## args)
 #define STM_DEBUG(fmt, args...)  ENTL_DEBUG("%s " fmt "\n", mcn->name, ## args)
 

@@ -36,6 +36,7 @@
 #include "entt_queue.h"
 #include "entl_state.h"
 
+#define ENTL_COUNT_MAX 10
 #define ENTL_DEVICE_NAME_LEN 15
 typedef struct entl_state_machine {
     spinlock_t state_lock;
