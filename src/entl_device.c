@@ -22,7 +22,7 @@ extern void entl_read_error_state(entl_state_machine_t *mcn, entl_state_t *st, e
 
 extern uint16_t entl_num_queued(entl_state_machine_t *mcn);
 
-extern void entl_state_machine_init(entl_state_machine_t *mcn);
+// extern void entl_state_machine_init(entl_state_machine_t *mcn);
 extern void entl_set_my_adder(entl_state_machine_t *mcn, uint16_t u_addr, uint32_t l_addr); 
 
 // algorithm:
@@ -397,8 +397,7 @@ static void entl_e1000_configure(struct e1000_adapter *adapter) {
 
         struct entl_state_machine *stm = &dev->edev_stm;
         entl_state_machine_init(stm);
-// bj
-        // strlcpy(stm->name, dev->edev_name, sizeof(stm->name)); // FIXME
+        strlcpy(stm->name, dev->edev_name, sizeof(stm->name));
         entl_e1000_set_my_addr(dev, netdev->dev_addr);
 
         // force to check the link status on kernel task
