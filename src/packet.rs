@@ -11,7 +11,7 @@ use serde_json;
 use crate::app_message::{SenderMsgSeqNo, get_next_count};
 use crate::config::{PACKET_MIN, PACKET_MAX, PAYLOAD_DEFAULT_ELEMENT,
     ByteArray, PacketNo};
-use crate::ec_message::{Message, MsgType, TypePlusMsg};
+use crate::ec_message::{Message, MsgType};
 use crate::name::{PortTreeID, Name};
 use crate::utility::{S, Stack};
 use crate::uuid_ec::{Uuid, AitState};
@@ -195,10 +195,7 @@ pub struct Serializer {}
 impl Serializer {
     pub fn serialize<M>(msg: &M) -> Result<String, Error>
             where M: Message + serde::Serialize {
-        let msg_type = msg.get_header().get_msg_type();
-        let serialized_msg = serde_json::to_string(msg).context(PacketError::Chain { func_name: "serialize", comment: S("msg")})?;
-        let msg_obj = TypePlusMsg::new(msg_type, serialized_msg);
-        let serialized = serde_json::to_string(&msg_obj).context(PacketError::Chain { func_name: "serialize", comment: S("msg_obj")})?;
+        let serialized = serde_json::to_string(msg as &dyn Message).context(PacketError::Chain { func_name: "serialize", comment: S("msg")})?;
         Ok(serialized)
     }
 }

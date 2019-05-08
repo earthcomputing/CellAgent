@@ -74,7 +74,7 @@ impl fmt::Display for TypePlusAppMsg {
         write!(f, "{}: {}", self.msg_type, self.serialized_msg)
     }
 }
-#[typetag::serde(tag = "msg_type")]
+#[typetag::serde(tag = "app_msg_type")]
 pub trait AppMessage: fmt::Display {
     fn get_header(&self) -> &AppMsgHeader;
     fn get_payload(&self) -> &dyn AppMsgPayload;
@@ -92,7 +92,7 @@ pub trait AppMessage: fmt::Display {
     fn process_ca(&self, cell_agent: &mut CellAgent, sender_id: SenderID) -> Result<(), Error>;
     fn process_noc(&self, noc: &mut Noc, noc_to_port: &NocToPort) -> Result<(), Error>;
 }
-#[typetag::serde(tag = "type")]
+#[typetag::serde(tag = "app_msg_payload_type")]
 pub trait AppMsgPayload: fmt::Display {}
 #[derive(Debug, Clone, Hash, Serialize, Deserialize)]
 pub struct AppMsgHeader {
