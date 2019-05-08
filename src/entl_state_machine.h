@@ -36,6 +36,7 @@
 #include "entt_queue.h"
 #include "entl_state.h"
 
+#define ENTL_DEVICE_NAME_LEN 15
 typedef struct entl_state_machine {
     spinlock_t state_lock;
     uint32_t state_count;
@@ -94,7 +95,7 @@ static inline void entl_state_machine_init(entl_state_machine_t *mcn) {
         mcn->current_state.p_error_flag = 0;
         memset(&mcn->current_state.update_time, 0, sizeof(struct timespec));
         memset(&mcn->current_state.error_time, 0, sizeof(struct timespec));
-        clear_intervals(); //  interval_time, max_interval_time, min_interval_time
+        clear_intervals(mcn); //  interval_time, max_interval_time, min_interval_time
     // error_state
     mcn->error_state.current_state = 0;
     mcn->error_state.error_flag = 0;
