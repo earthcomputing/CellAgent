@@ -1,6 +1,7 @@
 #include <linux/types.h>
 #include <linux/string.h>
 #include <linux/module.h>
+#include <linux/slab.h>
 
 #include "entl_state_machine.h"
 #include "entt_queue.h"
