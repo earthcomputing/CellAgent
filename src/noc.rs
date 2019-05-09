@@ -83,8 +83,8 @@ impl Noc {
         }
         loop {
             let bytes = noc_from_port.recv().context(NocError::Chain { func_name: _f, comment: S("")})?;
-            let serialized = bytes.as_str()?;
-            let app_msg: Box<dyn AppMessage> = serde_json::from_str(serialized).context(NocError::Chain { func_name: _f, comment: S("") })?;
+            let serialized = bytes.to_string()?;
+            let app_msg: Box<dyn AppMessage> = serde_json::from_str(&serialized).context(NocError::Chain { func_name: _f, comment: S("") })?;
             {
                 if TRACE_OPTIONS.all || TRACE_OPTIONS.noc {
                     let trace_params = &TraceHeaderParams { module: "src/noc.rs", line_no: line!(), function: _f, format: "noc_from_port" };
@@ -198,7 +198,7 @@ impl Noc {
         let manifest = Manifest::new("NocAgent", CellConfig::Large, &noc_agent_deploy_tree, &allowed_trees,
                                      vec![&vm_spec], vec![&up_tree]).context(NocError::Chain { func_name: "create_noc", comment: S("NocAgent")})?;
         let deploy_msg = AppManifestMsg::new("Noc", false,
-                                             &noc_master_deploy_tree, &manifest,
+                                             &noc_agent_deploy_tree, &manifest,
                                              &allowed_trees);
         println!("Noc: deploy {} on tree {}", manifest.get_id(), noc_agent_deploy_tree);
         let serialized = serde_json::to_string(&deploy_msg as &dyn AppMessage)?;

@@ -2,8 +2,7 @@ use std::{fmt,
           thread, thread::JoinHandle};
 
 use crate::config::{CONTINUE_ON_ERROR, TRACE_OPTIONS};
-use crate::dal;
-use crate::dal::{fork_trace_header, update_trace_header};
+use crate::dal::{add_to_trace, fork_trace_header, update_trace_header};
 use crate::ec_message_formats::{LinkToPort, LinkFromPort, LinkToPortPacket};
 use crate::name::{Name, LinkID, PortID};
 use crate::port::{PortStatus};
@@ -72,19 +71,19 @@ impl Link {
             if TRACE_OPTIONS.all || TRACE_OPTIONS.link {
                 let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "worker" };
                 let trace = json!({ "id": &self.get_id(), "thread_name": thread::current().name(), "thread_id": TraceHeader::parse(thread::current().id()) });
-                let _ = dal::add_to_trace(TraceType::Trace, trace_params, &trace, _f);
+                let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
             }
         }
         loop {
-            let msg = link_from.recv().context(LinkError::Chain { func_name: _f, comment: S(self.id.clone()) })?;
+            let packet = link_from.recv().context(LinkError::Chain { func_name: _f, comment: S(self.id.clone()) })?;
             {
                 if TRACE_OPTIONS.all || TRACE_OPTIONS.link {
                     let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "recv" };
-                    let trace = json!({ "id": &self.get_id(), "msg": msg });
-                    let _ = dal::add_to_trace(TraceType::Trace, trace_params, &trace, _f);
+                    let trace = json!({ "id": &self.get_id(), "msg": packet.to_string()? });
+                    let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
                 }
             }
-            link_to.send(LinkToPortPacket::Packet(msg)).context(LinkError::Chain { func_name: _f, comment: S(self.id.clone()) })?;
+            link_to.send(LinkToPortPacket::Packet(packet)).context(LinkError::Chain { func_name: _f, comment: S(self.id.clone()) })?;
         }
     }
 }

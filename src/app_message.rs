@@ -1,4 +1,3 @@
-#![allow(dead_code)]
 use std::{fmt,
           ops::{Deref},
           sync::atomic::{AtomicUsize, Ordering},
@@ -30,6 +29,14 @@ pub enum AppMsgType { // Make sure these match the struct names
     AppStackTreeMsg,
     AppTreeNameMsg,
 }
+impl AppMsgType {
+    pub fn app_msg_from_bytes(bytes: &ByteArray) -> Result<Box<dyn AppMessage>, Error> {
+        let _f = "app_msg_from_bytes";
+        let serialized = bytes.to_string()?;
+        let msg = serde_json::from_str(&serialized)?;
+        Ok(msg)
+    }
+}
 impl fmt::Display for AppMsgType {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let s = match *self {
@@ -55,23 +62,6 @@ impl fmt::Display for AppMsgDirection {
             AppMsgDirection::Leafward => "Leafward"
         };
         write!(f, "{}", s)
-    }
-}
-#[derive(Debug, Clone, Hash, Serialize, Deserialize)]
-pub struct TypePlusAppMsg {
-    msg_type: AppMsgType,
-    serialized_msg: String
-}
-impl TypePlusAppMsg {
-    pub fn _new(msg_type: AppMsgType, serialized_msg: String) -> TypePlusAppMsg {
-        TypePlusAppMsg { msg_type, serialized_msg }
-    }
-    fn get_msg_type(&self) -> AppMsgType { self.msg_type }
-    fn get_serialized_msg(&self) -> &str { &self.serialized_msg }
-}
-impl fmt::Display for TypePlusAppMsg {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}: {}", self.msg_type, self.serialized_msg)
     }
 }
 #[typetag::serde(tag = "app_msg_type")]
@@ -172,7 +162,7 @@ impl AppInterapplicationMsgPayload {
     fn new(body: &str) -> AppInterapplicationMsgPayload {
         AppInterapplicationMsgPayload { body: ByteArray::new(body) }
     }
-    pub fn get_body(&self) -> &ByteArray { &self.body }
+    pub fn _get_body(&self) -> &ByteArray { &self.body }
 }
 #[typetag::serde]
 impl AppMsgPayload for AppInterapplicationMsgPayload {}
@@ -246,7 +236,7 @@ pub struct AppManifestMsg {
 }
 impl AppManifestMsg {
     pub fn new(sender_name: &str, is_ait: bool, deploy_tree_name: &AllowedTree, manifest: &Manifest,
-               allowed_trees: &Vec<AllowedTree>)
+               _allowed_trees: &Vec<AllowedTree>)
             -> AppManifestMsg {
         // Note that direction is leafward so cell agent will get the message
         let allowed_trees = &vec![];
@@ -289,7 +279,6 @@ pub struct AppManifestMsgPayload {
 }
 impl AppManifestMsgPayload {
     fn new(manifest: &Manifest) -> AppManifestMsgPayload {
-        let tree_name = manifest.get_deployment_tree();
         AppManifestMsgPayload { manifest: manifest.clone() }
     }
     pub fn get_manifest(&self) -> &Manifest { &self.manifest }
@@ -348,7 +337,7 @@ pub struct AppQueryMsgPayload {
     query: String,
 }
 impl AppQueryMsgPayload {
-    fn new(query_tree_name: &Vec<AllowedTree>, query: &str) -> AppQueryMsgPayload {
+    fn new(_query_tree_name: &Vec<AllowedTree>, query: &str) -> AppQueryMsgPayload {
         AppQueryMsgPayload { query: S(query) }
     }
     pub fn get_query(&self) -> &str { &self.query }

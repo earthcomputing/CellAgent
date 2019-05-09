@@ -52,6 +52,14 @@ impl Packet {
     pub fn _get_header(&self) -> PacketHeader { self.header }
     pub fn _get_payload(&self) -> &Payload { &self.payload }
     pub fn get_count(&self) -> usize { self.packet_count }
+    
+    // Used for trace records
+    pub fn to_string(&self) -> Result<String, Error> {
+        let bytes = self.get_bytes();
+        let string = std::str::from_utf8(&bytes)?.to_owned();
+        let default_as_char = PAYLOAD_DEFAULT_ELEMENT as char;
+        Ok(string.replace(default_as_char, ""))
+    }
 
     // PacketHeader (delegate)
     pub fn get_tree_uuid(&self) -> Uuid { self.header.get_uuid() }
@@ -174,7 +182,7 @@ impl fmt::Display for Payload {
 }
 impl Serialize for Payload {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-        where S: Funky,
+        where S: serde::Serializer,
     {
         let body = self.bytes.to_hex();
         let mut state = serializer.serialize_struct("Payload", 5)?;
@@ -292,7 +300,7 @@ impl ToHex for [u8] {
             .trim_end_matches("00").to_string()
     }
 }
-use serde::ser::{Serialize, Serializer as Funky, SerializeStruct};
+use serde::ser::{Serialize, SerializeStruct};
 // Errors
 use failure::{Error, ResultExt};
 #[derive(Debug, Fail)]
