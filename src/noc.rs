@@ -282,7 +282,7 @@ impl Noc {
         {
             if TRACE_OPTIONS.all || TRACE_OPTIONS.noc {
                 let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "noc send" };
-                let trace = json!({ "NocMaster": self.get_name(), "app_msg": msg });
+                let trace = json!({ "app_msg": msg });
                 let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
             }
         }
