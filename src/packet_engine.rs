@@ -4,7 +4,8 @@ use std::{fmt, fmt::Write,
           thread};
 
 use crate::config::{CENTRAL_TREE, CONTINUE_ON_ERROR, DEBUG_OPTIONS,
-                    MAX_NUM_PHYS_PORTS_PER_CELL, TRACE_OPTIONS, PortNo};
+                    MAX_NUM_PHYS_PORTS_PER_CELL, PAYLOAD_DEFAULT_ELEMENT, TRACE_OPTIONS,
+                    ByteArray, PortNo};
 use crate::dal::{add_to_trace, fork_trace_header, update_trace_header};
 use crate::ec_message::{MsgType};
 use crate::ec_message_formats::{PeFromCm, PeToCm,
@@ -236,7 +237,16 @@ impl PacketEngine {
             {
                 if TRACE_OPTIONS.all || TRACE_OPTIONS.pe_cm {
                     let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "recv" };
-                    let trace = json!({ "cell_id": self.cell_id, "msg": &msg });
+                    let trace = match &msg {
+                        CmToPePacket::Packet((_, packet)) => {
+                            let bytes = packet.get_bytes();
+                            let string = std::str::from_utf8(&bytes)?.to_owned();
+                            let default_as_char = PAYLOAD_DEFAULT_ELEMENT as char;
+                            let string = string.replace(default_as_char, "");
+                            json!({ "cell_id": self.cell_id, "msg": string })
+                        },
+                        _ => json!({ "cell_id": &self.cell_id, "msg": msg })
+                    };
                     let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
                 }
             }
@@ -405,7 +415,16 @@ impl PacketEngine {
             {
                 if TRACE_OPTIONS.all || TRACE_OPTIONS.pe_port {
                     let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "pe_recv" };
-                    let trace = json!({ "cell_id": self.cell_id, "msg": &msg });
+                    let trace = match &msg {
+                        PortToPePacket::Packet((_, packet)) => {
+                            let bytes = packet.get_bytes();
+                            let string = std::str::from_utf8(&bytes)?.to_owned();
+                            let default_as_char = PAYLOAD_DEFAULT_ELEMENT as char;
+                            let string = string.replace(default_as_char, "");
+                            json!({ "cell_id": self.cell_id, "msg": string })
+                        },
+                        _ => json!({ "cell_id": &self.cell_id, "msg": msg })
+                    };
                     let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
                 }
             }
@@ -564,20 +583,18 @@ impl PacketEngine {
                 { // Debug block
                     let msg_type = MsgType::msg_type(&packet);
                     let port_tree_id = packet.get_port_tree_id();
-                    {
-                        if TRACE_OPTIONS.all || TRACE_OPTIONS.pe_port {
-                            let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "pe_forward_leafward" };
-                            let trace = json!({ "cell_id": self.cell_id, "port_tree_id": &port_tree_id, "msg_type": &msg_type, "port_nos": &port_nos });
-                            let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
-                        }
-                        if DEBUG_OPTIONS.all || DEBUG_OPTIONS.pe_pkt_send {
-                            match msg_type {
-                                MsgType::Discover => (),
-                                MsgType::DiscoverD => if port_tree_id.is_name(CENTRAL_TREE) { println!("PacketEngine {}: {} on {:?} {} {}", self.cell_id, _f, port_nos, msg_type, port_tree_id); },
-                                MsgType::Manifest => { println!("PacketEngine {} forwarding manifest leafward mask {} entry {}", self.cell_id, mask, entry); },
-                                _ => { println!("PacketEngine {}: {} on {:?} {} {}", self.cell_id, _f, port_nos, msg_type, port_tree_id); }
-                            };
-                        }
+                    if TRACE_OPTIONS.all || TRACE_OPTIONS.pe_port {
+                        let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "pe_forward_leafward" };
+                        let trace = json!({ "cell_id": self.cell_id, "port_tree_id": &port_tree_id, "port_nos": &port_nos, "msg": packet.to_string()? });
+                        let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
+                    }
+                    if DEBUG_OPTIONS.all || DEBUG_OPTIONS.pe_pkt_send {
+                        match msg_type {
+                            MsgType::Discover => (),
+                            MsgType::DiscoverD => if port_tree_id.is_name(CENTRAL_TREE) { println!("PacketEngine {}: {} on {:?} {} {}", self.cell_id, _f, port_nos, msg_type, port_tree_id); },
+                            MsgType::Manifest => { println!("PacketEngine {} forwarding manifest leafward mask {} entry {}", self.cell_id, mask, entry); },
+                            _ => { println!("PacketEngine {}: {} on {:?} {} {}", self.cell_id, _f, port_nos, msg_type, port_tree_id); }
+                        };
                     }
                 }
                 // Only side effects so use explicit loop instead of map

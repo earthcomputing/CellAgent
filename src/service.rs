@@ -97,8 +97,8 @@ impl NocMaster {
         }
         loop {
             let bytes = container_from_vm.recv().context(ServiceError::Chain { func_name: _f, comment: S("NocMaster from vm")})?;
-            let serialized = bytes.as_str()?;
-            let app_msg: Box<dyn AppMessage> = serde_json::from_str(serialized).context(ServiceError::Chain { func_name: _f, comment: S("NocMaster from vm")})?;
+            let serialized = bytes.to_string()?;
+            let app_msg: Box<dyn AppMessage> = serde_json::from_str(&serialized).context(ServiceError::Chain { func_name: _f, comment: S("NocMaster from vm")})?;
             {
                 if TRACE_OPTIONS.all || TRACE_OPTIONS.svc {
                     let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "recv" };
@@ -172,8 +172,8 @@ impl NocAgent {
         }
         loop {
             let bytes = container_from_vm.recv().context(ServiceError::Chain { func_name: _f, comment: S("Agent recv from vm") })?;
-            let serialized = bytes.as_str()?;
-            let app_msg: Box<dyn AppMessage> = serde_json::from_str(serialized).context(ServiceError::Chain { func_name: _f, comment: S("NocMaster from vm") })?;
+            let serialized = bytes.to_string()?;
+            let app_msg: Box<dyn AppMessage> = serde_json::from_str(&serialized).context(ServiceError::Chain { func_name: _f, comment: S("NocMaster from vm") })?;
             {
                 if TRACE_OPTIONS.all || TRACE_OPTIONS.svc {
                     let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "recv" };

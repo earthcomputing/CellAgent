@@ -17,7 +17,7 @@ pub const PACKET_MIN: usize = 64;
 pub const PACKET_MAX: usize = 9000;
 // Control
 pub const CONTINUE_ON_ERROR: bool = false; // Don't close channel following an error if true
-pub const RACE_SLEEP: u64 = 4; // Set to 4 (better is 6) to avoid race condition, 2 if you want to see it
+pub const RACE_SLEEP: u64 = 10; // Set to 4 (better is 6) to avoid race condition, 2 if you want to see it
 pub const AUTO_BREAK: Option<Edge> = (None, Some(Edge(CellNo(1), CellNo(2)))).0;// Use .1 to auto break link
 #[derive(Debug, Copy, Clone, Hash, Serialize, Deserialize)]
 pub enum CellConfig { Small, Medium, Large }
@@ -79,8 +79,8 @@ pub const TRACE_OPTIONS: TraceOptions = TraceOptions {
     cm:       true,
     pe:       true,
     pe_cm:    true,
-    pe_port:  false,
-    port:     false,
+    pe_port:  true,
+    port:     true,
     port_noc: true,
     link:     false
 };
@@ -139,10 +139,14 @@ impl ByteArray {
     pub fn new(str_ref: &str) -> ByteArray {
         ByteArray { bytes: S(str_ref).into_bytes() }
     }
+    pub fn new_from_bytes(bytes: &Vec<u8>) -> ByteArray {
+        ByteArray { bytes: bytes.clone() }
+    }
     pub fn get_bytes(&self) -> &Vec<u8> { &self.bytes }
-    pub fn as_str(&self) -> Result<&str, Error> {
+    pub fn to_string(&self) -> Result<String, Error> {
         let string = std::str::from_utf8(&self.bytes)?;
-        Ok(string)
+        let default_as_char = PAYLOAD_DEFAULT_ELEMENT as char;
+        Ok(string.replace(default_as_char, ""))
     }
 }
 impl fmt::Display for ByteArray {

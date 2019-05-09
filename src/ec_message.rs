@@ -37,14 +37,14 @@ impl MsgType {
         let _f = "get_msg";
         let bytes = Packetizer::unpacketize(packets).context(MessageError::Chain { func_name: _f, comment: S("unpacketize")})?;
         //println!("Message get_msg: serialized {}, packets {:?}", serialized, packets);
-        let serialized = bytes.as_str()?;
-        let msg = serde_json::from_str(serialized)?;
+        let serialized = bytes.to_string()?;
+        let msg = serde_json::from_str(&serialized)?;
         Ok(msg)
     }
     pub fn msg_from_bytes(bytes: &ByteArray) -> Result<Box<dyn Message>, Error> {
         let _f = "msg_from_bytes";
-        let serialized = bytes.as_str()?;
-        let msg = serde_json::from_str(serialized)?;
+        let serialized = bytes.to_string()?;
+        let msg = serde_json::from_str(&serialized)?;
         Ok(msg)
     }
     // A hack for printing debug output only for a specific message type

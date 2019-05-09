@@ -4,7 +4,8 @@ use std::{fmt,
 
 use failure::{Error, ResultExt};
 
-use crate::config::{CENTRAL_TREE, CONTINUE_ON_ERROR, DEBUG_OPTIONS, TRACE_OPTIONS, PortNo};
+use crate::config::{CENTRAL_TREE, CONTINUE_ON_ERROR, DEBUG_OPTIONS, PAYLOAD_DEFAULT_ELEMENT,
+                    TRACE_OPTIONS, PortNo};
 use crate::dal::{add_to_trace, fork_trace_header, update_trace_header};
 use crate::ec_message::MsgType;
 use crate::ec_message_formats::{CaToCmBytes, CmToCa, CmFromCa, CmToPe, CmFromPe, PeToCmPacket,
@@ -86,7 +87,12 @@ impl Cmodel {
             {
                 if TRACE_OPTIONS.all || TRACE_OPTIONS.cm {
                     let trace = match &msg {
-                        CaToCmBytes::Bytes(msg) => json!({"cell_id": &self.cell_id, "msg": (&msg.0, &msg.1, &msg.2, &msg.3.as_str()?[0..20])}),
+                        CaToCmBytes::Bytes((_, _, _, bytes)) => {
+                            json!({"cell_id": &self.cell_id, "msg": bytes.to_string()? })
+                        },
+                        CaToCmBytes::App((_, bytes)) => {
+                            json!({ "cell_id": &self.cell_id, "msg": bytes.to_string()? })
+                        }
                         _ => json!({ "cell_id": &self.cell_id, "msg": &msg })
                     };
                     let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "cm_bytes_from_ca" };
@@ -157,7 +163,12 @@ impl Cmodel {
             {
                 if TRACE_OPTIONS.all || TRACE_OPTIONS.cm {
                     let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "listen_pe_loop" };
-                    let trace = json!({ "cell_id": &self.cell_id, "msg": &msg });
+                    let trace = match &msg {
+                        PeToCmPacket::Packet((_, packet)) => {
+                            json!({ "cell_id": self.cell_id, "msg": packet.to_string()? })
+                        },
+                        _ => json!({ "cell_id": &self.cell_id, "msg": msg })
+                    };
                     let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
                 }
             }
@@ -198,12 +209,10 @@ packets: Vec<Packet>,
             let uuid = packet.get_tree_uuid();
             let bytes = Packetizer::unpacketize(&packets).context(CmodelError::Chain { func_name: _f, comment: S("") })?;
             {
-                if TRACE_OPTIONS.all || TRACE_OPTIONS.cm {
-                    let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "cm_bytes_to_ca" };
-                    let trace = json!({ "cell_id": &self.cell_id, "packet": &packet });
-                    let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f); // sender side, dup
-                }
                 if DEBUG_OPTIONS.all || DEBUG_OPTIONS.cm_from_ca {
+                    let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "cm_bytes_to_ca" };
+                    let trace = json!({ "cell_id": &self.cell_id, "packet": &packet.to_string()? });
+                    let _ = add_to_trace(TraceType::Debug, trace_params, &trace, _f); // sender side, dup
                     let packet_count = packets[0].get_count();
                     let dpi_msg = MsgType::msg_from_bytes(&bytes)?;
                     let dpi_msg_type = dpi_msg.get_msg_type();
