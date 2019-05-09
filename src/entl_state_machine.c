@@ -18,6 +18,12 @@
 
 static inline int get_entl_msg(uint16_t u_daddr) { return u_daddr & ENTL_MESSAGE_MASK; }
 
+static inline int cmp_addr(uint16_t l_high, uint32_t l_low, uint16_t r_high, uint32_t r_low) {
+    if (l_high > r_high) return 1;
+    if (l_high < r_high) return -1;
+    return l_low - r_low;
+}
+
 
 void entl_set_my_adder(entl_state_machine_t *mcn, uint16_t u_addr, uint32_t l_addr) {
     struct timespec ts = current_kernel_time();
@@ -59,6 +65,7 @@ int entl_received(entl_state_machine_t *mcn, uint16_t u_saddr, uint32_t l_saddr,
         case ENTL_STATE_IDLE: {
             STM_TDEBUG("message 0x%04x, Idle state", u_daddr);
         }
+        retval = ENTL_ACTION_NOP;
         break;
 
         case ENTL_STATE_HELLO: {
@@ -66,26 +73,32 @@ int entl_received(entl_state_machine_t *mcn, uint16_t u_saddr, uint32_t l_saddr,
                 mcn->hello_u_addr = u_saddr;
                 mcn->hello_l_addr = l_saddr;
                 mcn->hello_addr_valid = 1;
-                if (mcn->my_u_addr > u_saddr || (mcn->my_u_addr == u_saddr && mcn->my_l_addr > l_saddr)) {
+
+                int ordering = cmp_addr(mcn->my_u_addr, mcn->my_l_addr, u_saddr, l_saddr);
+                if (ordering > 0) {
+                // if ((mcn->my_u_addr > u_saddr) ||  ((mcn->my_u_addr == u_saddr) && (mcn->my_l_addr > l_saddr))) {
                     set_i_sent(mcn, 0);
                     set_i_know(mcn, 0);
                     set_send_next(mcn, 0);
                     set_atomic_state(mcn, ENTL_STATE_WAIT);
                     set_update_time(mcn, ts);
-                    clear_intervals(mcn); 
-                    retval = ENTL_ACTION_SEND;
+                    clear_intervals(mcn);
                     mcn->state_count = 0;
                     STM_TDEBUG("Hello message %d, hello state and win -> Wait state", u_saddr);
+                    retval = ENTL_ACTION_SEND;
                 }
-                else if ((mcn->my_u_addr == u_saddr) && (mcn->my_l_addr == l_saddr)) {
+                else if (ordering == 0) {
+                // else if ((mcn->my_u_addr == u_saddr) && (mcn->my_l_addr == l_saddr)) {
                     // say error as Alan's 1990s problem again
                     STM_TDEBUG("Fatal Error - hello, SAME ADDRESS");
                     set_error(mcn, ENTL_ERROR_SAME_ADDRESS);
                     set_atomic_state(mcn, ENTL_STATE_IDLE);
                     set_update_time(mcn, ts);
+                    retval = ENTL_ACTION_NOP;
                 }
                 else {
                     STM_TDEBUG("Hello message %d, wait state but not win", u_saddr);
+                    retval = ENTL_ACTION_NOP;
                 }
             }
             else if (get_entl_msg(u_daddr) == ENTL_MESSAGE_EVENT_U) {
@@ -96,15 +109,17 @@ int entl_received(entl_state_machine_t *mcn, uint16_t u_saddr, uint32_t l_saddr,
                     set_atomic_state(mcn, ENTL_STATE_SEND);
                     calc_intervals(mcn);
                     set_update_time(mcn, ts);
-                    retval = ENTL_ACTION_SEND;
                     STM_TDEBUG("message %d, Hello -> Send", l_daddr);
+                    retval = ENTL_ACTION_SEND;
                 }
                 else {
                     STM_TDEBUG("Out of sequence: message %d, Hello", l_daddr);
+                    retval = ENTL_ACTION_NOP;
                 }
             }
             else {
                 STM_TDEBUG("non-hello message 0x%04x, hello state", u_daddr);
+                retval = ENTL_ACTION_NOP;
             }
         }
         break;
@@ -120,6 +135,7 @@ int entl_received(entl_state_machine_t *mcn, uint16_t u_saddr, uint32_t l_saddr,
                     set_atomic_state(mcn, ENTL_STATE_HELLO);
                     set_update_time(mcn, ts);
                 }
+                retval = ENTL_ACTION_NOP;
             }
             else if (get_entl_msg(u_daddr) == ENTL_MESSAGE_EVENT_U) {
                 if (l_daddr == get_i_sent(mcn) + 1) {
@@ -127,9 +143,9 @@ int entl_received(entl_state_machine_t *mcn, uint16_t u_saddr, uint32_t l_saddr,
                     set_send_next(mcn, l_daddr + 1);
                     set_atomic_state(mcn, ENTL_STATE_SEND);
                     set_update_time(mcn, ts);
-                    clear_intervals(mcn); 
-                    retval = ENTL_ACTION_SEND;
+                    clear_intervals(mcn);
                     STM_TDEBUG("message %d, Wait -> Send", l_daddr);
+                    retval = ENTL_ACTION_SEND;
                 }
                 else {
                     set_i_know(mcn, 0);
@@ -137,8 +153,9 @@ int entl_received(entl_state_machine_t *mcn, uint16_t u_saddr, uint32_t l_saddr,
                     set_i_sent(mcn, 0);
                     set_atomic_state(mcn, ENTL_STATE_HELLO);
                     set_update_time(mcn, ts);
-                    clear_intervals(mcn); 
+                    clear_intervals(mcn);
                     STM_TDEBUG("Wrong message %d, Wait -> Hello", l_daddr);
+                    retval = ENTL_ACTION_NOP;
                 }
             }
             else {
@@ -160,6 +177,7 @@ int entl_received(entl_state_machine_t *mcn, uint16_t u_saddr, uint32_t l_saddr,
             ||  get_entl_msg(u_daddr) == ENTL_MESSAGE_ACK_U) {
                 if (l_daddr == get_i_know(mcn)) {
                     STM_TDEBUG("Same message %d, Send", l_daddr);
+                    retval = ENTL_ACTION_NOP;
                 }
                 else {
                     set_error(mcn, ENTL_ERROR_FLAG_SEQUENCE);
@@ -168,8 +186,8 @@ int entl_received(entl_state_machine_t *mcn, uint16_t u_saddr, uint32_t l_saddr,
                     set_i_sent(mcn, 0);
                     set_atomic_state(mcn, ENTL_STATE_HELLO);
                     set_update_time(mcn, ts);
-                    retval = ENTL_ACTION_ERROR;
                     STM_TDEBUG("Out of Sequence message %d, Send -> Hello", l_daddr);
+                    retval = ENTL_ACTION_ERROR;
                 }
             }
             else {
@@ -179,8 +197,8 @@ int entl_received(entl_state_machine_t *mcn, uint16_t u_saddr, uint32_t l_saddr,
                 set_i_sent(mcn, 0);
                 set_atomic_state(mcn, ENTL_STATE_HELLO);
                 set_update_time(mcn, ts);
-                retval = ENTL_ACTION_ERROR;
                 STM_TDEBUG("wrong message 0x%04x, Send -> Hello", u_daddr);
+                retval = ENTL_ACTION_ERROR;
             }
         }
         break;
@@ -201,6 +219,7 @@ int entl_received(entl_state_machine_t *mcn, uint16_t u_saddr, uint32_t l_saddr,
                 }
                 else if (get_i_know(mcn) == l_daddr) {
                     STM_TDEBUG("same message %d, Receive", l_daddr);
+                    retval = ENTL_ACTION_NOP;
                 }
                 else {
                     set_error(mcn, ENTL_ERROR_FLAG_SEQUENCE);
@@ -209,8 +228,8 @@ int entl_received(entl_state_machine_t *mcn, uint16_t u_saddr, uint32_t l_saddr,
                     set_i_sent(mcn, 0);
                     set_atomic_state(mcn, ENTL_STATE_HELLO);
                     set_update_time(mcn, ts);
-                    retval = ENTL_ACTION_ERROR;
                     STM_TDEBUG("Out of Sequence message %d, Receive -> Hello", l_daddr);
+                    retval = ENTL_ACTION_ERROR;
                 }
             }
             else if (get_entl_msg(u_daddr) == ENTL_MESSAGE_AIT_U) {
@@ -230,6 +249,7 @@ int entl_received(entl_state_machine_t *mcn, uint16_t u_saddr, uint32_t l_saddr,
                 }
                 else if (get_i_know(mcn) == l_daddr) {
                     STM_TDEBUG("same message %d, Receive", l_daddr);
+                    retval = ENTL_ACTION_NOP;
                 }
                 else {
                     set_error(mcn, ENTL_ERROR_FLAG_SEQUENCE);
@@ -238,8 +258,8 @@ int entl_received(entl_state_machine_t *mcn, uint16_t u_saddr, uint32_t l_saddr,
                     set_i_sent(mcn, 0);
                     set_atomic_state(mcn, ENTL_STATE_HELLO);
                     set_update_time(mcn, ts);
-                    retval = ENTL_ACTION_ERROR;
                     STM_TDEBUG("Out of Sequence message %d, Receive -> Hello", l_daddr);
+                    retval = ENTL_ACTION_ERROR;
                 }
             }
             else {
@@ -249,8 +269,8 @@ int entl_received(entl_state_machine_t *mcn, uint16_t u_saddr, uint32_t l_saddr,
                 set_i_sent(mcn, 0);
                 set_atomic_state(mcn, ENTL_STATE_HELLO);
                 set_update_time(mcn, ts);
-                retval = ENTL_ACTION_ERROR;
                 STM_TDEBUG("Wrong message 0x%04x, Receive -> Hello", u_daddr);
+                retval = ENTL_ACTION_ERROR;
             }
         }
         break;
@@ -262,9 +282,9 @@ int entl_received(entl_state_machine_t *mcn, uint16_t u_saddr, uint32_t l_saddr,
                     set_i_know(mcn, l_daddr);
                     set_send_next(mcn, l_daddr + 1);
                     set_atomic_state(mcn, ENTL_STATE_BM);
-                    retval = ENTL_ACTION_SEND;
                     set_update_time(mcn, ts);
                     STM_TDEBUG("ETL Ack message %d, Am -> Bm", l_daddr);
+                    retval = ENTL_ACTION_SEND;
                 }
                 else {
                     set_error(mcn, ENTL_ERROR_FLAG_SEQUENCE);
@@ -273,13 +293,14 @@ int entl_received(entl_state_machine_t *mcn, uint16_t u_saddr, uint32_t l_saddr,
                     set_i_sent(mcn, 0);
                     set_atomic_state(mcn, ENTL_STATE_HELLO);
                     set_update_time(mcn, ts);
-                    retval = ENTL_ACTION_ERROR;
                     STM_TDEBUG("Out of Sequence message %d, Am -> Hello", l_daddr);
+                    retval = ENTL_ACTION_ERROR;
                 }
             }
             else if (get_entl_msg(u_daddr) == ENTL_MESSAGE_EVENT_U) {
                 if (get_i_know(mcn) == l_daddr) {
                     STM_TDEBUG("same ETL event message %d, Am", l_daddr);
+                    retval = ENTL_ACTION_NOP;
                 }
                 else {
                     set_error(mcn, ENTL_ERROR_FLAG_SEQUENCE);
@@ -288,8 +309,8 @@ int entl_received(entl_state_machine_t *mcn, uint16_t u_saddr, uint32_t l_saddr,
                     set_i_sent(mcn, 0);
                     set_atomic_state(mcn, ENTL_STATE_HELLO);
                     set_update_time(mcn, ts);
-                    retval = ENTL_ACTION_ERROR;
                     STM_TDEBUG("Wrong message 0x%04x, Am -> Hello", u_daddr);
+                    retval = ENTL_ACTION_ERROR;
                 }
             }
             else {
@@ -299,8 +320,8 @@ int entl_received(entl_state_machine_t *mcn, uint16_t u_saddr, uint32_t l_saddr,
                 set_i_sent(mcn, 0);
                 set_atomic_state(mcn, ENTL_STATE_HELLO);
                 set_update_time(mcn, ts);
-                retval = ENTL_ACTION_ERROR;
                 STM_TDEBUG("Wrong message 0x%04x, Am -> Hello", u_daddr);
+                retval = ENTL_ACTION_ERROR;
             }
         }
         break;
@@ -310,6 +331,7 @@ int entl_received(entl_state_machine_t *mcn, uint16_t u_saddr, uint32_t l_saddr,
             if (get_entl_msg(u_daddr) == ENTL_MESSAGE_ACK_U) {
                 if (get_i_know(mcn) == l_daddr) {
                     STM_TDEBUG("same ETL Ack message %d, Bm", l_daddr);
+                    retval = ENTL_ACTION_NOP;
                 }
                 else {
                     set_error(mcn, ENTL_ERROR_FLAG_SEQUENCE);
@@ -318,8 +340,8 @@ int entl_received(entl_state_machine_t *mcn, uint16_t u_saddr, uint32_t l_saddr,
                     set_i_sent(mcn, 0);
                     set_atomic_state(mcn, ENTL_STATE_HELLO);
                     set_update_time(mcn, ts);
-                    retval = ENTL_ACTION_ERROR;
                     STM_TDEBUG("Wrong message 0x%04x, Bm -> Hello", u_daddr);
+                    retval = ENTL_ACTION_ERROR;
                 }
             }
             else {
@@ -329,8 +351,8 @@ int entl_received(entl_state_machine_t *mcn, uint16_t u_saddr, uint32_t l_saddr,
                 set_i_sent(mcn, 0);
                 set_atomic_state(mcn, ENTL_STATE_HELLO);
                 set_update_time(mcn, ts);
-                retval = ENTL_ACTION_ERROR;
                 STM_TDEBUG("Wrong message 0x%04x, Bm -> Hello", u_daddr);
+                retval = ENTL_ACTION_ERROR;
             }
         }
         break;
@@ -340,6 +362,7 @@ int entl_received(entl_state_machine_t *mcn, uint16_t u_saddr, uint32_t l_saddr,
             if (get_entl_msg(u_daddr) == ENTL_MESSAGE_AIT_U) {
                 if (get_i_know(mcn) == l_daddr) {
                     STM_TDEBUG("Same ENTL message %d, Ah", l_daddr);
+                    retval = ENTL_ACTION_NOP;
                 }
                 else {
                     set_error(mcn, ENTL_ERROR_FLAG_SEQUENCE);
@@ -348,8 +371,8 @@ int entl_received(entl_state_machine_t *mcn, uint16_t u_saddr, uint32_t l_saddr,
                     set_i_sent(mcn, 0);
                     set_atomic_state(mcn, ENTL_STATE_HELLO);
                     set_update_time(mcn, ts);
-                    retval = ENTL_ACTION_ERROR;
                     STM_TDEBUG("Out of Sequence message %d, Ah -> Hello", l_daddr);
+                    retval = ENTL_ACTION_ERROR;
                 }
             }
             else {
@@ -359,8 +382,8 @@ int entl_received(entl_state_machine_t *mcn, uint16_t u_saddr, uint32_t l_saddr,
                 set_i_sent(mcn, 0);
                 set_atomic_state(mcn, ENTL_STATE_HELLO);
                 set_update_time(mcn, ts);
-                retval = ENTL_ACTION_ERROR;
                 STM_TDEBUG("wrong message 0x%04x, Send -> Hello", u_daddr);
+                retval = ENTL_ACTION_ERROR;
             }
         }
         break;
@@ -372,11 +395,11 @@ int entl_received(entl_state_machine_t *mcn, uint16_t u_saddr, uint32_t l_saddr,
                     set_i_know(mcn, l_daddr);
                     set_send_next(mcn, l_daddr + 1);
                     set_atomic_state(mcn, ENTL_STATE_SEND);
-                    retval = ENTL_ACTION_SEND | ENTL_ACTION_SIG_AIT;
                     set_update_time(mcn, ts);
                     STM_TDEBUG("ETL Ack message %d, Bh -> Send", l_daddr);
                     ENTT_queue_back_push(&mcn->receive_ATI_queue, mcn->receive_buffer);
                     mcn->receive_buffer = NULL;
+                    retval = ENTL_ACTION_SEND | ENTL_ACTION_SIG_AIT;
                 }
                 else {
                     set_error(mcn, ENTL_ERROR_FLAG_SEQUENCE);
@@ -385,13 +408,14 @@ int entl_received(entl_state_machine_t *mcn, uint16_t u_saddr, uint32_t l_saddr,
                     set_i_sent(mcn, 0);
                     set_atomic_state(mcn, ENTL_STATE_HELLO);
                     set_update_time(mcn, ts);
-                    retval = ENTL_ACTION_ERROR;
                     STM_TDEBUG("Out of Sequence message %d, Am -> Hello", l_daddr);
+                    retval = ENTL_ACTION_ERROR;
                 }
             }
             else if (get_entl_msg(u_daddr) == ENTL_MESSAGE_AIT_U) {
                 if (get_i_know(mcn) == l_daddr) {
                     STM_TDEBUG("Same ENTL message %d, Bh", l_daddr);
+                    retval = ENTL_ACTION_NOP;
                 }
                 else {
                     set_error(mcn, ENTL_ERROR_FLAG_SEQUENCE);
@@ -400,8 +424,8 @@ int entl_received(entl_state_machine_t *mcn, uint16_t u_saddr, uint32_t l_saddr,
                     set_i_sent(mcn, 0);
                     set_atomic_state(mcn, ENTL_STATE_HELLO);
                     set_update_time(mcn, ts);
-                    retval = ENTL_ACTION_ERROR;
                     STM_TDEBUG("Out of Sequence message %d, Bh -> Hello", l_daddr);
+                    retval = ENTL_ACTION_ERROR;
                 }
             }
             else {
@@ -411,8 +435,8 @@ int entl_received(entl_state_machine_t *mcn, uint16_t u_saddr, uint32_t l_saddr,
                 set_i_sent(mcn, 0);
                 set_atomic_state(mcn, ENTL_STATE_HELLO);
                 set_update_time(mcn, ts);
-                retval = ENTL_ACTION_ERROR;
                 STM_TDEBUG("Wrong message 0x%04x, Am -> Hello", u_daddr);
+                retval = ENTL_ACTION_ERROR;
             }
         }
         break;
@@ -426,6 +450,7 @@ int entl_received(entl_state_machine_t *mcn, uint16_t u_saddr, uint32_t l_saddr,
             set_atomic_state(mcn, ENTL_STATE_IDLE);
             set_update_time(mcn, ts);
         }
+        retval = ENTL_ACTION_NOP;
         break;
     }
     STM_UNLOCK;
@@ -440,47 +465,41 @@ int entl_get_hello(entl_state_machine_t *mcn, uint16_t *u_addr, uint32_t *l_addr
         return ENTL_ACTION_NOP;
     }
 
+#define hello_next(hi, lo, action) { *u_addr = hi; *l_addr = lo; ret = action; }
+
     int ret = ENTL_ACTION_NOP;
     STM_LOCK;
         switch (get_atomic_state(mcn)) {
-        case ENTL_STATE_HELLO: {
-            *l_addr = ENTL_MESSAGE_HELLO_L; *u_addr = ENTL_MESSAGE_HELLO_U;
-            ret = ENTL_ACTION_SEND;
-        }
+        case ENTL_STATE_HELLO:
+            hello_next(ENTL_MESSAGE_HELLO_U, ENTL_MESSAGE_HELLO_L, ENTL_ACTION_SEND);
         break;
 
-        case ENTL_STATE_WAIT: {
-            *l_addr = 0; *u_addr = ENTL_MESSAGE_EVENT_U;
-            ret = ENTL_ACTION_SEND;
-        }
+        case ENTL_STATE_WAIT:
+            hello_next(ENTL_MESSAGE_EVENT_U, 0, ENTL_ACTION_SEND);
         break;
 
-        case ENTL_STATE_RECEIVE: {
-            STM_TDEBUG("repeated Message, Receive");
-            *l_addr = get_i_sent(mcn); *u_addr = ENTL_MESSAGE_EVENT_U;
-            ret = ENTL_ACTION_SEND;
-        }
+        case ENTL_STATE_RECEIVE:
+            hello_next(ENTL_MESSAGE_EVENT_U, get_i_sent(mcn), ENTL_ACTION_SEND);
+            STM_TDEBUG("repeat EVENT, Receive");
         break;
 
-        case ENTL_STATE_AM: {
-            STM_TDEBUG("repeated AIT, Am");
-            *l_addr = get_i_sent(mcn); *u_addr = ENTL_MESSAGE_AIT_U;
-            ret = ENTL_ACTION_SEND | ENTL_ACTION_SEND_AIT;
-        }
+        case ENTL_STATE_AM:
+            hello_next(ENTL_MESSAGE_AIT_U, get_i_sent(mcn), ENTL_ACTION_SEND | ENTL_ACTION_SEND_AIT);
+            STM_TDEBUG("repeat AIT, Am");
         break;
 
-        case ENTL_STATE_BH: {
-            if (ENTT_queue_full(&mcn->receive_ATI_queue)) {
+        case ENTL_STATE_BH:
+            if (!ENTT_queue_full(&mcn->receive_ATI_queue)) {
+                hello_next(ENTL_MESSAGE_ACK_U, get_i_sent(mcn), ENTL_ACTION_SEND);
+                STM_TDEBUG("repeat ACK, Bh");
             }
             else {
-                STM_TDEBUG("repeated Ack, Bh");
-                *l_addr = get_i_sent(mcn); *u_addr = ENTL_MESSAGE_ACK_U;
-                ret = ENTL_ACTION_SEND;
+                ret = ENTL_ACTION_NOP;
             }
-        }
         break;
 
         default:
+            ret = ENTL_ACTION_NOP;
         break;
         }
     STM_UNLOCK;
@@ -491,7 +510,7 @@ int entl_next_send(entl_state_machine_t *mcn, uint16_t *u_addr, uint32_t *l_addr
     struct timespec ts = current_kernel_time();
 
     if (mcn->error_state.error_count) {
-        *l_addr = 0; *u_addr = ENTL_MESSAGE_NOP_U;
+        *u_addr = ENTL_MESSAGE_NOP_U; *l_addr = 0;
         STM_TDEBUG("entl_next_send, error count %d", mcn->error_state.error_count);
         return ENTL_ACTION_NOP;
     }
@@ -500,25 +519,26 @@ int entl_next_send(entl_state_machine_t *mcn, uint16_t *u_addr, uint32_t *l_addr
     STM_LOCK;
         switch (get_atomic_state(mcn)) {
         case ENTL_STATE_IDLE: {
-            // say something here as attempt to send something on idle state
             STM_TDEBUG("Message requested, Idle");
-            *l_addr = 0; *u_addr = ENTL_MESSAGE_NOP_U;
+            *u_addr = ENTL_MESSAGE_NOP_U; *l_addr = 0;
         }
+        retval = ENTL_ACTION_NOP;
         break;
 
         case ENTL_STATE_HELLO: {
-            *l_addr = ENTL_MESSAGE_HELLO_L; *u_addr = ENTL_MESSAGE_HELLO_U;
-            retval = ENTL_ACTION_SEND;
+            *u_addr = ENTL_MESSAGE_HELLO_U; *l_addr = ENTL_MESSAGE_HELLO_L;
         }
+        retval = ENTL_ACTION_SEND;
         break;
 
         case ENTL_STATE_WAIT: {
-            *l_addr = 0; *u_addr = ENTL_MESSAGE_EVENT_U;
+            *u_addr = ENTL_MESSAGE_EVENT_U; *l_addr = 0;
         }
+        retval = ENTL_ACTION_NOP;
         break;
 
         case ENTL_STATE_SEND: {
-            uint32_t event_i_know = get_i_know(mcn); // last received event number 
+            uint32_t event_i_know = get_i_know(mcn); // last received event number
             uint32_t event_i_sent = get_i_sent(mcn);
             zebra(mcn);
             advance_send_next(mcn);
@@ -529,8 +549,8 @@ int entl_next_send(entl_state_machine_t *mcn, uint16_t *u_addr, uint32_t *l_addr
             if (event_i_know && event_i_sent && mcn->send_ATI_queue.count) {
                 set_atomic_state(mcn, ENTL_STATE_AM);
                 *u_addr = ENTL_MESSAGE_AIT_U;
-                retval = ENTL_ACTION_SEND | ENTL_ACTION_SEND_AIT;
                 STM_TDEBUG("ETL AIT message %d, Send -> Am", *l_addr);
+                retval = ENTL_ACTION_SEND | ENTL_ACTION_SEND_AIT;
             }
             else {
                 set_atomic_state(mcn, ENTL_STATE_RECEIVE);
@@ -541,24 +561,25 @@ int entl_next_send(entl_state_machine_t *mcn, uint16_t *u_addr, uint32_t *l_addr
         break;
 
         case ENTL_STATE_RECEIVE: {
-            *l_addr = 0; *u_addr = ENTL_MESSAGE_NOP_U;
+            *u_addr = ENTL_MESSAGE_NOP_U; *l_addr = 0;
         }
+        retval = ENTL_ACTION_NOP;
         break;
 
-        // AIT 
+        // AIT
         case ENTL_STATE_AM: {
-            *l_addr = 0; *u_addr = ENTL_MESSAGE_NOP_U;
+            *u_addr = ENTL_MESSAGE_NOP_U; *l_addr = 0;
         }
+        retval = ENTL_ACTION_NOP;
         break;
 
         case ENTL_STATE_BM: {
             struct entt_ioctl_ait_data *ait_data;
             zebra(mcn);
             advance_send_next(mcn);
-            *l_addr = get_i_sent(mcn); *u_addr = ENTL_MESSAGE_ACK_U;
+            *u_addr = ENTL_MESSAGE_ACK_U; *l_addr = get_i_sent(mcn);
             calc_intervals(mcn);
             set_update_time(mcn, ts);
-            retval = ENTL_ACTION_SEND | ENTL_ACTION_SIG_AIT;
             set_atomic_state(mcn, ENTL_STATE_RECEIVE);
             // drop the message on the top
             ait_data = ENTT_queue_front_pop(&mcn->send_ATI_queue);
@@ -567,34 +588,38 @@ int entl_next_send(entl_state_machine_t *mcn, uint16_t *u_addr, uint32_t *l_addr
             }
             STM_TDEBUG("ETL AIT ACK message %d, BM -> Receive", *l_addr);
         }
+        retval = ENTL_ACTION_SEND | ENTL_ACTION_SIG_AIT;
         break;
 
         case ENTL_STATE_AH: {
             if (ENTT_queue_full(&mcn->receive_ATI_queue)) {
-                *l_addr = 0; *u_addr = ENTL_MESSAGE_NOP_U;
+                *u_addr = ENTL_MESSAGE_NOP_U; *l_addr = 0;
+                retval = ENTL_ACTION_NOP;
             }
             else {
                 zebra(mcn);
                 advance_send_next(mcn);
-                *l_addr = get_i_sent(mcn); *u_addr = ENTL_MESSAGE_ACK_U;
+                *u_addr = ENTL_MESSAGE_ACK_U; *l_addr = get_i_sent(mcn);
                 calc_intervals(mcn);
                 set_update_time(mcn, ts);
-                retval = ENTL_ACTION_SEND;
                 set_atomic_state(mcn, ENTL_STATE_BH);
                 STM_TDEBUG("ETL AIT ACK message %d, Ah -> Bh", *l_addr);
+                retval = ENTL_ACTION_SEND;
             }
         }
         break;
 
         case ENTL_STATE_BH: {
-            *l_addr = 0; *u_addr = ENTL_MESSAGE_NOP_U;
+            *u_addr = ENTL_MESSAGE_NOP_U; *l_addr = 0;
         }
+        retval = ENTL_ACTION_NOP;
         break;
 
         default: {
-            *l_addr = 0; *u_addr = ENTL_MESSAGE_NOP_U;
+            *u_addr = ENTL_MESSAGE_NOP_U; *l_addr = 0;
         }
-        break; 
+        retval = ENTL_ACTION_NOP;
+        break;
         }
     STM_UNLOCK;
     return retval;
@@ -605,7 +630,7 @@ int entl_next_send_tx(entl_state_machine_t *mcn, uint16_t *u_addr, uint32_t *l_a
     struct timespec ts = current_kernel_time();
 
     if (mcn->error_state.error_count) {
-        *l_addr = 0; *u_addr = ENTL_MESSAGE_NOP_U;
+        *u_addr = ENTL_MESSAGE_NOP_U; *l_addr = 0;
         STM_TDEBUG("entl_next_send_tx, error count %d", mcn->error_state.error_count);
         return ENTL_ACTION_NOP;
     }
@@ -616,18 +641,23 @@ int entl_next_send_tx(entl_state_machine_t *mcn, uint16_t *u_addr, uint32_t *l_a
         case ENTL_STATE_IDLE: {
             // say something here as attempt to send something on idle state
             STM_TDEBUG("Message requested on Idle state");
-            *l_addr = 0; *u_addr = ENTL_MESSAGE_NOP_U;
+            *u_addr = ENTL_MESSAGE_NOP_U; *l_addr = 0;
         }
+        retval = ENTL_ACTION_NOP;
         break;
+
         case ENTL_STATE_HELLO: {
-            *l_addr = ENTL_MESSAGE_HELLO_L; *u_addr = ENTL_MESSAGE_HELLO_U;
-            retval = ENTL_ACTION_SEND;
+            *u_addr = ENTL_MESSAGE_HELLO_U; *l_addr = ENTL_MESSAGE_HELLO_L;
         }
+        retval = ENTL_ACTION_SEND;
         break;
+
         case ENTL_STATE_WAIT: {
-            *l_addr = 0; *u_addr = ENTL_MESSAGE_EVENT_U;
+            *u_addr = ENTL_MESSAGE_EVENT_U; *l_addr = 0;
         }
+        retval = ENTL_ACTION_NOP;
         break;
+
         case ENTL_STATE_SEND: {
             zebra(mcn);
             advance_send_next(mcn);
@@ -636,56 +666,67 @@ int entl_next_send_tx(entl_state_machine_t *mcn, uint16_t *u_addr, uint32_t *l_a
             set_update_time(mcn, ts);
             set_atomic_state(mcn, ENTL_STATE_RECEIVE);
             *u_addr = ENTL_MESSAGE_EVENT_U;
-            retval = ENTL_ACTION_SEND;
             // For TX, it can't send AIT, so just keep ENTL state on Send state
         }
+        retval = ENTL_ACTION_SEND;
         break;
+
         case ENTL_STATE_RECEIVE: {
-            *l_addr = 0; *u_addr = ENTL_MESSAGE_NOP_U;
+            *u_addr = ENTL_MESSAGE_NOP_U; *l_addr = 0;
         }
+        retval = ENTL_ACTION_NOP;
         break;
-        // AIT 
+
+        // AIT
         case ENTL_STATE_AM: {
-            *l_addr = 0; *u_addr = ENTL_MESSAGE_NOP_U;
+            *u_addr = ENTL_MESSAGE_NOP_U; *l_addr = 0;
         }
+        retval = ENTL_ACTION_NOP;
         break;
+
         case ENTL_STATE_BM: {
             zebra(mcn);
             advance_send_next(mcn);
-            *l_addr = get_i_sent(mcn); *u_addr = ENTL_MESSAGE_ACK_U;
+            *u_addr = ENTL_MESSAGE_ACK_U; *l_addr = get_i_sent(mcn);
             calc_intervals(mcn);
             set_update_time(mcn, ts);
-            retval = ENTL_ACTION_SEND | ENTL_ACTION_SIG_AIT;
             set_atomic_state(mcn, ENTL_STATE_RECEIVE);
             // drop the message on the top
             ENTT_queue_front_pop(&mcn->send_ATI_queue);
             STM_TDEBUG("ETL AIT ACK message %d, BM -> Receive", *l_addr);
         }
+        retval = ENTL_ACTION_SEND | ENTL_ACTION_SIG_AIT;
         break;
+
         case ENTL_STATE_AH: {
             if (ENTT_queue_full(&mcn->receive_ATI_queue)) {
-                *l_addr = 0; *u_addr = ENTL_MESSAGE_NOP_U;
+                *u_addr = ENTL_MESSAGE_NOP_U; *l_addr = 0;
+                retval = ENTL_ACTION_NOP;
             }
             else {
                 zebra(mcn);
                 advance_send_next(mcn);
-                *l_addr = get_i_sent(mcn); *u_addr = ENTL_MESSAGE_ACK_U;
+                *u_addr = ENTL_MESSAGE_ACK_U; *l_addr = get_i_sent(mcn);
                 calc_intervals(mcn);
                 set_update_time(mcn, ts);
-                retval = ENTL_ACTION_SEND;
                 set_atomic_state(mcn, ENTL_STATE_BH);
                 STM_TDEBUG("ETL AIT ACK message %d, Ah -> Bh", *l_addr);
+                retval = ENTL_ACTION_SEND;
             }
         }
         break;
+
         case ENTL_STATE_BH: {
-            *l_addr = 0; *u_addr = ENTL_MESSAGE_NOP_U;
+            *u_addr = ENTL_MESSAGE_NOP_U; *l_addr = 0;
         }
+        retval = ENTL_ACTION_NOP;
         break;
+
         default: {
-            *l_addr = 0; *u_addr = ENTL_MESSAGE_NOP_U;
+            *u_addr = ENTL_MESSAGE_NOP_U; *l_addr = 0;
         }
-        break; 
+        retval = ENTL_ACTION_NOP;
+        break;
         }
     STM_UNLOCK;
     return retval;
@@ -755,7 +796,7 @@ void entl_link_up(entl_state_machine_t *mcn) {
 }
 
 // AIT handling functions
-// Request to send the AIT message, return 0 if OK, -1 if queue full 
+// Request to send the AIT message, return 0 if OK, -1 if queue full
 int entl_send_AIT_message(entl_state_machine_t *mcn, struct entt_ioctl_ait_data *data) {
     STM_LOCK;
         int ret = ENTT_queue_back_push(&mcn->send_ATI_queue, (void *) data);
@@ -763,7 +804,7 @@ int entl_send_AIT_message(entl_state_machine_t *mcn, struct entt_ioctl_ait_data 
     return ret;
 }
 
-// Read the next AIT message to send 
+// Read the next AIT message to send
 struct entt_ioctl_ait_data *entl_next_AIT_message(entl_state_machine_t *mcn) {
     STM_LOCK;
         struct entt_ioctl_ait_data *dt = (struct entt_ioctl_ait_data *) ENTT_queue_front(&mcn->send_ATI_queue);
@@ -771,14 +812,14 @@ struct entt_ioctl_ait_data *entl_next_AIT_message(entl_state_machine_t *mcn) {
     return dt;
 }
 
-// the new AIT message received 
+// the new AIT message received
 void entl_new_AIT_message(entl_state_machine_t *mcn, struct entt_ioctl_ait_data *data) {
     STM_LOCK;
         mcn->receive_buffer = data;
     STM_UNLOCK;
 }
 
-// Read the AIT message, return NULL if queue empty 
+// Read the AIT message, return NULL if queue empty
 struct entt_ioctl_ait_data *entl_read_AIT_message(entl_state_machine_t *mcn) {
     STM_LOCK;
         struct entt_ioctl_ait_data *dt = ENTT_queue_front_pop(&mcn->receive_ATI_queue);
