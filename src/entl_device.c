@@ -397,7 +397,8 @@ static void entl_e1000_configure(struct e1000_adapter *adapter) {
 
         struct entl_state_machine *stm = &dev->edev_stm;
         entl_state_machine_init(stm);
-        strlcpy(stm->name, dev->edev_name, sizeof(stm->name));
+        size_t elen = strlcpy(dev->edev_name, adapter->netdev->name, sizeof(dev->edev_name));
+        size_t slen = strlcpy(stm->name, dev->edev_name, sizeof(stm->name));
         entl_e1000_set_my_addr(dev, netdev->dev_addr);
 
         // force to check the link status on kernel task
