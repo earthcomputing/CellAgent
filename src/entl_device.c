@@ -70,14 +70,14 @@ static void entl_device_init(entl_device_t *dev) {
 }
 
 static void entl_device_link_down(entl_device_t *dev) {
-    struct entl_state_machine *stm = &dev->edev_stm;
+    entl_state_machine_t *stm = &dev->edev_stm;
     entl_state_error(stm, ENTL_ERROR_FLAG_LINKDONW);
     dev->edev_flag = ENTL_DEVICE_FLAG_SIGNAL;
     mod_timer(&dev->edev_watchdog_timer, jiffies + 1);
 }
 
 static void entl_device_link_up(entl_device_t *dev) {
-    struct entl_state_machine *stm = &dev->edev_stm;
+    entl_state_machine_t *stm = &dev->edev_stm;
     entl_link_up(stm);
     dev->edev_flag |= ENTL_DEVICE_FLAG_SIGNAL;
     mod_timer(&dev->edev_watchdog_timer, jiffies + 1);
@@ -115,7 +115,7 @@ static bool entl_device_process_rx_packet(entl_device_t *dev, struct sk_buff *sk
     bool retval = true;
     if (dst_u & ENTL_MESSAGE_ONLY_U) retval = false;
 
-    struct entl_state_machine *stm = &dev->edev_stm;
+    entl_state_machine_t *stm = &dev->edev_stm;
     int result = entl_received(stm, src_u, src_l, dst_u, dst_l);
     if (result == ENTL_ACTION_ERROR) {
         dev->edev_flag |= (ENTL_DEVICE_FLAG_HELLO | ENTL_DEVICE_FLAG_SIGNAL);
@@ -261,7 +261,7 @@ static void entl_device_process_tx_packet(entl_device_t *dev, struct sk_buff *sk
         memcpy(eth->h_dest, d_addr, ETH_ALEN);
     }
     else {
-        struct entl_state_machine *stm = &dev->edev_stm;
+        entl_state_machine_t *stm = &dev->edev_stm;
         uint16_t u_addr;
         uint32_t l_addr;
         int ret = entl_next_send_tx(stm, &u_addr, &l_addr);
@@ -286,7 +286,7 @@ static int entl_do_ioctl(struct net_device *netdev, struct ifreq *ifr, int cmd) 
     struct e1000_adapter *adapter = netdev_priv(netdev);
     entl_device_t *dev = &adapter->entl_dev;
     struct e1000_hw *hw = &adapter->hw;
-    struct entl_state_machine *stm = &dev->edev_stm;
+    entl_state_machine_t *stm = &dev->edev_stm;
 
     switch (cmd) {
     case SIOCDEVPRIVATE_ENTL_RD_CURRENT: {
@@ -395,7 +395,7 @@ static void entl_e1000_configure(struct e1000_adapter *adapter) {
         entl_e1000_configure_rx(adapter);
         adapter->alloc_rx_buf(rx_ring, e1000_desc_unused(rx_ring), GFP_KERNEL);
 
-        struct entl_state_machine *stm = &dev->edev_stm;
+        entl_state_machine_t *stm = &dev->edev_stm;
         entl_state_machine_init(stm);
         size_t elen = strlcpy(dev->edev_name, adapter->netdev->name, sizeof(dev->edev_name));
         size_t slen = strlcpy(stm->name, dev->edev_name, sizeof(stm->name));
@@ -406,7 +406,7 @@ static void entl_e1000_configure(struct e1000_adapter *adapter) {
 }
 
 static void entl_e1000_set_my_addr(entl_device_t *dev, const uint8_t *addr) {
-    struct entl_state_machine *stm = &dev->edev_stm;
+    entl_state_machine_t *stm = &dev->edev_stm;
     uint16_t u_addr = (uint16_t) addr[0] << 8
                                | addr[1];
     uint32_t l_addr = (uint32_t)addr[2] << 24
@@ -457,7 +457,7 @@ static int inject_message(entl_device_t *dev, uint16_t u_addr, uint32_t l_addr, 
     struct e1000_ring *tx_ring = adapter->tx_ring;
     if (e1000_desc_unused(tx_ring) < 3) return 1;
 
-    struct entl_state_machine *stm = &dev->edev_stm;
+    entl_state_machine_t *stm = &dev->edev_stm;
 
     struct entt_ioctl_ait_data *ait_data;
     int len;
@@ -602,7 +602,7 @@ static void entl_watchdog_task(struct work_struct *work) {
             goto restart_watchdog;
         }
 
-        struct entl_state_machine *stm = &dev->edev_stm;
+        entl_state_machine_t *stm = &dev->edev_stm;
         uint32_t entl_state = FETCH_STATE(stm);
         if ((entl_state == ENTL_STATE_HELLO)
         ||  (entl_state == ENTL_STATE_WAIT)
