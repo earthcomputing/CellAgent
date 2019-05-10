@@ -19,9 +19,9 @@
 // FIXME: unused num_messages, num_queued?
 typedef struct entt_ioctl_ait_data {
     uint32_t num_messages;
-    uint32_t num_queued;
     uint32_t message_len;
     char data[MAX_AIT_MESSAGE_SIZE];
+    uint32_t num_queued;
 } entt_ioctl_ait_data_t;
 
 #include "entl_state.h"
