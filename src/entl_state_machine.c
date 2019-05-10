@@ -40,7 +40,7 @@ void entl_set_my_adder(entl_state_machine_t *mcn, uint16_t u_addr, uint32_t l_ad
 uint32_t get_entl_state(entl_state_machine_t *mcn) {
     STM_LOCK;
         uint16_t ret = (mcn->error_state.error_count) ? ENTL_STATE_ERROR : get_atomic_state(mcn);
-    OOPS_STM_UNLOCK;
+    STM_UNLOCK; // OOPS_STM_UNLOCK;
     return ret;
 }
 
@@ -76,7 +76,7 @@ int entl_received(entl_state_machine_t *mcn, uint16_t u_saddr, uint32_t l_saddr,
 
                 int ordering = cmp_addr(mcn->my_u_addr, mcn->my_l_addr, u_saddr, l_saddr);
                 if (ordering > 0) {
-                // if ((mcn->my_u_addr > u_saddr) ||  ((mcn->my_u_addr == u_saddr) && (mcn->my_l_addr > l_saddr))) {
+                // if ((mcn->my_u_addr > u_saddr) ||  ((mcn->my_u_addr == u_saddr) && (mcn->my_l_addr > l_saddr))) { // }
                     set_i_sent(mcn, 0);
                     set_i_know(mcn, 0);
                     set_send_next(mcn, 0);
@@ -88,7 +88,7 @@ int entl_received(entl_state_machine_t *mcn, uint16_t u_saddr, uint32_t l_saddr,
                     retval = ENTL_ACTION_SEND;
                 }
                 else if (ordering == 0) {
-                // else if ((mcn->my_u_addr == u_saddr) && (mcn->my_l_addr == l_saddr)) {
+                // else if ((mcn->my_u_addr == u_saddr) && (mcn->my_l_addr == l_saddr)) { // }
                     // say error as Alan's 1990s problem again
                     STM_TDEBUG("Fatal Error - hello, SAME ADDRESS");
                     set_error(mcn, ENTL_ERROR_SAME_ADDRESS);
@@ -515,26 +515,22 @@ int entl_next_send(entl_state_machine_t *mcn, uint16_t *u_addr, uint32_t *l_addr
         return ENTL_ACTION_NOP;
     }
 
+#define xxx(hi, lo, action) { *u_addr = hi; *l_addr = lo; retval = action; }
+
     int retval = ENTL_ACTION_NOP;
     STM_LOCK;
         switch (get_atomic_state(mcn)) {
-        case ENTL_STATE_IDLE: {
+        case ENTL_STATE_IDLE:
+            xxx(ENTL_MESSAGE_NOP_U, 0, ENTL_ACTION_NOP);
             STM_TDEBUG("Message requested, Idle");
-            *u_addr = ENTL_MESSAGE_NOP_U; *l_addr = 0;
-        }
-        retval = ENTL_ACTION_NOP;
         break;
 
-        case ENTL_STATE_HELLO: {
-            *u_addr = ENTL_MESSAGE_HELLO_U; *l_addr = ENTL_MESSAGE_HELLO_L;
-        }
-        retval = ENTL_ACTION_SEND;
+        case ENTL_STATE_HELLO:
+            xxx(ENTL_MESSAGE_HELLO_U, ENTL_MESSAGE_HELLO_L, ENTL_ACTION_SEND);
         break;
 
-        case ENTL_STATE_WAIT: {
-            *u_addr = ENTL_MESSAGE_EVENT_U; *l_addr = 0;
-        }
-        retval = ENTL_ACTION_NOP;
+        case ENTL_STATE_WAIT:
+            xxx(ENTL_MESSAGE_EVENT_U, 0, ENTL_ACTION_NOP);
         break;
 
         case ENTL_STATE_SEND: {
@@ -542,42 +538,35 @@ int entl_next_send(entl_state_machine_t *mcn, uint16_t *u_addr, uint32_t *l_addr
             uint32_t event_i_sent = get_i_sent(mcn);
             zebra(mcn);
             advance_send_next(mcn);
-            *l_addr = get_i_sent(mcn);
             calc_intervals(mcn);
             set_update_time(mcn, ts);
             // Avoiding to send AIT on the very first loop where other side will be in Hello state
             if (event_i_know && event_i_sent && mcn->send_ATI_queue.count) {
                 set_atomic_state(mcn, ENTL_STATE_AM);
-                *u_addr = ENTL_MESSAGE_AIT_U;
                 STM_TDEBUG("ETL AIT message %d, Send -> Am", *l_addr);
-                retval = ENTL_ACTION_SEND | ENTL_ACTION_SEND_AIT;
+                xxx(ENTL_MESSAGE_AIT_U, get_i_sent(mcn), ENTL_ACTION_SEND | ENTL_ACTION_SEND_AIT);
             }
             else {
                 set_atomic_state(mcn, ENTL_STATE_RECEIVE);
-                *u_addr = ENTL_MESSAGE_EVENT_U;
-                retval = ENTL_ACTION_SEND | ENTL_ACTION_SEND_DAT; // data send as optional
+                xxx(ENTL_MESSAGE_EVENT_U, get_i_sent(mcn), ENTL_ACTION_SEND | ENTL_ACTION_SEND_DAT); // data send as optional
             }
         }
         break;
 
-        case ENTL_STATE_RECEIVE: {
-            *u_addr = ENTL_MESSAGE_NOP_U; *l_addr = 0;
-        }
-        retval = ENTL_ACTION_NOP;
+        case ENTL_STATE_RECEIVE:
+            xxx(ENTL_MESSAGE_NOP_U, 0, ENTL_ACTION_NOP);
         break;
 
         // AIT
-        case ENTL_STATE_AM: {
-            *u_addr = ENTL_MESSAGE_NOP_U; *l_addr = 0;
-        }
-        retval = ENTL_ACTION_NOP;
+        case ENTL_STATE_AM:
+            xxx(ENTL_MESSAGE_NOP_U, 0, ENTL_ACTION_NOP);
         break;
 
         case ENTL_STATE_BM: {
             struct entt_ioctl_ait_data *ait_data;
             zebra(mcn);
             advance_send_next(mcn);
-            *u_addr = ENTL_MESSAGE_ACK_U; *l_addr = get_i_sent(mcn);
+            xxx(ENTL_MESSAGE_ACK_U, get_i_sent(mcn), ENTL_ACTION_SEND | ENTL_ACTION_SIG_AIT);
             calc_intervals(mcn);
             set_update_time(mcn, ts);
             set_atomic_state(mcn, ENTL_STATE_RECEIVE);
@@ -588,37 +577,30 @@ int entl_next_send(entl_state_machine_t *mcn, uint16_t *u_addr, uint32_t *l_addr
             }
             STM_TDEBUG("ETL AIT ACK message %d, BM -> Receive", *l_addr);
         }
-        retval = ENTL_ACTION_SEND | ENTL_ACTION_SIG_AIT;
         break;
 
         case ENTL_STATE_AH: {
             if (ENTT_queue_full(&mcn->receive_ATI_queue)) {
-                *u_addr = ENTL_MESSAGE_NOP_U; *l_addr = 0;
-                retval = ENTL_ACTION_NOP;
+                xxx(ENTL_MESSAGE_NOP_U, 0, ENTL_ACTION_NOP);
             }
             else {
                 zebra(mcn);
                 advance_send_next(mcn);
-                *u_addr = ENTL_MESSAGE_ACK_U; *l_addr = get_i_sent(mcn);
+                xxx(ENTL_MESSAGE_ACK_U, get_i_sent(mcn), ENTL_ACTION_SEND);
                 calc_intervals(mcn);
                 set_update_time(mcn, ts);
                 set_atomic_state(mcn, ENTL_STATE_BH);
                 STM_TDEBUG("ETL AIT ACK message %d, Ah -> Bh", *l_addr);
-                retval = ENTL_ACTION_SEND;
             }
         }
         break;
 
-        case ENTL_STATE_BH: {
-            *u_addr = ENTL_MESSAGE_NOP_U; *l_addr = 0;
-        }
-        retval = ENTL_ACTION_NOP;
+        case ENTL_STATE_BH:
+            xxx(ENTL_MESSAGE_NOP_U, 0, ENTL_ACTION_NOP);
         break;
 
-        default: {
-            *u_addr = ENTL_MESSAGE_NOP_U; *l_addr = 0;
-        }
-        retval = ENTL_ACTION_NOP;
+        default:
+            xxx(ENTL_MESSAGE_NOP_U, 0, ENTL_ACTION_NOP);
         break;
         }
     STM_UNLOCK;
@@ -635,59 +617,48 @@ int entl_next_send_tx(entl_state_machine_t *mcn, uint16_t *u_addr, uint32_t *l_a
         return ENTL_ACTION_NOP;
     }
 
+#define yyy(hi, lo, action) { *u_addr = hi; *l_addr = lo; retval = action; }
+
     int retval = ENTL_ACTION_NOP;
     STM_LOCK;
         switch (get_atomic_state(mcn)) {
-        case ENTL_STATE_IDLE: {
-            // say something here as attempt to send something on idle state
+        case ENTL_STATE_IDLE:
+            yyy(ENTL_MESSAGE_NOP_U, 0, ENTL_ACTION_NOP);
             STM_TDEBUG("Message requested on Idle state");
-            *u_addr = ENTL_MESSAGE_NOP_U; *l_addr = 0;
-        }
-        retval = ENTL_ACTION_NOP;
         break;
 
-        case ENTL_STATE_HELLO: {
-            *u_addr = ENTL_MESSAGE_HELLO_U; *l_addr = ENTL_MESSAGE_HELLO_L;
-        }
-        retval = ENTL_ACTION_SEND;
+        case ENTL_STATE_HELLO:
+            yyy(ENTL_MESSAGE_HELLO_U, ENTL_MESSAGE_HELLO_L, ENTL_ACTION_SEND);
         break;
 
-        case ENTL_STATE_WAIT: {
-            *u_addr = ENTL_MESSAGE_EVENT_U; *l_addr = 0;
-        }
-        retval = ENTL_ACTION_NOP;
+        case ENTL_STATE_WAIT:
+            yyy(ENTL_MESSAGE_EVENT_U, 0, ENTL_ACTION_NOP);
         break;
 
         case ENTL_STATE_SEND: {
             zebra(mcn);
             advance_send_next(mcn);
-            *l_addr = get_i_sent(mcn);
             calc_intervals(mcn);
             set_update_time(mcn, ts);
             set_atomic_state(mcn, ENTL_STATE_RECEIVE);
-            *u_addr = ENTL_MESSAGE_EVENT_U;
+            yyy(ENTL_MESSAGE_EVENT_U, get_i_sent(mcn), ENTL_ACTION_SEND);
             // For TX, it can't send AIT, so just keep ENTL state on Send state
         }
-        retval = ENTL_ACTION_SEND;
         break;
 
-        case ENTL_STATE_RECEIVE: {
-            *u_addr = ENTL_MESSAGE_NOP_U; *l_addr = 0;
-        }
-        retval = ENTL_ACTION_NOP;
+        case ENTL_STATE_RECEIVE:
+            yyy(ENTL_MESSAGE_NOP_U, 0, ENTL_ACTION_NOP);
         break;
 
         // AIT
-        case ENTL_STATE_AM: {
-            *u_addr = ENTL_MESSAGE_NOP_U; *l_addr = 0;
-        }
-        retval = ENTL_ACTION_NOP;
+        case ENTL_STATE_AM:
+            yyy(ENTL_MESSAGE_NOP_U, 0, ENTL_ACTION_NOP);
         break;
 
         case ENTL_STATE_BM: {
             zebra(mcn);
             advance_send_next(mcn);
-            *u_addr = ENTL_MESSAGE_ACK_U; *l_addr = get_i_sent(mcn);
+            yyy(ENTL_MESSAGE_ACK_U, get_i_sent(mcn), ENTL_ACTION_SEND | ENTL_ACTION_SIG_AIT);
             calc_intervals(mcn);
             set_update_time(mcn, ts);
             set_atomic_state(mcn, ENTL_STATE_RECEIVE);
@@ -695,37 +666,30 @@ int entl_next_send_tx(entl_state_machine_t *mcn, uint16_t *u_addr, uint32_t *l_a
             ENTT_queue_front_pop(&mcn->send_ATI_queue);
             STM_TDEBUG("ETL AIT ACK message %d, BM -> Receive", *l_addr);
         }
-        retval = ENTL_ACTION_SEND | ENTL_ACTION_SIG_AIT;
         break;
 
         case ENTL_STATE_AH: {
             if (ENTT_queue_full(&mcn->receive_ATI_queue)) {
-                *u_addr = ENTL_MESSAGE_NOP_U; *l_addr = 0;
-                retval = ENTL_ACTION_NOP;
+                yyy(ENTL_MESSAGE_NOP_U, 0, ENTL_ACTION_NOP);
             }
             else {
                 zebra(mcn);
                 advance_send_next(mcn);
-                *u_addr = ENTL_MESSAGE_ACK_U; *l_addr = get_i_sent(mcn);
+                yyy(ENTL_MESSAGE_ACK_U, get_i_sent(mcn), ENTL_ACTION_SEND);
                 calc_intervals(mcn);
                 set_update_time(mcn, ts);
                 set_atomic_state(mcn, ENTL_STATE_BH);
                 STM_TDEBUG("ETL AIT ACK message %d, Ah -> Bh", *l_addr);
-                retval = ENTL_ACTION_SEND;
             }
         }
         break;
 
-        case ENTL_STATE_BH: {
-            *u_addr = ENTL_MESSAGE_NOP_U; *l_addr = 0;
-        }
-        retval = ENTL_ACTION_NOP;
+        case ENTL_STATE_BH:
+            yyy(ENTL_MESSAGE_NOP_U, 0, ENTL_ACTION_NOP);
         break;
 
-        default: {
-            *u_addr = ENTL_MESSAGE_NOP_U; *l_addr = 0;
-        }
-        retval = ENTL_ACTION_NOP;
+        default:
+            yyy(ENTL_MESSAGE_NOP_U, 0, ENTL_ACTION_NOP);
         break;
         }
     STM_UNLOCK;
