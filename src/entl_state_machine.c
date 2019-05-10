@@ -16,8 +16,6 @@
 #define OOPS_STM_UNLOCK spin_unlock(&mcn->state_lock)
 
 
-static inline int get_entl_msg(uint16_t u_daddr) { return u_daddr & ENTL_MESSAGE_MASK; }
-
 static inline int cmp_addr(uint16_t l_high, uint32_t l_low, uint16_t r_high, uint32_t r_low) {
     if (l_high > r_high) return 1;
     if (l_high < r_high) return -1;

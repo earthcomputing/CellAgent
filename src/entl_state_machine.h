@@ -20,6 +20,8 @@
 #define ENTL_MESSAGE_ONLY_U  0x8000
 #define ENTL_TEST_MASK       0x7f00
 
+static inline int get_entl_msg(uint16_t u_daddr) { return u_daddr & ENTL_MESSAGE_MASK; }
+
 #define ENTL_STATE_IDLE     0
 #define ENTL_STATE_HELLO    1
 #define ENTL_STATE_WAIT     2
