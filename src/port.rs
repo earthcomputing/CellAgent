@@ -89,7 +89,7 @@ impl Port {
             let msg = port_from_noc.recv()?;
             {
                 if TRACE_OPTIONS.all || TRACE_OPTIONS.port {
-                    let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "recv from noc" };
+                    let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "port from noc" };
                     let trace = json!({ "id": self.get_id().get_name(), "msg": msg.to_string()? });
                     let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
                 }
@@ -128,7 +128,7 @@ impl Port {
             let msg = port_from_pe.recv().context(PortError::Chain { func_name: "listen_pe_for_noc", comment: S(self.id.get_name()) + " recv from pe"})?;
             {
                 if TRACE_OPTIONS.all || TRACE_OPTIONS.port_noc {
-                    let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "recv from noc" };
+                    let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "port from pe" };
                     let trace = match &msg {
                         PeToPortPacket::App(bytes) => json!({ "id": self.get_id().get_name(), "msg": bytes.to_string()? }),
                         PeToPortPacket::Packet(packet) => json!({ "id": self.get_id().get_name(), "msg": packet.to_string()? })
@@ -184,7 +184,7 @@ impl Port {
             let msg = port_from_link.recv().context(PortError::Chain { func_name: _f, comment: S(self.id.get_name()) + " recv from link"})?;
             {
                 if TRACE_OPTIONS.all || TRACE_OPTIONS.port {
-                    let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "recv" };
+                    let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "port from link" };
                     let trace = match &msg {
                         LinkToPortPacket::Packet(packet) => json!({ "id": self.get_id().get_name(), "msg": packet.to_string()? }),
                         LinkToPortPacket::Status(status) => json!({ "id": self.get_id().get_name(), "msg": msg})
@@ -204,10 +204,9 @@ impl Port {
                 LinkToPortPacket::Packet(mut packet) => {
                     {
                         if DEBUG_OPTIONS.all | DEBUG_OPTIONS.port {
-                            let msg_type = MsgType::msg_type(&packet);
                             let ait_state = packet.get_ait_state();
-                            let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "port got packet" };
-                            let trace = json!({"id": self.get_id().get_name(), "msg_type": msg_type, "ait_state": ait_state, "packet": packet.to_string()? });
+                            let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "port from link" };
+                            let trace = json!({"id": self.get_id().get_name(), "ait_state": ait_state, "packet": packet.to_string()? });
                             let _ = add_to_trace(TraceType::Debug, trace_params, &trace, _f);
                         }
                     }
@@ -277,14 +276,14 @@ impl Port {
         }
         loop {
             //println!("Port {}: waiting for packet from pe", id);
-            let msg = port_from_pe.recv().context(PortError::Chain { func_name: _f, comment: S(self.id.get_name()) + " recv from port"})?;
+            let msg = port_from_pe.recv().context(PortError::Chain { func_name: _f, comment: S(self.id.get_name()) + " recv from pe"})?;
             let mut packet = match msg.clone() { // clone needed for following trace
                 PeToPortPacket::Packet(packet) => packet,
                 _ => return Err(PortError::App { func_name: _f, port_no: *self.port_number.get_port_no() }.into())
             };
             {
                 if TRACE_OPTIONS.all || TRACE_OPTIONS.port {
-                    let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "recv from pe" };
+                    let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "port from pe" };
                     let trace = json!({ "id": self.get_id().get_name(), "msg": packet.to_string()? });
                     let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
                 }
