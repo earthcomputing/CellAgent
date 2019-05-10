@@ -65,7 +65,7 @@ static inline void unpack_eth(const uint8_t *p, uint16_t *u, uint32_t *l) {
                    | (uint32_t) p[4] <<  8
                    | (uint32_t) p[5];
     *u = src_u;
-    *l = src_l
+    *l = src_l;
 }
 
 static inline void encode_dest(uint8_t *h_dest, uint16_t u_addr, uint32_t l_addr) {
@@ -576,9 +576,9 @@ static void entl_watchdog_task(struct work_struct *work) {
 
         struct task_struct *task = pid_task(find_vpid(subscriber), PIDTYPE_PID);
         struct siginfo info = {
-            .si_signo = SIGIO;
-            .si_int = 1;
-            .si_code = SI_QUEUE;
+            .si_signo = SIGIO,
+            .si_int = 1,
+            .si_code = SI_QUEUE
         };
         if (task != NULL) send_sig_info(SIGUSR2, &info, task);
     }
