@@ -57,6 +57,17 @@ static void entl_watchdog(unsigned long data);
 static void entl_watchdog_task(struct work_struct *work);
 // static void dump_state(char *type, entl_state_t *st, int flag); // debug
 
+static inline void encode_dest(void *h_dest, uint16_t u_addr, uint32_t l_addr) {
+    unsigned char d_addr[ETH_ALEN];
+    d_addr[0] = u_addr >> 8;
+    d_addr[1] = u_addr;
+    d_addr[2] = l_addr >> 24;
+    d_addr[3] = l_addr >> 16;
+    d_addr[4] = l_addr >>  8;
+    d_addr[5] = l_addr;
+    memcpy(h_dest, d_addr, ETH_ALEN);
+}
+
 // netdev entry points:
 static void entl_device_init(entl_device_t *dev) {
     memset(dev, 0, sizeof(struct entl_device));
@@ -251,31 +262,17 @@ static void entl_device_process_tx_packet(entl_device_t *dev, struct sk_buff *sk
     if (skb_is_gso(skb)) {
         uint16_t u_addr = ENTL_MESSAGE_NOP_U;
         uint32_t l_addr = 0;
-        unsigned char d_addr[ETH_ALEN];
-        d_addr[0] = u_addr >> 8;
-        d_addr[1] = u_addr;
-        d_addr[2] = l_addr >> 24;
-        d_addr[3] = l_addr >> 16;
-        d_addr[4] = l_addr >>  8;
-        d_addr[5] = l_addr;
-        memcpy(eth->h_dest, d_addr, ETH_ALEN);
+        encode_dest(eth->h_dest, u_addr, l_addr);
     }
     else {
         entl_state_machine_t *stm = &dev->edev_stm;
-        uint16_t u_addr;
-        uint32_t l_addr;
+        uint16_t u_addr; uint32_t l_addr;
         int ret = entl_next_send_tx(stm, &u_addr, &l_addr);
+        encode_dest(eth->h_dest, u_addr, l_addr);
+
         if (ret & ENTL_ACTION_SIG_AIT) {
             dev->edev_flag |= ENTL_DEVICE_FLAG_SIGNAL2; // AIT send completion signal
         }
-        unsigned char d_addr[ETH_ALEN];
-        d_addr[0] = u_addr >> 8;
-        d_addr[1] = u_addr;
-        d_addr[2] = l_addr >> 24;
-        d_addr[3] = l_addr >> 16;
-        d_addr[4] = l_addr >>  8;
-        d_addr[5] = l_addr;
-        memcpy(eth->h_dest, d_addr, ETH_ALEN);
         if (u_addr != ENTL_MESSAGE_NOP_U) {
             dev->edev_flag &= ~(uint32_t) ENTL_DEVICE_FLAG_WAITING;
         }
@@ -479,17 +476,10 @@ static int inject_message(entl_device_t *dev, uint16_t u_addr, uint32_t l_addr, 
 
     skb->len = len;
 
-    unsigned char d_addr[ETH_ALEN];
-    d_addr[0] = (u_addr >> 8) | 0x80; // messege only
-    d_addr[1] = u_addr;
-    d_addr[2] = l_addr >> 24;
-    d_addr[3] = l_addr >> 16;
-    d_addr[4] = l_addr >>  8;
-    d_addr[5] = l_addr;
-
     struct ethhdr *eth = (struct ethhdr *) skb->data;
     memcpy(eth->h_source, netdev->dev_addr, ETH_ALEN);
-    memcpy(eth->h_dest, d_addr, ETH_ALEN);
+    u_addr |= 0x8000; // message only
+    encode_dest(eth->h_dest, u_addr, l_addr);
     eth->h_proto = 0; // protocol type is not used anyway
 
     if (flag & ENTL_ACTION_SEND_AIT) {
@@ -609,8 +599,7 @@ static void entl_watchdog_task(struct work_struct *work) {
         ||  (entl_state == ENTL_STATE_RECEIVE)
         ||  (entl_state == ENTL_STATE_AM)
         ||  (entl_state == ENTL_STATE_BH)) {
-            uint16_t u_addr;
-            uint32_t l_addr;
+            uint16_t u_addr; uint32_t l_addr;
             int ret = entl_get_hello(stm, &u_addr, &l_addr);
             if (ret) {
                 int result;
