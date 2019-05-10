@@ -57,7 +57,18 @@ static void entl_watchdog(unsigned long data);
 static void entl_watchdog_task(struct work_struct *work);
 // static void dump_state(char *type, entl_state_t *st, int flag); // debug
 
-static inline void encode_dest(void *h_dest, uint16_t u_addr, uint32_t l_addr) {
+static inline void unpack_eth(const uint8_t *p, uint16_t *u, uint32_t *l) {
+    uint16_t src_u = (uint16_t) p[0] << 8
+                             |  p[1];
+    uint32_t src_l = (uint32_t) p[2] << 24
+                   | (uint32_t) p[3] << 16
+                   | (uint32_t) p[4] <<  8
+                   | (uint32_t) p[5];
+    *u = src_u;
+    *l = src_l
+}
+
+static inline void encode_dest(uint8_t *h_dest, uint16_t u_addr, uint32_t l_addr) {
     unsigned char d_addr[ETH_ALEN];
     d_addr[0] = u_addr >> 8;
     d_addr[1] = u_addr;
@@ -101,6 +112,7 @@ static void entl_device_link_up(entl_device_t *dev) {
     }
 }
 
+
 // ISR context
 // returns
 // true when netdev.c should continue to process packet
@@ -109,25 +121,15 @@ static bool entl_device_process_rx_packet(entl_device_t *dev, struct sk_buff *sk
     struct e1000_adapter *adapter = container_of(dev, struct e1000_adapter, entl_dev);
     struct ethhdr *eth = (struct ethhdr *) skb->data;
 
-    uint16_t src_u = (uint16_t) eth->h_source[0] << 8
-                             |  eth->h_source[1];
-    uint32_t src_l = (uint32_t) eth->h_source[2] << 24
-                   | (uint32_t) eth->h_source[3] << 16
-                   | (uint32_t) eth->h_source[4] <<  8
-                   | (uint32_t) eth->h_source[5];
-
-    uint16_t dst_u = (uint16_t) eth->h_dest[0] << 8
-                              | eth->h_dest[1];
-    uint32_t dst_l = (uint32_t) eth->h_dest[2] << 24
-                   | (uint32_t) eth->h_dest[3] << 16
-                   | (uint32_t) eth->h_dest[4] <<  8
-                   | (uint32_t) eth->h_dest[5];
+    uint16_t src_u; uint32_t src_l; unpack_eth(eth->h_source, &src_u, &src_l);
+    uint16_t dst_u; uint32_t dst_l; unpack_eth(eth->h_dest, &dst_u, &dst_l);
 
     bool retval = true;
     if (dst_u & ENTL_MESSAGE_ONLY_U) retval = false;
 
     entl_state_machine_t *stm = &dev->edev_stm;
     int result = entl_received(stm, src_u, src_l, dst_u, dst_l);
+
     if (result == ENTL_ACTION_ERROR) {
         dev->edev_flag |= (ENTL_DEVICE_FLAG_HELLO | ENTL_DEVICE_FLAG_SIGNAL);
         mod_timer(&dev->edev_watchdog_timer, jiffies + 1);
@@ -187,7 +189,8 @@ static bool entl_device_process_rx_packet(entl_device_t *dev, struct sk_buff *sk
             else {
                 // tx queue becomes empty, so inject a new packet
                 int ret = entl_next_send(stm, &dst_u, &dst_l);
-                if ((dst_u & (uint16_t) ENTL_MESSAGE_MASK) != ENTL_MESSAGE_NOP_U) {
+
+                if (get_entl_msg(dst_u) != ENTL_MESSAGE_NOP_U) {
                     unsigned long flags;
                     spin_lock_irqsave(&adapter->entl_txring_lock, flags);
                     result = inject_message(dev, dst_u, dst_l, ret);
@@ -224,11 +227,13 @@ static bool entl_device_process_rx_packet(entl_device_t *dev, struct sk_buff *sk
         }
         else {
             int ret = entl_next_send(stm, &dst_u, &dst_l);
-            if ((dst_u & (uint16_t) ENTL_MESSAGE_MASK) != ENTL_MESSAGE_NOP_U) {
+
+            if (get_entl_msg(dst_u) != ENTL_MESSAGE_NOP_U) {
                 unsigned long flags;
                 spin_lock_irqsave(&adapter->entl_txring_lock, flags);
                 result = inject_message(dev, dst_u, dst_l, ret);
                 spin_unlock_irqrestore(&adapter->entl_txring_lock, flags);
+
                 // failed inject, invoke task
                 if (result == 1) {
                     // resource error, so retry
@@ -260,12 +265,11 @@ static void entl_device_process_tx_packet(entl_device_t *dev, struct sk_buff *sk
 
     // MSS packet can't be used for ENTL message (will use a header over multiple packets)
     if (skb_is_gso(skb)) {
-        uint16_t u_addr = ENTL_MESSAGE_NOP_U;
-        uint32_t l_addr = 0;
-        encode_dest(eth->h_dest, u_addr, l_addr);
+        encode_dest(eth->h_dest, ENTL_MESSAGE_NOP_U, 0);
     }
     else {
         entl_state_machine_t *stm = &dev->edev_stm;
+
         uint16_t u_addr; uint32_t l_addr;
         int ret = entl_next_send_tx(stm, &u_addr, &l_addr);
         encode_dest(eth->h_dest, u_addr, l_addr);
@@ -404,12 +408,7 @@ static void entl_e1000_configure(struct e1000_adapter *adapter) {
 
 static void entl_e1000_set_my_addr(entl_device_t *dev, const uint8_t *addr) {
     entl_state_machine_t *stm = &dev->edev_stm;
-    uint16_t u_addr = (uint16_t) addr[0] << 8
-                               | addr[1];
-    uint32_t l_addr = (uint32_t)addr[2] << 24
-                    | (uint32_t)addr[3] << 16
-                    | (uint32_t)addr[4] <<  8
-                    | (uint32_t)addr[5];
+    uint16_t u_addr; uint32_t l_addr; unpack_eth(addr, &u_addr, &l_addr);
     entl_set_my_adder(stm, u_addr, l_addr);
 }
 
@@ -560,27 +559,31 @@ static void entl_watchdog_task(struct work_struct *work) {
         goto restart_watchdog;
     }
 
-    if ((dev->edev_flag & ENTL_DEVICE_FLAG_SIGNAL) && dev->edev_user_pid) {
-            dev->edev_flag &= ~(uint32_t) ENTL_DEVICE_FLAG_SIGNAL;
+    int subscriber = dev->edev_user_pid;
+    if ((dev->edev_flag & ENTL_DEVICE_FLAG_SIGNAL) && subscriber) {
+        dev->edev_flag &= ~(uint32_t) ENTL_DEVICE_FLAG_SIGNAL;
 
-            struct task_struct *t = pid_task(find_vpid(dev->edev_user_pid), PIDTYPE_PID);
-            struct siginfo info;
-            info.si_signo = SIGIO;
-            info.si_int = 1;
-            info.si_code = SI_QUEUE;
-            if (t != NULL) send_sig_info(SIGUSR1, &info, t);
+        struct task_struct *task = pid_task(find_vpid(subscriber), PIDTYPE_PID);
+        struct siginfo info = {
+            .si_signo = SIGIO,
+            .si_int = 1,
+            .si_code = SI_QUEUE
+        };
+        if (task != NULL) send_sig_info(SIGUSR1, &info, task);
     }
-    else if ((dev->edev_flag & ENTL_DEVICE_FLAG_SIGNAL2) && dev->edev_user_pid) {
-            dev->edev_flag &= ~(uint32_t)ENTL_DEVICE_FLAG_SIGNAL2;
+    else if ((dev->edev_flag & ENTL_DEVICE_FLAG_SIGNAL2) && subscriber) {
+        dev->edev_flag &= ~(uint32_t) ENTL_DEVICE_FLAG_SIGNAL2;
 
-            struct task_struct *t = pid_task(find_vpid(dev->edev_user_pid), PIDTYPE_PID);
-            struct siginfo info;
-            info.si_signo = SIGIO;
-            info.si_int = 1;
-            info.si_code = SI_QUEUE;
-            if (t != NULL) send_sig_info(SIGUSR2, &info, t);
+        struct task_struct *task = pid_task(find_vpid(subscriber), PIDTYPE_PID);
+        struct siginfo info = {
+            .si_signo = SIGIO;
+            .si_int = 1;
+            .si_code = SI_QUEUE;
+        };
+        if (task != NULL) send_sig_info(SIGUSR2, &info, task);
     }
 
+    // notice carrier (i.e. link up)
     if (netif_carrier_ok(adapter->netdev) && (dev->edev_flag & ENTL_DEVICE_FLAG_HELLO)) {
         struct e1000_ring *tx_ring = adapter->tx_ring;
         if (test_bit(__E1000_DOWN, &adapter->state)) {
@@ -594,6 +597,7 @@ static void entl_watchdog_task(struct work_struct *work) {
 
         entl_state_machine_t *stm = &dev->edev_stm;
         uint32_t entl_state = FETCH_STATE(stm);
+
         if ((entl_state == ENTL_STATE_HELLO)
         ||  (entl_state == ENTL_STATE_WAIT)
         ||  (entl_state == ENTL_STATE_RECEIVE)
@@ -602,14 +606,13 @@ static void entl_watchdog_task(struct work_struct *work) {
             uint16_t u_addr; uint32_t l_addr;
             int ret = entl_get_hello(stm, &u_addr, &l_addr);
             if (ret) {
-                int result;
                 unsigned long flags;
                 spin_lock_irqsave(&adapter->entl_txring_lock, flags);
-                result = inject_message(dev, u_addr, l_addr, ret);
+                int result = inject_message(dev, u_addr, l_addr, ret);
                 spin_unlock_irqrestore(&adapter->entl_txring_lock, flags);
 
                 if (result == 0) {
-                    dev->edev_flag &= ~(uint32_t)ENTL_DEVICE_FLAG_HELLO;
+                    dev->edev_flag &= ~(uint32_t) ENTL_DEVICE_FLAG_HELLO;
                 }
             }
         }
@@ -624,15 +627,14 @@ static void entl_watchdog_task(struct work_struct *work) {
         struct e1000_ring *tx_ring = adapter->tx_ring;
         if (e1000_desc_unused(tx_ring) < 3) goto restart_watchdog;
 
-        int result;
         unsigned long flags;
         spin_lock_irqsave(&adapter->entl_txring_lock, flags);
-        result = inject_message(dev, dev->edev_u_addr, dev->edev_l_addr, dev->edev_action);
+        int result = inject_message(dev, dev->edev_u_addr, dev->edev_l_addr, dev->edev_action);
         spin_unlock_irqrestore(&adapter->entl_txring_lock, flags);
 
         if (result == 0) {
             dev->edev_flag &= ~(uint32_t) ENTL_DEVICE_FLAG_RETRY;
-            dev->edev_flag &= ~(uint32_t)ENTL_DEVICE_FLAG_WAITING;
+            dev->edev_flag &= ~(uint32_t) ENTL_DEVICE_FLAG_WAITING;
         }
     }
     else if (dev->edev_flag & ENTL_DEVICE_FLAG_WAITING) {
