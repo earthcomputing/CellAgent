@@ -236,15 +236,14 @@ impl PacketEngine {
             let msg = pe_from_cm.recv().context(PacketEngineError::Chain { func_name: _f, comment: S("recv entry from cm ") + &self.cell_id.get_name()})?;
             {
                 if TRACE_OPTIONS.all || TRACE_OPTIONS.pe_cm {
-                    let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "recv" };
+                    let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "pe from cm" };
                     let trace = match &msg {
                         CmToPePacket::Packet((_, packet)) => {
-                            let bytes = packet.get_bytes();
-                            let string = std::str::from_utf8(&bytes)?.to_owned();
-                            let default_as_char = PAYLOAD_DEFAULT_ELEMENT as char;
-                            let string = string.replace(default_as_char, "");
-                            json!({ "cell_id": self.cell_id, "msg": string })
+                            json!({ "cell_id": self.cell_id, "msg": packet.to_string()? })
                         },
+                        CmToPePacket::App((_, bytes)) => {
+                            json!({ "cell_id": &self.cell_id, "msg": bytes.to_string()? })
+                        }
                         _ => json!({ "cell_id": &self.cell_id, "msg": msg })
                     };
                     let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
@@ -319,7 +318,7 @@ impl PacketEngine {
                     {
                         if TRACE_OPTIONS.all || TRACE_OPTIONS.pe_cm {
                             let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "pe_packet_from_cm" };
-                            let trace = json!({ "cell_id": self.cell_id, "port_tree_id": port_tree_id, "ait_state": ait_state, "msg_type": &msg_type });
+                            let trace = json!({ "cell_id": self.cell_id, "port_tree_id": port_tree_id, "ait_state": ait_state, "msg": packet.to_string()? });
                             let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
                         }
                         if DEBUG_OPTIONS.pe_pkt_recv {
@@ -349,6 +348,13 @@ impl PacketEngine {
                 let broken_outbuf = &mut locked_outbuf[port_no.as_usize()].clone();
                 let reroute_outbuf = &mut locked_outbuf[reroute_port_no.as_usize()];
                 reroute_outbuf.append(broken_outbuf);
+            }
+        }
+        {
+            if TRACE_OPTIONS.all || TRACE_OPTIONS.pe_port {
+                let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "pe to port" };
+                let trace = json!({ "cell_id": self.cell_id, "port_no": reroute_port_no, "msg": packet.to_string()? });
+                let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
             }
         }
         self.pe_to_ports.get(reroute_port_no.as_usize())
@@ -411,10 +417,10 @@ impl PacketEngine {
             }
         }
         loop {
-            let msg = pe_from_ports.recv().context(PacketEngineError::Chain { func_name: _f, comment: S("receive")})?;
+            let msg = pe_from_ports.recv().context(PacketEngineError::Chain { func_name: _f, comment: S("pe from packet")})?;
             {
                 if TRACE_OPTIONS.all || TRACE_OPTIONS.pe_port {
-                    let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "pe_recv" };
+                    let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "pe from port" };
                     let trace = match &msg {
                         PortToPePacket::Packet((_, packet)) => {
                             let bytes = packet.get_bytes();
@@ -422,6 +428,9 @@ impl PacketEngine {
                             let default_as_char = PAYLOAD_DEFAULT_ELEMENT as char;
                             let string = string.replace(default_as_char, "");
                             json!({ "cell_id": self.cell_id, "msg": string })
+                        },
+                        PortToPePacket::App((_, bytes)) => {
+                            json!({ "cell_id": &self.cell_id, "msg": bytes.to_string()? })
                         },
                         _ => json!({ "cell_id": &self.cell_id, "msg": msg })
                     };
@@ -549,9 +558,6 @@ impl PacketEngine {
                 let parent = entry.get_parent();
                 if *parent == 0 {
                     {
-                        if DEBUG_OPTIONS.all || DEBUG_OPTIONS.manifest && MsgType::msg_type(&packet) == MsgType::Manifest {
-                            println!("PacketEngine {} forwarding manifest leafward mask {} entry {}", self.cell_id, user_mask, entry);
-                        };
                         if DEBUG_OPTIONS.all || DEBUG_OPTIONS.pe_pkt_send {
                             let msg_type = MsgType::msg_type(&packet);
                             match msg_type {
@@ -559,7 +565,7 @@ impl PacketEngine {
                                 _ => {
                                     let tree_name = packet.get_port_tree_id();
                                     {
-                                        let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "pe_forward_to_cm" };
+                                        let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "pe to cm rootward" };
                                         let trace = json!({ "cell_id": self.cell_id, "tree_name": &tree_name, "msg_type": &msg_type, "parent_port": &parent });
                                         let _ = add_to_trace(TraceType::Debug, trace_params, &trace, _f);
                                     }
@@ -584,7 +590,7 @@ impl PacketEngine {
                     let msg_type = MsgType::msg_type(&packet);
                     let port_tree_id = packet.get_port_tree_id();
                     if TRACE_OPTIONS.all || TRACE_OPTIONS.pe_port {
-                        let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "pe_forward_leafward" };
+                        let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "pe to cm leafward" };
                         let trace = json!({ "cell_id": self.cell_id, "port_tree_id": &port_tree_id, "port_nos": &port_nos, "msg": packet.to_string()? });
                         let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
                     }

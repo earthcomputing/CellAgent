@@ -87,7 +87,7 @@ impl Noc {
             let app_msg: Box<dyn AppMessage> = serde_json::from_str(&serialized).context(NocError::Chain { func_name: _f, comment: S("") })?;
             {
                 if TRACE_OPTIONS.all || TRACE_OPTIONS.noc {
-                    let trace_params = &TraceHeaderParams { module: "src/noc.rs", line_no: line!(), function: _f, format: "noc_from_port" };
+                    let trace_params = &TraceHeaderParams { module: "src/noc.rs", line_no: line!(), function: _f, format: "noc from port" };
                     let trace = json!({ "id": self.get_name(), "app_msg": app_msg });
                     let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
                 }
@@ -147,7 +147,7 @@ impl Noc {
             let input = &noc_from_application.recv()?;
             {
                 if TRACE_OPTIONS.all || TRACE_OPTIONS.noc {
-                    let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "worker" };
+                    let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "noc from application" };
                     let trace = json!({ "id": self.get_name(), "thread_name": thread::current().name(), "thread_id": TraceHeader::parse(thread::current().id()), "input": input });
                     let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
                 }
@@ -187,9 +187,7 @@ impl Noc {
                                              &noc_master_deploy_tree, &manifest,
                                               &allowed_trees);
         println!("Noc: deploy {} on tree {}", manifest.get_id(), noc_master_deploy_tree);
-        let serialized = serde_json::to_string(&deploy_msg as &dyn AppMessage)?;
-        let bytes = ByteArray::new(&serialized);
-        noc_to_port.send(bytes).context(NocError::Chain { func_name: "create_noc", comment: S("NocMaster")})?;
+        self.send_msg(&deploy_msg, noc_to_port)?;
         // Deploy NocAgent
         let up_tree = UpTreeSpec::new("NocAgent", vec![0]).context(NocError::Chain { func_name: "create_noc", comment: S("NocAgent") })?;
         let service = ContainerSpec::new("NocAgent", "NocAgent", vec![], &allowed_trees).context(NocError::Chain { func_name: "create_noc", comment: S("NocAgent") })?;
@@ -202,9 +200,6 @@ impl Noc {
                                              &allowed_trees);
         println!("Noc: deploy {} on tree {}", manifest.get_id(), noc_agent_deploy_tree);
         self.send_msg(&deploy_msg, noc_to_port)?;
-        let serialized = serde_json::to_string(&deploy_msg as &dyn AppMessage)?;
-        let bytes = ByteArray::new(&serialized);
-        noc_to_port.send(bytes).context(NocError::Chain { func_name: "create_noc", comment: S("NocMaster")})?;
         Ok(())
     }
     // Because of packet forwarding, this tree gets stacked on all cells even though only one of them can receive the deployment message

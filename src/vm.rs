@@ -91,7 +91,10 @@ impl VirtualMachine {
             let msg = vm_from_ca.recv().context("listen_ca_loop").context(VmError::Chain { func_name: "listen_ca_loop", comment: S(self.id.get_name()) })?;
             {
                 if TRACE_OPTIONS.all || TRACE_OPTIONS.vm {
-                    let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "recv" };
+                    let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "vm from ca" };
+                    let trace = json!({ "id": self.id, "msg": msg });
+                    let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
+                    let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "vm to container" };
                     let trace = json!({ "id": self.id, "msg": msg });
                     let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
                 }
@@ -118,7 +121,10 @@ impl VirtualMachine {
             let msg = vm_from_container.recv().context("listen_container_loop").context(VmError::Chain { func_name: "listen_container_loop", comment: S(self.id.get_name()) + " recv from container"})?;
             {
                 if TRACE_OPTIONS.all || TRACE_OPTIONS.vm {
-                    let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "recv" };
+                    let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "vm from container" };
+                    let trace = json!({ "id": self.id, "msg": msg });
+                    let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
+                    let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "vm to ca" };
                     let trace = json!({ "id": self.id, "msg": msg });
                     let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
                 }
