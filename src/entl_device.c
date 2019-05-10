@@ -4,52 +4,17 @@
 
 #include "entl_skb_queue.h"
 #include "entl_state_machine.h"
-
-// entl_state_machine entry points:
-extern void entl_link_up(entl_state_machine_t *mcn);
-extern int entl_next_send(entl_state_machine_t *mcn, uint16_t *u_addr, uint32_t *l_addr); // ENTL_ACTION
-extern int entl_next_send_tx(entl_state_machine_t *mcn, uint16_t *u_addr, uint32_t *l_addr); // ENTL_ACTION
-extern int entl_received(entl_state_machine_t *mcn, uint16_t u_saddr, uint32_t l_saddr, uint16_t u_daddr, uint32_t l_daddr); // ENTL_ACTION
-extern void entl_state_error(entl_state_machine_t *mcn, uint32_t error_flag); // enter error state
 #include "entl_ioctl.h"
-extern void entl_new_AIT_message(entl_state_machine_t *mcn, struct entt_ioctl_ait_data *data);
-extern int entl_send_AIT_message(entl_state_machine_t *mcn, struct entt_ioctl_ait_data *data);
-extern struct entt_ioctl_ait_data *entl_next_AIT_message(entl_state_machine_t *mcn);
-extern struct entt_ioctl_ait_data *entl_read_AIT_message(entl_state_machine_t *mcn); 
-
-extern void entl_read_current_state(entl_state_machine_t *mcn, entl_state_t *st, entl_state_t *err);
-extern void entl_read_error_state(entl_state_machine_t *mcn, entl_state_t *st, entl_state_t *err);
-
-extern uint16_t entl_num_queued(entl_state_machine_t *mcn);
-
-// extern void entl_state_machine_init(entl_state_machine_t *mcn);
-extern void entl_set_my_adder(entl_state_machine_t *mcn, uint16_t u_addr, uint32_t l_addr); 
-
-// algorithm:
-extern int entl_get_hello(entl_state_machine_t *mcn, uint16_t *u_addr, uint32_t *l_addr);
-
 #include "entl_device.h"
+#include "entl_user_api.h"
+
+#include "netdev_entl_if.h"
+#include "entl_stm_if.h"
 
 // copied e1000 routines:
 static void entl_e1000e_set_rx_mode(struct net_device *netdev);
 static void entl_e1000_setup_rctl(struct e1000_adapter *adapter);
 static void entl_e1000_configure_rx(struct e1000_adapter *adapter);
-
-// back references to netdev.c
-static netdev_tx_t e1000_xmit_frame(struct sk_buff *skb, struct net_device *netdev);
-
-// needed by netdev.c
-static void entl_device_init(entl_device_t *dev);
-static void entl_device_link_down(entl_device_t *dev);
-static void entl_device_link_up(entl_device_t *dev);
-static bool entl_device_process_rx_packet(entl_device_t *dev, struct sk_buff *skb);
-static void entl_device_process_tx_packet(entl_device_t *dev, struct sk_buff *skb);
-static int entl_do_ioctl(struct net_device *netdev, struct ifreq *ifr, int cmd);
-static void entl_e1000_configure(struct e1000_adapter *adapter);
-static void entl_e1000_set_my_addr(entl_device_t *dev, const uint8_t *addr);
-#ifdef ENTL_TX_ON_ENTL_ENABLE
-static netdev_tx_t entl_tx_transmit(struct sk_buff *skb, struct net_device *netdev);
-#endif
 
 // forward declarations (internal/private)
 static int inject_message(entl_device_t *dev, uint16_t u_addr, uint32_t l_addr, int flag);
@@ -57,9 +22,10 @@ static void entl_watchdog(unsigned long data);
 static void entl_watchdog_task(struct work_struct *work);
 // static void dump_state(char *type, entl_state_t *st, int flag); // debug
 
+// inline helpers:
 static inline void unpack_eth(const uint8_t *p, uint16_t *u, uint32_t *l) {
     uint16_t src_u = (uint16_t) p[0] << 8
-                             |  p[1];
+                   | (uint16_t) p[1];
     uint32_t src_l = (uint32_t) p[2] << 24
                    | (uint32_t) p[3] << 16
                    | (uint32_t) p[4] <<  8
@@ -70,12 +36,12 @@ static inline void unpack_eth(const uint8_t *p, uint16_t *u, uint32_t *l) {
 
 static inline void encode_dest(uint8_t *h_dest, uint16_t u_addr, uint32_t l_addr) {
     unsigned char d_addr[ETH_ALEN];
-    d_addr[0] = u_addr >> 8;
-    d_addr[1] = u_addr;
-    d_addr[2] = l_addr >> 24;
-    d_addr[3] = l_addr >> 16;
-    d_addr[4] = l_addr >>  8;
-    d_addr[5] = l_addr;
+    d_addr[0] = (u_addr >>  8) & 0xff;
+    d_addr[1] = (u_addr)       & 0xff;
+    d_addr[2] = (l_addr >> 24) & 0xff;
+    d_addr[3] = (l_addr >> 16) & 0xff;
+    d_addr[4] = (l_addr >>  8) & 0xff;
+    d_addr[5] = (l_addr)       & 0xff;
     memcpy(h_dest, d_addr, ETH_ALEN);
 }
 
@@ -111,7 +77,6 @@ static void entl_device_link_up(entl_device_t *dev) {
         mod_timer(&dev->edev_watchdog_timer, jiffies + 1);
     }
 }
-
 
 // ISR context
 // returns
@@ -537,12 +502,6 @@ static int inject_message(entl_device_t *dev, uint16_t u_addr, uint32_t l_addr, 
     return 0;
 }
 
-/*
- *  Author: Atsushi Kasuya
- *    Note: This code is written as .c but actually included in a part of netdevice.c in e1000e driver code
- *     so that it can share the static functions in the driver.
- */
-
 static void entl_watchdog(unsigned long data) {
     entl_device_t *dev = (entl_device_t *)data;
     schedule_work(&dev->edev_watchdog_task); // use global kernel work queue
@@ -656,8 +615,27 @@ restart_watchdog:
 // unused, debug
 #if 0
 static void dump_state(char *type, entl_state_t *st, int flag) {
-    ENTL_DEBUG("%s event_i_know: %d  event_i_sent: %d event_send_next: %d current_state: %d error_flag %x p_error %x error_count %d @ %ld.%ld \n",
-        type, st->event_i_know, st->event_i_sent, st->event_send_next, st->current_state, st->error_flag, st->p_error_flag, st->error_count, st->update_time.tv_sec, st->update_time.tv_nsec
+    ENTL_DEBUG(
+        "%s"
+        " event_i_know: %d"
+        " event_i_sent: %d"
+        " event_send_next: %d"
+        " current_state: %d"
+        " error_flag %x"
+        " p_error %x"
+        " error_count %d"
+        " @ %ld.%ld"
+        "\n",
+
+        type,
+        st->event_i_know,
+        st->event_i_sent,
+        st->event_send_next,
+        st->current_state,
+        st->error_flag,
+        st->p_error_flag,
+        st->error_count,
+        st->update_time.tv_sec, st->update_time.tv_nsec
     );
 
     if (st->error_flag) {

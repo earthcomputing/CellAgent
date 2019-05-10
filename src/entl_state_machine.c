@@ -5,7 +5,8 @@
 
 #include "entl_state_machine.h"
 #include "entt_queue.h"
-
+#include "entl_stm_if.h"
+#include "entl_user_api.h"
 
 // FIXME: duplicate defn
 #define ENTL_DEBUG(fmt, args...) printk(KERN_ALERT "ENTL:" fmt, ## args)
@@ -15,13 +16,11 @@
 #define STM_UNLOCK spin_unlock_irqrestore(&mcn->state_lock, flags)
 #define OOPS_STM_UNLOCK spin_unlock(&mcn->state_lock)
 
-
 static inline int cmp_addr(uint16_t l_high, uint32_t l_low, uint16_t r_high, uint32_t r_low) {
     if (l_high > r_high) return 1;
     if (l_high < r_high) return -1;
     return l_low - r_low;
 }
-
 
 void entl_set_my_adder(entl_state_machine_t *mcn, uint16_t u_addr, uint32_t l_addr) {
     struct timespec ts = current_kernel_time();
