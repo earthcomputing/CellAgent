@@ -93,21 +93,21 @@ static bool entl_device_process_rx_packet(entl_device_t *dev, struct sk_buff *sk
     if (dst_u & ENTL_MESSAGE_ONLY_U) retval = false;
 
     entl_state_machine_t *stm = &dev->edev_stm;
-    int result = entl_received(stm, src_u, src_l, dst_u, dst_l);
+    int recv_action = entl_received(stm, src_u, src_l, dst_u, dst_l);
 
-    if (result == ENTL_ACTION_ERROR) {
+    if (recv_action == ENTL_ACTION_ERROR) {
         dev->edev_flag |= (ENTL_DEVICE_FLAG_HELLO | ENTL_DEVICE_FLAG_SIGNAL);
         mod_timer(&dev->edev_watchdog_timer, jiffies + 1);
         return retval;
     }
 
-    if (result == ENTL_ACTION_SIG_ERR) {
+    if (recv_action == ENTL_ACTION_SIG_ERR) {
         dev->edev_flag |= ENTL_DEVICE_FLAG_SIGNAL;
         mod_timer(&dev->edev_watchdog_timer, jiffies + 1);
         return retval;
     }
 
-    if (result & ENTL_ACTION_PROC_AIT) {
+    if (recv_action & ENTL_ACTION_PROC_AIT) {
         unsigned int len = skb->len;
         if (len > sizeof(struct ethhdr)) {
             struct entt_ioctl_ait_data *ait_data = kzalloc(sizeof(struct entt_ioctl_ait_data), GFP_ATOMIC);
@@ -134,13 +134,13 @@ static bool entl_device_process_rx_packet(entl_device_t *dev, struct sk_buff *sk
         }
     }
 
-    if (result & ENTL_ACTION_SIG_AIT) {
+    if (recv_action & ENTL_ACTION_SIG_AIT) {
         dev->edev_flag |= ENTL_DEVICE_FLAG_SIGNAL2;
     }
 
-    if (result & ENTL_ACTION_SEND) {
+    if (recv_action & ENTL_ACTION_SEND) {
         // SEND_DAT flag is set on SEND state to check if TX queue has data
-        if (result & ENTL_ACTION_SEND_DAT && ENTL_skb_queue_has_data(&dev->edev_tx_skb_queue)) {
+        if (recv_action & ENTL_ACTION_SEND_DAT && ENTL_skb_queue_has_data(&dev->edev_tx_skb_queue)) {
             // TX queue has data, so transfer with data
             struct sk_buff *dt = ENTL_skb_queue_front_pop(&dev->edev_tx_skb_queue);
             while (NULL != dt && skb_is_gso(dt)) { // GSO can't be used for ENTL
@@ -158,11 +158,11 @@ static bool entl_device_process_rx_packet(entl_device_t *dev, struct sk_buff *sk
                 if (get_entl_msg(dst_u) != ENTL_MESSAGE_NOP_U) {
                     unsigned long flags;
                     spin_lock_irqsave(&adapter->entl_txring_lock, flags);
-                    result = inject_message(dev, dst_u, dst_l, ret);
+                    int recv_action2 = inject_message(dev, dst_u, dst_l, ret);
                     spin_unlock_irqrestore(&adapter->entl_txring_lock, flags);
 
                     // failed inject, invoke task
-                    if (result == 1) {
+                    if (recv_action2 == 1) {
                         // resource error, retry
                         dev->edev_u_addr = dst_u;
                         dev->edev_l_addr = dst_l;
@@ -170,7 +170,7 @@ static bool entl_device_process_rx_packet(entl_device_t *dev, struct sk_buff *sk
                         dev->edev_flag |= ENTL_DEVICE_FLAG_RETRY;
                         mod_timer(&dev->edev_watchdog_timer, jiffies + 1);
                     }
-                    else if (result == -1) {
+                    else if (recv_action2 == -1) {
                         entl_state_error(stm, ENTL_ERROR_FATAL);
                         dev->edev_flag |= ENTL_DEVICE_FLAG_SIGNAL;
                         mod_timer(&dev->edev_watchdog_timer, jiffies + 1);
@@ -196,11 +196,11 @@ static bool entl_device_process_rx_packet(entl_device_t *dev, struct sk_buff *sk
             if (get_entl_msg(dst_u) != ENTL_MESSAGE_NOP_U) {
                 unsigned long flags;
                 spin_lock_irqsave(&adapter->entl_txring_lock, flags);
-                result = inject_message(dev, dst_u, dst_l, ret);
+                int recv_action2 = inject_message(dev, dst_u, dst_l, ret);
                 spin_unlock_irqrestore(&adapter->entl_txring_lock, flags);
 
                 // failed inject, invoke task
-                if (result == 1) {
+                if (recv_action2 == 1) {
                     // resource error, so retry
                     dev->edev_u_addr = dst_u;
                     dev->edev_l_addr = dst_l;
@@ -208,7 +208,7 @@ static bool entl_device_process_rx_packet(entl_device_t *dev, struct sk_buff *sk
                     dev->edev_flag |= ENTL_DEVICE_FLAG_RETRY;
                     mod_timer(&dev->edev_watchdog_timer, jiffies + 1);
                 }
-                else if (result == -1) {
+                else if (recv_action2 == -1) {
                     entl_state_error(stm, ENTL_ERROR_FATAL);
                     dev->edev_flag |= ENTL_DEVICE_FLAG_SIGNAL;
                     mod_timer(&dev->edev_watchdog_timer, jiffies + 1);
@@ -236,10 +236,10 @@ static void entl_device_process_tx_packet(entl_device_t *dev, struct sk_buff *sk
         entl_state_machine_t *stm = &dev->edev_stm;
 
         uint16_t u_addr; uint32_t l_addr;
-        int ret = entl_next_send_tx(stm, &u_addr, &l_addr);
+        int send_action = entl_next_send_tx(stm, &u_addr, &l_addr);
         encode_dest(eth->h_dest, u_addr, l_addr);
 
-        if (ret & ENTL_ACTION_SIG_AIT) {
+        if (send_action & ENTL_ACTION_SIG_AIT) {
             dev->edev_flag |= ENTL_DEVICE_FLAG_SIGNAL2; // AIT send completion signal
         }
         if (u_addr != ENTL_MESSAGE_NOP_U) {
@@ -409,7 +409,7 @@ static netdev_tx_t entl_tx_transmit(struct sk_buff *skb, struct net_device *netd
 
 // internal
 
-static int inject_message(entl_device_t *dev, uint16_t u_addr, uint32_t l_addr, int flag) {
+static int inject_message(entl_device_t *dev, uint16_t u_addr, uint32_t l_addr, int send_action) {
     struct e1000_adapter *adapter = container_of(dev, struct e1000_adapter, entl_dev);
     if (test_bit(__E1000_DOWN, &adapter->state)) return 1;
 
@@ -422,7 +422,7 @@ static int inject_message(entl_device_t *dev, uint16_t u_addr, uint32_t l_addr, 
 
     struct entt_ioctl_ait_data *ait_data;
     int len;
-    if (flag & ENTL_ACTION_SEND_AIT) {
+    if (send_action & ENTL_ACTION_SEND_AIT) {
         ait_data = entl_next_AIT_message(stm);
         len = ETH_HLEN + ait_data->message_len + sizeof(uint32_t);
         if (len < ETH_ZLEN) len = ETH_ZLEN; // min 60 - include/uapi/linux/if_ether.h
@@ -446,7 +446,7 @@ static int inject_message(entl_device_t *dev, uint16_t u_addr, uint32_t l_addr, 
     encode_dest(eth->h_dest, u_addr, l_addr);
     eth->h_proto = 0; // protocol type is not used anyway
 
-    if (flag & ENTL_ACTION_SEND_AIT) {
+    if (send_action & ENTL_ACTION_SEND_AIT) {
         unsigned char *cp = skb->data + sizeof(struct ethhdr);
         unsigned char *payload = cp + sizeof(uint32_t);
         memcpy(cp, &ait_data->message_len, sizeof(uint32_t));
@@ -567,10 +567,10 @@ static void entl_watchdog_task(struct work_struct *work) {
             if (ret) {
                 unsigned long flags;
                 spin_lock_irqsave(&adapter->entl_txring_lock, flags);
-                int result = inject_message(dev, u_addr, l_addr, ret);
+                int recv_action = inject_message(dev, u_addr, l_addr, ret);
                 spin_unlock_irqrestore(&adapter->entl_txring_lock, flags);
 
-                if (result == 0) {
+                if (recv_action == 0) {
                     dev->edev_flag &= ~(uint32_t) ENTL_DEVICE_FLAG_HELLO;
                 }
             }
@@ -588,10 +588,10 @@ static void entl_watchdog_task(struct work_struct *work) {
 
         unsigned long flags;
         spin_lock_irqsave(&adapter->entl_txring_lock, flags);
-        int result = inject_message(dev, dev->edev_u_addr, dev->edev_l_addr, dev->edev_action);
+        int recv_action = inject_message(dev, dev->edev_u_addr, dev->edev_l_addr, dev->edev_action);
         spin_unlock_irqrestore(&adapter->entl_txring_lock, flags);
 
-        if (result == 0) {
+        if (recv_action == 0) {
             dev->edev_flag &= ~(uint32_t) ENTL_DEVICE_FLAG_RETRY;
             dev->edev_flag &= ~(uint32_t) ENTL_DEVICE_FLAG_WAITING;
         }
@@ -651,7 +651,7 @@ static void dump_state(char *type, entl_state_t *st, int flag) {
 }
 #endif
 
-// deriviate work - ref: orig-frag-netdev.c, copied-frag-entl_device.c
+// derivative work - ref: orig-frag-netdev.c, copied-frag-entl_device.c
 
 /**
  * entl_e1000e_set_rx_mode - ENTL versin, always set Promiscuous mode
