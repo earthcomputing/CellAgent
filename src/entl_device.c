@@ -153,7 +153,7 @@ static bool entl_device_process_rx_packet(entl_device_t *dev, struct sk_buff *sk
             }
             else {
                 // tx queue empty, inject a new packet
-                uint16_t emsg_raw; uint32_t seqno;
+                uint16_t emsg_raw = (uint16_t) -1; uint32_t seqno = (uint32_t) -1;
                 int ret = entl_next_send(stm, &emsg_raw, &seqno);
 
                 if (get_entl_msg(emsg_raw) != ENTL_MESSAGE_NOP_U) {
@@ -192,7 +192,7 @@ static bool entl_device_process_rx_packet(entl_device_t *dev, struct sk_buff *sk
             }
         }
         else {
-            uint16_t emsg_raw; uint32_t seqno;
+            uint16_t emsg_raw = (uint16_t) -1; uint32_t seqno = (uint32_t) -1;
             int ret = entl_next_send(stm, &emsg_raw, &seqno);
 
             if (get_entl_msg(emsg_raw) != ENTL_MESSAGE_NOP_U) {
@@ -237,7 +237,7 @@ static void entl_device_process_tx_packet(entl_device_t *dev, struct sk_buff *sk
     else {
         entl_state_machine_t *stm = &dev->edev_stm;
 
-        uint16_t emsg_raw; uint32_t seqno;
+        uint16_t emsg_raw = (uint16_t) -1; uint32_t seqno = (uint32_t) -1;
         int send_action = entl_next_send_tx(stm, &emsg_raw, &seqno);
         encode_dest(eth->h_dest, emsg_raw, seqno);
 
@@ -351,11 +351,11 @@ static void edev_init(struct e1000_adapter *adapter) {
     entl_device_t *edev = &adapter->entl_dev;
     ENTL_DEBUG("%s edev_init\n", netdev->name);
     size_t elen = strlcpy(edev->edev_name, netdev->name, sizeof(edev->edev_name));
-    entl_e1000_set_my_addr(adapter, netdev->dev_addr);
 
     entl_state_machine_t *stm = &edev->edev_stm;
     entl_state_machine_init(stm);
     size_t slen = strlcpy(stm->name, edev->edev_name, sizeof(stm->name));
+    entl_e1000_set_my_addr(adapter, netdev->dev_addr);
 
     // FIXME: is this really needed?
     // force to check the link status on kernel task

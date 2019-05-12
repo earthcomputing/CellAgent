@@ -509,9 +509,10 @@ int entl_next_send(entl_state_machine_t *mcn, uint16_t *emsg_raw, uint32_t *seqn
     struct timespec ts = current_kernel_time();
 
     if (mcn->error_state.error_count) {
-        *emsg_raw = ENTL_MESSAGE_NOP_U; *seqno = 0;
+        int ret_action;
+        respond_with(ENTL_MESSAGE_NOP_U, 0, ENTL_ACTION_NOP);
         STM_TDEBUG("entl_next_send, error count %d", mcn->error_state.error_count);
-        return ENTL_ACTION_NOP;
+        return ret_action;
     }
 
     int ret_action = ENTL_ACTION_NOP;
@@ -540,8 +541,8 @@ int entl_next_send(entl_state_machine_t *mcn, uint16_t *emsg_raw, uint32_t *seqn
             // Avoiding to send AIT on the very first loop where other side will be in Hello state
             if (event_i_know && event_i_sent && mcn->send_ATI_queue.count) {
                 set_atomic_state(mcn, ENTL_STATE_AM);
-                STM_TDEBUG("AIT(out): seqno %d, SEND -> AM", *seqno);
                 respond_with(ENTL_MESSAGE_AIT_U, get_i_sent(mcn), ENTL_ACTION_SEND | ENTL_ACTION_SEND_AIT);
+                STM_TDEBUG("AIT(out): seqno %d, SEND -> AM", *seqno);
             }
             else {
                 set_atomic_state(mcn, ENTL_STATE_RECEIVE);
@@ -563,15 +564,15 @@ int entl_next_send(entl_state_machine_t *mcn, uint16_t *emsg_raw, uint32_t *seqn
             zebra(mcn);
             advance_send_next(mcn);
             respond_with(ENTL_MESSAGE_ACK_U, get_i_sent(mcn), ENTL_ACTION_SEND | ENTL_ACTION_SIG_AIT);
+            set_atomic_state(mcn, ENTL_STATE_RECEIVE);
+            STM_TDEBUG("TOCK(out): seqno %d, BM -> RECEIVE", *seqno);
             calc_intervals(mcn);
             set_update_time(mcn, ts);
-            set_atomic_state(mcn, ENTL_STATE_RECEIVE);
             // drop the message on the top
             struct entt_ioctl_ait_data *ait_data = ENTT_queue_front_pop(&mcn->send_ATI_queue);
             if (ait_data) {
                 kfree(ait_data);
             }
-            STM_TDEBUG("TOCK(out): seqno %d, BM -> RECEIVE", *seqno);
         }
         break;
 
@@ -583,10 +584,10 @@ int entl_next_send(entl_state_machine_t *mcn, uint16_t *emsg_raw, uint32_t *seqn
                 zebra(mcn);
                 advance_send_next(mcn);
                 respond_with(ENTL_MESSAGE_ACK_U, get_i_sent(mcn), ENTL_ACTION_SEND);
-                calc_intervals(mcn);
-                set_update_time(mcn, ts);
                 set_atomic_state(mcn, ENTL_STATE_BH);
                 STM_TDEBUG("TOCK(out): seqno %d, AH -> BH", *seqno);
+                calc_intervals(mcn);
+                set_update_time(mcn, ts);
             }
         }
         break;
@@ -608,9 +609,10 @@ int entl_next_send_tx(entl_state_machine_t *mcn, uint16_t *emsg_raw, uint32_t *s
     struct timespec ts = current_kernel_time();
 
     if (mcn->error_state.error_count) {
-        *emsg_raw = ENTL_MESSAGE_NOP_U; *seqno = 0;
+        int ret_action;
+        respond_with(ENTL_MESSAGE_NOP_U, 0, ENTL_ACTION_NOP);
         STM_TDEBUG("entl_next_send_tx, error count %d", mcn->error_state.error_count);
-        return ENTL_ACTION_NOP;
+        return ret_action;
     }
 
     int ret_action = ENTL_ACTION_NOP;
@@ -653,12 +655,12 @@ int entl_next_send_tx(entl_state_machine_t *mcn, uint16_t *emsg_raw, uint32_t *s
             zebra(mcn);
             advance_send_next(mcn);
             respond_with(ENTL_MESSAGE_ACK_U, get_i_sent(mcn), ENTL_ACTION_SEND | ENTL_ACTION_SIG_AIT);
+            set_atomic_state(mcn, ENTL_STATE_RECEIVE);
+            STM_TDEBUG("TOCK(out): seqno %d, BM -> RECEIVE", *seqno);
             calc_intervals(mcn);
             set_update_time(mcn, ts);
-            set_atomic_state(mcn, ENTL_STATE_RECEIVE);
             // drop the message on the top
             ENTT_queue_front_pop(&mcn->send_ATI_queue);
-            STM_TDEBUG("TOCK(out): seqno %d, BM -> RECEIVE", *seqno);
         }
         break;
 
@@ -670,10 +672,10 @@ int entl_next_send_tx(entl_state_machine_t *mcn, uint16_t *emsg_raw, uint32_t *s
                 zebra(mcn);
                 advance_send_next(mcn);
                 respond_with(ENTL_MESSAGE_ACK_U, get_i_sent(mcn), ENTL_ACTION_SEND);
-                calc_intervals(mcn);
-                set_update_time(mcn, ts);
                 set_atomic_state(mcn, ENTL_STATE_BH);
                 STM_TDEBUG("TOCK(out): seqno %d, AH -> BH", *seqno);
+                calc_intervals(mcn);
+                set_update_time(mcn, ts);
             }
         }
         break;
