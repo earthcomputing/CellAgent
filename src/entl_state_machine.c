@@ -16,6 +16,8 @@
 #define STM_UNLOCK spin_unlock_irqrestore(&mcn->state_lock, flags)
 #define OOPS_STM_UNLOCK spin_unlock(&mcn->state_lock)
 
+#define respond_with(hi, lo, action) { *emsg_raw = hi; *seqno = lo; ret_action = action; }
+
 static inline int cmp_addr(uint16_t l_high, uint32_t l_low, uint16_t r_high, uint32_t r_low) {
     if (l_high > r_high) return 1;
     if (l_high < r_high) return -1;
@@ -461,32 +463,30 @@ int entl_get_hello(entl_state_machine_t *mcn, uint16_t *emsg_raw, uint32_t *seqn
         return ENTL_ACTION_NOP;
     }
 
-#define hello_next(hi, lo, action) { *emsg_raw = hi; *seqno = lo; ret_action = action; }
-
     int ret_action = ENTL_ACTION_NOP;
     STM_LOCK;
         switch (get_atomic_state(mcn)) {
         case ENTL_STATE_HELLO:
-            hello_next(ENTL_MESSAGE_HELLO_U, ENTL_MESSAGE_HELLO_L, ENTL_ACTION_SEND);
+            respond_with(ENTL_MESSAGE_HELLO_U, ENTL_MESSAGE_HELLO_L, ENTL_ACTION_SEND);
         break;
 
         case ENTL_STATE_WAIT:
-            hello_next(ENTL_MESSAGE_EVENT_U, 0, ENTL_ACTION_SEND);
+            respond_with(ENTL_MESSAGE_EVENT_U, 0, ENTL_ACTION_SEND);
         break;
 
         case ENTL_STATE_RECEIVE:
-            hello_next(ENTL_MESSAGE_EVENT_U, get_i_sent(mcn), ENTL_ACTION_SEND);
+            respond_with(ENTL_MESSAGE_EVENT_U, get_i_sent(mcn), ENTL_ACTION_SEND);
             STM_TDEBUG("repeat EVENT, Receive");
         break;
 
         case ENTL_STATE_AM:
-            hello_next(ENTL_MESSAGE_AIT_U, get_i_sent(mcn), ENTL_ACTION_SEND | ENTL_ACTION_SEND_AIT);
+            respond_with(ENTL_MESSAGE_AIT_U, get_i_sent(mcn), ENTL_ACTION_SEND | ENTL_ACTION_SEND_AIT);
             STM_TDEBUG("repeat AIT, Am");
         break;
 
         case ENTL_STATE_BH:
             if (!ENTT_queue_full(&mcn->receive_ATI_queue)) {
-                hello_next(ENTL_MESSAGE_ACK_U, get_i_sent(mcn), ENTL_ACTION_SEND);
+                respond_with(ENTL_MESSAGE_ACK_U, get_i_sent(mcn), ENTL_ACTION_SEND);
                 STM_TDEBUG("repeat ACK, Bh");
             }
             else {
@@ -511,22 +511,20 @@ int entl_next_send(entl_state_machine_t *mcn, uint16_t *emsg_raw, uint32_t *seqn
         return ENTL_ACTION_NOP;
     }
 
-#define xxx(hi, lo, action) { *emsg_raw = hi; *seqno = lo; ret_action = action; }
-
     int ret_action = ENTL_ACTION_NOP;
     STM_LOCK;
         switch (get_atomic_state(mcn)) {
         case ENTL_STATE_IDLE:
-            xxx(ENTL_MESSAGE_NOP_U, 0, ENTL_ACTION_NOP);
+            respond_with(ENTL_MESSAGE_NOP_U, 0, ENTL_ACTION_NOP);
             STM_TDEBUG("Message requested, Idle");
         break;
 
         case ENTL_STATE_HELLO:
-            xxx(ENTL_MESSAGE_HELLO_U, ENTL_MESSAGE_HELLO_L, ENTL_ACTION_SEND);
+            respond_with(ENTL_MESSAGE_HELLO_U, ENTL_MESSAGE_HELLO_L, ENTL_ACTION_SEND);
         break;
 
         case ENTL_STATE_WAIT:
-            xxx(ENTL_MESSAGE_EVENT_U, 0, ENTL_ACTION_NOP);
+            respond_with(ENTL_MESSAGE_EVENT_U, 0, ENTL_ACTION_NOP);
         break;
 
         case ENTL_STATE_SEND: {
@@ -540,28 +538,28 @@ int entl_next_send(entl_state_machine_t *mcn, uint16_t *emsg_raw, uint32_t *seqn
             if (event_i_know && event_i_sent && mcn->send_ATI_queue.count) {
                 set_atomic_state(mcn, ENTL_STATE_AM);
                 STM_TDEBUG("ETL AIT seqno %d, Send -> Am", *seqno);
-                xxx(ENTL_MESSAGE_AIT_U, get_i_sent(mcn), ENTL_ACTION_SEND | ENTL_ACTION_SEND_AIT);
+                respond_with(ENTL_MESSAGE_AIT_U, get_i_sent(mcn), ENTL_ACTION_SEND | ENTL_ACTION_SEND_AIT);
             }
             else {
                 set_atomic_state(mcn, ENTL_STATE_RECEIVE);
-                xxx(ENTL_MESSAGE_EVENT_U, get_i_sent(mcn), ENTL_ACTION_SEND | ENTL_ACTION_SEND_DAT); // data send as optional
+                respond_with(ENTL_MESSAGE_EVENT_U, get_i_sent(mcn), ENTL_ACTION_SEND | ENTL_ACTION_SEND_DAT); // data send as optional
             }
         }
         break;
 
         case ENTL_STATE_RECEIVE:
-            xxx(ENTL_MESSAGE_NOP_U, 0, ENTL_ACTION_NOP);
+            respond_with(ENTL_MESSAGE_NOP_U, 0, ENTL_ACTION_NOP);
         break;
 
         // AIT
         case ENTL_STATE_AM:
-            xxx(ENTL_MESSAGE_NOP_U, 0, ENTL_ACTION_NOP);
+            respond_with(ENTL_MESSAGE_NOP_U, 0, ENTL_ACTION_NOP);
         break;
 
         case ENTL_STATE_BM: {
             zebra(mcn);
             advance_send_next(mcn);
-            xxx(ENTL_MESSAGE_ACK_U, get_i_sent(mcn), ENTL_ACTION_SEND | ENTL_ACTION_SIG_AIT);
+            respond_with(ENTL_MESSAGE_ACK_U, get_i_sent(mcn), ENTL_ACTION_SEND | ENTL_ACTION_SIG_AIT);
             calc_intervals(mcn);
             set_update_time(mcn, ts);
             set_atomic_state(mcn, ENTL_STATE_RECEIVE);
@@ -576,12 +574,12 @@ int entl_next_send(entl_state_machine_t *mcn, uint16_t *emsg_raw, uint32_t *seqn
 
         case ENTL_STATE_AH: {
             if (ENTT_queue_full(&mcn->receive_ATI_queue)) {
-                xxx(ENTL_MESSAGE_NOP_U, 0, ENTL_ACTION_NOP);
+                respond_with(ENTL_MESSAGE_NOP_U, 0, ENTL_ACTION_NOP);
             }
             else {
                 zebra(mcn);
                 advance_send_next(mcn);
-                xxx(ENTL_MESSAGE_ACK_U, get_i_sent(mcn), ENTL_ACTION_SEND);
+                respond_with(ENTL_MESSAGE_ACK_U, get_i_sent(mcn), ENTL_ACTION_SEND);
                 calc_intervals(mcn);
                 set_update_time(mcn, ts);
                 set_atomic_state(mcn, ENTL_STATE_BH);
@@ -591,11 +589,11 @@ int entl_next_send(entl_state_machine_t *mcn, uint16_t *emsg_raw, uint32_t *seqn
         break;
 
         case ENTL_STATE_BH:
-            xxx(ENTL_MESSAGE_NOP_U, 0, ENTL_ACTION_NOP);
+            respond_with(ENTL_MESSAGE_NOP_U, 0, ENTL_ACTION_NOP);
         break;
 
         default:
-            xxx(ENTL_MESSAGE_NOP_U, 0, ENTL_ACTION_NOP);
+            respond_with(ENTL_MESSAGE_NOP_U, 0, ENTL_ACTION_NOP);
         break;
         }
     STM_UNLOCK;
@@ -612,22 +610,20 @@ int entl_next_send_tx(entl_state_machine_t *mcn, uint16_t *emsg_raw, uint32_t *s
         return ENTL_ACTION_NOP;
     }
 
-#define yyy(hi, lo, action) { *emsg_raw = hi; *seqno = lo; ret_action = action; }
-
     int ret_action = ENTL_ACTION_NOP;
     STM_LOCK;
         switch (get_atomic_state(mcn)) {
         case ENTL_STATE_IDLE:
-            yyy(ENTL_MESSAGE_NOP_U, 0, ENTL_ACTION_NOP);
+            respond_with(ENTL_MESSAGE_NOP_U, 0, ENTL_ACTION_NOP);
             STM_TDEBUG("Message requested on Idle state");
         break;
 
         case ENTL_STATE_HELLO:
-            yyy(ENTL_MESSAGE_HELLO_U, ENTL_MESSAGE_HELLO_L, ENTL_ACTION_SEND);
+            respond_with(ENTL_MESSAGE_HELLO_U, ENTL_MESSAGE_HELLO_L, ENTL_ACTION_SEND);
         break;
 
         case ENTL_STATE_WAIT:
-            yyy(ENTL_MESSAGE_EVENT_U, 0, ENTL_ACTION_NOP);
+            respond_with(ENTL_MESSAGE_EVENT_U, 0, ENTL_ACTION_NOP);
         break;
 
         case ENTL_STATE_SEND: {
@@ -636,24 +632,24 @@ int entl_next_send_tx(entl_state_machine_t *mcn, uint16_t *emsg_raw, uint32_t *s
             calc_intervals(mcn);
             set_update_time(mcn, ts);
             set_atomic_state(mcn, ENTL_STATE_RECEIVE);
-            yyy(ENTL_MESSAGE_EVENT_U, get_i_sent(mcn), ENTL_ACTION_SEND);
+            respond_with(ENTL_MESSAGE_EVENT_U, get_i_sent(mcn), ENTL_ACTION_SEND);
             // For TX, it can't send AIT, so just keep ENTL state on Send state
         }
         break;
 
         case ENTL_STATE_RECEIVE:
-            yyy(ENTL_MESSAGE_NOP_U, 0, ENTL_ACTION_NOP);
+            respond_with(ENTL_MESSAGE_NOP_U, 0, ENTL_ACTION_NOP);
         break;
 
         // AIT
         case ENTL_STATE_AM:
-            yyy(ENTL_MESSAGE_NOP_U, 0, ENTL_ACTION_NOP);
+            respond_with(ENTL_MESSAGE_NOP_U, 0, ENTL_ACTION_NOP);
         break;
 
         case ENTL_STATE_BM: {
             zebra(mcn);
             advance_send_next(mcn);
-            yyy(ENTL_MESSAGE_ACK_U, get_i_sent(mcn), ENTL_ACTION_SEND | ENTL_ACTION_SIG_AIT);
+            respond_with(ENTL_MESSAGE_ACK_U, get_i_sent(mcn), ENTL_ACTION_SEND | ENTL_ACTION_SIG_AIT);
             calc_intervals(mcn);
             set_update_time(mcn, ts);
             set_atomic_state(mcn, ENTL_STATE_RECEIVE);
@@ -665,12 +661,12 @@ int entl_next_send_tx(entl_state_machine_t *mcn, uint16_t *emsg_raw, uint32_t *s
 
         case ENTL_STATE_AH: {
             if (ENTT_queue_full(&mcn->receive_ATI_queue)) {
-                yyy(ENTL_MESSAGE_NOP_U, 0, ENTL_ACTION_NOP);
+                respond_with(ENTL_MESSAGE_NOP_U, 0, ENTL_ACTION_NOP);
             }
             else {
                 zebra(mcn);
                 advance_send_next(mcn);
-                yyy(ENTL_MESSAGE_ACK_U, get_i_sent(mcn), ENTL_ACTION_SEND);
+                respond_with(ENTL_MESSAGE_ACK_U, get_i_sent(mcn), ENTL_ACTION_SEND);
                 calc_intervals(mcn);
                 set_update_time(mcn, ts);
                 set_atomic_state(mcn, ENTL_STATE_BH);
@@ -680,11 +676,11 @@ int entl_next_send_tx(entl_state_machine_t *mcn, uint16_t *emsg_raw, uint32_t *s
         break;
 
         case ENTL_STATE_BH:
-            yyy(ENTL_MESSAGE_NOP_U, 0, ENTL_ACTION_NOP);
+            respond_with(ENTL_MESSAGE_NOP_U, 0, ENTL_ACTION_NOP);
         break;
 
         default:
-            yyy(ENTL_MESSAGE_NOP_U, 0, ENTL_ACTION_NOP);
+            respond_with(ENTL_MESSAGE_NOP_U, 0, ENTL_ACTION_NOP);
         break;
         }
     STM_UNLOCK;

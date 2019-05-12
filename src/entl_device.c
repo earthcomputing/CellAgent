@@ -25,11 +25,11 @@ static void entl_watchdog_task(struct work_struct *work);
 // inline helpers:
 static inline void unpack_eth(const uint8_t *p, uint16_t *u, uint32_t *l) {
     uint16_t mac_hi = (uint16_t) p[0] << 8
-                   | (uint16_t) p[1];
+                    | (uint16_t) p[1];
     uint32_t mac_lo = (uint32_t) p[2] << 24
-                   | (uint32_t) p[3] << 16
-                   | (uint32_t) p[4] <<  8
-                   | (uint32_t) p[5];
+                    | (uint32_t) p[3] << 16
+                    | (uint32_t) p[4] <<  8
+                    | (uint32_t) p[5];
     *u = mac_hi;
     *l = mac_lo;
 }
@@ -93,7 +93,7 @@ static bool entl_device_process_rx_packet(entl_device_t *dev, struct sk_buff *sk
     if (emsg_raw & ENTL_MESSAGE_ONLY_U) retval = false;
 
     entl_state_machine_t *stm = &dev->edev_stm;
-    int recv_action = entl_received(stm, smac_hi, smac_lo, emsg_raw, seqno); // smac_hi: from_hi, smac_lo: from_lo
+    int recv_action = entl_received(stm, smac_hi, smac_lo, emsg_raw, seqno);
 
     if (recv_action == ENTL_ACTION_ERROR) {
         dev->edev_flag |= (ENTL_DEVICE_FLAG_HELLO | ENTL_DEVICE_FLAG_SIGNAL);
@@ -109,7 +109,10 @@ static bool entl_device_process_rx_packet(entl_device_t *dev, struct sk_buff *sk
 
     if (recv_action & ENTL_ACTION_PROC_AIT) {
         unsigned int len = skb->len;
-        if (len > sizeof(struct ethhdr)) {
+        if (len <= sizeof(struct ethhdr)) {
+            // FIXME
+        }
+        else {
             struct entt_ioctl_ait_data *ait_data = kzalloc(sizeof(struct entt_ioctl_ait_data), GFP_ATOMIC);
             unsigned char *data = skb->data + sizeof(struct ethhdr);
             uint32_t nbytes;
@@ -129,9 +132,6 @@ static bool entl_device_process_rx_packet(entl_device_t *dev, struct sk_buff *sk
             }
             entl_new_AIT_message(stm, ait_data);
         }
-        else {
-            // FIXME
-        }
     }
 
     if (recv_action & ENTL_ACTION_SIG_AIT) {
@@ -139,7 +139,7 @@ static bool entl_device_process_rx_packet(entl_device_t *dev, struct sk_buff *sk
     }
 
     if (recv_action & ENTL_ACTION_SEND) {
-        // SEND_DAT flag is set on SEND state to check if TX queue has data
+        // SEND_DAT is set on SEND state to check if TX queue has data
         if (recv_action & ENTL_ACTION_SEND_DAT && ENTL_skb_queue_has_data(&dev->edev_tx_skb_queue)) {
             // TX queue has data, so transfer with data
             struct sk_buff *dt = ENTL_skb_queue_front_pop(&dev->edev_tx_skb_queue);
@@ -152,7 +152,7 @@ static bool entl_device_process_rx_packet(entl_device_t *dev, struct sk_buff *sk
                 e1000_xmit_frame(dt, adapter->netdev);
             }
             else {
-                // tx queue becomes empty, so inject a new packet
+                // tx queue empty, inject a new packet
                 uint16_t emsg_raw; uint32_t seqno;
                 int ret = entl_next_send(stm, &emsg_raw, &seqno);
 
