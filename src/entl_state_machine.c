@@ -206,11 +206,9 @@ int entl_received(entl_state_machine_t *mcn, uint16_t u_saddr, uint32_t l_saddr,
                     set_i_know(mcn, l_daddr);
                     set_send_next(mcn, l_daddr + 1);
                     set_atomic_state(mcn, ENTL_STATE_SEND);
-                    if (mcn->send_ATI_queue.count) { // AIT has priority
-                        ret_action = ENTL_ACTION_SEND;
-                    }
-                    else {
-                        ret_action = ENTL_ACTION_SEND | ENTL_ACTION_SEND_DAT; // data send as optional
+                    ret_action = ENTL_ACTION_SEND;
+                    if (!mcn->send_ATI_queue.count) { // AIT has priority
+                        ret_action |= ENTL_ACTION_SEND_DAT; // data send as optional
                     }
                     set_update_time(mcn, ts);
                 }
@@ -234,12 +232,12 @@ int entl_received(entl_state_machine_t *mcn, uint16_t u_saddr, uint32_t l_saddr,
                     set_i_know(mcn, l_daddr);
                     set_send_next(mcn, l_daddr + 1);
                     set_atomic_state(mcn, ENTL_STATE_AH);
-                    if (ENTT_queue_full(&mcn->receive_ATI_queue)) {
-                        STM_TDEBUG("message %d, queue full -> Ah", l_daddr);
-                        ret_action = ENTL_ACTION_PROC_AIT;
+                    ret_action = ENTL_ACTION_PROC_AIT;
+                    if (!ENTT_queue_full(&mcn->receive_ATI_queue)) {
+                        ret_action |= ENTL_ACTION_SEND;
                     }
                     else {
-                        ret_action = ENTL_ACTION_SEND | ENTL_ACTION_PROC_AIT;
+                        STM_TDEBUG("message %d, queue full -> Ah", l_daddr);
                     }
                     set_update_time(mcn, ts);
                     STM_TDEBUG("message %d, Receive -> Ah", l_daddr);
