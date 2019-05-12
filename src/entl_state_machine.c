@@ -99,7 +99,7 @@ int entl_received(entl_state_machine_t *mcn, uint16_t from_hi, uint32_t from_lo,
                     ret_action = ENTL_ACTION_NOP;
                 }
                 else {
-                    STM_TDEBUG("neighbor %04x %08x, HELLO (slave) -> WAIT", from_hi, from_lo);
+                    STM_TDEBUG("neighbor %04x %08x, HELLO (slave)", from_hi, from_lo);
                     ret_action = ENTL_ACTION_NOP;
                 }
             }
@@ -111,7 +111,7 @@ int entl_received(entl_state_machine_t *mcn, uint16_t from_hi, uint32_t from_lo,
                     set_atomic_state(mcn, ENTL_STATE_SEND);
                     calc_intervals(mcn);
                     set_update_time(mcn, ts);
-                    STM_TDEBUG("TICK: seqno %d, HELLO -> SEND", seqno);
+                    STM_TDEBUG("TICK: seqno %d, HELLO (slave) -> SEND", seqno);
                     ret_action = ENTL_ACTION_SEND;
                 }
                 else {
@@ -147,7 +147,7 @@ int entl_received(entl_state_machine_t *mcn, uint16_t from_hi, uint32_t from_lo,
                     set_atomic_state(mcn, ENTL_STATE_SEND);
                     set_update_time(mcn, ts);
                     clear_intervals(mcn);
-                    STM_TDEBUG("TICK: seqno %d, WAIT -> SEND", seqno);
+                    STM_TDEBUG("TICK: seqno %d, WAIT (master) -> SEND", seqno);
                     ret_action = ENTL_ACTION_SEND;
                 }
                 else {
