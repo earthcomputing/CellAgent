@@ -1,6 +1,6 @@
 
 #define FETCH_STATE(stm) 0 /* ((stm)->current_state.current_state) */
-#define ENTL_DEBUG(fmt, args...) printk(KERN_ALERT "ENTL:" fmt, ## args)
+#define ENTL_DEBUG(fmt, args...) printk(KERN_ALERT "ENTL: " fmt, ## args)
 
 #include "entl_skb_queue.h"
 #include "entl_state_machine.h"
@@ -331,7 +331,7 @@ static int entl_do_ioctl(struct net_device *netdev, struct ifreq *ifr, int cmd) 
     break;
 
     default:
-        ENTL_DEBUG("ENTL %s ioctl error: undefined cmd %d\n", netdev->name, cmd);
+        ENTL_DEBUG("%s ioctl error: undefined cmd %d\n", netdev->name, cmd);
         break;
     }
 
@@ -339,7 +339,7 @@ static int entl_do_ioctl(struct net_device *netdev, struct ifreq *ifr, int cmd) 
 }
 
 static void entl_e1000_set_my_addr(struct e1000_adapter *adapter, const uint8_t *addr) {
-    ENTL_DEBUG("ENTL %s macaddr %02x:%02x:%02x:%02x:%02x:%02x\n", adapter->netdev->name, addr[0], addr[1], addr[2], addr[3], addr[4], addr[5]);
+    ENTL_DEBUG("%s macaddr %02x:%02x:%02x:%02x:%02x:%02x\n", adapter->netdev->name, addr[0], addr[1], addr[2], addr[3], addr[4], addr[5]);
     entl_device_t *edev = &adapter->entl_dev;
     entl_state_machine_t *stm = &edev->edev_stm;
     uint16_t u_addr; uint32_t l_addr; unpack_eth(addr, &u_addr, &l_addr);
@@ -347,19 +347,20 @@ static void entl_e1000_set_my_addr(struct e1000_adapter *adapter, const uint8_t 
 }
 
 static void edev_init(struct e1000_adapter *adapter) {
-        struct net_device *netdev = adapter->netdev;
-        entl_device_t *edev = &adapter->entl_dev;
-        size_t elen = strlcpy(edev->edev_name, netdev->name, sizeof(edev->edev_name));
-        entl_e1000_set_my_addr(adapter, netdev->dev_addr);
+    struct net_device *netdev = adapter->netdev;
+    entl_device_t *edev = &adapter->entl_dev;
+    ENTL_DEBUG("%s edev_init\n", netdev->name);
+    size_t elen = strlcpy(edev->edev_name, netdev->name, sizeof(edev->edev_name));
+    entl_e1000_set_my_addr(adapter, netdev->dev_addr);
 
-        entl_state_machine_t *stm = &edev->edev_stm;
-        entl_state_machine_init(stm);
-        size_t slen = strlcpy(stm->name, edev->edev_name, sizeof(stm->name));
+    entl_state_machine_t *stm = &edev->edev_stm;
+    entl_state_machine_init(stm);
+    size_t slen = strlcpy(stm->name, edev->edev_name, sizeof(stm->name));
 
-        // FIXME: is this really needed?
-        // force to check the link status on kernel task
-        struct e1000_hw *hw = &adapter->hw;
-        hw->mac.get_link_status = true;
+    // FIXME: is this really needed?
+    // force to check the link status on kernel task
+    struct e1000_hw *hw = &adapter->hw;
+    hw->mac.get_link_status = true;
 }
 
 #ifdef ENTL_TX_ON_ENTL_ENABLE
@@ -665,7 +666,7 @@ static void entl_e1000_configure(struct e1000_adapter *adapter) {
 
 // derivative work - ref: orig-frag-netdev.c, copied-frag-entl_device.c
 
-#define ADAPTER_DEBUG(fmt, args...) printk(KERN_ALERT "ENTL: %s" fmt, adapter->netdev->name, ## args)
+#define ADAPTER_DEBUG(fmt, args...) printk(KERN_ALERT "ENTL: %s " fmt, adapter->netdev->name, ## args)
 
 /**
  * entl_e1000e_set_rx_mode - ENTL versin, always set Promiscuous mode
