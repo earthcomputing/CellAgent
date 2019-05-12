@@ -92,7 +92,7 @@ int entl_received(entl_state_machine_t *mcn, uint16_t from_hi, uint32_t from_lo,
                 else if (ordering == 0) {
                 // else if ((mcn->mac_hi == from_hi) && (mcn->mac_lo == from_lo)) { // }
                     // say error as Alan's 1990s problem again
-                    STM_TDEBUG("Fatal Error - HELLO, SAME ADDRESS");
+                    STM_TDEBUG("neighbor %04x %08x, Fatal Error - HELLO, SAME ADDRESS", from_hi, from_lo);
                     set_error(mcn, ENTL_ERROR_SAME_ADDRESS);
                     set_atomic_state(mcn, ENTL_STATE_IDLE);
                     set_update_time(mcn, ts);
@@ -189,7 +189,7 @@ int entl_received(entl_state_machine_t *mcn, uint16_t from_hi, uint32_t from_lo,
                     set_i_sent(mcn, 0);
                     set_atomic_state(mcn, ENTL_STATE_HELLO);
                     set_update_time(mcn, ts);
-                    STM_TDEBUG("%s Out of Sequence seqno %d, SEND -> HELLO", msg_nick(emsg_type), seqno);
+                    STM_TDEBUG("%s Out of Sequence: seqno %d, SEND -> HELLO", msg_nick(emsg_type), seqno);
                     ret_action = ENTL_ACTION_ERROR;
                 }
             }
@@ -229,7 +229,7 @@ int entl_received(entl_state_machine_t *mcn, uint16_t from_hi, uint32_t from_lo,
                     set_i_sent(mcn, 0);
                     set_atomic_state(mcn, ENTL_STATE_HELLO);
                     set_update_time(mcn, ts);
-                    STM_TDEBUG("TICK: Out of Sequence seqno %d, RECEIVE -> HELLO", seqno);
+                    STM_TDEBUG("TICK: Out of Sequence: seqno %d, RECEIVE -> HELLO", seqno);
                     ret_action = ENTL_ACTION_ERROR;
                 }
             }
@@ -259,7 +259,7 @@ int entl_received(entl_state_machine_t *mcn, uint16_t from_hi, uint32_t from_lo,
                     set_i_sent(mcn, 0);
                     set_atomic_state(mcn, ENTL_STATE_HELLO);
                     set_update_time(mcn, ts);
-                    STM_TDEBUG("AIT: Out of Sequence seqno %d, RECEIVE -> HELLO", seqno);
+                    STM_TDEBUG("AIT: Out of Sequence: seqno %d, RECEIVE -> HELLO", seqno);
                     ret_action = ENTL_ACTION_ERROR;
                 }
             }
@@ -294,7 +294,7 @@ int entl_received(entl_state_machine_t *mcn, uint16_t from_hi, uint32_t from_lo,
                     set_i_sent(mcn, 0);
                     set_atomic_state(mcn, ENTL_STATE_HELLO);
                     set_update_time(mcn, ts);
-                    STM_TDEBUG("TOCK: Out of Sequence seqno %d, AM -> HELLO", seqno);
+                    STM_TDEBUG("TOCK: Out of Sequence: seqno %d, AM -> HELLO", seqno);
                     ret_action = ENTL_ACTION_ERROR;
                 }
             }
@@ -372,7 +372,7 @@ int entl_received(entl_state_machine_t *mcn, uint16_t from_hi, uint32_t from_lo,
                     set_i_sent(mcn, 0);
                     set_atomic_state(mcn, ENTL_STATE_HELLO);
                     set_update_time(mcn, ts);
-                    STM_TDEBUG("AIT: Out of Sequence seqno %d, AH -> HELLO", seqno);
+                    STM_TDEBUG("AIT: Out of Sequence: seqno %d, AH -> HELLO", seqno);
                     ret_action = ENTL_ACTION_ERROR;
                 }
             }
@@ -425,7 +425,7 @@ int entl_received(entl_state_machine_t *mcn, uint16_t from_hi, uint32_t from_lo,
                     set_i_sent(mcn, 0);
                     set_atomic_state(mcn, ENTL_STATE_HELLO);
                     set_update_time(mcn, ts);
-                    STM_TDEBUG("AIT: Out of Sequence seqno %d, BH -> HELLO", seqno);
+                    STM_TDEBUG("AIT: Out of Sequence: seqno %d, BH -> HELLO", seqno);
                     ret_action = ENTL_ACTION_ERROR;
                 }
             }
@@ -479,18 +479,18 @@ int entl_get_hello(entl_state_machine_t *mcn, uint16_t *emsg_raw, uint32_t *seqn
 
         case ENTL_STATE_RECEIVE:
             respond_with(ENTL_MESSAGE_EVENT_U, get_i_sent(mcn), ENTL_ACTION_SEND);
-            STM_TDEBUG("repeat EVENT, Receive");
+            STM_TDEBUG("TICK(out): RECEIVE");
         break;
 
         case ENTL_STATE_AM:
             respond_with(ENTL_MESSAGE_AIT_U, get_i_sent(mcn), ENTL_ACTION_SEND | ENTL_ACTION_SEND_AIT);
-            STM_TDEBUG("repeat AIT, Am");
+            STM_TDEBUG("AIT(out): AM");
         break;
 
         case ENTL_STATE_BH:
             if (!ENTT_queue_full(&mcn->receive_ATI_queue)) {
                 respond_with(ENTL_MESSAGE_ACK_U, get_i_sent(mcn), ENTL_ACTION_SEND);
-                STM_TDEBUG("repeat ACK, Bh");
+                STM_TDEBUG("TOCK(out): BH");
             }
             else {
                 ret_action = ENTL_ACTION_NOP;
@@ -519,7 +519,7 @@ int entl_next_send(entl_state_machine_t *mcn, uint16_t *emsg_raw, uint32_t *seqn
         switch (get_atomic_state(mcn)) {
         case ENTL_STATE_IDLE:
             respond_with(ENTL_MESSAGE_NOP_U, 0, ENTL_ACTION_NOP);
-            STM_TDEBUG("Message requested, Idle");
+            STM_TDEBUG("Message requested, IDLE");
         break;
 
         case ENTL_STATE_HELLO:
@@ -540,7 +540,7 @@ int entl_next_send(entl_state_machine_t *mcn, uint16_t *emsg_raw, uint32_t *seqn
             // Avoiding to send AIT on the very first loop where other side will be in Hello state
             if (event_i_know && event_i_sent && mcn->send_ATI_queue.count) {
                 set_atomic_state(mcn, ENTL_STATE_AM);
-                STM_TDEBUG("ETL AIT seqno %d, Send -> Am", *seqno);
+                STM_TDEBUG("AIT(out): seqno %d, SEND -> AM", *seqno);
                 respond_with(ENTL_MESSAGE_AIT_U, get_i_sent(mcn), ENTL_ACTION_SEND | ENTL_ACTION_SEND_AIT);
             }
             else {
@@ -571,7 +571,7 @@ int entl_next_send(entl_state_machine_t *mcn, uint16_t *emsg_raw, uint32_t *seqn
             if (ait_data) {
                 kfree(ait_data);
             }
-            STM_TDEBUG("ETL AIT ACK seqno %d, BM -> Receive", *seqno);
+            STM_TDEBUG("TOCK(out): seqno %d, BM -> RECEIVE", *seqno);
         }
         break;
 
@@ -586,7 +586,7 @@ int entl_next_send(entl_state_machine_t *mcn, uint16_t *emsg_raw, uint32_t *seqn
                 calc_intervals(mcn);
                 set_update_time(mcn, ts);
                 set_atomic_state(mcn, ENTL_STATE_BH);
-                STM_TDEBUG("ETL AIT ACK seqno %d, Ah -> Bh", *seqno);
+                STM_TDEBUG("TOCK(out): seqno %d, AH -> BH", *seqno);
             }
         }
         break;
@@ -618,7 +618,7 @@ int entl_next_send_tx(entl_state_machine_t *mcn, uint16_t *emsg_raw, uint32_t *s
         switch (get_atomic_state(mcn)) {
         case ENTL_STATE_IDLE:
             respond_with(ENTL_MESSAGE_NOP_U, 0, ENTL_ACTION_NOP);
-            STM_TDEBUG("Message requested on Idle state");
+            STM_TDEBUG("NOP(out): IDLE");
         break;
 
         case ENTL_STATE_HELLO:
@@ -658,7 +658,7 @@ int entl_next_send_tx(entl_state_machine_t *mcn, uint16_t *emsg_raw, uint32_t *s
             set_atomic_state(mcn, ENTL_STATE_RECEIVE);
             // drop the message on the top
             ENTT_queue_front_pop(&mcn->send_ATI_queue);
-            STM_TDEBUG("ETL AIT ACK seqno %d, BM -> Receive", *seqno);
+            STM_TDEBUG("TOCK(out): seqno %d, BM -> RECEIVE", *seqno);
         }
         break;
 
@@ -673,7 +673,7 @@ int entl_next_send_tx(entl_state_machine_t *mcn, uint16_t *emsg_raw, uint32_t *s
                 calc_intervals(mcn);
                 set_update_time(mcn, ts);
                 set_atomic_state(mcn, ENTL_STATE_BH);
-                STM_TDEBUG("ETL AIT ACK seqno %d, Ah -> Bh", *seqno);
+                STM_TDEBUG("TOCK(out): seqno %d, AH -> BH", *seqno);
             }
         }
         break;
@@ -741,7 +741,7 @@ void entl_link_up(entl_state_machine_t *mcn) {
             STM_TDEBUG("Link Up, error count %d, ignored", mcn->error_state.error_count);
         }
         else {
-            STM_TDEBUG("Link Up");
+            STM_TDEBUG("Link Up, IDLE -> HELLO");
             set_atomic_state(mcn, ENTL_STATE_HELLO);
             set_update_time(mcn, ts);
             clear_error(mcn);
