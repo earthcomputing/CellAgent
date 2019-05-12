@@ -14,7 +14,7 @@ static bool entl_device_process_rx_packet(entl_device_t *dev, struct sk_buff *sk
 static void entl_device_process_tx_packet(entl_device_t *dev, struct sk_buff *skb);
 static int entl_do_ioctl(struct net_device *netdev, struct ifreq *ifr, int cmd);
 static void entl_e1000_configure(struct e1000_adapter *adapter);
-static void entl_e1000_set_my_addr(entl_device_t *dev, const uint8_t *addr);
+static void entl_e1000_set_my_addr(struct e1000_adapter *adapter, const uint8_t *addr);
 #ifdef ENTL_TX_ON_ENTL_ENABLE
 static netdev_tx_t entl_tx_transmit(struct sk_buff *skb, struct net_device *netdev);
 #endif

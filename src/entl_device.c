@@ -338,45 +338,28 @@ static int entl_do_ioctl(struct net_device *netdev, struct ifreq *ifr, int cmd) 
     return 0;
 }
 
-// entl version of e1000_configure
-static void entl_e1000_configure(struct e1000_adapter *adapter) {
-        struct e1000_ring *rx_ring = adapter->rx_ring;
-        entl_device_t *dev = &adapter->entl_dev;
-        struct e1000_hw *hw = &adapter->hw;
-        struct net_device *netdev = adapter->netdev;
-
-        entl_e1000e_set_rx_mode(netdev);
-#if defined(NETIF_F_HW_VLAN_TX) || defined(NETIF_F_HW_VLAN_CTAG_TX)
-        e1000_restore_vlan(adapter);
-#endif
-        e1000_init_manageability_pt(adapter);
-
-        // We don’t need immediate interrupt on Tx completion.
-        // (unless buffer was full and quick responce is required, but that’s not likely)
-        e1000_configure_tx(adapter);
-
-#ifdef NETIF_F_RXHASH
-        if (netdev->features & NETIF_F_RXHASH)
-                e1000e_setup_rss_hash(adapter);
-#endif
-        entl_e1000_setup_rctl(adapter);
-        entl_e1000_configure_rx(adapter);
-        adapter->alloc_rx_buf(rx_ring, e1000_desc_unused(rx_ring), GFP_KERNEL);
-
-        entl_state_machine_t *stm = &dev->edev_stm;
-        entl_state_machine_init(stm);
-        size_t elen = strlcpy(dev->edev_name, adapter->netdev->name, sizeof(dev->edev_name));
-        size_t slen = strlcpy(stm->name, dev->edev_name, sizeof(stm->name));
-        entl_e1000_set_my_addr(dev, netdev->dev_addr);
-
-        // force to check the link status on kernel task
-        hw->mac.get_link_status = true;
-}
-
-static void entl_e1000_set_my_addr(entl_device_t *dev, const uint8_t *addr) {
-    entl_state_machine_t *stm = &dev->edev_stm;
+static void entl_e1000_set_my_addr(struct e1000_adapter *adapter, const uint8_t *addr) {
+    ENTL_DEBUG("ENTL %s macaddr %02x:%02x:%02x:%02x:%02x:%02x\n", adapter->netdev->name, addr[0], addr[1], addr[2], addr[3], addr[4], addr[5]);
+    entl_device_t *edev = &adapter->entl_dev;
+    entl_state_machine_t *stm = &edev->edev_stm;
     uint16_t u_addr; uint32_t l_addr; unpack_eth(addr, &u_addr, &l_addr);
     entl_set_my_adder(stm, u_addr, l_addr);
+}
+
+static void edev_init(struct e1000_adapter *adapter) {
+        struct net_device *netdev = adapter->netdev;
+        entl_device_t *edev = &adapter->entl_dev;
+        size_t elen = strlcpy(edev->edev_name, netdev->name, sizeof(edev->edev_name));
+        entl_e1000_set_my_addr(adapter, netdev->dev_addr);
+
+        entl_state_machine_t *stm = &edev->edev_stm;
+        entl_state_machine_init(stm);
+        size_t slen = strlcpy(stm->name, edev->edev_name, sizeof(stm->name));
+
+        // FIXME: is this really needed?
+        // force to check the link status on kernel task
+        struct e1000_hw *hw = &adapter->hw;
+        hw->mac.get_link_status = true;
 }
 
 #ifdef ENTL_TX_ON_ENTL_ENABLE
@@ -653,7 +636,36 @@ static void dump_state(char *type, entl_state_t *st, int flag) {
 }
 #endif
 
+// entl version of e1000_configure
+static void entl_e1000_configure(struct e1000_adapter *adapter) {
+        struct e1000_ring *rx_ring = adapter->rx_ring;
+
+        entl_e1000e_set_rx_mode(adapter->netdev);
+#if defined(NETIF_F_HW_VLAN_TX) || defined(NETIF_F_HW_VLAN_CTAG_TX)
+        e1000_restore_vlan(adapter);
+#endif
+        e1000_init_manageability_pt(adapter);
+
+        // We don’t need immediate interrupt on Tx completion.
+        // (unless buffer was full and quick responce is required, but that’s not likely)
+        e1000_configure_tx(adapter);
+
+#ifdef NETIF_F_RXHASH
+        if (adapter->netdev->features & NETIF_F_RXHASH)
+                e1000e_setup_rss_hash(adapter);
+#endif
+        entl_e1000_setup_rctl(adapter);
+        entl_e1000_configure_rx(adapter);
+        adapter->alloc_rx_buf(rx_ring, e1000_desc_unused(rx_ring), GFP_KERNEL);
+#ifdef ENTL
+        edev_init(adapter);
+#endif
+}
+
+
 // derivative work - ref: orig-frag-netdev.c, copied-frag-entl_device.c
+
+#define ADAPTER_DEBUG(fmt, args...) printk(KERN_ALERT "ENTL: %s" fmt, adapter->netdev->name, ## args)
 
 /**
  * entl_e1000e_set_rx_mode - ENTL versin, always set Promiscuous mode
@@ -686,7 +698,7 @@ static void entl_e1000e_set_rx_mode(struct net_device *netdev)
 	e1000e_vlan_filter_disable(adapter);
 #endif /* HAVE_VLAN_RX_REGISTER */
 
-    ENTL_DEBUG("entl_e1000e_set_rx_mode  RCTL = %08x\n", rctl );
+    ADAPTER_DEBUG("entl_e1000e_set_rx_mode  RCTL = %08x\n", rctl);
 #else
 	/* clear the affected bits */
 	rctl &= ~(E1000_RCTL_UPE | E1000_RCTL_MPE);
@@ -783,11 +795,11 @@ static void entl_e1000_setup_rctl(struct e1000_adapter *adapter)
 
 	/* Enable Long Packet receive */
 	if (adapter->netdev->mtu <= ETH_DATA_LEN) {
-		ENTL_DEBUG("entl_e1000_setup_rctl %d <= %d\n", adapter->netdev->mtu, ETH_DATA_LEN );
+		ADAPTER_DEBUG("entl_e1000_setup_rctl %d <= %d\n", adapter->netdev->mtu, ETH_DATA_LEN);
 		rctl &= ~E1000_RCTL_LPE;
 	}
 	else {
-		ENTL_DEBUG("entl_e1000_setup_rctl %d > %d\n", adapter->netdev->mtu, ETH_DATA_LEN );
+		ADAPTER_DEBUG("entl_e1000_setup_rctl %d > %d\n", adapter->netdev->mtu, ETH_DATA_LEN);
 		rctl |= E1000_RCTL_LPE;
 	}
 
@@ -803,7 +815,7 @@ static void entl_e1000_setup_rctl(struct e1000_adapter *adapter)
 		u32 mac_data;
 		u16 phy_data;
 
-		ENTL_DEBUG("entl_e1000_setup_rctl Workaround Si errata on 82577/82578 - configure IPG for jumbos\n" );
+		ADAPTER_DEBUG("entl_e1000_setup_rctl Workaround Si errata on 82577/82578 - configure IPG for jumbos\n");
 
 		e1e_rphy(hw, PHY_REG(770, 26), &phy_data);
 		phy_data &= 0xfff8;
@@ -830,20 +842,20 @@ static void entl_e1000_setup_rctl(struct e1000_adapter *adapter)
 	switch (adapter->rx_buffer_len) {
 	case 2048:
 	default:
-		ENTL_DEBUG("entl_e1000_setup_rctl E1000_RCTL_SZ_2048\n" );
+		ADAPTER_DEBUG("entl_e1000_setup_rctl E1000_RCTL_SZ_2048\n");
 		rctl |= E1000_RCTL_SZ_2048;
 		rctl &= ~E1000_RCTL_BSEX;
 		break;
 	case 4096:
-		ENTL_DEBUG("entl_e1000_setup_rctl E1000_RCTL_SZ_4096\n" );
+		ADAPTER_DEBUG("entl_e1000_setup_rctl E1000_RCTL_SZ_4096\n");
 		rctl |= E1000_RCTL_SZ_4096;
 		break;
 	case 8192:
-		ENTL_DEBUG("entl_e1000_setup_rctl E1000_RCTL_SZ_8192\n" );
+		ADAPTER_DEBUG("entl_e1000_setup_rctl E1000_RCTL_SZ_8192\n");
 		rctl |= E1000_RCTL_SZ_8192;
 		break;
 	case 16384:
-		ENTL_DEBUG("entl_e1000_setup_rctl E1000_RCTL_SZ_16384\n" );
+		ADAPTER_DEBUG("entl_e1000_setup_rctl E1000_RCTL_SZ_16384\n");
 		rctl |= E1000_RCTL_SZ_16384;
 		break;
 	}
@@ -873,7 +885,7 @@ static void entl_e1000_setup_rctl(struct e1000_adapter *adapter)
 	else
 		adapter->rx_ps_pages = 0;
 
-	ENTL_DEBUG("entl_e1000_setup_rctl rx_ps_pages = %d\n", adapter->rx_ps_pages );
+	ADAPTER_DEBUG("entl_e1000_setup_rctl rx_ps_pages = %d\n", adapter->rx_ps_pages);
 
 	if (adapter->rx_ps_pages) {
 		u32 psrctl = 0;
@@ -914,7 +926,7 @@ static void entl_e1000_setup_rctl(struct e1000_adapter *adapter)
 		 * and that breaks VLANs.
 		 */
 	}
-    ENTL_DEBUG("entl_e1000_setup_rctl  RCTL = %08x\n", rctl );
+    ADAPTER_DEBUG("entl_e1000_setup_rctl  RCTL = %08x\n", rctl);
 
 	ew32(RCTL, rctl);
 	/* just started the receive unit, no need to restart */
@@ -940,19 +952,19 @@ static void entl_e1000_configure_rx(struct e1000_adapter *adapter)
 		    sizeof(union e1000_rx_desc_packet_split);
 		adapter->clean_rx = e1000_clean_rx_irq_ps;
 		adapter->alloc_rx_buf = e1000_alloc_rx_buffers_ps;
-		ENTL_DEBUG("entl_e1000_configure_rx use e1000_alloc_rx_buffers_ps\n" );
+		ADAPTER_DEBUG("entl_e1000_configure_rx use e1000_alloc_rx_buffers_ps\n");
 #ifdef CONFIG_E1000E_NAPI
 	} else if (adapter->netdev->mtu > ETH_FRAME_LEN + ETH_FCS_LEN) {
 		rdlen = rx_ring->count * sizeof(union e1000_rx_desc_extended);
 		adapter->clean_rx = e1000_clean_jumbo_rx_irq;
 		adapter->alloc_rx_buf = e1000_alloc_jumbo_rx_buffers;
-		ENTL_DEBUG("entl_e1000_configure_rx use e1000_alloc_jumbo_rx_buffers\n" );
+		ADAPTER_DEBUG("entl_e1000_configure_rx use e1000_alloc_jumbo_rx_buffers\n");
 #endif
 	} else {
 		rdlen = rx_ring->count * sizeof(union e1000_rx_desc_extended);
 		adapter->clean_rx = e1000_clean_rx_irq;
 		adapter->alloc_rx_buf = e1000_alloc_rx_buffers;
-		ENTL_DEBUG("entl_e1000_configure_rx use e1000_alloc_rx_buffers\n" );
+		ADAPTER_DEBUG("entl_e1000_configure_rx use e1000_alloc_rx_buffers\n");
 	}
 
 	/* disable receives while setting up the descriptors */
@@ -963,7 +975,7 @@ static void entl_e1000_configure_rx(struct e1000_adapter *adapter)
 	usleep_range(10000, 20000);
 
 	if (adapter->flags2 & FLAG2_DMA_BURST) {
-		ENTL_DEBUG("entl_e1000_configure_rx set DMA burst\n" );
+		ADAPTER_DEBUG("entl_e1000_configure_rx set DMA burst\n");
 		/* set the writeback threshold (only takes effect if the RDTR
 		 * is set). set GRAN=1 and write back up to 0x4 worth, and
 		 * enable prefetching of 0x20 Rx descriptors
@@ -985,11 +997,11 @@ static void entl_e1000_configure_rx(struct e1000_adapter *adapter)
 	}
 
 	/* set the Receive Delay Timer Register */
-	ENTL_DEBUG("entl_e1000_configure_rx set Receive Delay Timer Register = %d\n", adapter->rx_int_delay );
+	ADAPTER_DEBUG("entl_e1000_configure_rx set Receive Delay Timer Register = %d\n", adapter->rx_int_delay);
 	ew32(RDTR, adapter->rx_int_delay);
 
 	/* irq moderation */
-	ENTL_DEBUG("entl_e1000_configure_rx set Abs Delay Timer Register = %d\n", adapter->rx_abs_int_delay );
+	ADAPTER_DEBUG("entl_e1000_configure_rx set Abs Delay Timer Register = %d\n", adapter->rx_abs_int_delay);
 	ew32(RADV, adapter->rx_abs_int_delay);
 	if ((adapter->itr_setting != 0) && (adapter->itr != 0))
 		e1000e_write_itr(adapter, adapter->itr);
@@ -1035,7 +1047,7 @@ static void entl_e1000_configure_rx(struct e1000_adapter *adapter)
 		    ((er32(PBA) & E1000_PBA_RXA_MASK) * 1024 -
 		     adapter->max_frame_size) * 8 / 1000;
 
-		ENTL_DEBUG("entl_e1000_configure_rx adapter->netdev->mtu %d > ETH_DATA_LEN %d lat = %d\n", adapter->netdev->mtu, ETH_DATA_LEN, lat );
+		ADAPTER_DEBUG("entl_e1000_configure_rx adapter->netdev->mtu %d > ETH_DATA_LEN %d lat = %d\n", adapter->netdev->mtu, ETH_DATA_LEN, lat);
 
 		if (adapter->flags & FLAG_IS_ICH) {
 			u32 rxdctl = er32(RXDCTL(0));
@@ -1051,7 +1063,7 @@ static void entl_e1000_configure_rx(struct e1000_adapter *adapter)
 					  adapter->netdev->name, lat);
 #endif
 	} else {
-		ENTL_DEBUG("entl_e1000_configure_rx adapter->netdev->mtu %d <= ETH_DATA_LEN %d default qos = %d\n", adapter->netdev->mtu, ETH_DATA_LEN, PM_QOS_DEFAULT_VALUE );
+		ADAPTER_DEBUG("entl_e1000_configure_rx adapter->netdev->mtu %d <= ETH_DATA_LEN %d default qos = %d\n", adapter->netdev->mtu, ETH_DATA_LEN, PM_QOS_DEFAULT_VALUE);
 
 #ifdef HAVE_PM_QOS_REQUEST_LIST_NEW
 		pm_qos_update_request(&adapter->pm_qos_req,
@@ -1065,7 +1077,7 @@ static void entl_e1000_configure_rx(struct e1000_adapter *adapter)
 					  PM_QOS_DEFAULT_VALUE);
 #endif
 	}
-	ENTL_DEBUG("entl_e1000_configure_rx  RCTL = %08x\n", rctl );
+	ADAPTER_DEBUG("entl_e1000_configure_rx  RCTL = %08x\n", rctl);
 
 	/* Enable Receives */
 	ew32(RCTL, rctl);

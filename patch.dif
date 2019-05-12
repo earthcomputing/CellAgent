@@ -347,7 +347,7 @@ diff -u intel-e1000e-3.3.4/src/netdev.c e1000e-3.3.4/src/netdev.c
  	}
  
 +#ifdef ENTL
-+	entl_e1000_set_my_addr(&adapter->entl_dev, netdev->dev_addr);
++	entl_e1000_set_my_addr(adapter, netdev->dev_addr);
 +#endif
 +
  	init_timer(&adapter->watchdog_timer);
