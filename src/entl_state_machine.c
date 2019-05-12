@@ -45,9 +45,9 @@ uint32_t get_entl_state(entl_state_machine_t *mcn) {
 
 int entl_received(entl_state_machine_t *mcn, uint16_t from_hi, uint32_t from_lo, uint16_t emsg_raw, uint32_t seqno) {
     struct timespec ts = current_kernel_time();
-    uint16_t emsg_hi = get_entl_msg(emsg_raw);
+    uint16_t emsg_type = get_entl_msg(emsg_raw);
 
-    if (emsg_hi == ENTL_MESSAGE_NOP_U) return ENTL_ACTION_NOP;
+    if (emsg_type == ENTL_MESSAGE_NOP_U) return ENTL_ACTION_NOP;
 
     if (mcn->mac_valid == 0) {
         STM_TDEBUG("invalid, macaddr %04x %08x", mcn->mac_hi, mcn->mac_lo);
@@ -69,7 +69,7 @@ int entl_received(entl_state_machine_t *mcn, uint16_t from_hi, uint32_t from_lo,
         break;
 
         case ENTL_STATE_HELLO: {
-            if (emsg_hi == ENTL_MESSAGE_HELLO_U) {
+            if (emsg_type == ENTL_MESSAGE_HELLO_U) {
                 mcn->hello_hi = from_hi;
                 mcn->hello_lo = from_lo;
                 mcn->hello_valid = 1;
@@ -101,7 +101,7 @@ int entl_received(entl_state_machine_t *mcn, uint16_t from_hi, uint32_t from_lo,
                     ret_action = ENTL_ACTION_NOP;
                 }
             }
-            else if (emsg_hi == ENTL_MESSAGE_EVENT_U) {
+            else if (emsg_type == ENTL_MESSAGE_EVENT_U) {
                 // Hello state got event
                 if (seqno == 0) {
                     set_i_know(mcn, seqno);
@@ -125,7 +125,7 @@ int entl_received(entl_state_machine_t *mcn, uint16_t from_hi, uint32_t from_lo,
         break;
 
         case ENTL_STATE_WAIT: {
-            if (emsg_hi == ENTL_MESSAGE_HELLO_U) {
+            if (emsg_type == ENTL_MESSAGE_HELLO_U) {
                 mcn->state_count++;
                 if (mcn->state_count > ENTL_COUNT_MAX) {
                     STM_TDEBUG("Hello message %d, overflow %d, Wait -> Hello", from_hi, mcn->state_count);
@@ -137,7 +137,7 @@ int entl_received(entl_state_machine_t *mcn, uint16_t from_hi, uint32_t from_lo,
                 }
                 ret_action = ENTL_ACTION_NOP;
             }
-            else if (emsg_hi == ENTL_MESSAGE_EVENT_U) {
+            else if (emsg_type == ENTL_MESSAGE_EVENT_U) {
                 if (seqno == get_i_sent(mcn) + 1) {
                     set_i_know(mcn, seqno);
                     set_send_next(mcn, seqno + 1);
@@ -173,8 +173,8 @@ int entl_received(entl_state_machine_t *mcn, uint16_t from_hi, uint32_t from_lo,
         break;
 
         case ENTL_STATE_SEND: {
-            if (emsg_hi == ENTL_MESSAGE_EVENT_U
-            ||  emsg_hi == ENTL_MESSAGE_ACK_U) {
+            if (emsg_type == ENTL_MESSAGE_EVENT_U
+            ||  emsg_type == ENTL_MESSAGE_ACK_U) {
                 if (seqno == get_i_know(mcn)) {
                     STM_TDEBUG("Same seqno %d, Send", seqno);
                     ret_action = ENTL_ACTION_NOP;
@@ -204,7 +204,7 @@ int entl_received(entl_state_machine_t *mcn, uint16_t from_hi, uint32_t from_lo,
         break;
 
         case ENTL_STATE_RECEIVE: {
-            if (emsg_hi == ENTL_MESSAGE_EVENT_U) {
+            if (emsg_type == ENTL_MESSAGE_EVENT_U) {
                 if (get_i_know(mcn) + 2 == seqno) {
                     set_i_know(mcn, seqno);
                     set_send_next(mcn, seqno + 1);
@@ -230,7 +230,7 @@ int entl_received(entl_state_machine_t *mcn, uint16_t from_hi, uint32_t from_lo,
                     ret_action = ENTL_ACTION_ERROR;
                 }
             }
-            else if (emsg_hi == ENTL_MESSAGE_AIT_U) {
+            else if (emsg_type == ENTL_MESSAGE_AIT_U) {
                 if (get_i_know(mcn) + 2 == seqno) {
                     set_i_know(mcn, seqno);
                     set_send_next(mcn, seqno + 1);
@@ -275,7 +275,7 @@ int entl_received(entl_state_machine_t *mcn, uint16_t from_hi, uint32_t from_lo,
 
         // AIT message sent, waiting for ack
         case ENTL_STATE_AM: {
-            if (emsg_hi == ENTL_MESSAGE_ACK_U) {
+            if (emsg_type == ENTL_MESSAGE_ACK_U) {
                 if (get_i_know(mcn) + 2 == seqno) {
                     set_i_know(mcn, seqno);
                     set_send_next(mcn, seqno + 1);
@@ -295,7 +295,7 @@ int entl_received(entl_state_machine_t *mcn, uint16_t from_hi, uint32_t from_lo,
                     ret_action = ENTL_ACTION_ERROR;
                 }
             }
-            else if (emsg_hi == ENTL_MESSAGE_EVENT_U) {
+            else if (emsg_type == ENTL_MESSAGE_EVENT_U) {
                 if (get_i_know(mcn) == seqno) {
                     STM_TDEBUG("same ETL event seqno %d, Am", seqno);
                     ret_action = ENTL_ACTION_NOP;
@@ -326,7 +326,7 @@ int entl_received(entl_state_machine_t *mcn, uint16_t from_hi, uint32_t from_lo,
 
         // AIT sent, Ack received, sending Ack
         case ENTL_STATE_BM: {
-            if (emsg_hi == ENTL_MESSAGE_ACK_U) {
+            if (emsg_type == ENTL_MESSAGE_ACK_U) {
                 if (get_i_know(mcn) == seqno) {
                     STM_TDEBUG("same ETL Ack seqno %d, Bm", seqno);
                     ret_action = ENTL_ACTION_NOP;
@@ -357,7 +357,7 @@ int entl_received(entl_state_machine_t *mcn, uint16_t from_hi, uint32_t from_lo,
 
         // AIT message received, sending Ack
         case ENTL_STATE_AH: {
-            if (emsg_hi == ENTL_MESSAGE_AIT_U) {
+            if (emsg_type == ENTL_MESSAGE_AIT_U) {
                 if (get_i_know(mcn) == seqno) {
                     STM_TDEBUG("Same ENTL seqno %d, Ah", seqno);
                     ret_action = ENTL_ACTION_NOP;
@@ -388,7 +388,7 @@ int entl_received(entl_state_machine_t *mcn, uint16_t from_hi, uint32_t from_lo,
 
         // got AIT, Ack sent, waiting for ack
         case ENTL_STATE_BH: {
-            if (emsg_hi == ENTL_MESSAGE_ACK_U) {
+            if (emsg_type == ENTL_MESSAGE_ACK_U) {
                 if (get_i_know(mcn) + 2 == seqno) {
                     set_i_know(mcn, seqno);
                     set_send_next(mcn, seqno + 1);
@@ -410,7 +410,7 @@ int entl_received(entl_state_machine_t *mcn, uint16_t from_hi, uint32_t from_lo,
                     ret_action = ENTL_ACTION_ERROR;
                 }
             }
-            else if (emsg_hi == ENTL_MESSAGE_AIT_U) {
+            else if (emsg_type == ENTL_MESSAGE_AIT_U) {
                 if (get_i_know(mcn) == seqno) {
                     STM_TDEBUG("Same ENTL seqno %d, Bh", seqno);
                     ret_action = ENTL_ACTION_NOP;
