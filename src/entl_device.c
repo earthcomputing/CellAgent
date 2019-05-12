@@ -24,25 +24,25 @@ static void entl_watchdog_task(struct work_struct *work);
 
 // inline helpers:
 static inline void unpack_eth(const uint8_t *p, uint16_t *u, uint32_t *l) {
-    uint16_t src_u = (uint16_t) p[0] << 8
+    uint16_t mac_hi = (uint16_t) p[0] << 8
                    | (uint16_t) p[1];
-    uint32_t src_l = (uint32_t) p[2] << 24
+    uint32_t mac_lo = (uint32_t) p[2] << 24
                    | (uint32_t) p[3] << 16
                    | (uint32_t) p[4] <<  8
                    | (uint32_t) p[5];
-    *u = src_u;
-    *l = src_l;
+    *u = mac_hi;
+    *l = mac_lo;
 }
 
-static inline void encode_dest(uint8_t *h_dest, uint16_t u_addr, uint32_t l_addr) {
-    unsigned char d_addr[ETH_ALEN];
-    d_addr[0] = (u_addr >>  8) & 0xff;
-    d_addr[1] = (u_addr)       & 0xff;
-    d_addr[2] = (l_addr >> 24) & 0xff;
-    d_addr[3] = (l_addr >> 16) & 0xff;
-    d_addr[4] = (l_addr >>  8) & 0xff;
-    d_addr[5] = (l_addr)       & 0xff;
-    memcpy(h_dest, d_addr, ETH_ALEN);
+static inline void encode_dest(uint8_t *h_dest, uint16_t mac_hi, uint32_t mac_lo) {
+    unsigned char mac_addr[ETH_ALEN];
+    mac_addr[0] = (mac_hi >>  8) & 0xff;
+    mac_addr[1] = (mac_hi)       & 0xff;
+    mac_addr[2] = (mac_lo >> 24) & 0xff;
+    mac_addr[3] = (mac_lo >> 16) & 0xff;
+    mac_addr[4] = (mac_lo >>  8) & 0xff;
+    mac_addr[5] = (mac_lo)       & 0xff;
+    memcpy(h_dest, mac_addr, ETH_ALEN);
 }
 
 // netdev entry points:
@@ -86,14 +86,14 @@ static bool entl_device_process_rx_packet(entl_device_t *dev, struct sk_buff *sk
     struct e1000_adapter *adapter = container_of(dev, struct e1000_adapter, entl_dev);
     struct ethhdr *eth = (struct ethhdr *) skb->data;
 
-    uint16_t src_u; uint32_t src_l; unpack_eth(eth->h_source, &src_u, &src_l);
-    uint16_t dst_u; uint32_t dst_l; unpack_eth(eth->h_dest, &dst_u, &dst_l);
+    uint16_t smac_hi; uint32_t smac_lo; unpack_eth(eth->h_source, &smac_hi, &smac_lo);
+    uint16_t emsg_raw; uint32_t seqno; unpack_eth(eth->h_dest, &emsg_raw, &seqno);
 
     bool retval = true;
-    if (dst_u & ENTL_MESSAGE_ONLY_U) retval = false;
+    if (emsg_raw & ENTL_MESSAGE_ONLY_U) retval = false;
 
     entl_state_machine_t *stm = &dev->edev_stm;
-    int recv_action = entl_received(stm, src_u, src_l, dst_u, dst_l);
+    int recv_action = entl_received(stm, smac_hi, smac_lo, emsg_raw, seqno); // smac_hi: from_hi, smac_lo: from_lo
 
     if (recv_action == ENTL_ACTION_ERROR) {
         dev->edev_flag |= (ENTL_DEVICE_FLAG_HELLO | ENTL_DEVICE_FLAG_SIGNAL);
@@ -153,19 +153,20 @@ static bool entl_device_process_rx_packet(entl_device_t *dev, struct sk_buff *sk
             }
             else {
                 // tx queue becomes empty, so inject a new packet
-                int ret = entl_next_send(stm, &dst_u, &dst_l);
+                uint16_t emsg_raw; uint32_t seqno;
+                int ret = entl_next_send(stm, &emsg_raw, &seqno);
 
-                if (get_entl_msg(dst_u) != ENTL_MESSAGE_NOP_U) {
+                if (get_entl_msg(emsg_raw) != ENTL_MESSAGE_NOP_U) {
                     unsigned long flags;
                     spin_lock_irqsave(&adapter->entl_txring_lock, flags);
-                    int recv_action2 = inject_message(dev, dst_u, dst_l, ret);
+                    int recv_action2 = inject_message(dev, emsg_raw, seqno, ret);
                     spin_unlock_irqrestore(&adapter->entl_txring_lock, flags);
 
                     // failed inject, invoke task
                     if (recv_action2 == 1) {
                         // resource error, retry
-                        dev->edev_u_addr = dst_u;
-                        dev->edev_l_addr = dst_l;
+                        dev->edev_u_addr = emsg_raw;
+                        dev->edev_l_addr = seqno;
                         dev->edev_action = ret;
                         dev->edev_flag |= ENTL_DEVICE_FLAG_RETRY;
                         mod_timer(&dev->edev_watchdog_timer, jiffies + 1);
@@ -191,19 +192,20 @@ static bool entl_device_process_rx_packet(entl_device_t *dev, struct sk_buff *sk
             }
         }
         else {
-            int ret = entl_next_send(stm, &dst_u, &dst_l);
+            uint16_t emsg_raw; uint32_t seqno;
+            int ret = entl_next_send(stm, &emsg_raw, &seqno);
 
-            if (get_entl_msg(dst_u) != ENTL_MESSAGE_NOP_U) {
+            if (get_entl_msg(emsg_raw) != ENTL_MESSAGE_NOP_U) {
                 unsigned long flags;
                 spin_lock_irqsave(&adapter->entl_txring_lock, flags);
-                int recv_action2 = inject_message(dev, dst_u, dst_l, ret);
+                int recv_action2 = inject_message(dev, emsg_raw, seqno, ret);
                 spin_unlock_irqrestore(&adapter->entl_txring_lock, flags);
 
                 // failed inject, invoke task
                 if (recv_action2 == 1) {
                     // resource error, so retry
-                    dev->edev_u_addr = dst_u;
-                    dev->edev_l_addr = dst_l;
+                    dev->edev_u_addr = emsg_raw;
+                    dev->edev_l_addr = seqno;
                     dev->edev_action = ret;
                     dev->edev_flag |= ENTL_DEVICE_FLAG_RETRY;
                     mod_timer(&dev->edev_watchdog_timer, jiffies + 1);
@@ -235,14 +237,14 @@ static void entl_device_process_tx_packet(entl_device_t *dev, struct sk_buff *sk
     else {
         entl_state_machine_t *stm = &dev->edev_stm;
 
-        uint16_t u_addr; uint32_t l_addr;
-        int send_action = entl_next_send_tx(stm, &u_addr, &l_addr);
-        encode_dest(eth->h_dest, u_addr, l_addr);
+        uint16_t emsg_raw; uint32_t seqno;
+        int send_action = entl_next_send_tx(stm, &emsg_raw, &seqno);
+        encode_dest(eth->h_dest, emsg_raw, seqno);
 
         if (send_action & ENTL_ACTION_SIG_AIT) {
             dev->edev_flag |= ENTL_DEVICE_FLAG_SIGNAL2; // AIT send completion signal
         }
-        if (u_addr != ENTL_MESSAGE_NOP_U) {
+        if (emsg_raw != ENTL_MESSAGE_NOP_U) {
             dev->edev_flag &= ~(uint32_t) ENTL_DEVICE_FLAG_WAITING;
         }
     }

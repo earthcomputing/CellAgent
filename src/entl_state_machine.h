@@ -52,12 +52,12 @@ typedef struct entl_state_machine {
     ENTT_queue_t receive_ATI_queue;
     char name[ENTL_DEVICE_NAME_LEN];
 
-    uint16_t my_u_addr; // MAC addr for Hello message
-    uint32_t my_l_addr; // MAC addr for Hello message
-    uint8_t my_addr_valid;
-    uint16_t hello_u_addr;
-    uint32_t hello_l_addr;
-    uint8_t hello_addr_valid;
+    uint16_t mac_hi; // MAC addr for Hello message
+    uint32_t mac_lo; // MAC addr for Hello message
+    uint8_t mac_valid;
+    uint16_t hello_hi;
+    uint32_t hello_lo;
+    uint8_t hello_valid;
 } entl_state_machine_t;
 
 static inline void set_update_time(entl_state_machine_t *mcn, struct timespec ts) { memcpy(&mcn->current_state.update_time, &ts, sizeof(struct timespec)); }
@@ -109,8 +109,8 @@ static inline void entl_state_machine_init(entl_state_machine_t *mcn) {
     ENTT_queue_init(&mcn->send_ATI_queue);
     ENTT_queue_init(&mcn->receive_ATI_queue);
     // hello
-    mcn->my_addr_valid = 0;
-    mcn->hello_addr_valid = 0;
+    mcn->mac_valid = 0;
+    mcn->hello_valid = 0;
     spin_lock_init(&mcn->state_lock);
 }
 
