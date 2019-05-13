@@ -12,6 +12,7 @@
 #include "entl_stm_if.h"
 
 // copied e1000 routines:
+static void entl_e1000_configure(struct e1000_adapter *adapter);
 static void entl_e1000e_set_rx_mode(struct net_device *netdev);
 static void entl_e1000_setup_rctl(struct e1000_adapter *adapter);
 static void entl_e1000_configure_rx(struct e1000_adapter *adapter);
@@ -637,7 +638,13 @@ static void dump_state(char *type, entl_state_t *st, int flag) {
 }
 #endif
 
+// derivative work - ref: orig-frag-netdev.c, copied-frag-entl_device.c
+
 // entl version of e1000_configure
+/**
+ * e1000_configure - configure the hardware for Rx and Tx
+ * @adapter: private board structure
+ **/
 static void entl_e1000_configure(struct e1000_adapter *adapter) {
         struct e1000_ring *rx_ring = adapter->rx_ring;
 
@@ -662,9 +669,6 @@ static void entl_e1000_configure(struct e1000_adapter *adapter) {
         edev_init(adapter);
 #endif
 }
-
-
-// derivative work - ref: orig-frag-netdev.c, copied-frag-entl_device.c
 
 #define ADAPTER_DEBUG(fmt, args...) printk(KERN_ALERT "ENTL: %s " fmt, adapter->netdev->name, ## args)
 
