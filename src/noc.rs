@@ -276,7 +276,7 @@ impl Noc {
         let _f = "send_msg";
         {
             if TRACE_OPTIONS.all || TRACE_OPTIONS.noc {
-                let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "noc send" };
+                let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "noc to port" };
                 let trace = json!({ "app_msg": msg });
                 let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
             }

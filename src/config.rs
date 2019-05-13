@@ -65,7 +65,6 @@ pub struct TraceOptions {
     pub pe_cm:    bool,
     pub pe_port:  bool,
     pub port:     bool,
-    pub port_noc: bool,
     pub link:     bool
 }
 pub const TRACE_OPTIONS: TraceOptions = TraceOptions {
@@ -81,7 +80,6 @@ pub const TRACE_OPTIONS: TraceOptions = TraceOptions {
     pe_cm:    true,
     pe_port:  true,
     port:     true,
-    port_noc: true,
     link:     false
 };
 
