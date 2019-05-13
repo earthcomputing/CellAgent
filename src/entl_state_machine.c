@@ -398,7 +398,8 @@ int entl_received(entl_state_machine_t *mcn, uint16_t from_hi, uint32_t from_lo,
                     set_atomic_state(mcn, ENTL_STATE_SEND);
                     set_update_time(mcn, ts);
                     STM_TDEBUG("TOCK: seqno %d, BH -> SEND", seqno);
-                    ENTT_queue_back_push(&mcn->receive_ATI_queue, mcn->receive_buffer);
+                    int q_space = ENTT_queue_back_push(&mcn->receive_ATI_queue, mcn->receive_buffer);
+                    // FIXME: what about when q is full?
                     mcn->receive_buffer = NULL;
                     ret_action = ENTL_ACTION_SEND | ENTL_ACTION_SIG_AIT;
                 }
@@ -759,9 +760,9 @@ void entl_link_up(entl_state_machine_t *mcn) {
 // Request to send the AIT message, return 0 if OK, -1 if queue full
 int entl_send_AIT_message(entl_state_machine_t *mcn, struct entt_ioctl_ait_data *data) {
     STM_LOCK;
-        int ret = ENTT_queue_back_push(&mcn->send_ATI_queue, (void *) data);
+        int q_space = ENTT_queue_back_push(&mcn->send_ATI_queue, (void *) data);
     STM_UNLOCK;
-    return ret;
+    return q_space;
 }
 
 // Read the next AIT message to send

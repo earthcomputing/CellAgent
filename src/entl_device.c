@@ -154,24 +154,24 @@ static bool entl_device_process_rx_packet(entl_device_t *dev, struct sk_buff *sk
             else {
                 // tx queue empty, inject a new packet
                 uint16_t emsg_raw = (uint16_t) -1; uint32_t seqno = (uint32_t) -1;
-                int ret = entl_next_send(stm, &emsg_raw, &seqno);
+                int send_action = entl_next_send(stm, &emsg_raw, &seqno);
 
                 if (get_entl_msg(emsg_raw) != ENTL_MESSAGE_NOP_U) {
                     unsigned long flags;
                     spin_lock_irqsave(&adapter->entl_txring_lock, flags);
-                    int recv_action2 = inject_message(dev, emsg_raw, seqno, ret);
+                    int inject_action = inject_message(dev, emsg_raw, seqno, send_action);
                     spin_unlock_irqrestore(&adapter->entl_txring_lock, flags);
 
                     // failed inject, invoke task
-                    if (recv_action2 == 1) {
+                    if (inject_action == 1) {
                         // resource error, retry
                         dev->edev_u_addr = emsg_raw;
                         dev->edev_l_addr = seqno;
-                        dev->edev_action = ret;
+                        dev->edev_action = send_action;
                         dev->edev_flag |= ENTL_DEVICE_FLAG_RETRY;
                         mod_timer(&dev->edev_watchdog_timer, jiffies + 1);
                     }
-                    else if (recv_action2 == -1) {
+                    else if (inject_action == -1) {
                         entl_state_error(stm, ENTL_ERROR_FATAL);
                         dev->edev_flag |= ENTL_DEVICE_FLAG_SIGNAL;
                         mod_timer(&dev->edev_watchdog_timer, jiffies + 1);
@@ -193,24 +193,24 @@ static bool entl_device_process_rx_packet(entl_device_t *dev, struct sk_buff *sk
         }
         else {
             uint16_t emsg_raw = (uint16_t) -1; uint32_t seqno = (uint32_t) -1;
-            int ret = entl_next_send(stm, &emsg_raw, &seqno);
+            int send_action = entl_next_send(stm, &emsg_raw, &seqno);
 
             if (get_entl_msg(emsg_raw) != ENTL_MESSAGE_NOP_U) {
                 unsigned long flags;
                 spin_lock_irqsave(&adapter->entl_txring_lock, flags);
-                int recv_action2 = inject_message(dev, emsg_raw, seqno, ret);
+                int inject_action = inject_message(dev, emsg_raw, seqno, send_action);
                 spin_unlock_irqrestore(&adapter->entl_txring_lock, flags);
 
                 // failed inject, invoke task
-                if (recv_action2 == 1) {
+                if (inject_action == 1) {
                     // resource error, so retry
                     dev->edev_u_addr = emsg_raw;
                     dev->edev_l_addr = seqno;
-                    dev->edev_action = ret;
+                    dev->edev_action = send_action;
                     dev->edev_flag |= ENTL_DEVICE_FLAG_RETRY;
                     mod_timer(&dev->edev_watchdog_timer, jiffies + 1);
                 }
-                else if (recv_action2 == -1) {
+                else if (inject_action == -1) {
                     entl_state_error(stm, ENTL_ERROR_FATAL);
                     dev->edev_flag |= ENTL_DEVICE_FLAG_SIGNAL;
                     mod_timer(&dev->edev_watchdog_timer, jiffies + 1);
@@ -304,11 +304,11 @@ static int entl_do_ioctl(struct net_device *netdev, struct ifreq *ifr, int cmd) 
         struct entt_ioctl_ait_data *ait_data = kzalloc(sizeof(struct entt_ioctl_ait_data), GFP_ATOMIC);
         copy_from_user(ait_data, ifr->ifr_data, sizeof(struct entt_ioctl_ait_data));
 
-        int ret = entl_send_AIT_message(stm, ait_data);
-        ait_data->num_messages = ret;
+        int q_space = entl_send_AIT_message(stm, ait_data);
+        ait_data->num_messages = q_space;
         copy_to_user(ifr->ifr_data, ait_data, sizeof(struct entt_ioctl_ait_data));
 
-        if (ret < 0) {
+        if (q_space < 0) {
             kfree(ait_data); // FIXME: check for memory leak?
         }
     }
@@ -549,11 +549,11 @@ static void entl_watchdog_task(struct work_struct *work) {
         ||  (entl_state == ENTL_STATE_AM)
         ||  (entl_state == ENTL_STATE_BH)) {
             uint16_t u_addr; uint32_t l_addr;
-            int ret = entl_get_hello(stm, &u_addr, &l_addr);
-            if (ret) {
+            int hello_action = entl_get_hello(stm, &u_addr, &l_addr);
+            if (hello_action) {
                 unsigned long flags;
                 spin_lock_irqsave(&adapter->entl_txring_lock, flags);
-                int recv_action = inject_message(dev, u_addr, l_addr, ret);
+                int recv_action = inject_message(dev, u_addr, l_addr, hello_action);
                 spin_unlock_irqrestore(&adapter->entl_txring_lock, flags);
 
                 if (recv_action == 0) {
