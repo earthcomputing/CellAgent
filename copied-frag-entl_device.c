@@ -1,4 +1,33 @@
 
+// entl version of e1000_configure
+/**
+ * e1000_configure - configure the hardware for Rx and Tx
+ * @adapter: private board structure
+ **/
+static void entl_e1000_configure(struct e1000_adapter *adapter)
+{
+	struct e1000_ring *rx_ring = adapter->rx_ring;
+
+	entl_e1000e_set_rx_mode(adapter->netdev);
+#if defined(NETIF_F_HW_VLAN_TX) || defined(NETIF_F_HW_VLAN_CTAG_TX)
+	e1000_restore_vlan(adapter);
+#endif
+	e1000_init_manageability_pt(adapter);
+
+	e1000_configure_tx(adapter);
+
+#ifdef NETIF_F_RXHASH
+	if (adapter->netdev->features & NETIF_F_RXHASH)
+		e1000e_setup_rss_hash(adapter);
+#endif
+	entl_e1000_setup_rctl(adapter);
+	entl_e1000_configure_rx(adapter);
+	adapter->alloc_rx_buf(rx_ring, e1000_desc_unused(rx_ring), GFP_KERNEL);
+#ifdef ENTL
+	edev_init(adapter);
+#endif
+}
+
 /**
  * entl_e1000e_set_rx_mode - ENTL versin, always set Promiscuous mode
  * @netdev: network interface device structure
