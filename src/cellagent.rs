@@ -480,7 +480,7 @@ impl CellAgent {
             let app_msg: Box<dyn AppMessage> = serde_json::from_str(&serialized).context(CellagentError::Chain { func_name: _f, comment: S("") })?;
             {
                 if TRACE_OPTIONS.all || TRACE_OPTIONS.ca {
-                    let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "ca from vm" };
+                    let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "ca_from_vm" };
                     let trace = json!({ "cell_id": &self.cell_id, "app_msg": app_msg });
                     let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
                 }
@@ -579,6 +579,12 @@ impl CellAgent {
     }
     fn update_entry(&self, entry: &RoutingTableEntry) -> Result<(), Error> {
         let _f = "update_entry";
+        if TRACE_OPTIONS.all || TRACE_OPTIONS.ca {
+            let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "ca_to_cm_entry" };
+            //println!("Cellagent {}: {} msg {}", self.cell_id, _f, msg); // Should be msg.value()
+            let trace = json!({ "cell_id": &self.cell_id, "entry": entry });
+            let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
+        }
         self.ca_to_cm.send(CaToCmBytes::Entry(*entry)).context(CellagentError::Chain { func_name: _f, comment: S("")})?;
         Ok(())
     }
@@ -612,7 +618,7 @@ impl CellAgent {
             let msg = ca_from_cm.recv().context(CellagentError::Chain { func_name: _f, comment: S(self.cell_id)})?;
             {
                 if TRACE_OPTIONS.all || TRACE_OPTIONS.ca {
-                    let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "ca from cm" };
+                    let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "ca_from_cm" };
                     let trace = match &msg {
                         CmToCaBytes::Bytes((_, _, _, bytes)) => {
                             json!({ "cell_id": self.cell_id, "msg": bytes.to_string()? })
@@ -695,6 +701,13 @@ impl CellAgent {
         let serialized = serde_json::to_string(app_msg)?;
         let bytes = ByteArray::new(&serialized);
         let senders = self.get_vm_senders(port_tree_id.to_tree_id()).context(CellagentError::Chain { func_name: _f, comment: S("") })?;
+        {
+            if TRACE_OPTIONS.all || TRACE_OPTIONS.ca {
+                let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "ca_to_vm" };
+                let trace = json!({ "cell_id": &self.cell_id, "app_msg": bytes.to_string()? });
+                let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
+            }
+        }
         for sender in senders {
             sender.send(bytes.clone()).context(CellagentError::Chain { func_name: _f, comment: S("") })?;
         }
@@ -864,6 +877,13 @@ impl CellAgent {
                         broken_element.get_port_no()
                     };
                     let no_packets = payload.get_number_of_packets();
+                    {
+                        if TRACE_OPTIONS.all || TRACE_OPTIONS.ca {
+                            let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "ca_to_cm_reroute" };
+                            let trace = json!({ "cell_id": &self.cell_id, "broken_port_no": broken_port_no, "port_no": port_no, "no_packets": no_packets });
+                            let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
+                        }
+                    }
                     self.ca_to_cm.send(CaToCmBytes::Reroute((broken_port_no, port_no, no_packets)))?;
                     // Following line is commented out because the packet engine does rerouting.
                     // Packets still go the out queue for the broken link, but the packet engine reroutes them
@@ -1256,6 +1276,13 @@ impl CellAgent {
                              &base_tree, base_tree.get_name());
             let serialized = serde_json::to_string(&tree_name_msg as &dyn AppMessage).context(CellagentError::Chain { func_name: "port_connected", comment: S(self.cell_id) })?;
             let bytes = ByteArray::new(&serialized);
+            {
+                if TRACE_OPTIONS.all || TRACE_OPTIONS.ca {
+                    let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "ca_to_noc_tree_name" };
+                    let trace = json!({ "cell_id": &self.cell_id, "app_msg": tree_name_msg });
+                    let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
+                }
+            }
             self.ca_to_cm.send(CaToCmBytes::App((port_number, bytes)))?;
             Ok(())
         } else {
@@ -1380,12 +1407,6 @@ impl CellAgent {
             let port_mask = user_mask.and(mask);
             let ports = Mask::get_port_nos(port_mask);
             let msg_type = msg.get_msg_type();
-            if TRACE_OPTIONS.all || TRACE_OPTIONS.ca || DEBUG_OPTIONS.all || DEBUG_OPTIONS.ca_msg_send {
-                let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "ca to cm" };
-                //println!("Cellagent {}: {} msg {}", self.cell_id, _f, msg); // Should be msg.value()
-                let trace = json!({ "cell_id": &self.cell_id, "tree_id": &tree_id, "port_nos": &ports, "msg": msg.value() });
-                let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
-            }
             if DEBUG_OPTIONS.all || DEBUG_OPTIONS.ca_msg_send {
                 match msg_type {
                     MsgType::Discover  |
@@ -1408,6 +1429,14 @@ impl CellAgent {
         self.tree_map
             .get(&tree_uuid)
             .ok_or::<Error>(CellagentError::Tree { func_name: _f, cell_id: self.cell_id, tree_uuid }.into())?;
+        {
+            if TRACE_OPTIONS.all || TRACE_OPTIONS.ca || DEBUG_OPTIONS.all || DEBUG_OPTIONS.ca_msg_send {
+                let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "ca_to_cm_msg" };
+                //println!("Cellagent {}: {} msg {}", self.cell_id, _f, msg); // Should be msg.value()
+                let trace = json!({ "cell_id": &self.cell_id, "tree_id": &tree_id, "msg": bytes.to_string()? });
+                let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
+            }
+        }
         let msg = CaToCmBytes::Bytes((tree_id, is_ait, user_mask, bytes));
         self.ca_to_cm.send(msg)?;
         Ok(())
