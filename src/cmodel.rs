@@ -95,7 +95,7 @@ impl Cmodel {
                         }
                         _ => json!({ "cell_id": &self.cell_id, "msg": &msg })
                     };
-                    let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "cm from ca" };
+                    let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "cm_from_ca" };
                     let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
                 }
             }
@@ -162,7 +162,7 @@ impl Cmodel {
             let msg = cm_from_pe.recv()?;
             {
                 if TRACE_OPTIONS.all || TRACE_OPTIONS.cm {
-                    let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "cm from pe" };
+                    let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "cm_from_pe" };
                     let trace = match &msg {
                         PeToCmPacket::Packet((_, packet)) => {
                             json!({ "cell_id": self.cell_id, "msg": packet.to_string()? })
