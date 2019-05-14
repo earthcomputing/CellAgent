@@ -38,15 +38,27 @@ impl Link {
     pub fn break_link(&mut self) -> Result<(), Error> {
         let _f = "break_link";
         self.is_connected = false;
-        // TODO: Create trace records
-        self.to_left.clone().expect("Cannot fail in break_link").send(LinkToPortPacket::Status(PortStatus::Disconnected)).context(LinkError::Chain { func_name: _f, comment: S(self.id.clone()) + " left"})?;
-        self.to_rite.clone().expect("Cannot fail in break_link").send(LinkToPortPacket::Status(PortStatus::Disconnected)).context(LinkError::Chain { func_name: _f, comment: S(self.id.clone()) + " left"})?;
+        {
+            if TRACE_OPTIONS.all || TRACE_OPTIONS.link {
+                let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "link_to_port_disconnected" };
+                let trace = json!({ "id": &self.get_id(), "status": LinkToPortPacket::Status(PortStatus::Disconnected) });
+                let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
+            }
+        }
+        self.to_left.clone().expect("Unwrap cannot fail in break_link").send(LinkToPortPacket::Status(PortStatus::Disconnected)).context(LinkError::Chain { func_name: _f, comment: S(self.id.clone()) + " left"})?;
+        self.to_rite.clone().expect("Unwrap cannot fail in break_link").send(LinkToPortPacket::Status(PortStatus::Disconnected)).context(LinkError::Chain { func_name: _f, comment: S(self.id.clone()) + " left"})?;
         Ok(())
     }
     fn listen(&self, status: &LinkToPort, link_from: LinkFromPort, link_to: LinkToPort)
             -> Result<JoinHandle<()>, Error> {
         let _f = "listen";
-        // TODO: Create trace record
+        {
+            if TRACE_OPTIONS.all || TRACE_OPTIONS.link {
+                let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "link_to_port_connected" };
+                let trace = json!({ "id": &self.get_id(), "status": LinkToPortPacket::Status(PortStatus::Connected) });
+                let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
+            }
+        }
         status.send(LinkToPortPacket::Status(PortStatus::Connected)).context(LinkError::Chain { func_name: _f, comment: S(self.id.clone()) + " send status to port"})?;
         let join_handle = self.listen_port(link_from, link_to)?;
         Ok(join_handle)
@@ -80,10 +92,10 @@ impl Link {
             let packet = link_from.recv().context(LinkError::Chain { func_name: _f, comment: S(self.id.clone()) })?;
             {
                 if TRACE_OPTIONS.all || TRACE_OPTIONS.link {
-                    let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "link from port" };
+                    let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "link_from_port" };
                     let trace = json!({ "id": &self.get_id(), "msg": packet.to_string()? });
                     let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
-                    let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "link to port" };
+                    let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "link_to_port" };
                     let trace = json!({ "id": &self.get_id(), "msg": packet.to_string()? });
                     let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
                 }
