@@ -87,7 +87,7 @@ impl Noc {
             let app_msg: Box<dyn AppMessage> = serde_json::from_str(&serialized).context(NocError::Chain { func_name: _f, comment: S("") })?;
             {
                 if TRACE_OPTIONS.all || TRACE_OPTIONS.noc {
-                    let trace_params = &TraceHeaderParams { module: "src/noc.rs", line_no: line!(), function: _f, format: "noc from port" };
+                    let trace_params = &TraceHeaderParams { module: "src/noc.rs", line_no: line!(), function: _f, format: "noc_from_port" };
                     let trace = json!({ "id": self.get_name(), "app_msg": app_msg });
                     let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
                 }
@@ -147,7 +147,7 @@ impl Noc {
             let input = &noc_from_application.recv()?;
             {
                 if TRACE_OPTIONS.all || TRACE_OPTIONS.noc {
-                    let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "noc from application" };
+                    let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "noc_from_application" };
                     let trace = json!({ "id": self.get_name(), "thread_name": thread::current().name(), "thread_id": TraceHeader::parse(thread::current().id()), "input": input });
                     let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
                 }
@@ -276,7 +276,7 @@ impl Noc {
         let _f = "send_msg";
         {
             if TRACE_OPTIONS.all || TRACE_OPTIONS.noc {
-                let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "noc to port" };
+                let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "noc_to_port" };
                 let trace = json!({ "app_msg": msg });
                 let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
             }
