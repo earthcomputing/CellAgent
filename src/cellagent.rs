@@ -677,32 +677,33 @@ impl CellAgent {
             }
         }
     }
-    pub fn process_interapplication_msg(&mut self, app_msg: &InterapplicationMsg, port_no: PortNo)
+    pub fn process_interapplication_msg(&mut self, ec_app_msg: &InterapplicationMsg, port_no: PortNo)
             -> Result<(), Error> {
         let _f = "process_interapplication_msg";
-        let port_tree_id = app_msg.get_port_tree_id();
+        let port_tree_id = ec_app_msg.get_port_tree_id();
+        let app_msg = ec_app_msg.get_payload().get_app_msg();
         let gvm_eqn = self.get_gvm_eqn(port_tree_id)?;
         let save = self.gvm_eval_save(port_tree_id, &gvm_eqn).context(CellagentError::Chain { func_name: _f, comment: S(self.cell_id)})?;
         {
             if DEBUG_OPTIONS.all || DEBUG_OPTIONS.process_msg {
                 let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "ca_process_interapplication_msg" };
-                let trace = json!({ "cell_id": &self.cell_id,"port_tree_id": port_tree_id, "port_no": port_no, "save": save, "app_msg": app_msg.value() });
+                let trace = json!({ "cell_id": &self.cell_id,"port_tree_id": port_tree_id, "port_no": port_no, "save": save, "ec_app_msg": ec_app_msg.value() });
                 let _ = add_to_trace(TraceType::Debug, trace_params, &trace, _f);
-                println!("Cellagent {}: {} tree {} port {} save {} app_msg {}", self.cell_id, _f, port_tree_id, *port_no, save, app_msg);
+                println!("Cellagent {}: {} tree {} port {} save {} ec_app_msg {}", self.cell_id, _f, port_tree_id, *port_no, save, ec_app_msg);
             }
         }
-        let serialized = serde_json::to_string(app_msg as &dyn Message)?;
-        let bytes = ByteArray::new(&serialized);
         let senders = self.get_vm_senders(port_tree_id.to_tree_id()).context(CellagentError::Chain { func_name: _f, comment: S("") })?;
         {
             if TRACE_OPTIONS.all || TRACE_OPTIONS.ca {
                 let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "ca_to_vm" };
-                let trace = json!({ "cell_id": &self.cell_id, "app_msg": bytes.to_string()? });
+                let trace = json!({ "cell_id": &self.cell_id, "app_msg": app_msg });
                 let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
             }
         }
+        let serialized = serde_json::to_string(app_msg as &dyn AppMessage)?;
         for sender in senders {
-            sender.send(bytes.clone()).context(CellagentError::Chain { func_name: _f, comment: S("") })?;
+            let bytes = ByteArray::new(&serialized);
+            sender.send(bytes).context(CellagentError::Chain { func_name: _f, comment: S("") })?;
         }
         Ok(())
     }
