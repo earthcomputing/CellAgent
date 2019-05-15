@@ -614,7 +614,7 @@ impl PacketEngine {
                                 _ => {
                                     let tree_name = packet.get_port_tree_id();
                                     {
-                                        let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "pe to cm rootward" };
+                                        let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "pe_to_cm_rootward" };
                                         let trace = json!({ "cell_id": self.cell_id, "tree_name": &tree_name, "msg_type": &msg_type, "parent_port": &parent });
                                         let _ = add_to_trace(TraceType::Debug, trace_params, &trace, _f);
                                     }
@@ -646,7 +646,7 @@ impl PacketEngine {
                     let msg_type = MsgType::msg_type(&packet);
                     let port_tree_id = packet.get_port_tree_id();
                     if TRACE_OPTIONS.all || TRACE_OPTIONS.pe_port {
-                        let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "pe to cm leafward" };
+                        let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "pe_to_cm_leafward" };
                         let trace = json!({ "cell_id": self.cell_id, "port_tree_id": &port_tree_id, "port_nos": &port_nos, "msg": packet.to_string()? });
                         let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
                     }

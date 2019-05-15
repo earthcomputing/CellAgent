@@ -78,8 +78,8 @@ pub const TRACE_OPTIONS: TraceOptions = TraceOptions {
     cm:       true,
     pe:       true,
     pe_cm:    true,
-    pe_port:  true,
-    port:     true,
+    pe_port:  false,
+    port:     false,
     link:     false
 };
 
@@ -110,7 +110,7 @@ pub struct DebugOptions {
 pub const DEBUG_OPTIONS: DebugOptions = DebugOptions {
     all:            false,
     flow_control:   false,
-    ca_msg_recv:    false,
+    ca_msg_recv:    true,
     ca_msg_send:    false,
     cm_from_ca:     false,
     cm_to_ca:       false,
@@ -120,7 +120,7 @@ pub const DEBUG_OPTIONS: DebugOptions = DebugOptions {
     deploy:         false,
     discover:       false,
     discoverd:      false,
-    manifest:       false,
+    manifest:       true,
     pe_pkt_recv:    false,
     pe_pkt_send:    false,
     process_msg:    false,
