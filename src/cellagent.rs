@@ -691,7 +691,7 @@ impl CellAgent {
                 println!("Cellagent {}: {} tree {} port {} save {} app_msg {}", self.cell_id, _f, port_tree_id, *port_no, save, app_msg);
             }
         }
-        let serialized = serde_json::to_string(app_msg)?;
+        let serialized = serde_json::to_string(app_msg as &dyn Message)?;
         let bytes = ByteArray::new(&serialized);
         let senders = self.get_vm_senders(port_tree_id.to_tree_id()).context(CellagentError::Chain { func_name: _f, comment: S("") })?;
         {
@@ -1115,9 +1115,8 @@ impl CellAgent {
     pub fn app_manifest(&mut self, app_msg: &AppManifestMsg, sender_id: SenderID) -> Result<(), Error> {
         let _f = "app_manifest";
         let deploy_tree_name = app_msg.get_deploy_tree_name();
-        let mut locked = self.tree_name_map.lock().unwrap();
-        let tree_map = locked
-            .get_mut (&sender_id)
+        let mut tree_map = self.tree_name_map.lock().unwrap()
+            .remove(&sender_id)
             .ok_or::<Error>(CellagentError::TreeMap { func_name: _f, cell_id: self.cell_id, tree_name: deploy_tree_name.clone() }.into())?;
         let deploy_tree_id = tree_map
             .get(deploy_tree_name.get_name())
@@ -1134,7 +1133,7 @@ impl CellAgent {
                 .ok_or::<Error>(CellagentError::TreeMap { func_name: _f, cell_id: self.cell_id, tree_name: allowed_tree.clone() }.into())?;
         }
         let manifest = app_msg.get_payload().get_manifest();
-        let msg = ManifestMsg::new(sender_id, false, deploy_tree_id.clone(), tree_map, &manifest);
+        let msg = ManifestMsg::new(sender_id, false, deploy_tree_id.clone(), &tree_map, &manifest);
         let mask = self.get_mask(deploy_port_tree_id)?;
         {
             if DEBUG_OPTIONS.all || DEBUG_OPTIONS.process_msg {   // Debug
@@ -1145,7 +1144,7 @@ impl CellAgent {
             }
         }
         self.send_msg(deploy_tree_id, &msg, mask.or(Mask::port0())).context(CellagentError::Chain { func_name: _f, comment: S(self.cell_id) + " send manifest" })?;
-        self.tree_name_map.lock().unwrap().insert(sender_id, tree_map.clone());
+        self.tree_name_map.lock().unwrap().insert(sender_id, tree_map);
         Ok(())
     }
     pub fn app_query(&self, msg: &AppQueryMsg, sender_id: SenderID) -> Result<MsgTreeMap, Error> {

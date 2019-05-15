@@ -281,7 +281,7 @@ impl Noc {
                 let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
             }
         }
-        let serialized = serde_json::to_string(msg)?;
+        let serialized = serde_json::to_string(msg as &dyn AppMessage)?;
         let bytes = ByteArray::new(&serialized);
         noc_to_port.send(bytes).context(NocError::Chain { func_name: _f, comment: S("") })?;
         Ok(())
