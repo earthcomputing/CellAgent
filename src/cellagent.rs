@@ -618,17 +618,23 @@ impl CellAgent {
             let msg = ca_from_cm.recv().context(CellagentError::Chain { func_name: _f, comment: S(self.cell_id)})?;
             {
                 if TRACE_OPTIONS.all || TRACE_OPTIONS.ca {
-                    let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "ca_from_cm" };
-                    let trace = match &msg {
+                    match &msg {
                         CmToCaBytes::Bytes((_, _, _, bytes)) => {
-                            json!({ "cell_id": self.cell_id, "msg": bytes.to_string()? })
+                            let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "ca_from_cm_bytes" };
+                            let trace = json!({ "cell_id": self.cell_id, "bytes": bytes.to_string()? });
+                            let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
                         },
                         CmToCaBytes::App((_, bytes)) => {
-                            json!({ "cell_id": &self.cell_id, "msg": bytes.to_string()? })
+                            let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "ca_from_cm_app" };
+                            let trace = json!({ "cell_id": &self.cell_id, "msg": bytes.to_string()? });
+                            let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
                         }
-                        _ => json!({ "cell_id": &self.cell_id, "msg": msg })
-                    };
-                    let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
+                        CmToCaBytes::Status((port_no, is_border, number_of_packets, status)) => {
+                            let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "ca_from_cm_status" };
+                            let trace = json!({ "cell_id": &self.cell_id, "port": port_no, "is_border": is_border, "no_packets": number_of_packets, "status": status });
+                            let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
+                        },
+                    }
                 }
             }
             match msg {
@@ -639,19 +645,11 @@ impl CellAgent {
                 CmToCaBytes::Bytes((port_no, is_ait, uuid, bytes)) => {
                     // The index may be pointing to the control tree because the other cell didn't get the StackTree or StackTreeD message in time
                     let mut msg = MsgType::msg_from_bytes(&bytes).context(CellagentError::Chain { func_name: _f, comment: S(self.cell_id)})?;
-                    let msg_tree_id = {  // Use control tree if uuid not found
-                        self.tree_id_map
-                            .get(&uuid)
-                            .unwrap_or(&self.control_tree_id.to_port_tree_id_0())
-                            .clone()
-                    };
                     {
-                        if TRACE_OPTIONS.all || TRACE_OPTIONS.ca {
-                            let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "ca got msg" };
+                        if DEBUG_OPTIONS.all || DEBUG_OPTIONS.ca_msg_recv {
+                            let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "ca_got_msg" };
                             let trace = json!({ "cell_id": &self.cell_id, "msg": &msg.value(), "port_no": port_no });
-                            let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
-                        }
-                        if DEBUG_OPTIONS.all || DEBUG_OPTIONS.ca_msg_recv {   //Debug print
+                            let _ = add_to_trace(TraceType::Debug, trace_params, &trace, _f);
                             match msg.get_msg_type() {
                                 /*MsgType::Discover  |
                                 MsgType::DiscoverD => {
@@ -665,6 +663,12 @@ impl CellAgent {
                             }
                         }
                     }
+                    let msg_tree_id = {  // Use control tree if uuid not found
+                        self.tree_id_map
+                            .get(&uuid)
+                            .unwrap_or(&self.control_tree_id.to_port_tree_id_0())
+                            .clone()
+                    };
                     msg.process_ca(self, port_no, msg_tree_id, is_ait).context(CellagentError::Chain { func_name: _f, comment: S(self.cell_id)})?;
                 },
                 CmToCaBytes::App((port_no, bytes)) => {
