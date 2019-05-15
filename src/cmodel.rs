@@ -267,7 +267,7 @@ packets: Vec<Packet>,
             {
                 if TRACE_OPTIONS.all || TRACE_OPTIONS.cm {
                     let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "cm_to_ca_bytes" };
-                    let trace = json!({ "cell_id": &self.cell_id, "packet": &bytes.to_string()? });
+                    let trace = json!({ "cell_id": &self.cell_id, "bytes": &bytes.to_string()? });
                     let _ = add_to_trace(TraceType::Debug, trace_params, &trace, _f); // sender side, dup
                     if DEBUG_OPTIONS.all || DEBUG_OPTIONS.cm_from_ca {
                         let packet_count = packets[0].get_count();
