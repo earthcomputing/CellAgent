@@ -648,20 +648,9 @@ impl CellAgent {
                     {
                         if DEBUG_OPTIONS.all || DEBUG_OPTIONS.ca_msg_recv {
                             let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "ca_got_msg" };
-                            let trace = json!({ "cell_id": &self.cell_id, "msg": &msg.value(), "port_no": port_no });
+                            let trace = json!({ "cell_id": &self.cell_id, "port_no": port_no, "msg": &msg });
                             let _ = add_to_trace(TraceType::Debug, trace_params, &trace, _f);
-                            match msg.get_msg_type() {
-                                /*MsgType::Discover  |
-                                MsgType::DiscoverD => {
-                                    if msg.get_port_tree_id().is_name("Tree:C:2") {
-                                        println!("Cellagent {}: {} Port {} received {}", self.cell_id, _f, *port_no, msg);
-                                    }
-                                }, */
-                                _ => {
-                                    println!("Cellagent {}: {} Port {} received {}", self.cell_id, _f, *port_no, msg);
-                                }
-                            }
-                        }
+                       }
                     }
                     let msg_tree_id = {  // Use control tree if uuid not found
                         self.tree_id_map
@@ -677,10 +666,10 @@ impl CellAgent {
                         .get(&port_number)
                         .ok_or::<Error>(CellagentError::Border { func_name: _f, cell_id: self.cell_id, port_no: *port_no }.into())?
                         .0;
-                    let tree_map= &(self.tree_name_map.lock().unwrap()
-                        .get(&sender_id)
-                        .cloned()
-                        .ok_or::<Error>(CellagentError::TreeNameMap { func_name: _f, cell_id: self.cell_id,  sender_id }.into())?);
+                    // Verify that this sender can name this tree
+                    if !self.tree_name_map.lock().unwrap().contains_key(&sender_id) {
+                        return Err(CellagentError::TreeNameMap { func_name: _f, cell_id: self.cell_id,  sender_id }.into());
+                    }
                     let serialized = bytes.to_string()?;
                     let app_msg: Box<dyn AppMessage> = serde_json::from_str(&serialized).context(CellagentError::Chain { func_name: _f, comment: S("") })?;
                     app_msg.process_ca(self, sender_id)?;
