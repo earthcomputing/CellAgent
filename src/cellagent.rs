@@ -472,10 +472,6 @@ impl CellAgent {
         }
         loop {
             let bytes = ca_from_vm.recv()?;
-            let tree_map = self.tree_name_map.lock().unwrap()
-                .get(&sender_id)
-                .cloned()
-                .ok_or::<Error>(CellagentError::TreeNameMap { func_name: _f, cell_id: self.cell_id, sender_id }.into())?;
             let serialized = bytes.to_string()?;
             let app_msg: Box<dyn AppMessage> = serde_json::from_str(&serialized).context(CellagentError::Chain { func_name: _f, comment: S("") })?;
             {
@@ -1116,7 +1112,8 @@ impl CellAgent {
     pub fn app_manifest(&mut self, app_msg: &AppManifestMsg, sender_id: SenderID) -> Result<(), Error> {
         let _f = "app_manifest";
         let deploy_tree_name = app_msg.get_deploy_tree_name();
-        let mut tree_map = self.tree_name_map.lock().unwrap()
+        let mut locked = self.tree_name_map.lock().unwrap();
+        let mut tree_map = locked
             .remove(&sender_id)
             .ok_or::<Error>(CellagentError::TreeMap { func_name: _f, cell_id: self.cell_id, tree_name: deploy_tree_name.clone() }.into())?;
         let deploy_tree_id = tree_map
@@ -1136,6 +1133,7 @@ impl CellAgent {
         let manifest = app_msg.get_payload().get_manifest();
         let msg = ManifestMsg::new(sender_id, false, deploy_tree_id.clone(), &tree_map, &manifest);
         let mask = self.get_mask(deploy_port_tree_id)?;
+        locked.insert(sender_id, tree_map);
         {
             if DEBUG_OPTIONS.all || DEBUG_OPTIONS.process_msg {   // Debug
                 let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "ca_got_manifest_app_msg" };
@@ -1145,10 +1143,9 @@ impl CellAgent {
             }
         }
         self.send_msg(deploy_tree_id, &msg, mask.or(Mask::port0())).context(CellagentError::Chain { func_name: _f, comment: S(self.cell_id) + " send manifest" })?;
-        self.tree_name_map.lock().unwrap().insert(sender_id, tree_map);
         Ok(())
     }
-    pub fn app_query(&self, msg: &AppQueryMsg, sender_id: SenderID) -> Result<MsgTreeMap, Error> {
+    pub fn app_query(&self, msg: &AppQueryMsg, _sender_id: SenderID) -> Result<MsgTreeMap, Error> {
         let _f = "app_query";
         // Needs may_send test
         Err(UtilityError::Unimplemented { func_name: _f, feature: S("AppMsgType::Query")}.into())
