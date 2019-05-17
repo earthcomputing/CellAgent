@@ -1,16 +1,22 @@
 #[cfg(feature = "cell")]
-#[link(name = ":ecnl.a")]
-extern {
-    pub fn get_num_phys_ports_c() -> c_uchar;
-}
+extern crate libc;
 
-use std::{fmt, fmt::Write,
-          ffi::CStr,
-          collections::{HashMap, HashSet},
-	  os::raw::{c_char, c_int, c_uchar},
-          sync::mpsc::channel,
-          thread,
-          iter::FromIterator
+use std::{
+    fmt, fmt::Write,
+    collections::{HashMap, HashSet},
+    os::raw::{c_void},
+    sync::mpsc::channel,
+    thread,
+    iter::FromIterator
+};
+
+#[cfg(feature = "cell")]
+use libc::{free};
+#[cfg(feature = "cell")]
+use std::{
+    os::raw::{c_char, c_int, c_uchar, c_uint},
+    ptr::{null, null_mut},	  
+    ffi::CStr,
 };
 
 use crate::cellagent::{CellAgent};
@@ -26,6 +32,17 @@ use crate::port::{Port};
 use crate::utility::{CellConfig, CellType, PortNo, S, TraceHeaderParams, TraceType, write_err};
 use crate::vm::VirtualMachine;
 
+#[cfg(feature = "cell")]
+#[allow(improper_ctypes)]
+#[link(name = ":ecnl_sdk.o")]
+#[link(name = ":libnl-3.so")]
+#[link(name = ":libnl-genl-3.so")]
+extern {
+    pub fn alloc_ecnl_session(ecnl_session_ptr: *const *mut c_void) -> c_int;
+    pub fn get_module_info(ecnl_session: *mut c_void, mipp: *const *const ModuleInfo) -> c_int;
+    pub fn free_ecnl_session(ecnl_session: *mut c_void) -> c_int;
+}
+
 #[derive(Debug)]
 pub struct NalCell {
     id: CellID,
@@ -37,16 +54,55 @@ pub struct NalCell {
     packet_engine: PacketEngine,
     vms: Vec<VirtualMachine>,
     ports_from_pe: HashMap<PortNo, PortFromPe>,
+    ecnl: Option<*mut c_void>
 }
 
 impl NalCell {
     pub fn new(name: &str, simulated_options: Option<PortQty>, border_port_nos: &HashSet<PortNo>, config: CellConfig)
             -> Result<NalCell, Error> {
         let _f = "new";
+        let ecnl =
+            match simulated_options {
+                Some(num_phys_ports) => None,
+                None => {
+                    #[cfg(feature = "cell")]
+                    {
+                        let ecnl_session: *mut c_void = null_mut();
+                        let ecnl_session_ptr: *const *mut c_void = &ecnl_session;
+                        unsafe {
+                            alloc_ecnl_session(ecnl_session_ptr);
+                            Some(*ecnl_session_ptr)
+                        }
+                    }
+                    #[cfg(feature = "simulator")]
+                    {
+                        None
+                    }
+                },
+            };
 	let num_phys_ports =
 	    match simulated_options {
 	        Some(num_phys_ports) => num_phys_ports,
-		None => get_num_phys_ports(),
+		None => {
+                    #[cfg(feature = "cell")]
+                    let mip: *const ModuleInfo = null();
+                    #[cfg(feature = "cell")]
+                    unsafe {
+                        get_module_info(ecnl.unwrap(), &mip);
+                        let module_id = (*mip).module_id as u8;
+                        println!("Module id: {:?} ", module_id);
+                        let module_name = CStr::from_ptr((*mip).module_name).to_string_lossy().into_owned();
+                        println!("Module name: {:?} ", module_name);
+                        let num_phys_ports = (*mip).num_ports as u8;
+                        println!("Num phys ports: {:?} ", num_phys_ports);
+                        free(mip as *mut libc::c_void);
+                        PortQty(num_phys_ports)
+                    }
+                    #[cfg(feature = "simulator")]
+                    {
+                        PortQty(0)
+                    }
+                }
             };
         if *num_phys_ports > *CONFIG.max_num_phys_ports_per_cell {
             return Err(NalcellError::NumberPorts { num_phys_ports, func_name: "new", max_num_phys_ports: CONFIG.max_num_phys_ports_per_cell }.into())
@@ -97,7 +153,7 @@ impl NalCell {
         NalCell::start_packet_engine(&packet_engine, pe_from_cm, pe_from_ports);
         Ok(NalCell { id: cell_id, cell_type, config, cmodel,
                      ports: boxed_ports, cell_agent, vms: Vec::new(),
-                     packet_engine, ports_from_pe })
+                     packet_engine, ports_from_pe, ecnl })
     }
     // SPAWN THREAD (ca.initialize)
     fn start_cell(cell_agent: &CellAgent, ca_from_cm: CaFromCm) {
@@ -200,18 +256,27 @@ impl fmt::Display for NalCell {
         write!(s, "\n{}", self.packet_engine)?;
         write!(f, "{}", s) }
 }
+impl Drop for NalCell {
+    fn drop(&mut self) {
+        match self.ecnl {
+            Some(ecnl_session) => {
+                #[cfg(feature = "cell")]
+                unsafe {
+                    free_ecnl_session(ecnl_session);
+                }
+            },
+            None => {
+            },
+        }
+    }
+}
 
-fn get_num_phys_ports() -> PortQty {
-    let num_phys_ports:c_uchar;
-    #[cfg(feature = "cell")]
-    unsafe {
-        num_phys_ports = get_num_phys_ports_c();
-    }
-    #[cfg(feature = "simulator")]
-    {
-        num_phys_ports = 0;
-    }
-    return PortQty(num_phys_ports);
+#[cfg(feature = "cell")]
+#[repr(C)]
+pub struct ModuleInfo {
+    module_id: c_uint,
+    module_name: *const c_char,
+    num_ports: c_uint,
 }
 
 
