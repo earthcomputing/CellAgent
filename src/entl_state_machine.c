@@ -192,7 +192,8 @@ int entl_received(entl_state_machine_t *mcn, uint16_t from_hi, uint32_t from_lo,
                     set_i_know(mcn, seqno); set_send_next(mcn, seqno + 1);
                     set_atomic_state(mcn, ENTL_STATE_SEND);
                     ret_action = ENTL_ACTION_SEND;
-                    if (!mcn->send_ATI_queue.count) { // AIT has priority
+// send queue non-empty
+                    if (!sendq_count(mcn)) { // AIT has priority
                         ret_action |= ENTL_ACTION_SEND_DAT; // data send as optional
                     }
                     set_update_time(mcn, ts);
@@ -214,11 +215,12 @@ int entl_received(entl_state_machine_t *mcn, uint16_t from_hi, uint32_t from_lo,
                     set_i_know(mcn, seqno); set_send_next(mcn, seqno + 1);
                     set_atomic_state(mcn, ENTL_STATE_AH);
                     ret_action = ENTL_ACTION_PROC_AIT;
-                    if (!ENTT_queue_full(&mcn->receive_ATI_queue)) {
+// recv queue space avail
+                    if (!recvq_full(mcn)) {
                         ret_action |= ENTL_ACTION_SEND;
                     }
                     else {
-                        STM_TDEBUG("AIT: seqno %d, queue full RECEIVE -> AH", seqno);
+                        STM_TDEBUG("AIT: queue full seqno %d, RECEIVE -> AH", seqno);
                     }
                     set_update_time(mcn, ts);
                     STM_TDEBUG("AIT: seqno %d, RECEIVE -> AH", seqno);
@@ -344,7 +346,8 @@ int entl_received(entl_state_machine_t *mcn, uint16_t from_hi, uint32_t from_lo,
                     set_atomic_state(mcn, ENTL_STATE_SEND);
                     set_update_time(mcn, ts);
                     STM_TDEBUG("TOCK: seqno %d, BH -> SEND", seqno);
-                    int q_space = ENTT_queue_back_push(&mcn->receive_ATI_queue, mcn->receive_buffer);
+// add to recvq
+                    int recv_space = recvq_push(mcn);
                     // FIXME: what about when q is full?
                     mcn->receive_buffer = NULL;
                     ret_action = ENTL_ACTION_SEND | ENTL_ACTION_SIG_AIT;
@@ -423,7 +426,8 @@ int entl_get_hello(entl_state_machine_t *mcn, uint16_t *emsg_raw, uint32_t *seqn
         break;
 
         case ENTL_STATE_BH:
-            if (!ENTT_queue_full(&mcn->receive_ATI_queue)) {
+// recv queue space avail
+            if (!recvq_full(mcn)) {
                 respond_with(ENTL_MESSAGE_ACK_U, get_i_sent(mcn), ENTL_ACTION_SEND);
                 STM_TDEBUG("TOCK(out): BH");
             }
@@ -473,7 +477,8 @@ int entl_next_send(entl_state_machine_t *mcn, uint16_t *emsg_raw, uint32_t *seqn
             calc_intervals(mcn);
             set_update_time(mcn, ts);
             // Avoiding to send AIT on the very first loop where other side will be in Hello state
-            if (event_i_know && event_i_sent && mcn->send_ATI_queue.count) {
+// send queue non-empty
+            if (event_i_know && event_i_sent && sendq_count(mcn)) {
                 set_atomic_state(mcn, ENTL_STATE_AM);
                 respond_with(ENTL_MESSAGE_AIT_U, get_i_sent(mcn), ENTL_ACTION_SEND | ENTL_ACTION_SEND_AIT);
                 STM_TDEBUG("AIT(out): seqno %d, SEND -> AM", *seqno);
@@ -501,8 +506,8 @@ int entl_next_send(entl_state_machine_t *mcn, uint16_t *emsg_raw, uint32_t *seqn
             STM_TDEBUG("TOCK(out): seqno %d, BM -> RECEIVE", *seqno);
             calc_intervals(mcn);
             set_update_time(mcn, ts);
-            // drop the message on the top
-            struct entt_ioctl_ait_data *ait_data = ENTT_queue_front_pop(&mcn->send_ATI_queue);
+// discard off send queue
+            struct entt_ioctl_ait_data *ait_data = sendq_pop(mcn);
             if (ait_data) {
                 kfree(ait_data);
             }
@@ -510,16 +515,18 @@ int entl_next_send(entl_state_machine_t *mcn, uint16_t *emsg_raw, uint32_t *seqn
         break;
 
         case ENTL_STATE_AH: {
-            if (ENTT_queue_full(&mcn->receive_ATI_queue)) {
-                respond_with(ENTL_MESSAGE_NOP_U, 0, ENTL_ACTION_NOP);
-            }
-            else {
+// recv queue space avail
+            if (!recvq_full(mcn)) {
                 zebra(mcn); advance_send_next(mcn);
                 respond_with(ENTL_MESSAGE_ACK_U, get_i_sent(mcn), ENTL_ACTION_SEND);
                 set_atomic_state(mcn, ENTL_STATE_BH);
+// space avail
                 STM_TDEBUG("TOCK(out): seqno %d, AH -> BH", *seqno);
                 calc_intervals(mcn);
                 set_update_time(mcn, ts);
+            }
+            else {
+                respond_with(ENTL_MESSAGE_NOP_U, 0, ENTL_ACTION_NOP);
             }
         }
         break;
@@ -589,22 +596,25 @@ int entl_next_send_tx(entl_state_machine_t *mcn, uint16_t *emsg_raw, uint32_t *s
             STM_TDEBUG("TOCK(out): seqno %d, BM -> RECEIVE", *seqno);
             calc_intervals(mcn);
             set_update_time(mcn, ts);
-            // drop the message on the top
-            ENTT_queue_front_pop(&mcn->send_ATI_queue);
+// discard off send queue
+            struct entt_ioctl_ait_data *ait_data = sendq_pop(mcn);
+// FIXME: memory leak?
         }
         break;
 
         case ENTL_STATE_AH: {
-            if (ENTT_queue_full(&mcn->receive_ATI_queue)) {
-                respond_with(ENTL_MESSAGE_NOP_U, 0, ENTL_ACTION_NOP);
-            }
-            else {
+// recv queue space avail
+            if (!recvq_full(mcn)) {
                 zebra(mcn); advance_send_next(mcn);
                 respond_with(ENTL_MESSAGE_ACK_U, get_i_sent(mcn), ENTL_ACTION_SEND);
                 set_atomic_state(mcn, ENTL_STATE_BH);
+// space avail
                 STM_TDEBUG("TOCK(out): seqno %d, AH -> BH", *seqno);
                 calc_intervals(mcn);
                 set_update_time(mcn, ts);
+            }
+            else {
+                respond_with(ENTL_MESSAGE_NOP_U, 0, ENTL_ACTION_NOP);
             }
         }
         break;
@@ -678,44 +688,45 @@ void entl_link_up(entl_state_machine_t *mcn) {
 }
 
 // AIT handling functions
-// Request to send the AIT message, return 0 if OK, -1 if queue full
+// add AIT message to send queue, return 0 when OK, -1 when queue full
 int entl_send_AIT_message(entl_state_machine_t *mcn, struct entt_ioctl_ait_data *data) {
     STM_LOCK;
-        int q_space = ENTT_queue_back_push(&mcn->send_ATI_queue, (void *) data);
+        int send_space = sendq_push(mcn, (void *) data);
     STM_UNLOCK;
-    return q_space;
+    return send_space;
 }
 
-// Read the next AIT message to send
+// peek at next AIT message to xmit
 struct entt_ioctl_ait_data *entl_next_AIT_message(entl_state_machine_t *mcn) {
     STM_LOCK;
-        struct entt_ioctl_ait_data *dt = (struct entt_ioctl_ait_data *) ENTT_queue_front(&mcn->send_ATI_queue);
+        struct entt_ioctl_ait_data *dt = (struct entt_ioctl_ait_data *) sendq_peek(mcn);
     STM_UNLOCK;
     return dt;
 }
 
-// the new AIT message received
+// new AIT message received
 void entl_new_AIT_message(entl_state_machine_t *mcn, struct entt_ioctl_ait_data *data) {
     STM_LOCK;
         mcn->receive_buffer = data;
     STM_UNLOCK;
 }
 
-// Read the AIT message, return NULL if queue empty
+// Read (consume) AIT message, return NULL when queue empty
 struct entt_ioctl_ait_data *entl_read_AIT_message(entl_state_machine_t *mcn) {
     STM_LOCK;
-        struct entt_ioctl_ait_data *dt = ENTT_queue_front_pop(&mcn->receive_ATI_queue);
+        struct entt_ioctl_ait_data *dt = recvq_pop(mcn);
         if (dt) {
-            dt->num_messages = mcn->receive_ATI_queue.count; // return how many left
-            dt->num_queued = mcn->send_ATI_queue.count;
+            dt->num_messages = recvq_count(mcn);
+            dt->num_queued = sendq_count(mcn);
         }
     STM_UNLOCK;
     return dt;
 }
 
+// number of pending xmits
 uint16_t entl_num_queued(entl_state_machine_t *mcn) {
     STM_LOCK;
-        uint16_t count = mcn->send_ATI_queue.count;
+        uint16_t count = sendq_count(mcn);
     STM_UNLOCK;
     return count;
 }

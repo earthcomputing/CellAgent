@@ -94,6 +94,16 @@ static inline void clear_error(entl_state_machine_t *mcn) {
     mcn->current_state.error_count = 0;
 }
 
+static inline int recvq_count(entl_state_machine_t *mcn) { return mcn->receive_ATI_queue.count; }
+static inline int recvq_full(entl_state_machine_t *mcn) { return ENTT_queue_full(&mcn->receive_ATI_queue); }
+static inline void* recvq_pop(entl_state_machine_t *mcn) { return ENTT_queue_front_pop(&mcn->receive_ATI_queue); }
+static inline int recvq_push(entl_state_machine_t *mcn) { return ENTT_queue_back_push(&mcn->receive_ATI_queue, mcn->receive_buffer); }
+
+static inline int sendq_count(entl_state_machine_t *mcn) { return mcn->send_ATI_queue.count; }
+static inline void* sendq_peek(entl_state_machine_t *mcn) { return ENTT_queue_front(&mcn->send_ATI_queue); }
+static inline void* sendq_pop(entl_state_machine_t *mcn) { return ENTT_queue_front_pop(&mcn->send_ATI_queue); }
+static inline int sendq_push(entl_state_machine_t *mcn, void *data) { return ENTT_queue_back_push(&mcn->send_ATI_queue, data); }
+
 // when the 3 members (event_i_sent, event_i_know, event_send_next) are all zero, things are fresh out of Hello handshake
 static inline void entl_state_machine_init(entl_state_machine_t *mcn) {
     mcn->state_count = 0;
