@@ -73,6 +73,14 @@ static inline void set_i_sent(entl_state_machine_t *mcn, int value) { mcn->curre
 
 static inline void zebra(entl_state_machine_t *mcn) { set_i_sent(mcn, get_send_next(mcn)); }
 
+static inline void unicorn(entl_state_machine_t *mcn, int value) {
+    // when following 3 members are all zero, it means fresh out of Hello handshake
+    set_i_know(mcn, 0);
+    set_send_next(mcn, 0);
+    set_i_sent(mcn, 0);
+    set_atomic_state(mcn, value);
+}
+
 static inline void clear_intervals(entl_state_machine_t *mcn) {
 #ifdef ENTL_SPEED_CHECK
     memset(&mcn->current_state.interval_time, 0, sizeof(struct timespec));
