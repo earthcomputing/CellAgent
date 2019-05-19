@@ -87,6 +87,12 @@ static bool entl_device_process_rx_packet(entl_device_t *dev, struct sk_buff *sk
     struct e1000_adapter *adapter = container_of(dev, struct e1000_adapter, entl_dev);
     struct ethhdr *eth = (struct ethhdr *) skb->data;
 
+    unsigned int len = skb->len;
+    if (len <= sizeof(struct ethhdr)) {
+        // FIXME
+        ENTL_DEBUG("%s process_rx - runt len %d\n", dev->edev_stm.name, len);
+    }
+
     uint16_t smac_hi; uint32_t smac_lo; unpack_eth(eth->h_source, &smac_hi, &smac_lo);
     uint16_t emsg_raw; uint32_t seqno; unpack_eth(eth->h_dest, &emsg_raw, &seqno);
 
@@ -131,6 +137,7 @@ static bool entl_device_process_rx_packet(entl_device_t *dev, struct sk_buff *sk
                 // ait_data->num_messages = 0;
                 // ait_data->num_queued = 0;
             }
+ENTL_DEBUG("%s process_rx - entl_new_AIT_message\n", stm->name);
             entl_new_AIT_message(stm, ait_data);
         }
     }
@@ -231,7 +238,7 @@ static bool entl_device_process_rx_packet(entl_device_t *dev, struct sk_buff *sk
 static void entl_device_process_tx_packet(entl_device_t *dev, struct sk_buff *skb) {
     struct ethhdr *eth = (struct ethhdr *) skb->data;
 
-    // MSS packet can't be used for ENTL message (will use a header over multiple packets)
+    // maximum segment size (MSS) packet can't be used for ENTL message (will use a header over multiple packets)
     if (skb_is_gso(skb)) {
         encode_dest(eth->h_dest, ENTL_MESSAGE_NOP_U, 0);
     }
@@ -246,6 +253,7 @@ static void entl_device_process_tx_packet(entl_device_t *dev, struct sk_buff *sk
             dev->edev_flag |= ENTL_DEVICE_FLAG_SIGNAL2; // AIT send completion signal
         }
         if (emsg_raw != ENTL_MESSAGE_NOP_U) {
+ENTL_DEBUG("%s process_tx - message 0x%04x\n", stm->name, emsg_raw);
             dev->edev_flag &= ~(uint32_t) ENTL_DEVICE_FLAG_WAITING;
         }
     }
@@ -305,6 +313,7 @@ static int entl_do_ioctl(struct net_device *netdev, struct ifreq *ifr, int cmd) 
         struct entt_ioctl_ait_data *ait_data = kzalloc(sizeof(struct entt_ioctl_ait_data), GFP_ATOMIC);
         copy_from_user(ait_data, ifr->ifr_data, sizeof(struct entt_ioctl_ait_data));
 
+ENTL_DEBUG("%s ioctl - entl_send_AIT_message\n", stm->name);
         int q_space = entl_send_AIT_message(stm, ait_data);
         ait_data->num_messages = q_space;
         copy_to_user(ifr->ifr_data, ait_data, sizeof(struct entt_ioctl_ait_data));
@@ -316,6 +325,7 @@ static int entl_do_ioctl(struct net_device *netdev, struct ifreq *ifr, int cmd) 
     break;
 
     case SIOCDEVPRIVATE_ENTT_READ_AIT: {
+ENTL_DEBUG("%s ioctl - entl_read_AIT_message\n", stm->name);
         struct entt_ioctl_ait_data *ait_data = entl_read_AIT_message(stm);
         if (ait_data) {
             copy_to_user(ifr->ifr_data, ait_data, sizeof(struct entt_ioctl_ait_data));
@@ -410,6 +420,7 @@ static int inject_message(entl_device_t *dev, uint16_t u_addr, uint32_t l_addr, 
     struct entt_ioctl_ait_data *ait_data;
     int len;
     if (send_action & ENTL_ACTION_SEND_AIT) {
+ENTL_DEBUG("%s inject - entl_next_AIT_message\n", stm->name);
         ait_data = entl_next_AIT_message(stm);
         len = ETH_HLEN + ait_data->message_len + sizeof(uint32_t);
         if (len < ETH_ZLEN) len = ETH_ZLEN; // min 60 - include/uapi/linux/if_ether.h

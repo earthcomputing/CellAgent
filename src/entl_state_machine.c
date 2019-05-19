@@ -347,6 +347,7 @@ int entl_received(entl_state_machine_t *mcn, uint16_t from_hi, uint32_t from_lo,
                     set_update_time(mcn, ts);
                     STM_TDEBUG("TOCK: seqno %d, BH -> SEND", seqno);
 // add to recvq
+STM_TDEBUG("recvq_push");
                     int recv_space = recvq_push(mcn);
                     // FIXME: what about when q is full?
                     mcn->receive_buffer = NULL;
@@ -459,7 +460,7 @@ int entl_next_send(entl_state_machine_t *mcn, uint16_t *emsg_raw, uint32_t *seqn
         switch (get_atomic_state(mcn)) {
         case ENTL_STATE_IDLE:
             respond_with(ENTL_MESSAGE_NOP_U, 0, ENTL_ACTION_NOP);
-            STM_TDEBUG("Message requested, IDLE");
+            STM_TDEBUG("NOP(out): IDLE");
         break;
 
         case ENTL_STATE_HELLO:
@@ -507,6 +508,7 @@ int entl_next_send(entl_state_machine_t *mcn, uint16_t *emsg_raw, uint32_t *seqn
             calc_intervals(mcn);
             set_update_time(mcn, ts);
 // discard off send queue
+STM_TDEBUG("sendq_pop");
             struct entt_ioctl_ait_data *ait_data = sendq_pop(mcn);
             if (ait_data) {
                 kfree(ait_data);
@@ -597,6 +599,7 @@ int entl_next_send_tx(entl_state_machine_t *mcn, uint16_t *emsg_raw, uint32_t *s
             calc_intervals(mcn);
             set_update_time(mcn, ts);
 // discard off send queue
+STM_TDEBUG("sendq_pop");
             struct entt_ioctl_ait_data *ait_data = sendq_pop(mcn);
 // FIXME: memory leak?
         }
@@ -690,6 +693,8 @@ void entl_link_up(entl_state_machine_t *mcn) {
 // AIT handling functions
 // add AIT message to send queue, return 0 when OK, -1 when queue full
 int entl_send_AIT_message(entl_state_machine_t *mcn, struct entt_ioctl_ait_data *data) {
+    struct timespec ts = current_kernel_time();
+STM_TDEBUG("sendq_push");
     STM_LOCK;
         int send_space = sendq_push(mcn, (void *) data);
     STM_UNLOCK;
@@ -698,6 +703,8 @@ int entl_send_AIT_message(entl_state_machine_t *mcn, struct entt_ioctl_ait_data 
 
 // peek at next AIT message to xmit
 struct entt_ioctl_ait_data *entl_next_AIT_message(entl_state_machine_t *mcn) {
+    struct timespec ts = current_kernel_time();
+STM_TDEBUG("sendq_peek");
     STM_LOCK;
         struct entt_ioctl_ait_data *dt = (struct entt_ioctl_ait_data *) sendq_peek(mcn);
     STM_UNLOCK;
@@ -713,6 +720,8 @@ void entl_new_AIT_message(entl_state_machine_t *mcn, struct entt_ioctl_ait_data 
 
 // Read (consume) AIT message, return NULL when queue empty
 struct entt_ioctl_ait_data *entl_read_AIT_message(entl_state_machine_t *mcn) {
+    struct timespec ts = current_kernel_time();
+STM_TDEBUG("recvq_pop");
     STM_LOCK;
         struct entt_ioctl_ait_data *dt = recvq_pop(mcn);
         if (dt) {
