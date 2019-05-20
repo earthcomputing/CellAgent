@@ -11,6 +11,9 @@
 #include "netdev_entl_if.h"
 #include "entl_stm_if.h"
 
+#define ENTL_ADAPT_IMPL
+#include "ecnl_entl_if.h"
+
 // copied e1000 routines:
 static void entl_e1000_configure(struct e1000_adapter *adapter);
 static void entl_e1000e_set_rx_mode(struct net_device *netdev);
@@ -253,7 +256,7 @@ static void entl_device_process_tx_packet(entl_device_t *dev, struct sk_buff *sk
             dev->edev_flag |= ENTL_DEVICE_FLAG_SIGNAL2; // AIT send completion signal
         }
         if (emsg_raw != ENTL_MESSAGE_NOP_U) {
-ENTL_DEBUG("%s process_tx - message 0x%04x\n", stm->name, emsg_raw);
+ENTL_DEBUG("%s process_tx - message 0x%04x seqno %d\n", stm->name, emsg_raw, seqno);
             dev->edev_flag &= ~(uint32_t) ENTL_DEVICE_FLAG_WAITING;
         }
     }
@@ -1102,3 +1105,13 @@ static void entl_e1000_configure_rx(struct e1000_adapter *adapter)
 	/* Enable Receives */
 	ew32(RCTL, rctl);
 }
+
+// ENTL - ECNL linkage
+
+static int adapt_validate(struct net_device *dev, int magic) { return 1; }
+static netdev_tx_t adapt_start_xmit(struct sk_buff *skb, struct net_device *e1000e) { return NETDEV_TX_BUSY; }
+static int adapt_send_AIT(struct sk_buff *skb, struct net_device *e1000e) { return -1; }
+static int adapt_retrieve_AIT(struct net_device *e1000e, ec_ait_data_t *data) { return -1; }
+static int adapt_write_reg(struct net_device *e1000e, ec_alo_reg_t *reg) { return -1; }
+static int adapt_read_regset(struct net_device *e1000e, ec_alo_regs_t *regs) { return -1; }
+static int adapt_get_state(struct net_device *dev, ec_state_t *state) { return -1; }
