@@ -28,6 +28,7 @@ eval = "^0.4.1"
 failure = "0.1.5"
 #failure_derive = "0.1.0"
 futures = "0.1.23" # used in dal.rs
+#im = "13.0.0" # Fast cloneable collections
 #indexmap = "1.0.1" # HashMap and HashSet that preserve order
 #internment = "0.3.6"
 lazy_static = "1.1.0"
