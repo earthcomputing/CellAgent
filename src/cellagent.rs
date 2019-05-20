@@ -1,6 +1,7 @@
 use std::{fmt, fmt::Write,
           sync::{Arc, Mutex, mpsc::channel},
           thread,
+          collections::hash_map::Entry,
           collections::{HashMap, HashSet}};
 
 use serde;
@@ -280,7 +281,8 @@ impl CellAgent {
             }
         }
         let mut traph = self.traphs
-            .remove(&base_tree_id.get_uuid()) // Remove to avoid borrow problems on self
+            .get_mut(&base_tree_id.get_uuid())
+            .cloned()
             .unwrap_or(Traph::new(&self.cell_id, self.no_ports, base_tree_id, gvm_eqn)?);
         let (gvm_recv, gvm_send, _gvm_xtnd, _gvm_save) =  {
                 let variables = traph.get_params(gvm_eqn.get_variables()).context(CellagentError::Chain { func_name: "update_traph", comment: S("") })?;
@@ -774,7 +776,6 @@ impl CellAgent {
         let gvm_eqn = GvmEquation::new(&eqns, &Vec::new());
         let _ = self.update_traph(base_port_tree_id, port_number, port_state, &gvm_eqn,
                                   children, PathLength(CellQty(0)), path)?;
-        let mask = Mask::new(port_number);
         {
             if DEBUG_OPTIONS.all || DEBUG_OPTIONS.discoverd {
                 let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "ca_process_discover_d_msg" };
@@ -1091,12 +1092,13 @@ impl CellAgent {
         let _f = "app_manifest";
         let deploy_tree_name = app_msg.get_deploy_tree_name();
         let mut locked = self.tree_name_map.lock().unwrap();
-        let mut tree_map = locked
-            .remove(&sender_id)
-            .ok_or::<Error>(CellagentError::TreeMap { func_name: _f, cell_id: self.cell_id, tree_name: deploy_tree_name.clone() }.into())?;
+        let tree_map = match locked.entry(sender_id) {
+            Entry::Vacant(_) => return Err(CellagentError::TreeMap { func_name: _f, cell_id: self.cell_id, tree_name: deploy_tree_name.clone() }.into()),
+            Entry::Occupied(tree_map) => tree_map.into_mut()
+        };
         let deploy_tree_id = tree_map
             .get(deploy_tree_name.get_name())
-            .cloned()
+            .cloned() // Need TreeID, not &TreeID
             .ok_or::<Error>(CellagentError::TreeMap { func_name: "_f", cell_id: self.cell_id, tree_name: deploy_tree_name.clone() }.into())?;
         let deploy_port_tree_id = deploy_tree_id.to_port_tree_id_0();
         if !self.may_send(deploy_port_tree_id)? { return Err(CellagentError::MayNotSend { func_name: _f, cell_id: self.cell_id, tree_id: deploy_tree_id }.into()); }
@@ -1104,14 +1106,13 @@ impl CellAgent {
         for allowed_tree in allowed_trees {
             tree_map
                 .get(allowed_tree.get_name())
-                .cloned()
+                .cloned() // Need TreeID, not &TreeID
                 .map(|tree_id| tree_map.insert(allowed_tree.get_name().clone(), tree_id))
                 .ok_or::<Error>(CellagentError::TreeMap { func_name: _f, cell_id: self.cell_id, tree_name: allowed_tree.clone() }.into())?;
         }
         let manifest = app_msg.get_payload().get_manifest();
         let msg = ManifestMsg::new(sender_id, false, deploy_tree_id.clone(), &tree_map, &manifest);
         let mask = self.get_mask(deploy_port_tree_id)?;
-        locked.insert(sender_id, tree_map);
         {
             if DEBUG_OPTIONS.all || DEBUG_OPTIONS.process_msg {   // Debug
                 let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "ca_got_manifest_app_msg" };
