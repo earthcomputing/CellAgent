@@ -18,7 +18,7 @@ static void entl_e1000_setup_rctl(struct e1000_adapter *adapter);
 static void entl_e1000_configure_rx(struct e1000_adapter *adapter);
 
 // forward declarations (internal/private)
-static int inject_message(entl_device_t *dev, uint16_t u_addr, uint32_t l_addr, int flag);
+static int inject_message(entl_device_t *dev, uint16_t emsg_raw, uint32_t seqno, int send_action);
 static void entl_watchdog(unsigned long data);
 static void entl_watchdog_task(struct work_struct *work);
 // static void dump_state(char *type, entl_state_t *st, int flag); // debug
@@ -406,7 +406,8 @@ static netdev_tx_t entl_tx_transmit(struct sk_buff *skb, struct net_device *netd
 
 // internal
 
-static int inject_message(entl_device_t *dev, uint16_t u_addr, uint32_t l_addr, int send_action) {
+// emsg_raw, seqno
+static int inject_message(entl_device_t *dev, uint16_t emsg_raw, uint32_t seqno, int send_action) {
     struct e1000_adapter *adapter = container_of(dev, struct e1000_adapter, entl_dev);
     if (test_bit(__E1000_DOWN, &adapter->state)) return 1;
 
@@ -440,8 +441,8 @@ ENTL_DEBUG("%s inject - entl_next_AIT_message\n", stm->name);
 
     struct ethhdr *eth = (struct ethhdr *) skb->data;
     memcpy(eth->h_source, netdev->dev_addr, ETH_ALEN);
-    u_addr |= 0x8000; // message only
-    encode_dest(eth->h_dest, u_addr, l_addr);
+    emsg_raw |= 0x8000; // message only
+    encode_dest(eth->h_dest, emsg_raw, seqno);
     eth->h_proto = 0; // protocol type is not used anyway
 
     if (send_action & ENTL_ACTION_SEND_AIT) {
@@ -560,12 +561,12 @@ static void entl_watchdog_task(struct work_struct *work) {
         ||  (entl_state == ENTL_STATE_RECEIVE)
         ||  (entl_state == ENTL_STATE_AM)
         ||  (entl_state == ENTL_STATE_BH)) {
-            uint16_t u_addr; uint32_t l_addr;
-            int hello_action = entl_get_hello(stm, &u_addr, &l_addr);
+            uint16_t emsg_raw = (uint16_t) -1; uint32_t seqno = (uint32_t) -1;
+            int hello_action = entl_get_hello(stm, &emsg_raw, &seqno);
             if (hello_action) {
                 unsigned long flags;
                 spin_lock_irqsave(&adapter->entl_txring_lock, flags);
-                int recv_action = inject_message(dev, u_addr, l_addr, hello_action);
+                int recv_action = inject_message(dev, emsg_raw, seqno, hello_action);
                 spin_unlock_irqrestore(&adapter->entl_txring_lock, flags);
 
                 if (recv_action == 0) {
@@ -584,6 +585,9 @@ static void entl_watchdog_task(struct work_struct *work) {
         struct e1000_ring *tx_ring = adapter->tx_ring;
         if (e1000_desc_unused(tx_ring) < 3) goto restart_watchdog;
 
+        // uint16_t emsg_raw = dev->edev_u_addr;
+        // uint32_t seqno = dev->edev_l_addr;
+        // int action = dev->edev_action;
         unsigned long flags;
         spin_lock_irqsave(&adapter->entl_txring_lock, flags);
         int recv_action = inject_message(dev, dev->edev_u_addr, dev->edev_l_addr, dev->edev_action);
