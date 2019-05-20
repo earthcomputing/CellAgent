@@ -1,7 +1,6 @@
 use std::{fmt, fmt::Write,
           sync::{Arc, Mutex, mpsc::channel},
           thread,
-          collections::hash_map::Entry,
           collections::{HashMap, HashSet}};
 
 use serde;
@@ -39,7 +38,7 @@ use crate::uuid_ec::Uuid;
 use crate::vm::VirtualMachine;
 
 use failure::{Error, ResultExt, Fail};
-use rdkafka::message::ToBytes;
+use futures::future::Err;
 
 type BorderTreeIDMap = HashMap<PortNumber, (SenderID, TreeID)>;
 pub type PortTreeIDMap = HashMap<Uuid, PortTreeID>;
@@ -1092,10 +1091,10 @@ impl CellAgent {
         let _f = "app_manifest";
         let deploy_tree_name = app_msg.get_deploy_tree_name();
         let mut locked = self.tree_name_map.lock().unwrap();
-        let tree_map = match locked.entry(sender_id) {
-            Entry::Vacant(_) => return Err(CellagentError::TreeMap { func_name: _f, cell_id: self.cell_id, tree_name: deploy_tree_name.clone() }.into()),
-            Entry::Occupied(tree_map) => tree_map.into_mut()
-        };
+        let mut tree_map = locked
+            .get_mut(&sender_id)
+            .cloned()
+            .ok_or::<Error>(CellagentError::TreeMap { func_name: _f, cell_id: self.cell_id, tree_name: deploy_tree_name.clone() }.into())?;
         let deploy_tree_id = tree_map
             .get(deploy_tree_name.get_name())
             .cloned() // Need TreeID, not &TreeID
@@ -1121,6 +1120,7 @@ impl CellAgent {
                 println!("Cellagent {}: {} sending on tree {} with mask {} manifest app_msg {}", self.cell_id, _f, deploy_tree_id, mask, msg);
             }
         }
+        locked.insert(sender_id, tree_map);
         self.send_msg(deploy_tree_id, &msg, mask.or(Mask::port0())).context(CellagentError::Chain { func_name: _f, comment: S(self.cell_id) + " send manifest" })?;
         Ok(())
     }
