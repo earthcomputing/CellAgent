@@ -1,8 +1,6 @@
 use std::sync::mpsc;
 
-use crate::app_message::{AppMsgType, AppMsgDirection};
 use crate::config::{ByteArray};
-use crate::uptree_spec::AllowedTree;
 
 pub type ISAIT = bool;
 pub type APP = ByteArray;

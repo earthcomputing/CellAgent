@@ -4,13 +4,11 @@ use std::{fmt,
           sync::{atomic::AtomicBool, Arc, atomic::Ordering::SeqCst}};
 
 use crate::app_message_formats::{PortToNoc, PortFromNoc};
-use crate::config::{ByteArray, CONTINUE_ON_ERROR, DEBUG_OPTIONS, TRACE_OPTIONS, PortNo};
+use crate::config::{ByteArray, CONTINUE_ON_ERROR, TRACE_OPTIONS, PortNo};
 use crate::dal::{add_to_trace, fork_trace_header, update_trace_header};
-use crate::ec_message::MsgType;
 use crate::ec_message_formats::{PortToLink, PortFromLink, PortToPe, PortFromPe, LinkToPortPacket,
-                                PortToPePacket, PeToPortPacket, PortToLinkPacket};
+                                PortToPePacket, PeToPortPacket};
 use crate::name::{Name, PortID, CellID};
-use crate::packet::Packet;
 use crate::utility::{PortNumber, S, write_err, TraceHeader, TraceHeaderParams, TraceType};
 use crate::uuid_ec::AitState;
 
@@ -157,14 +155,7 @@ impl Port {
                 PeToPortPacket::App(bytes) => bytes,
                 _ => return Err(PortError::NonApp { func_name: "listen_pe_for_noc", port_no: *self.port_number.get_port_no() }.into())
             };
-            {
-                if TRACE_OPTIONS.all | TRACE_OPTIONS.port {
-                    let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "port_to_noc" };
-                    let trace = json!({ "id": self.get_id().get_name(), "msg": bytes.to_string()? });
-                    let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
-                }
-            }
-            port_to_noc.send(bytes)?;
+            self.send_to_noc(port_to_noc, bytes)?;
         }
     }
 
@@ -206,13 +197,19 @@ impl Port {
             let msg = port_from_link.recv().context(PortError::Chain { func_name: _f, comment: S(self.id.get_name()) + " recv from link"})?;
             {
                 if TRACE_OPTIONS.all || TRACE_OPTIONS.port {
-                    let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "port_from_link" };
-                    let trace = match &msg {
-                        LinkToPortPacket::Packet(packet) => json!({ "id": self.get_id().get_name(), "msg": packet.to_string()? }),
-                        LinkToPortPacket::Status(status) => json!({ "id": self.get_id().get_name(), "msg": msg})
+                    match &msg {
+                        LinkToPortPacket::Packet(packet) => {
+                            let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "port_from_link_packet" };
+                            let trace = json!({ "id": self.get_id().get_name(), "msg": packet.to_string()? });
+                            let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
+                        },
+                        LinkToPortPacket::Status(status) => {
+                            let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "port_from_link_status" };
+                            let trace = json!({ "id": self.get_id().get_name(), "status": status, "msg": msg});
+                            let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
+                        }
                         
-                    };
-                    let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
+                    }
                 }
             }
             match msg {
@@ -267,7 +264,7 @@ impl Port {
                                 if TRACE_OPTIONS.all | TRACE_OPTIONS.port {
                                     let ait_state = packet.get_ait_state();
                                     let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "port_to_link" };
-                                    let trace = json!({ "id": self.get_id().get_name(), "msg": packet.to_string()? });
+                                    let trace = json!({ "id": self.get_id().get_name(), "ait_state": ait_state, "msg": packet.to_string()? });
                                     let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
                                 }
                             }

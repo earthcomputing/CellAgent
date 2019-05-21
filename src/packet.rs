@@ -251,9 +251,9 @@ impl Packetizer {
     }
     fn packet_payload_size(len: usize) -> usize {
         match len-1 {
-            0..=PACKET_MIN            => PAYLOAD_MIN,
+            0..=PACKET_MIN                   => PAYLOAD_MIN,
             PAYLOAD_MIN..=PAYLOAD_MAX => len,
-            _                         => PAYLOAD_MAX
+            _                                => PAYLOAD_MAX
         }
     }
 }

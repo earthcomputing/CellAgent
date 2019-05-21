@@ -6,7 +6,7 @@ use std::{fmt, fmt::Write,
 use serde;
 use serde_json;
 
-use crate::app_message::{AppMessage, AppMsgType, AppMsgDirection,
+use crate::app_message::{AppMessage, AppMsgType,
                          AppDeleteTreeMsg, AppInterapplicationMsg, AppManifestMsg,
                          AppQueryMsg, AppStackTreeMsg, AppTreeNameMsg};
 use crate::app_message_formats::{CaToVm, VmFromCa, VmToCa, CaFromVm};
@@ -14,7 +14,7 @@ use crate::config::{CONNECTED_PORTS_TREE_NAME, CONTINUE_ON_ERROR, CONTROL_TREE_N
              MAX_NUM_PHYS_PORTS_PER_CELL, TRACE_OPTIONS,
              ByteArray, CellQty, CellType, CellConfig, CellInfo, Quench, PathLength, PortNo, PortQty};
 use crate::dal::{add_to_trace, fork_trace_header, update_trace_header};
-use crate::ec_message::{Message, MsgHeader, MsgDirection, MsgTreeMap, MsgType,
+use crate::ec_message::{Message, MsgHeader, MsgTreeMap, MsgType,
               InterapplicationMsg,
               DiscoverMsg, DiscoverDMsg, DiscoverDType,
               FailoverMsg, FailoverDMsg, FailoverMsgPayload, FailoverResponse,
@@ -33,12 +33,11 @@ use crate::tree::Tree;
 use crate::uptree_spec::{AllowedTree, Manifest};
 use crate::utility::{BASE_TENANT_MASK, DEFAULT_USER_MASK, Mask, Path,
               PortNumber, S, TraceHeader, TraceHeaderParams, TraceType, UtilityError,
-              new_hash_set, write_err};
+              write_err};
 use crate::uuid_ec::Uuid;
 use crate::vm::VirtualMachine;
 
 use failure::{Error, ResultExt, Fail};
-use futures::future::Err;
 
 type BorderTreeIDMap = HashMap<PortNumber, (SenderID, TreeID)>;
 pub type PortTreeIDMap = HashMap<Uuid, PortTreeID>;
@@ -376,7 +375,7 @@ impl CellAgent {
             .ok_or(CellagentError::NoTraph { cell_id: self.cell_id, func_name: "stack_tree", tree_id: base_tree_id }.into())
     }
     fn deploy(&mut self, sender_id: SenderID, deployment_port_tree_id: PortTreeID, _msg_tree_id: PortTreeID,
-                  msg_tree_map: &MsgTreeMap, manifest: &Manifest) -> Result<(), Error> {
+                  _msg_tree_map: &MsgTreeMap, manifest: &Manifest) -> Result<(), Error> {
         let _f = "deploy";
         let tree_map = self.tree_name_map.lock().unwrap()
             .get(&sender_id)
@@ -767,7 +766,7 @@ impl CellAgent {
         }
         let path = payload.get_path();
         let port_number = port_no.make_port_number(self.no_ports)?;
-        let children = new_hash_set(Box::new([port_number]));
+        let children = [port_number].iter().cloned().collect::<HashSet<_>>();
         let port_state = PortState::Child;
         let mut eqns = HashSet::new();
         eqns.insert(GvmEqn::Recv("true"));
@@ -1073,9 +1072,7 @@ impl CellAgent {
             -> Result<(), Error> {
         let _f = "app_interapplication";
         let header = app_msg.get_header();
-        let payload = app_msg.get_payload();
         let target_tree = header.get_target_tree();
-        let allowed_trees = header.get_allowed_trees();
         let direction = header.get_direction().into();
         let locked = self.tree_name_map.lock().unwrap();
         let tree_map = locked
@@ -1142,7 +1139,7 @@ impl CellAgent {
         self.send_msg(deploy_tree_id, &msg, mask.or(Mask::port0())).context(CellagentError::Chain { func_name: _f, comment: S(self.cell_id) + " send manifest" })?;
         Ok(())
     }
-    pub fn app_query(&self, msg: &AppQueryMsg, _sender_id: SenderID) -> Result<MsgTreeMap, Error> {
+    pub fn app_query(&self, _msg: &AppQueryMsg, _sender_id: SenderID) -> Result<MsgTreeMap, Error> {
         let _f = "app_query";
         // Needs may_send test
         Err(UtilityError::Unimplemented { func_name: _f, feature: S("AppMsgType::Query")}.into())
@@ -1200,7 +1197,7 @@ impl CellAgent {
         }
         Ok(())
     }
-    pub fn app_tree_name(&self, msg: &AppTreeNameMsg, sender_id: SenderID) -> Result<(), Error> {
+    pub fn app_tree_name(&self, _msg: &AppTreeNameMsg, _sender_id: SenderID) -> Result<(), Error> {
         let _f = "app_tree_name";
         Err(CellagentError::AppMessageType { func_name: _f, cell_id: self.cell_id, msg: AppMsgType::AppTreeNameMsg }.into())
     }

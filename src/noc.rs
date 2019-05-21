@@ -95,19 +95,19 @@ impl Noc {
             app_msg.process_noc(self, noc_to_port)?;
         }
     }
-    pub fn app_process_delete_tree(&self, msg: &AppDeleteTreeMsg, noc_to_port: &NocToPort) -> Result<(), Error> {
+    pub fn app_process_delete_tree(&self, _msg: &AppDeleteTreeMsg, _noc_to_port: &NocToPort) -> Result<(), Error> {
         unimplemented!()
     }
-    pub fn app_process_interapplication(&self, msg: &AppInterapplicationMsg, noc_to_port: &NocToPort) -> Result<(), Error> {
+    pub fn app_process_interapplication(&self, _msg: &AppInterapplicationMsg, _noc_to_port: &NocToPort) -> Result<(), Error> {
         unimplemented!()
     }
-    pub fn app_process_query(&self, msg: &AppQueryMsg, noc_to_port: &NocToPort) -> Result<(), Error> {
+    pub fn app_process_query(&self, _msg: &AppQueryMsg, _noc_to_port: &NocToPort) -> Result<(), Error> {
         unimplemented!()
     }
-    pub fn app_process_manifest(&self, msg: &AppManifestMsg, noc_to_port: &NocToPort) -> Result<(), Error> {
+    pub fn app_process_manifest(&self, _msg: &AppManifestMsg, _noc_to_port: &NocToPort) -> Result<(), Error> {
         unimplemented!()
     }
-    pub fn app_process_stack_tree(&self, msg: &AppStackTreeMsg, noc_to_port: &NocToPort) -> Result<(), Error> {
+    pub fn app_process_stack_tree(&self, _msg: &AppStackTreeMsg, _noc_to_port: &NocToPort) -> Result<(), Error> {
         unimplemented!()
     }
     pub fn app_process_tree_name(&mut self, msg: &AppTreeNameMsg, noc_to_port: &NocToPort) -> Result<(), Error> {
@@ -164,7 +164,6 @@ impl Noc {
             println!("---> Sleeping {} seconds to let discover process finish", RACE_SLEEP);
             sleep(RACE_SLEEP);
         }
-        let is_ait = false;
         // Stack the trees needed to deploy the master and agent and for them to talk master->agent and agent->master
         let noc_master_deploy_tree = AllowedTree::new(NOC_MASTER_DEPLOY_TREE_NAME);
         self.noc_master_deploy_tree(&noc_master_deploy_tree, base_tree_name, noc_to_port).context(NocError::Chain { func_name: "create_noc", comment: S("noc master deploy")})?;
@@ -252,7 +251,6 @@ impl Noc {
         eqns.insert(GvmEqn::Xtnd("true"));
         eqns.insert(GvmEqn::Save("true"));
         let gvm_eqn = GvmEquation::new(&eqns, &[GvmVariable::new(GvmVariableType::PathLength, "hops")]);
-        let gvm_eqn_ser = serde_json::to_string(&gvm_eqn).context(NocError::Chain { func_name: "noc_master_tree", comment: S("gvm")})?;
         let stack_tree_msg = AppStackTreeMsg::new("Noc",
                    noc_master_agent, parent_tree_name,
                                  AppMsgDirection::Leafward, &gvm_eqn);

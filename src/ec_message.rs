@@ -734,7 +734,7 @@ impl Message for InterapplicationMsg {
         serde_json::to_value(self).expect("I don't know how to handle errors in msg.value()")
     }
     fn process_ca(&mut self, cell_agent: &mut CellAgent, port_no: PortNo,
-                  msg_tree_id: PortTreeID, is_ait: bool) -> Result<(), Error> {
+                  _msg_tree_id: PortTreeID, _is_ait: bool) -> Result<(), Error> {
         cell_agent.process_interapplication_msg(self, port_no)
     }
 }
