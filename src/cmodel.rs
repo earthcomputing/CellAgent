@@ -4,7 +4,7 @@ use std::{fmt,
 
 use failure::{Error, ResultExt};
 
-use crate::config::{CENTRAL_TREE, CONTINUE_ON_ERROR, DEBUG_OPTIONS, PAYLOAD_DEFAULT_ELEMENT,
+use crate::config::{CENTRAL_TREE, CONTINUE_ON_ERROR, DEBUG_OPTIONS,
                     TRACE_OPTIONS, PortNo};
 use crate::dal::{add_to_trace, fork_trace_header, update_trace_header};
 use crate::ec_message::MsgType;

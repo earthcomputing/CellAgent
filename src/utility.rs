@@ -265,6 +265,7 @@ pub fn _string_to_object(string: &str) -> Result<Value, Error> {
 }
 // There are so many places in my code where it's more convenient
 // to provide &str but I need String that I made the following
+#[allow(non_snake_case)]
 pub fn S<T: fmt::Display>(s: T) -> String { s.to_string() }
 // Errors
 use failure::{Error, Fail, ResultExt};

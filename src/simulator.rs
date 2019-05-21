@@ -55,7 +55,7 @@ use crate::config::{AUTO_BREAK, OUTPUT_DIR_NAME, OUTPUT_FILE_NAME, QUENCH,
                     CellConfig, CellQty, PortNo, PortQty};
 use crate::datacenter::{Datacenter};
 use crate::gvm_equation::{GvmEqn};
-use crate::app_message_formats::{ApplicationToNoc, ApplicationFromNoc};
+use crate::app_message_formats::{ApplicationToNoc};
 use crate::link::Link;
 use crate::uptree_spec::{AllowedTree, ContainerSpec, Manifest, UpTreeSpec, VmSpec};
 use crate::utility::{_print_hash_map, sleep, S, TraceHeader};

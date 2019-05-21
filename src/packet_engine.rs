@@ -1,12 +1,11 @@
 use std::{fmt, fmt::Write,
           sync::{Arc, Mutex},
-          sync::mpsc::Sender,
           collections::{HashSet, VecDeque},
           thread};
 
 use crate::config::{CENTRAL_TREE, CONTINUE_ON_ERROR, DEBUG_OPTIONS,
-                    MAX_NUM_PHYS_PORTS_PER_CELL, PAYLOAD_DEFAULT_ELEMENT, TRACE_OPTIONS,
-                    ByteArray, PortNo};
+                    MAX_NUM_PHYS_PORTS_PER_CELL, TRACE_OPTIONS,
+                    PortNo};
 use crate::dal::{add_to_trace, fork_trace_header, update_trace_header};
 use crate::ec_message::{MsgType};
 use crate::ec_message_formats::{PeFromCm, PeToCm,
@@ -178,6 +177,7 @@ impl PacketEngine {
     fn add_packet_to_back(array: &mut PacketArray, port_no: PortNo, packet: Packet) {
         PacketEngine::add_packet(true, array, port_no, packet);
     }
+    #[allow(dead_code)]
     fn add_to_out_buffer_front(&mut self, port_no: PortNo, packet: Packet) {
         let _f = "add_to_out_buffer_front";
         PacketEngine::add_packet_to_front(&mut self.out_buffers, port_no, packet);

@@ -3,7 +3,7 @@ use std::{fmt, thread};
 //use reqwest::Client::*;
 
 use crate::app_message_formats::{ContainerToVm, ContainerFromVm};
-use crate::app_message::{AppMsgDirection, AppInterapplicationMsg, AppMessage, AppMsgType};
+use crate::app_message::{AppMsgDirection, AppInterapplicationMsg, AppMessage};
 use crate::config::{ByteArray, CONTINUE_ON_ERROR, TRACE_OPTIONS};
 use crate::dal::{add_to_trace, fork_trace_header, update_trace_header};
 use crate::name::{ContainerID, UptreeID};

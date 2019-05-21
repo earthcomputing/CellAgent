@@ -6,7 +6,7 @@ use std::{fmt,
 use serde_json;
 
 use crate::cellagent::CellAgent;
-use crate::config::{ByteArray, PortNo};
+use crate::config::{ByteArray};
 use crate::gvm_equation::{GvmEquation};
 use crate::name::{SenderID};
 use crate::noc::Noc;
