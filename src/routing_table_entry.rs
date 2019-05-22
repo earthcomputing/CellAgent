@@ -1,7 +1,7 @@
 use std::{fmt, fmt::Write,
           collections::HashSet};
 
-use crate::config::{PortNo};
+use crate::config::{PortNo, PortQty};
 use crate::name::{Name, PortTreeID, TreeID};
 use crate::utility::{Mask, PortNumber};
 use crate::uuid_ec::Uuid;
@@ -31,6 +31,8 @@ impl RoutingTableEntry {
 //  pub fn may_receive(&self) -> bool { !self.mask.and(Mask::port0()).equal(Mask::empty()) }
     pub fn enable_send(&mut self) { self.may_send = true; }
     pub fn disable_send(&mut self) { self.may_send = false; }
+    pub fn enable_receive(&mut self) { self.mask = self.mask.or(Mask::port0()); }
+    pub fn disable_receive(&mut self, no_ports: PortQty) { self.mask = self.mask.and(Mask::all_but_zero(no_ports)); }
 //  pub fn is_on_tree(&self) -> bool {
 //        self.may_send || self.may_receive()
 //    }
