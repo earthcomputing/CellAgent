@@ -70,8 +70,8 @@ impl NocMaster {
         let bytes:ByteArray = ByteArray::new(&serialized);
         {
             if TRACE_OPTIONS.all || TRACE_OPTIONS.svc {
-                let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "NocMaster to vm" };
-                let trace = json!({ "NocMaster": self.get_name(), "app_msg": app_msg });
+                let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "NocMaster_to_vm" };
+                let trace = json!({ "NocMaster": self.get_name(), "app_msg": app_msg.to_string() });
                 let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
             }
         }
@@ -108,8 +108,8 @@ impl NocMaster {
             let app_msg: Box<dyn AppMessage> = serde_json::from_str(&serialized).context(ServiceError::Chain { func_name: _f, comment: S("NocMaster from vm")})?;
             {
                 if TRACE_OPTIONS.all || TRACE_OPTIONS.svc {
-                    let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "NocMaster from vm" };
-                    let trace = json!({ "NocMaster": self.get_name(), "app_msg": app_msg });
+                    let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "NocMaster_from_vm" };
+                    let trace = json!({ "NocMaster": self.get_name(), "app_msg": app_msg.to_string() });
                     let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
                 }
             }
@@ -182,8 +182,8 @@ impl NocAgent {
             let app_msg: Box<dyn AppMessage> = serde_json::from_str(&serialized).context(ServiceError::Chain { func_name: _f, comment: S("NocAgent from vm") })?;
             {
                 if TRACE_OPTIONS.all || TRACE_OPTIONS.svc {
-                    let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "NocAgent from vm" };
-                    let trace = json!({ "NocAgent": self.get_name(), "app_msg": app_msg });
+                    let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "NocAgent_from_vm" };
+                    let trace = json!({ "NocAgent": self.get_name(), "app_msg": app_msg.to_string() });
                     let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
                 }
             }
@@ -199,8 +199,8 @@ impl NocAgent {
             let bytes = ByteArray::new(&serialized);
             {
                 if TRACE_OPTIONS.all || TRACE_OPTIONS.svc {
-                    let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "NocAgent to vm" };
-                    let trace = json!({ "NocAgent": self.get_name(), "app_msg": app_msg });
+                    let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "NocAgent_to_vm" };
+                    let trace = json!({ "NocAgent": self.get_name(), "app_msg": reply.to_string() });
                     let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
                 }
             }

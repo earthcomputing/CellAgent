@@ -740,7 +740,7 @@ impl Message for InterapplicationMsg {
 }
 impl fmt::Display for InterapplicationMsg {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let s = format!("{}: tree {}", self.get_header(), self.get_payload());
+        let s = format!("{}: tree {}", self.header, self.payload);
         write!(f, "{}", s)
     }
 }
@@ -761,7 +761,7 @@ impl InterapplicationMsgPayload {
 impl MsgPayload for InterapplicationMsgPayload {}
 impl fmt::Display for InterapplicationMsgPayload {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "Sending application message on tree {}: {}", self.port_tree_id, self.app_msg)
+        write!(f, "Sending application message on tree {}: {}", self.port_tree_id, self.app_msg.to_string())
     }
 }
 #[derive(Debug, Clone, Serialize, Deserialize)]

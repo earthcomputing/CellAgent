@@ -88,20 +88,21 @@ impl VirtualMachine {
             }
         }
         loop {
-            let msg = vm_from_ca.recv().context("listen_ca_loop").context(VmError::Chain { func_name: "listen_ca_loop", comment: S(self.id.get_name()) })?;
+            let bytes = vm_from_ca.recv().context("listen_ca_loop").context(VmError::Chain { func_name: "listen_ca_loop", comment: S(self.id.get_name()) })?;
             {
                 if TRACE_OPTIONS.all || TRACE_OPTIONS.vm {
-                    let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "vm from ca" };
-                    let trace = json!({ "id": self.id, "msg": msg });
+                    let msg: Box<dyn AppMessage> = serde_json::from_str(&bytes.to_string()?)?;
+                    let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "vm_from_ca" };
+                    let trace = json!({ "id": self.id, "msg": msg.to_string() });
                     let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
-                    let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "vm to container" };
-                    let trace = json!({ "id": self.id, "msg": msg });
+                    let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "vm_to_container" };
+                    let trace = json!({ "id": self.id, "msg": msg.to_string() });
                     let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
                 }
             }
             //println!("VM {} send to {} containers msg from ca: {}", self.id,  self.vm_to_containers.len(), msg);
             for vm_to_container in &self.vm_to_containers {
-                vm_to_container.send(msg.clone()).context(VmError::Chain { func_name: "listen_ca_loop", comment: S("send to container") })?;
+                vm_to_container.send(bytes.clone()).context(VmError::Chain { func_name: "listen_ca_loop", comment: S("send to container") })?;
             }
         }
     }
@@ -118,24 +119,27 @@ impl VirtualMachine {
             }
         }
         loop {
-            let msg = vm_from_container.recv().context("listen_container_loop").context(VmError::Chain { func_name: "listen_container_loop", comment: S(self.id.get_name()) + " recv from container"})?;
+            let bytes = vm_from_container.recv().context("listen_container_loop").context(VmError::Chain { func_name: "listen_container_loop", comment: S(self.id.get_name()) + " recv from container"})?;
             {
                 if TRACE_OPTIONS.all || TRACE_OPTIONS.vm {
-                    let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "vm from container" };
-                    let trace = json!({ "id": self.id, "msg": msg });
+                    let msg: Box<dyn AppMessage> = serde_json::from_str(&bytes.to_string()?)?;
+                    let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "vm_from_container" };
+                    let trace = json!({ "id": self.id, "msg": msg.to_string() });
                     let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
-                    let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "vm to ca" };
-                    let trace = json!({ "id": self.id, "msg": msg });
+                    let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "vm_to_ca" };
+                    let trace = json!({ "id": self.id, "msg": msg.to_string() });
                     let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
                 }
             }
             //println!("VM {} got from container {} msg {} {} {} {}", self.id, container_id, msg.0, msg.1, msg.2, msg.3);
-            vm_to_ca.send(msg).context(VmError::Chain { func_name: "listen_container_loop", comment: S(self.id.get_name()) + " send to ca"})?;
+            vm_to_ca.send(bytes).context(VmError::Chain { func_name: "listen_container_loop", comment: S(self.id.get_name()) + " send to ca"})?;
         }
     }
 }
 // Errors
 use failure::{Error, ResultExt};
+use crate::app_message::AppMessage;
+
 #[derive(Debug, Fail)]
 pub enum VmError {
     #[fail(display = "VmError::Chain {} {}", func_name, comment)]

@@ -150,7 +150,7 @@ impl AppMessage for AppInterapplicationMsg {
 }
 impl fmt::Display for AppInterapplicationMsg {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let s = format!("{}: tree {}", self.get_header(), self.get_payload());
+        let s = format!("{}: {}", self.header, self.payload);
         write!(f, "{}", s)
     }
 }
@@ -162,13 +162,14 @@ impl AppInterapplicationMsgPayload {
     fn new(body: &str) -> AppInterapplicationMsgPayload {
         AppInterapplicationMsgPayload { body: ByteArray::new(body) }
     }
-    pub fn _get_body(&self) -> &ByteArray { &self.body }
+    pub fn get_body(&self) -> &ByteArray { &self.body }
 }
 #[typetag::serde]
 impl AppMsgPayload for AppInterapplicationMsgPayload {}
 impl fmt::Display for AppInterapplicationMsgPayload {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", self.body)
+        let body = self.body.to_string().expect("Error converting bytes to string in AppInterapplicationMsg fmt::Display");
+        write!(f, "{}", body)
     }
 }
 #[derive(Debug, Clone, Serialize, Deserialize)]

@@ -599,13 +599,15 @@ impl CellAgent {
                 if TRACE_OPTIONS.all || TRACE_OPTIONS.ca {
                     match &msg {
                         CmToCaBytes::Bytes((_, _, _, bytes)) => {
+                            let ec_msg: Box<dyn Message> = serde_json::from_str(&bytes.to_string()?)?;
                             let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "ca_from_cm_bytes" };
-                            let trace = json!({ "cell_id": self.cell_id, "bytes": bytes.to_string()? });
+                            let trace = json!({ "cell_id": self.cell_id, "ec_msg": ec_msg.to_string() });
                             let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
                         },
                         CmToCaBytes::App((_, bytes)) => {
+                            let app_msg: Box<dyn AppMessage> = serde_json::from_str(&bytes.to_string()?)?;
                             let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "ca_from_cm_app" };
-                            let trace = json!({ "cell_id": &self.cell_id, "msg": bytes.to_string()? });
+                            let trace = json!({ "cell_id": &self.cell_id, "msg": app_msg.to_string() });
                             let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
                         }
                         CmToCaBytes::Status((port_no, is_border, number_of_packets, status)) => {
@@ -675,7 +677,7 @@ impl CellAgent {
         {
             if TRACE_OPTIONS.all || TRACE_OPTIONS.ca {
                 let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "ca_to_vm" };
-                let trace = json!({ "cell_id": &self.cell_id, "app_msg": app_msg });
+                let trace = json!({ "cell_id": &self.cell_id, "app_msg": app_msg.to_string() });
                 let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
             }
         }
