@@ -1158,17 +1158,13 @@ impl CellAgent {
         let new_tree_id = self.my_tree_id.add_component(&new_tree_name.get_name()).context(CellagentError::Chain { func_name: _f, comment: S(self.cell_id) + " new_tree_id" })?;
         let parent_tree_id = {
             let mut locked = self.tree_name_map.lock().unwrap();
-            let mut tree_map = locked
+            let tree_map = locked
                 .get_mut(&sender_id)
-                .cloned()
-                .ok_or::<Error>(CellagentError::TreeMap { func_name: _f, cell_id: self.cell_id, tree_name: parent_tree_name.clone() }.into())?;
-            let parent_tree_id = tree_map
-                .get(parent_tree_name.get_name())
-                .cloned()
                 .ok_or::<Error>(CellagentError::TreeMap { func_name: _f, cell_id: self.cell_id, tree_name: parent_tree_name.clone() }.into())?;
             tree_map.insert(new_tree_name.get_name().clone(), new_tree_id);
-            locked.insert(sender_id, tree_map);
-            parent_tree_id
+            *tree_map
+                .get(parent_tree_name.get_name())
+                .ok_or::<Error>(CellagentError::TreeMap { func_name: _f, cell_id: self.cell_id, tree_name: parent_tree_name.clone() }.into())?
         };
         let parent_port_tree_id = parent_tree_id.to_port_tree_id_0();
         if !self.may_send(parent_port_tree_id)? { return Err(CellagentError::MayNotSend { func_name: _f, cell_id: self.cell_id, tree_id: parent_tree_id }.into()); }
