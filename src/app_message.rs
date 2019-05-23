@@ -40,12 +40,12 @@ impl AppMsgType {
 impl fmt::Display for AppMsgType {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let s = match *self {
-            AppMsgType::AppInterapplicationMsg => "Interapplication",
-            AppMsgType::AppDeleteTreeMsg       => "DeleteTree",
-            AppMsgType::AppManifestMsg         => "Manifest",
-            AppMsgType::AppQueryMsg            => "Query",
-            AppMsgType::AppStackTreeMsg        => "StackTree",
-            AppMsgType::AppTreeNameMsg         => "TreeName",
+            AppMsgType::AppInterapplicationMsg => "AppInterapplication",
+            AppMsgType::AppDeleteTreeMsg       => "AppDeleteTree",
+            AppMsgType::AppManifestMsg         => "AppManifest",
+            AppMsgType::AppQueryMsg            => "AppQuery",
+            AppMsgType::AppStackTreeMsg        => "AppStackTree",
+            AppMsgType::AppTreeNameMsg         => "AppTreeName",
         };
         write!(f, "{}", s)
     }

@@ -601,14 +601,14 @@ pub struct StackTreeDMsg {
 }
 impl StackTreeDMsg {
     pub fn new(in_reply_to: SenderMsgSeqNo, sender_id: SenderID,
-               port_tree_id: PortTreeID, join: bool) -> StackTreeDMsg {
+               port_tree_id: PortTreeID, parent_port_tree_id: PortTreeID) -> StackTreeDMsg {
         let header = MsgHeader::new(sender_id, true,MsgType::StackTreeD, MsgDirection::Leafward);
-        let payload = StackTreeMsgDPayload::new(in_reply_to, port_tree_id, join);
+        let payload = StackTreeMsgDPayload::new(in_reply_to, port_tree_id, parent_port_tree_id);
         StackTreeDMsg { header, payload}
     }
     pub fn get_payload(&self) -> &StackTreeMsgDPayload { &self.payload }
     pub fn get_port_tree_id(&self) -> PortTreeID { self.payload.get_port_tree_id() }
-    pub fn join_tree(&self) -> bool { self.payload.join_tree() }
+    pub fn get_parent_port_tree_id(&self) -> PortTreeID { self.payload.get_parent_port_tree_id() }
 }
 #[typetag::serde]
 impl Message for StackTreeDMsg {
@@ -634,15 +634,15 @@ impl fmt::Display for StackTreeDMsg {
 pub struct StackTreeMsgDPayload {
     in_reply_to: SenderMsgSeqNo,
     port_tree_id: PortTreeID,
-    join: bool
+    parent_port_tree_id: PortTreeID,
 }
 impl StackTreeMsgDPayload {
-    fn new(in_reply_to: SenderMsgSeqNo, port_tree_id: PortTreeID, join: bool)
+    fn new(in_reply_to: SenderMsgSeqNo, port_tree_id: PortTreeID, parent_port_tree_id: PortTreeID)
             -> StackTreeMsgDPayload {
-        StackTreeMsgDPayload { in_reply_to, port_tree_id, join }
+        StackTreeMsgDPayload { in_reply_to, port_tree_id, parent_port_tree_id }
     }
     fn get_port_tree_id(&self) -> PortTreeID { self.port_tree_id }
-    fn join_tree(&self) -> bool { self.join }
+    fn get_parent_port_tree_id(&self) -> PortTreeID { self.parent_port_tree_id }
 }
 #[typetag::serde]
 impl MsgPayload for StackTreeMsgDPayload {}
