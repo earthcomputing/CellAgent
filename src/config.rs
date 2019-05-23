@@ -188,15 +188,15 @@ impl PortNo {
     pub fn as_usize(self) -> usize { self.0 as usize }
 }
 impl Deref for PortNo { type Target = u8; fn deref(&self) -> &Self::Target { &self.0 } }
+impl fmt::Display for PortNo {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "P:{}", self.0)
+    }
+}
 #[derive(Debug, Copy, Clone)]
 pub enum CellType {
     Border,
     Interior
-}
-impl fmt::Display for PortNo {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "P:{}", *self)
-    }
 }
 impl fmt::Display for CellType {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
