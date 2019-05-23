@@ -1114,4 +1114,48 @@ static int adapt_send_AIT(struct sk_buff *skb, struct net_device *e1000e) { retu
 static int adapt_retrieve_AIT(struct net_device *e1000e, ec_ait_data_t *data) { return -1; }
 static int adapt_write_reg(struct net_device *e1000e, ec_alo_reg_t *reg) { return -1; }
 static int adapt_read_regset(struct net_device *e1000e, ec_alo_regs_t *regs) { return -1; }
-static int adapt_get_state(struct net_device *dev, ec_state_t *state) { return -1; }
+
+
+#define ADAPT_INFO(fmt, args...) printk(KERN_INFO "ADAPT: " fmt "\n", ## args)
+
+int adapt_get_state(struct net_device *e1000e, ec_state_t *state) {
+    if (state == NULL) return -1;
+
+    // ref: e1000e-3.3.4/src/e1000.h
+    struct e1000_adapter *adapter = netdev_priv(e1000e);
+    // ADAPT_INFO("net_device: \"%s\", adapter: %p", e1000e->name, adapter);
+    if (adapter == NULL) return -1;
+
+    entl_device_t *entl_dev = &adapter->entl_dev;
+    // ADAPT_INFO("entl_dev: %p", entl_dev);
+    if (entl_dev == NULL) return -1;
+
+    ADAPT_INFO("adapt_get_state e1000e \"%s\"", e1000e->name);
+    ADAPT_INFO("  entl_dev->edev_name: \"%s\"", entl_dev->edev_name);
+    ADAPT_INFO("  entl_dev->edev_queue_stopped: %d", entl_dev->edev_queue_stopped);
+
+    char *nic_name = adapter->netdev->name;
+    if (netif_carrier_ok(e1000e)) {
+        int link_speed = adapter->link_speed;
+        int link_duplex = adapter->link_duplex;
+        ADAPT_INFO("\"%s\" NIC Link is Up %d Mbps %s Duplex", nic_name, link_speed, (link_duplex == FULL_DUPLEX) ? "Full" : "Half");
+    }
+    else {
+        ADAPT_INFO("\"%s\" NIC Link is Down", nic_name);
+    }
+
+#if 0
+    // ref: add_link_state
+    state->ecs_link_state = link_state;
+    state->ecs_s_count = s_count;
+    state->ecs_r_count = r_count;
+    state->ecs_recover_count = recover_count;
+    state->ecs_recovered_count = recovered_count;
+    state->ecs_entt_count = entt_count;
+    state->ecs_aop_count = aop_count;
+    state->ecs_num_queued = num_queued;
+    // FIXME: update_time, interval_time, max_interval_time, min_interval_time
+#endif
+    return 0;
+}
+
