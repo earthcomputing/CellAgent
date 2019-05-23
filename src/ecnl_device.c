@@ -1411,8 +1411,8 @@ static int __init ecnl_init_module(void) {
         return -EINVAL;
     }
 
-    pr_info("Earth Computing Generic Netlink Module - %s ", ECNL_DEVICE_DRIVER_VERSION);
-    pr_info("Copyright(c) 2018, 2019 Earth Computing");
+    pr_info("Earth Computing Generic Netlink Module - %s\n", ECNL_DEVICE_DRIVER_VERSION);
+    pr_info("Copyright(c) 2018, 2019 Earth Computing\n");
 
     int err = genl_register_family_with_ops_groups(&nl_ecnd_fam, nl_ecnl_ops, nl_ecnd_mcgrps);
     if (err) {
