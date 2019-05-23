@@ -76,7 +76,7 @@ pub struct CellAgent {
     neighbors: HashMap<PortNo, (CellID, PortNo)>,
     failover_reply_ports: HashMap<PortTreeID, PortNo>,
     no_packets: [NumberOfPackets; MAX_NUM_PHYS_PORTS_PER_CELL.0 as usize],
-    child_ports: HashMap<PortTreeID, HashSet<PortNo>>,
+    child_ports: HashMap<TreeID, HashSet<PortNo>>,
 }
 impl CellAgent {
     pub fn new(cell_id: CellID, cell_type: CellType, config: CellConfig, no_ports: PortQty,
@@ -980,16 +980,16 @@ impl CellAgent {
         } else {
             self.send_msg(self.connected_tree_id, msg, parent_mask)?; // Send to children of parent tree
         }
-        self.child_ports.insert(parent_port_tree_id, child_ports);
+        self.child_ports.insert(new_port_tree_id.to_tree_id(), child_ports);
         let parent_tree_id = payload.get_parent_port_tree_id();
         let base_tree_id = self.get_base_tree_id(parent_tree_id).context(CellagentError::Chain { func_name: _f, comment: S("") })?;
         self.update_base_tree_map(parent_tree_id, base_tree_id);
         {
             if DEBUG_OPTIONS.all || DEBUG_OPTIONS.stack_tree {
                 let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "ca_process_stack_tree_msg" };
-                let trace = json!({ "cell_id": &self.cell_id, "new_port_tree_id": new_port_tree_id, "port_no": port_no, "child_ports": self.child_ports.get(&parent_tree_id), "msg": msg.value() });
+                let trace = json!({ "cell_id": &self.cell_id, "new_port_tree_id": new_port_tree_id, "port_no": port_no, "child_ports": self.child_ports.get(&parent_tree_id.to_tree_id()), "msg": msg.value() });
                 let _ = add_to_trace(TraceType::Debug, trace_params, &trace, _f);
-                println!("Cellagent {}: {} tree {} port {} xtnd {} child ports {:?} msg {}", self.cell_id, _f, parent_tree_id, *port_no, gvm_xtnd, self.child_ports.get(&parent_tree_id), msg);
+                println!("Cellagent {}: {} tree {} port {} xtnd {} child ports {:?} msg {}", self.cell_id, _f, parent_tree_id, *port_no, gvm_xtnd, self.child_ports.get(&parent_tree_id.to_tree_id()), msg);
             }
         }
         (*self.traphs_mutex.lock().unwrap()) = self.traphs.clone();
@@ -1003,7 +1003,7 @@ impl CellAgent {
         let parent_port_tree_id = msg.get_parent_port_tree_id();
         let tree_uuid = port_tree_id.get_uuid();
         let traph = self.get_traph_mut(port_tree_id)?;
-        let parent_port = traph._get_parent_port()?;
+        let parent_port = traph.get_parent_port()?;
         if is_joining {
             let mut entry = traph.get_tree_entry(&tree_uuid).context(CellagentError::Chain { func_name: _f, comment: S("") })?;
             let user_mask = Mask::new(port_number);
@@ -1015,15 +1015,37 @@ impl CellAgent {
         {
             if DEBUG_OPTIONS.all || DEBUG_OPTIONS.stack_tree {
                 let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "ca_process_stack_tree_d_msg" };
-                let trace = json!({ "cell_id": &self.cell_id, "msg": msg, "join": is_joining, "port": port_no, "parent tree": parent_port_tree_id, "child_ports": self.child_ports.get(&port_tree_id) });
+                let trace = json!({ "cell_id": &self.cell_id, "msg": msg, "join": is_joining, "port": port_no, "parent tree": parent_port_tree_id, "child_ports": self.child_ports.get(&port_tree_id.to_tree_id()) });
                 let _ = add_to_trace(TraceType::Debug, trace_params, &trace, _f);
-                println!("Cellagent {}: {} tree {} child ports {:?}", self.cell_id, _f, parent_port_tree_id, self.child_ports.get(&parent_port_tree_id));
+                println!("Cellagent {}: {} tree {} child ports {:?}", self.cell_id, _f, port_tree_id, self.child_ports.get(&parent_port_tree_id.to_tree_id()));
             }
         }
-        if let Some(child_ports) = self.child_ports.get_mut(&parent_port_tree_id) {
-            child_ports.remove(&port_no);
-            if child_ports.len() == 0 {
-                let port_number = parent_port.make_port_number(self.no_ports)?;
+        let child_ports = self.child_ports
+            .get_mut(&port_tree_id.to_tree_id())
+            .expect("Child ports must exist");
+        child_ports.remove(&port_no);
+        if child_ports.len() == 0 {
+            let port_number = parent_port.make_port_number(self.no_ports)?;
+            if parent_port == PortNo(0) {
+                // I am the root of the tree.  I need to tell the sender.
+                let tree_name = port_tree_id.get_name();
+                let sender_id = msg.get_header().get_sender_id();
+                let allowed_tree = AllowedTree::new(&tree_name);
+                self.add_tree_name_map_item(sender_id, &allowed_tree, port_tree_id.to_tree_id());
+                let tree_name_msg = AppTreeNameMsg::new("noc",
+                                                        &allowed_tree, &parent_port_tree_id.get_name());
+                let serialized = serde_json::to_string(&tree_name_msg as &dyn AppMessage).context(CellagentError::Chain { func_name: "port_connected", comment: S(self.cell_id) })?;
+                let bytes = ByteArray::new(&serialized);
+                {
+                    if TRACE_OPTIONS.all || TRACE_OPTIONS.ca {
+                        let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "ca_to_noc_tree_name" };
+                        let trace = json!({ "cell_id": &self.cell_id, "port": port_no, "app_msg": tree_name_msg });
+                        let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
+                    }
+                }
+                let port_number = self.get_border_port(&sender_id)?;
+                self.ca_to_cm.send(CaToCmBytes::App((port_number, bytes)))?;
+            } else {
                 let mask = Mask::new(port_number);
                 let in_reply_to = msg.get_sender_msg_seq_no();
                 let sender_id = msg.get_header().get_sender_id();
@@ -1031,25 +1053,6 @@ impl CellAgent {
                 let new_msg = StackTreeDMsg::new(in_reply_to, sender_id, port_tree_id, parent_port_tree_id, true);
                 self.send_msg(self.get_connected_tree_id(), &new_msg, mask)?;
             }
-        } else {
-            // I am the root of the tree.  I need to tell the sender.
-            let tree_name = port_tree_id.get_name();
-            let sender_id = msg.get_header().get_sender_id();
-            let allowed_tree = AllowedTree::new(&tree_name);
-            self.add_tree_name_map_item(sender_id, &allowed_tree, port_tree_id.to_tree_id());
-            let tree_name_msg = AppTreeNameMsg::new("noc",
-                                                    &allowed_tree, &parent_port_tree_id.get_name());
-            let serialized = serde_json::to_string(&tree_name_msg as &dyn AppMessage).context(CellagentError::Chain { func_name: "port_connected", comment: S(self.cell_id) })?;
-            let bytes = ByteArray::new(&serialized);
-            {
-                if TRACE_OPTIONS.all || TRACE_OPTIONS.ca {
-                    let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "ca_to_noc_tree_name" };
-                    let trace = json!({ "cell_id": &self.cell_id, "port": port_no, "app_msg": tree_name_msg });
-                    let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
-                }
-            }
-            let port_number = self.get_border_port(&sender_id)?;
-            self.ca_to_cm.send(CaToCmBytes::App((port_number, bytes)))?;
         }
         (*self.traphs_mutex.lock().unwrap()) = self.traphs.clone();
         Ok(())
@@ -1199,6 +1202,10 @@ impl CellAgent {
                 .get(parent_tree_name.get_name())
                 .ok_or::<Error>(CellagentError::TreeMap { func_name: _f, cell_id: self.cell_id, tree_name: parent_tree_name.clone() }.into())?
         };
+        let parent_entry = self.get_tree_entry(parent_tree_id.to_port_tree_id_0())?;
+        let parent_mask = parent_entry.get_mask().all_but_port(PortNumber::new0());
+        let child_ports = new_hash_set(&parent_mask.get_port_nos());
+        self.child_ports.insert(new_tree_id, child_ports);
         {
             if DEBUG_OPTIONS.all || DEBUG_OPTIONS.process_msg {
                 let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "ca_got_stack_tree_app_msg" };
@@ -1214,14 +1221,16 @@ impl CellAgent {
         self.stack_tree(sender_id, new_tree_name, new_tree_id.to_port_tree_id_0(),
                         parent_port_tree_id,None, gvm_eqn)?;
         let traph = self.get_traph(parent_port_tree_id).context(CellagentError::Chain { func_name: _f, comment: S("") })?;
+        let parent_entry = self.get_tree_entry(parent_port_tree_id).context(CellagentError::Chain { func_name: _f, comment: S("get parent_entry") })?;
+        let parent_mask = parent_entry.get_mask().and(DEFAULT_USER_MASK);  // Excludes port 0
         let variables = traph.get_params(gvm_eqn.get_variables())?;
         let gvm_xtnd = gvm_eqn.eval_xtnd(&variables)?;
         if gvm_xtnd {
             let stack_tree_msg = StackTreeMsg::new(sender_id, new_tree_name, new_tree_id, parent_tree_id, direction, gvm_eqn);
-            let parent_entry = self.get_tree_entry(parent_port_tree_id).context(CellagentError::Chain { func_name: _f, comment: S("get parent_entry") })?;
-            let parent_mask = parent_entry.get_mask().and(DEFAULT_USER_MASK);  // Excludes port 0
             self.send_msg(self.connected_tree_id, &stack_tree_msg, parent_mask)?;
         }
+        let child_ports = new_hash_set(&parent_mask.get_port_nos());
+        self.child_ports.insert(parent_port_tree_id.to_tree_id(), child_ports);
         Ok(())
     }
     pub fn app_tree_name(&self, _msg: &AppTreeNameMsg, _sender_id: SenderID) -> Result<(), Error> {
