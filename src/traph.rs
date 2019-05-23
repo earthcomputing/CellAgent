@@ -174,7 +174,7 @@ impl Traph {
     pub fn get_port_status(&self, port_number: PortNumber) -> PortState {
         self.elements[*port_number.get_port_no() as usize].get_state()
     }
-    pub fn _get_parent_port(&self) -> Result<PortNo, Error> {
+    pub fn get_parent_port(&self) -> Result<PortNo, Error> {
         self.get_parent_element()
             .map(|element| element.get_port_no())
     }
