@@ -763,7 +763,7 @@ static const struct genl_ops nl_ecnl_ops[] = {
 static int ecnl_driver_index(unsigned char *ecnl_name) {
     struct net_device *plug_in = find_ecnl_device(ecnl_name);
     if (plug_in == NULL) {
-        ECNL_DEBUG("ecnl_driver_index module \"%s\" not found\n", ecnl_name);
+        ECNL_DEBUG("ecnl_driver_index module \"%s\" not found", ecnl_name);
         return -EINVAL;
     }
 
@@ -774,7 +774,7 @@ static int ecnl_driver_index(unsigned char *ecnl_name) {
 static int ecnl_register_port(int module_id, unsigned char *name, struct net_device *e1000e, struct entl_driver_funcs *funcs) {
     struct net_device *plug_in = ecnl_devices[module_id];
     if (plug_in == NULL) {
-        ECNL_DEBUG("ecnl_register_port module-id %d not found\n", module_id);
+        ECNL_DEBUG("ecnl_register_port module-id %d not found", module_id);
         return -EINVAL;
     }
 
@@ -783,14 +783,14 @@ static int ecnl_register_port(int module_id, unsigned char *name, struct net_dev
     int port_id = -1;
     unsigned long flags;
     spin_lock_irqsave(&e_dev->ecnl_lock, flags);
-    // ECNL_DEBUG("ecnl_register_port \"%s\" port-id %d\n", name, e_dev->ecnl_num_ports);
+    // ECNL_DEBUG("ecnl_register_port \"%s\" port-id %d", name, e_dev->ecnl_num_ports);
     if (e_dev->ecnl_num_ports < ECNL_DRIVER_MAX) {
         // FIXME: ENCL_FW_TABLE_ENTRY_ARRAY
         port_id = e_dev->ecnl_num_ports++;
 
         e_dev->ecnl_fw_map[port_id] = port_id; // default map by register order
 
-        ECNL_DEBUG("ecnl_register_port module-id %d port-name \"%s\" port-id %d\n", module_id, name, port_id);
+        ECNL_DEBUG("ecnl_register_port module-id %d port-name \"%s\" port-id %d", module_id, name, port_id);
         struct entl_driver *e_driver = &e_dev->ecnl_drivers[port_id];
         e_driver->eda_index = port_id; // port_id
         e_driver->eda_name = name;
@@ -798,7 +798,7 @@ static int ecnl_register_port(int module_id, unsigned char *name, struct net_dev
         e_driver->eda_funcs = funcs;
     }
     else {
-        ECNL_DEBUG("ecnl_register_port module-id %d table overflow %d\n", module_id, e_dev->ecnl_num_ports);
+        ECNL_DEBUG("ecnl_register_port module-id %d table overflow %d", module_id, e_dev->ecnl_num_ports);
     }
     spin_unlock_irqrestore(&e_dev->ecnl_lock, flags);
 
@@ -808,7 +808,7 @@ static int ecnl_register_port(int module_id, unsigned char *name, struct net_dev
 static void ecnl_deregister_ports(int module_id) {
     struct net_device *plug_in = ecnl_devices[module_id];
     if (plug_in == NULL) {
-        ECNL_DEBUG("ecnl_deregister_ports module-id %d not found\n", module_id);
+        ECNL_DEBUG("ecnl_deregister_ports module-id %d not found", module_id);
         return;
     }
 
@@ -872,7 +872,7 @@ static void set_next_id(struct sk_buff *skb, u32 nextID) {
 static int ecnl_receive_skb(int module_id, int index, struct sk_buff *skb) {
     struct net_device *plug_in = ecnl_devices[module_id];
     if (plug_in == NULL) {
-        ECNL_DEBUG("ecnl_receive_skb module-id %d not found\n", module_id);
+        ECNL_DEBUG("ecnl_receive_skb module-id %d not found", module_id);
         return -EINVAL;
     }
 
@@ -901,7 +901,7 @@ static int ecnl_receive_skb(int module_id, int index, struct sk_buff *skb) {
 
     // table miss, send to host
     if (!e_dev->ecnl_current_table || id >= e_dev->ecnl_current_table_size) {
-        ECNL_DEBUG("ecnl_receive_skb module-id %d can't forward packet id %d\n", module_id, id);
+        ECNL_DEBUG("ecnl_receive_skb module-id %d can't forward packet id %d", module_id, id);
         netif_rx(skb);
         return 0;
     }
@@ -915,7 +915,7 @@ static int ecnl_receive_skb(int module_id, int index, struct sk_buff *skb) {
     u16 port_vector = entry.info.port_vector;
     if (direction == 0) {  // forward direction
         if (port_vector == 0) {
-            ECNL_DEBUG("ecnl_receive_skb no forward bit, module-id %d %08x\n", module_id, index);
+            ECNL_DEBUG("ecnl_receive_skb no forward bit, module-id %d %08x", module_id, index);
             return -EINVAL;
         }
 
@@ -1053,7 +1053,7 @@ static void ecnl_forward_ait_message(int module_id, int drv_index, struct sk_buf
             port_vector = entry.info.port_vector;
             if (direction == 0) {  // forward direction
                 if (port_vector == 0) {
-                    ECNL_DEBUG("ecnl_forward_ait_message no forward bit module-id %d xx %08x\n", module_id, drv_index);
+                    ECNL_DEBUG("ecnl_forward_ait_message no forward bit module-id %d xx %08x", module_id, drv_index);
                     to_host = 1;				
                 }
                 else {
@@ -1183,13 +1183,13 @@ EXPORT_SYMBOL(ecnl_api_funcs);
 
 // net_device interface functions
 static int ecnl_open(struct net_device *plug_in) {
-    ECNL_DEBUG("ecnl_open \"%s\"\n", plug_in->name);
+    ECNL_DEBUG("ecnl_open \"%s\"", plug_in->name);
     netif_start_queue(plug_in);
     return 0;
 }
 
 static int ecnl_stop(struct net_device *plug_in) {
-    ECNL_DEBUG("ecnl_stop \"%s\"\n", plug_in->name);
+    ECNL_DEBUG("ecnl_stop \"%s\"", plug_in->name);
     netif_stop_queue(plug_in);
     return 0;
 }
@@ -1209,7 +1209,7 @@ static int ecnl_hard_start_xmit(struct sk_buff *skb, struct net_device *plug_in)
     // FIXME: direct mapped table ??
 
     if (!e_dev->ecnl_current_table || id >= e_dev->ecnl_current_table_size) {
-        ECNL_DEBUG("ecnl_hard_start_xmit \"%s\" can't forward packet\n", e_dev->ecnl_name);
+        ECNL_DEBUG("ecnl_hard_start_xmit \"%s\" can't forward packet", e_dev->ecnl_name);
         return -EINVAL;
     }
 
@@ -1252,7 +1252,7 @@ static int ecnl_hard_start_xmit(struct sk_buff *skb, struct net_device *plug_in)
         u8 parent = entry.info.parent;
         if (parent == 0) {
             // send to this host
-            ECNL_DEBUG("ecnl_hard_start_xmit \"%s\" forwarding packet to self\n", e_dev->ecnl_name);
+            ECNL_DEBUG("ecnl_hard_start_xmit \"%s\" forwarding packet to self", e_dev->ecnl_name);
             return -EINVAL;
         }
         else {
@@ -1389,7 +1389,7 @@ static void scan_netdev(void) {
     const struct net *net = &init_net;
     struct net_device *n_dev; for_each_netdev(net, n_dev) {
     // for (struct net_device *n_dev = first_net_device(net); n_dev; n_dev = next_net_device(n_dev)) {
-        ECNL_DEBUG("scan_netdev considering [%s]\n", n_dev->name);
+        ECNL_DEBUG("scan_netdev considering [%s]", n_dev->name);
         inject_dev(n_dev);
     }
     read_unlock(&dev_base_lock);
@@ -1404,20 +1404,20 @@ static void ecnl_setup(struct net_device *plug_in) {
 
 static int __init ecnl_init_module(void) {
     if (device_busy) {
-        ECNL_DEBUG("ecnl_init_module called on busy state\n");
+        ECNL_DEBUG("ecnl_init_module called on busy state");
         return -EINVAL;
     }
 
     pr_info("Earth Computing Generic Netlink Module - %s ", ECNL_DEVICE_DRIVER_VERSION);
-    pr_info("Copyright(c) 2018, 2019 Earth Computing\n");
+    pr_info("Copyright(c) 2018, 2019 Earth Computing");
 
     int err = genl_register_family_with_ops_groups(&nl_ecnd_fam, nl_ecnl_ops, nl_ecnd_mcgrps);
     if (err) {
-        ECNL_DEBUG("ecnl_init_module failed register genetlink family: \"%s\"\n", nl_ecnd_fam.name);
+        ECNL_DEBUG("ecnl_init_module failed register genetlink family: \"%s\"", nl_ecnd_fam.name);
         return -EINVAL;
     }
 
-    ECNL_DEBUG("registered genetlink family: \"%s\"\n", nl_ecnd_fam.name);        	
+    ECNL_DEBUG("registered genetlink family: \"%s\"", nl_ecnd_fam.name);        	
 
     struct net_device *plug_in = alloc_netdev(sizeof(ecnl_device_t), MAIN_DRIVER_NAME, NET_NAME_UNKNOWN, ecnl_setup);
     ecnl_device_t *this_device = (ecnl_device_t *) netdev_priv(plug_in);
@@ -1431,7 +1431,7 @@ static int __init ecnl_init_module(void) {
     //inter_module_register("ecnl_driver_funcs", THIS_MODULE, ecnl_funcs);
 
     if (register_netdev(plug_in)) {
-        ECNL_DEBUG("ecnl_init_module failed register net_dev: \"%s\"\n", this_device->ecnl_name);
+        ECNL_DEBUG("ecnl_init_module failed register net_dev: \"%s\"", this_device->ecnl_name);
     }
 
     ecnl_devices[num_ecnl_devices++] = plug_in;
@@ -1444,12 +1444,12 @@ static int __init ecnl_init_module(void) {
 // FIXME: clean up data
 static void __exit ecnl_cleanup_module(void) {
     if (device_busy) {
-        ECNL_DEBUG("ecnl_cleanup_module busy\n");
+        ECNL_DEBUG("ecnl_cleanup_module busy");
         //inter_module_unregister("ecnl_driver_funcs");
         device_busy = 0;
     }
     else {
-        ECNL_DEBUG("ecnl_cleanup_module non-busy\n");		
+        ECNL_DEBUG("ecnl_cleanup_module non-busy");		
     }
 }
 

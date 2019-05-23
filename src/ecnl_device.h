@@ -1,7 +1,7 @@
 #ifndef _ECNL_DEVICE_H_
 #define _ECNL_DEVICE_H_
 
-#define ECNL_DEBUG(fmt, args...) printk(KERN_ALERT "ECNL:" fmt, ## args)
+#define ECNL_DEBUG(fmt, args...) printk(KERN_ALERT "ECNL: " fmt "\n", ## args)
 
 typedef struct entl_driver {
     unsigned char *eda_name;
