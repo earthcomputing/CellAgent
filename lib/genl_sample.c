@@ -2,6 +2,7 @@
 
 int doit(struct nl_sock *sock, struct nl_msg *msg) {
     uint32_t module_id = 0;
+    uint32_t actual_module_id;
 
 // --
 
@@ -31,7 +32,24 @@ num_ports = mi.num_ports;
 
 // --
 
-    uint32_t actual_module_id;
+    uint32_t port_id = 0;
+    uint32_t actual_port_id = 0;
+
+// num_ports from get_module_info (above)
+for (uint32_t port_id = 0; port_id < num_ports; port_id++) {
+CLEAR_MSG;
+    {
+printf("get_port_state %d\n", port_id);
+        link_state_t link_state; memset(&link_state, 0, sizeof(link_state_t));
+        int rc = get_port_state(sock, msg, module_id, port_id, &actual_module_id, &actual_port_id, &link_state);
+        if (rc < 0) fatal_error(rc, "get_port_state");
+        if (actual_module_id != module_id) fatal_error(-1, "module mismatch: %d, %d", module_id, actual_module_id);
+        if (actual_port_id != port_id) fatal_error(-1, "port mismatch: %d, %d", port_id, actual_port_id);
+    }
+}
+
+// --
+
 CLEAR_MSG;
     {
 printf("start_forwarding\n");
@@ -140,23 +158,6 @@ printf("map_ports\n");
         if (actual_module_id != module_id) fatal_error(-1, "module mismatch: %d, %d", module_id, actual_module_id);
     }
 
-// --
-
-    uint32_t port_id = 0;
-    uint32_t actual_port_id = 0;
-
-// num_ports from get_module_info (above)
-for (uint32_t port_id = 0; port_id < num_ports; port_id++) {
-CLEAR_MSG;
-    {
-printf("get_port_state\n");
-        link_state_t link_state; memset(&link_state, 0, sizeof(link_state_t));
-        int rc = get_port_state(sock, msg, module_id, port_id, &actual_module_id, &actual_port_id, &link_state);
-        if (rc < 0) fatal_error(rc, "get_port_state");
-        if (actual_module_id != module_id) fatal_error(-1, "module mismatch: %d, %d", module_id, actual_module_id);
-        if (actual_port_id != port_id) fatal_error(-1, "port mismatch: %d, %d", port_id, actual_port_id);
-    }
-}
 
     buf_desc_t buf = {
         .len = 0,
