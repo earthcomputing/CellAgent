@@ -955,6 +955,8 @@ impl CellAgent {
         traph.set_tree_entry(&new_port_tree_id.get_uuid(), entry)?;
         let params = traph.get_params(gvm_eqn.get_variables())?;
         let gvm_xtnd = gvm_eqn.eval_xtnd(&params)?;
+        let gvm_send = gvm_eqn.eval_send(&params)?;
+        let gvm_recv = gvm_eqn.eval_recv(&params)?;
         // Update StackTreeMsg and forward
         let parent_entry = self.get_tree_entry(parent_port_tree_id)?;
         let parent_mask = parent_entry.get_mask().all_but_port(PortNumber::new0());
@@ -962,8 +964,10 @@ impl CellAgent {
         let child_ports = new_hash_set(&parent_mask.get_port_nos());
         if child_ports.len() == 0 || !gvm_xtnd {  // I am a leaf on the new tree
             let mask = Mask::new(port_number);
+            let join = gvm_xtnd || gvm_send || gvm_recv;
             let in_reply_to = msg.get_sender_msg_seq_no();
-            let new_msg = StackTreeDMsg::new(in_reply_to, sender_id, new_port_tree_id, parent_port_tree_id);
+            let new_msg = StackTreeDMsg::new(in_reply_to, sender_id, new_port_tree_id,
+                                             parent_port_tree_id, join);
             self.send_msg(self.get_connected_tree_id(), &new_msg, mask)?;
         } else {
             self.send_msg(self.connected_tree_id, msg, parent_mask)?; // Send to children of parent tree
@@ -985,22 +989,25 @@ impl CellAgent {
     }
     pub fn process_stack_tree_d_msg(&mut self, msg: &StackTreeDMsg, port_no: PortNo) -> Result<(), Error> {
         let _f = "process_stack_treed_msg";
+        let is_joining = msg.is_joining();
         let port_number = port_no.make_port_number(self.no_ports)?;
         let port_tree_id = msg.get_port_tree_id();
         let parent_port_tree_id = msg.get_parent_port_tree_id();
         let tree_uuid = port_tree_id.get_uuid();
         let traph = self.get_traph_mut(port_tree_id)?;
-        let mut entry = traph.get_tree_entry(&tree_uuid).context(CellagentError::Chain { func_name: _f, comment: S("") })?;
-        let user_mask = Mask::new(port_number);
-        let mask = entry.get_mask().or(user_mask);
-        entry.set_mask(mask);
-        traph.set_tree_entry(&tree_uuid, entry)?;
         let parent_port = traph._get_parent_port()?;
-        self.update_entry(&entry).context(CellagentError::Chain { func_name: _f, comment: S(self.cell_id) })?;
+        if is_joining {
+            let mut entry = traph.get_tree_entry(&tree_uuid).context(CellagentError::Chain { func_name: _f, comment: S("") })?;
+            let user_mask = Mask::new(port_number);
+            let mask = entry.get_mask().or(user_mask);
+            entry.set_mask(mask);
+            traph.set_tree_entry(&tree_uuid, entry)?;
+            self.update_entry(&entry).context(CellagentError::Chain { func_name: _f, comment: S(self.cell_id) })?;
+        }
         {
             if DEBUG_OPTIONS.all || DEBUG_OPTIONS.stack_tree {
                 let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "ca_process_stack_tree_d_msg" };
-                let trace = json!({ "cell_id": &self.cell_id, "msg": msg, "port": port_no, "parent tree": parent_port_tree_id, "child_ports": self.child_ports.get(&port_tree_id) });
+                let trace = json!({ "cell_id": &self.cell_id, "msg": msg, "join": is_joining, "port": port_no, "parent tree": parent_port_tree_id, "child_ports": self.child_ports.get(&port_tree_id) });
                 let _ = add_to_trace(TraceType::Debug, trace_params, &trace, _f);
                 println!("Cellagent {}: {} tree {} child ports {:?}", self.cell_id, _f, parent_port_tree_id, self.child_ports.get(&parent_port_tree_id));
             }
@@ -1013,7 +1020,7 @@ impl CellAgent {
                 let in_reply_to = msg.get_sender_msg_seq_no();
                 let sender_id = msg.get_header().get_sender_id();
                 let parent_port_tree_id = msg.get_parent_port_tree_id();
-                let new_msg = StackTreeDMsg::new(in_reply_to, sender_id, port_tree_id, parent_port_tree_id);
+                let new_msg = StackTreeDMsg::new(in_reply_to, sender_id, port_tree_id, parent_port_tree_id, true);
                 self.send_msg(self.get_connected_tree_id(), &new_msg, mask)?;
             }
         }
