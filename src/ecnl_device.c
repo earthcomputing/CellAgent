@@ -26,6 +26,9 @@
 #include "ecnl_protocol.h"
 
 
+#define ECNL_INFO(fmt, args...) printk(KERN_INFO "ECNL: " fmt "\n", ## args)
+
+
 #define DRV_NAME        "ecnl"
 #define DRV_VERSION     "0.0.2"
 
@@ -248,26 +251,26 @@ static int nl_ecnl_get_port_state(struct sk_buff *skb, struct genl_info *info) {
     u32 port_id = nla_get_u32(info->attrs[NL_ECNL_ATTR_PORT_ID]);
     if (port_id >= e_dev->ecnl_num_ports) return -EINVAL;
 
-    // printk(KERN_INFO "nl_ecnl_get_port_state: \"%s\" %d\n", e_dev->ecnl_name, port_id);
+    // ECNL_INFO("nl_ecnl_get_port_state: \"%s\" %d", e_dev->ecnl_name, port_id);
 
     struct entl_driver *e_driver = &e_dev->ecnl_drivers[port_id];
     if (!e_driver) return -EINVAL;
 
     struct net_device *e1000e = e_driver->eda_device;
     struct entl_driver_funcs *funcs = e_driver->eda_funcs;
-    // printk(KERN_INFO "entl_driver: \"%s\" e1000e: %p, funcs: %p\n", e_driver->eda_name, e1000e, funcs);
+    // ECNL_INFO("entl_driver: \"%s\" e1000e: %p, funcs: %p", e_driver->eda_name, e1000e, funcs);
     if (!e1000e || !funcs) return -EINVAL;
 
-    // printk(KERN_INFO "net_device: \"%s\"\n", e1000e->name);
+    // ECNL_INFO("net_device: \"%s\"", e1000e->name);
 
     ec_state_t state; memset(&state, 0, sizeof(ec_state_t));
     int err = funcs->edf_get_state(e1000e, &state);
     if (err) return -EINVAL;
 
-    // printk(KERN_INFO "reply e_dev: \"%s\" (%d)\n", e_dev->ecnl_name, e_dev->ecnl_index); // module_id
-    // printk(KERN_INFO "reply e_driver: \"%s\" (%d)\n", e_driver->eda_name, e_driver->eda_index); // port_id
+    // ECNL_INFO("reply e_dev: \"%s\" (%d)", e_dev->ecnl_name, e_dev->ecnl_index); // module_id
+    // ECNL_INFO("reply e_driver: \"%s\" (%d)", e_driver->eda_name, e_driver->eda_index); // port_id
 
-    // printk(KERN_INFO "state:\n");
+    // ECNL_INFO("state:");
 
     // return data packet back to caller
     struct sk_buff *rskb = genlmsg_new(NLMSG_GOODSIZE, GFP_KERNEL);
@@ -1351,25 +1354,25 @@ int adapt_get_state(struct net_device *e1000e, ec_state_t *state) {
 
     // ref: e1000e-3.3.4/src/e1000.h
     struct e1000_adapter *adapter = netdev_priv(e1000e);
-    // printk(KERN_INFO "net_device: \"%s\", adapter: %p\n", e1000e->name, adapter);
+    // ECNL_INFO("net_device: \"%s\", adapter: %p", e1000e->name, adapter);
     if (adapter == NULL) return -1;
 
     entl_device_t *entl_dev = &adapter->entl_dev;
-    // printk(KERN_INFO "entl_dev: %p\n", entl_dev);
+    // ECNL_INFO("entl_dev: %p", entl_dev);
     if (entl_dev == NULL) return -1;
 
-    printk(KERN_INFO "adapt_get_state e1000e \"%s\"\n", e1000e->name);
-    printk(KERN_INFO "  entl_dev->edev_name: \"%s\"\n", entl_dev->edev_name);
-    printk(KERN_INFO "  entl_dev->edev_queue_stopped: %d\n", entl_dev->edev_queue_stopped);
+    ECNL_INFO("adapt_get_state e1000e \"%s\"", e1000e->name);
+    ECNL_INFO("  entl_dev->edev_name: \"%s\"", entl_dev->edev_name);
+    ECNL_INFO("  entl_dev->edev_queue_stopped: %d", entl_dev->edev_queue_stopped);
 
     char *nic_name = adapter->netdev->name;
     if (netif_carrier_ok(e1000e)) {
         int link_speed = adapter->link_speed;
         int link_duplex = adapter->link_duplex;
-        printk(KERN_INFO "\"%s\" NIC Link is Up %d Mbps %s Duplex\n", nic_name, link_speed, (link_duplex == FULL_DUPLEX) ? "Full" : "Half");
+        ECNL_INFO("\"%s\" NIC Link is Up %d Mbps %s Duplex", nic_name, link_speed, (link_duplex == FULL_DUPLEX) ? "Full" : "Half");
     }
     else {
-        printk(KERN_INFO "\"%s\" NIC Link is Down\n", nic_name);
+        ECNL_INFO("\"%s\" NIC Link is Down", nic_name);
     }
 
 #if 0
@@ -1416,7 +1419,7 @@ static void hack_init(void) {
     for (int i = 0; i < ARRAY_SIZE(e1000e_ports); i++) {
         e1000e_hackery_t *p = &e1000e_ports[i];
         int port_no = ecnl_register_port(module_id, p->name, p->e1000e, funcs);
-        if (port_no < 0) { printk(KERN_INFO "failed to register \"%s\"\n", p->name); }
+        if (port_no < 0) { ECNL_INFO("failed to register \"%s\"", p->name); }
     }
 }
 
