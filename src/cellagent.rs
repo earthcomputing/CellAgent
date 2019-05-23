@@ -207,6 +207,14 @@ impl CellAgent {
         }
         self.saved_discover.push(discover_msg.clone());
     }
+    fn get_border_port(&self, test_sender_id: &SenderID) -> Result<PortNumber, Error> {
+        let _f = "get_border_port";
+        let entry = self.border_port_tree_id_map
+            .iter()
+            .find(|(_, (sender_id, _))| test_sender_id == sender_id )
+            .ok_or(CellagentError::Sender { func_name: _f, cell_id: self.cell_id, sender_id: test_sender_id.clone() })?;
+        Ok(*entry.0)
+    }
     fn add_tree_name_map_item(&mut self, sender_id: SenderID, allowed_tree: &AllowedTree, allowed_tree_id: TreeID) {
         let _f = "add_tree_name_map_item";
         let mut locked = self.tree_name_map.lock().unwrap();
@@ -1023,6 +1031,25 @@ impl CellAgent {
                 let new_msg = StackTreeDMsg::new(in_reply_to, sender_id, port_tree_id, parent_port_tree_id, true);
                 self.send_msg(self.get_connected_tree_id(), &new_msg, mask)?;
             }
+        } else {
+            // I am the root of the tree.  I need to tell the sender.
+            let tree_name = port_tree_id.get_name();
+            let sender_id = msg.get_header().get_sender_id();
+            let allowed_tree = AllowedTree::new(&tree_name);
+            self.add_tree_name_map_item(sender_id, &allowed_tree, port_tree_id.to_tree_id());
+            let tree_name_msg = AppTreeNameMsg::new("noc",
+                                                    &allowed_tree, &parent_port_tree_id.get_name());
+            let serialized = serde_json::to_string(&tree_name_msg as &dyn AppMessage).context(CellagentError::Chain { func_name: "port_connected", comment: S(self.cell_id) })?;
+            let bytes = ByteArray::new(&serialized);
+            {
+                if TRACE_OPTIONS.all || TRACE_OPTIONS.ca {
+                    let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "ca_to_noc_tree_name" };
+                    let trace = json!({ "cell_id": &self.cell_id, "port": port_no, "app_msg": tree_name_msg });
+                    let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
+                }
+            }
+            let port_number = self.get_border_port(&sender_id)?;
+            self.ca_to_cm.send(CaToCmBytes::App((port_number, bytes)))?;
         }
         (*self.traphs_mutex.lock().unwrap()) = self.traphs.clone();
         Ok(())
@@ -1186,13 +1213,13 @@ impl CellAgent {
         // There is no new_port_tree for up trees
         self.stack_tree(sender_id, new_tree_name, new_tree_id.to_port_tree_id_0(),
                         parent_port_tree_id,None, gvm_eqn)?;
-        let stack_tree_msg = StackTreeMsg::new(sender_id, new_tree_name, new_tree_id, parent_tree_id, direction, gvm_eqn);
-        let parent_entry = self.get_tree_entry(parent_port_tree_id).context(CellagentError::Chain { func_name: _f, comment: S("get parent_entry") })?;
-        let parent_mask = parent_entry.get_mask().and(DEFAULT_USER_MASK);  // Excludes port 0
         let traph = self.get_traph(parent_port_tree_id).context(CellagentError::Chain { func_name: _f, comment: S("") })?;
         let variables = traph.get_params(gvm_eqn.get_variables())?;
         let gvm_xtnd = gvm_eqn.eval_xtnd(&variables)?;
         if gvm_xtnd {
+            let stack_tree_msg = StackTreeMsg::new(sender_id, new_tree_name, new_tree_id, parent_tree_id, direction, gvm_eqn);
+            let parent_entry = self.get_tree_entry(parent_port_tree_id).context(CellagentError::Chain { func_name: _f, comment: S("get parent_entry") })?;
+            let parent_mask = parent_entry.get_mask().and(DEFAULT_USER_MASK);  // Excludes port 0
             self.send_msg(self.connected_tree_id, &stack_tree_msg, parent_mask)?;
         }
         Ok(())
@@ -1424,6 +1451,8 @@ pub enum CellagentError {
 //    SavedMsgType { func_name: &'static str, msg_type: MsgType },
     #[fail(display = "CellAgentError::Partition {}: No path from {} to {}", func_name, lw_tree_id, rw_tree_id)]
     Partition { func_name: &'static str, lw_tree_id: TreeID, rw_tree_id: TreeID },
+    #[fail(display = "CellAgentError::Sender {}: No port for sender {} on cell {}", func_name, sender_id, cell_id)]
+    Sender { func_name: &'static str, cell_id: CellID, sender_id: SenderID },
     #[fail(display = "CellAgentError::StackTree {}: Problem stacking tree {} on cell {}", func_name, tree_id, cell_id)]
     StackTree { func_name: &'static str, tree_id: PortTreeID, cell_id: CellID },
 //    #[fail(display = "CellAgentError::TenantMask {}: Cell {} has no tenant mask", func_name, cell_id)]
