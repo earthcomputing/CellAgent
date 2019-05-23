@@ -1348,48 +1348,6 @@ typedef struct entl_device {
 
 #endif
 
-// ref: <ec_user_api.h>, e1000e-3.3.4/src/entl_device.c
-int adapt_get_state(struct net_device *e1000e, ec_state_t *state) {
-    if (state == NULL) return -1;
-
-    // ref: e1000e-3.3.4/src/e1000.h
-    struct e1000_adapter *adapter = netdev_priv(e1000e);
-    // ECNL_INFO("net_device: \"%s\", adapter: %p", e1000e->name, adapter);
-    if (adapter == NULL) return -1;
-
-    entl_device_t *entl_dev = &adapter->entl_dev;
-    // ECNL_INFO("entl_dev: %p", entl_dev);
-    if (entl_dev == NULL) return -1;
-
-    ECNL_INFO("adapt_get_state e1000e \"%s\"", e1000e->name);
-    ECNL_INFO("  entl_dev->edev_name: \"%s\"", entl_dev->edev_name);
-    ECNL_INFO("  entl_dev->edev_queue_stopped: %d", entl_dev->edev_queue_stopped);
-
-    char *nic_name = adapter->netdev->name;
-    if (netif_carrier_ok(e1000e)) {
-        int link_speed = adapter->link_speed;
-        int link_duplex = adapter->link_duplex;
-        ECNL_INFO("\"%s\" NIC Link is Up %d Mbps %s Duplex", nic_name, link_speed, (link_duplex == FULL_DUPLEX) ? "Full" : "Half");
-    }
-    else {
-        ECNL_INFO("\"%s\" NIC Link is Down", nic_name);
-    }
-
-#if 0
-    // ref: add_link_state
-    state->ecs_link_state = link_state;
-    state->ecs_s_count = s_count;
-    state->ecs_r_count = r_count;
-    state->ecs_recover_count = recover_count;
-    state->ecs_recovered_count = recovered_count;
-    state->ecs_entt_count = entt_count;
-    state->ecs_aop_count = aop_count;
-    state->ecs_num_queued = num_queued;
-    // FIXME: update_time, interval_time, max_interval_time, min_interval_time
-#endif
-    return 0;
-}
-
 typedef struct {
     int index;
     unsigned char *name;
