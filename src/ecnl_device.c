@@ -116,7 +116,10 @@ static struct genl_family nl_ecnd_fam = {
 #define GENLMSG_DATA(nh) ((void *) (((char *) nlmsg_data(nh)) + GENL_HDRLEN))
 #define NLA_DATA(na) ((void *) (((char *) (na)) + NLA_HDRLEN))
 
+// each call to printk() begins a new line unless KERN_CONT is used
 #define PRINTIT printk
+
+// on the user side, prefer: env NLCB=debug
 static void dump_skbuff(void *user_hdr) {
     struct nlmsghdr *nh = genlmsg_nlhdr(user_hdr, &nl_ecnd_fam);
     struct genlmsghdr *gh = nlmsg_data(nh);
