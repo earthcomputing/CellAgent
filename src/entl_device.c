@@ -1108,17 +1108,67 @@ static void entl_e1000_configure_rx(struct e1000_adapter *adapter)
 
 // ENTL - ECNL linkage
 
-static int adapt_validate(struct net_device *dev, int magic) { return 1; }
-static netdev_tx_t adapt_start_xmit(struct sk_buff *skb, struct net_device *e1000e) { return NETDEV_TX_BUSY; }
-static int adapt_send_AIT(struct sk_buff *skb, struct net_device *e1000e) { return -1; }
-static int adapt_retrieve_AIT(struct net_device *e1000e, ec_ait_data_t *data) { return -1; }
-static int adapt_write_reg(struct net_device *e1000e, ec_alo_reg_t *reg) { return -1; }
-static int adapt_read_regset(struct net_device *e1000e, ec_alo_regs_t *regs) { return -1; }
-
-
 #define ADAPT_INFO(fmt, args...) printk(KERN_INFO "ADAPT: " fmt "\n", ## args)
 
-int adapt_get_state(struct net_device *e1000e, ec_state_t *state) {
+// minimal i/f compatibility
+static int adapt_validate(struct net_device *e1000e, int magic) {
+    ADAPT_INFO("adapt_validate e1000e \"%s\"", e1000e->name);
+
+    struct e1000_adapter *adapter = netdev_priv(e1000e);
+    if (adapter == NULL) return -1;
+    entl_device_t *entl_dev = &adapter->entl_dev;
+    if (entl_dev == NULL) return -1;
+    entl_state_machine_t *stm = &entl_dev->edev_stm;
+    if (stm == NULL) return -1;
+
+    return (magic == ENCL_ENTL_MAGIC) ? 1 : -1; // ENCL_ENTL_MAGIC 0x5affdead
+}
+
+static netdev_tx_t adapt_start_xmit(struct sk_buff *skb, struct net_device *e1000e) {
+    ADAPT_INFO("adapt_start_xmit e1000e \"%s\"", e1000e->name);
+    if (skb == NULL) return -1;
+
+    return NETDEV_TX_BUSY;
+}
+
+static int adapt_send_AIT(struct sk_buff *skb, struct net_device *e1000e) {
+    ADAPT_INFO("adapt_send_AIT e1000e \"%s\"", e1000e->name);
+    if (skb == NULL) return -1;
+
+    struct e1000_adapter *adapter = netdev_priv(e1000e);
+    if (adapter == NULL) return -1;
+    entl_device_t *entl_dev = &adapter->entl_dev;
+    if (entl_dev == NULL) return -1;
+    entl_state_machine_t *stm = &entl_dev->edev_stm;
+    if (stm == NULL) return -1;
+
+    return 0;
+}
+
+static int adapt_retrieve_AIT(struct net_device *e1000e, ec_ait_data_t *data) {
+    ADAPT_INFO("adapt_retrieve_AIT e1000e \"%s\"", e1000e->name);
+    if (data == NULL) return -1;
+
+    return 0;
+}
+
+static int adapt_write_reg(struct net_device *e1000e, ec_alo_reg_t *reg) {
+    ADAPT_INFO("adapt_write_reg e1000e \"%s\"", e1000e->name);
+    if (reg == NULL) return -1;
+
+    return 0;
+}
+
+static int adapt_read_regset(struct net_device *e1000e, ec_alo_regs_t *regs) {
+    ADAPT_INFO("adapt_read_regset e1000e \"%s\"", e1000e->name);
+    if (regs == NULL) return -1;
+
+    return 0;
+}
+
+static int adapt_get_state(struct net_device *e1000e, ec_state_t *state) {
+    ADAPT_INFO("adapt_get_state e1000e \"%s\"", e1000e->name);
+
     if (state == NULL) return -1;
 
     // ref: e1000e-3.3.4/src/e1000.h
@@ -1130,7 +1180,6 @@ int adapt_get_state(struct net_device *e1000e, ec_state_t *state) {
     // ADAPT_INFO("entl_dev: %p", entl_dev);
     if (entl_dev == NULL) return -1;
 
-    ADAPT_INFO("adapt_get_state e1000e \"%s\"", e1000e->name);
     ADAPT_INFO("  entl_dev->edev_name: \"%s\"", entl_dev->edev_name);
     ADAPT_INFO("  entl_dev->edev_queue_stopped: %d", entl_dev->edev_queue_stopped);
 
@@ -1143,6 +1192,9 @@ int adapt_get_state(struct net_device *e1000e, ec_state_t *state) {
     else {
         ADAPT_INFO("\"%s\" NIC Link is Down", nic_name);
     }
+
+    entl_state_machine_t *stm = &entl_dev->edev_stm;
+    if (stm == NULL) return -1;
 
 #if 0
     // ref: add_link_state
@@ -1158,4 +1210,3 @@ int adapt_get_state(struct net_device *e1000e, ec_state_t *state) {
 #endif
     return 0;
 }
-
