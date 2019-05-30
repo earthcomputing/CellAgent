@@ -1,4 +1,5 @@
 use std::{fmt, thread};
+use std::collections::HashSet;
 
 //use reqwest::Client::*;
 
@@ -7,11 +8,12 @@ use crate::app_message::{AppMsgDirection, AppInterapplicationMsg, AppMessage};
 use crate::config::{ByteArray, CONTINUE_ON_ERROR, TRACE_OPTIONS};
 use crate::dal::{add_to_trace, fork_trace_header, update_trace_header};
 use crate::name::{ContainerID, UptreeID};
+use crate::noc::{NOC_CONTROL_TREE_NAME, NOC_LISTEN_TREE_NAME};
 use crate::uptree_spec::{AllowedTree};
 use crate::utility::{S, write_err, TraceHeader, TraceHeaderParams, TraceType};
 
-pub const NOCMASTER: &str ="NocMaster";
-pub const NOCAGENT: &str = "NocAgent";
+const NOC_MASTER: &str ="NocMaster";
+const NOC_AGENT: &str = "NocAgent";
 
 #[derive(Debug, Clone)]
 pub enum Service {
@@ -19,18 +21,18 @@ pub enum Service {
     NocAgent { service: NocAgent }
 }
 impl Service {
-    pub fn new(container_id: ContainerID, service_name: &str, allowed_trees: &[AllowedTree],
+    pub fn new(container_id: ContainerID, service_name: &str, allowed_trees: &HashSet<AllowedTree>,
             container_to_vm: ContainerToVm) -> Result<Service, ServiceError> {
         match service_name {
-            NOCMASTER => Ok(Service::NocMaster { service: NocMaster::new(container_id, NOCMASTER, container_to_vm, allowed_trees) }),
-            NOCAGENT => Ok(Service::NocAgent { service: NocAgent::new(container_id, NOCAGENT, container_to_vm, allowed_trees) }),
+            NOC_MASTER => Ok(Service::NocMaster { service: NocMaster::new(container_id, NOC_MASTER, container_to_vm, allowed_trees) }),
+            NOC_AGENT => Ok(Service::NocAgent { service: NocAgent::new(container_id, NOC_AGENT, container_to_vm, allowed_trees) }),
             _ => Err(ServiceError::NoSuchService { func_name: "create_service", service_name: S(service_name) })
         }
     }
     pub fn initialize(&self, up_tree_id: UptreeID, container_from_vm: ContainerFromVm) -> Result<(), Error> {
-        match *self {
-            Service::NocMaster { ref service } => service.initialize(up_tree_id, container_from_vm),
-            Service::NocAgent  { ref service } => service.initialize(up_tree_id, container_from_vm)
+        match self {
+            Service::NocMaster { service } => service.initialize(up_tree_id, container_from_vm),
+            Service::NocAgent  { service  } => service.initialize(up_tree_id, container_from_vm)
         }
     }
 }
@@ -47,25 +49,25 @@ pub struct NocMaster {
     container_id: ContainerID,
     name: String,
     container_to_vm: ContainerToVm,
-    allowed_trees: Vec<AllowedTree>
+    allowed_trees: HashSet<AllowedTree>
 }
 impl NocMaster {
     pub fn get_name(&self) -> &str { &self.name }
     //pub fn get_id(&self) -> &ContainerID { &self.container_id }
     pub fn new(container_id: ContainerID, name: &str, container_to_vm: ContainerToVm,
-               allowed_trees: &[AllowedTree]) -> NocMaster {
+               allowed_trees: &HashSet<AllowedTree>) -> NocMaster {
         NocMaster { container_id, name: S(name), container_to_vm,
             allowed_trees: allowed_trees.to_owned() }
     }
     //fn get_container_id(&self) -> &ContainerID { &self.container_id }
-    pub fn initialize(&self, _: UptreeID, container_from_vm: ContainerFromVm) -> Result<(), Error> {
+    pub fn initialize(&self, _up_tree_id: UptreeID, container_from_vm: ContainerFromVm) -> Result<(), Error> {
         let _f = "initialize";
         println!("Service {} running NocMaster", self.container_id);
         self.listen_vm(container_from_vm)?;
+        let base_tree = AllowedTree::new(NOC_CONTROL_TREE_NAME);
         let body = "Hello From Master";
-        let target_tree = self.allowed_trees.get(0).unwrap();
         let app_msg = AppInterapplicationMsg::new(&self.get_name(),
-            false, target_tree, AppMsgDirection::Leafward, &Vec::new(), body);
+            false, &base_tree, AppMsgDirection::Leafward, &Vec::new(), body);
         let serialized = serde_json::to_string(&app_msg as &dyn AppMessage)?;
         let bytes:ByteArray = ByteArray::new(&serialized);
         {
@@ -136,12 +138,12 @@ pub struct NocAgent {
     container_id: ContainerID,
     name: String,
     container_to_vm: ContainerToVm,
-    allowed_trees: Vec<AllowedTree>
+    allowed_trees: HashSet<AllowedTree>
 }
 impl NocAgent {
     pub fn get_name(&self) -> &str { &self.name }
     pub fn new(container_id: ContainerID, name: &str, container_to_vm: ContainerToVm,
-            allowed_trees: &[AllowedTree]) -> NocAgent {
+            allowed_trees: &HashSet<AllowedTree>) -> NocAgent {
         NocAgent { container_id, name: S(name), container_to_vm,
             allowed_trees: allowed_trees.to_owned() }
     }
@@ -190,7 +192,7 @@ impl NocAgent {
             let body = app_msg.get_payload();
             println!("NocAgent on container {} got msg {}", self.container_id, body);
             let msg = format!("Reply from {}", self.container_id);
-            let target_tree = AllowedTree::new("NocAgentMaster");
+            let target_tree = AllowedTree::new(NOC_LISTEN_TREE_NAME);
             let reply = AppInterapplicationMsg::new(self.get_name(),
                 false, &target_tree, AppMsgDirection::Rootward,
                                                     &vec![], &msg);
