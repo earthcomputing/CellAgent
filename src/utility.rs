@@ -242,8 +242,13 @@ pub fn _print_hash_set<T: fmt::Display + Eq + std::hash::Hash>(hashset: &HashSet
 pub fn _print_hash_map<K: fmt::Display + Eq + std::hash::Hash, T: fmt::Display + Eq + std::hash::Hash>(hashmap: &HashMap<K, T>) {
     for (k, v) in hashmap.iter() { println!("{}: {}", k, v); }
 }
-pub fn new_hash_set<T: Clone + Eq + std::hash::Hash>(values: &[T]) -> HashSet<T> {
+pub fn new_hashset<T: Clone + Eq + std::hash::Hash>(values: &[T]) -> HashSet<T> {
     values.iter().cloned().collect::<HashSet<T>>()
+}
+pub fn vec_from_hashset<T: Clone + Eq + std::hash::Hash>(values: &HashSet<T>) -> Vec<T> {
+    let mut vec = Vec::new();
+    for item in values.into_iter() { vec.push(item.clone()); }
+    vec
 }
 pub fn write_err(caller: &str, e: &Error) {
     use ::std::io::Write;

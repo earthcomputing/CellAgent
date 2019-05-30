@@ -23,7 +23,7 @@ impl VirtualMachine {
         VirtualMachine { id: id.clone(), vm_to_ca, allowed_trees: allowed_trees_ref.to_owned(),
             vm_to_containers: Vec::new() }
     }
-    pub fn initialize(&mut self, up_tree_name: &str, vm_from_ca: VmFromCa, _: &HashSet<AllowedTree>,
+    pub fn initialize(&mut self, up_tree_name: &str, vm_from_ca: VmFromCa, allowed_trees: &HashSet<AllowedTree>,
             container_specs: &[ContainerSpec]) -> Result<(), Error> {
         //println!("VM {} initializing", self.id);
         let up_tree_id = UptreeID::new(up_tree_name).context(VmError::Chain { func_name: "initialize", comment: S(self.id.get_name()) + " up tree id"})?;
@@ -33,7 +33,7 @@ impl VirtualMachine {
             let name = format!("Container:{}+{}", self.id, container_specs.len() + 1);
             let container_id = ContainerID::new(&name).context(VmError::Chain { func_name: "initialize", comment: S(self.id.get_name())})?;
             let service_name = container_spec.get_image();
-            let container = Container::new(container_id, service_name.as_str(), &self.allowed_trees,
+            let container = Container::new(container_id, service_name.as_str(), allowed_trees,
                  container_to_vm).context(VmError::Chain { func_name: "initialize", comment: S("")})?;
             container.initialize(up_tree_id, container_from_vm).context(VmError::Chain { func_name: "initialize", comment: S(self.id.get_name())})?;
             self.vm_to_containers.push(vm_to_container);
