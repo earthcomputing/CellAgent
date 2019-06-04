@@ -175,6 +175,7 @@ impl CellAgent {
     pub fn get_cell_id(&self) -> CellID { self.cell_id }
     pub fn get_connected_tree_id(&self) -> TreeID { self. connected_tree_id }
     pub fn _get_control_tree_id(&self) -> TreeID { self.control_tree_id }
+    fn get_no_neighbors(&self) -> usize { self.neighbors.len() }
 //    pub fn get_cell_info(&self) -> CellInfo { self.cell_info }
 //    pub fn get_tree_name_map(&self) -> &TreeNameMap { &self.tree_name_map }
     fn get_vm_senders(&self, tree_id: TreeID) -> Result<Vec<CaToVm>, Error> {
@@ -808,8 +809,8 @@ impl CellAgent {
         let tree_id = port_tree_id.to_tree_id();
         let count = self.discover_d_count.entry(tree_id).or_insert(0);
         *count += 1;
-        if *count >= self.neighbors.len() && tree_id != self.my_tree_id {
-            println!("Cellagent {}: {} count {} neighbors {}", self.cell_id, _f, count, self.neighbors.len());
+        if *count >= self.neighbors.len() {
+            //println!("Cellagent {}: {} count {} neighbors {} tree {}", self.cell_id, _f, count, self.neighbors.len(), tree_id);
         }
         let discover_type = msg.get_discover_type();
         if discover_type == DiscoverDType::Subsequent {
@@ -831,17 +832,16 @@ impl CellAgent {
         eqns.insert(GvmEqn::Xtnd("false"));
         eqns.insert(GvmEqn::Save("false"));
         let gvm_eqn = GvmEquation::new(&eqns, &Vec::new());
-        let _ = self.update_traph(port_tree_id, port_number, port_state, &gvm_eqn,
-                                  children, PathLength(CellQty(0)), path)?;
         {
             if DEBUG_OPTIONS.all || DEBUG_OPTIONS.discoverd {
                 let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "ca_process_discover_d_msg" };
-                let trace = json!({ "cell_id": &self.cell_id, "port_tree_id": port_tree_id, "port_no": port_no, "msg": msg.value() });
+                let trace = json!({ "cell_id": &self.cell_id, "port_tree_id": port_tree_id, "# Hello": *count,
+                    "# neighbors": self.get_no_neighbors(), "port_no": port_no, "msg": msg.value() });
                 let _ = add_to_trace(TraceType::Debug, trace_params, &trace, _f);
-                println!("Cellagent {}: {} port_tree_id {}, add child on port {} {}", self.cell_id, _f, port_tree_id, port_number, msg);
-                println!("Cellagent {}: {} send unblock", self.cell_id, _f);
             }
         }
+        let _ = self.update_traph(port_tree_id, port_number, port_state, &gvm_eqn,
+                                  children, PathLength(CellQty(0)), path)?;
         Ok(())
     }
     pub fn process_failover_msg(&mut self, msg: &FailoverMsg, port_no: PortNo) -> Result<(), Error> {
@@ -959,7 +959,18 @@ impl CellAgent {
         let payload = msg.get_payload();
         let neighbor_cell_id = payload.get_cell_id();
         let neigbor_port_no = payload.get_port_no();
+        let port_number = port_no.make_port_number(self.no_ports)?;
         self.neighbors.insert(port_no, (neighbor_cell_id, *neigbor_port_no));
+        let sender_id = SenderID::new(self.cell_id, "CellAgent")?;
+        let user_mask = Mask::new(port_number);
+        let path = Path::new(port_no, self.no_ports)?;
+        let hops = PathLength(CellQty(1));
+        let my_port_tree_id = self.my_tree_id.to_port_tree_id(port_number);
+        self.update_base_tree_map(my_port_tree_id, self.my_tree_id);
+        let discover_msg = DiscoverMsg::new(sender_id, my_port_tree_id,
+                                            self.cell_id, hops, path);
+        self.send_msg(self.connected_tree_id, &discover_msg, user_mask).context(CellagentError::Chain { func_name: _f, comment: S(self.cell_id) })?;
+        self.forward_discover(user_mask).context(CellagentError::Chain { func_name: _f, comment: S(self.cell_id) })?;
         {
             if DEBUG_OPTIONS.all || DEBUG_OPTIONS.process_msg {   // Debug
                 let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "ca_process_hello_msg" };
@@ -1192,7 +1203,7 @@ impl CellAgent {
         let direction = app_msg.get_direction().into();
         let tree_id = self.tree_from_name(sender_id, target_tree_name)?;
         let port_tree_id = tree_id.to_port_tree_id_0();
-        if !self.may_send(port_tree_id)? { return Err(CellagentError::MayNotSend { func_name: _f, cell_id: self.cell_id, tree_id: tree_id }.into()); }
+        if !self.may_send(port_tree_id)? { return Err(CellagentError::MayNotSend { func_name: _f, cell_id: self.cell_id, tree_id }.into()); }
         let msg = InterapplicationMsg::new(sender_id, false, tree_id,
                                            direction, &tree_map, app_msg);
         {
