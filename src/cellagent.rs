@@ -80,6 +80,7 @@ pub struct CellAgent {
     up_tree_senders: HashMap<UptreeID, HashMap<String,TreeID>>,
     up_traphs_clist: HashMap<TreeID, TreeID>,
     neighbors: HashMap<PortNo, (CellID, PortNo)>,
+    discover_d_count: HashMap<TreeID, usize>,
     failover_reply_ports: HashMap<PortTreeID, PortNo>,
     no_packets: [NumberOfPackets; MAX_NUM_PHYS_PORTS_PER_CELL.0 as usize],
     child_ports: HashMap<TreeID, HashSet<PortNo>>,
@@ -105,7 +106,7 @@ impl CellAgent {
             tree_name_map: Arc::new(Mutex::new(HashMap::new())),
             border_port_tree_id_map: HashMap::new(),
             saved_discover: Vec::new(),
-            my_entry, base_tree_map, neighbors: HashMap::new(),
+            my_entry, base_tree_map, neighbors: HashMap::new(), discover_d_count: HashMap::new(),
             connected_tree_entry: RoutingTableEntry::default(),
             tenant_masks, up_tree_senders: HashMap::new(), cell_info: CellInfo::new(),
             up_traphs_clist: HashMap::new(), ca_to_cm, failover_reply_ports: HashMap::new(),
@@ -803,11 +804,16 @@ impl CellAgent {
     pub fn process_discover_d_msg(&mut self, msg: &DiscoverDMsg, port_no: PortNo)
                                   -> Result<(), Error> {
         let _f = "process_discoverd_msg";
-        let payload = msg.get_payload();
-        let base_port_tree_id = payload.get_port_tree_id();
-        let discover_type = payload.get_discover_type();
+        let port_tree_id = msg.get_port_tree_id();
+        let tree_id = port_tree_id.to_tree_id();
+        let count = self.discover_d_count.entry(tree_id).or_insert(0);
+        *count += 1;
+        if *count >= self.neighbors.len() && tree_id != self.my_tree_id {
+            println!("Cellagent {}: {} count {} neighbors {}", self.cell_id, _f, count, self.neighbors.len());
+        }
+        let discover_type = msg.get_discover_type();
         if discover_type == DiscoverDType::Subsequent {
-            let traph = self.get_traph_mut(base_port_tree_id)?;
+            let traph = self.get_traph_mut(port_tree_id)?;
             let element = traph.get_element_mut(port_no)?;
             element.set_connected();
             if element.is_state(PortState::Unknown) {
@@ -815,7 +821,7 @@ impl CellAgent {
             }
             return Ok(());
         }
-        let path = payload.get_path();
+        let path = msg.get_path();
         let port_number = port_no.make_port_number(self.no_ports)?;
         let children = [port_number].iter().cloned().collect::<HashSet<_>>();
         let port_state = PortState::Child;
@@ -825,14 +831,14 @@ impl CellAgent {
         eqns.insert(GvmEqn::Xtnd("false"));
         eqns.insert(GvmEqn::Save("false"));
         let gvm_eqn = GvmEquation::new(&eqns, &Vec::new());
-        let _ = self.update_traph(base_port_tree_id, port_number, port_state, &gvm_eqn,
+        let _ = self.update_traph(port_tree_id, port_number, port_state, &gvm_eqn,
                                   children, PathLength(CellQty(0)), path)?;
         {
             if DEBUG_OPTIONS.all || DEBUG_OPTIONS.discoverd {
                 let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "ca_process_discover_d_msg" };
-                let trace = json!({ "cell_id": &self.cell_id, "port_tree_id": base_port_tree_id, "port_no": port_no, "msg": msg.value() });
+                let trace = json!({ "cell_id": &self.cell_id, "port_tree_id": port_tree_id, "port_no": port_no, "msg": msg.value() });
                 let _ = add_to_trace(TraceType::Debug, trace_params, &trace, _f);
-                println!("Cellagent {}: {} port_tree_id {}, add child on port {} {}", self.cell_id, _f, base_port_tree_id, port_number, msg);
+                println!("Cellagent {}: {} port_tree_id {}, add child on port {} {}", self.cell_id, _f, port_tree_id, port_number, msg);
                 println!("Cellagent {}: {} send unblock", self.cell_id, _f);
             }
         }

@@ -283,6 +283,10 @@ impl DiscoverDMsg {
         DiscoverDMsg { header, payload }
     }
     pub fn get_payload(&self) -> &DiscoverDPayload { &self.payload }
+    pub fn get_in_reply_to(&self) -> SenderMsgSeqNo { self.payload.get_in_reply_to() }
+    pub fn get_port_tree_id(&self) -> PortTreeID { self.payload.get_port_tree_id() }
+    pub fn get_path(&self) -> Path { self.payload.get_path() }
+    pub fn get_discover_type(&self) -> DiscoverDType { self.payload.get_discover_type() }
 }
 #[typetag::serde]
 impl Message for DiscoverDMsg {
@@ -320,9 +324,10 @@ impl DiscoverDPayload {
         DiscoverDPayload { in_reply_to, sending_cell_id: sending_cell_id.clone(), port_tree_id: port_tree_id.clone(),
             path, root_port_no, discover_type }
     }
-    pub fn get_port_tree_id(&self) -> PortTreeID { self.port_tree_id }
-    pub fn get_path(&self) -> Path { self.path }
-    pub fn get_discover_type(&self) -> DiscoverDType { self.discover_type }
+    fn get_in_reply_to(&self) -> SenderMsgSeqNo { self.in_reply_to }
+    fn get_port_tree_id(&self) -> PortTreeID { self.port_tree_id }
+    fn get_path(&self) -> Path { self.path }
+    fn get_discover_type(&self) -> DiscoverDType { self.discover_type }
 }
 #[typetag::serde]
 impl MsgPayload for DiscoverDPayload {}
