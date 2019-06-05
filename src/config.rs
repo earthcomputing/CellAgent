@@ -17,7 +17,6 @@ pub const PACKET_MIN: usize = 64;
 pub const PACKET_MAX: usize = 9000;
 // Control
 pub const CONTINUE_ON_ERROR: bool = false; // Don't close channel following an error if true
-pub const RACE_SLEEP: u64 = 4; // Set to 4 (better is 6) to avoid race condition, 2 if you want to see it
 pub const AUTO_BREAK: Option<Edge> = (None, Some(Edge(CellNo(1), CellNo(2)))).0;// Use .1 to auto break link
 #[derive(Debug, Copy, Clone, Hash, Serialize, Deserialize)]
 pub enum CellConfig { Small, Medium, Large }
@@ -193,7 +192,7 @@ impl fmt::Display for PortNo {
         write!(f, "P:{}", self.0)
     }
 }
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, Eq, PartialEq)]
 pub enum CellType {
     Border,
     Interior

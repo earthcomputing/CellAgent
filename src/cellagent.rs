@@ -80,6 +80,7 @@ pub struct CellAgent {
     up_tree_senders: HashMap<UptreeID, HashMap<String,TreeID>>,
     up_traphs_clist: HashMap<TreeID, TreeID>,
     neighbors: HashMap<PortNo, (CellID, PortNo)>,
+    sent_to_noc: bool,
     discover_d_count: HashMap<TreeID, usize>,
     failover_reply_ports: HashMap<PortTreeID, PortNo>,
     no_packets: [NumberOfPackets; MAX_NUM_PHYS_PORTS_PER_CELL.0 as usize],
@@ -104,10 +105,9 @@ impl CellAgent {
             vm_id_no: 0, tree_id_map: HashMap::new(), tree_map: HashMap::new(),
             name_tree_map: Arc::new(Mutex::new(HashMap::new())),
             tree_name_map: Arc::new(Mutex::new(HashMap::new())),
-            border_port_tree_id_map: HashMap::new(),
-            saved_discover: Vec::new(),
+            border_port_tree_id_map: HashMap::new(), saved_discover: Vec::new(),
             my_entry, base_tree_map, neighbors: HashMap::new(), discover_d_count: HashMap::new(),
-            connected_tree_entry: RoutingTableEntry::default(),
+            connected_tree_entry: RoutingTableEntry::default(), sent_to_noc: false,
             tenant_masks, up_tree_senders: HashMap::new(), cell_info: CellInfo::new(),
             up_traphs_clist: HashMap::new(), ca_to_cm, failover_reply_ports: HashMap::new(),
             no_packets: [NumberOfPackets::new(); MAX_NUM_PHYS_PORTS_PER_CELL.0 as usize],
@@ -175,6 +175,7 @@ impl CellAgent {
     pub fn get_cell_id(&self) -> CellID { self.cell_id }
     pub fn get_connected_tree_id(&self) -> TreeID { self. connected_tree_id }
     pub fn _get_control_tree_id(&self) -> TreeID { self.control_tree_id }
+    fn is_border(&self) -> bool { self.cell_type == CellType::Border }
     fn get_no_neighbors(&self) -> usize { self.neighbors.len() }
 //    pub fn get_cell_info(&self) -> CellInfo { self.cell_info }
 //    pub fn get_tree_name_map(&self) -> &TreeNameMap { &self.tree_name_map }
@@ -853,6 +854,19 @@ impl CellAgent {
         }
         let _ = self.update_traph(port_tree_id, port_number, port_state, &gvm_eqn,
                                   children, PathLength(CellQty(0)), path)?;
+        if tree_id == self.my_tree_id &&
+           !self.sent_to_noc          &&
+           self.is_border()           &&
+           count >= self.neighbors.len() {
+            // TODO: Make sure first mover always gets access to Base tree
+            // Send the tree_name message to each border port
+            let base_tree_name = AllowedTree::new("Base");
+            for port_number in self.border_port_tree_id_map.keys() {
+                println!("Border cell {} sending AppTreeNameMsg to NOC on port {}", self.cell_id, port_number);
+                self.send_tree_name_msg(port_number.get_port_no(), &base_tree_name)?;
+            }
+            self.sent_to_noc = true;
+        }
         Ok(())
     }
     pub fn process_failover_msg(&mut self, msg: &FailoverMsg, port_no: PortNo) -> Result<(), Error> {
@@ -1317,6 +1331,23 @@ impl CellAgent {
         self.send_msg(outside_tree_id.get_uuid(), &packets, port_no_mask);
     }
     */
+    fn send_tree_name_msg(&self, port_no: PortNo, base_tree_name: &AllowedTree) -> Result<(), Error> {
+        let _f = "send_tree_name_msg";
+        let tree_name_msg = AppTreeNameMsg::new("cell_agent",
+                                                base_tree_name, base_tree_name);
+        let serialized = serde_json::to_string(&tree_name_msg as &dyn AppMessage).context(CellagentError::Chain { func_name: "port_connected", comment: S(self.cell_id) })?;
+        let bytes = ByteArray::new(&serialized);
+        {
+            if TRACE_OPTIONS.all || TRACE_OPTIONS.ca {
+                let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "ca_to_noc_tree_name" };
+                let trace = json!({ "cell_id": &self.cell_id, "port": port_no, "app_msg": tree_name_msg });
+                let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
+            }
+        }
+        let port_number = port_no.make_port_number(self.no_ports)?;
+        self.ca_to_cm.send(CaToCmBytes::App((port_number, bytes)))?;
+        Ok(())
+    }
     fn port_connected(&mut self, port_no: PortNo, is_border: bool) -> Result<(), Error> {
         let _f = "port_connected";
         {
@@ -1339,23 +1370,12 @@ impl CellAgent {
             self.tree_id_map.insert(new_tree_id.get_uuid(), new_tree_id.to_port_tree_id_0());
             let _ = self.update_traph(new_tree_id.to_port_tree_id(port_number), port_number, PortState::Parent,
                                       &gvm_eqn, HashSet::new(), PathLength(CellQty(1)), Path::new0(), ).context(CellagentError::Chain { func_name: "port_connected", comment: S(self.cell_id) })?;
-            let base_tree = AllowedTree::new("Base");
+            let base_tree_name = AllowedTree::new("Base");
             let my_tree_id = self.my_tree_id;
             let sender_id = SenderID::new(self.cell_id, &format!("BorderPort+{}", *port_no))?;
-            self.add_tree_name_map_item(sender_id,&base_tree, my_tree_id);
+            self.add_tree_name_map_item(sender_id,&base_tree_name, my_tree_id);
             self.border_port_tree_id_map.insert(port_number, (sender_id, new_tree_id));
-            let tree_name_msg = AppTreeNameMsg::new("noc",
-                             &base_tree, &base_tree);
-            let serialized = serde_json::to_string(&tree_name_msg as &dyn AppMessage).context(CellagentError::Chain { func_name: "port_connected", comment: S(self.cell_id) })?;
-            let bytes = ByteArray::new(&serialized);
-            {
-                if TRACE_OPTIONS.all || TRACE_OPTIONS.ca {
-                    let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "ca_to_noc_tree_name" };
-                    let trace = json!({ "cell_id": &self.cell_id, "port": port_no, "app_msg": tree_name_msg });
-                    let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
-                }
-            }
-            self.ca_to_cm.send(CaToCmBytes::App((port_number, bytes)))?;
+            // TODO: Send TreeNameMsg for "Base" to Noc if port is connected after Discover finishes
             Ok(())
         } else {
             let sender_id = SenderID::new(self.cell_id, "CellAgent")?;
