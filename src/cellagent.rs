@@ -10,7 +10,8 @@ use crate::app_message::{AppMsgDirection, AppMessage, AppMsgType,
                          AppDeleteTreeMsg, AppInterapplicationMsg, AppManifestMsg,
                          AppQueryMsg, AppStackTreeMsg, AppTreeNameMsg};
 use crate::app_message_formats::{CaToVm, VmFromCa, VmToCa, CaFromVm};
-use crate::config::{CONNECTED_PORTS_TREE_NAME, CONTINUE_ON_ERROR, CONTROL_TREE_NAME, DEBUG_OPTIONS,
+use crate::config::{CONNECTED_PORTS_TREE_NAME, CONTINUE_ON_ERROR, CONTROL_TREE_NAME,
+                    DISCOVER_QUIESCE_FACTOR, DEBUG_OPTIONS,
                     QUENCH, MAX_NUM_PHYS_PORTS_PER_CELL, TRACE_OPTIONS,
                     ByteArray, CellQty, CellType, CellConfig, CellInfo, Quench, PathLength, PortNo,
                     PortQty};
@@ -203,6 +204,10 @@ impl CellAgent {
         let tree = traph.get_tree(&tree_uuid)?;
         let gvm_eqn = tree.get_gvm_eqn().clone();
         Ok(gvm_eqn.clone())
+    }
+    fn is_discover_done(&self, tree_id: &TreeID) -> bool {
+        let count = self.discover_d_count.get(tree_id).or(Some(&0)).unwrap();
+        *count >= DISCOVER_QUIESCE_FACTOR * self.neighbors.len()
     }
     fn get_saved_discover(&self) -> &Vec<SavedDiscover> { &self.saved_discover }
     fn add_saved_discover(&mut self, discover_msg: &SavedDiscover) {
@@ -857,7 +862,7 @@ impl CellAgent {
         if tree_id == self.my_tree_id &&
            !self.sent_to_noc          &&
            self.is_border()           &&
-           count >= self.neighbors.len() {
+           self.is_discover_done(&tree_id) {
             // TODO: Make sure first mover always gets access to Base tree
             // Send the tree_name message to each border port
             let base_tree_name = AllowedTree::new("Base");
