@@ -4,12 +4,13 @@ use std::{fmt,
           sync::{atomic::AtomicBool, Arc, atomic::Ordering::SeqCst}};
 
 use crate::app_message_formats::{PortToNoc, PortFromNoc};
-use crate::config::{ByteArray, CONTINUE_ON_ERROR, TRACE_OPTIONS, PortNo};
+use crate::config::{CONTINUE_ON_ERROR, TRACE_OPTIONS};
 use crate::dal::{add_to_trace, fork_trace_header, update_trace_header};
 use crate::ec_message_formats::{PortToLink, PortFromLink, PortToPe, PortFromPe, LinkToPortPacket,
                                 PortToPePacket, PeToPortPacket};
 use crate::name::{Name, PortID, CellID};
-use crate::utility::{PortNumber, S, write_err, TraceHeader, TraceHeaderParams, TraceType};
+use crate::utility::{ByteArray, PortNo, PortNumber, S, TraceHeader, TraceHeaderParams, TraceType,
+                     write_err};
 use crate::uuid_ec::AitState;
 
 // TODO: There is no distinction between a broken link and a disconnected one.  We may want to revisit.

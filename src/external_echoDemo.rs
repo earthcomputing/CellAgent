@@ -44,13 +44,13 @@ use std::{io::{stdin, stdout, Read, Write},
           sync::mpsc::channel};
 
 use crate::app_message_formats::{ApplicationFromNoc, ApplicationToNoc, NocFromApplication, NocToApplication};
-use crate::blueprint::{Blueprint, CellNo, is2e};
+use crate::blueprint::{Blueprint};
 use crate::config::{OUTPUT_FILE_NAME, QUENCH,
-                    CellQty, CellConfig, PortNo, PortQty};
+                    CellQty, PortQty};
 use crate::gvm_equation::{GvmEqn};
 use crate::noc::Noc;
 use crate::uptree_spec::{AllowedTree, ContainerSpec, Manifest, UpTreeSpec, VmSpec};
-use crate::utility::{_print_vec, S, TraceHeader};
+use crate::utility::{CellConfig, CellNo, PortNo, S, TraceHeader, is2e, _print_vec};
 
 fn main() -> Result<(), Error> {
     let _f = "main";

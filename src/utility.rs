@@ -1,5 +1,6 @@
 use std::{fmt,
           collections::{HashSet, HashMap},
+          ops::Deref,
           thread::ThreadId
 };
 
@@ -9,28 +10,10 @@ use serde_json::{Value};
 use lazy_static::lazy_static;
 use time;
 
-use crate::config::{MAX_NUM_PHYS_PORTS_PER_CELL, REPO, MaskValue, PortNo, PortQty};
+use crate::config::{MAX_NUM_PHYS_PORTS_PER_CELL, PAYLOAD_DEFAULT_ELEMENT, REPO,
+                    CellQty, MaskValue, PortQty};
+use crate::uuid_ec::Uuid;
 
-/*
-pub fn get_first_arg(a: Vec<String>) -> Option<i32> {
-    if a.len() != 2 {
-        None
-    } else {
-        match a[1].parse::<i32>() {
-            Ok(x) => Some(x),
-            Err(_) => None
-        }
-    }
-}
-pub fn chars_to_string(chars: &[char]) -> String {
-    let mut s = String::new();
-    for c in chars.iter() {
-        if *c == ' ' { break; }
-        s = s + &c.to_string();
-    }
-    s
-}
-*/
 pub const BASE_TENANT_MASK: Mask = Mask { mask: MaskValue(255) };   // All ports
 pub const DEFAULT_USER_MASK: Mask = Mask { mask: MaskValue(254) };  // All ports except port 0
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Hash, Serialize, Deserialize)]
@@ -80,6 +63,34 @@ impl Mask {
 impl fmt::Display for Mask {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, " {:016.b}", *self.mask)
+    }
+}
+#[derive(Debug, Copy, Clone, Hash, Eq, PartialEq, Ord, PartialOrd, Serialize, Deserialize)]
+pub struct PortNo(pub u8);
+impl PortNo {
+    pub fn make_port_number(self, no_ports: PortQty) -> Result<PortNumber, Error> {
+        Ok(PortNumber::new(self, no_ports)?)
+    }
+    pub fn as_usize(self) -> usize { self.0 as usize }
+}
+impl Deref for PortNo { type Target = u8; fn deref(&self) -> &Self::Target { &self.0 } }
+impl fmt::Display for PortNo {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "P:{}", self.0)
+    }
+}
+#[derive(Debug, Copy, Clone, Eq, PartialEq)]
+pub enum CellType {
+    Border,
+    Interior
+}
+impl fmt::Display for CellType {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let s = match *self {
+            CellType::Border   => "Border",
+            CellType::Interior => "Interior",
+        };
+        write!(f, "{}", s)
     }
 }
 #[derive(Debug, Copy, Clone, Hash, PartialEq, Eq, Serialize, Deserialize)]
@@ -233,6 +244,85 @@ impl fmt::Display for TraceType {
         })
     }
 }
+#[derive(Debug, Copy, Clone, Hash, Serialize, Deserialize)]
+pub enum CellConfig { Small, Medium, Large }
+impl fmt::Display for CellConfig {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let s = match *self {
+            CellConfig::Small  => "Small",
+            CellConfig::Medium => "Medium",
+            CellConfig::Large  => "Large"
+        };
+        write!(f, "{}", s)
+    }
+}
+#[derive(Debug, Copy, Clone, Serialize, Deserialize)]
+pub struct CellInfo {   // Any data the cell agent wants to expose to applications
+external_id: Uuid   // An externally visible identifier so applications can talk about individual cells
+}
+impl CellInfo {
+    pub fn new() -> CellInfo {
+        CellInfo { external_id: Uuid::new() }
+    }
+    pub fn get_external_id(&self) -> Uuid {
+        return self.external_id;
+    }
+}
+impl fmt::Display for CellInfo {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "External ID {}", self.external_id)
+    }
+}
+#[derive(Debug, Clone, Hash, Eq, PartialEq, Serialize, Deserialize)]
+pub struct ByteArray { bytes: Vec<u8> }
+impl ByteArray {
+    pub fn new(str_ref: &str) -> ByteArray {
+        ByteArray { bytes: S(str_ref).into_bytes() }
+    }
+    pub fn new_from_bytes(bytes: &Vec<u8>) -> ByteArray {
+        ByteArray { bytes: bytes.clone() }
+    }
+    pub fn get_bytes(&self) -> &Vec<u8> { &self.bytes }
+    pub fn to_string(&self) -> Result<String, Error> {
+        let string = std::str::from_utf8(&self.bytes)?;
+        let default_as_char = PAYLOAD_DEFAULT_ELEMENT as char;
+        Ok(string.replace(default_as_char, ""))
+    }
+}
+impl fmt::Display for ByteArray {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let bytes = std::str::from_utf8(&self.bytes).expect("ByteArray: Error converting bytes to str");
+        write!(f, "{}", bytes)
+    }
+}
+#[derive(Debug, Copy, Clone)]
+pub enum Quench { Simple, RootPort }
+impl fmt::Display for Quench {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Quench::Simple   => write!(f, "Simple"),
+            Quench::RootPort => write!(f, "RootPort")
+        }
+    }
+}
+#[derive(Debug, Copy, Clone, Hash, Eq, PartialEq, Serialize, Deserialize)]
+pub struct CellNo(pub usize);
+impl Deref for CellNo { type Target = usize; fn deref(&self) -> &Self::Target { &self.0 } }
+impl fmt::Display for CellNo {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "C:{}", self.0)
+    }
+}
+#[derive(Debug, Copy, Clone, Hash, Eq, PartialEq, Serialize, Deserialize)]
+pub struct Edge(pub CellNo, pub CellNo);
+impl fmt::Display for Edge {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "E: ({}, {})", *self.0, *self.1)
+    }
+}
+
+// Utility functions
+pub fn is2e(i: usize, j: usize) -> Edge { Edge(CellNo(i), CellNo(j)) }
 pub fn _print_vec<T: fmt::Display>(vector: &[T]) {
     for (count, v) in vector.iter().enumerate() { println!("{:3}: {}", count, v) }
 }
@@ -267,6 +357,34 @@ pub fn _string_to_object(string: &str) -> Result<Value, Error> {
     let _f = "_string_to_object";
     let v = serde_json::from_str(string).context(UtilityError::Chain { func_name: _f, comment: S("") })?;
     Ok(v)
+}
+// Used to get nice layouts in display - gives (row,col) for each cell
+pub fn get_geometry(num_cells: CellQty) -> (usize, usize, Vec<(usize, usize)>) {
+    let geometry = match num_cells {
+        CellQty(3)  => vec![(0,0), (0,2), (1,1)],
+        CellQty(4)  => vec![(0,0), (0,1), (1,0), (1,1)],
+        CellQty(10) => vec![(0,0), (0,1), (0,2), (0,3), (0,4),
+                            (1,0), (1,1), (1,2), (1,3), (1,4)],
+        CellQty(47) => vec![(0,2), (0,4), (0,5), (0,7), (0,9), (0,10),
+                            (1,0), (1,1), (1,2), (1,3), (1,4), (1,5), (1,7), (1,8), (1,9), (1,10),
+                            (2,0), (2,1), (2,2), (2,3), (2,4), (2,6), (2,7), (2,8), (2,9),
+                            (3,1), (3,2), (3,4), (3,5), (3,8), (3,9), (3,10),
+                            (4,0), (4,1), (4,2), (4,3), (4,4), (4,6), (4,7), (4,8), (4,9),
+                            (5,0), (5,1), (5,2), (5,3), (5,4), (5,6)],
+        _ => panic!("Invalid number of cells")
+    };
+    let max_x = geometry
+        .iter()
+        .max_by_key(|xy| xy.0)
+        .map(|xy| xy.0 +1)
+        .unwrap_or(0);
+    let max_y = geometry
+        .iter()
+        .max_by_key(|xy| xy.1)
+        .map(|xy| xy.1 + 1)
+        .unwrap_or(0);
+    if geometry.len() != *num_cells { panic!(format!("Topology has {} entries for {} cells", geometry.len(), *num_cells)) };
+    (max_x, max_y, geometry)
 }
 // There are so many places in my code where it's more convenient
 // to provide &str but I need String that I made the following

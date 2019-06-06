@@ -1,6 +1,6 @@
 use std::sync::mpsc;
 
-use crate::config::{ByteArray};
+use crate::utility::{ByteArray};
 
 pub type ISAIT = bool;
 pub type APP = ByteArray;

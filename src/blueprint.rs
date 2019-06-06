@@ -1,10 +1,10 @@
 use std::{fmt, fmt::Write,
           collections::{HashMap, HashSet},
           iter::FromIterator,
-          ops::{Deref},
 };
 
-use crate::config::{MAX_NUM_PHYS_PORTS_PER_CELL, MIN_NUM_BORDER_CELLS, CellQty, CellType, PortNo, PortQty};
+use crate::config::{MAX_NUM_PHYS_PORTS_PER_CELL, MIN_NUM_BORDER_CELLS, CellQty, PortQty};
+use crate::utility::{CellNo, CellType, Edge, PortNo};
 
 #[derive(Debug)]
 pub struct Blueprint {
@@ -186,24 +186,6 @@ impl fmt::Display for InteriorCell {
         write!(f, "{}", s)
     }
 }
-
-#[derive(Debug, Copy, Clone, Hash, Eq, PartialEq, Serialize, Deserialize)]
-pub struct CellNo(pub usize);
-impl Deref for CellNo { type Target = usize; fn deref(&self) -> &Self::Target { &self.0 } }
-impl fmt::Display for CellNo {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "C:{}", self.0)
-    }
-}
-#[derive(Debug, Copy, Clone, Hash, Eq, PartialEq, Serialize, Deserialize)]
-pub struct Edge(pub CellNo, pub CellNo);
-impl fmt::Display for Edge {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "E: ({}, {})", *self.0, *self.1)
-    }
-}
-pub fn is2e(i: usize, j: usize) -> Edge { Edge(CellNo(i), CellNo(j)) }
-
 
 // Errors
 #[derive(Debug, Fail)]

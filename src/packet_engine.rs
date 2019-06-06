@@ -3,9 +3,8 @@ use std::{fmt, fmt::Write,
           collections::{HashSet, VecDeque},
           thread};
 
-use crate::config::{CENTRAL_TREE, CONTINUE_ON_ERROR, DEBUG_OPTIONS,
-                    MAX_NUM_PHYS_PORTS_PER_CELL, TRACE_OPTIONS,
-                    PortNo};
+use crate::config::{CONTINUE_ON_ERROR, DEBUG_OPTIONS,
+                    MAX_NUM_PHYS_PORTS_PER_CELL, TRACE_OPTIONS};
 use crate::dal::{add_to_trace, fork_trace_header, update_trace_header};
 use crate::ec_message::{MsgType};
 use crate::ec_message_formats::{PeFromCm, PeToCm,
@@ -16,7 +15,7 @@ use crate::packet::Packet;
 use crate::port::PortStatus;
 use crate::routing_table::RoutingTable;
 use crate::routing_table_entry::{RoutingTableEntry};
-use crate::utility::{Mask, S, TraceHeader, TraceHeaderParams, TraceType, write_err};
+use crate::utility::{Mask, PortNo, S, TraceHeader, TraceHeaderParams, TraceType, write_err};
 use crate::uuid_ec::{AitState, Uuid};
 
 // I need one slot per port, but ports use 1-based indexing.  I could subtract 1 all the time,
@@ -568,7 +567,6 @@ impl PacketEngine {
                             let _ = add_to_trace(TraceType::Debug, trace_params, &trace, _f);
                             match msg_type {
                                 MsgType::Discover => (),
-                                MsgType::DiscoverD => if port_tree_id.is_name(CENTRAL_TREE) { println!("PacketEngine {}: got from {} {} {}", self.cell_id, *port_no, msg_type, port_tree_id); }
                                 _ => { println!("PacketEngine {}: got from {} {} {} {}", self.cell_id, *port_no, msg_type, port_tree_id, entry); },
                             }
                         }
@@ -653,7 +651,6 @@ impl PacketEngine {
                     if DEBUG_OPTIONS.all || DEBUG_OPTIONS.pe_pkt_send {
                         match msg_type {
                             MsgType::Discover => (),
-                            MsgType::DiscoverD => if port_tree_id.is_name(CENTRAL_TREE) { println!("PacketEngine {}: {} on {:?} {} {}", self.cell_id, _f, port_nos, msg_type, port_tree_id); },
                             MsgType::Manifest => { println!("PacketEngine {} forwarding manifest leafward mask {} entry {}", self.cell_id, mask, entry); },
                             _ => { println!("PacketEngine {}: {} on {:?} {} {}", self.cell_id, _f, port_nos, msg_type, port_tree_id); }
                         };

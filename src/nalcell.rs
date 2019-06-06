@@ -6,7 +6,7 @@ use std::{fmt, fmt::Write,
 
 use crate::cellagent::{CellAgent};
 use crate::cmodel::{Cmodel};
-use crate::config::{CONTINUE_ON_ERROR, MAX_NUM_PHYS_PORTS_PER_CELL, TRACE_OPTIONS, CellType, CellConfig, PortNo, PortQty};
+use crate::config::{CONTINUE_ON_ERROR, MAX_NUM_PHYS_PORTS_PER_CELL, TRACE_OPTIONS, PortQty};
 use crate::dal::{add_to_trace, fork_trace_header, update_trace_header};
 use crate::ec_message_formats::{PortToPe, PeFromPort, PeToPort,PortFromPe,
                                 CaToCm, CmFromCa, CmToCa, CaFromCm,
@@ -14,7 +14,7 @@ use crate::ec_message_formats::{PortToPe, PeFromPort, PeToPort,PortFromPe,
 use crate::name::{CellID};
 use crate::packet_engine::{PacketEngine};
 use crate::port::{Port};
-use crate::utility::{S, TraceHeaderParams, TraceType, write_err};
+use crate::utility::{CellConfig, CellType, PortNo, S, TraceHeaderParams, TraceType, write_err};
 use crate::vm::VirtualMachine;
 
 #[derive(Debug)]
