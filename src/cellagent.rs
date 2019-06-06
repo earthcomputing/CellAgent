@@ -859,18 +859,11 @@ impl CellAgent {
         }
         let _ = self.update_traph(port_tree_id, port_number, port_state, &gvm_eqn,
                                   children, PathLength(CellQty(0)), path)?;
-        if tree_id == self.my_tree_id &&
-           !self.sent_to_noc          &&
-           self.is_border()           &&
-           self.is_discover_done(&tree_id) {
-            // TODO: Make sure first mover always gets access to Base tree
-            // Send the tree_name message to each border port
-            let base_tree_name = AllowedTree::new("Base");
-            for port_number in self.border_port_tree_id_map.keys() {
-                println!("Border cell {} sending AppTreeNameMsg to NOC on port {}", self.cell_id, port_number);
-                self.send_tree_name_msg(port_number.get_port_no(), &base_tree_name)?;
-            }
-            self.sent_to_noc = true;
+        if tree_id == self.my_tree_id   &&
+                      !self.sent_to_noc &&
+                      self.is_border()  &&
+                      self.is_discover_done(&tree_id) {
+            self.send_base_tree_to_noc()?;
         }
         Ok(())
     }
@@ -1166,6 +1159,16 @@ impl CellAgent {
         (*self.traphs_mutex.lock().unwrap()) = self.traphs.clone();
         Ok(())
     }
+    fn send_base_tree_to_noc(&mut self) -> Result<(), Error> {
+        // TODO: Make sure first mover always gets access to Base tree
+        // Send the tree_name message to each border port
+        let base_tree_name = AllowedTree::new("Base");
+        if let Some(port_number) = self.border_port_tree_id_map.keys().next() {
+            self.send_tree_name_msg(port_number.get_port_no(), &base_tree_name)?;
+            self.sent_to_noc = true;
+        }
+        Ok(())
+    }
     fn find_new_parent(&mut self, header: &MsgHeader, payload: &FailoverMsgPayload, port_no: PortNo)
             -> Result<(), Error> {
         let _f = "find_new_parent";
@@ -1381,6 +1384,9 @@ impl CellAgent {
             self.add_tree_name_map_item(sender_id,&base_tree_name, my_tree_id);
             self.border_port_tree_id_map.insert(port_number, (sender_id, new_tree_id));
             // TODO: Send TreeNameMsg for "Base" to Noc if port is connected after Discover finishes
+            if !self.sent_to_noc && self.is_discover_done(&my_tree_id) {
+                self.send_base_tree_to_noc()?;
+            }
             Ok(())
         } else {
             let sender_id = SenderID::new(self.cell_id, "CellAgent")?;
