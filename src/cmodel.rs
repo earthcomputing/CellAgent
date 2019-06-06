@@ -4,15 +4,15 @@ use std::{fmt,
 
 use failure::{Error, ResultExt};
 
-use crate::config::{CENTRAL_TREE, CONTINUE_ON_ERROR, DEBUG_OPTIONS,
-                    TRACE_OPTIONS, PortNo};
+use crate::config::{CONTINUE_ON_ERROR, DEBUG_OPTIONS,
+                    TRACE_OPTIONS};
 use crate::dal::{add_to_trace, fork_trace_header, update_trace_header};
 use crate::ec_message::{Message, MsgType};
 use crate::ec_message_formats::{CaToCmBytes, CmToCa, CmFromCa, CmToPe, CmFromPe, PeToCmPacket,
                                 CmToPePacket, CmToCaBytes};
 use crate::name::{Name, CellID};
 use crate::packet::{Packet, PacketAssembler, PacketAssemblers, Packetizer};
-use crate::utility::{S, TraceHeader, TraceHeaderParams, TraceType, write_err};
+use crate::utility::{PortNo, S, TraceHeader, TraceHeaderParams, TraceType, write_err};
 
 #[derive(Debug, Clone)]
 pub struct Cmodel {
@@ -143,12 +143,8 @@ impl Cmodel {
                         if DEBUG_OPTIONS.all || DEBUG_OPTIONS.cm_from_ca {
                             let dpi_msg = MsgType::msg_from_bytes(&bytes)?;
                             let dpi_msg_type = dpi_msg.get_msg_type();
-                            let dpi_tree_id = dpi_msg.get_port_tree_id();
                             match dpi_msg_type {
                                 MsgType::Discover => (),
-                                MsgType::DiscoverD => {
-                                    if dpi_tree_id.is_name(CENTRAL_TREE) { println!("Cmodel {}: {} received {}", self.cell_id, _f, dpi_msg); }
-                                },
                                 _ => {
                                     println!("Cmodel {}: {} received {}", self.cell_id, _f, dpi_msg);
                                 }
@@ -274,12 +270,8 @@ packets: Vec<Packet>,
                         let packet_count = packets[0].get_count();
                         let dpi_msg = MsgType::msg_from_bytes(&bytes)?;
                         let dpi_msg_type = dpi_msg.get_msg_type();
-                        let dpi_tree_id = dpi_msg.get_port_tree_id();
                         match dpi_msg_type {
                             MsgType::Discover => (),
-                            MsgType::DiscoverD => {
-                                if dpi_tree_id.is_name(CENTRAL_TREE) { println!("Cmodel {}: {} received {}", self.cell_id, _f, dpi_msg); }
-                            },
                             _ => {
                                 println!("Cmodel {}: {} received {} count {}", self.cell_id, _f, dpi_msg, packet_count);
                             }

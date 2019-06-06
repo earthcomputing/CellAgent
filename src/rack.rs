@@ -7,15 +7,15 @@ use std::{fmt, fmt::Write,
           thread::{JoinHandle}};
 
 use crate::app_message_formats::{PortToNoc, PortFromNoc};
-use crate::blueprint::{Blueprint, Cell, CellNo, Edge};
-use crate::config::{TRACE_OPTIONS, CellQty, CellConfig, LinkQty, get_geometry};
+use crate::blueprint::{Blueprint, Cell, };
+use crate::config::{TRACE_OPTIONS, CellQty, LinkQty};
 use crate::dal::add_to_trace;
 use crate::ec_message_formats::{LinkToPort, PortFromLink, PortToLink, LinkFromPort, PortFromPe};
 use crate::link::{Link};
 use crate::nalcell::{NalCell};
 use crate::name::{CellID, LinkID};
 use crate::port::{Port};
-use crate::utility::{S, TraceHeaderParams, TraceType};
+use crate::utility::{CellNo, CellConfig, Edge, S, TraceHeaderParams, TraceType, get_geometry};
 
 #[derive(Debug)]
 pub struct Rack {

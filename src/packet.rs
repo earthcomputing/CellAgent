@@ -10,10 +10,10 @@ use serde_json;
 
 use crate::app_message::{SenderMsgSeqNo, get_next_count};
 use crate::config::{PACKET_MIN, PACKET_MAX, PAYLOAD_DEFAULT_ELEMENT,
-    ByteArray, PacketNo};
+    PacketNo};
 use crate::ec_message::{Message, MsgType};
 use crate::name::{PortTreeID, Name};
-use crate::utility::{S, Stack};
+use crate::utility::{ByteArray, S, Stack};
 use crate::uuid_ec::{Uuid, AitState};
  
 //const LARGEST_MSG: usize = std::u32::MAX as usize;

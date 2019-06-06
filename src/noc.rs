@@ -8,12 +8,12 @@ use crate::app_message::{AppMsgType, AppMessage, AppMsgDirection,
                          AppManifestMsg, AppStackTreeMsg, AppTreeNameMsg};
 use crate::app_message_formats::{NocToPort, NocFromPort, PortToNoc, PortFromNoc, NocFromApplication, NocToApplication};
 use crate::blueprint::{Blueprint};
-use crate::config::{CONTINUE_ON_ERROR, SCHEMA_VERSION, TRACE_OPTIONS,
-                    ByteArray, CellConfig, get_geometry};
+use crate::config::{CONTINUE_ON_ERROR, SCHEMA_VERSION, TRACE_OPTIONS};
 use crate::dal::{add_to_trace, fork_trace_header, update_trace_header};
 use crate::gvm_equation::{GvmEquation, GvmEqn, GvmVariable, GvmVariableType};
 use crate::uptree_spec::{AllowedTree, ContainerSpec, Manifest, UpTreeSpec, VmSpec};
-use crate::utility::{S, TraceHeader, TraceHeaderParams, TraceType, vec_from_hashset, write_err};
+use crate::utility::{ByteArray, CellConfig, S, TraceHeader, TraceHeaderParams, TraceType,
+                     get_geometry, vec_from_hashset, write_err};
 
 const NOC_MASTER_DEPLOY_TREE_NAME: &str = "NocMasterDeploy";
 const NOC_AGENT_DEPLOY_TREE_NAME:  &str = "NocAgentDeploy";

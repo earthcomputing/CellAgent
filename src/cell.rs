@@ -46,12 +46,11 @@ use std::{io::{stdin, stdout, Read, Write},
           sync::mpsc::channel,
 	  iter::FromIterator};
 
-use crate::config::{OUTPUT_FILE_NAME, QUENCH,
-                    CellType, CellConfig, PortNo, PortQty};
+use crate::config::{OUTPUT_FILE_NAME, QUENCH, PortQty};
 use crate::gvm_equation::{GvmEqn};
 use crate::nalcell::{NalCell};
 use crate::uptree_spec::{AllowedTree, ContainerSpec, Manifest, UpTreeSpec, VmSpec};
-use crate::utility::{_print_vec, S, TraceHeader};
+use crate::utility::{_print_vec, CellConfig, CellType, PortNo, S, TraceHeader};
 
 fn main() -> Result<(), Error> {
     let _f = "main";

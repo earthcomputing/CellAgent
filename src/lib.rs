@@ -45,10 +45,10 @@ pub mod vm;
 
 use std::{collections::{HashMap}};
 
-use crate::blueprint::{Blueprint, CellNo, Edge, is2e};
-use crate::config::{MAX_NUM_PHYS_PORTS_PER_CELL, CellQty, PortNo, PortQty};
+use crate::blueprint::{Blueprint};
+use crate::config::{MAX_NUM_PHYS_PORTS_PER_CELL, CellQty, PortQty};
 use crate::datacenter::{Datacenter};
-use crate::utility::{TraceHeader};
+use crate::utility::{CellNo, Edge, PortNo, TraceHeader, is2e};
 
 trait Test {
     fn test(&mut self);

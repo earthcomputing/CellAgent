@@ -5,12 +5,12 @@ use std::collections::HashSet;
 
 use crate::app_message_formats::{ContainerToVm, ContainerFromVm};
 use crate::app_message::{AppMsgDirection, AppInterapplicationMsg, AppMessage};
-use crate::config::{ByteArray, CONTINUE_ON_ERROR, TRACE_OPTIONS};
+use crate::config::{CONTINUE_ON_ERROR, TRACE_OPTIONS};
 use crate::dal::{add_to_trace, fork_trace_header, update_trace_header};
 use crate::name::{ContainerID, UptreeID};
 use crate::noc::{NOC_CONTROL_TREE_NAME, NOC_LISTEN_TREE_NAME};
 use crate::uptree_spec::{AllowedTree};
-use crate::utility::{S, write_err, TraceHeader, TraceHeaderParams, TraceType};
+use crate::utility::{ByteArray, S, write_err, TraceHeader, TraceHeaderParams, TraceType};
 
 const NOC_MASTER: &str ="NocMaster";
 const NOC_AGENT: &str = "NocAgent";

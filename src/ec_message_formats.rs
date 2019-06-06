@@ -1,13 +1,12 @@
 use std::sync::mpsc;
 
 use crate::app_message_formats::{ISAIT, APP};
-use crate::config::{ByteArray, PortNo};
 use crate::name::{TreeID};
 use crate::packet::{Packet};
 use crate::packet_engine::NumberOfPackets;
 use crate::port::{PortStatus};
 use crate::routing_table_entry::{RoutingTableEntry};
-use crate::utility::{Mask, PortNumber};
+use crate::utility::{ByteArray, Mask, PortNo, PortNumber};
 use crate::uuid_ec::Uuid;
 
 type CATOCM = (TreeID, ISAIT, Mask, ByteArray);

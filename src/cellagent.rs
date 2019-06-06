@@ -10,11 +10,10 @@ use crate::app_message::{AppMsgDirection, AppMessage, AppMsgType,
                          AppDeleteTreeMsg, AppInterapplicationMsg, AppManifestMsg,
                          AppQueryMsg, AppStackTreeMsg, AppTreeNameMsg};
 use crate::app_message_formats::{CaToVm, VmFromCa, VmToCa, CaFromVm};
-use crate::config::{CONNECTED_PORTS_TREE_NAME, CONTINUE_ON_ERROR, CONTROL_TREE_NAME,
+use crate::config::{BASE_TREE_NAME, CONNECTED_PORTS_TREE_NAME, CONTINUE_ON_ERROR, CONTROL_TREE_NAME,
                     DISCOVER_QUIESCE_FACTOR, DEBUG_OPTIONS,
                     QUENCH, MAX_NUM_PHYS_PORTS_PER_CELL, TRACE_OPTIONS,
-                    ByteArray, CellQty, CellType, CellConfig, CellInfo, Quench, PathLength, PortNo,
-                    PortQty};
+                    CellQty, PathLength, PortQty};
 use crate::dal::{add_to_trace, fork_trace_header, update_trace_header};
 use crate::ec_message::{Message, MsgHeader, MsgTreeMap, MsgType,
               InterapplicationMsg,
@@ -33,7 +32,9 @@ use crate::routing_table_entry::{RoutingTableEntry};
 use crate::traph::{PortState, Traph};
 use crate::tree::Tree;
 use crate::uptree_spec::{AllowedTree, Manifest};
-use crate::utility::{BASE_TENANT_MASK, DEFAULT_USER_MASK, Mask, Path, PortNumber, S,
+use crate::utility::{BASE_TENANT_MASK, DEFAULT_USER_MASK,
+                     ByteArray, CellConfig, CellInfo, CellType, Mask, Path, PortNo,
+                     Quench, PortNumber, S,
                      TraceHeader, TraceHeaderParams, TraceType, UtilityError,
                      write_err, new_hashset};
 use crate::uuid_ec::Uuid;
@@ -1160,9 +1161,8 @@ impl CellAgent {
         Ok(())
     }
     fn send_base_tree_to_noc(&mut self) -> Result<(), Error> {
-        // TODO: Make sure first mover always gets access to Base tree
-        // Send the tree_name message to each border port
-        let base_tree_name = AllowedTree::new("Base");
+        // The first mover always gets access to Base tree
+        let base_tree_name = AllowedTree::new(BASE_TREE_NAME);
         if let Some(port_number) = self.border_port_tree_id_map.keys().next() {
             self.send_tree_name_msg(port_number.get_port_no(), &base_tree_name)?;
             self.sent_to_noc = true;
@@ -1378,12 +1378,12 @@ impl CellAgent {
             self.tree_id_map.insert(new_tree_id.get_uuid(), new_tree_id.to_port_tree_id_0());
             let _ = self.update_traph(new_tree_id.to_port_tree_id(port_number), port_number, PortState::Parent,
                                       &gvm_eqn, HashSet::new(), PathLength(CellQty(1)), Path::new0(), ).context(CellagentError::Chain { func_name: "port_connected", comment: S(self.cell_id) })?;
-            let base_tree_name = AllowedTree::new("Base");
+            let base_tree_name = AllowedTree::new(BASE_TREE_NAME);
             let my_tree_id = self.my_tree_id;
             let sender_id = SenderID::new(self.cell_id, &format!("BorderPort+{}", *port_no))?;
             self.add_tree_name_map_item(sender_id,&base_tree_name, my_tree_id);
             self.border_port_tree_id_map.insert(port_number, (sender_id, new_tree_id));
-            // TODO: Send TreeNameMsg for "Base" to Noc if port is connected after Discover finishes
+            // TODO: Send TreeNameMsg for BASE_TREE_NAME to Noc if port is connected after Discover finishes
             if !self.sent_to_noc && self.is_discover_done(&my_tree_id) {
                 self.send_base_tree_to_noc()?;
             }
