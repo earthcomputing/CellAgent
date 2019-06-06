@@ -18,6 +18,7 @@ pub const PACKET_MAX: usize = 9000;
 // Control
 pub const CONTINUE_ON_ERROR: bool = false; // Don't close channel following an error if true
 pub const AUTO_BREAK: Option<Edge> = (None, Some(Edge(CellNo(1), CellNo(2)))).0;// Use .1 to auto break link
+pub const DISCOVER_QUIESCE_FACTOR: usize = 4; // Bigger means wait longer to quiesce
 #[derive(Debug, Copy, Clone, Hash, Serialize, Deserialize)]
 pub enum CellConfig { Small, Medium, Large }
 impl fmt::Display for CellConfig {
