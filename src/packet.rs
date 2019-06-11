@@ -9,8 +9,7 @@ use serde;
 use serde_json;
 
 use crate::app_message::{SenderMsgSeqNo, get_next_count};
-use crate::config::{PACKET_MIN, PACKET_MAX, PAYLOAD_DEFAULT_ELEMENT,
-    PacketNo};
+use crate::config::{PACKET_MIN, PACKET_MAX, PAYLOAD_DEFAULT_ELEMENT, PacketNo};
 use crate::ec_message::{Message, MsgType};
 use crate::name::{PortTreeID, Name};
 use crate::utility::{ByteArray, S, Stack};

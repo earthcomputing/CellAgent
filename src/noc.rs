@@ -8,7 +8,7 @@ use crate::app_message::{AppMsgType, AppMessage, AppMsgDirection,
                          AppManifestMsg, AppStackTreeMsg, AppTreeNameMsg};
 use crate::app_message_formats::{NocToPort, NocFromPort, PortToNoc, PortFromNoc, NocFromApplication, NocToApplication};
 use crate::blueprint::{Blueprint};
-use crate::config::{CONTINUE_ON_ERROR, SCHEMA_VERSION, TRACE_OPTIONS};
+use crate::config::{CONFIG, SCHEMA_VERSION};
 use crate::dal::{add_to_trace, fork_trace_header, update_trace_header};
 use crate::gvm_equation::{GvmEquation, GvmEqn, GvmVariable, GvmVariableType};
 use crate::uptree_spec::{AllowedTree, ContainerSpec, Manifest, UpTreeSpec, VmSpec};
@@ -35,7 +35,7 @@ impl Noc {
             -> Result<(PortToNoc, PortFromNoc), Error> {
         let _f = "initialize";
         {
-            if TRACE_OPTIONS.all || TRACE_OPTIONS.noc {
+            if CONFIG.trace_options.all || CONFIG.trace_options.noc {
                 // For reasons I can't understand, the trace record doesn't show up when generated from main.
                 let (rows, cols, _geometry) = get_geometry(blueprint.get_ncells());
                 let trace_params = &TraceHeaderParams { module: "src/main.rs", line_no: line!(), function: "MAIN", format: "trace_schema" };
@@ -65,7 +65,7 @@ impl Noc {
         let join_port = thread::Builder::new().name(thread_name).spawn( move || {
             update_trace_header(child_trace_header);
             let _ = noc.listen_port_loop(&noc_to_port, &noc_from_port).map_err(|e| write_err("port", &e));
-            if CONTINUE_ON_ERROR { let _ = noc.listen_port(noc_to_port, noc_from_port); }
+            if CONFIG.continue_on_error { let _ = noc.listen_port(noc_to_port, noc_from_port); }
         });
         Ok(join_port?)
     }
@@ -75,7 +75,7 @@ impl Noc {
             -> Result<(), Error> {
         let _f = "listen_port_loop";
         {
-            if TRACE_OPTIONS.all || TRACE_OPTIONS.noc {
+            if CONFIG.trace_options.all || CONFIG.trace_options.noc {
                 let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "worker" };
                 let trace = json!({ "id": self.get_name(), "thread_name": thread::current().name(), "thread_id": TraceHeader::parse(thread::current().id()) });
                 let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
@@ -86,7 +86,7 @@ impl Noc {
             let serialized = bytes.to_string()?;
             let app_msg: Box<dyn AppMessage> = serde_json::from_str(&serialized).context(NocError::Chain { func_name: _f, comment: S("") })?;
             {
-                if TRACE_OPTIONS.all || TRACE_OPTIONS.noc {
+                if CONFIG.trace_options.all || CONFIG.trace_options.noc {
                     let trace_params = &TraceHeaderParams { module: "src/noc.rs", line_no: line!(), function: _f, format: "noc_from_port" };
                     let trace = json!({ "id": self.get_name(), "app_msg": app_msg });
                     let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
@@ -133,7 +133,7 @@ impl Noc {
         let join_application = thread::Builder::new().name(thread_name).spawn( move || {
             update_trace_header(child_trace_header);
             let _ = noc.listen_application_loop(&noc_from_application, &noc_to_port).map_err(|e| write_err("application", &e));
-            if CONTINUE_ON_ERROR { }
+            if CONFIG.continue_on_error { }
         });
         Ok(join_application?)
     }
@@ -143,7 +143,7 @@ impl Noc {
             -> Result<(), Error> {
         let _f = "listen_application_loop";
         {
-            if TRACE_OPTIONS.all || TRACE_OPTIONS.noc {
+            if CONFIG.trace_options.all || CONFIG.trace_options.noc {
                 let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "worker" };
                 let trace = json!({ "id": self.get_name(), "thread_name": thread::current().name(), "thread_id": TraceHeader::parse(thread::current().id()) });
                 let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
@@ -152,7 +152,7 @@ impl Noc {
         loop {
             let input = &noc_from_application.recv()?;
             {
-                if TRACE_OPTIONS.all || TRACE_OPTIONS.noc {
+                if CONFIG.trace_options.all || CONFIG.trace_options.noc {
                     let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "noc_from_application" };
                     let trace = json!({ "id": self.get_name(), "thread_name": thread::current().name(), "thread_id": TraceHeader::parse(thread::current().id()), "input": input });
                     let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
@@ -280,7 +280,7 @@ impl Noc {
     fn send_msg(&self, msg: &dyn AppMessage, noc_to_port: &NocToPort) -> Result<(), Error> {
         let _f = "send_msg";
         {
-            if TRACE_OPTIONS.all || TRACE_OPTIONS.noc {
+            if CONFIG.trace_options.all || CONFIG.trace_options.noc {
                 let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "noc_to_port" };
                 let trace = json!({ "app_msg": msg });
                 let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);

@@ -1,7 +1,7 @@
 use std::{fmt,
           thread, thread::JoinHandle};
 
-use crate::config::{CONTINUE_ON_ERROR, TRACE_OPTIONS};
+use crate::config::{CONFIG};
 use crate::dal::{add_to_trace, fork_trace_header, update_trace_header};
 use crate::ec_message_formats::{LinkToPort, LinkFromPort, LinkToPortPacket};
 use crate::name::{Name, LinkID, PortID};
@@ -39,7 +39,7 @@ impl Link {
         let _f = "break_link";
         self.is_connected = false;
         {
-            if TRACE_OPTIONS.all || TRACE_OPTIONS.link {
+            if CONFIG.trace_options.all || CONFIG.trace_options.link {
                 let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "link_to_port_disconnected" };
                 let trace = json!({ "id": &self.get_id(), "status": LinkToPortPacket::Status(PortStatus::Disconnected) });
                 let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
@@ -53,7 +53,7 @@ impl Link {
             -> Result<JoinHandle<()>, Error> {
         let _f = "listen";
         {
-            if TRACE_OPTIONS.all || TRACE_OPTIONS.link {
+            if CONFIG.trace_options.all || CONFIG.trace_options.link {
                 let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "link_to_port_connected" };
                 let trace = json!({ "id": &self.get_id(), "status": LinkToPortPacket::Status(PortStatus::Connected) });
                 let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
@@ -73,7 +73,7 @@ impl Link {
         let join_handle = thread::Builder::new().name(thread_name).spawn( move || {
             update_trace_header(child_trace_header);
             let _ = link.listen_loop(&link_from, &link_to).map_err(|e| write_err("link", &e));
-            if CONTINUE_ON_ERROR { let _ = link.listen_port(link_from, link_to); }
+            if CONFIG.continue_on_error { let _ = link.listen_port(link_from, link_to); }
         })?;
         Ok(join_handle)
     }
@@ -82,7 +82,7 @@ impl Link {
     fn listen_loop(&self, link_from: &LinkFromPort, link_to: &LinkToPort) -> Result<(), Error> {
         let _f = "listen_loop";
         {
-            if TRACE_OPTIONS.all || TRACE_OPTIONS.link {
+            if CONFIG.trace_options.all || CONFIG.trace_options.link {
                 let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "worker" };
                 let trace = json!({ "id": &self.get_id(), "thread_name": thread::current().name(), "thread_id": TraceHeader::parse(thread::current().id()) });
                 let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
@@ -91,7 +91,7 @@ impl Link {
         loop {
             let packet = link_from.recv().context(LinkError::Chain { func_name: _f, comment: S(self.id.clone()) })?;
             {
-                if TRACE_OPTIONS.all || TRACE_OPTIONS.link {
+                if CONFIG.trace_options.all || CONFIG.trace_options.link {
                     let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "link_from_port" };
                     let trace = json!({ "id": &self.get_id(), "msg": packet.to_string()? });
                     let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);

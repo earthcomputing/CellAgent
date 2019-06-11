@@ -6,11 +6,12 @@ use std::{fmt,
 
 use serde_json;
 use serde_json::{Value};
+use strum_macros::EnumIter;
 
 use lazy_static::lazy_static;
 use time;
 
-use crate::config::{MAX_NUM_PHYS_PORTS_PER_CELL, PAYLOAD_DEFAULT_ELEMENT, REPO,
+use crate::config::{CONFIG, PAYLOAD_DEFAULT_ELEMENT, REPO,
                     CellQty, MaskValue, PortQty};
 use crate::uuid_ec::Uuid;
 
@@ -50,8 +51,8 @@ impl Mask {
                 mask.or(Mask::new(*port_number)) )
     }
     pub fn get_port_nos(self) -> Vec<PortNo> {
-        (0..*MAX_NUM_PHYS_PORTS_PER_CELL)
-            .map(|i| PortNo(i).make_port_number(MAX_NUM_PHYS_PORTS_PER_CELL)
+        (0..*CONFIG.max_num_phys_ports_per_cell)
+            .map(|i| PortNo(i).make_port_number(CONFIG.max_num_phys_ports_per_cell)
                 .expect("Mask make_port_number cannont generate an error"))
             .map(|port_number| Mask::new(port_number))
             .enumerate()
@@ -295,7 +296,7 @@ impl fmt::Display for ByteArray {
         write!(f, "{}", bytes)
     }
 }
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, Serialize, Deserialize, EnumIter)]
 pub enum Quench { Simple, RootPort }
 impl fmt::Display for Quench {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {

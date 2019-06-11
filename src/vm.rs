@@ -3,7 +3,7 @@ use std::{collections::{HashSet}, sync::mpsc::channel, thread};
 use crate::app_message_formats::{VmToCa, VmFromCa,
                                  VmToContainer, ContainerFromVm,
                                  ContainerToVm, VmFromContainer};
-use crate::config::{CONTINUE_ON_ERROR, TRACE_OPTIONS};
+use crate::config::{CONFIG};
 use crate::container::{Container};
 use crate::dal::{add_to_trace, fork_trace_header, update_trace_header};
 use crate::name::{Name, ContainerID, UptreeID, VmID};
@@ -56,7 +56,7 @@ impl VirtualMachine {
         thread::Builder::new().name(thread_name).spawn( move || {
             update_trace_header(child_trace_header);
             let _ = vm.listen_ca_loop(&vm_from_ca).map_err(|e| write_err("vm", &e));
-            if CONTINUE_ON_ERROR { let _ = vm.listen_ca(vm_from_ca); }
+            if CONFIG.continue_on_error { let _ = vm.listen_ca(vm_from_ca); }
         })?;
         Ok(())
     }
@@ -72,7 +72,7 @@ impl VirtualMachine {
         thread::Builder::new().name(thread_name).spawn( move || {
             update_trace_header(child_trace_header);
             let _ = vm.listen_container_loop(container_id, &vm_from_container, &vm_to_ca).map_err(|e| write_err("vm", &e));
-            if CONTINUE_ON_ERROR { let _ = vm.listen_container(container_id, vm_from_container, vm_to_ca); }
+            if CONFIG.continue_on_error { let _ = vm.listen_container(container_id, vm_from_container, vm_to_ca); }
         })?;
         Ok(())
     }
@@ -81,7 +81,7 @@ impl VirtualMachine {
     fn listen_ca_loop(&self, vm_from_ca: &VmFromCa) -> Result<(), Error> {
         let _f = "listen_ca_loop";
         {
-            if TRACE_OPTIONS.all || TRACE_OPTIONS.vm {
+            if CONFIG.trace_options.all || CONFIG.trace_options.vm {
                 let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "worker" };
                 let trace = json!({ "id": self.id, "thread_name": thread::current().name(), "thread_id": TraceHeader::parse(thread::current().id()) });
                 let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
@@ -90,7 +90,7 @@ impl VirtualMachine {
         loop {
             let bytes = vm_from_ca.recv().context("listen_ca_loop").context(VmError::Chain { func_name: "listen_ca_loop", comment: S(self.id.get_name()) })?;
             {
-                if TRACE_OPTIONS.all || TRACE_OPTIONS.vm {
+                if CONFIG.trace_options.all || CONFIG.trace_options.vm {
                     let msg: Box<dyn AppMessage> = serde_json::from_str(&bytes.to_string()?)?;
                     let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "vm_from_ca" };
                     let trace = json!({ "id": self.id, "msg": msg.to_string() });
@@ -112,7 +112,7 @@ impl VirtualMachine {
             -> Result<(), Error> {
         let _f = "listen_container_loop";
         {
-            if TRACE_OPTIONS.all || TRACE_OPTIONS.vm {
+            if CONFIG.trace_options.all || CONFIG.trace_options.vm {
                 let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "worker" };
                 let trace = json!({ "id": self.id, "thread_name": thread::current().name(), "thread_id": TraceHeader::parse(thread::current().id()) });
                 let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
@@ -121,7 +121,7 @@ impl VirtualMachine {
         loop {
             let bytes = vm_from_container.recv().context("listen_container_loop").context(VmError::Chain { func_name: "listen_container_loop", comment: S(self.id.get_name()) + " recv from container"})?;
             {
-                if TRACE_OPTIONS.all || TRACE_OPTIONS.vm {
+                if CONFIG.trace_options.all || CONFIG.trace_options.vm {
                     let msg: Box<dyn AppMessage> = serde_json::from_str(&bytes.to_string()?)?;
                     let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "vm_from_container" };
                     let trace = json!({ "id": self.id, "msg": msg.to_string() });
