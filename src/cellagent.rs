@@ -10,9 +10,7 @@ use crate::app_message::{AppMsgDirection, AppMessage, AppMsgType,
                          AppDeleteTreeMsg, AppInterapplicationMsg, AppManifestMsg,
                          AppQueryMsg, AppStackTreeMsg, AppTreeNameMsg};
 use crate::app_message_formats::{CaToVm, VmFromCa, VmToCa, CaFromVm};
-use crate::config::{BASE_TREE_NAME, CONNECTED_PORTS_TREE_NAME, CONTINUE_ON_ERROR, CONTROL_TREE_NAME,
-                    DISCOVER_QUIESCE_FACTOR, DEBUG_OPTIONS,
-                    QUENCH, MAX_NUM_PHYS_PORTS_PER_CELL, TRACE_OPTIONS,
+use crate::config::{CONFIG, BASE_TREE_NAME, CONNECTED_PORTS_TREE_NAME, CONTROL_TREE_NAME,
                     CellQty, PathLength, PortQty};
 use crate::dal::{add_to_trace, fork_trace_header, update_trace_header};
 use crate::ec_message::{Message, MsgHeader, MsgTreeMap, MsgType,
@@ -85,7 +83,7 @@ pub struct CellAgent {
     sent_to_noc: bool,
     discover_d_count: HashMap<TreeID, usize>,
     failover_reply_ports: HashMap<PortTreeID, PortNo>,
-    no_packets: [NumberOfPackets; MAX_NUM_PHYS_PORTS_PER_CELL.0 as usize],
+    no_packets: Vec<NumberOfPackets>,
     child_ports: HashMap<TreeID, HashSet<PortNo>>,
 }
 impl CellAgent {
@@ -112,16 +110,16 @@ impl CellAgent {
             connected_tree_entry: RoutingTableEntry::default(), sent_to_noc: false,
             tenant_masks, up_tree_senders: HashMap::new(), cell_info: CellInfo::new(),
             up_traphs_clist: HashMap::new(), ca_to_cm, failover_reply_ports: HashMap::new(),
-            no_packets: [NumberOfPackets::new(); MAX_NUM_PHYS_PORTS_PER_CELL.0 as usize],
-            child_ports: HashMap::new()
-        })
+            no_packets: Vec::new(),
+            child_ports: HashMap::new() }
+        )
     }
 
     // WORKER (CellAgent)
     pub fn initialize(&mut self, ca_from_cm: CaFromCm) -> Result<&mut Self, Error> {
         let _f = "initialize";
         {
-            if TRACE_OPTIONS.all || TRACE_OPTIONS.ca {
+            if CONFIG.trace_options.all || CONFIG.trace_options.ca {
                 let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "worker" };
                 let trace = json!({ "cell_id": &self.cell_id, "thread_name": thread::current().name(), "thread_id": TraceHeader::parse(thread::current().id()) });
                 let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
@@ -208,14 +206,14 @@ impl CellAgent {
     }
     fn is_discover_done(&self, tree_id: &TreeID) -> bool {
         let count = self.discover_d_count.get(tree_id).or(Some(&0)).unwrap();
-        *count >= DISCOVER_QUIESCE_FACTOR * self.neighbors.len()
+        *count >= CONFIG.discover_quiescence_factor * self.neighbors.len()
     }
     fn get_saved_discover(&self) -> &Vec<SavedDiscover> { &self.saved_discover }
     fn add_saved_discover(&mut self, discover_msg: &SavedDiscover) {
         let _f = "add_saved_discover";
         let port_tree_id = discover_msg.get_port_tree_id();
         {
-            if DEBUG_OPTIONS.all || DEBUG_OPTIONS.saved_discover {
+            if CONFIG.debug_options.all || CONFIG.debug_options.saved_discover {
                 let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "ca_save_discover_msg" };
                 let trace = json!({ "cell_id": &self.cell_id, "tree_id": port_tree_id, "msg": &discover_msg });
                 let _ = add_to_trace(TraceType::Debug, trace_params, &trace, _f);
@@ -277,7 +275,7 @@ impl CellAgent {
     fn update_base_tree_map(&mut self, stacked_tree_id: PortTreeID, base_tree_id: TreeID) {
         let _f = "update_base_tree_map";
         {
-            if DEBUG_OPTIONS.all || DEBUG_OPTIONS.traph_entry {
+            if CONFIG.debug_options.all || CONFIG.debug_options.traph_entry {
                 let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "ca_update_base_tree_map" };
                 let trace = json!({ "cell_id": &self.cell_id, "stacked_tree_id": stacked_tree_id, "base_tree_id": base_tree_id, });
                 let _ = add_to_trace(TraceType::Debug, trace_params, &trace, _f);
@@ -290,7 +288,7 @@ impl CellAgent {
     fn get_base_tree_id(&self, port_tree_id: PortTreeID) -> Result<TreeID, Error> {
         let _f = "get_base_tree_id";
         {
-            if DEBUG_OPTIONS.all || DEBUG_OPTIONS.traph_entry {   // Debug print
+            if CONFIG.debug_options.all || CONFIG.debug_options.traph_entry {   // Debug print
                 let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "ca_get_base_tree_id" };
                 let trace = json!({ "cell_id": &self.cell_id, "port_tree_id": port_tree_id });
                 let _ = add_to_trace(TraceType::Debug, trace_params, &trace, _f);
@@ -326,7 +324,7 @@ impl CellAgent {
         let _f = "update_traph";
         let base_tree_id = base_port_tree_id.to_tree_id();
         {
-            if DEBUG_OPTIONS.all || DEBUG_OPTIONS.traph_entry {
+            if CONFIG.debug_options.all || CONFIG.debug_options.traph_entry {
                 let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "ca_update_traph" };
                 let trace = json!({ "cell_id": &self.cell_id,
                 "base_tree_id": base_port_tree_id, "port_number": &port_number, "hops": &hops,
@@ -364,7 +362,7 @@ impl CellAgent {
         let mut entry = traph.update_element(base_tree_id, port_number, entry_port_status, &children, updated_hops, path).context(CellagentError::Chain { func_name: "update_traph", comment: S("") })?;
         if gvm_send { entry.enable_send() } else { entry.disable_send() }
         {
-            if DEBUG_OPTIONS.all || DEBUG_OPTIONS.traph_entry {
+            if CONFIG.debug_options.all || CONFIG.debug_options.traph_entry {
                 let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "ca_updated_traph_entry" };
                 let trace = json!({ "cell_id": &self.cell_id, "base_tree_id": base_tree_id, "entry": &entry });
                 let _ = add_to_trace(TraceType::Debug, trace_params, &trace, _f);
@@ -467,7 +465,7 @@ impl CellAgent {
             vm.initialize(up_tree_name, vm_from_ca, &allowed_trees, container_specs)?;
             let keys = self.tree_vm_map.keys().collect::<Vec<_>>();
             {
-                if DEBUG_OPTIONS.all || DEBUG_OPTIONS.deploy {
+                if CONFIG.debug_options.all || CONFIG.debug_options.deploy {
                     let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "ca_deploy" };
                     let trace = json!({ "cell_id": &self.cell_id,
                         "deployment_port_tree_id": deployment_port_tree_id, "tree_vm_map_keys":  &keys,
@@ -493,7 +491,7 @@ impl CellAgent {
         thread::Builder::new().name(thread_name).spawn( move || {
             update_trace_header(child_trace_header);
             let _ = ca.listen_uptree_loop(sender_id, vm_id, &ca_from_vm).map_err(|e| write_err("cellagent", &e));
-            if CONTINUE_ON_ERROR { ca.listen_uptree(sender_id, vm_id, trees, ca_from_vm); }
+            if CONFIG.continue_on_error { ca.listen_uptree(sender_id, vm_id, trees, ca_from_vm); }
         }).expect("thread failed");
     }
 
@@ -502,7 +500,7 @@ impl CellAgent {
             -> Result<(), Error> {
         let _f = "listen_uptree_loop";
         {
-            if TRACE_OPTIONS.all || TRACE_OPTIONS.ca {
+            if CONFIG.trace_options.all || CONFIG.trace_options.ca {
                 let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "worker" };
                 let trace = json!({ "cell_id": &self.cell_id, "thread_name": thread::current().name(), "thread_id": TraceHeader::parse(thread::current().id()) });
                 let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
@@ -513,7 +511,7 @@ impl CellAgent {
             let serialized = bytes.to_string()?;
             let app_msg: Box<dyn AppMessage> = serde_json::from_str(&serialized).context(CellagentError::Chain { func_name: _f, comment: S("") })?;
             {
-                if TRACE_OPTIONS.all || TRACE_OPTIONS.ca {
+                if CONFIG.trace_options.all || CONFIG.trace_options.ca {
                     let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "ca_from_vm_app" };
                     let trace = json!({ "cell_id": &self.cell_id, "app_msg": app_msg.to_string() });
                     let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
@@ -587,7 +585,7 @@ impl CellAgent {
             self.update_entry(&entry)?;
         }
         {
-            if DEBUG_OPTIONS.all || DEBUG_OPTIONS.stack_tree { // Debug print
+            if CONFIG.debug_options.all || CONFIG.debug_options.stack_tree { // Debug print
                 let keys: Vec<PortTreeID> = self.base_tree_map.iter().map(|(k, _)| k.clone()).collect();
                 let values: Vec<TreeID> = self.base_tree_map.iter().map(|(_, v)| v.clone()).collect();
                 let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "ca_stack_tree" };
@@ -608,7 +606,7 @@ impl CellAgent {
     }
     fn update_entry(&self, entry: &RoutingTableEntry) -> Result<(), Error> {
         let _f = "update_entry";
-        if TRACE_OPTIONS.all || TRACE_OPTIONS.ca {
+        if CONFIG.trace_options.all || CONFIG.trace_options.ca {
             let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "ca_to_cm_entry" };
             //println!("Cellagent {}: {} msg {}", self.cell_id, _f, msg); // Should be msg.value()
             let trace = json!({ "cell_id": &self.cell_id, "entry": entry });
@@ -628,7 +626,7 @@ impl CellAgent {
             update_trace_header(child_trace_header);
             let _ = ca.listen_cm_loop(&ca_from_cm).map_err(|e| write_err("cellagent", &e));
             // println!("Cellagent {}: Back from listen_cm_loop", ca.cell_id);
-            if CONTINUE_ON_ERROR { let _ = ca.listen_cm(ca_from_cm); }
+            if CONFIG.continue_on_error { let _ = ca.listen_cm(ca_from_cm); }
         })?;
         Ok(())
     }
@@ -637,7 +635,7 @@ impl CellAgent {
     fn listen_cm_loop(&mut self, ca_from_cm: &CaFromCm) -> Result<(), Error> {
         let _f = "listen_cm_loop";
         {
-            if TRACE_OPTIONS.all || TRACE_OPTIONS.ca {
+            if CONFIG.trace_options.all || CONFIG.trace_options.ca {
                 let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "worker" };
                 let trace = json!({ "cell_id": &self.cell_id, "thread_name": thread::current().name(), "thread_id": TraceHeader::parse(thread::current().id()) });
                 let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
@@ -646,7 +644,7 @@ impl CellAgent {
         loop {
             let msg = ca_from_cm.recv().context(CellagentError::Chain { func_name: _f, comment: S(self.cell_id)})?;
             {
-                if TRACE_OPTIONS.all || TRACE_OPTIONS.ca {
+                if CONFIG.trace_options.all || CONFIG.trace_options.ca {
                     match &msg {
                         CmToCaBytes::Bytes((port_no, _, _, bytes)) => {
                             let ec_msg: Box<dyn Message> = serde_json::from_str(&bytes.to_string()?)?;
@@ -677,7 +675,7 @@ impl CellAgent {
                     // The index may be pointing to the control tree because the other cell didn't get the StackTree or StackTreeD message in time
                     let mut msg = MsgType::msg_from_bytes(&bytes).context(CellagentError::Chain { func_name: _f, comment: S(self.cell_id)})?;
                     {
-                        if DEBUG_OPTIONS.all || DEBUG_OPTIONS.ca_msg_recv {
+                        if CONFIG.debug_options.all || CONFIG.debug_options.ca_msg_recv {
                             let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "ca_got_msg" };
                             let trace = json!({ "cell_id": &self.cell_id, "port_no": port_no, "msg": &msg });
                             let _ = add_to_trace(TraceType::Debug, trace_params, &trace, _f);
@@ -724,7 +722,7 @@ impl CellAgent {
             self.update_sender_tree_map(sender_id, &allowed_trees, port_tree_id.to_tree_id());
         }
         {
-            if DEBUG_OPTIONS.all || DEBUG_OPTIONS.process_msg {
+            if CONFIG.debug_options.all || CONFIG.debug_options.process_msg {
                 let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "ca_process_interapplication_msg" };
                 let trace = json!({ "cell_id": &self.cell_id,"port_tree_id": port_tree_id, "port_no": port_no, "ec_app_msg": ec_app_msg.value() });
                 let _ = add_to_trace(TraceType::Debug, trace_params, &trace, _f);
@@ -733,7 +731,7 @@ impl CellAgent {
         }
         let senders = self.get_vm_senders(port_tree_id.to_tree_id()).context(CellagentError::Chain { func_name: _f, comment: S("") })?;
         {
-            if TRACE_OPTIONS.all || TRACE_OPTIONS.ca {
+            if CONFIG.trace_options.all || CONFIG.trace_options.ca {
                 let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "ca_to_vm_app" };
                 let trace = json!({ "cell_id": &self.cell_id, "app_msg": app_msg.to_string() });
                 let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
@@ -768,7 +766,7 @@ impl CellAgent {
                           &discoverd_msg, mask).context(CellagentError::Chain { func_name: "process_ca", comment: S("DiscoverMsg") })?;
         }
         let port_tree_seen = self.quench_root_port(new_tree_id, path);
-        let quench = match QUENCH {
+        let quench = match CONFIG.quench {
             Quench::Simple => tree_seen,       // Must see this tree once
             Quench::RootPort => port_tree_seen // Must see every root port for this tree once
         };
@@ -779,7 +777,7 @@ impl CellAgent {
         eqns.insert(GvmEqn::Save("false"));
         let gvm_equation = GvmEquation::new(&eqns, &Vec::new());
         {
-            if DEBUG_OPTIONS.all || DEBUG_OPTIONS.discover {
+            if CONFIG.debug_options.all || CONFIG.debug_options.discover {
                 let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "ca_process_discover_msg" };
                 let trace = json!({ "cell_id": &self.cell_id, "quench": quench, "new_port_tree_id": new_tree_id, "port_no": port_no, "msg": msg.value() });
                 let _ = add_to_trace(TraceType::Debug, trace_params, &trace, _f);
@@ -851,7 +849,7 @@ impl CellAgent {
         eqns.insert(GvmEqn::Save("false"));
         let gvm_eqn = GvmEquation::new(&eqns, &Vec::new());
         {
-            if DEBUG_OPTIONS.all || DEBUG_OPTIONS.discoverd {
+            if CONFIG.debug_options.all || CONFIG.debug_options.discoverd {
                 let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "ca_process_discover_d_msg" };
                 let trace = json!({ "cell_id": &self.cell_id, "port_tree_id": port_tree_id, "# Hello": count,
                     "# neighbors": self.get_no_neighbors(), "port_no": port_no, "msg": msg.value() });
@@ -930,7 +928,7 @@ impl CellAgent {
                     };
                     let no_packets = payload.get_number_of_packets();
                     {
-                        if TRACE_OPTIONS.all || TRACE_OPTIONS.ca {
+                        if CONFIG.trace_options.all || CONFIG.trace_options.ca {
                             let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "ca_to_cm_reroute" };
                             let trace = json!({ "cell_id": &self.cell_id, "broken_port_no": broken_port_no, "port_no": port_no, "no_packets": no_packets });
                             let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
@@ -996,7 +994,7 @@ impl CellAgent {
         self.send_msg(self.connected_tree_id, &discover_msg, user_mask).context(CellagentError::Chain { func_name: _f, comment: S(self.cell_id) })?;
         self.forward_discover(user_mask).context(CellagentError::Chain { func_name: _f, comment: S(self.cell_id) })?;
         {
-            if DEBUG_OPTIONS.all || DEBUG_OPTIONS.process_msg {   // Debug
+            if CONFIG.debug_options.all || CONFIG.debug_options.process_msg {   // Debug
                 let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "ca_process_hello_msg" };
                 let trace = json!({ "cell_id": &self.cell_id, "recv_port_no": port_no, "msg": msg.value() });
                 let _ = add_to_trace(TraceType::Debug, trace_params, &trace, _f);
@@ -1021,7 +1019,7 @@ impl CellAgent {
         let traph = self.get_traph(tree_id).context(CellagentError::Chain { func_name: _f, comment: S("") })?;
         traph.get_tree_entry(&tree_id.get_uuid()).context(CellagentError::Chain { func_name: _f, comment: S("") })?;
         {
-            if DEBUG_OPTIONS.all || DEBUG_OPTIONS.manifest {
+            if CONFIG.debug_options.all || CONFIG.debug_options.manifest {
                 let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "ca_process_manifest_msg" };
                 let trace = json!({ "cell_id": &self.cell_id, "tree_id": tree_id, "port_no": port_no, "msg": msg.value() });
                 let _ = add_to_trace(TraceType::Debug, trace_params, &trace, _f);
@@ -1087,7 +1085,7 @@ impl CellAgent {
         let base_tree_id = self.get_base_tree_id(parent_tree_id).context(CellagentError::Chain { func_name: _f, comment: S("") })?;
         self.update_base_tree_map(parent_tree_id, base_tree_id);
         {
-            if DEBUG_OPTIONS.all || DEBUG_OPTIONS.stack_tree {
+            if CONFIG.debug_options.all || CONFIG.debug_options.stack_tree {
                 let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "ca_process_stack_tree_msg" };
                 let trace = json!({ "cell_id": &self.cell_id, "new_port_tree_id": new_port_tree_id, "port_no": port_no, "child_ports": self.child_ports.get(&parent_tree_id.to_tree_id()), "msg": msg.value() });
                 let _ = add_to_trace(TraceType::Debug, trace_params, &trace, _f);
@@ -1116,7 +1114,7 @@ impl CellAgent {
             self.update_entry(&entry).context(CellagentError::Chain { func_name: _f, comment: S(self.cell_id) })?;
         }
         {
-            if DEBUG_OPTIONS.all || DEBUG_OPTIONS.stack_tree {
+            if CONFIG.debug_options.all || CONFIG.debug_options.stack_tree {
                 let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "ca_process_stack_tree_d_msg" };
                 let trace = json!({ "cell_id": &self.cell_id, "msg": msg, "join": is_joining, "port": port_no, "parent tree": parent_port_tree_id, "child_ports": self.child_ports.get(&port_tree_id.to_tree_id()) });
                 let _ = add_to_trace(TraceType::Debug, trace_params, &trace, _f);
@@ -1140,7 +1138,7 @@ impl CellAgent {
                 let serialized = serde_json::to_string(&tree_name_msg as &dyn AppMessage).context(CellagentError::Chain { func_name: "port_connected", comment: S(self.cell_id) })?;
                 let bytes = ByteArray::new(&serialized);
                 {
-                    if TRACE_OPTIONS.all || TRACE_OPTIONS.ca {
+                    if CONFIG.trace_options.all || CONFIG.trace_options.ca {
                         let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "ca_to_noc_tree_name" };
                         let trace = json!({ "cell_id": &self.cell_id, "port": port_no, "app_msg": tree_name_msg });
                         let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
@@ -1240,7 +1238,7 @@ impl CellAgent {
         let msg = InterapplicationMsg::new(sender_id, false, tree_id,
                                            direction, &tree_map, app_msg);
         {
-            if DEBUG_OPTIONS.all || DEBUG_OPTIONS.process_msg {   // Debug
+            if CONFIG.debug_options.all || CONFIG.debug_options.process_msg {   // Debug
                 let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "ca_got_app_interapplication_msg" };
                 let trace = json!({ "cell_id": &self.cell_id, "tree_id": tree_id, "msg": msg.value() });
                 let _ = add_to_trace(TraceType::Debug, trace_params, &trace, _f);
@@ -1269,7 +1267,7 @@ impl CellAgent {
                                    deploy_tree_id.clone(), &tree_map, &manifest);
         let mask = self.get_mask(deploy_port_tree_id)?;
         {
-            if DEBUG_OPTIONS.all || DEBUG_OPTIONS.process_msg {   // Debug
+            if CONFIG.debug_options.all || CONFIG.debug_options.process_msg {   // Debug
                 let ports = mask.get_port_nos();
                 let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "ca_got_manifest_app_msg" };
                 let trace = json!({ "cell_id": &self.cell_id, "deploy_tree_id": deploy_tree_id, "ports": ports, "msg": msg.value() });
@@ -1300,7 +1298,7 @@ impl CellAgent {
         let child_ports = new_hashset(&parent_mask.get_port_nos());
         self.child_ports.insert(new_tree_id, child_ports);
         {
-            if DEBUG_OPTIONS.all || DEBUG_OPTIONS.process_msg {
+            if CONFIG.debug_options.all || CONFIG.debug_options.process_msg {
                 let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "ca_got_stack_tree_app_msg" };
                 let trace = json!({ "cell_id": &self.cell_id, "new_tree_id": new_tree_id, "msg": app_msg.to_string() });
                 let _ = add_to_trace(TraceType::Debug, trace_params, &trace, _f);
@@ -1346,7 +1344,7 @@ impl CellAgent {
         let serialized = serde_json::to_string(&tree_name_msg as &dyn AppMessage).context(CellagentError::Chain { func_name: "port_connected", comment: S(self.cell_id) })?;
         let bytes = ByteArray::new(&serialized);
         {
-            if TRACE_OPTIONS.all || TRACE_OPTIONS.ca {
+            if CONFIG.trace_options.all || CONFIG.trace_options.ca {
                 let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "ca_to_noc_tree_name" };
                 let trace = json!({ "cell_id": &self.cell_id, "port": port_no, "app_msg": tree_name_msg });
                 let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
@@ -1359,7 +1357,7 @@ impl CellAgent {
     fn port_connected(&mut self, port_no: PortNo, is_border: bool) -> Result<(), Error> {
         let _f = "port_connected";
         {
-            if TRACE_OPTIONS.all || TRACE_OPTIONS.ca {
+            if CONFIG.trace_options.all || CONFIG.trace_options.ca {
                 let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "port_connected" };
                 let trace = json!({ "cell_id": &self.cell_id, "port_no": port_no, "is_border": is_border });
                 let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
@@ -1470,7 +1468,7 @@ impl CellAgent {
             let port_mask = user_mask.and(mask);
             let ports = Mask::get_port_nos(port_mask);
             let msg_type = msg.get_msg_type();
-            if DEBUG_OPTIONS.all || DEBUG_OPTIONS.ca_msg_send {
+            if CONFIG.debug_options.all || CONFIG.debug_options.ca_msg_send {
                 match msg_type {
                     MsgType::Discover  |
                     MsgType::DiscoverD => println!("Cellagent {}: {} send on ports {:?} msg {}", self.cell_id, _f, ports, msg),
@@ -1493,7 +1491,7 @@ impl CellAgent {
             .get(&tree_uuid)
             .ok_or::<Error>(CellagentError::Tree { func_name: _f, cell_id: self.cell_id, tree_uuid }.into())?;
         {
-            if TRACE_OPTIONS.all || TRACE_OPTIONS.ca || DEBUG_OPTIONS.all || DEBUG_OPTIONS.ca_msg_send {
+            if CONFIG.trace_options.all || CONFIG.trace_options.ca || CONFIG.debug_options.all || CONFIG.debug_options.ca_msg_send {
                 let ports = user_mask.get_port_nos();
                 let msg: Box<dyn Message> = serde_json::from_str(&bytes.to_string()?)?;
                 let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "ca_to_cm_bytes" };

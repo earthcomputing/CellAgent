@@ -44,9 +44,9 @@ use std::{io::{stdin, stdout, Read, Write},
           collections::{HashMap, HashSet},
           fs::{File, OpenOptions},
           sync::mpsc::channel,
-	  iter::FromIterator};
+	      iter::FromIterator};
 
-use crate::config::{OUTPUT_FILE_NAME, QUENCH, PortQty};
+use crate::config::{CONFIG, PortQty};
 use crate::gvm_equation::{GvmEqn};
 use crate::nalcell::{NalCell};
 use crate::uptree_spec::{AllowedTree, ContainerSpec, Manifest, UpTreeSpec, VmSpec};

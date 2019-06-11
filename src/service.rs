@@ -5,7 +5,7 @@ use std::collections::HashSet;
 
 use crate::app_message_formats::{ContainerToVm, ContainerFromVm};
 use crate::app_message::{AppMsgDirection, AppInterapplicationMsg, AppMessage};
-use crate::config::{CONTINUE_ON_ERROR, TRACE_OPTIONS};
+use crate::config::{CONFIG};
 use crate::dal::{add_to_trace, fork_trace_header, update_trace_header};
 use crate::name::{ContainerID, UptreeID};
 use crate::noc::{NOC_CONTROL_TREE_NAME, NOC_LISTEN_TREE_NAME};
@@ -71,7 +71,7 @@ impl NocMaster {
         let serialized = serde_json::to_string(&app_msg as &dyn AppMessage)?;
         let bytes:ByteArray = ByteArray::new(&serialized);
         {
-            if TRACE_OPTIONS.all || TRACE_OPTIONS.svc {
+            if CONFIG.trace_options.all || CONFIG.trace_options.svc {
                 let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "NocMaster_to_vm" };
                 let trace = json!({ "NocMaster": self.get_name(), "app_msg": app_msg.to_string() });
                 let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
@@ -90,7 +90,7 @@ impl NocMaster {
         thread::Builder::new().name(thread_name).spawn( move || {
             update_trace_header(child_trace_header);
             let _ = master.listen_vm_loop(&container_from_vm).map_err(|e| write_err("service", &e));
-            if CONTINUE_ON_ERROR { let _ = master.listen_vm(container_from_vm); }
+            if CONFIG.continue_on_error { let _ = master.listen_vm(container_from_vm); }
         })?;
         Ok(())
     }
@@ -98,7 +98,7 @@ impl NocMaster {
     fn listen_vm_loop(&self, container_from_vm: &ContainerFromVm) -> Result<(), Error> {
         let _f = "listen_vm_loop";
         {
-            if TRACE_OPTIONS.all || TRACE_OPTIONS.svc {
+            if CONFIG.trace_options.all || CONFIG.trace_options.svc {
                 let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "worker" };
                 let trace = json!({ "NocMaster": self.get_name(), "thread_name": thread::current().name(), "thread_id": TraceHeader::parse(thread::current().id()) });
                 let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
@@ -109,7 +109,7 @@ impl NocMaster {
             let serialized = bytes.to_string()?;
             let app_msg: Box<dyn AppMessage> = serde_json::from_str(&serialized).context(ServiceError::Chain { func_name: _f, comment: S("NocMaster from vm")})?;
             {
-                if TRACE_OPTIONS.all || TRACE_OPTIONS.svc {
+                if CONFIG.trace_options.all || CONFIG.trace_options.svc {
                     let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "NocMaster_from_vm" };
                     let trace = json!({ "NocMaster": self.get_name(), "app_msg": app_msg.to_string() });
                     let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
@@ -163,7 +163,7 @@ impl NocAgent {
         thread::Builder::new().name(thread_name).spawn( move || {
             update_trace_header(child_trace_header);
             let _ = agent.listen_vm_loop(&container_from_vm).map_err(|e| write_err("service", &e));
-            if CONTINUE_ON_ERROR { let _ = agent.listen_vm(container_from_vm); }
+            if CONFIG.continue_on_error { let _ = agent.listen_vm(container_from_vm); }
         })?;
         Ok(())
     }
@@ -172,7 +172,7 @@ impl NocAgent {
     fn listen_vm_loop(&self, container_from_vm: &ContainerFromVm) -> Result<(), Error> {
         let _f = "listen_vm_loop";
         {
-            if TRACE_OPTIONS.all || TRACE_OPTIONS.svc {
+            if CONFIG.trace_options.all || CONFIG.trace_options.svc {
                 let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "worker" };
                 let trace = json!({ "NocAgent": self.get_name(), "thread_name": thread::current().name(), "thread_id": TraceHeader::parse(thread::current().id()) });
                 let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
@@ -183,7 +183,7 @@ impl NocAgent {
             let serialized = bytes.to_string()?;
             let app_msg: Box<dyn AppMessage> = serde_json::from_str(&serialized).context(ServiceError::Chain { func_name: _f, comment: S("NocAgent from vm") })?;
             {
-                if TRACE_OPTIONS.all || TRACE_OPTIONS.svc {
+                if CONFIG.trace_options.all || CONFIG.trace_options.svc {
                     let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "NocAgent_from_vm" };
                     let trace = json!({ "NocAgent": self.get_name(), "app_msg": app_msg.to_string() });
                     let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
@@ -200,7 +200,7 @@ impl NocAgent {
             let serialized = serde_json::to_string(&reply as &dyn AppMessage)?;
             let bytes = ByteArray::new(&serialized);
             {
-                if TRACE_OPTIONS.all || TRACE_OPTIONS.svc {
+                if CONFIG.trace_options.all || CONFIG.trace_options.svc {
                     let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "NocAgent_to_vm" };
                     let trace = json!({ "NocAgent": self.get_name(), "app_msg": reply.to_string() });
                     let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);

@@ -45,8 +45,7 @@ use std::{io::{stdin, stdout, Read, Write},
 
 use crate::app_message_formats::{ApplicationFromNoc, ApplicationToNoc, NocFromApplication, NocToApplication};
 use crate::blueprint::{Blueprint};
-use crate::config::{OUTPUT_FILE_NAME, QUENCH,
-                    CellQty, PortQty};
+use crate::config::{CONFIG, CellQty, PortQty};
 use crate::gvm_equation::{GvmEqn};
 use crate::noc::Noc;
 use crate::uptree_spec::{AllowedTree, ContainerSpec, Manifest, UpTreeSpec, VmSpec};
@@ -54,9 +53,9 @@ use crate::utility::{CellConfig, CellNo, PortNo, S, TraceHeader, is2e, _print_ve
 
 fn main() -> Result<(), Error> {
     let _f = "main";
-    println!("Multicell Routing: Output to file {} (set in config.rs)", OUTPUT_FILE_NAME);
-    println!("{:?} Quenching of Discover messages", QUENCH);
-    let _ = OpenOptions::new().write(true).truncate(true).open(OUTPUT_FILE_NAME);
+    println!("Multicell Routing: Output to file {} (set in config.rs)", CONFIG.output_file_name);
+    println!("{:?} Quenching of Discover messages", CONFIG.quench);
+    let _ = OpenOptions::new().write(true).truncate(true).open(CONFIG.output_file_name);
     let cell_port_exceptions = HashMap::new();
     let mut border_cell_ports = HashMap::new();
     border_cell_ports.insert(CellNo(0), vec![PortNo(2)]);
