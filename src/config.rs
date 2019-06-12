@@ -8,7 +8,7 @@ use std::{fmt,
 
 use lazy_static::lazy_static;
 
-use crate::utility::{CellNo, Edge, PortNo, Quench};
+use crate::utility::{CellConfig, CellNo, Edge, PortNo, Quench};
 
 // System parameters
 pub const SCHEMA_VERSION: &str = "0.1";
@@ -41,6 +41,7 @@ pub struct Config {
     pub num_ports_per_cell: PortQty,
     pub cell_port_exceptions: HashMap<CellNo, PortQty>,
     pub border_cell_ports: HashMap<CellNo, Vec<PortNo>>,
+    pub cell_config: HashMap<String, CellConfig>,
     pub edge_list: Vec<Edge>,
     pub geometry: Vec<(usize, usize)>,
     pub trace_options: TraceOptions,
