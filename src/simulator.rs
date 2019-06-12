@@ -9,59 +9,56 @@
 #[macro_use] extern crate serde_derive;
 #[macro_use] extern crate serde_json;
 
-mod app_message;
-mod app_message_formats;
-mod blueprint;
-mod cellagent;
-mod cmodel;
-mod config;
-mod container;
-mod dal;
-mod datacenter;
-mod dumpstack;
-mod errors;
-mod gvm_equation;
-mod link;
-mod ec_message;
-mod ec_message_formats;
-mod nalcell;
-mod name;
-mod noc;
-mod packet;
-mod packet_engine;
-mod port;
-mod port_tree;
-mod rack;
-mod routing_table;
-mod routing_table_entry;
-mod service;
-mod tenant;
-mod traph;
-mod traph_element;
-mod tree;
-mod uptree_spec;
-mod utility;
-mod uuid_ec;
-mod vm;
+pub mod app_message;
+pub mod app_message_formats;
+pub mod blueprint;
+pub mod cellagent;
+pub mod cmodel;
+pub mod config;
+pub mod container;
+pub mod dal;
+pub mod datacenter;
+pub mod dumpstack;
+pub mod errors;
+pub mod gvm_equation;
+pub mod link;
+pub mod ec_message;
+pub mod ec_message_formats;
+pub mod nalcell;
+pub mod name;
+pub mod noc;
+pub mod packet;
+pub mod packet_engine;
+pub mod port;
+pub mod port_tree;
+pub mod rack;
+pub mod routing_table;
+pub mod routing_table_entry;
+pub mod service;
+pub mod tenant;
+pub mod traph;
+pub mod traph_element;
+pub mod tree;
+pub mod uptree_spec;
+pub mod utility;
+pub mod uuid_ec;
+pub mod vm;
 
 use std::{io::{stdin, stdout, Read, Write},
           collections::{HashMap, HashSet},
           fs::{File, OpenOptions, create_dir, remove_dir_all},
           path::Path,
-          thread::{JoinHandle},
 };
 
 use crate::blueprint::{Blueprint, CellNo, Edge, is2e};
-use crate::config::{OUTPUT_DIR_NAME, OUTPUT_FILE_NAME, QUENCH,
+use crate::config::{AUTO_BREAK, OUTPUT_DIR_NAME, OUTPUT_FILE_NAME, QUENCH,
                     CellConfig, CellQty, PortNo, PortQty};
 use crate::datacenter::{Datacenter};
 use crate::gvm_equation::{GvmEqn};
-use crate::app_message_formats::{ApplicationToNoc, ApplicationFromNoc};
+use crate::app_message_formats::{ApplicationToNoc};
 use crate::link::Link;
 use crate::uptree_spec::{AllowedTree, ContainerSpec, Manifest, UpTreeSpec, VmSpec};
-use crate::utility::{print_hash_map, sleep, S, TraceHeader};
-
-pub const AUTO_BREAK: Option<Edge> = None;//  Some(Edge(CellNo(0), CellNo(1))); // Set to edge to break when debugging broken link with VSCode, else 0
+use crate::utility::{_print_hash_map, sleep, S, TraceHeader};
 
 fn main() -> Result<(), Error> {
     let _f = "main";
@@ -95,9 +92,9 @@ fn main() -> Result<(), Error> {
         match Datacenter::construct(
             Blueprint::new(
                 num_cells,
-                &vec![is2e(0,1), is2e(1,2), is2e(2,3), is2e(3,4),
-                      is2e(5,6), is2e(6,7), is2e(7,8), is2e(8,9),
-                      is2e(0,5), is2e(1,6), is2e(2,7), is2e(3,8), is2e(4,9)],
+                &vec![is2e(0,1), is2e(1,2), is2e(3,4), is2e(2,3),
+                      is2e(1,6), is2e(5,6), is2e(6,7), is2e(7,8), is2e(8,9),
+                      is2e(0,5), is2e(2,7), is2e(3,8), is2e(4,9)],
                 default_num_phys_ports_per_cell,
                 &cell_port_exceptions, &border_cell_ports,
             )?
@@ -106,14 +103,7 @@ fn main() -> Result<(), Error> {
             Err(err) => panic!("Datacenter construction failure: {}", err)
         };
     if false { deployment_demo()?; }    // Demonstrate features of deployment spec
-    match AUTO_BREAK {
-        Some(edge) => {
-            println!("---> Automatically break link");
-            break_link(&mut dc)?;
-        },
-        None => {
-        }
-    }
+    if AUTO_BREAK.is_some() { break_link(&mut dc)?; }
     loop {
         stdout().write(b"\nType:
             d to print datacenter
@@ -146,7 +136,7 @@ fn main() -> Result<(), Error> {
 fn show_ca(dc: &Datacenter) -> Result<(), Error> {
     let rack = dc.get_rack();
     let cells = rack.get_cells();
-    print_hash_map(&rack.get_cell_ids());
+    _print_hash_map(&rack.get_cell_ids());
     let _ = stdout().write(b"Enter cell to display cell\n")?;
     let cell_no = read_int()?;
     cells.get(&CellNo(cell_no))
@@ -159,7 +149,7 @@ fn show_ca(dc: &Datacenter) -> Result<(), Error> {
 fn show_pe(dc: &Datacenter) -> Result<(), Error> {
     let rack = dc.get_rack();
     let cells = rack.get_cells();
-    print_hash_map(&rack.get_cell_ids());
+    _print_hash_map(&rack.get_cell_ids());
     let _ = stdout().write(b"Enter cell to display forwarding table\n")?;
     let cell_no = read_int()?;
     cells.get(&CellNo(cell_no))
@@ -174,13 +164,14 @@ fn break_link(dc: &mut Datacenter) -> Result<(), Error> {
     let edge: Edge = match AUTO_BREAK {
         Some(edge) => {
             // TODO: Wait until discover is done before automatically breaking link, should be removed
-            sleep(4);
+            println!("---> Sleeping to let discover finish before automatically breaking link");
+            sleep(6);
             println!("---> Automatically break link {}", edge);
             edge
         },
         None => {
             let link_ids = rack.get_link_ids();
-            print_hash_map(&link_ids);
+            _print_hash_map(&link_ids);
             let _ = stdout().write(b"Enter first cell number of link to break\n")?;
             let left: usize = read_int()?;
             let _ = stdout().write(b"Enter second cell number of link to break\n")?;
@@ -226,20 +217,20 @@ fn deployment_demo() -> Result<(), Error> {
 //  let ref gvm_eqn = GvmEquation::new(eqns, vec![GvmVariable::new(GvmVariableType::PathLength, "hops")]);
     let up_tree1 = UpTreeSpec::new("test1", vec![0, 0, 0, 2, 2]).context(MainError::Chain { func_name: "deployment_demo", comment: S("")})?;
     let up_tree2 = UpTreeSpec::new("test2", vec![1, 1, 0, 1]).context(MainError::Chain { func_name: "deployment_demo", comment: S("")})?;
-    let allowed_tree1 = &AllowedTree::new("foo");
-    let allowed_tree2 = &AllowedTree::new("bar");
-    let c1 = ContainerSpec::new("c1", "D1", vec!["param1"], &[allowed_tree1, allowed_tree2]).context(MainError::Chain { func_name: "deployment_demo", comment: S("")})?;
-    let c2 = ContainerSpec::new("c2", "D1", vec!["param1","param2"], &[allowed_tree1]).context(MainError::Chain { func_name: "deployment_demo", comment: S("")})?;
-    let c3 = ContainerSpec::new("c3", "D3", vec!["param3"], &[allowed_tree1]).context(MainError::Chain { func_name: "deployment_demo", comment: S("")})?;
-    let c4 = ContainerSpec::new("c4", "D2", vec![], &[allowed_tree1, allowed_tree2]).context(MainError::Chain { func_name: "deployment_demo", comment: S("")})?;
+    let allowed_tree1 = AllowedTree::new("foo");
+    let allowed_tree2 = AllowedTree::new("bar");
+    let c1 = ContainerSpec::new("c1", "D1", vec!["param1"], &[allowed_tree1.clone(), allowed_tree2.clone()]).context(MainError::Chain { func_name: "deployment_demo", comment: S("")})?;
+    let c2 = ContainerSpec::new("c2", "D1", vec!["param1","param2"], &[allowed_tree1.clone()]).context(MainError::Chain { func_name: "deployment_demo", comment: S("")})?;
+    let c3 = ContainerSpec::new("c3", "D3", vec!["param3"], &[allowed_tree1.clone()]).context(MainError::Chain { func_name: "deployment_demo", comment: S("")})?;
+    let c4 = ContainerSpec::new("c4", "D2", vec![], &[allowed_tree1.clone(), allowed_tree2.clone()]).context(MainError::Chain { func_name: "deployment_demo", comment: S("")})?;
     let c5 = ContainerSpec::new("c5", "D2", vec![], &[]).context(MainError::Chain { func_name: "deployment_demo", comment: S("")})?;
-    let c6 = ContainerSpec::new("c6", "D3", vec!["param4"], &[allowed_tree1]).context(MainError::Chain { func_name: "deployment_demo", comment: S("")})?;
+    let c6 = ContainerSpec::new("c6", "D3", vec!["param4"], &[allowed_tree1.clone()]).context(MainError::Chain { func_name: "deployment_demo", comment: S("")})?;
     let vm_spec1 = VmSpec::new("vm1", "Ubuntu", CellConfig::Large,
-                               &vec![allowed_tree1, allowed_tree2], vec![&c1, &c2, &c4, &c5, &c5], vec![&up_tree1, &up_tree2]).context(MainError::Chain { func_name: "deployment_demo", comment: S("")})?;
+                               &vec![allowed_tree1.clone(), allowed_tree2.clone()], vec![&c1, &c2, &c4, &c5, &c5], vec![&up_tree1, &up_tree2]).context(MainError::Chain { func_name: "deployment_demo", comment: S("")})?;
     let up_tree3 = UpTreeSpec::new("test3", vec![0, 0]).context(MainError::Chain { func_name: "deployment_demo", comment: S("")})?;
     let up_tree4 = UpTreeSpec::new("test4", vec![1, 1, 0]).context(MainError::Chain { func_name: "deployment_demo", comment: S("")})?;
     let vm_spec2 = VmSpec::new("vm2", "RedHat",  CellConfig::Large,
-                               &vec![allowed_tree1], vec![&c5, &c3, &c6], vec![&up_tree3, &up_tree4]).context(MainError::Chain { func_name: "deployment_demo", comment: S("")})?;
+                               &vec![allowed_tree1.clone()], vec![&c5, &c3, &c6], vec![&up_tree3, &up_tree4]).context(MainError::Chain { func_name: "deployment_demo", comment: S("")})?;
     let up_tree_def = Manifest::new("mytest", CellConfig::Large,
                                     &AllowedTree::new("cell_tree"),
                                     &[allowed_tree1, allowed_tree2],

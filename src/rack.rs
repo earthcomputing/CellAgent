@@ -1,4 +1,3 @@
-extern crate multi_mut;
 use multi_mut::{HashMapMultiMut};
 
 use std::{fmt, fmt::Write,
@@ -10,7 +9,7 @@ use std::{fmt, fmt::Write,
 use crate::app_message_formats::{PortToNoc, PortFromNoc};
 use crate::blueprint::{Blueprint, Cell, CellNo, Edge};
 use crate::config::{TRACE_OPTIONS, CellQty, CellConfig, LinkQty, get_geometry};
-use crate::dal;
+use crate::dal::add_to_trace;
 use crate::ec_message_formats::{LinkToPort, PortFromLink, PortToLink, LinkFromPort, PortFromPe};
 use crate::link::{Link};
 use crate::nalcell::{NalCell};
@@ -46,7 +45,7 @@ impl Rack {
                         let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "border_cell_start" };
                         let cell_id = nal_cell.get_id();
                         let trace = json!({ "cell_id": cell_id, "cell_number": cell_no, "location":  geometry.2.get(*cell_no)});
-                        let _ = dal::add_to_trace(TraceType::Trace, trace_params, &trace, _f);
+                        let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
                     }
                 }
                 Ok((cell_no, nal_cell))
@@ -68,7 +67,7 @@ impl Rack {
                         let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "interior_cell_start" };
                         let cell_id = nal_cell.get_id();
                         let trace = json!({ "cell_id": cell_id, "cell_number": cell_no, "location": geometry.2.get(*cell_no as usize) });
-                        let _ = dal::add_to_trace(TraceType::Trace, trace_params, &trace, _f);
+                        let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
                     }
                 }
                 Ok((cell_no, nal_cell))
@@ -103,7 +102,7 @@ impl Rack {
                 if TRACE_OPTIONS.all || TRACE_OPTIONS.dc {
                     let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "connect_link" };
                     let trace = json!({ "left_cell": left_cell_id, "rite_cell": rite_cell_id, "left_port": left_port.get_port_no(), "rite_port": rite_port.get_port_no(), "link_id": link.get_id() });
-                    let _ = dal::add_to_trace(TraceType::Trace, trace_params, &trace, _f);
+                    let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
                 }
             }
             let mut handle_pair = link.start_threads(link_to_left, link_from_left, link_to_rite, link_from_rite)?;

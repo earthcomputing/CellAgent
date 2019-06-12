@@ -2,7 +2,9 @@ use std::{fmt,
           ops::{Deref}};
 
 use failure::Error;
-use crate::utility::PortNumber;
+
+use crate::blueprint::{CellNo, Edge};
+use crate::utility::{PortNumber, S};
 use crate::uuid_ec::Uuid;
 
 pub const SCHEMA_VERSION: &str = "0.1";
@@ -15,6 +17,8 @@ pub const PACKET_MIN: usize = 64;
 pub const PACKET_MAX: usize = 9000;
 // Control
 pub const CONTINUE_ON_ERROR: bool = false; // Don't close channel following an error if true
+pub const AUTO_BREAK: Option<Edge> = (None, Some(Edge(CellNo(1), CellNo(2)))).0;// Use .1 to auto break link
+pub const DISCOVER_QUIESCE_FACTOR: usize = 4; // Bigger means wait longer to quiesce
 #[derive(Debug, Copy, Clone, Hash, Serialize, Deserialize)]
 pub enum CellConfig { Small, Medium, Large }
 impl fmt::Display for CellConfig {
@@ -61,7 +65,6 @@ pub struct TraceOptions {
     pub pe_cm:    bool,
     pub pe_port:  bool,
     pub port:     bool,
-    pub port_noc: bool,
     pub link:     bool
 }
 pub const TRACE_OPTIONS: TraceOptions = TraceOptions {
@@ -72,12 +75,11 @@ pub const TRACE_OPTIONS: TraceOptions = TraceOptions {
     svc:      true,
     vm:       true,
     ca:       true,
-    cm:       true,
-    pe:       true,
-    pe_cm:    true,
+    cm:       false,
+    pe:       false,
+    pe_cm:    false,
     pe_port:  false,
     port:     false,
-    port_noc: true,
     link:     false
 };
 
@@ -99,8 +101,9 @@ pub struct DebugOptions {
     pub pe_pkt_send:    bool,
     pub process_msg:    bool,
     pub pe_process_pkt: bool,
+    pub port:           bool,
     pub saved_discover: bool,
-    pub saved_msgs:     bool,
+    pub saved_stack:    bool,
     pub stack_tree:     bool,
     pub traph_entry:    bool,
 }
@@ -122,15 +125,35 @@ pub const DEBUG_OPTIONS: DebugOptions = DebugOptions {
     pe_pkt_send:    false,
     process_msg:    false,
     pe_process_pkt: false,
+    port:           false,
     saved_discover: false,
-    saved_msgs:     false,
+    saved_stack:    false,
     stack_tree:     false,
     traph_entry:    false,
 };
-// Size of various fields
 #[derive(Debug, Clone, Hash, Eq, PartialEq, Serialize, Deserialize)]
-pub struct ByteArray(pub Vec<u8>);
-impl Deref for ByteArray { type Target = Vec<u8>; fn deref(&self) -> &Self::Target { &self.0 } }
+pub struct ByteArray { bytes: Vec<u8> }
+impl ByteArray {
+    pub fn new(str_ref: &str) -> ByteArray {
+        ByteArray { bytes: S(str_ref).into_bytes() }
+    }
+    pub fn new_from_bytes(bytes: &Vec<u8>) -> ByteArray {
+        ByteArray { bytes: bytes.clone() }
+    }
+    pub fn get_bytes(&self) -> &Vec<u8> { &self.bytes }
+    pub fn to_string(&self) -> Result<String, Error> {
+        let string = std::str::from_utf8(&self.bytes)?;
+        let default_as_char = PAYLOAD_DEFAULT_ELEMENT as char;
+        Ok(string.replace(default_as_char, ""))
+    }
+}
+impl fmt::Display for ByteArray {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let bytes = std::str::from_utf8(&self.bytes).expect("ByteArray: Error converting bytes to str");
+        write!(f, "{}", bytes)
+    }
+}
+// Size of various fields
 #[derive(Debug, Copy, Clone, Eq, Hash, PartialEq, Serialize, Deserialize)]
 pub struct CellQty(pub usize);
 impl Deref for CellQty { type Target = usize; fn deref(&self) -> &Self::Target { &self.0 } }
@@ -165,15 +188,15 @@ impl PortNo {
     pub fn as_usize(self) -> usize { self.0 as usize }
 }
 impl Deref for PortNo { type Target = u8; fn deref(&self) -> &Self::Target { &self.0 } }
-#[derive(Debug, Copy, Clone)]
+impl fmt::Display for PortNo {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "P:{}", self.0)
+    }
+}
+#[derive(Debug, Copy, Clone, Eq, PartialEq)]
 pub enum CellType {
     Border,
     Interior
-}
-impl fmt::Display for PortNo {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "P:{}", *self)
-    }
 }
 impl fmt::Display for CellType {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {

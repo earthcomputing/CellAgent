@@ -28,7 +28,7 @@ impl PortTree {
     pub fn get_in_port_no(&self) -> PortNo { self.in_port_no }
     pub fn _get_hops(&self) -> &PathLength { &self.hops }
     pub fn get_entry(&self) -> RoutingTableEntry { self.entry }
-    pub fn has_child(&self, child: PortNumber) -> bool { self.entry.has_child(child) }
+    pub fn _has_child(&self, child: PortNumber) -> bool { self.entry._has_child(child) }
     pub fn set_entry(&mut self, new_entry: RoutingTableEntry) { self.entry = new_entry; }
     pub fn add_child(&mut self, child: PortNumber) -> RoutingTableEntry {
         self.entry.add_child(child)
@@ -39,7 +39,7 @@ impl PortTree {
     pub fn set_parent(&mut self, new_parent: PortNumber) -> RoutingTableEntry {
         self.entry.set_parent(new_parent)
     }
-    pub fn make_child_parent(&mut self, child: PortNumber) -> RoutingTableEntry {
+    pub fn _make_child_parent(&mut self, child: PortNumber) -> RoutingTableEntry {
         self.remove_child(child);
         self.set_parent(child)
     }
