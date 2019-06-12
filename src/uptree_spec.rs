@@ -14,18 +14,18 @@ pub struct Manifest {
     trees: Vec<UpTreeSpec>
 }
 impl Manifest {
-    pub fn new(id: &str, cell_config: CellConfig, deployment_tree: &AllowedTree, allowed_refs: &[&AllowedTree],
+    pub fn new(id: &str, cell_config: CellConfig, deployment_tree: &AllowedTree, allowed_refs: &[AllowedTree],
             vm_refs: Vec<&VmSpec>, tree_refs: Vec<&UpTreeSpec>) -> Result<Manifest, Error> {
         let mut trees = Vec::new();
         for t in tree_refs { trees.push(t.clone()); }
         let mut allowed_trees = Vec::new();
-        for &a in allowed_refs { allowed_trees.push(a.clone()); }
+        for a in allowed_refs { allowed_trees.push(a.clone()); }
         let mut vms = Vec::new();
         for v in vm_refs {
             vms.push(v.to_owned());
             let allowed = v.get_allowed_trees();
             for tree in allowed {
-                if !allowed_trees.contains(tree) { return Err(UptreeSpecError::Allowed { func_name: "new", vm_id: v.get_id().clone(), tree: tree.clone() }.into()); }
+                if !allowed_trees.contains(&tree) { return Err(UptreeSpecError::Allowed { func_name: "new", vm_id: v.get_id().clone(), tree: tree.clone() }.into()); }
             }
         }
         Ok(Manifest { id: S(id), deployment_tree: deployment_tree.clone(), cell_config,
@@ -57,11 +57,11 @@ pub struct VmSpec {
     trees: Vec<UpTreeSpec>
 }
 impl VmSpec {
-    pub fn new(id: &str, image: &str, config: CellConfig, allowed_refs: &[&AllowedTree],
+    pub fn new(id: &str, image: &str, config: CellConfig, allowed_refs: &[AllowedTree],
             container_refs: Vec<&ContainerSpec>, tree_refs: Vec<&UpTreeSpec>) -> Result<VmSpec, Error> {
         let mut max_tree_size = 0;
         let mut allowed_trees = Vec::new();
-        for &a in allowed_refs { allowed_trees.push(a.clone()); }
+        for a in allowed_refs { allowed_trees.push(a.clone()); }
         let mut trees = Vec::new();
         for t in tree_refs {
             trees.push(t.clone());
@@ -101,11 +101,11 @@ pub struct ContainerSpec {
     allowed_trees: Vec<AllowedTree>
 }
 impl ContainerSpec {
-    pub fn new(id: &str, image: &str, param_refs: Vec<&str>, allowed_refs: &[&AllowedTree]) -> Result<ContainerSpec, Error> {
+    pub fn new(id: &str, image: &str, param_refs: Vec<&str>, allowed_refs: &[AllowedTree]) -> Result<ContainerSpec, Error> {
         let mut params = Vec::new();
         for p in param_refs { params.push(S(p)); }
         let mut allowed_trees = Vec::new();
-        for &a in allowed_refs { allowed_trees.push(a.clone()); }
+        for a in allowed_refs { allowed_trees.push(a.clone()); }
         Ok(ContainerSpec { id: S(id), image: S(image), params, allowed_trees: allowed_trees.clone() })
     }
     pub fn get_id(&self) -> String { self.id.clone() }

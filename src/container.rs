@@ -1,4 +1,5 @@
 use std::fmt;
+use std::collections::HashSet;
 use failure::Error;
 
 use crate::app_message_formats::{ContainerToVm, ContainerFromVm};
@@ -9,11 +10,11 @@ use crate::uptree_spec::AllowedTree;
 #[derive(Debug, Clone)]
 pub struct Container {
     id: ContainerID,
-    allowed_trees: Vec<AllowedTree>,
+    allowed_trees: HashSet<AllowedTree>,
     service: Service,
 }
 impl Container {
-    pub fn new(id: ContainerID, service_name: &str, allowed_trees: &[AllowedTree],
+    pub fn new(id: ContainerID, service_name: &str, allowed_trees: &HashSet<AllowedTree>,
                container_to_vm: ContainerToVm) -> Result<Container, Error> {
         //println!("Create container {}", id);
         let service = Service::new( id, service_name, allowed_trees, container_to_vm)?;

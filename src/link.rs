@@ -2,8 +2,7 @@ use std::{fmt,
           thread, thread::JoinHandle};
 
 use crate::config::{CONTINUE_ON_ERROR, TRACE_OPTIONS};
-use crate::dal;
-use crate::dal::{fork_trace_header, update_trace_header};
+use crate::dal::{add_to_trace, fork_trace_header, update_trace_header};
 use crate::ec_message_formats::{LinkToPort, LinkFromPort, LinkToPortPacket};
 use crate::name::{Name, LinkID, PortID};
 use crate::port::{PortStatus};
@@ -39,13 +38,27 @@ impl Link {
     pub fn break_link(&mut self) -> Result<(), Error> {
         let _f = "break_link";
         self.is_connected = false;
-        self.clone().to_left.expect("Cannot fail in break_link").send(LinkToPortPacket::Status(PortStatus::Disconnected)).context(LinkError::Chain { func_name: _f, comment: S(self.id.clone()) + " left"})?;
-        self.clone().to_rite.expect("Cannot fail in break_link").send(LinkToPortPacket::Status(PortStatus::Disconnected)).context(LinkError::Chain { func_name: _f, comment: S(self.id.clone()) + " left"})?;
+        {
+            if TRACE_OPTIONS.all || TRACE_OPTIONS.link {
+                let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "link_to_port_disconnected" };
+                let trace = json!({ "id": &self.get_id(), "status": LinkToPortPacket::Status(PortStatus::Disconnected) });
+                let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
+            }
+        }
+        self.to_left.clone().expect("Unwrap cannot fail in break_link").send(LinkToPortPacket::Status(PortStatus::Disconnected)).context(LinkError::Chain { func_name: _f, comment: S(self.id.clone()) + " left"})?;
+        self.to_rite.clone().expect("Unwrap cannot fail in break_link").send(LinkToPortPacket::Status(PortStatus::Disconnected)).context(LinkError::Chain { func_name: _f, comment: S(self.id.clone()) + " left"})?;
         Ok(())
     }
     fn listen(&self, status: &LinkToPort, link_from: LinkFromPort, link_to: LinkToPort)
             -> Result<JoinHandle<()>, Error> {
         let _f = "listen";
+        {
+            if TRACE_OPTIONS.all || TRACE_OPTIONS.link {
+                let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "link_to_port_connected" };
+                let trace = json!({ "id": &self.get_id(), "status": LinkToPortPacket::Status(PortStatus::Connected) });
+                let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
+            }
+        }
         status.send(LinkToPortPacket::Status(PortStatus::Connected)).context(LinkError::Chain { func_name: _f, comment: S(self.id.clone()) + " send status to port"})?;
         let join_handle = self.listen_port(link_from, link_to)?;
         Ok(join_handle)
@@ -72,19 +85,22 @@ impl Link {
             if TRACE_OPTIONS.all || TRACE_OPTIONS.link {
                 let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "worker" };
                 let trace = json!({ "id": &self.get_id(), "thread_name": thread::current().name(), "thread_id": TraceHeader::parse(thread::current().id()) });
-                let _ = dal::add_to_trace(TraceType::Trace, trace_params, &trace, _f);
+                let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
             }
         }
         loop {
-            let msg = link_from.recv().context(LinkError::Chain { func_name: _f, comment: S(self.id.clone()) })?;
+            let packet = link_from.recv().context(LinkError::Chain { func_name: _f, comment: S(self.id.clone()) })?;
             {
                 if TRACE_OPTIONS.all || TRACE_OPTIONS.link {
-                    let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "recv" };
-                    let trace = json!({ "id": &self.get_id(), "msg": msg });
-                    let _ = dal::add_to_trace(TraceType::Trace, trace_params, &trace, _f);
+                    let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "link_from_port" };
+                    let trace = json!({ "id": &self.get_id(), "msg": packet.to_string()? });
+                    let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
+                    let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "link_to_port" };
+                    let trace = json!({ "id": &self.get_id(), "msg": packet.to_string()? });
+                    let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
                 }
             }
-            link_to.send(LinkToPortPacket::Packet(msg)).context(LinkError::Chain { func_name: _f, comment: S(self.id.clone()) })?;
+            link_to.send(LinkToPortPacket::Packet(packet)).context(LinkError::Chain { func_name: _f, comment: S(self.id.clone()) })?;
         }
     }
 }

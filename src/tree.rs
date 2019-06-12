@@ -32,12 +32,12 @@ impl Tree {
     pub fn get_table_entry(&self) -> RoutingTableEntry { self.table_entry }
     pub fn set_table_entry(&mut self, entry: RoutingTableEntry) { self.table_entry = entry; }
     pub fn get_gvm_eqn(&self) -> &GvmEquation { &self.gvm_eqn }
-    pub fn has_child(&self, child: PortNumber) -> bool { self.table_entry.has_child(child) }
+    pub fn _has_child(&self, child: PortNumber) -> bool { self.table_entry._has_child(child) }
     pub fn add_child(&mut self, child: PortNumber) -> RoutingTableEntry { self.table_entry.add_child(child) }
     pub fn remove_child(&mut self, child: PortNumber) -> RoutingTableEntry {
         self.table_entry.remove_child(child)
     }
-    pub fn make_child_parent(&mut self, child: PortNumber) -> RoutingTableEntry {
+    pub fn _make_child_parent(&mut self, child: PortNumber) -> RoutingTableEntry {
         self.remove_child(child);
         self.set_parent(child)
     }

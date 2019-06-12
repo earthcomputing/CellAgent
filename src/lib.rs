@@ -1,44 +1,47 @@
 #![deny(unused_must_use)]
 //#![warn(rust_2018_idioms)]
 #![recursion_limit="1024"]
+#![allow(dead_code)]
+#![allow(unused_variables)]
+#![allow(unused_imports)]
 #[macro_use] extern crate failure;
 #[macro_use] extern crate serde_derive;
 #[macro_use] extern crate serde_json;
 #[macro_use] extern crate lazy_static;
-mod app_message;
-mod app_message_formats;
-mod blueprint;
-mod cellagent;
-mod cmodel;
-mod config;
-mod container;
-mod dal;
-mod datacenter;
-mod dumpstack;
-mod ec_message;
-mod ec_message_formats;
-mod errors;
-mod gvm_equation;
-mod link;
-mod nalcell;
-mod name;
-mod noc;
-mod packet;
-mod packet_engine;
-mod port;
-mod port_tree;
-mod rack;
-mod routing_table;
-mod routing_table_entry;
-mod service;
-mod tenant;
-mod traph;
-mod traph_element;
-mod tree;
-mod uptree_spec;
-mod utility;
-mod uuid_ec;
-mod vm;
+pub mod app_message;
+pub mod app_message_formats;
+pub mod blueprint;
+pub mod cellagent;
+pub mod cmodel;
+pub mod config;
+pub mod container;
+pub mod dal;
+pub mod datacenter;
+pub mod dumpstack;
+pub mod ec_message;
+pub mod ec_message_formats;
+pub mod errors;
+pub mod gvm_equation;
+pub mod link;
+pub mod nalcell;
+pub mod name;
+pub mod noc;
+pub mod packet;
+pub mod packet_engine;
+pub mod port;
+pub mod port_tree;
+pub mod rack;
+pub mod routing_table;
+pub mod routing_table_entry;
+pub mod service;
+pub mod tenant;
+pub mod traph;
+pub mod traph_element;
+pub mod tree;
+pub mod uptree_spec;
+pub mod utility;
+pub mod uuid_ec;
+pub mod vm;
 
 use std::{collections::{HashMap}};
 
@@ -559,7 +562,7 @@ impl<'a, 'b> Test for DatacenterBorder<'a, 'b> {
                     is_border_cell = !border_ports.is_empty();
                 }
                 None => {
-                    border_ports = &Vec::new();
+                    ()// border_ports = &Vec::new(); // Assigned value never used
                 }
             }
             assert_eq!(cell.is_border(), is_border_cell);

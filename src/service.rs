@@ -1,18 +1,19 @@
 use std::{fmt, thread};
+use std::collections::HashSet;
 
 //use reqwest::Client::*;
 
 use crate::app_message_formats::{ContainerToVm, ContainerFromVm};
-use crate::app_message::{AppMsgDirection, AppMsgType};
+use crate::app_message::{AppMsgDirection, AppInterapplicationMsg, AppMessage};
 use crate::config::{ByteArray, CONTINUE_ON_ERROR, TRACE_OPTIONS};
-use crate::dal;
-use crate::dal::{fork_trace_header, update_trace_header};
+use crate::dal::{add_to_trace, fork_trace_header, update_trace_header};
 use crate::name::{ContainerID, UptreeID};
+use crate::noc::{NOC_CONTROL_TREE_NAME, NOC_LISTEN_TREE_NAME};
 use crate::uptree_spec::{AllowedTree};
 use crate::utility::{S, write_err, TraceHeader, TraceHeaderParams, TraceType};
 
-pub const NOCMASTER: &str ="NocMaster";
-pub const NOCAGENT: &str = "NocAgent";
+const NOC_MASTER: &str ="NocMaster";
+const NOC_AGENT: &str = "NocAgent";
 
 #[derive(Debug, Clone)]
 pub enum Service {
@@ -20,18 +21,18 @@ pub enum Service {
     NocAgent { service: NocAgent }
 }
 impl Service {
-    pub fn new(container_id: ContainerID, service_name: &str, allowed_trees: &[AllowedTree],
+    pub fn new(container_id: ContainerID, service_name: &str, allowed_trees: &HashSet<AllowedTree>,
             container_to_vm: ContainerToVm) -> Result<Service, ServiceError> {
         match service_name {
-            NOCMASTER => Ok(Service::NocMaster { service: NocMaster::new(container_id, NOCMASTER, container_to_vm, allowed_trees) }),
-            NOCAGENT => Ok(Service::NocAgent { service: NocAgent::new(container_id, NOCAGENT, container_to_vm, allowed_trees) }),
+            NOC_MASTER => Ok(Service::NocMaster { service: NocMaster::new(container_id, NOC_MASTER, container_to_vm, allowed_trees) }),
+            NOC_AGENT => Ok(Service::NocAgent { service: NocAgent::new(container_id, NOC_AGENT, container_to_vm, allowed_trees) }),
             _ => Err(ServiceError::NoSuchService { func_name: "create_service", service_name: S(service_name) })
         }
     }
     pub fn initialize(&self, up_tree_id: UptreeID, container_from_vm: ContainerFromVm) -> Result<(), Error> {
-        match *self {
-            Service::NocMaster { ref service } => service.initialize(up_tree_id, container_from_vm),
-            Service::NocAgent  { ref service } => service.initialize(up_tree_id, container_from_vm)
+        match self {
+            Service::NocMaster { service } => service.initialize(up_tree_id, container_from_vm),
+            Service::NocAgent  { service  } => service.initialize(up_tree_id, container_from_vm)
         }
     }
 }
@@ -48,26 +49,35 @@ pub struct NocMaster {
     container_id: ContainerID,
     name: String,
     container_to_vm: ContainerToVm,
-    allowed_trees: Vec<AllowedTree>
+    allowed_trees: HashSet<AllowedTree>
 }
 impl NocMaster {
     pub fn get_name(&self) -> &str { &self.name }
     //pub fn get_id(&self) -> &ContainerID { &self.container_id }
     pub fn new(container_id: ContainerID, name: &str, container_to_vm: ContainerToVm,
-               allowed_trees: &[AllowedTree]) -> NocMaster {
-        //println!("NocMaster started in container {}", container_id);
+               allowed_trees: &HashSet<AllowedTree>) -> NocMaster {
         NocMaster { container_id, name: S(name), container_to_vm,
             allowed_trees: allowed_trees.to_owned() }
     }
     //fn get_container_id(&self) -> &ContainerID { &self.container_id }
-    pub fn initialize(&self, _: UptreeID, container_from_vm: ContainerFromVm) -> Result<(), Error> {
+    pub fn initialize(&self, _up_tree_id: UptreeID, container_from_vm: ContainerFromVm) -> Result<(), Error> {
         let _f = "initialize";
         println!("Service {} running NocMaster", self.container_id);
         self.listen_vm(container_from_vm)?;
-        let msg = S("Hello From Master");
-        let bytes = ByteArray(msg.into_bytes());
-        let is_ait = false;
-        self.container_to_vm.send((is_ait, AllowedTree::new("NocMasterAgent"), AppMsgType::Interapplication, AppMsgDirection::Leafward, bytes))?;
+        let base_tree = AllowedTree::new(NOC_CONTROL_TREE_NAME);
+        let body = "Hello From Master";
+        let app_msg = AppInterapplicationMsg::new(&self.get_name(),
+            false, &base_tree, AppMsgDirection::Leafward, &Vec::new(), body);
+        let serialized = serde_json::to_string(&app_msg as &dyn AppMessage)?;
+        let bytes:ByteArray = ByteArray::new(&serialized);
+        {
+            if TRACE_OPTIONS.all || TRACE_OPTIONS.svc {
+                let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "NocMaster_to_vm" };
+                let trace = json!({ "NocMaster": self.get_name(), "app_msg": app_msg.to_string() });
+                let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
+            }
+        }
+        self.container_to_vm.send(bytes)?;
         Ok(())
     }
     // SPAWN THREAD (listen_vm_loop)
@@ -91,26 +101,30 @@ impl NocMaster {
             if TRACE_OPTIONS.all || TRACE_OPTIONS.svc {
                 let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "worker" };
                 let trace = json!({ "NocMaster": self.get_name(), "thread_name": thread::current().name(), "thread_id": TraceHeader::parse(thread::current().id()) });
-                let _ = dal::add_to_trace(TraceType::Trace, trace_params, &trace, _f);
+                let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
             }
         }
         loop {
-            let (_is_ait, msg) = container_from_vm.recv().context("NocMaster container_from_vm").context(ServiceError::Chain { func_name: "listen_vm_loop", comment: S("NocMaster from vm")})?;
+            let bytes = container_from_vm.recv().context(ServiceError::Chain { func_name: _f, comment: S("NocMaster from vm")})?;
+            let serialized = bytes.to_string()?;
+            let app_msg: Box<dyn AppMessage> = serde_json::from_str(&serialized).context(ServiceError::Chain { func_name: _f, comment: S("NocMaster from vm")})?;
             {
                 if TRACE_OPTIONS.all || TRACE_OPTIONS.svc {
-                    let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "recv" };
-                    let trace = json!({ "NocMaster": self.get_name(), "msg": msg });
-                    let _ = dal::add_to_trace(TraceType::Trace, trace_params, &trace, _f);
+                    let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "NocMaster_from_vm" };
+                    let trace = json!({ "NocMaster": self.get_name(), "app_msg": app_msg.to_string() });
+                    let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
                 }
             }
-            let msg = format!("NocMaster on container {} got msg {}", self.container_id, ::std::str::from_utf8(&msg)?);
-            println!("{}", msg);
+            let body = app_msg.get_payload();
+            println!("NocMaster on container {} got msg {}", self.container_id, body);
+            /*
             let foo = reqwest::Client::new()
                 .post("http://localhost:8081/")
                 .body(msg)
                 .send()
                 .and_then(|res| { Ok(()/*println!("Response {:?}", res.status())*/)})
                 .map_err(|e| { println!("HTTP {:?}", e) });
+                */
         }
     }
 }
@@ -124,23 +138,21 @@ pub struct NocAgent {
     container_id: ContainerID,
     name: String,
     container_to_vm: ContainerToVm,
-    allowed_trees: Vec<AllowedTree>
+    allowed_trees: HashSet<AllowedTree>
 }
 impl NocAgent {
     pub fn get_name(&self) -> &str { &self.name }
     pub fn new(container_id: ContainerID, name: &str, container_to_vm: ContainerToVm,
-            allowed_trees: &[AllowedTree]) -> NocAgent {
-        //println!("NocAgent started in container {}", container_id);
+            allowed_trees: &HashSet<AllowedTree>) -> NocAgent {
         NocAgent { container_id, name: S(name), container_to_vm,
             allowed_trees: allowed_trees.to_owned() }
     }
     pub fn initialize(&self, _up_tree_id: UptreeID, container_from_vm: ContainerFromVm) -> Result<(), Error> {
-        //let _f = "initialize";
-        //self.container_to_vm.send((S("NocAgent"), S("Message from NocAgent"))).context(ServiceError::Chain { func_name: _f, comment: S("NocAgent") })?;
+        let _f = "initialize";
         println!("Service {} running NocAgent", self.container_id);
         self.listen_vm(container_from_vm)
     }
-    //pub fn get_id(&self) -> &ContainerID { &self.container_id }
+    pub fn _get_id(&self) -> &ContainerID { &self.container_id }
     // SPAWN THREAD (listen_vm_loop)
     fn listen_vm(&self, container_from_vm: ContainerFromVm) -> Result<(), Error> {
         let _f = "listen_vm";
@@ -163,24 +175,38 @@ impl NocAgent {
             if TRACE_OPTIONS.all || TRACE_OPTIONS.svc {
                 let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "worker" };
                 let trace = json!({ "NocAgent": self.get_name(), "thread_name": thread::current().name(), "thread_id": TraceHeader::parse(thread::current().id()) });
-                let _ = dal::add_to_trace(TraceType::Trace, trace_params, &trace, _f);
+                let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
             }
         }
         loop {
-            let (_is_ait, msg) = container_from_vm.recv().context(ServiceError::Chain { func_name: _f, comment: S("Agent recv from vm") })?;
+            let bytes = container_from_vm.recv().context(ServiceError::Chain { func_name: _f, comment: S("NocAgent recv from vm") })?;
+            let serialized = bytes.to_string()?;
+            let app_msg: Box<dyn AppMessage> = serde_json::from_str(&serialized).context(ServiceError::Chain { func_name: _f, comment: S("NocAgent from vm") })?;
             {
                 if TRACE_OPTIONS.all || TRACE_OPTIONS.svc {
-                    let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "recv" };
-                    let trace = json!({ "NocAgent": self.get_name(), "msg": msg });
-                    let _ = dal::add_to_trace(TraceType::Trace, trace_params, &trace, _f);
+                    let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "NocAgent_from_vm" };
+                    let trace = json!({ "NocAgent": self.get_name(), "app_msg": app_msg.to_string() });
+                    let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
                 }
             }
-            println!("NocAgent on container {} got msg {}", self.container_id, ::std::str::from_utf8(&msg)?);
+            let body = app_msg.get_payload();
+            println!("NocAgent on container {} got msg {}", self.container_id, body);
             let msg = format!("Reply from {}", self.container_id);
+            let target_tree = AllowedTree::new(NOC_LISTEN_TREE_NAME);
+            let reply = AppInterapplicationMsg::new(self.get_name(),
+                false, &target_tree, AppMsgDirection::Rootward,
+                                                    &vec![], &msg);
             //println!("Service {} sending {}", self.container_id, msg);
-            let bytes = ByteArray(msg.into_bytes());
-            let is_ait = false;
-            self.container_to_vm.send((is_ait, AllowedTree::new("NocAgentMaster"), AppMsgType::Interapplication, AppMsgDirection::Rootward, bytes))?;
+            let serialized = serde_json::to_string(&reply as &dyn AppMessage)?;
+            let bytes = ByteArray::new(&serialized);
+            {
+                if TRACE_OPTIONS.all || TRACE_OPTIONS.svc {
+                    let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "NocAgent_to_vm" };
+                    let trace = json!({ "NocAgent": self.get_name(), "app_msg": reply.to_string() });
+                    let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
+                }
+            }
+            self.container_to_vm.send(bytes)?;
         }
     }
 }
@@ -190,7 +216,7 @@ impl fmt::Display for NocAgent {
     }
 }
 // Errors
-use failure::{Error, ResultExt};
+use failure::{Error, ResultExt, Fail};
 #[derive(Debug, Fail)]
 pub enum ServiceError {
     #[fail(display = "ServiceError::Chain {} {}", func_name, comment)]
