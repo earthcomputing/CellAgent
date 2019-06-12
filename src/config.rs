@@ -19,31 +19,9 @@ pub const CONTROL_TREE_NAME: & str = "Control";
 pub const CONNECTED_PORTS_TREE_NAME: & str = "Connected";
 pub const BASE_TREE_NAME: & str = "Base";
 pub const PAYLOAD_DEFAULT_ELEMENT: u8 = 0;
-pub const PACKET_MIN: usize = 64;
-pub const PACKET_MAX: usize = 9000;
-/* Run parameters
-pub const NUM_CELLS: CellQty = CellQty(10);
-pub const MAX_NUM_PHYS_PORTS_PER_CELL: PortQty = PortQty(9);          // Limit on number of ports per cell
-pub const NUM_PORTS_PER_CELL:PortQty = PortQty(8);
-pub const MIN_NUM_BORDER_CELLS: CellQty = CellQty(1);   // Minimum acceptable number of border cells
-pub const QUENCH: Quench = Quench::RootPort;
-pub const CONTINUE_ON_ERROR: bool = false; // Don't close channel following an error if true
-pub const AUTO_BREAK: Option<Edge> = (None, Some(Edge(CellNo(1), CellNo(2)))).0;// Use .1 to auto break link
-pub const DISCOVER_QUIESCE_FACTOR: usize = 4; // Bigger means wait longer to quiesce
-pub const OUTPUT_DIR_NAME: &str = "/tmp/multicell/";
-pub const OUTPUT_FILE_NAME: &str = "/tmp/multicell/trace";
-pub const KAFKA_SERVER: &str = "172.16.1.2";
-pub const KAFKA_TOPIC: &str = "CellAgent";
-pub const CELL_PORT_EXCEPTIONS: [(CellNo, PortQty); 2] = [(CellNo(5), PortQty(7)), (CellNo(5), PortQty(7))];
-pub const BORDER_CELL_PORTS: [(CellNo, [PortNo; 1]); 2] = [(CellNo(2), [PortNo(2)]),
-                                                               (CellNo(7), [PortNo(2)])];
-pub const EDGE_LIST: [(usize, usize); 13] = [(0,1), (1,2), (3,4), (2,3),
-        (1,6), (5,6), (6,7), (7,8), (8,9),
-        (0,5), (2,7), (3,8), (4,9)];
-pub const GEOMETRY: [(usize, usize); 10] = [(0,0), (0,1), (0,2), (0,3), (0,4),
-                                           (1,0), (1,1), (1,2), (1,3), (1,4)];
-*/
-                                           
+pub const PACKET_MIN: usize = 64;   // Can't be in Config because I use it as a const in packet.rs
+pub const PACKET_MAX: usize = 9000; // Can't be in Config because I use it as a const in packet.rs
+
 lazy_static!{
     pub static ref CONFIG: Config = Config::new().expect("Error in config file");
 }

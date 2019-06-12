@@ -32,7 +32,7 @@ lazy_static! {
 pub fn add_to_trace(trace_type: TraceType, trace_params: &TraceHeaderParams,
                     trace_body: &Value, caller: &str) -> Result<(), Error> {
     let _f = "add_to_trace";
-    let output_file_name = format!("{}.json", CONFIG.output_file_name);
+    let output_file_name = format!("{}", CONFIG.output_file_name);
     let other = json!({"name": "Other"});
     let cell_id = trace_body
         .get("cell_id")
@@ -41,7 +41,7 @@ pub fn add_to_trace(trace_type: TraceType, trace_params: &TraceHeaderParams,
         .unwrap()
         .as_str()
         .unwrap();
-    let cell_file_name = format!("{}-{}.json", CONFIG.output_file_name, cell_id);
+    let cell_file_name = format!("{}-{}", CONFIG.output_file_name, cell_id);
     let mut cell_id_handle = OpenOptions::new().append(true).open(cell_file_name.clone())
         .or_else(|_| { File::create(cell_file_name) })?;
     let mut file_handle = OpenOptions::new().append(true).open(output_file_name.clone())
