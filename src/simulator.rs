@@ -60,7 +60,7 @@ use crate::utility::{CellConfig, CellNo, Edge, S, TraceHeader, _print_hash_map, 
 
 fn main() -> Result<(), Error> {
     let _f = "main";
-    println!("Multicell Routing: Output to file {} (set in config.rs)", CONFIG.output_file_name);
+    println!("\nMulticell routing output to file {} (set in config.rs)", CONFIG.output_file_name);
     println!("{:?} Quenching of Discover messages", CONFIG.quench);
     println!("\nMain: {} ports for each of {} cells", CONFIG.num_ports_per_cell , CONFIG.num_cells);
     let mut dc =

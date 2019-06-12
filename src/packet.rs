@@ -17,7 +17,7 @@ use crate::uuid_ec::{Uuid, AitState};
  
 //const LARGEST_MSG: usize = std::u32::MAX as usize;
 const PACKET_HEADER_SIZE: usize = 16; // PacketHeader / Uuid
-const PAYLOAD_MIN: usize = PACKET_MAX - PACKET_HEADER_SIZE;
+const PAYLOAD_MIN: usize = PACKET_MIN - PACKET_HEADER_SIZE;
 const PAYLOAD_MAX: usize = PACKET_MAX - PACKET_HEADER_SIZE;
 
 pub type PacketAssemblers = HashMap<SenderMsgSeqNo, PacketAssembler>;
