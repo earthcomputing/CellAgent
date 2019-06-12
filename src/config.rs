@@ -77,7 +77,6 @@ impl Config {
             .ok_or(ConfigError::Args { func_name: _f })?;
         let config_file = File::open(config_file_name)?;//.context(ConfigError::File { func_name: _f, file_name: config_file_name})?;
         let config: Config = serde_json::from_reader(config_file)?;//.context(ConfigError::Chain { func_name: _f, comment: S("") })?;
-        println!("Config: {}", json!({"config": config }));
         if Path::new(&config.output_dir_name).exists() {
             remove_dir_all(&config.output_dir_name)?;
         }
