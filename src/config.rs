@@ -41,7 +41,7 @@ pub struct Config {
     pub num_ports_per_cell: PortQty,
     pub cell_port_exceptions: HashMap<CellNo, PortQty>,
     pub border_cell_ports: HashMap<CellNo, Vec<PortNo>>,
-    pub cell_config: HashMap<String, CellConfig>,
+    pub cell_config: HashMap<CellNo, CellConfig>,
     pub edge_list: Vec<Edge>,
     pub geometry: Vec<(usize, usize)>,
     pub trace_options: TraceOptions,
