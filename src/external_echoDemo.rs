@@ -55,7 +55,7 @@ fn main() -> Result<(), Error> {
     let _f = "main";
     println!("Multicell Routing: Output to file {} (set in config.rs)", CONFIG.output_file_name);
     println!("{:?} Quenching of Discover messages", CONFIG.quench);
-    let _ = OpenOptions::new().write(true).truncate(true).open(CONFIG.output_file_name);
+    let _ = OpenOptions::new().write(true).truncate(true).open(&CONFIG.output_file_name);
     let cell_port_exceptions = HashMap::new();
     let mut border_cell_ports = HashMap::new();
     border_cell_ports.insert(CellNo(0), vec![PortNo(2)]);

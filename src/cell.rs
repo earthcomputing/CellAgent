@@ -54,12 +54,12 @@ use crate::utility::{_print_vec, CellConfig, CellType, PortNo, S, TraceHeader};
 
 fn main() -> Result<(), Error> {
     let _f = "main";
-    println!("Multicell Routing: Output to file {} (set in config.rs)", OUTPUT_FILE_NAME);
-    println!("{:?} Quenching of Discover messages", QUENCH);
+    println!("Multicell Routing: Output to file {} (set in config.rs)", CONFIG.output_file_name);
+    println!("{:?} Quenching of Discover messages", CONFIG.quench);
     let _ = OpenOptions::new()
         .write(true)
         .truncate(true)
-	.open(OUTPUT_FILE_NAME);
+	.open(&CONFIG.output_file_name);
     let cell_name = "Alice"; /* if needed, can read cell name from config file */
     let num_phys_ports = PortQty(3);
     let border_port_list : Vec<PortNo> = vec![2u8]
