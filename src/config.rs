@@ -55,7 +55,7 @@ impl Config {
             .skip(1)
             .next()
             .ok_or(ConfigError::Args { func_name: _f })?;
-        println!("\nReading configurataion from {}", config_file_name);
+        println!("\nReading configuratation from {}", config_file_name);
         let config_file = File::open(config_file_name)?;//.context(ConfigError::File { func_name: _f, file_name: config_file_name})?;
         let config: Config = serde_json::from_reader(config_file)?;//.context(ConfigError::Chain { func_name: _f, comment: S("") })?;
         if Path::new(&config.output_dir_name).exists() {
