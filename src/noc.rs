@@ -13,7 +13,7 @@ use crate::dal::{add_to_trace, fork_trace_header, update_trace_header};
 use crate::gvm_equation::{GvmEquation, GvmEqn, GvmVariable, GvmVariableType};
 use crate::uptree_spec::{AllowedTree, ContainerSpec, Manifest, UpTreeSpec, VmSpec};
 use crate::utility::{ByteArray, CellConfig, S, TraceHeader, TraceHeaderParams, TraceType,
-                     get_geometry, vec_from_hashset, write_err};
+                     get_geometry, sleep, vec_from_hashset, write_err};
 
 const NOC_MASTER_DEPLOY_TREE_NAME: &str = "NocMasterDeploy";
 const NOC_AGENT_DEPLOY_TREE_NAME:  &str = "NocAgentDeploy";
@@ -115,6 +115,10 @@ impl Noc {
         let tree_name = msg.get_tree_name();
         self.allowed_trees.insert(tree_name.clone());
         if self.allowed_trees.len() == 1 {
+            if CONFIG.race_sleep > 0 {
+                println!("Noc: Sleeping {} seconds to wait for discover to quiesce", CONFIG.race_sleep);
+                sleep(CONFIG.race_sleep);
+            }
             self.base_tree = Some(tree_name.clone());
             self.stack_trees(tree_name, &noc_to_port).context(NocError::Chain { func_name: "listen_port", comment: S("") })?;
         }
