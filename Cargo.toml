@@ -25,6 +25,11 @@ name = "external_echoDemo"
 required-features = ["noc"]
 path = "src/external_echoDemo.rs"
 
+[[test]]
+name = "test"
+test = true
+path = "src/test.rs"
+
 [dependencies]
 backtrace = "0.3" # used in dumpstack.rs
 #bimap = {version = "0.3.1", features = ["serde"]} # bi-directional hashmap h: H(A,B), h.get_by_left(a: A), h.get_by_right(b: B)

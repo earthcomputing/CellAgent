@@ -1,27 +1,7 @@
-Using Eclipse to debug Rust programs on a Mac
+There are three executables.
+$ cargo run --bin simulator
+$ cargo run --bin cell
+$ cargo run --bin external_echoDemo
 
-1. Install Eclipse from https://eclipse.org/downloads/
-
-2. Follow the instructions at https://medium.com/@royalstream/how-to-install-and-codesign-gdb-on-os-x-el-capitan-aab3d1172e95#.wpc2ubuit to install and configure gdb.  Verify it worked by typing gdb on a terminal.
-
-3. Install Rust from https://www.rust-lang.org/en-US/install.html.  Make sure to include the source.
-
-4. Follow the instructions at https://github.com/RustDT/RustDT/blob/latest/documentation/Installation.md#installation to install RustDT.
-
-5. Follow the instructions at https://github.com/RustDT/RustDT/blob/latest/documentation/UserGuide.md#configuration to configure Eclipse for Rust.
-
-6. Start Eclipse and create a new Rust project.  (If you don't see Rust as an option, something went wrong with the previous step.)  Add a new file, main.rs with a function main that prints a message.
-
-7. Configure your Rust toolchain.  Highlight your project in the Eclipse Project Explorer, and select Properties from the Project menu.  Fill in the directory containing rustc and the directory with the Rust source.  Click the Download button on the other three fields to download and install the other tool chain components.
-
-8. Eclipse does not initialize its environment properly, so you have to do it manually once per project.  In a terminal, navigate to your project folder and type cargo run.  You should see the message from your main.rs.
-
-9. In your project folder create an empty file tests/dummy.rs.  You'll know that you forgot this step if Eclipse doesn't appear to be running the version of the code you see in its editor.
-
-10. Eclipse is now configured with a bunch of cool features, including on the fly syntax checking, auto complete (CTL-Space).  Eclipse will automatically check for compiler errors on every save if you right click on build under Build Targets and enable auto-check.
-
-Eclipse must run as root in order for gdb to work.  Assuming Eclipse is in Applications, from the console run
-
-sudo /Applications/Eclipse.app/Contents/MacOS/eclipse
-
-Now, wasn't that easy???
+Tests are in src/test.rs
+$ cargo test
