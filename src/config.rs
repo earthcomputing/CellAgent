@@ -44,6 +44,7 @@ pub struct Config {
     pub cell_config: HashMap<CellNo, CellConfig>,
     pub edge_list: Vec<Edge>,
     pub geometry: Vec<(usize, usize)>,
+    pub race_sleep: u64,
     pub trace_options: TraceOptions,
     pub debug_options: DebugOptions
 }
@@ -54,6 +55,7 @@ impl Config {
             .skip(1)
             .next()
             .ok_or(ConfigError::Args { func_name: _f })?;
+        println!("\nReading configurataion from {}", config_file_name);
         let config_file = File::open(config_file_name)?;//.context(ConfigError::File { func_name: _f, file_name: config_file_name})?;
         let config: Config = serde_json::from_reader(config_file)?;//.context(ConfigError::Chain { func_name: _f, comment: S("") })?;
         if Path::new(&config.output_dir_name).exists() {
