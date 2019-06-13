@@ -4,6 +4,7 @@
 #![allow(dead_code)]
 #![allow(unused_variables)]
 #![allow(unused_imports)]
+#[cfg(test)]
 #[macro_use] extern crate failure;
 #[macro_use] extern crate serde_derive;
 #[macro_use] extern crate serde_json;
