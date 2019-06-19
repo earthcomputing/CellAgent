@@ -8,7 +8,7 @@ use std::{fmt,
 
 use lazy_static::lazy_static;
 
-use crate::utility::{CellConfig, CellNo, Edge, PortNo, Quench};
+use crate::utility::{CellConfig, CellNo, Edge, PortNo, Quench, S};
 
 // System parameters
 pub const SCHEMA_VERSION: &str = "0.1";
@@ -54,7 +54,7 @@ impl Config {
         let config_file_name = args()
             .skip(1)
             .next()
-            .ok_or(ConfigError::Args { func_name: _f })?;
+            .unwrap_or(S("configs/10cell_config.json"));
         println!("\nReading configuratation from {}", config_file_name);
         let config_file = File::open(config_file_name)?;//.context(ConfigError::File { func_name: _f, file_name: config_file_name})?;
         let config: Config = serde_json::from_reader(config_file)?;//.context(ConfigError::Chain { func_name: _f, comment: S("") })?;
