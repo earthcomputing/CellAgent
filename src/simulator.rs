@@ -44,66 +44,37 @@ pub mod utility;
 pub mod uuid_ec;
 pub mod vm;
 
-use std::{io::{stdin, stdout, Read, Write},
-          collections::{HashMap, HashSet},
-          fs::{File, OpenOptions, create_dir, remove_dir_all},
-          path::Path,
+use std::{io::{stdin, stdout, Write},
+          fs::{File,},
+          collections::{HashSet},
 };
 
-use crate::blueprint::{Blueprint, CellNo, Edge, is2e};
-use crate::config::{AUTO_BREAK, OUTPUT_DIR_NAME, OUTPUT_FILE_NAME, QUENCH,
-                    CellConfig, CellQty, PortNo, PortQty};
+use crate::blueprint::{Blueprint};
+use crate::config::{CONFIG};
 use crate::datacenter::{Datacenter};
 use crate::gvm_equation::{GvmEqn};
 use crate::app_message_formats::{ApplicationToNoc};
 use crate::link::Link;
 use crate::uptree_spec::{AllowedTree, ContainerSpec, Manifest, UpTreeSpec, VmSpec};
-use crate::utility::{_print_hash_map, sleep, S, TraceHeader};
+use crate::utility::{CellConfig, CellNo, Edge, S, TraceHeader, _print_hash_map, sleep};
 
 fn main() -> Result<(), Error> {
     let _f = "main";
-    if Path::new(OUTPUT_DIR_NAME).exists() {
-        remove_dir_all(OUTPUT_DIR_NAME)?;
-    }
-    create_dir(OUTPUT_DIR_NAME)?;
-    println!("Multicell Routing: Output to file {} (set in config.rs)", OUTPUT_FILE_NAME);
-    println!("{:?} Quenching of Discover messages", QUENCH);
-    /* Can't get records from main() to show up in trace file
-        use crate::config::{NCELLS};
-        let (rows, cols, geometry) = config::get_geometry();
-        {
-            // For reasons I can't understand, the trace record doesn't show up when generated from main.
-            let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "trace_schema" };
-            let trace = json!({ "schema_version": SCHEMA_VERSION, "ncells": NCELLS, "rows": rows, "cols": cols });
-            let _ = dal::add_to_trace(trace_header, TraceType::Trace, trace_params,&trace, _f);
-        }
-    */
-    let _ = OpenOptions::new().write(true).truncate(true).open(OUTPUT_FILE_NAME);
-    let mut cell_port_exceptions = HashMap::new();
-    cell_port_exceptions.insert(CellNo(5), PortQty(7));
-    cell_port_exceptions.insert(CellNo(2), PortQty(6));
-    let mut border_cell_ports = HashMap::new();
-    border_cell_ports.insert(CellNo(2), vec![PortNo(2)]);
-    border_cell_ports.insert(CellNo(7), vec![PortNo(2)]);
-    let num_cells = CellQty(10);
-    let default_num_phys_ports_per_cell = PortQty(8);
-    println!("\nMain: {} ports for each of {} cells", *default_num_phys_ports_per_cell, *num_cells);
+    println!("\nMulticell trace and debug output to file {}", CONFIG.output_file_name);
+    println!("{:?} Quenching of Discover messages", CONFIG.quench);
+    println!("\nMain: {} ports for each of {} cells", CONFIG.num_ports_per_cell , CONFIG.num_cells);
     let mut dc =
-        match Datacenter::construct(
-            Blueprint::new(
-                num_cells,
-                &vec![is2e(0,1), is2e(1,2), is2e(3,4), is2e(2,3),
-                      is2e(1,6), is2e(5,6), is2e(6,7), is2e(7,8), is2e(8,9),
-                      is2e(0,5), is2e(2,7), is2e(3,8), is2e(4,9)],
-                default_num_phys_ports_per_cell,
-                &cell_port_exceptions, &border_cell_ports,
-            )?
-        ) {
-            Ok(dc) => dc,
-            Err(err) => panic!("Datacenter construction failure: {}", err)
-        };
+        match Datacenter::construct(Blueprint::new(CONFIG.num_cells,
+                              &CONFIG.edge_list,
+                                                   CONFIG.num_ports_per_cell,
+                              &CONFIG.cell_port_exceptions, &CONFIG.border_cell_ports,
+        )?)
+            {
+                Ok(dc) => dc,
+                Err(err) => panic!("Datacenter construction failure: {}", err)
+            };
     if false { deployment_demo()?; }    // Demonstrate features of deployment spec
-    if AUTO_BREAK.is_some() { break_link(&mut dc)?; }
+    if CONFIG.auto_break.is_some() { break_link(&mut dc)?; }
     loop {
         stdout().write(b"\nType:
             d to print datacenter
@@ -113,7 +84,7 @@ fn main() -> Result<(), Error> {
             m to deploy an application
             x to exit program\n").context(MainError::Chain { func_name: "run", comment: S("") })?;
         let mut print_opt = String::new();
-        stdin().read_line(&mut print_opt).context(MainError::Chain { func_name: "run", comment: S("") })?;
+        stdin().read_line(&mut print_opt).context(MainError::Chain { func_name: _f, comment: S("") })?;
         if print_opt.len() > 1 {
             match print_opt.trim() {
                 "d" => {
@@ -161,7 +132,7 @@ fn show_pe(dc: &Datacenter) -> Result<(), Error> {
 }
 fn break_link(dc: &mut Datacenter) -> Result<(), Error> {
     let rack = dc.get_rack_mut();
-    let edge: Edge = match AUTO_BREAK {
+    let edge: Edge = match CONFIG.auto_break {
         Some(edge) => {
             // TODO: Wait until discover is done before automatically breaking link, should be removed
             println!("---> Sleeping to let discover finish before automatically breaking link");
@@ -199,6 +170,7 @@ fn read_int() -> Result<usize, Error> {
     }
 }
 fn deploy(application_to_noc: &ApplicationToNoc) -> Result<(), Error> {
+    let _f = "deploy";
     stdout().write(b"Enter the name of a file containing a manifest\n").context(MainError::Chain { func_name: "run", comment: S("") })?;
     let mut filename = String::new();
     stdin().read_line(&mut filename).context(MainError::Chain { func_name: "run", comment: S("") })?;
@@ -240,6 +212,8 @@ fn deployment_demo() -> Result<(), Error> {
 }
 // Errors
 use failure::{Error, ResultExt};
+use std::io::Read;
+
 #[derive(Debug, Fail)]
 pub enum MainError {
     #[fail(display = "MainError::Chain {} {}", func_name, comment)]

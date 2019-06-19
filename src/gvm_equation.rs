@@ -5,8 +5,8 @@ use eval::{Expr, to_value};
 use serde_json;
 use failure::{Error, ResultExt};
 
-use crate::config::{CellInfo, PathLength};
-use crate::utility::S;
+use crate::config::{PathLength};
+use crate::utility::{CellInfo, S};
 
 #[derive(Debug, Clone, Hash, Eq, PartialEq)]
 pub enum GvmEqn<'a> {

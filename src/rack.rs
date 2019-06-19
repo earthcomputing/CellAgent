@@ -7,15 +7,15 @@ use std::{fmt, fmt::Write,
           thread::{JoinHandle}};
 
 use crate::app_message_formats::{PortToNoc, PortFromNoc};
-use crate::blueprint::{Blueprint, Cell, CellNo, Edge};
-use crate::config::{TRACE_OPTIONS, CellQty, CellConfig, LinkQty, get_geometry};
+use crate::blueprint::{Blueprint, Cell, };
+use crate::config::{CONFIG, CellQty, LinkQty};
 use crate::dal::add_to_trace;
 use crate::ec_message_formats::{LinkToPort, PortFromLink, PortToLink, LinkFromPort, PortFromPe};
 use crate::link::{Link};
 use crate::nalcell::{NalCell};
 use crate::name::{CellID, LinkID};
 use crate::port::{Port};
-use crate::utility::{S, TraceHeaderParams, TraceType};
+use crate::utility::{CellNo, CellConfig, Edge, S, TraceHeaderParams, TraceType, get_geometry};
 
 #[derive(Debug)]
 pub struct Rack {
@@ -41,7 +41,7 @@ impl Rack {
                                             &HashSet::from_iter(border_cell.get_border_ports().clone()),
                                             CellConfig::Large)?;
                 {
-                    if TRACE_OPTIONS.all || TRACE_OPTIONS.dc {
+                    if CONFIG.trace_options.all || CONFIG.trace_options.dc {
                         let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "border_cell_start" };
                         let cell_id = nal_cell.get_id();
                         let trace = json!({ "cell_id": cell_id, "cell_number": cell_no, "location":  geometry.2.get(*cell_no)});
@@ -63,7 +63,7 @@ impl Rack {
                 let nal_cell = NalCell::new(&interior_cell.get_name(), interior_cell.get_num_phys_ports(),
                                             &HashSet::new(), CellConfig::Large)?;
                 {
-                    if TRACE_OPTIONS.all || TRACE_OPTIONS.dc {
+                    if CONFIG.trace_options.all || CONFIG.trace_options.dc {
                         let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "interior_cell_start" };
                         let cell_id = nal_cell.get_id();
                         let trace = json!({ "cell_id": cell_id, "cell_number": cell_no, "location": geometry.2.get(*cell_no as usize) });
@@ -99,7 +99,7 @@ impl Rack {
             rite_port.link_channel(rite_to_link, rite_from_link, rite_from_pe);
             let mut link = Link::new(left_port.get_id(), rite_port.get_id())?;
             {
-                if TRACE_OPTIONS.all || TRACE_OPTIONS.dc {
+                if CONFIG.trace_options.all || CONFIG.trace_options.dc {
                     let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "connect_link" };
                     let trace = json!({ "left_cell": left_cell_id, "rite_cell": rite_cell_id, "left_port": left_port.get_port_no(), "rite_port": rite_port.get_port_no(), "link_id": link.get_id() });
                     let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);

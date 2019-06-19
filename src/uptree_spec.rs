@@ -1,8 +1,7 @@
 use std::{fmt, fmt::Write,
           collections::HashSet};
 
-use crate::config::{CellConfig};
-use crate::utility::S;
+use crate::utility::{CellConfig, S};
 
 #[derive(Debug, Clone, Hash, Serialize, Deserialize)]
 pub struct Manifest {
