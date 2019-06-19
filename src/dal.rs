@@ -10,7 +10,7 @@ use serde_json;
 use serde_json::{Value};
 use futures::Future;
 
-use crate::config::{KAFKA_SERVER, KAFKA_TOPIC, OUTPUT_FILE_NAME};
+use crate::config::{CONFIG};
 use crate::utility::{S, TraceHeader, TraceHeaderParams, TraceType};
 
 thread_local!(static TRACE_HEADER: RefCell<TraceHeader> = RefCell::new(TraceHeader::new()));
@@ -23,7 +23,7 @@ const FOR_EVAL: bool = true;
 
 lazy_static! {
     static ref PRODUCER_RD: FutureProducer = ClientConfig::new()
-                        .set("bootstrap.servers", KAFKA_SERVER)
+                        .set("bootstrap.servers", &CONFIG.kafka_server)
                         .set("message.timeout.ms", "5000")
                         .create()
                         .expect("Dal: Problem setting up Kafka");
@@ -32,7 +32,7 @@ lazy_static! {
 pub fn add_to_trace(trace_type: TraceType, trace_params: &TraceHeaderParams,
                     trace_body: &Value, caller: &str) -> Result<(), Error> {
     let _f = "add_to_trace";
-    let output_file_name = format!("{}.json", OUTPUT_FILE_NAME);
+    let output_file_name = format!("{}", CONFIG.output_file_name);
     let other = json!({"name": "Other"});
     let cell_id = trace_body
         .get("cell_id")
@@ -41,7 +41,7 @@ pub fn add_to_trace(trace_type: TraceType, trace_params: &TraceHeaderParams,
         .unwrap()
         .as_str()
         .unwrap();
-    let cell_file_name = format!("{}-{}.json", OUTPUT_FILE_NAME, cell_id);
+    let cell_file_name = format!("{}-{}", CONFIG.output_file_name, cell_id);
     let mut cell_id_handle = OpenOptions::new().append(true).open(cell_file_name.clone())
         .or_else(|_| { File::create(cell_file_name) })?;
     let mut file_handle = OpenOptions::new().append(true).open(output_file_name.clone())
@@ -59,7 +59,7 @@ pub fn add_to_trace(trace_type: TraceType, trace_params: &TraceHeaderParams,
     };
     cell_id_handle.write(&(line.clone() + ",\n").into_bytes()).context(DalError::Chain { func_name: "add_to_trace", comment: S("Write cell record") })?;
     file_handle.write(   &(line.clone() + ",\n").into_bytes()).context(DalError::Chain { func_name: "add_to_trace", comment: S("Write record") })?;
-    let _ = PRODUCER_RD.send(FutureRecord::to(KAFKA_TOPIC)
+    let _ = PRODUCER_RD.send(FutureRecord::to(&CONFIG.kafka_topic)
             .payload(&line)
             .key(&format!("{:?}", trace_header.get_event_id())),
         0)

@@ -7,13 +7,13 @@ use serde_json;
 
 use crate::app_message::{SenderMsgSeqNo, AppMsgDirection, AppInterapplicationMsg, get_next_count};
 use crate::cellagent::{CellAgent};
-use crate::config::{ByteArray, CellQty, PathLength, PortNo};
+use crate::config::{CellQty, PathLength};
 use crate::gvm_equation::{GvmEquation, GvmEqn};
 use crate::name::{Name, CellID, PortTreeID, SenderID, TreeID};
 use crate::packet::{Packet, Packetizer, Serializer};
 use crate::packet_engine::NumberOfPackets;
 use crate::uptree_spec::{AllowedTree, Manifest};
-use crate::utility::{S, Path};
+use crate::utility::{ByteArray, PortNo, S, Path};
 
 pub type MsgTreeMap = HashMap<String, TreeID>; // Must be String for serialization
 
