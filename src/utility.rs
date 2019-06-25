@@ -160,6 +160,7 @@ use std::thread;
 pub struct TraceHeader {
     starting_epoch: u64,
     epoch: u64,
+    spawning_thread_id: u64,
     thread_id: u64,
     event_id: Vec<u64>,
     trace_type: TraceType,
@@ -174,7 +175,8 @@ impl TraceHeader {
         let thread_id = TraceHeader::parse(thread::current().id());
         let epoch = timestamp();
         TraceHeader { starting_epoch: *STARTING_EPOCH, epoch,
-            thread_id, event_id: vec![0], trace_type: TraceType::Trace,
+            thread_id, spawning_thread_id: thread_id,
+            event_id: vec![0], trace_type: TraceType::Trace,
             module: "", line_no: 0, function: "", format: "", repo: REPO }
     }
     pub fn next(&mut self, trace_type: TraceType) {
@@ -189,15 +191,17 @@ impl TraceHeader {
         event_id.push(0);
         let thread_id = TraceHeader::parse(thread::current().id());
         TraceHeader { starting_epoch: *STARTING_EPOCH, epoch: timestamp(),
-            thread_id, event_id, trace_type: self.trace_type,
+            thread_id, spawning_thread_id: thread_id,
+            event_id, trace_type: self.trace_type,
             module: self.module, line_no: self.line_no, function: self.function, format: self.format, repo: REPO }
     }
     pub fn update(&mut self, params: &TraceHeaderParams) {
-        self.module   = params.get_module();
-        self.line_no  = params.get_line_no();
-        self.function = params.get_function();
-        self.format   = params.get_format();
-        self.epoch    = timestamp();
+        self.module    = params.get_module();
+        self.line_no   = params.get_line_no();
+        self.function  = params.get_function();
+        self.format    = params.get_format();
+        self.epoch     = timestamp();
+        self.thread_id = TraceHeader::parse(thread::current().id());
     }
     pub fn get_event_id(&self) -> Vec<u64> { self.event_id.clone() }
     pub fn parse(thread_id: ThreadId) -> u64 {
