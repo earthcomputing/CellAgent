@@ -65,14 +65,14 @@ fn main() -> Result<(), Error> {
     println!("\nMain: {} ports for each of {} cells", CONFIG.num_ports_per_cell , CONFIG.num_cells);
     let mut dc =
         match Datacenter::construct(Blueprint::new(CONFIG.num_cells,
-                              &CONFIG.edge_list,
+                                                   &CONFIG.edge_list,
                                                    CONFIG.num_ports_per_cell,
-                              &CONFIG.cell_port_exceptions, &CONFIG.border_cell_ports,
-        )?)
-            {
-                Ok(dc) => dc,
-                Err(err) => panic!("Datacenter construction failure: {}", err)
-            };
+                                                   &CONFIG.cell_port_exceptions,
+                                                   &CONFIG.border_cell_ports,
+        )?) {
+            Ok(dc) => dc,
+            Err(err) => panic!("Datacenter construction failure: {}", err)
+        };
     if false { deployment_demo()?; }    // Demonstrate features of deployment spec
     if CONFIG.auto_break.is_some() { break_link(&mut dc)?; }
     loop {
