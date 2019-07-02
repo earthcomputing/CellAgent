@@ -1,9 +1,9 @@
 An environment variable CELL_AGENT_DIR must be set.
 
 There are three executables.
-$ cargo run --bin simulator --features="simulator" --manifest-path="simulator/Cargo.toml"
-$ cargo run --bin cell --features="cell" --manifest-path="cell/Cargo.toml"
-$ cargo run --bin external_echoDemo --features="noc" --manifest-path="external_echoDemo/Cargo.toml"
+$ cargo run --bin simulator --features="simulator" --manifest-path="binaries/simulator/Cargo.toml"
+$ cargo run --bin cell --features="cell" --manifest-path="binaries/cell/Cargo.toml"
+$ cargo run --bin external_echoDemo --features="noc" --manifest-path="binaries/external_echoDemo/Cargo.toml"
 
 Tests are in src/test.rs
 $ cargo test --features="simulator"
