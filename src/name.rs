@@ -3,8 +3,8 @@ use std::string::String;
 
 use serde::{Deserialize, Deserializer, Serializer};
 
-use crate::config::{MAX_CHARS, SEPARATOR, PortNo};
-use crate::utility::{PortNumber, S};
+use crate::config::{MAX_CHARS, SEPARATOR};
+use crate::utility::{PortNo, PortNumber, S};
 use crate::uuid_ec::Uuid;
 
 type NameType = [char; MAX_CHARS];

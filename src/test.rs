@@ -46,10 +46,10 @@ pub mod vm;
 
 use std::{collections::{HashMap}};
 
-use crate::blueprint::{Blueprint, CellNo, Edge, is2e};
-use crate::config::{MAX_NUM_PHYS_PORTS_PER_CELL, CellQty, PortNo, PortQty};
+use crate::blueprint::{Blueprint};
+use crate::config::{CONFIG, CellQty, PortQty};
 use crate::datacenter::{Datacenter};
-use crate::utility::{TraceHeader};
+use crate::utility::{CellNo, Edge, PortNo, TraceHeader, is2e};
 
 trait Test {
     fn test(&mut self);
@@ -146,7 +146,7 @@ impl Test for DatacenterGraphSpec {
                 match Blueprint::new(
                     self.num_cells,
                     &self.edges,
-                    MAX_NUM_PHYS_PORTS_PER_CELL,
+                    CONFIG.max_num_phys_ports_per_cell,
                     &HashMap::new(),
                     &border_cell_ports,
                 ) {
@@ -325,7 +325,7 @@ lazy_static! {
 
 impl<'a> DatacenterPortsSpec<'a> {
     fn new_invalid_default_num_phys_ports_per_cell() -> DatacenterPortsSpec<'static> {
-        let default_num_phys_ports_per_cell = PortQty(*MAX_NUM_PHYS_PORTS_PER_CELL+1);
+        let default_num_phys_ports_per_cell = PortQty(*CONFIG.max_num_phys_ports_per_cell+1);
         let cell_port_exceptions = HashMap::new();
         DatacenterPortsSpec {
             default_num_phys_ports_per_cell: default_num_phys_ports_per_cell,

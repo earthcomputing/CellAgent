@@ -1,9 +1,9 @@
 use std::{fmt, fmt::Write,
           collections::HashSet};
 
-use crate::config::{PortNo, PortQty};
+use crate::config::{PortQty};
 use crate::name::{Name, PortTreeID, TreeID};
-use crate::utility::{Mask, PortNumber};
+use crate::utility::{Mask, PortNo, PortNumber};
 use crate::uuid_ec::Uuid;
 
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Hash, Serialize, Deserialize)]

@@ -6,7 +6,7 @@ use std::{fmt, fmt::Write,
 use serde_json;
 //use uuid::Uuid;
 
-use crate::config::{PathLength, PortNo, PortQty};
+use crate::config::{PathLength, PortQty};
 //use dumpstack::{dumpstack};
 use crate::gvm_equation::{GvmEquation, GvmVariable, GvmVariableType};
 use crate::name::{Name, CellID, PortTreeID, TreeID};
@@ -14,7 +14,7 @@ use crate::port_tree::PortTree;
 use crate::routing_table_entry::{RoutingTableEntry};
 use crate::traph_element::TraphElement;
 use crate::tree::Tree;
-use crate::utility::{Path, PortNumber, S};
+use crate::utility::{Path, PortNo, PortNumber, S};
 use crate::uuid_ec::Uuid;
 
 type StackedTrees = HashMap<Uuid, Tree>;

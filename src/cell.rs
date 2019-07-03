@@ -44,30 +44,29 @@ use std::{io::{stdin, stdout, Read, Write},
           collections::{HashMap, HashSet},
           fs::{File, OpenOptions},
           sync::mpsc::channel,
-	  iter::FromIterator};
+	      iter::FromIterator};
 
-use crate::config::{OUTPUT_FILE_NAME, QUENCH,
-                    CellType, CellConfig, PortNo, PortQty};
+use crate::config::{CONFIG, PortQty};
 use crate::gvm_equation::{GvmEqn};
 use crate::nalcell::{NalCell};
 use crate::uptree_spec::{AllowedTree, ContainerSpec, Manifest, UpTreeSpec, VmSpec};
-use crate::utility::{_print_vec, S, TraceHeader};
+use crate::utility::{_print_vec, CellConfig, CellType, PortNo, S, TraceHeader};
 
 fn main() -> Result<(), Error> {
     let _f = "main";
-    println!("Multicell Routing: Output to file {} (set in config.rs)", OUTPUT_FILE_NAME);
-    println!("{:?} Quenching of Discover messages", QUENCH);
+    println!("Multicell Routing: Output to file {} (set in config.rs)", CONFIG.output_file_name);
+    println!("{:?} Quenching of Discover messages", CONFIG.quench);
     let _ = OpenOptions::new()
         .write(true)
         .truncate(true)
-	.open(OUTPUT_FILE_NAME);
+	.open(&CONFIG.output_file_name);
     let cell_name = "Alice"; /* if needed, can read cell name from config file */
     let num_phys_ports = PortQty(3);
     let border_port_list : Vec<PortNo> = vec![2u8]
         .iter()
         .map(|i| PortNo(*i as u8))
 	.collect();
-    let nal_cell = NalCell::new(cell_name, PortQty(5), &HashSet::from_iter(border_port_list.clone()), CellConfig::Large);
+    let nal_cell = NalCell::new(cell_name, None, &HashSet::from_iter(border_port_list.clone()), CellConfig::Large);
     Ok(())
 }
 

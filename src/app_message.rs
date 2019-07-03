@@ -6,12 +6,11 @@ use std::{fmt,
 use serde_json;
 
 use crate::cellagent::CellAgent;
-use crate::config::{ByteArray};
 use crate::gvm_equation::{GvmEquation};
 use crate::name::{SenderID};
 use crate::noc::Noc;
 use crate::uptree_spec::{AllowedTree, Manifest};
-use crate::utility::{S};
+use crate::utility::{ByteArray, S};
 
 // This is currently at the cell level, but could be placed at the up-tree level.
 #[derive(Debug, Copy, Clone, Hash, Eq, PartialEq, Serialize, Deserialize)]

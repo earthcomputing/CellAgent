@@ -1,10 +1,10 @@
 use std::{fmt, fmt::Write,
           collections::{HashMap, HashSet},
           iter::FromIterator,
-          ops::{Deref},
 };
 
-use crate::config::{MAX_NUM_PHYS_PORTS_PER_CELL, MIN_NUM_BORDER_CELLS, CellQty, CellType, PortNo, PortQty};
+use crate::config::{CONFIG, CellQty, PortQty};
+use crate::utility::{CellNo, CellType, Edge, PortNo};
 
 #[derive(Debug)]
 pub struct Blueprint {
@@ -34,11 +34,11 @@ impl Blueprint {
             }
         }
         let mut cell_num_phys_ports: HashMap<CellNo, PortQty> = HashMap::new();
-        if *default_num_phys_ports_per_cell > *MAX_NUM_PHYS_PORTS_PER_CELL {
+        if *default_num_phys_ports_per_cell > *CONFIG.max_num_phys_ports_per_cell {
             return Err(BlueprintError::DefaultNumPhysPortsPerCell {
                 func_name: _f,
                 default_num_phys_ports_per_cell: *default_num_phys_ports_per_cell,
-                max_num_phys_ports_per_cell: *MAX_NUM_PHYS_PORTS_PER_CELL,
+                max_num_phys_ports_per_cell: *CONFIG.max_num_phys_ports_per_cell,
             }.into());
         }
         for (cell_no, num_phys_ports) in cell_port_exceptions {
@@ -49,12 +49,12 @@ impl Blueprint {
                     num_cells: *num_cells,
                 }.into());
             }
-            if **num_phys_ports > *MAX_NUM_PHYS_PORTS_PER_CELL {
+            if **num_phys_ports > *CONFIG.max_num_phys_ports_per_cell {
                 return Err(BlueprintError::CellPortsExceptionsPorts {
                     func_name: _f,
                     cell_no: **cell_no,
                     num_phys_ports: **num_phys_ports,
-                    max_num_phys_ports_per_cell: *MAX_NUM_PHYS_PORTS_PER_CELL,
+                    max_num_phys_ports_per_cell: *CONFIG.max_num_phys_ports_per_cell,
                 }.into());
             }
         }
@@ -86,8 +86,8 @@ impl Blueprint {
             }
         }
         let num_border = border_cell_ports.len();
-        if num_border < *MIN_NUM_BORDER_CELLS {
-            return Err(BlueprintError::BorderCellCount { func_name: _f, num_border, num_reqd: *MIN_NUM_BORDER_CELLS})
+        if num_border < *CONFIG.min_num_border_cells {
+            return Err(BlueprintError::BorderCellCount { func_name: _f, num_border, num_reqd: *CONFIG.min_num_border_cells})
         }
         let mut interior_cells = Vec::new();
         let mut border_cells = 	Vec::new();
@@ -186,24 +186,6 @@ impl fmt::Display for InteriorCell {
         write!(f, "{}", s)
     }
 }
-
-#[derive(Debug, Copy, Clone, Hash, Eq, PartialEq, Serialize, Deserialize)]
-pub struct CellNo(pub usize);
-impl Deref for CellNo { type Target = usize; fn deref(&self) -> &Self::Target { &self.0 } }
-impl fmt::Display for CellNo {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "C:{}", self.0)
-    }
-}
-#[derive(Debug, Copy, Clone, Hash, Eq, PartialEq, Serialize, Deserialize)]
-pub struct Edge(pub CellNo, pub CellNo);
-impl fmt::Display for Edge {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "E: ({}, {})", *self.0, *self.1)
-    }
-}
-pub fn is2e(i: usize, j: usize) -> Edge { Edge(CellNo(i), CellNo(j)) }
-
 
 // Errors
 #[derive(Debug, Fail)]
