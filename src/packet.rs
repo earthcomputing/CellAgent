@@ -9,16 +9,15 @@ use serde;
 use serde_json;
 
 use crate::app_message::{SenderMsgSeqNo, get_next_count};
-use crate::config::{PACKET_MIN, PACKET_MAX, PAYLOAD_DEFAULT_ELEMENT,
-    ByteArray, PacketNo};
+use crate::config::{PACKET_MIN, PACKET_MAX, PAYLOAD_DEFAULT_ELEMENT, PacketNo};
 use crate::ec_message::{Message, MsgType};
 use crate::name::{PortTreeID, Name};
-use crate::utility::{S, Stack};
+use crate::utility::{ByteArray, S, Stack};
 use crate::uuid_ec::{Uuid, AitState};
  
 //const LARGEST_MSG: usize = std::u32::MAX as usize;
 const PACKET_HEADER_SIZE: usize = 16; // PacketHeader / Uuid
-const PAYLOAD_MIN: usize = PACKET_MAX - PACKET_HEADER_SIZE;
+const PAYLOAD_MIN: usize = PACKET_MIN - PACKET_HEADER_SIZE;
 const PAYLOAD_MAX: usize = PACKET_MAX - PACKET_HEADER_SIZE;
 
 pub type PacketAssemblers = HashMap<SenderMsgSeqNo, PacketAssembler>;

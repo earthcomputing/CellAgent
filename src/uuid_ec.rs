@@ -3,8 +3,7 @@ use std::fmt;
 
 use uuid;
 
-use crate::config::PortNo;
-use crate::utility::PortNumber;
+use crate::utility::{PortNo, PortNumber};
 
 const NORMAL:   u8 = 0b0000_0000;  // Used for all Name UUIDs, including TreeIDs and for normal packets
 const ENTL:     u8 = 0b0000_1111;  // Used just to generate a recv event

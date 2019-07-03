@@ -1,19 +1,15 @@
 [package]
-name = "multicell"
+name = "multicell-external_echoDemo"
 version = "0.1.0"
 authors = ["Alan Karp <alan@earthcomputing.io>"]
 edition = "2018"
 
-[[bin]]
-name = "simulator"
-path = "src/simulator.rs"
-
-[[bin]]
-name = "cell"
-path = "src/cell.rs"
+[features]
+noc = []
 
 [[bin]]
 name = "external_echoDemo"
+required-features = ["noc"]
 path = "src/external_echoDemo.rs"
 
 [[test]]
