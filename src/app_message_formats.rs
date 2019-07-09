@@ -1,6 +1,7 @@
 use std::sync::mpsc;
 
-use crate::utility::{ByteArray};
+use crate::port::PortStatus;
+use crate::utility::{ByteArray, PortNo};
 
 pub type ISAIT = bool;
 pub type APP = ByteArray;
@@ -24,7 +25,17 @@ pub type NocToApplicationMsg = String;
 pub type NocToApplication = mpsc::Sender<NocToApplicationMsg>;
 pub type ApplicationFromNoc = mpsc::Receiver<NocToApplicationMsg>;
 //pub type NocApplicationError = mpsc::SendError<NocToApplicationMsg>;
-
+// Boundary Port to Ca
+#[derive(Debug, Clone, Serialize)]
+pub enum PortToCaMsg { Status(PortNo, bool, PortStatus), AppMsg(PortNo, APP) }
+pub type PortToCa = mpsc::Sender<PortToCaMsg>;
+pub type CaFromPort = mpsc::Receiver<PortToCaMsg>;
+//pub type PortCaError = mpsc::SendError<PortToCaMsg>;
+// Ca to Boundary Port
+pub type CaToPortMsg = APP;
+pub type CaToPort = mpsc::Sender<CaToPortMsg>;
+pub type PortFromCa = mpsc::Receiver<CaToPortMsg>;
+//pub type CaToPortError = mpsc::SendError<CaToPortMsg>;
 // Cell agent to VM
 pub type CaToVmMsg = ByteArray;
 pub type CaToVm = mpsc::Sender<CaToVmMsg>;
