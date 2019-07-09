@@ -83,14 +83,9 @@ impl Rack {
                 .get_pair_mut(&edge.0, &edge.1)
                 .unwrap();
             let left_cell_id: CellID = left_cell.get_id(); // For Trace
-            let left_pair: (&mut Port, PortFromPe) = left_cell.get_free_ec_port_mut()?;
-            let left_port: &mut Port = left_pair.0;
-            let left_from_pe: PortFromPe = left_pair.1;
+            let (left_port, left_from_pe): (&mut Port, PortFromPe) = left_cell.get_free_ec_port_mut()?;
             let rite_cell_id: CellID = rite_cell.get_id(); // For Trace
-            let rite_pair: (&mut Port, PortFromPe) = rite_cell.get_free_ec_port_mut()?;
-            let rite_port: &mut Port = rite_pair.0;
-            let rite_from_pe: PortFromPe = rite_pair.1;
-                //println!("Rack: edge {:?} {} {}", edge, *left_port.get_id(), *rite_port.get_id());
+            let (rite_port, rite_from_pe): (&mut Port, PortFromPe) = rite_cell.get_free_ec_port_mut()?;
             let (link_to_left, left_from_link): (LinkToPort, PortFromLink) = channel();
             let (left_to_link, link_from_left): (PortToLink, LinkFromPort) = channel();
             let (link_to_rite, rite_from_link): (LinkToPort, PortFromLink) = channel();
@@ -128,14 +123,14 @@ impl Rack {
     pub fn connect_to_noc(&mut self, port_to_noc: PortToNoc, port_from_noc: PortFromNoc)
             -> Result<(), Error> {
         let _f = "connect_to_noc";
-        let (port, port_from_pe) = self.cells
+        let cell = self.cells
             .iter_mut()
             .filter(|binding| binding.1.is_border())
             .map(|binding| binding.1)
             .nth(0)
-            .ok_or::<Error>(RackError::Boundary { func_name: _f }.into())?
-            .get_free_boundary_port_mut()?;
-        port.noc_channel(port_to_noc, port_from_noc, port_from_pe)?;
+            .ok_or::<Error>(RackError::Boundary { func_name: _f }.into())?;
+        let (port, port_from_ca) = cell.get_free_boundary_port_mut()?;
+        port.noc_channel(port_to_noc, port_from_noc, port_from_ca)?;
         Ok(())
     }
 }

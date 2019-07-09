@@ -39,6 +39,7 @@ use crate::uuid_ec::Uuid;
 use crate::vm::VirtualMachine;
 
 use failure::{Error, ResultExt, Fail};
+use crate::app_message_formats::CaFromPort;
 
 type BorderTreeIDMap = HashMap<PortNumber, (SenderID, TreeID)>;
 type MsgNameMap = HashMap<TreeID, AllowedTree>;
@@ -116,7 +117,7 @@ impl CellAgent {
     }
 
     // WORKER (CellAgent)
-    pub fn initialize(&mut self, ca_from_cm: CaFromCm) -> Result<&mut Self, Error> {
+    pub fn initialize(&mut self, ca_from_cm: CaFromCm, ca_from_ports: CaFromPort) -> Result<&mut Self, Error> {
         let _f = "initialize";
         {
             if CONFIG.trace_options.all || CONFIG.trace_options.ca {
@@ -169,6 +170,7 @@ impl CellAgent {
                                           PortState::Parent, &gvm_equation,
                                           HashSet::new(), hops, path)?;
         self.listen_cm(ca_from_cm)?;
+        self.listen_port(ca_from_ports)?;
         Ok(self)
     }
     fn get_no_ports(&self) -> PortQty { self.no_ports }
@@ -616,6 +618,33 @@ impl CellAgent {
         Ok(())
     }
 
+    // SPAWN THREAD (listen_port_loop)
+    fn listen_port(&mut self, ca_from_port: CaFromPort) -> Result<(), Error> {
+        let _f = "listen_port";
+        let mut ca = self.clone();
+        let child_trace_header = fork_trace_header();
+        let thread_name = format!("CellAgent {} listen_port_loop", self.cell_id);
+        thread::Builder::new().name(thread_name).spawn( move || {
+            update_trace_header(child_trace_header);
+            let _ = ca.listen_port_loop(&ca_from_port).map_err(|e| write_err("cellagent", &e));
+            if CONFIG.continue_on_error { let _ = ca.listen_port(ca_from_port); }
+        })?;
+        Ok(())
+    }
+    fn listen_port_loop(&mut self, ca_from_port: &CaFromPort) -> Result<(), Error> {
+        let _f = "listen_port_loop";
+        {
+            if CONFIG.trace_options.all || CONFIG.trace_options.ca {
+                let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "worker" };
+                let trace = json!({ "cell_id": &self.cell_id, "thread_name": thread::current().name(), "thread_id": TraceHeader::parse(thread::current().id()) });
+                let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
+            }
+        }
+        loop {
+            let msg = ca_from_port.recv()?;
+            println!("Cellagent {}: {} got {:?}", self.cell_id, _f, msg);
+        }
+    }
     // SPAWN THREAD (listen_cm_loop)
     fn listen_cm(&mut self, ca_from_cm: CaFromCm) -> Result<(), Error>{
         let _f = "listen_cm";
