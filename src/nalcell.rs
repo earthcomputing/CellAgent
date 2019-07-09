@@ -19,6 +19,8 @@ use std::{
     ffi::CStr,
 };
 
+use either::Either;
+
 use crate::cellagent::{CellAgent};
 use crate::cmodel::{Cmodel};
 use crate::config::{CONFIG, PortQty};
@@ -54,7 +56,8 @@ pub struct NalCell {
     packet_engine: PacketEngine,
     vms: Vec<VirtualMachine>,
     ports_from_pe: HashMap<PortNo, PortFromPe>,
-    ecnl: Option<*mut c_void>
+    ports_from_ca: HashMap<PortNo, PortFromCa>,
+    ecnl: Option<*mut c_void>,
 }
 
 impl NalCell {
@@ -113,6 +116,7 @@ impl NalCell {
         let (cm_to_pe, pe_from_cm): (CmToPe, PeFromCm) = channel();
         let (pe_to_cm, cm_from_pe): (PeToCm, CmFromPe) = channel();
         let (port_to_pe, pe_from_ports): (PortToPe, PeFromPort) = channel();
+        let (port_to_ca, ca_from_ports): (PortToCa, CaFromPort) = channel();
         let port_list : Vec<PortNo> = (0..*num_phys_ports)
             .map(|i| PortNo(i as u8))
             .collect();
@@ -125,6 +129,8 @@ impl NalCell {
         let mut ports = Vec::new();
         let mut pe_to_ports = Vec::new();
         let mut ports_from_pe = HashMap::new(); // So I can remove the item
+        let mut ca_to_ports = Vec::new();
+        let mut ports_from_ca = HashMap::new();
         {
             if CONFIG.trace_options.all || CONFIG.trace_options.nal {
                 let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "nalcell_port_setup" };
@@ -135,17 +141,25 @@ impl NalCell {
         let cell_type = if border_port_nos.is_empty() { CellType::Interior } else { CellType::Border };
         for i in 0..=*num_phys_ports {
             let is_border_port = border_port_nos.contains(&PortNo(i));
-            let (pe_to_port, port_from_pe): (PeToPort, PortFromPe) = channel();
-            pe_to_ports.push(pe_to_port);
-            ports_from_pe.insert(PortNo(i), port_from_pe);
+            let port_to_pe_or_ca = if is_border_port {
+                let (ca_to_port, port_from_ca): (CaToPort, PortFromCa) = channel();
+                ca_to_ports.push(ca_to_port);
+                ports_from_ca.insert(PortNo(i), port_from_ca);
+                Either::Right(port_to_ca.clone())
+            } else {
+                let (pe_to_port, port_from_pe): (PeToPort, PortFromPe) = channel();
+                pe_to_ports.push(pe_to_port);
+                ports_from_pe.insert(PortNo(i), port_from_pe);
+                Either::Left(port_to_pe.clone())
+            };
             let is_connected = i == 0;
             let port_number = PortNo(i).make_port_number(num_phys_ports).context(NalcellError::Chain { func_name: "new", comment: S("port number")})?;
-            let port = Port::new(cell_id, port_number, is_border_port, is_connected, port_to_pe.clone()).context(NalcellError::Chain { func_name: "new", comment: S("port")})?;
+            let port = Port::new(cell_id, port_number, is_border_port, is_connected, port_to_pe_or_ca).context(NalcellError::Chain { func_name: "new", comment: S("port")})?;
             ports.push(port);
         }
         let boxed_ports: Box<[Port]> = ports.into_boxed_slice();
         let cell_agent = CellAgent::new(cell_id, cell_type, config, num_phys_ports, ca_to_cm).context(NalcellError::Chain { func_name: "new", comment: S("cell agent create")})?;
-        NalCell::start_cell(&cell_agent, ca_from_cm);
+        NalCell::start_cell(&cell_agent, ca_from_cm, ca_from_ports);
         let cmodel = Cmodel::new(cell_id);
         NalCell::start_cmodel(&cmodel, cm_from_ca, cm_to_pe, cm_from_pe, cm_to_ca);
         let packet_engine = PacketEngine::new(cell_id, cell_agent.get_connected_tree_id(),
@@ -153,10 +167,10 @@ impl NalCell {
         NalCell::start_packet_engine(&packet_engine, pe_from_cm, pe_from_ports);
         Ok(NalCell { id: cell_id, cell_type, config, cmodel,
                      ports: boxed_ports, cell_agent, vms: Vec::new(),
-                     packet_engine, ports_from_pe, ecnl })
+                     packet_engine, ports_from_pe, ports_from_ca, ecnl })
     }
     // SPAWN THREAD (ca.initialize)
-    fn start_cell(cell_agent: &CellAgent, ca_from_cm: CaFromCm) {
+    fn start_cell(cell_agent: &CellAgent, ca_from_cm: CaFromCm, ca_from_ports: CaFromPort) {
         let _f = "start_cell";
         {
             if CONFIG.trace_options.all || CONFIG.trace_options.nal {
@@ -170,7 +184,7 @@ impl NalCell {
         let thread_name = format!("CellAgent {}", cell_agent.get_cell_id());
         thread::Builder::new().name(thread_name).spawn( move || {
             update_trace_header(child_trace_header);
-            let _ = ca.initialize(ca_from_cm).map_err(|e| write_err("nalcell", &e));
+            let _ = ca.initialize(ca_from_cm, ca_from_ports).map_err(|e| write_err("nalcell", &e));
             if CONFIG.continue_on_error { } // Don't automatically restart cell agent if it crashes
         }).expect("thread failed");
     }
@@ -215,6 +229,9 @@ impl NalCell {
     pub fn _get_cell_agent(&self) -> &CellAgent { &self.cell_agent }
     //pub fn get_cmodel(&self) -> &Cmodel { &self.cmodel }
     pub fn get_packet_engine(&self) -> &PacketEngine { &self.packet_engine }
+    pub fn take_port_from_ca(&mut self, port_no: PortNo) -> Option<PortFromCa> {
+        self.ports_from_ca.remove(&port_no)
+    }
     pub fn is_border(&self) -> bool {
         match self.cell_type {
             CellType::Border => true,
@@ -222,24 +239,32 @@ impl NalCell {
         }
     }
     pub fn get_free_ec_port_mut(&mut self) -> Result<(&mut Port, PortFromPe), Error> {
-        self.get_free_port_mut(false)
-    }
-    pub fn get_free_boundary_port_mut(&mut self) -> Result<(&mut Port, PortFromPe), Error> {
-        self.get_free_port_mut(true)
-    }
-    pub fn get_free_port_mut(&mut self, want_boundary_port: bool)
-            -> Result<(&mut Port, PortFromPe), Error> {
-        let _f = "get_free_port_mut";
+        let _f = "get_free_ec_port_mut";
         let cell_id = self.id;
         let port = self.ports
             .iter_mut()
             .filter(|port| !port.is_connected())
-            .filter(|port| !(want_boundary_port ^ port.is_border()))
+            .filter(|port| !port.is_border())
             .filter(|port| (*(port.get_port_no()) != 0 as u8))
             .nth(0)
             .ok_or::<Error>(NalcellError::NoFreePorts{ cell_id, func_name: _f }.into())?;
         port.set_connected();
         let recvr = self.ports_from_pe.remove(&port.get_port_no())
+            .ok_or::<Error>(NalcellError::Channel { port_no: port.get_port_no(), func_name: _f }.into())?;
+        Ok((port, recvr))
+    }
+    pub fn get_free_boundary_port_mut(&mut self) -> Result<(&mut Port, PortFromCa), Error> {
+        let _f = "get_free_boundary_port_mut";
+        let cell_id = self.id;
+        let port = self.ports
+            .iter_mut()
+            .filter(|port| !port.is_connected())
+            .filter(|port| port.is_border())
+            .filter(|port| (*(port.get_port_no()) != 0 as u8))
+            .nth(0)
+            .ok_or::<Error>(NalcellError::NoFreePorts{ cell_id, func_name: _f }.into())?;
+        port.set_connected();
+        let recvr = self.ports_from_ca.remove(&port.get_port_no())
             .ok_or::<Error>(NalcellError::Channel { port_no: port.get_port_no(), func_name: _f }.into())?;
         Ok((port, recvr))
     }
@@ -282,6 +307,8 @@ pub struct ModuleInfo {
 
 // Errors
 use failure::{Error, ResultExt};
+use crate::app_message_formats::{PortToCa, CaFromPort, CaToPort, PortFromCa};
+
 #[derive(Debug, Fail)]
 pub enum NalcellError {
     #[fail(display = "NalcellError::Chain {} {}", func_name, comment)]

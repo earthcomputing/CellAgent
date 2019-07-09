@@ -6,7 +6,7 @@ use uuid;
 use crate::utility::{PortNo, PortNumber};
 
 const NORMAL:   u8 = 0b0000_0000;  // Used for all Name UUIDs, including TreeIDs and for normal packets
-const ENTL:     u8 = 0b0000_1111;  // Used just to generate a recv event
+const ENTL:     u8 = 0b0000_1111;  // Used just to generate a recv event for simulator only
 const AITD:     u8 = 0b0000_1011;  // AIT packet delivered or not (ACK/NACK depending on time reversal)
 const AIT:      u8 = 0b0000_1001;  // Sent AIT packet
 const TECK:     u8 = 0b0000_0111;
