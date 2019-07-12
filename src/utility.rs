@@ -391,6 +391,7 @@ pub fn get_geometry(num_cells: CellQty) -> (usize, usize, Vec<(usize, usize)>) {
     if geometry.len() != *num_cells { panic!(format!("Topology has {} entries for {} cells", geometry.len(), *num_cells)) };
     (max_x, max_y, geometry)
 }
+pub fn _dbg_get_thread_id() -> u64 { TraceHeader::parse(thread::current().id()) }
 // There are so many places in my code where it's more convenient
 // to provide &str but I need String that I made the following
 #[allow(non_snake_case)]

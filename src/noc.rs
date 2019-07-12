@@ -1,7 +1,8 @@
 use std::{thread,
           thread::{JoinHandle},
-          sync::mpsc::channel,
+          //sync::mpsc::channel,
           collections::{HashSet}};
+use crossbeam::crossbeam_channel::unbounded as channel;
 
 use crate::app_message::{AppMsgType, AppMessage, AppMsgDirection,
                          AppDeleteTreeMsg, AppInterapplicationMsg, AppQueryMsg,
@@ -113,8 +114,10 @@ impl Noc {
     pub fn app_process_tree_name(&mut self, msg: &AppTreeNameMsg, noc_to_port: &NocToPort) -> Result<(), Error> {
         let _f = "app_process_tree_name";
         let tree_name = msg.get_tree_name();
+        // Handle duplicate notifications
+        if self.allowed_trees.get(tree_name).is_some() { return Ok(()); }
         self.allowed_trees.insert(tree_name.clone());
-        if self.allowed_trees.len() == 1 {
+        if self.base_tree.is_none() {
             if CONFIG.race_sleep > 0 {
                 println!("Noc: Sleeping {} seconds to wait for discover to quiesce", CONFIG.race_sleep);
                 sleep(CONFIG.race_sleep);

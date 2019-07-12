@@ -1,4 +1,5 @@
-use std::{sync::mpsc::channel};
+//use std::{sync::mpsc::channel};
+use crossbeam::crossbeam_channel::unbounded as channel;
 
 use crate::app_message_formats::{ApplicationFromNoc, ApplicationToNoc, NocFromApplication, NocToApplication};
 use crate::blueprint::{Blueprint};
