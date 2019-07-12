@@ -3,7 +3,8 @@
 use std::{io::{stdin, stdout, Read, Write},
           collections::{HashMap, HashSet},
           fs::{File, OpenOptions},
-          sync::mpsc::channel};
+};
+use crossbeam::crossbeam_channel::unbounded as channel;
 
 use ec_fabrix::app_message_formats::{ApplicationFromNoc, ApplicationToNoc, NocFromApplication, NocToApplication};
 use ec_fabrix::blueprint::{Blueprint};

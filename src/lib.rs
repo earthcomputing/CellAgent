@@ -1,10 +1,11 @@
-#![warn(bare_trait_objects)]
 #![deny(unused_must_use)]
+#![deny(bare_trait_objects)]
 //#![allow(dead_code)]
 //#![allow(unused_variables)]
 //#![allow(unused_imports)]
 //#![warn(rust_2018_idioms)]
 #![recursion_limit="1024"]
+#[macro_use] extern crate crossbeam;
 #[macro_use] extern crate failure;
 #[macro_use] extern crate serde_derive;
 #[macro_use] extern crate serde_json;
