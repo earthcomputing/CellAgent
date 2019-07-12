@@ -1,7 +1,8 @@
 use std::{thread,
           thread::{JoinHandle},
-          sync::mpsc::channel,
+          //sync::mpsc::channel,
           collections::{HashSet}};
+use crossbeam::crossbeam_channel::unbounded as channel;
 
 use crate::app_message::{AppMsgType, AppMessage, AppMsgDirection,
                          AppDeleteTreeMsg, AppInterapplicationMsg, AppQueryMsg,

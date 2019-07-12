@@ -5,10 +5,11 @@ use std::{
     fmt, fmt::Write,
     collections::{HashMap, HashSet},
     os::raw::{c_void},
-    sync::mpsc::channel,
+//    sync::mpsc::channel,
     thread,
     iter::FromIterator
 };
+use crossbeam::crossbeam_channel::unbounded as channel;
 
 #[cfg(feature = "cell")]
 use libc::{free};
@@ -66,58 +67,59 @@ impl NalCell {
         let _f = "new";
         let ecnl =
             match simulated_options {
-                Some(num_phys_ports) => None,
+                Some(_) => None,
                 None => {
                     #[cfg(feature = "cell")]
-                    {
-                        let ecnl_session: *mut c_void = null_mut();
-                        let ecnl_session_ptr: *const *mut c_void = &ecnl_session;
-                        unsafe {
-                            alloc_ecnl_session(ecnl_session_ptr);
-                            Some(*ecnl_session_ptr)
+                        {
+                            let ecnl_session: *mut c_void = null_mut();
+                            let ecnl_session_ptr: *const *mut c_void = &ecnl_session;
+                            unsafe {
+                                alloc_ecnl_session(ecnl_session_ptr);
+                                Some(*ecnl_session_ptr)
+                            }
                         }
-                    }
                     #[cfg(feature = "simulator")]
-                    {
-                        None
-                    }
+                        {
+                            None
+                        }
                 },
             };
-	let num_phys_ports =
-	    match simulated_options {
-	        Some(num_phys_ports) => num_phys_ports,
-		None => {
+        let num_phys_ports =
+            match simulated_options {
+                Some(num_phys_ports) => num_phys_ports,
+                None => {
                     #[cfg(feature = "cell")]
-                    let mip: *const ModuleInfo = null();
+                        let mip: *const ModuleInfo = null();
                     #[cfg(feature = "cell")]
-                    unsafe {
-                        get_module_info(ecnl.unwrap(), &mip);
-                        let module_id = (*mip).module_id as u8;
-                        println!("Module id: {:?} ", module_id);
-                        let module_name = CStr::from_ptr((*mip).module_name).to_string_lossy().into_owned();
-                        println!("Module name: {:?} ", module_name);
-                        let num_phys_ports = (*mip).num_ports as u8;
-                        println!("Num phys ports: {:?} ", num_phys_ports);
-                        free(mip as *mut libc::c_void);
-                        PortQty(num_phys_ports)
-                    }
+                        unsafe
+                        {
+                            get_module_info(ecnl.unwrap(), &mip);
+                            let module_id = (*mip).module_id as u8;
+                            println!("Module id: {:?} ", module_id);
+                            let module_name = CStr::from_ptr((*mip).module_name).to_string_lossy().into_owned();
+                            println!("Module name: {:?} ", module_name);
+                            let num_phys_ports = (*mip).num_ports as u8;
+                            println!("Num phys ports: {:?} ", num_phys_ports);
+                            free(mip as *mut libc::c_void);
+                            PortQty(num_phys_ports)
+                        }
                     #[cfg(feature = "simulator")]
-                    {
-                        PortQty(0)
-                    }
+                        {
+                            PortQty(0)
+                        }
                 }
             };
         if *num_phys_ports > *CONFIG.max_num_phys_ports_per_cell {
             return Err(NalcellError::NumberPorts { num_phys_ports, func_name: "new", max_num_phys_ports: CONFIG.max_num_phys_ports_per_cell }.into())
         }
-        let cell_id = CellID::new(name).context(NalcellError::Chain { func_name: "new", comment: S("cell_id")})?;
+        let cell_id = CellID::new(name).context(NalcellError::Chain { func_name: "new", comment: S("cell_id") })?;
         let (ca_to_cm, cm_from_ca): (CaToCm, CmFromCa) = channel();
         let (cm_to_ca, ca_from_cm): (CmToCa, CaFromCm) = channel();
         let (cm_to_pe, pe_from_cm): (CmToPe, PeFromCm) = channel();
         let (pe_to_cm, cm_from_pe): (PeToCm, CmFromPe) = channel();
         let (port_to_pe, pe_from_ports): (PortToPe, PeFromPort) = channel();
         let (port_to_ca, ca_from_ports): (PortToCa, CaFromPort) = channel();
-        let port_list : Vec<PortNo> = (0..*num_phys_ports)
+        let port_list: Vec<PortNo> = (0..*num_phys_ports)
             .map(|i| PortNo(i as u8))
             .collect();
         let all: HashSet<PortNo> = HashSet::from_iter(port_list);
@@ -127,9 +129,9 @@ impl NalCell {
             .collect::<Vec<_>>();
         interior_port_list.sort();
         let mut ports = Vec::new();
-        let mut pe_to_ports = Vec::new();
+        let mut pe_to_ports = HashMap::new();
         let mut ports_from_pe = HashMap::new(); // So I can remove the item
-        let mut ca_to_ports = Vec::new();
+        let mut ca_to_ports = HashMap::new();
         let mut ports_from_ca = HashMap::new();
         {
             if CONFIG.trace_options.all || CONFIG.trace_options.nal {
@@ -143,31 +145,41 @@ impl NalCell {
             let is_border_port = border_port_nos.contains(&PortNo(i));
             let port_to_pe_or_ca = if is_border_port {
                 let (ca_to_port, port_from_ca): (CaToPort, PortFromCa) = channel();
-                ca_to_ports.push(ca_to_port);
+                ca_to_ports.insert(PortNo(i), ca_to_port);
                 ports_from_ca.insert(PortNo(i), port_from_ca);
                 Either::Right(port_to_ca.clone())
             } else {
                 let (pe_to_port, port_from_pe): (PeToPort, PortFromPe) = channel();
-                pe_to_ports.push(pe_to_port);
+                pe_to_ports.insert(PortNo(i), pe_to_port);
                 ports_from_pe.insert(PortNo(i), port_from_pe);
                 Either::Left(port_to_pe.clone())
             };
             let is_connected = i == 0;
-            let port_number = PortNo(i).make_port_number(num_phys_ports).context(NalcellError::Chain { func_name: "new", comment: S("port number")})?;
-            let port = Port::new(cell_id, port_number, is_border_port, is_connected, port_to_pe_or_ca).context(NalcellError::Chain { func_name: "new", comment: S("port")})?;
+            let port_number = PortNo(i).make_port_number(num_phys_ports).context(NalcellError::Chain { func_name: "new", comment: S("port number") })?;
+            let port = Port::new(cell_id, port_number, is_border_port, is_connected, port_to_pe_or_ca).context(NalcellError::Chain { func_name: "new", comment: S("port") })?;
             ports.push(port);
         }
         let boxed_ports: Box<[Port]> = ports.into_boxed_slice();
-        let cell_agent = CellAgent::new(cell_id, cell_type, config, num_phys_ports, ca_to_cm).context(NalcellError::Chain { func_name: "new", comment: S("cell agent create")})?;
+        let cell_agent = CellAgent::new(cell_id, cell_type, config, num_phys_ports, ca_to_ports, ca_to_cm).context(NalcellError::Chain { func_name: "new", comment: S("cell agent create") })?;
         NalCell::start_cell(&cell_agent, ca_from_cm, ca_from_ports);
         let cmodel = Cmodel::new(cell_id);
         NalCell::start_cmodel(&cmodel, cm_from_ca, cm_to_pe, cm_from_pe, cm_to_ca);
         let packet_engine = PacketEngine::new(cell_id, cell_agent.get_connected_tree_id(),
-                                              pe_to_cm, pe_to_ports, border_port_nos).context(NalcellError::Chain { func_name: "new", comment: S("packet engine create")})?;
+                                              pe_to_cm, pe_to_ports, border_port_nos).context(NalcellError::Chain { func_name: "new", comment: S("packet engine create") })?;
         NalCell::start_packet_engine(&packet_engine, pe_from_cm, pe_from_ports);
-        Ok(NalCell { id: cell_id, cell_type, config, cmodel,
-                     ports: boxed_ports, cell_agent, vms: Vec::new(),
-                     packet_engine, ports_from_pe, ports_from_ca, ecnl })
+        Ok(NalCell {
+            id: cell_id,
+            cell_type,
+            config,
+            cmodel,
+            ports: boxed_ports,
+            cell_agent,
+            vms: Vec::new(),
+            packet_engine,
+            ports_from_pe,
+            ports_from_ca,
+            ecnl
+        })
     }
     // SPAWN THREAD (ca.initialize)
     fn start_cell(cell_agent: &CellAgent, ca_from_cm: CaFromCm, ca_from_ports: CaFromPort) {
@@ -284,7 +296,7 @@ impl fmt::Display for NalCell {
 impl Drop for NalCell {
     fn drop(&mut self) {
         match self.ecnl {
-            Some(ecnl_session) => {
+            Some(_) => {
                 #[cfg(feature = "cell")]
                 unsafe {
                     free_ecnl_session(ecnl_session);

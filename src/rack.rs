@@ -3,8 +3,9 @@ use multi_mut::{HashMapMultiMut};
 use std::{fmt, fmt::Write,
           collections::{HashMap, HashSet},
           iter::FromIterator,
-          sync::mpsc::channel,
+          //sync::mpsc::channel,
           thread::{JoinHandle}};
+use crossbeam::crossbeam_channel::unbounded as channel;
 
 use crate::app_message_formats::{PortToNoc, PortFromNoc};
 use crate::blueprint::{Blueprint, Cell, };
@@ -37,7 +38,8 @@ impl Rack {
             .iter()
             .map(|border_cell| -> Result<(CellNo, NalCell), Error> {
                 let cell_no = border_cell.get_cell_no();
-                let nal_cell = NalCell::new(&border_cell.get_name(), Some(border_cell.get_num_phys_ports()),
+                let nal_cell = NalCell::new(&border_cell.get_name(),
+                                            Some(border_cell.get_num_phys_ports()),
                                             &HashSet::from_iter(border_cell.get_border_ports().clone()),
                                             CellConfig::Large)?;
                 {

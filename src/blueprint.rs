@@ -175,7 +175,7 @@ impl Cell for InteriorCell {
 }
 impl InteriorCell {
     pub fn _new(cell_no: CellNo, cell_type: CellType, interior_ports: Vec<PortNo>) -> InteriorCell {
-	InteriorCell { cell_no, cell_type, interior_ports }
+        InteriorCell { cell_no, cell_type, interior_ports }
     }
 }
 impl fmt::Display for InteriorCell {

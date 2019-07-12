@@ -9,7 +9,7 @@ use crate::app_message_formats::{PortToNoc, PortFromNoc, PortToCa, PortToCaMsg, 
 use crate::config::{CONFIG};
 use crate::dal::{add_to_trace, fork_trace_header, update_trace_header};
 use crate::ec_message_formats::{PortToLink, PortFromLink, PortToPe, PortFromPe, LinkToPortPacket,
-                                PortToPePacket, PeToPortPacket};
+                                PortToPePacket};
 use crate::name::{Name, PortID, CellID};
 use crate::utility::{ByteArray, PortNo, PortNumber, S, TraceHeader, TraceHeaderParams, TraceType,
                      write_err};
@@ -58,7 +58,7 @@ impl Port {
     pub fn noc_channel(&self, port_to_noc: PortToNoc, port_from_noc: PortFromNoc,
             port_from_ca: PortFromCa) -> Result<JoinHandle<()>, Error> {
         let _f = "noc_channel";
-        let status = PortToCaMsg::Status(self.get_port_no(), self.is_border, PortStatus::Connected);
+        let status = PortToCaMsg::Status(self.get_port_no(), PortStatus::Connected);
         {
             if CONFIG.trace_options.all || CONFIG.trace_options.port {
                 let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "port_to_pe_status" };
@@ -118,7 +118,7 @@ impl Port {
         }
     }
 
-    // SPAWN THREAD (listen_pe_for_noc_loop)
+    // SPAWN THREAD (listen_ca_loop)
     fn listen_ca(&self, port_to_noc: PortToNoc, port_from_ca: PortFromCa) -> Result<JoinHandle<()>, Error> {
         let _f = "listen_ca";
         let port = self.clone();
@@ -143,10 +143,10 @@ impl Port {
             }
         }
         loop {
-            let bytes = port_from_ca.recv().context(PortError::Chain { func_name: "listen_pe_for_noc", comment: S(self.id.get_name()) + " recv from pe"})?;
+            let bytes = port_from_ca.recv().context(PortError::Chain { func_name: _f, comment: S(self.id.get_name()) + " recv from ca"})?;
             {
                 if CONFIG.trace_options.all || CONFIG.trace_options.port {
-                    let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "port_from_pe" };
+                    let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "port_from_ca" };
                     let trace = json!({ "id": self.get_id().get_name(), "msg": bytes.to_string()? });
                     let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
                 }
@@ -293,11 +293,7 @@ impl Port {
         }
         loop {
             //println!("Port {}: waiting for packet from pe", id);
-            let msg = port_from_pe.recv().context(PortError::Chain { func_name: _f, comment: S(self.id.get_name()) + " port_from_pe"})?;
-            let mut packet = match msg.clone() { // clone needed for following trace
-                PeToPortPacket::Packet(packet) => packet,
-                _ => return Err(PortError::App { func_name: _f, port_no: *self.port_number.get_port_no() }.into())
-            };
+            let mut packet = port_from_pe.recv().context(PortError::Chain { func_name: _f, comment: S(self.id.get_name()) + " port_from_pe"})?;
             {
                 if CONFIG.trace_options.all || CONFIG.trace_options.port {
                     let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "port from pe" };

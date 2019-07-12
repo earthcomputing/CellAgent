@@ -1,15 +1,17 @@
 use std::{fmt, fmt::Write,
-          sync::{Arc, Mutex, mpsc::channel},
+          sync::{Arc, Mutex, },//mpsc::channel},
           thread,
           collections::{HashMap, HashSet}};
 
+use crossbeam::crossbeam_channel::unbounded as channel;
 use serde;
 use serde_json;
 
 use crate::app_message::{AppMsgDirection, AppMessage, AppMsgType,
                          AppDeleteTreeMsg, AppInterapplicationMsg, AppManifestMsg,
                          AppQueryMsg, AppStackTreeMsg, AppTreeNameMsg};
-use crate::app_message_formats::{CaToVm, VmFromCa, VmToCa, CaFromVm};
+use crate::app_message_formats::{CaToPort, PortToCaMsg,
+                                 CaToVm, VmFromCa, VmToCa, CaFromVm};
 use crate::config::{CONFIG, BASE_TREE_NAME, CONNECTED_PORTS_TREE_NAME, CONTROL_TREE_NAME,
                     CellQty, PathLength, PortQty};
 use crate::dal::{add_to_trace, fork_trace_header, update_trace_header};
@@ -39,7 +41,7 @@ use crate::uuid_ec::Uuid;
 use crate::vm::VirtualMachine;
 
 use failure::{Error, ResultExt, Fail};
-use crate::app_message_formats::CaFromPort;
+use crate::app_message_formats::{CaFromPort};
 
 type BorderTreeIDMap = HashMap<PortNumber, (SenderID, TreeID)>;
 type MsgNameMap = HashMap<TreeID, AllowedTree>;
@@ -77,6 +79,7 @@ pub struct CellAgent {
     tree_vm_map: TreeVmMap,
     ca_to_vms: HashMap<VmID, CaToVm>,
     ca_to_cm: CaToCm,
+    ca_to_ports: HashMap<PortNo, CaToPort>,
     vm_id_no: usize,
     up_tree_senders: HashMap<UptreeID, HashMap<String,TreeID>>,
     up_traphs_clist: HashMap<TreeID, TreeID>,
@@ -89,10 +92,11 @@ pub struct CellAgent {
 }
 impl CellAgent {
     pub fn new(cell_id: CellID, cell_type: CellType, config: CellConfig, no_ports: PortQty,
-               ca_to_cm: CaToCm )
+               ca_to_ports: HashMap<PortNo, CaToPort>, ca_to_cm: CaToCm )
                -> Result<CellAgent, Error> {
+        let _f = "new";
         let tenant_masks = vec![BASE_TENANT_MASK];
-        let my_tree_id = TreeID::new(&cell_id.get_name()).context(CellagentError::Chain { func_name: "new", comment: S("my_tree_id")})?;
+        let my_tree_id = TreeID::new(&cell_id.get_name()).context(CellagentError::Chain { func_name: _f, comment: S("my_tree_id")})?;
         let control_tree_id = TreeID::new(&cell_id.get_name())?.
             add_component(CONTROL_TREE_NAME)?;
         let connected_tree_id = TreeID::new(&cell_id.get_name())?
@@ -110,7 +114,8 @@ impl CellAgent {
             my_entry, base_tree_map, neighbors: HashMap::new(), discover_d_count: HashMap::new(),
             connected_tree_entry: RoutingTableEntry::default(), sent_to_noc: false,
             tenant_masks, up_tree_senders: HashMap::new(), cell_info: CellInfo::new(),
-            up_traphs_clist: HashMap::new(), ca_to_cm, failover_reply_ports: HashMap::new(),
+            up_traphs_clist: HashMap::new(), ca_to_cm, ca_to_ports,
+            failover_reply_ports: HashMap::new(),
             no_packets: Vec::new(),
             child_ports: HashMap::new() }
         )
@@ -170,7 +175,7 @@ impl CellAgent {
                                           PortState::Parent, &gvm_equation,
                                           HashSet::new(), hops, path)?;
         self.listen_cm(ca_from_cm)?;
-        self.listen_port(ca_from_ports)?;
+        if self.is_border() { self.listen_port(ca_from_ports)?; }
         Ok(self)
     }
     fn get_no_ports(&self) -> PortQty { self.no_ports }
@@ -325,6 +330,7 @@ impl CellAgent {
                     -> Result<RoutingTableEntry, Error> {
         let _f = "update_traph";
         let base_tree_id = base_port_tree_id.to_tree_id();
+        self.tree_id_map.insert(base_tree_id.get_uuid(), base_port_tree_id);
         {
             if CONFIG.debug_options.all || CONFIG.debug_options.traph_entry {
                 let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "ca_update_traph" };
@@ -406,7 +412,7 @@ impl CellAgent {
             traph.add_port_tree(&port_tree);
             self.update_entry(&new_entry)?;
         }
-         self.traphs.insert(base_tree_id.get_uuid(), traph);
+        self.traphs.insert(base_tree_id.get_uuid(), traph);
         // TODO: Need to update entries of stacked trees following a failover but not as base tree builds out
         //let entries = traph.update_stacked_entries(entry).context(CellagentError::Chain { func_name: _f, comment: S("") })?;
         //for entry in entries {
@@ -509,7 +515,7 @@ impl CellAgent {
             }
         }
         loop {
-            let bytes = ca_from_vm.recv()?;
+            let bytes = ca_from_vm.recv().context(CellagentError::Chain { func_name: _f, comment: S("")})?;
             let serialized = bytes.to_string()?;
             let app_msg: Box<dyn AppMessage> = serde_json::from_str(&serialized).context(CellagentError::Chain { func_name: _f, comment: S("") })?;
             {
@@ -543,21 +549,21 @@ impl CellAgent {
         Ok(entry)
     }
     fn stack_tree(&mut self, sender_id: SenderID, allowed_tree: &AllowedTree,
-                  new_port_tree_id: PortTreeID, parent_tree_id: PortTreeID,
+                  new_port_tree_id: PortTreeID, parent_port_tree_id: PortTreeID,
                   new_port_tree_id_opt: Option<PortTreeID>,
                   gvm_eqn: &GvmEquation) -> Result<RoutingTableEntry, Error> {
         let _f = "stack_tree";
         let no_ports = self.no_ports;
-        let base_tree_id = self.get_base_tree_id(parent_tree_id)
+        let base_tree_id = self.get_base_tree_id(parent_port_tree_id)
             .unwrap_or_else(|_| {
-                let tree_id = parent_tree_id.to_tree_id();
+                let tree_id = parent_port_tree_id.to_tree_id();
                 self.update_base_tree_map(new_port_tree_id, tree_id);
                 tree_id
             });
         self.add_tree_name_map_item( sender_id, allowed_tree, new_port_tree_id.to_tree_id());
         self.update_base_tree_map(new_port_tree_id, base_tree_id);
-        let traph = self.get_traph_mut(parent_tree_id).context(CellagentError::Chain { func_name: "stack_tree", comment: S("own_traph")})?;
-        let parent_entry = traph.get_tree_entry(&parent_tree_id.get_uuid()).context(CellagentError::Chain { func_name: "stack_tree", comment: S("get_tree_entry")})?;
+        let traph = self.get_traph_mut(parent_port_tree_id).context(CellagentError::Chain { func_name: "stack_tree", comment: S("own_traph")})?;
+        let parent_entry = traph.get_tree_entry(&parent_port_tree_id.get_uuid()).context(CellagentError::Chain { func_name: "stack_tree", comment: S("get_tree_entry")})?;
         let mut entry = parent_entry; // Copy so parent_entry won't change when entry does
         entry.set_uuid(&new_port_tree_id.get_uuid());
         let params = traph.get_params(gvm_eqn.get_variables()).context(CellagentError::Chain { func_name: "stack_tree", comment: S("get_params")})?;
@@ -571,18 +577,18 @@ impl CellAgent {
         } else {
             entry.disable_receive(no_ports);
         }
-        let tree = Tree::new(new_port_tree_id, base_tree_id, parent_tree_id, &gvm_eqn, entry);
+        let tree = Tree::new(new_port_tree_id, base_tree_id, parent_port_tree_id, &gvm_eqn, entry);
         traph.stack_tree(tree);
         self.tree_map.insert(new_port_tree_id.get_uuid(), base_tree_id.get_uuid());
         self.tree_id_map.insert(new_port_tree_id.get_uuid(), new_port_tree_id);
         // TODO: Make sure that stacked tree entries for port trees get created
         self.update_entry(&entry).context(CellagentError::Chain { func_name: _f, comment: S("")})?;
         // Next line avoids a mutability error; requires NLL
-        let traph = self.get_traph_mut(parent_tree_id).context(CellagentError::Chain { func_name: "stack_tree", comment: S("own_traph")})?;
+        let traph = self.get_traph_mut(parent_port_tree_id).context(CellagentError::Chain { func_name: "stack_tree", comment: S("own_traph")})?;
         // No new_port_tree for uptrees, denoted by new_port_tree_id = None
         if new_port_tree_id_opt.is_some() {
             entry.set_tree_id(new_port_tree_id);
-            let tree = Tree::new(new_port_tree_id, base_tree_id, parent_tree_id, &gvm_eqn, entry);
+            let tree = Tree::new(new_port_tree_id, base_tree_id, parent_port_tree_id, &gvm_eqn, entry);
             traph.stack_tree(tree);
             self.update_entry(&entry)?;
         }
@@ -641,8 +647,33 @@ impl CellAgent {
             }
         }
         loop {
-            let msg = ca_from_port.recv()?;
-            println!("Cellagent {}: {} got {:?}", self.cell_id, _f, msg);
+            let msg = ca_from_port.recv().context(CellagentError::Chain { func_name: _f, comment: S(self.cell_id)})?;
+            {
+                if CONFIG.trace_options.all || CONFIG.trace_options.ca {
+                    match &msg {
+                        PortToCaMsg::AppMsg(port_no, bytes) => {
+                            let ec_msg: Box<dyn AppMessage> = serde_json::from_str(&bytes.to_string()?)?;
+                            let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "ca_from_port_bytes" };
+                            let trace = json!({ "cell_id": self.cell_id, "port": port_no, "ec_msg": ec_msg.to_string() });
+                            let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
+                        },
+                        PortToCaMsg::Status(port_no, status) => {
+                            let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "ca_from_port_status" };
+                            let trace = json!({ "cell_id": &self.cell_id, "port": port_no, "status": status });
+                            let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
+                        },
+                    }
+                }
+            }
+            match msg {
+                PortToCaMsg::AppMsg(port_no, bytes) => {
+                    self.ca_to_cm.send(CaToCmBytes::Tunnel((port_no, bytes)))?;
+                }
+                PortToCaMsg::Status(port_no, port_status) => {
+                    let is_border = true;
+                    self.ca_to_cm.send(CaToCmBytes::Status((port_no, is_border, NumberOfPackets::new(), port_status)))?;
+                }
+            }
         }
     }
     // SPAWN THREAD (listen_cm_loop)
@@ -654,7 +685,6 @@ impl CellAgent {
         thread::Builder::new().name(thread_name).spawn( move || {
             update_trace_header(child_trace_header);
             let _ = ca.listen_cm_loop(&ca_from_cm).map_err(|e| write_err("cellagent", &e));
-            // println!("Cellagent {}: Back from listen_cm_loop", ca.cell_id);
             if CONFIG.continue_on_error { let _ = ca.listen_cm(ca_from_cm); }
         })?;
         Ok(())
@@ -681,15 +711,15 @@ impl CellAgent {
                             let trace = json!({ "cell_id": self.cell_id, "port": port_no, "ec_msg": ec_msg.to_string() });
                             let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
                         },
-                        CmToCaBytes::App((port_no, bytes)) => {
-                            let app_msg: Box<dyn AppMessage> = serde_json::from_str(&bytes.to_string()?)?;
-                            let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "ca_from_cm_app" };
-                            let trace = json!({ "cell_id": &self.cell_id, "port": port_no, "msg": app_msg.to_string() });
-                            let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
-                        }
                         CmToCaBytes::Status((port_no, is_border, number_of_packets, status)) => {
                             let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "ca_from_cm_status" };
                             let trace = json!({ "cell_id": &self.cell_id, "port": port_no, "is_border": is_border, "no_packets": number_of_packets, "status": status });
+                            let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
+                        },
+                        CmToCaBytes::Tunnel((port_no, bytes)) => {
+                            let app_msg: Box<dyn AppMessage> = serde_json::from_str(&bytes.to_string()?)?;
+                            let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "ca_from_cm_bytes" };
+                            let trace = json!({ "cell_id": self.cell_id, "port": port_no, "app_msg": app_msg.to_string() });
                             let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
                         },
                     }
@@ -718,7 +748,7 @@ impl CellAgent {
                     };
                     msg.process_ca(self, port_no, msg_tree_id, is_ait).context(CellagentError::Chain { func_name: _f, comment: S(self.cell_id)})?;
                 },
-                CmToCaBytes::App((port_no, bytes)) => {
+                CmToCaBytes::Tunnel((port_no, bytes)) => {
                     let port_number = port_no.make_port_number(self.no_ports).context(CellagentError::Chain { func_name: _f, comment: S(self.cell_id) + " PortNumber" })?;
                     let sender_id = self.border_port_tree_id_map
                         .get(&port_number)
@@ -726,12 +756,13 @@ impl CellAgent {
                         .0;
                     // Verify that this sender can name this tree
                     if !self.name_tree_map.lock().unwrap().contains_key(&sender_id) {
-                        return Err(CellagentError::TreeNameMap { func_name: _f, cell_id: self.cell_id,  sender_id }.into());
+                        return Err(CellagentError::TreeNameMap { func_name: _f, cell_id: self.cell_id, sender_id }.into());
                     }
                     let serialized = bytes.to_string()?;
                     let app_msg: Box<dyn AppMessage> = serde_json::from_str(&serialized).context(CellagentError::Chain { func_name: _f, comment: S("") })?;
                     app_msg.process_ca(self, sender_id)?;
                 }
+          
             }
         }
     }
@@ -1080,7 +1111,7 @@ impl CellAgent {
         let gvm_send = gvm_eqn.eval_send(&params)?;
         let gvm_recv = gvm_eqn.eval_recv(&params)?;
         // Update StackTreeMsg and forward
-        let parent_entry = self.get_tree_entry(parent_port_tree_id)?;
+        let parent_entry = self.get_tree_entry(parent_port_tree_id).context(CellagentError::Chain { func_name: _f, comment: S("") })?;
         let parent_mask = parent_entry.get_mask().all_but_port(PortNumber::new0());
         self.update_entry(&entry)?;
         let child_ports = if gvm_xtnd {
@@ -1098,9 +1129,18 @@ impl CellAgent {
                 let parent_tree_name = self.name_from_tree(sender_id, parent_port_tree_id.to_tree_id())?;
                 let app_msg = AppStackTreeMsg::new(&sender_id.get_name(), &new_tree_name,
                                 &parent_tree_name, AppMsgDirection::Rootward, gvm_eqn);
+                {
+                    if CONFIG.trace_options.all || CONFIG.trace_options.ca {
+                        let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "ca_to_noc_tree_name" };
+                        let trace = json!({ "cell_id": &self.cell_id, "port": port_no, "app_msg": app_msg });
+                        let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
+                    }
+                }
                 let serialized = serde_json::to_string(&app_msg)?;
                 let bytes = ByteArray::new(&serialized);
-                self.ca_to_cm.send(CaToCmBytes::App((port_number, bytes)))?;
+                let port_no = self.get_border_port(&sender_id)?.get_port_no();
+                let ca_to_port = self.ca_to_ports.get(&port_no).expect("cellagent.rs: border port sender must be set");
+                ca_to_port.send(bytes)?;
             } else {
                 let new_msg = StackTreeDMsg::new(in_reply_to, sender_id, new_port_tree_id,
                                                  parent_port_tree_id, join);
@@ -1110,15 +1150,15 @@ impl CellAgent {
             self.send_msg(self.connected_tree_id, msg, parent_mask)?; // Send to children of parent tree
         }
         self.child_ports.insert(new_port_tree_id.to_tree_id(), child_ports);
-        let parent_tree_id = payload.get_parent_port_tree_id();
-        let base_tree_id = self.get_base_tree_id(parent_tree_id).context(CellagentError::Chain { func_name: _f, comment: S("") })?;
-        self.update_base_tree_map(parent_tree_id, base_tree_id);
+        let parent_port_tree_id = payload.get_parent_port_tree_id();
+        let base_tree_id = self.get_base_tree_id(parent_port_tree_id).context(CellagentError::Chain { func_name: _f, comment: S("") })?;
+        self.update_base_tree_map(new_port_tree_id, base_tree_id);
         {
             if CONFIG.debug_options.all || CONFIG.debug_options.stack_tree {
                 let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "ca_process_stack_tree_msg" };
-                let trace = json!({ "cell_id": &self.cell_id, "new_port_tree_id": new_port_tree_id, "port_no": port_no, "child_ports": self.child_ports.get(&parent_tree_id.to_tree_id()), "msg": msg.value() });
+                let trace = json!({ "cell_id": &self.cell_id, "new_port_tree_id": new_port_tree_id, "port_no": port_no, "child_ports": self.child_ports.get(&parent_port_tree_id.to_tree_id()), "msg": msg.value() });
                 let _ = add_to_trace(TraceType::Debug, trace_params, &trace, _f);
-                println!("Cellagent {}: {} tree {} port {} xtnd {} child ports {:?} msg {}", self.cell_id, _f, parent_tree_id, *port_no, gvm_xtnd, self.child_ports.get(&parent_tree_id.to_tree_id()), msg);
+                println!("Cellagent {}: {} tree {} port {} xtnd {} child ports {:?} msg {}", self.cell_id, _f, parent_port_tree_id, *port_no, gvm_xtnd, self.child_ports.get(&parent_port_tree_id.to_tree_id()), msg);
             }
         }
         (*self.traphs_mutex.lock().unwrap()) = self.traphs.clone();
@@ -1132,7 +1172,7 @@ impl CellAgent {
         let port_tree_id = msg.get_port_tree_id();
         let parent_port_tree_id = msg.get_parent_port_tree_id();
         let tree_uuid = port_tree_id.get_uuid();
-        let traph = self.get_traph_mut(port_tree_id)?;
+        let traph = self.get_traph_mut(port_tree_id).context(CellagentError::Chain { func_name: _f, comment: S("") })?;
         let parent_port = traph.get_parent_port()?;
         if is_joining {
             let mut entry = traph.get_tree_entry(&tree_uuid).context(CellagentError::Chain { func_name: _f, comment: S("") })?;
@@ -1164,8 +1204,6 @@ impl CellAgent {
                 let tree_name_msg = AppTreeNameMsg::new("noc",
                                &AllowedTree::new(&parent_port_tree_id.get_name()),
                                     &allowed_tree);
-                let serialized = serde_json::to_string(&tree_name_msg as &dyn AppMessage).context(CellagentError::Chain { func_name: "port_connected", comment: S(self.cell_id) })?;
-                let bytes = ByteArray::new(&serialized);
                 {
                     if CONFIG.trace_options.all || CONFIG.trace_options.ca {
                         let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "ca_to_noc_tree_name" };
@@ -1173,8 +1211,11 @@ impl CellAgent {
                         let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
                     }
                 }
-                let port_number = self.get_border_port(&sender_id)?;
-                self.ca_to_cm.send(CaToCmBytes::App((port_number, bytes)))?;
+                let serialized = serde_json::to_string(&tree_name_msg as &dyn AppMessage).context(CellagentError::Chain { func_name: "port_connected", comment: S(self.cell_id) })?;
+                let bytes = ByteArray::new(&serialized);
+                let port_no = self.get_border_port(&sender_id)?.get_port_no();
+                let ca_to_port = self.ca_to_ports.get(&port_no).expect("cellagent.rs: border port sender must be set");
+                ca_to_port.send(bytes)?;
             } else {
                 let mask = Mask::new(port_number);
                 let in_reply_to = msg.get_sender_msg_seq_no();
@@ -1241,7 +1282,8 @@ impl CellAgent {
         Ok(())
     }
     fn may_send(&self, port_tree_id: PortTreeID) -> Result<bool, Error> {
-        let entry = self.get_tree_entry(port_tree_id)?;
+        let _f = "may_send";
+        let entry = self.get_tree_entry(port_tree_id).context(CellagentError::Chain { func_name: _f, comment: S("") })?;
         Ok(entry.may_send())
     }
     fn make_tree_map(&self, sender_id: SenderID, allowed_trees: &Vec<AllowedTree>)
@@ -1263,7 +1305,9 @@ impl CellAgent {
         let direction = app_msg.get_direction().into();
         let tree_id = self.tree_from_name(sender_id, target_tree_name)?;
         let port_tree_id = tree_id.to_port_tree_id_0();
-        if !self.may_send(port_tree_id)? { return Err(CellagentError::MayNotSend { func_name: _f, cell_id: self.cell_id, tree_id }.into()); }
+        if !self.may_send(port_tree_id).context(CellagentError::Chain { func_name: _f, comment: S("") })? {
+            return Err(CellagentError::MayNotSend { func_name: _f, cell_id: self.cell_id, tree_id }.into());
+        }
         let msg = InterapplicationMsg::new(sender_id, false, tree_id,
                                            direction, &tree_map, app_msg);
         {
@@ -1290,7 +1334,9 @@ impl CellAgent {
         let deploy_tree_id = self.tree_from_name(sender_id, deploy_tree_name)?;
         tree_map.insert(S(deploy_tree_name.get_name()), deploy_tree_id);
         let deploy_port_tree_id = deploy_tree_id.to_port_tree_id_0();
-        if !self.may_send(deploy_port_tree_id)? { return Err(CellagentError::MayNotSend { func_name: _f, cell_id: self.cell_id, tree_id: deploy_tree_id }.into()); }
+        if !self.may_send(deploy_port_tree_id).context(CellagentError::Chain { func_name: _f, comment: S("") })? {
+            return Err(CellagentError::MayNotSend { func_name: _f, cell_id: self.cell_id, tree_id: deploy_tree_id }.into());
+        }
         let manifest = app_msg.get_payload().get_manifest();
         let msg = ManifestMsg::new(sender_id, false,
                                    deploy_tree_id.clone(), &tree_map, &manifest);
@@ -1322,7 +1368,7 @@ impl CellAgent {
         let new_tree_id = self.my_tree_id.add_component(&new_tree_name.get_name()).context(CellagentError::Chain { func_name: _f, comment: S(self.cell_id) + " new_tree_id" })?;
         self.add_tree_name_map_item(sender_id, new_tree_name, new_tree_id);
         let parent_tree_id = self.tree_from_name(sender_id, parent_tree_name)?;
-        let parent_entry = self.get_tree_entry(parent_tree_id.to_port_tree_id_0())?;
+        let parent_entry = self.get_tree_entry(parent_tree_id.to_port_tree_id_0()).context(CellagentError::Chain { func_name: _f, comment: S("") })?;
         let parent_mask = parent_entry.get_mask().all_but_port(PortNumber::new0());
         let child_ports = new_hashset(&parent_mask.get_port_nos());
         self.child_ports.insert(new_tree_id, child_ports);
@@ -1336,16 +1382,15 @@ impl CellAgent {
             }
         }
         let parent_port_tree_id = parent_tree_id.to_port_tree_id_0();
-        if !self.may_send(parent_port_tree_id)? { return Err(CellagentError::MayNotSend { func_name: _f, cell_id: self.cell_id, tree_id: parent_tree_id }.into()); }
+        if !self.may_send(parent_port_tree_id).context(CellagentError::Chain { func_name: _f, comment: S("") })? {
+            return Err(CellagentError::MayNotSend { func_name: _f, cell_id: self.cell_id, tree_id: parent_tree_id }.into());
+        }
         // There is no new_port_tree for up trees
-        self.stack_tree(sender_id, new_tree_name, new_tree_id.to_port_tree_id_0(),
-                        parent_port_tree_id, None, gvm_eqn)?;
         let parent_entry = self.get_tree_entry(parent_port_tree_id).context(CellagentError::Chain { func_name: _f, comment: S("get parent_entry") })?;
         let parent_mask = parent_entry.get_mask();
         let stack_tree_msg = StackTreeMsg::new(sender_id, new_tree_name, new_tree_id, parent_tree_id, direction, gvm_eqn);
+        self.send_msg(self.control_tree_id, &stack_tree_msg, Mask::port0())?;
         self.send_msg(self.connected_tree_id, &stack_tree_msg, parent_mask)?;
-        let child_ports = new_hashset(&parent_mask.get_port_nos());
-        self.child_ports.insert(parent_port_tree_id.to_tree_id(), child_ports);
         Ok(())
     }
     pub fn app_tree_name(&self, _msg: &AppTreeNameMsg, _sender_id: SenderID) -> Result<(), Error> {
@@ -1370,8 +1415,6 @@ impl CellAgent {
         let _f = "send_tree_name_msg";
         let tree_name_msg = AppTreeNameMsg::new("cell_agent",
                                                 base_tree_name, base_tree_name);
-        let serialized = serde_json::to_string(&tree_name_msg as &dyn AppMessage).context(CellagentError::Chain { func_name: "port_connected", comment: S(self.cell_id) })?;
-        let bytes = ByteArray::new(&serialized);
         {
             if CONFIG.trace_options.all || CONFIG.trace_options.ca {
                 let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "ca_to_noc_tree_name" };
@@ -1379,8 +1422,10 @@ impl CellAgent {
                 let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
             }
         }
-        let port_number = port_no.make_port_number(self.no_ports)?;
-        self.ca_to_cm.send(CaToCmBytes::App((port_number, bytes)))?;
+        let serialized = serde_json::to_string(&tree_name_msg as &dyn AppMessage).context(CellagentError::Chain { func_name: "port_connected", comment: S(self.cell_id) })?;
+        let bytes = ByteArray::new(&serialized);
+        let ca_to_port = self.ca_to_ports.get(&port_no).expect("cellagent.rs send_tree_name_msg: send port must be set");
+        ca_to_port.send(bytes)?;
         Ok(())
     }
     fn port_connected(&mut self, port_no: PortNo, is_border: bool) -> Result<(), Error> {
@@ -1532,6 +1577,21 @@ impl CellAgent {
         let msg = CaToCmBytes::Bytes((tree_id, is_ait, user_mask, bytes));
         self.ca_to_cm.send(msg)?;
         Ok(())
+    }
+    // For debugging only
+    fn _dbg_get_traph_keys(&self) -> Vec<String> {
+        let _f = "get_traph_keys";
+        self.traphs
+            .keys()
+            .map(|key| self.tree_id_map.get(key))
+            .map(|tree_id| {
+                if tree_id.is_some() {
+                    tree_id.unwrap().get_name()
+                } else {
+                    S("None")
+                }
+            })
+            .collect::<Vec<String>>()
     }
 }
 impl fmt::Display for CellAgent {

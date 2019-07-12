@@ -38,21 +38,21 @@ impl Cmodel {
                 let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
             }
         }
-        self.listen_ca(cm_from_ca, cm_to_pe)?;
+        self.listen_ca(cm_from_ca, cm_to_pe, cm_to_ca.clone())?;
         self.listen_pe(cm_from_pe, cm_to_ca)?;
         Ok(())
     }
 
     // SPAWN THREAD (listen_ca_loop)
-    fn listen_ca(&self, cm_from_ca: CmFromCa, cm_to_pe: CmToPe) -> Result<JoinHandle<()>, Error> {
+    fn listen_ca(&self, cm_from_ca: CmFromCa, cm_to_pe: CmToPe, cm_to_ca: CmToCa) -> Result<JoinHandle<()>, Error> {
         let _f = "listen_ca";
         let cmodel = self.clone();
         let child_trace_header = fork_trace_header();
         let thread_name = format!("Cmodel {} listen_ca_loop", self.cell_id.get_name());
         let join_handle = thread::Builder::new().name(thread_name).spawn( move || {
             update_trace_header(child_trace_header);
-            let _ = cmodel.listen_ca_loop(&cm_from_ca, &cm_to_pe).map_err(|e| write_err("cmodel listen_ca", &e));
-            if CONFIG.continue_on_error { let _ = cmodel.listen_ca(cm_from_ca, cm_to_pe); }
+            let _ = cmodel.listen_ca_loop(&cm_from_ca, &cm_to_pe, &cm_to_ca).map_err(|e| write_err("cmodel listen_ca", &e));
+            if CONFIG.continue_on_error { let _ = cmodel.listen_ca(cm_from_ca, cm_to_pe, cm_to_ca); }
         })?;
         Ok(join_handle)
     }
@@ -72,7 +72,7 @@ impl Cmodel {
     }
 
     // WORKER (CmFromCa)
-    fn listen_ca_loop(&self, cm_from_ca: &CmFromCa, cm_to_pe: &CmToPe) -> Result<(), Error> {
+    fn listen_ca_loop(&self, cm_from_ca: &CmFromCa, cm_to_pe: &CmToPe, cm_to_ca: &CmToCa) -> Result<(), Error> {
         let _f = "listen_ca_loop";
         {
             if CONFIG.trace_options.all || CONFIG.trace_options.cm {
@@ -91,19 +91,24 @@ impl Cmodel {
                             let trace = json!({"cell_id": &self.cell_id, "msg": bytes.to_string()? });
                             let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
                         },
-                        CaToCmBytes::App((_, bytes)) => {
-                            let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "cm_from_ca_app" };
-                            let trace = json!({ "cell_id": &self.cell_id, "msg": bytes.to_string()? });
-                            let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
-                        },
                         CaToCmBytes::Entry(entry) => {
-                            let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "cm_from_ca_entry" };
+                            let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "cm_from_ca_bytes(entry)" };
                             let trace = json!({ "cell_id": &self.cell_id, "entry": entry });
                             let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
                         },
                         CaToCmBytes::Reroute((broken_port, new_parent, number_of_packets)) => {
-                            let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "cm_from_ca_reroute" };
+                            let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "cm_from_ca_bytes(reroute)" };
                             let trace = json!({ "cell_id": &self.cell_id, "broken_port": broken_port, "new_parent": new_parent, "no_packets": number_of_packets });
+                            let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
+                        },
+                        CaToCmBytes::Status((port_no, is_border, _number_of_packets, status)) => {
+                            let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "cm_from_ca_bytes(status)" };
+                            let trace = json!({"cell_id": &self.cell_id, "port_no": port_no, "is_border": is_border, "status": status });
+                            let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
+                        },
+                        CaToCmBytes::Tunnel((port_no, bytes)) => {
+                            let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "cm_from_ca_bytes(tunnel)" };
+                            let trace = json!({"cell_id": &self.cell_id, "port_no": port_no, "app_msg": bytes.to_string()? });
                             let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
                         }
                     }
@@ -117,7 +122,7 @@ impl Cmodel {
                         let trace = json!({ "cell_id": &self.cell_id, "broken_port": broken_port, "new_parent": new_parent, "no_packets": number_of_packets });
                         let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
                     }
-                    cm_to_pe.send(CmToPePacket::Reroute((broken_port, new_parent, number_of_packets)))
+                    cm_to_pe.send(CmToPePacket::Reroute((broken_port, new_parent, number_of_packets)))?;
                 },
                 CaToCmBytes::Entry(entry) => {
                     if CONFIG.trace_options.all || CONFIG.trace_options.cm {
@@ -125,16 +130,14 @@ impl Cmodel {
                         let trace = json!({ "cell_id": &self.cell_id, "entry": entry });
                         let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
                     }
-                    cm_to_pe.send(CmToPePacket::Entry(entry))
+                    cm_to_pe.send(CmToPePacket::Entry(entry))?;
                 },
-                CaToCmBytes::App((port_number, bytes)) => {
-                    if CONFIG.trace_options.all || CONFIG.trace_options.cm {
-                        let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "cm_to_pe_app" };
-                        let trace = json!({ "cell_id": &self.cell_id, "msg": bytes.to_string()? });
-                        let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
-                    }
-                    cm_to_pe.send(CmToPePacket::App((port_number, bytes)))
-                },
+                CaToCmBytes::Status(status_msg) => {
+                    cm_to_ca.send(CmToCaBytes::Status(status_msg))?;
+                }
+                CaToCmBytes::Tunnel(tunnel_msg) => {
+                    cm_to_ca.send(CmToCaBytes::Tunnel(tunnel_msg))?;
+                }
 
                 // packetize
                 CaToCmBytes::Bytes((tree_id, is_ait, user_mask, bytes)) => {
@@ -172,9 +175,8 @@ impl Cmodel {
                         }
                         cm_to_pe.send(CmToPePacket::Packet((user_mask, packet)))?;
                     }
-                    Ok(())
                 },
-            }?;
+            }
         }
     }
 
@@ -198,11 +200,6 @@ impl Cmodel {
                             let trace = json!({ "cell_id": self.cell_id, "msg": packet.to_string()? });
                             let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
                         },
-                        PeToCmPacket::App((_, bytes) ) => {
-                            let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "cm_from_pe_app" };
-                            let trace = json!({ "cell_id": &self.cell_id, "msg": bytes.to_string()? });
-                            let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
-                        },
                         PeToCmPacket::Status((port_no, is_border, number_of_packets, status)) => {
                             let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "cm_from_pe_status" };
                             let trace = json!({ "cell_id": &self.cell_id, "port": port_no, "is_border": is_border, "no_packets": number_of_packets, "status": status});
@@ -220,14 +217,6 @@ impl Cmodel {
                         let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
                     }
                     cm_to_ca.send(CmToCaBytes::Status((port_no, is_border, number_of_packets, status)))?
-                },
-                PeToCmPacket::App((port_no, bytes)) => {
-                    if CONFIG.trace_options.all || CONFIG.trace_options.cm {
-                        let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "cm_to_ca_app" };
-                        let trace = json!({ "cell_id": &self.cell_id, "msg": bytes.to_string()? });
-                        let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
-                    }
-                    cm_to_ca.send(CmToCaBytes::App((port_no, bytes)))?
                 },
 
                 // de-packetize

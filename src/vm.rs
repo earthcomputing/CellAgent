@@ -1,4 +1,7 @@
-use std::{collections::{HashSet}, sync::mpsc::channel, thread};
+use std::{collections::{HashSet},
+          //sync::mpsc::channel,
+          thread};
+use crossbeam::crossbeam_channel::unbounded as channel;
 
 use crate::app_message_formats::{VmToCa, VmFromCa,
                                  VmToContainer, ContainerFromVm,
