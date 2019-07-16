@@ -1,4 +1,15 @@
+Assuming this file is in top level of CellAgent repository.
 An environment variable CELL_AGENT_DIR must be set.
+
+After turning on cell:
+$ sudo insmod ../NALDD/entl_drivers/ecnl_device/ecnl_device.ko
+
+
+Make the driver interface code in C:
+$ cd ecnl
+ecnl$ make
+
+$ cd ..
 
 There are three executables.
 $ cargo run --bin simulator --features="simulator" --manifest-path="binaries/simulator/Cargo.toml"

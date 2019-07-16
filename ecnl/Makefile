@@ -6,6 +6,3 @@ all:
 #	ar -rc ecnl_sdk.a ecnl_sdk.o /lib/x86_64-linux-gnu/libnl-genl-3.so /lib/x86_64-linux-gnu/libnl-3.so
 
 
-
-# sudo insmod ../../NALDD/entl_drivers/ecnl_device/ecnl_device.ko
-# sudo env NLCB=debug ./ecnl_sdk
