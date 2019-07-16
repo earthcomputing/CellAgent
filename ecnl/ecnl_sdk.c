@@ -12,6 +12,8 @@ typedef struct {
 
 typedef nl_session_t ecnl_session_t;
 
+struct nl_sock *init_sock();
+
 static const trans_tbl_t attr_names[] = {
     __ADD(NL_ECNL_ATTR_MODULE_NAME, module_name),
     __ADD(NL_ECNL_ATTR_MODULE_ID, module_id),
@@ -212,24 +214,14 @@ int alloc_ecnl_session(void **ecnl_session_ptr) {
     int err;
     *ecnl_session_ptr = (ecnl_session_t *) malloc(sizeof(ecnl_session_t));
     ecnl_session_t *ecnl_session = *((ecnl_session_t **) ecnl_session_ptr);
-    ecnl_session->sock = nl_socket_alloc();
+    ecnl_session->sock = init_sock();
+    printf("init_sock\n");
     struct nl_sock *sock = ecnl_session->sock;
-    nl_connect(sock, NETLINK_GENERIC);
-    // nl_socket_disable_seq_check(sock); // FIXME: resp seqno = req seqno
-
-    // ref: lib/genl/mngt.c
-    if ((err = genl_register_family(&ops)) < 0) {
-        fatal_error(err, "Unable to register Generic Netlink family: \"%s\"", ops.o_name);
-    }
-
-    if ((err = genl_ops_resolve(sock, &ops)) < 0) {
-        fatal_error(err, "Unable to resolve family: \"%s\"", ops.o_name);
-    }
-
     char *nlctrl = "nlctrl";
     if (genl_ctrl_resolve(sock, nlctrl) != GENL_ID_CTRL) {
         fatal_error(NLE_INVAL, "Resolving of \"%s\" failed", nlctrl);
     }
+    printf("genl_ctrl_resolve(nlctrl)\n");
 
     ecnl_session->msg = nlmsg_alloc();
     struct nl_msg *msg = ecnl_session->msg;
@@ -248,9 +240,9 @@ int free_ecnl_session(void *ecnl_session) {
     struct nl_sock *sock = ((ecnl_session_t *) ecnl_session)->sock;
     struct nl_msg *msg = ((ecnl_session_t *) ecnl_session)->msg;
     uint32_t module_id = ((ecnl_session_t *) ecnl_session)->module_id;
+    nlmsg_free(msg);
     nl_close(sock);
     nl_socket_free(sock);
-    nlmsg_free(msg);
     free((ecnl_session_t *) ecnl_session);
     return 0;
 };
@@ -882,4 +874,23 @@ int signal_ait_message(void *ecnl_session, uint32_t port_id, buf_desc_t buf, uin
 }
 WAIT_ACK;
     return 0;
+}
+
+struct nl_sock *init_sock() {
+    int err;
+
+    struct nl_sock *sock = nl_socket_alloc();
+    nl_connect(sock, NETLINK_GENERIC);
+    // nl_socket_disable_seq_check(sock); // FIXME: resp seqno = req seqno
+
+    // ref: lib/genl/mngt.c
+    if ((err = genl_register_family(&ops)) < 0) {
+        fatal_error(err, "Unable to register Generic Netlink family: \"%s\"", ops.o_name);
+    }
+
+    if ((err = genl_ops_resolve(sock, &ops)) < 0) {
+        fatal_error(err, "Unable to resolve family: \"%s\"", ops.o_name);
+    }
+
+    return sock;
 }
