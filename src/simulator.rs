@@ -84,7 +84,7 @@ fn main() -> Result<(), Error> {
             l to print links
             p to print forwarding table
             m to deploy an application
-            x to exit program\n").context(MainError::Chain { func_name: "run", comment: S("") })?;
+            x to exit program\n\n").context(MainError::Chain { func_name: "run", comment: S("") })?;
         let mut print_opt = String::new();
         stdin().read_line(&mut print_opt).context(MainError::Chain { func_name: _f, comment: S("") })?;
         if print_opt.len() > 1 {

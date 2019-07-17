@@ -106,9 +106,14 @@ impl Cmodel {
                             let trace = json!({"cell_id": &self.cell_id, "port_no": port_no, "is_border": is_border, "status": status });
                             let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
                         },
-                        CaToCmBytes::Tunnel((port_no, bytes)) => {
-                            let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "cm_from_ca_bytes(tunnel)" };
+                        CaToCmBytes::TunnelPort((port_no, bytes)) => {
+                            let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "cm_from_ca_bytes(port tunnel)" };
                             let trace = json!({"cell_id": &self.cell_id, "port_no": port_no, "app_msg": bytes.to_string()? });
+                            let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
+                        }
+                        CaToCmBytes::TunnelUp((sender_id, bytes)) => {
+                            let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "cm_from_ca_bytes(up tunnel)" };
+                            let trace = json!({"cell_id": &self.cell_id, "sender id": sender_id, "app_msg": bytes.to_string()? });
                             let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
                         }
                     }
@@ -135,8 +140,11 @@ impl Cmodel {
                 CaToCmBytes::Status(status_msg) => {
                     cm_to_ca.send(CmToCaBytes::Status(status_msg))?;
                 }
-                CaToCmBytes::Tunnel(tunnel_msg) => {
-                    cm_to_ca.send(CmToCaBytes::Tunnel(tunnel_msg))?;
+                CaToCmBytes::TunnelPort(tunnel_msg) => {
+                    cm_to_ca.send(CmToCaBytes::TunnelPort(tunnel_msg))?;
+                }
+                CaToCmBytes::TunnelUp(tunnel_msg) => {
+                    cm_to_ca.send(CmToCaBytes::TunnelUp(tunnel_msg))?;
                 }
 
                 // packetize
@@ -211,16 +219,20 @@ impl Cmodel {
             match msg {
                 // just forward to CA
                 PeToCmPacket::Status((port_no, is_border, number_of_packets, status)) => {
-                    if CONFIG.trace_options.all || CONFIG.trace_options.cm {
-                        let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "cm_to_ca_status" };
-                        let trace = json!({ "cell_id": &self.cell_id, "port": port_no, "is_border": is_border, "no_packets": number_of_packets, "status": status});
-                        let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
+                    {
+                        if CONFIG.trace_options.all || CONFIG.trace_options.cm {
+                            let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "cm_to_ca_status" };
+                            let trace = json!({ "cell_id": &self.cell_id, "port": port_no, "is_border": is_border, "no_packets": number_of_packets, "status": status});
+                            let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
+                        }
                     }
                     cm_to_ca.send(CmToCaBytes::Status((port_no, is_border, number_of_packets, status)))?
                 },
 
                 // de-packetize
-                PeToCmPacket::Packet((port_no, packet)) => self.process_packet(cm_to_ca, port_no, packet)?
+                PeToCmPacket::Packet((port_no, packet)) => {
+                    self.process_packet(cm_to_ca, port_no, packet)?
+                }
             };
         }
     }
