@@ -20,6 +20,13 @@ impl Link {
                link_to_left: LinkToPort, link_to_rite: LinkToPort) -> Result<Link, Error> {
         let _f = "new";
         let id = LinkID::new(left_id, rite_id)?;
+        {
+            if CONFIG.trace_options.all || CONFIG.trace_options.link {
+                let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "link_connected" };
+                let trace = json!({ "id": id });
+                let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
+            }
+        }
         link_to_left.send(LinkToPortPacket::Status(PortStatus::Connected)).context(LinkError::Chain { func_name: _f, comment: S(id) + " send status to port"})?;
         link_to_rite.send(LinkToPortPacket::Status(PortStatus::Connected)).context(LinkError::Chain { func_name: _f, comment: S(id) + " send status to port"})?;
         Ok(Link { id, is_connected: true, link_to_left, link_to_rite })
