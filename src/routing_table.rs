@@ -7,7 +7,7 @@ use crate::name::{CellID};
 use crate::routing_table_entry::{RoutingTableEntry};
 use crate::uuid_ec::Uuid;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct RoutingTable {
     id: CellID,
     entries: HashMap<Uuid, RoutingTableEntry>,
