@@ -204,6 +204,13 @@ impl NalCell {
     // SPAWN THREAD (cm.initialize)
     fn start_cmodel(cmodel: &Cmodel, cm_from_ca: CmFromCa, cm_from_pe: CmFromPe) {
         let _f = "start_cmodel";
+        {
+            if CONFIG.trace_options.all || CONFIG.trace_options.nal {
+                let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "nalcell_start_cmodel" };
+                let trace = json!({ "cell_id": cmodel.get_cell_id() });
+                let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
+            }
+        }
         let mut cm = cmodel.clone();
         let child_trace_header = fork_trace_header();
         let thread_name = format!("Cmodel {}", cmodel.get_name());
@@ -224,7 +231,7 @@ impl NalCell {
                 let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
             }
         }
-        let pe = packet_engine.clone();
+        let mut pe = packet_engine.clone();
         let child_trace_header = fork_trace_header();
         let thread_name = format!("PacketEngine {}", packet_engine.get_cell_id());
         thread::Builder::new().name(thread_name).spawn( move || {

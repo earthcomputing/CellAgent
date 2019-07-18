@@ -1,10 +1,9 @@
 use std::{fmt, fmt::Write,
-          sync::{Arc, Mutex},
           collections::{HashMap, HashSet, VecDeque},
-          thread};
+          };
 
 use crate::config::{CONFIG};
-use crate::dal::{add_to_trace, fork_trace_header, update_trace_header};
+use crate::dal::{add_to_trace};
 use crate::ec_message::{MsgType};
 use crate::ec_message_formats::{PeFromCm, PeToCm,
                                 PeToPort, PeFromPort, PortToPePacket,
@@ -14,7 +13,7 @@ use crate::packet::Packet;
 use crate::port::PortStatus;
 use crate::routing_table::RoutingTable;
 use crate::routing_table_entry::{RoutingTableEntry};
-use crate::utility::{Mask, PortNo, S, TraceHeader, TraceHeaderParams, TraceType, write_err};
+use crate::utility::{Mask, PortNo, S, TraceHeaderParams, TraceType};
 use crate::uuid_ec::{AitState, Uuid};
 
 // I need one slot per port, but ports use 1-based indexing.  I could subtract 1 all the time,
@@ -22,17 +21,17 @@ use crate::uuid_ec::{AitState, Uuid};
 // TODO: Use Config.max_num_phys_ports_per_cell
 const MAX_SLOTS: usize = 10; //MAX_NUM_PHYS_PORTS_PER_CELL.0 as usize + 1;
 
-type BoolArray = Arc<Mutex<[bool; MAX_SLOTS]>>;
-type UsizeArray = Arc<Mutex<[usize; MAX_SLOTS]>>;
-type PacketArray = Arc<Mutex<Vec<VecDeque<Packet>>>>;
-type Reroute = Arc<Mutex<[PortNo; MAX_SLOTS]>>;
+type BoolArray = [bool; MAX_SLOTS];
+type UsizeArray = [usize; MAX_SLOTS];
+type PacketArray = Vec<VecDeque<Packet>>;
+type Reroute = [PortNo; MAX_SLOTS];
 
 #[derive(Debug, Clone)]
 pub struct PacketEngine {
     cell_id: CellID,
     connected_tree_uuid: Uuid,
     border_port_nos: HashSet<PortNo>,
-    routing_table: Arc<Mutex<RoutingTable>>,
+    routing_table: RoutingTable,
     no_seen_packets: UsizeArray, // Number of packets received since last packet sent
     no_sent_packets: UsizeArray, // Number of packets sent since last packet received
     sent_packets: PacketArray, // Packets that may need to be resent
@@ -49,54 +48,60 @@ impl PacketEngine {
     pub fn new(cell_id: CellID, connected_tree_id: TreeID, pe_to_cm: PeToCm,
                pe_to_ports: HashMap<PortNo, PeToPort>,
                border_port_nos: &HashSet<PortNo>) -> Result<PacketEngine, Error> {
-        let routing_table = Arc::new(Mutex::new(RoutingTable::new(cell_id)));
+        let routing_table = RoutingTable::new(cell_id);
         let mut array = vec![];
         for _ in 0..MAX_SLOTS { array.push(VecDeque::new()); }
         let count = [0; MAX_SLOTS];
-        Ok(PacketEngine { cell_id, connected_tree_uuid: connected_tree_id.get_uuid(),
-            routing_table, border_port_nos: border_port_nos.clone(),
-            no_seen_packets: Arc::new(Mutex::new(count)),
-            no_sent_packets: Arc::new(Mutex::new(count)),
-            sent_packets: Arc::new(Mutex::new(array.clone())),
-            out_buffers: Arc::new(Mutex::new(array.clone())),
-            in_buffer: Arc::new(Mutex::new(array)),
-            port_got_event: Arc::new(Mutex::new([false; MAX_SLOTS])),
-            reroute: Arc::new(Mutex::new([PortNo(0); MAX_SLOTS])),
-            pe_to_cm, pe_to_ports })
+        Ok(PacketEngine {
+            cell_id,
+            connected_tree_uuid: connected_tree_id.get_uuid(),
+            routing_table,
+            border_port_nos: border_port_nos.clone(),
+            no_seen_packets: count,
+            no_sent_packets: count,
+            sent_packets: array.clone(),
+            out_buffers: array.clone(),
+            in_buffer: array,
+            port_got_event: [false; MAX_SLOTS],
+            reroute: [PortNo(0); MAX_SLOTS],
+            pe_to_cm,
+            pe_to_ports
+        })
     }
-
+    
     // INIT (PeFromCm PeFromPort)
     // WORKER (PacketEngine)
-    pub fn initialize(&self, pe_from_cm: PeFromCm, pe_from_ports: PeFromPort) -> Result<(), Error> {
-// FIXME: dal::add_to_trace mutates trace_header, spawners don't ??
+    pub fn initialize(&mut self, pe_from_cm: PeFromCm, pe_from_ports: PeFromPort) -> Result<(), Error> {
         let _f = "initialize";
-        {
-            if CONFIG.trace_options.all || CONFIG.trace_options.pe {
-                let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "worker" };
-                let trace = json!({ "cell_id": self.cell_id, "thread_name": thread::current().name(), "thread_id": TraceHeader::parse(thread::current().id()) });
-                let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
+        loop {
+            select! {
+                recv(pe_from_cm) -> recvd => {
+                    let msg = recvd.context(PacketEngineError::Chain { func_name: _f, comment: S("pe from cm") })?;
+                    self.listen_cm(msg).context(PacketEngineError::Chain { func_name: _f, comment: S("listen cm") })?;
+                },
+                recv(pe_from_ports) -> recvd => {
+                    let msg = recvd.context(PacketEngineError::Chain { func_name: _f, comment: S("pe from port") })?;
+                    self.listen_port(msg).context(PacketEngineError::Chain { func_name: _f, comment: S("listen port") })?;
+                }
             }
         }
-        self.listen_cm(pe_from_cm)?;
-        self.listen_port(pe_from_ports)?;
-        Ok(())
     }
     pub fn get_cell_id(&self) -> CellID { self.cell_id }
     
     fn may_send(&self, port_no: PortNo) -> bool {
-        self.port_got_event.lock().unwrap()[port_no.as_usize()]
+        self.port_got_event[port_no.as_usize()]
     }
     fn set_may_not_send(&mut self, port_no: PortNo) {
-        self.port_got_event.lock().unwrap()[port_no.as_usize()] = false;
+        self.port_got_event[port_no.as_usize()] = false;
     }
     fn set_may_send(&mut self, port_no: PortNo) {
-        self.port_got_event.lock().unwrap()[port_no.as_usize()] = true;
+        self.port_got_event[port_no.as_usize()] = true;
     }
     fn _get_outbuf(&self, port_no: PortNo) -> VecDeque<Packet> {
-        self.out_buffers.lock().unwrap().get(port_no.as_usize()).unwrap().clone()
+        self.out_buffers.get(port_no.as_usize()).unwrap().clone()
     }
     fn get_size(array: &PacketArray, port_no: PortNo) -> usize {
-        (*array.lock().unwrap())[port_no.as_usize()].len()
+        (*array)[port_no.as_usize()].len()
     }
     fn get_outbuf_size(&self, port_no: PortNo) -> usize {
         PacketEngine::get_size(&self.out_buffers, port_no)
@@ -108,29 +113,28 @@ impl PacketEngine {
         PacketEngine::get_size(&self.sent_packets, port_no)
     }
     fn get_outbuf_first_type(&self, port_no: PortNo) -> Option<MsgType> {
-        (*self.out_buffers.lock().unwrap())
+        (*self.out_buffers)
             .get(port_no.as_usize())
             .unwrap()
             .get(0)
             .map(|packet| MsgType::msg_type(packet))
     }
     fn get_outbuf_first_ait_state(&self, port_no: PortNo) -> Option<AitState> {
-        (*self.out_buffers.lock().unwrap())
+        (*self.out_buffers)
             .get(port_no.as_usize())
             .unwrap()
             .get(0)
             .map(|packet| packet.get_ait_state())
     }
     fn add_to_packet_count(packet_count: &mut UsizeArray, port_no: PortNo) {
-        let mut count = packet_count.lock().unwrap();
-        if count.len() == 1 { // Replace 1 with PACKET_PIPELINE_SIZE when adding pipelining
-            count[port_no.as_usize()] = 0;
+         if packet_count.len() == 1 { // Replace 1 with PACKET_PIPELINE_SIZE when adding pipelining
+            packet_count[port_no.as_usize()] = 0;
         } else {
-            count[port_no.as_usize()] = count[port_no.as_usize()] + 1;
+            packet_count[port_no.as_usize()] = packet_count[port_no.as_usize()] + 1;
         }
     }
     fn get_packet_count(packet_count: &UsizeArray, port_no: PortNo) -> usize {
-        packet_count.lock().unwrap()[port_no.as_usize()]
+        packet_count[port_no.as_usize()]
     }
     fn get_no_sent_packets(&self, port_no: PortNo) -> usize {
         PacketEngine::get_packet_count(&self.no_sent_packets, port_no)
@@ -142,18 +146,17 @@ impl PacketEngine {
         PacketEngine::add_to_packet_count(&mut self.no_seen_packets, port_no);
     }
     fn _clear_seen_packet_count(&mut self, port_no: PortNo) {
-        self.no_seen_packets.lock().unwrap()[port_no.as_usize()] = 0;
+        self.no_seen_packets[port_no.as_usize()] = 0;
     }
     fn add_sent_packet(&mut self, port_no: PortNo, packet: Packet) {
         PacketEngine::add_packet_to_back(&mut self.sent_packets, port_no, packet);
         PacketEngine::add_to_packet_count(&mut self.no_sent_packets, port_no);
     }
     fn clear_sent_packets(&mut self, port_no: PortNo) {
-        self.no_seen_packets.lock().unwrap()[port_no.as_usize()] = 0;
+        self.no_seen_packets[port_no.as_usize()] = 0;
     }
     fn pop_first(array: &mut PacketArray, port_no: PortNo) -> Option<Packet> {
-        let mut locked = array.lock().unwrap();
-        let item = locked.get_mut(port_no.as_usize()).unwrap(); // Safe since vector always has MAX_NUM_PHYS_PORTS_PER_CELL entries
+        let item = array.get_mut(port_no.as_usize()).unwrap(); // Safe since vector always has MAX_NUM_PHYS_PORTS_PER_CELL entries
         item.pop_front()
     }
     fn _pop_first_outbuf(&mut self, port_no: PortNo) -> Option<Packet> {
@@ -166,10 +169,8 @@ impl PacketEngine {
         PacketEngine::pop_first(&mut self.sent_packets, port_no)
     }
     fn add_packet(to_end: bool, array: &mut PacketArray, port_no: PortNo, packet: Packet) {
-        let mut locked = array.lock().unwrap();
-        let item = locked.get_mut(port_no.as_usize()).unwrap();
-        if to_end { item.push_back(packet); }
-        else      { item.push_front(packet); }
+        let item = array.get_mut(port_no.as_usize()).unwrap();
+        if to_end { item.push_back(packet); } else { item.push_front(packet); }
     }
     fn add_packet_to_front(array: &mut PacketArray, port_no: PortNo, packet: Packet) {
         PacketEngine::add_packet(false, array, port_no, packet);
@@ -193,111 +194,111 @@ impl PacketEngine {
         PacketEngine::add_packet_to_back(&mut self.sent_packets, port_no, packet);
     }
     // SPAWN THREAD (listen_cm_loop)
-    fn listen_cm(&self, pe_from_cm: PeFromCm) -> Result<(), Error> {
+    fn listen_cm(&mut self, msg: CmToPePacket) -> Result<(), Error> {
         let _f = "listen_cm";
-        let mut pe = self.clone();
-        let child_trace_header = fork_trace_header();
-        let thread_name = format!("PacketEngine {} listen_cm_loop", self.cell_id);
-        thread::Builder::new().name(thread_name).spawn( move || {
-            update_trace_header(child_trace_header);
-            let _ = pe.listen_cm_loop(&pe_from_cm).map_err(|e| write_err("packet_engine", &e));
-            if CONFIG.continue_on_error { let _ = pe.listen_cm(pe_from_cm); }
-        })?;
-        Ok(())
-    }
-
-    // SPAWN THREAD (listen_port)
-    // TODO: One thread for all ports; should be a different thread for each port
-    fn listen_port(&self, pe_from_ports: PeFromPort)
-            -> Result<(),Error> {
-        let _f = "listen_port";
-        let mut pe = self.clone();
-        let child_trace_header = fork_trace_header();
-        let thread_name = format!("PacketEngine {} listen_port_loop", self.cell_id);
-        thread::Builder::new().name(thread_name).spawn( move || {
-            update_trace_header(child_trace_header);
-            let _ = pe.listen_port_loop(&pe_from_ports).map_err(|e| write_err("packet_engine", &e));
-            if CONFIG.continue_on_error { let _ = pe.listen_port(pe_from_ports); }
-        })?;
-        Ok(())
-    }
-
-    // WORKER (PeFromCm)
-    fn listen_cm_loop(&mut self, pe_from_cm: &PeFromCm)
-            -> Result<(), Error> {
-        let _f = "listen_cm_loop";
         {
             if CONFIG.trace_options.all || CONFIG.trace_options.pe_cm {
-                let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "worker" };
-                let trace = json!({ "cell_id": self.cell_id, "thread_name": thread::current().name(), "thread_id": TraceHeader::parse(thread::current().id()) });
-                let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
-            }
-        }
-        loop {
-            let msg = pe_from_cm.recv().context(PacketEngineError::Chain { func_name: _f, comment: S("recv entry from cm ") + &self.cell_id.get_name()})?;
-            {
-                if CONFIG.trace_options.all || CONFIG.trace_options.pe_cm {
-                    match &msg {
-                        CmToPePacket::Packet((_, packet)) => {
-                            let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "pe_from_cm_packet" };
-                            let trace = json!({ "cell_id": self.cell_id, "bytes": packet.to_string()? });
-                            let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
-                        },
-                        CmToPePacket::Entry(entry) => {
-                            let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "pe_from_cm_entry" };
-                            let trace = json!({ "cell_id": &self.cell_id, "entry": entry });
-                            let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
-                        },
-                        CmToPePacket::Reroute((broken_port_no, new_parent, no_packets)) => {
-                            let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "pe_from_cm_reroute" };
-                            let trace = json!({ "cell_id": &self.cell_id, "broken_port": broken_port_no, "new_parent": new_parent, "no_packets": no_packets });
-                            let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
-                        }
+                match &msg {
+                    CmToPePacket::Packet((_, packet)) => {
+                        let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "pe_from_cm_packet" };
+                        let trace = json!({ "cell_id": self.cell_id, "bytes": packet.to_string()? });
+                        let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
+                    },
+                    CmToPePacket::Entry(entry) => {
+                        let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "pe_from_cm_entry" };
+                        let trace = json!({ "cell_id": &self.cell_id, "entry": entry });
+                        let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
+                    },
+                    CmToPePacket::Reroute((broken_port_no, new_parent, no_packets)) => {
+                        let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "pe_from_cm_reroute" };
+                        let trace = json!({ "cell_id": &self.cell_id, "broken_port": broken_port_no, "new_parent": new_parent, "no_packets": no_packets });
+                        let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
                     }
                 }
             }
-            match msg {
-                // control plane from CellAgent
-                CmToPePacket::Reroute((broken_port_no, new_parent, no_packets)) => {
-                    self.reroute_packets(broken_port_no, new_parent, no_packets);
-                },
-                CmToPePacket::Entry(entry) => {
-                    self.routing_table.lock().unwrap().set_entry(entry)
-                },
-
-                // route packet, xmit to neighbor(s) or up to CModel
-                CmToPePacket::Packet((user_mask, packet)) => {
-                    self.route_cm_packet(user_mask, packet)?;
-                }
-            };
         }
+        match msg {
+            // control plane from CellAgent
+            CmToPePacket::Reroute((broken_port_no, new_parent, no_packets)) => {
+                self.reroute_packets(broken_port_no, new_parent, no_packets);
+            },
+            CmToPePacket::Entry(entry) => {
+                self.routing_table.set_entry(entry)
+            },
+        
+            // route packet, xmit to neighbor(s) or up to CModel
+            CmToPePacket::Packet((user_mask, packet)) => {
+                self.route_cm_packet(user_mask, packet)?;
+            }
+        };
+        Ok(())
     }
+    // SPAWN THREAD (listen_port)
+    // TODO: One thread for all ports; should be a different thread for each port
+    fn listen_port(&mut self, msg: PortToPePacket) -> Result<(), Error> {
+        let _f = "listen_port";
+        {
+            if CONFIG.trace_options.all || CONFIG.trace_options.pe_port {
+                match &msg {
+                    PortToPePacket::Packet((_, packet)) => {
+                        let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "pe_from_port_packet" };
+                        let trace = json!({ "cell_id": self.cell_id, "msg": packet.to_string()? });
+                        let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
+                    },
+                    PortToPePacket::Status((port_no, is_border, port_status)) => {
+                        let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "pe_from_port_status" };
+                        let trace = json!({ "cell_id": &self.cell_id,  "port": port_no, "is_border": is_border, "status": port_status});
+                        let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
+                    }
+                };
+            }
+        }
+        match msg {
+            // deliver to CModel
+            PortToPePacket::Status((port_no, is_border, status)) => {
+                let number_of_packets = NumberOfPackets {
+                    sent: self.get_no_sent_packets(port_no),
+                    recd: self.get_no_seen_packets(port_no)
+                };
+                match status {
+                    PortStatus::Connected => self.set_may_send(port_no),
+                    PortStatus::Disconnected => self.set_may_not_send(port_no)
+                }
+                {
+                    if CONFIG.trace_options.all | CONFIG.trace_options.pe {
+                        let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "pe_to_cm_status" };
+                        let trace = json!({ "cell_id": &self.cell_id, "port": port_no, "is_border": is_border, "no_packets": number_of_packets, "status": status });
+                        let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
+                    }
+                }
+                self.pe_to_cm.send(PeToCmPacket::Status((port_no, is_border, number_of_packets, status))).context(PacketEngineError::Chain { func_name: "listen_port", comment: S("send status to ca ") + &self.cell_id.get_name() })?
+            },
+            
+            // recv from neighbor
+            PortToPePacket::Packet((port_no, packet)) => {
+                self.process_packet(port_no, packet).context(PacketEngineError::Chain { func_name: "listen_port", comment: S("process_packet ") + &self.cell_id.get_name() })?
+            }
+        };
+        Ok(())
+    }
+
     fn reroute_packets(&mut self, broken_port_no: PortNo, new_parent: PortNo, no_packets: NumberOfPackets) {
         let _f = "reroute_packets";
-        {
-            let mut locked_reroute = self.reroute.lock().unwrap();
-            locked_reroute[broken_port_no.as_usize()] = new_parent;
-            //println!("PacketEngine {}: {} broken port {} to {:?}", self.cell_id, _f, *broken_port_no, *locked_reroute);
-        }
-        let mut locked_outbuf = self.out_buffers.lock().unwrap();
-        let mut locked_sent = self.sent_packets.lock().unwrap();
-        let sent_buf = &mut locked_sent[broken_port_no.as_usize()];
+        self.reroute[broken_port_no.as_usize()] = new_parent;
         let no_my_sent_packets = self.get_no_sent_packets(broken_port_no);
+        let sent_buf = &mut self.sent_packets[broken_port_no.as_usize()];
         let no_her_seen_packets = no_packets.get_number_seen();
         let no_resend = no_my_sent_packets - no_her_seen_packets;
         let mut remaining_sent = sent_buf.split_off(no_resend);
-        let broken_outbuf = &mut locked_outbuf[broken_port_no.as_usize()].clone();
-        let new_parent_outbuf = &mut locked_outbuf[new_parent.as_usize()];
+        let broken_outbuf = &mut self.out_buffers[broken_port_no.as_usize()].clone();
+        let new_parent_outbuf = &mut self.out_buffers[new_parent.as_usize()];
         new_parent_outbuf.append(&mut remaining_sent);
         new_parent_outbuf.append(broken_outbuf);
     }
     fn route_cm_packet(&mut self, user_mask: Mask, packet: Packet) -> Result<(), Error> {
         let _f = "route_cm_packet";
         let uuid = packet.get_tree_uuid().for_lookup();  // Strip AIT info for lookup
-        let entry = {
-            let locked = self.routing_table.lock().unwrap();
-            locked.get_entry(uuid).context(PacketEngineError::Chain { func_name: _f, comment: S(self.cell_id.get_name()) })?
-        };
+        let entry = self.routing_table.get_entry(uuid).context(PacketEngineError::Chain { func_name: _f, comment: S(self.cell_id.get_name()) })?;
 
         match packet.get_ait_state() {
             AitState::AitD |
@@ -333,18 +334,17 @@ impl PacketEngine {
         }
         Ok(())
     }
-    fn send_packet(&self, port_no: PortNo, packet: &Packet) -> Result<(), Error> {
+    fn send_packet(&mut self, port_no: PortNo, packet: &Packet) -> Result<(), Error> {
         let _f = "send_packet";
-        let mut reroute_port_no = self.reroute.lock().unwrap()[port_no.as_usize()];
+        let mut reroute_port_no = self.reroute[port_no.as_usize()];
         if reroute_port_no == PortNo(0) {
             reroute_port_no = port_no;
         } else {
-            let mut locked_outbuf = self.out_buffers.lock().unwrap();
-            let broken_outbuf = &mut locked_outbuf[port_no.as_usize()];
+            let broken_outbuf = &mut self.out_buffers[port_no.as_usize()];
             if broken_outbuf.len() > 0 {
                 // Only clone if there are packets in the broken out buffer
-                let broken_outbuf = &mut locked_outbuf[port_no.as_usize()].clone();
-                let reroute_outbuf = &mut locked_outbuf[reroute_port_no.as_usize()];
+                let broken_outbuf = &mut self.out_buffers[port_no.as_usize()].clone();
+                let reroute_outbuf = &mut self.out_buffers[reroute_port_no.as_usize()];
                 reroute_outbuf.append(broken_outbuf);
             }
         }
@@ -404,62 +404,6 @@ impl PacketEngine {
         }
         self.send_packet_flow_control(port_no)
     }
-    // WORKER (PeFromPort)
-    fn listen_port_loop(&mut self, pe_from_ports: &PeFromPort) -> Result<(), Error> {
-        let _f = "listen_port_loop";
-        {
-            if CONFIG.trace_options.all || CONFIG.trace_options.pe_port {
-                let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "worker" };
-                let trace = json!({ "cell_id": self.cell_id, "thread_name": thread::current().name(), "thread_id": TraceHeader::parse(thread::current().id()) });
-                let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
-            }
-        }
-        loop {
-            let msg = pe_from_ports.recv().context(PacketEngineError::Chain { func_name: _f, comment: S("pe from packet")})?;
-            {
-                if CONFIG.trace_options.all || CONFIG.trace_options.pe_port {
-                    match &msg {
-                        PortToPePacket::Packet((_, packet)) => {
-                            let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "pe_from_port_packet" };
-                            let trace = json!({ "cell_id": self.cell_id, "msg": packet.to_string()? });
-                            let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
-                        },
-                        PortToPePacket::Status((port_no, is_border, port_status)) => {
-                            let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "pe_from_port_status" };
-                            let trace = json!({ "cell_id": &self.cell_id,  "port": port_no, "is_border": is_border, "status": port_status});
-                            let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
-                        }
-                    };
-                }
-            }
-            match msg {
-                // deliver to CModel
-                PortToPePacket::Status((port_no, is_border, status)) => {
-                    let number_of_packets = NumberOfPackets {
-                        sent: self.get_no_sent_packets(port_no),
-                        recd: self.get_no_seen_packets(port_no)
-                    };
-                    match status {
-                        PortStatus::Connected    => self.set_may_send(port_no),
-                        PortStatus::Disconnected => self.set_may_not_send(port_no)
-                    }
-                    {
-                        if CONFIG.trace_options.all | CONFIG.trace_options.pe {
-                            let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "pe_to_cm_status" };
-                            let trace = json!({ "cell_id": &self.cell_id, "port": port_no, "is_border": is_border, "no_packets": number_of_packets, "status": status });
-                            let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
-                        }
-                    }
-                    self.pe_to_cm.send(PeToCmPacket::Status((port_no, is_border, number_of_packets, status))).context(PacketEngineError::Chain { func_name: "listen_port", comment: S("send status to ca ") + &self.cell_id.get_name()})?
-                },
-
-                // recv from neighbor
-                PortToPePacket::Packet((port_no, packet))  => {
-                    self.process_packet(port_no, packet).context(PacketEngineError::Chain { func_name: "listen_port", comment: S("process_packet ") + &self.cell_id.get_name()})?
-                }
-            };
-        }
-    }
 
     // TODO: Make sure I don't have a race condition because I'm dropping the lock on the routing table
     // Potential hazard here; CA may have sent a routing table update.  I can't just hold the lock on the table
@@ -504,7 +448,7 @@ impl PacketEngine {
                 let uuid = packet.get_tree_uuid().for_lookup();
                 let entry =
                     { // Using this block releases the lock on the routing table
-                        match self.routing_table.lock().unwrap().get_entry(uuid) {
+                        match self.routing_table.get_entry(uuid) {
                             Ok(e) => e,
                             Err(err) => {
                                 // deliver to CellAgent when tree not recognized
@@ -656,7 +600,7 @@ impl PacketEngine {
 impl fmt::Display for PacketEngine {
     fn fmt(&self, _f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let mut s = format!("Packet Engine for cell {}", self.cell_id);
-        write!(s, "{}", *self.routing_table.lock().unwrap())?;
+        write!(s, "{}", self.routing_table)?;
         write!(_f, "{}", s) }
 }
 #[derive(Debug, Copy, Clone, Serialize, Deserialize)]

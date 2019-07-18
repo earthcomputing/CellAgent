@@ -21,7 +21,7 @@ pub struct Cmodel {
 }
 impl Cmodel {
     pub fn get_name(&self) -> String { self.cell_id.get_name() }
-    //pub fn get_cell_id(&self) -> &CellID { &self.cell_id }
+    pub fn get_cell_id(&self) -> &CellID { &self.cell_id }
     // NEW
     pub fn new(cell_id: CellID, cm_to_ca: CmToCa, cm_to_pe: CmToPe) -> Cmodel {
         Cmodel { cell_id, packet_assemblers: PacketAssemblers::new(), cm_to_ca, cm_to_pe }
