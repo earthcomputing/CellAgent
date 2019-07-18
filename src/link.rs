@@ -34,7 +34,7 @@ impl Link {
     pub fn get_id(&self) -> LinkID { self.id }
     pub fn listen(&mut self, link_from_left: LinkFromPort, link_from_rite: LinkFromPort)
                   -> Result<(), Error> {
-        let _f = "start_threads";
+        let _f = "listen";
         loop {
             select! {
                 recv(link_from_left) -> recvd => {
