@@ -4,13 +4,13 @@ use std::{fmt, fmt::Write,
           collections::{HashMap, HashSet},
           iter::FromIterator,
           //sync::mpsc::channel,
-          thread::{JoinHandle}};
+          thread, thread::{JoinHandle}};
 use crossbeam::crossbeam_channel::unbounded as channel;
 
 use crate::app_message_formats::{PortToNoc, PortFromNoc};
 use crate::blueprint::{Blueprint, Cell, };
 use crate::config::{CONFIG, CellQty, LinkQty};
-use crate::dal::add_to_trace;
+use crate::dal::{add_to_trace, fork_trace_header, update_trace_header};
 use crate::ec_message_formats::{LinkToPort, PortFromLink, PortToLink, LinkFromPort, PortFromPe};
 use crate::link::{Link};
 use crate::nalcell::{NalCell};
@@ -94,7 +94,8 @@ impl Rack {
             let (rite_to_link, link_from_rite): (PortToLink, LinkFromPort) = channel();
             left_port.link_channel(left_to_link, left_from_link, left_from_pe);
             rite_port.link_channel(rite_to_link, rite_from_link, rite_from_pe);
-            let mut link = Link::new(left_port.get_id(), rite_port.get_id())?;
+            let link = Link::new(left_port.get_id(), rite_port.get_id(),
+                                           link_to_left, link_to_rite)?;
             {
                 if CONFIG.trace_options.all || CONFIG.trace_options.dc {
                     let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "connect_link" };
@@ -102,10 +103,18 @@ impl Rack {
                     let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
                 }
             }
-            let mut handle_pair = link.start_threads(link_to_left, link_from_left, link_to_rite, link_from_rite)?;
-            link_handles.append(&mut handle_pair);
+            let mut link_clone = link.clone();
+            let child_trace_header = fork_trace_header();
+            let thread_name = format!("Link {} thread", link.get_id());
+            let join_handle = thread::Builder::new().name(thread_name).spawn( move || {
+                update_trace_header(child_trace_header);
+                let _ = link_clone.listen(link_from_left, link_from_rite);
+            })?;
+            //let mut handle_pair = link.start_threads(link_to_left, link_from_left, link_to_rite, link_from_rite)?;
+            link_handles.append(&mut vec![join_handle]);
             self.links.insert(*edge, link);
-        } 
+        }
+        println!("Rack {}: Links started", _f);
         Ok(link_handles)
     }
     pub fn construct(blueprint: &Blueprint) -> Result<(Rack, Vec<JoinHandle<()>>), Error> {
