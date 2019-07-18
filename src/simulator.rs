@@ -6,7 +6,7 @@
 //#![allow(unused_imports)]
 //#![warn(rust_2018_idioms)]
 #![recursion_limit="1024"]
-//#[macro_use] extern crate crossbeam;
+#[macro_use] extern crate crossbeam;
 #[macro_use] extern crate failure;
 #[macro_use] extern crate serde_derive;
 #[macro_use] extern crate serde_json;

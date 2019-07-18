@@ -104,6 +104,9 @@ impl CellAgent {
             .add_component(CONNECTED_PORTS_TREE_NAME)?;
         let mut base_tree_map = HashMap::new();
         base_tree_map.insert(my_tree_id.to_port_tree_id_0(), my_tree_id);
+        let mut no_packets = Vec::new();
+        (1..=(*CONFIG.max_num_phys_ports_per_cell) as usize)
+            .for_each(|_| no_packets.push(NumberOfPackets::new()));
         let my_entry = RoutingTableEntry::default().add_child(PortNumber::new0());
         Ok(CellAgent { cell_id, my_tree_id, cell_type, config, no_ports,
             control_tree_id, connected_tree_id, tree_vm_map: HashMap::new(), ca_to_vms: HashMap::new(),
@@ -118,7 +121,7 @@ impl CellAgent {
             tenant_masks, up_tree_senders: HashMap::new(), cell_info: CellInfo::new(),
             up_traphs_clist: HashMap::new(), ca_to_cm, ca_to_ports,
             failover_reply_ports: HashMap::new(),
-            no_packets: Vec::new(),
+            no_packets,
             child_ports: HashMap::new() }
         )
     }
