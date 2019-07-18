@@ -162,8 +162,8 @@ impl NalCell {
         let boxed_ports: Box<[Port]> = ports.into_boxed_slice();
         let cell_agent = CellAgent::new(cell_id, cell_type, config, num_phys_ports, ca_to_ports, ca_to_cm).context(NalcellError::Chain { func_name: "new", comment: S("cell agent create") })?;
         NalCell::start_cell(&cell_agent, ca_from_cm, ca_from_ports);
-        let cmodel = Cmodel::new(cell_id);
-        NalCell::start_cmodel(&cmodel, cm_from_ca, cm_to_pe, cm_from_pe, cm_to_ca);
+        let cmodel = Cmodel::new(cell_id, cm_to_ca, cm_to_pe);
+        NalCell::start_cmodel(&cmodel, cm_from_ca, cm_from_pe);
         let packet_engine = PacketEngine::new(cell_id, cell_agent.get_connected_tree_id(),
                                               pe_to_cm, pe_to_ports, border_port_nos).context(NalcellError::Chain { func_name: "new", comment: S("packet engine create") })?;
         NalCell::start_packet_engine(&packet_engine, pe_from_cm, pe_from_ports);
@@ -202,15 +202,14 @@ impl NalCell {
     }
 
     // SPAWN THREAD (cm.initialize)
-    fn start_cmodel(cmodel: &Cmodel, cm_from_ca: CmFromCa, cm_to_pe: CmToPe,
-                    cm_from_pe: CmFromPe, cm_to_ca: CmToCa) {
+    fn start_cmodel(cmodel: &Cmodel, cm_from_ca: CmFromCa, cm_from_pe: CmFromPe) {
         let _f = "start_cmodel";
-        let cm = cmodel.clone();
+        let mut cm = cmodel.clone();
         let child_trace_header = fork_trace_header();
         let thread_name = format!("Cmodel {}", cmodel.get_name());
         thread::Builder::new().name(thread_name).spawn( move || {
             update_trace_header(child_trace_header);
-            let _ = cm.initialize(cm_from_ca, cm_to_pe, cm_from_pe, cm_to_ca);
+            let _ = cm.initialize(cm_from_ca, cm_from_pe);
             if CONFIG.continue_on_error { } // Don't automatically restart cmodel if it crashes
         }).expect("thread failed");
     }
