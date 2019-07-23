@@ -1,5 +1,6 @@
 use std::{fmt, fmt::Write,
           collections::{HashMap, HashSet, VecDeque},
+          sync::{Arc, Mutex},
           };
 
 use crate::config::{CONFIG};
@@ -32,6 +33,7 @@ pub struct PacketEngine {
     connected_tree_uuid: Uuid,
     border_port_nos: HashSet<PortNo>,
     routing_table: RoutingTable,
+    routing_table_mutex: Arc<Mutex<RoutingTable>>,
     no_seen_packets: UsizeArray, // Number of packets received since last packet sent
     no_sent_packets: UsizeArray, // Number of packets sent since last packet received
     sent_packets: PacketArray, // Packets that may need to be resent
@@ -49,6 +51,7 @@ impl PacketEngine {
                pe_to_ports: HashMap<PortNo, PeToPort>,
                border_port_nos: &HashSet<PortNo>) -> Result<PacketEngine, Error> {
         let routing_table = RoutingTable::new(cell_id);
+        let routing_table_mutex = Arc::new(Mutex::new(routing_table.clone()));
         let mut array = vec![];
         for _ in 0..MAX_SLOTS { array.push(VecDeque::new()); }
         let count = [0; MAX_SLOTS];
@@ -56,6 +59,7 @@ impl PacketEngine {
             cell_id,
             connected_tree_uuid: connected_tree_id.get_uuid(),
             routing_table,
+            routing_table_mutex,  // Needed so I can print the routing table from main
             border_port_nos: border_port_nos.clone(),
             no_seen_packets: count,
             no_sent_packets: count,
@@ -223,7 +227,8 @@ impl PacketEngine {
                 self.reroute_packets(broken_port_no, new_parent, no_packets);
             },
             CmToPePacket::Entry(entry) => {
-                self.routing_table.set_entry(entry)
+                self.routing_table.set_entry(entry);
+                (*self.routing_table_mutex.lock().unwrap()) = self.routing_table.clone();
             },
         
             // route packet, xmit to neighbor(s) or up to CModel
@@ -600,7 +605,7 @@ impl PacketEngine {
 impl fmt::Display for PacketEngine {
     fn fmt(&self, _f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let mut s = format!("Packet Engine for cell {}", self.cell_id);
-        write!(s, "{}", self.routing_table)?;
+        write!(s, "{}", self.routing_table_mutex.lock().unwrap())?;
         write!(_f, "{}", s) }
 }
 #[derive(Debug, Copy, Clone, Serialize, Deserialize)]
