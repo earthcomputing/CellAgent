@@ -42,10 +42,10 @@ impl Link {
                     {
                         if CONFIG.trace_options.all || CONFIG.trace_options.link {
                             let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "link_from_left_port" };
-                            let trace = json!({ "id": &self.get_id(), "msg": packet.to_string()? });
+                            let trace = json!({ "id": &self.get_id(), "msg": packet });
                             let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
                             let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "link_to_rite_port" };
-                            let trace = json!({ "id": &self.get_id(), "msg": packet.to_string()? });
+                            let trace = json!({ "id": &self.get_id(), "msg": packet });
                             let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
                         }
                     }
@@ -56,10 +56,10 @@ impl Link {
                     {
                         if CONFIG.trace_options.all || CONFIG.trace_options.link {
                             let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "link_from_rite_port" };
-                            let trace = json!({ "id": &self.get_id(), "msg": packet.to_string()? });
+                            let trace = json!({ "id": &self.get_id(), "msg": packet });
                             let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
                             let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "link_to_left_port" };
-                            let trace = json!({ "id": &self.get_id(), "msg": packet.to_string()? });
+                            let trace = json!({ "id": &self.get_id(), "msg": packet });
                             let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
                         }
                     }

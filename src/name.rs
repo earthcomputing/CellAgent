@@ -7,12 +7,13 @@ use crate::config::{MAX_CHARS, SEPARATOR};
 use crate::utility::{PortNo, PortNumber, S};
 use crate::uuid_ec::Uuid;
 
+const DEFAULT_CHAR: char = '\n';
 type NameType = [char; MAX_CHARS];
 
-fn name_string<S: Serializer>(name: &[char; MAX_CHARS], s: S) -> Result<S::Ok, S::Error> {
+fn name_string<S: Serializer>(name: &NameType, s: S) -> Result<S::Ok, S::Error> {
     s.serialize_str(&str_from_chars(*name))
 }
-fn string_name<'de, D: Deserializer<'de>>(deserializer: D) -> Result<[char; MAX_CHARS], D::Error>
+fn string_name<'de, D: Deserializer<'de>>(deserializer: D) -> Result<NameType, D::Error>
 {
     let s: &str = Deserialize::deserialize(deserializer)?;
     Ok(str_to_chars(s))
@@ -23,25 +24,22 @@ fn str_to_chars(string: &str) -> NameType {
         // Should never reach here because check is done when name is created
         panic!(format!("String |{}| is longer than {} characters {}", string, MAX_CHARS, string.len()))
     }
-    let mut char_slice = ['\n'; MAX_CHARS];
-    for (i, c) in string.char_indices() {
-        char_slice[i] = c; }
+    let mut char_slice = [DEFAULT_CHAR; MAX_CHARS];
+    string.char_indices()
+        .for_each(|(i, c)| char_slice[i] = c);
     char_slice
 }
 fn str_from_chars(chars: NameType) -> String {
     let _f = "str_from_chars";
-    let mut output = S("");
-    for c in &chars {
-        if c == &'\n' { break; }
-        output.push(*c);
-    }
-    output
+    chars.iter()
+        .take_while(|&c| *c != DEFAULT_CHAR )
+        .fold(S(""), |mut acc, &c| { acc.push(c); acc } )
 }
 
 pub trait Name: Sized {
     fn get_name(&self) -> String;
     fn get_uuid(&self) -> Uuid;
-    fn create_from_string(&self, n: &str) -> Self;
+    fn create_from_string(&self, n: &str) -> Self; // Warning is an IntelliJ false positive
     // Default implementations
     fn stringify(&self) -> String { S(self.get_name()) }
     fn name_from_str(&self, s: &str) -> Result<Self, Error> {

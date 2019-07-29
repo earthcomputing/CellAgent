@@ -41,7 +41,7 @@ impl Cmodel {
         self.listen(cm_from_ca, cm_from_pe)?;
         Ok(())
     }
-    pub fn listen(&mut self, cm_from_ca: CmFromCa, cm_from_pe: CmFromPe) -> Result<(), Error> {
+    fn listen(&mut self, cm_from_ca: CmFromCa, cm_from_pe: CmFromPe) -> Result<(), Error> {
         let _f = "listen";
         loop {
             select! {
@@ -65,7 +65,7 @@ impl Cmodel {
                 match &msg {
                     CaToCmBytes::Bytes((_, _, _, bytes)) => {
                         let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "cm_from_ca_bytes" };
-                        let trace = json!({"cell_id": &self.cell_id, "msg": bytes.to_string()? });
+                        let trace = json!({"cell_id": &self.cell_id, "msg": bytes });
                         let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
                     },
                     CaToCmBytes::Entry(entry) => {
@@ -85,12 +85,12 @@ impl Cmodel {
                     },
                     CaToCmBytes::TunnelPort((port_no, bytes)) => {
                         let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "cm_from_ca_bytes(port tunnel)" };
-                        let trace = json!({"cell_id": &self.cell_id, "port_no": port_no, "app_msg": bytes.to_string()? });
+                        let trace = json!({"cell_id": &self.cell_id, "port_no": port_no, "app_msg": bytes });
                         let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
                     }
                     CaToCmBytes::TunnelUp((sender_id, bytes)) => {
                         let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "cm_from_ca_bytes(up tunnel)" };
-                        let trace = json!({"cell_id": &self.cell_id, "sender id": sender_id, "app_msg": bytes.to_string()? });
+                        let trace = json!({"cell_id": &self.cell_id, "sender id": sender_id, "app_msg": bytes });
                         let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
                     }
                 }
@@ -159,7 +159,7 @@ impl Cmodel {
                 for packet in packets {
                     if CONFIG.trace_options.all || CONFIG.trace_options.cm {
                         let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "cm_to_pe_packet" };
-                        let trace = json!({ "cell_id": &self.cell_id, "msg": packet.to_string()? });
+                        let trace = json!({ "cell_id": &self.cell_id, "msg": packet });
                         let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
                     }
                     self.cm_to_pe.send(CmToPePacket::Packet((user_mask, packet)))?;
@@ -170,14 +170,14 @@ impl Cmodel {
     }
 
     // WORKER (CmFromPe)
-    fn listen_pe(&mut self, msg: PeToCmPacket) -> Result<(), Error> {
+    fn listen_pe(&mut self, packet: PeToCmPacket) -> Result<(), Error> {
         let _f = "listen_pe";
         {
             if CONFIG.trace_options.all || CONFIG.trace_options.cm {
-                match &msg {
+                match &packet {
                     PeToCmPacket::Packet((_, packet)) => {
                         let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "cm_from_pe_packet" };
-                        let trace = json!({ "cell_id": self.cell_id, "msg": packet.to_string()? });
+                        let trace = json!({ "cell_id": self.cell_id, "packet": packet });
                         let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
                     },
                     PeToCmPacket::Status((port_no, is_border, number_of_packets, status)) => {
@@ -188,7 +188,7 @@ impl Cmodel {
                 }
             }
         }
-        match msg {
+        match packet {
             // just forward to CA
             PeToCmPacket::Status((port_no, is_border, number_of_packets, status)) => {
                 {

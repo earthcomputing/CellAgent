@@ -9,7 +9,7 @@
     "output_file_name":"/tmp/multicell/trace.json",
     "quench":"RootPort", "//": "Either Simple or RootPort",
     "trace_options":{
-        "all":false,
+        "all":true,
         "ca":true,
         "cm":false,
         "dc":true,
