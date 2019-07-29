@@ -241,10 +241,10 @@ impl NalCell {
     }
 
     pub fn get_id(&self) -> CellID { self.id }
-    pub fn get_name(&self) -> String { self.id.get_name() }                     // Used only in tests
-    pub fn get_num_ports(&self) -> PortQty { PortQty(self.ports.len() as u8) }  // Used only in tests
+    fn _get_name(&self) -> String { self.id.get_name() }                     // Used only in tests
+    fn _get_num_ports(&self) -> PortQty { PortQty(self.ports.len() as u8) }  // Used only in tests
     pub fn _get_cell_agent(&self) -> &CellAgent { &self.cell_agent }
-    //pub fn get_cmodel(&self) -> &Cmodel { &self.cmodel }
+    pub fn _get_cmodel(&self) -> &Cmodel { &self.cmodel }
     pub fn get_packet_engine(&self) -> &PacketEngine { &self.packet_engine }
     pub fn take_port_from_ca(&mut self, port_no: PortNo) -> Option<PortFromCa> {
         self.ports_from_ca.remove(&port_no)

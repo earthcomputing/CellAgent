@@ -137,7 +137,7 @@ impl CellAgent {
             }
         }
         // Set up predefined trees - Must be first two in this order
-        let port_number_0 = PortNumber::new0();
+        let port_number = PortNumber::new0();
         let hops = PathLength(CellQty(0));
         let path = Path::new0();
         let control_tree_id = self.control_tree_id;
@@ -155,7 +155,7 @@ impl CellAgent {
         eqns.insert(GvmEqn::Xtnd("true"));
         eqns.insert(GvmEqn::Save("false"));
         let gvm_equation = GvmEquation::new(&eqns, &Vec::new());
-        self.update_traph(control_tree_id.to_port_tree_id_0(), port_number_0,
+        self.update_traph(control_tree_id.to_port_tree_id_0(), port_number,
                           PortState::Parent, &gvm_equation,
                           HashSet::new(), hops, path)?;
         let mut eqns = HashSet::new();
@@ -165,7 +165,7 @@ impl CellAgent {
         eqns.insert(GvmEqn::Save("false"));
         let gvm_equation = GvmEquation::new(&eqns, &Vec::new());
         let connected_tree_entry = self.update_traph(connected_tree_id.to_port_tree_id_0(),
-                                                     port_number_0,
+                                                     port_number,
                                                      PortState::Parent, &gvm_equation,
                                                      HashSet::new(), hops, path)?;
         self.connected_tree_entry = connected_tree_entry;
@@ -175,9 +175,9 @@ impl CellAgent {
         eqns.insert(GvmEqn::Send("true"));
         eqns.insert(GvmEqn::Xtnd("true"));
         eqns.insert(GvmEqn::Save("false"));
-        let gvm_equation = GvmEquation::new(&eqns, &Vec::new());
-        self.my_entry = self.update_traph(my_tree_id.to_port_tree_id_0(), port_number_0,
-                                          PortState::Parent, &gvm_equation,
+        let gvm_eqn = GvmEquation::new(&eqns, &Vec::new());
+        self.my_entry = self.update_traph(my_tree_id.to_port_tree_id_0(), port_number,
+                                          PortState::Parent, &gvm_eqn,
                                           HashSet::new(), hops, path)?;
         self.listen_cm(ca_from_cm)?;
         if self.is_border() { self.listen_port(ca_from_ports)?; }
@@ -186,7 +186,7 @@ impl CellAgent {
     fn get_no_ports(&self) -> PortQty { self.no_ports }
     pub fn get_cell_id(&self) -> CellID { self.cell_id }
     pub fn get_connected_tree_id(&self) -> TreeID { self. connected_tree_id }
-    pub fn _get_control_tree_id(&self) -> TreeID { self.control_tree_id }
+    fn _get_control_tree_id(&self) -> TreeID { self.control_tree_id }
     fn is_border(&self) -> bool { self.cell_type == CellType::Border }
     fn get_no_neighbors(&self) -> usize { self.neighbors.len() }
 //    pub fn get_cell_info(&self) -> CellInfo { self.cell_info }
@@ -631,15 +631,15 @@ impl CellAgent {
     }
 
     // SPAWN THREAD (listen_port_loop)
-    fn listen_port(&mut self, ca_from_port: CaFromPort) -> Result<(), Error> {
+    fn listen_port(&mut self, ca_from_ports: CaFromPort) -> Result<(), Error> {
         let _f = "listen_port";
         let mut ca = self.clone();
         let child_trace_header = fork_trace_header();
         let thread_name = format!("CellAgent {} listen_port_loop", self.cell_id);
         thread::Builder::new().name(thread_name).spawn( move || {
             update_trace_header(child_trace_header);
-            let _ = ca.listen_port_loop(&ca_from_port).map_err(|e| write_err("cellagent", &e));
-            if CONFIG.continue_on_error { let _ = ca.listen_port(ca_from_port); }
+            let _ = ca.listen_port_loop(&ca_from_ports).map_err(|e| write_err("cellagent", &e));
+            if CONFIG.continue_on_error { let _ = ca.listen_port(ca_from_ports); }
         })?;
         Ok(())
     }
