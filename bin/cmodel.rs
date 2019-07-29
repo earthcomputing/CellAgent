@@ -149,7 +149,7 @@ impl Cmodel {
                 let packets = Packetizer::packetize(&uuid, &bytes);
                 let first = packets.get(0).expect("No packets from packetizer");
                 let dpi_is_ait = first.is_ait();
-                let sender_msg_seq_no = first.get_unique_msg_id();
+                let sender_msg_seq_no = first.get_sender_msg_seq_no();
                 let packet_count = first.get_count();
                 {
                     if CONFIG.debug_options.all || CONFIG.debug_options.cm_from_ca {
@@ -224,7 +224,7 @@ packets: Vec<Packet>,
 
     fn process_packet(&mut self, port_no: PortNo, packet: Packet) -> Result<(), Error> {
         let _f = "process_packet";
-        let sender_msg_seq_no = packet.get_unique_msg_id();
+        let sender_msg_seq_no = packet.get_sender_msg_seq_no();
         let mut packet_assembler = self.packet_assemblers.remove(&sender_msg_seq_no).unwrap_or(PacketAssembler::new(sender_msg_seq_no)); // autovivification
         let (last_packet, packets) = packet_assembler.add(packet.clone()); // Need clone only because of trace
 
