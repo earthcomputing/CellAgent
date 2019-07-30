@@ -107,7 +107,7 @@ pub struct TreeID {
 impl TreeID {
     pub fn new(name: &str) -> Result<TreeID, Error> {
         match name.find(' ') {
-            None => Ok(TreeID { name: str_to_chars(name), uuid: Uuid::new() }),
+            None => Ok(TreeID { name: str_to_chars(&(S("Tree:") + name)), uuid: Uuid::new() }),
             Some(_) => Err(NameError::Format { name: S(name), func_name: "TreeID::new" }.into())
         }
     }

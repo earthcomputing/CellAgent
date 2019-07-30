@@ -169,6 +169,7 @@ fn deployment_demo() -> Result<(), Error> {
 // Errors
 use failure::{Error, ResultExt};
 use std::io::Read;
+use rdkafka::message::ToBytes;
 
 #[derive(Debug, Fail)]
 pub enum MainError {
