@@ -664,7 +664,8 @@ impl StackTreeMsgDPayload {
 impl MsgPayload for StackTreeMsgDPayload {}
 impl fmt::Display for StackTreeMsgDPayload {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "Tree {}", self.port_tree_id)
+        write!(f, "In reply to {} Tree {} on parent {}", *self.in_reply_to,
+               self.port_tree_id, self.parent_port_tree_id)
     }
 }
 #[derive(Debug, Clone, Serialize, Deserialize)]

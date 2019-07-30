@@ -1,6 +1,7 @@
 use std::{fmt,
           collections::HashMap,
           cmp::min,
+          ops::Deref,
           sync::atomic::{AtomicUsize, Ordering},
           str};
 
@@ -8,7 +9,6 @@ use rand;
 use serde;
 use serde_json;
 
-use crate::app_message::{SenderMsgSeqNo, get_next_count};
 use crate::config::{PACKET_MIN, PACKET_MAX, PAYLOAD_DEFAULT_ELEMENT, PacketNo};
 use crate::ec_message::{Message, MsgType};
 use crate::name::{PortTreeID, Name};
@@ -20,7 +20,12 @@ const PACKET_HEADER_SIZE: usize = 16; // PacketHeader / Uuid
 const PAYLOAD_MIN: usize = PACKET_MIN - PACKET_HEADER_SIZE;
 const PAYLOAD_MAX: usize = PACKET_MAX - PACKET_HEADER_SIZE;
 
-pub type PacketAssemblers = HashMap<SenderMsgSeqNo, PacketAssembler>;
+pub type PacketAssemblers = HashMap<UniqueMsgId, PacketAssembler>;
+
+#[derive(Debug, Copy, Clone, Hash, Eq, PartialEq, Serialize, Deserialize)]
+pub struct UniqueMsgId(pub u64);
+impl UniqueMsgId { fn new() -> UniqueMsgId { UniqueMsgId(rand::random()) } }
+impl Deref for UniqueMsgId { type Target = u64; fn deref(&self) -> &Self::Target { &self.0 } }
 
 static PACKET_COUNT: AtomicUsize = AtomicUsize::new(0);
 #[derive(Debug, Clone, Serialize)]
@@ -30,10 +35,10 @@ pub struct Packet {
     packet_count: usize
 }
 impl Packet {
-    fn new(sender_msg_seq_no: SenderMsgSeqNo, uuid: &Uuid, size: PacketNo,
+    fn new(unique_msg_id: UniqueMsgId, uuid: &Uuid, size: PacketNo,
            is_last_packet: bool, data_bytes: Vec<u8>) -> Packet {
         let header = PacketHeader::new(uuid);
-        let payload = Payload::new(sender_msg_seq_no, size, is_last_packet, data_bytes);
+        let payload = Payload::new(unique_msg_id, size, is_last_packet, data_bytes);
         Packet { header, payload, packet_count: Packet::get_next_count() }
     }
     pub fn _make(header: PacketHeader, payload: Payload, packet_count: usize) -> Packet {
@@ -42,7 +47,7 @@ impl Packet {
     pub fn make_entl_packet() -> Packet {
         let mut uuid = Uuid::new();
         uuid.make_entl();
-        Packet::new(get_next_count(), &uuid, PacketNo(1),
+        Packet::new(UniqueMsgId::new(), &uuid, PacketNo(1),
                     false, vec![])
     }
     
@@ -65,7 +70,7 @@ impl Packet {
 
     // Payload (delegate)
     pub fn is_last_packet(&self) -> bool { self.payload.is_last_packet() }
-    pub fn get_sender_msg_seq_no(&self) -> SenderMsgSeqNo { self.payload.get_sender_msg_seq_no() }
+    pub fn get_unique_msg_id(&self) -> UniqueMsgId { self.payload.get_unique_msg_id() }
     pub fn get_size(&self) -> PacketNo { self.payload.get_size() }
     pub fn get_bytes(&self) -> Vec<u8> { self.payload.bytes.iter().cloned().collect() }
     // pub fn get_payload_bytes(&self) -> Vec<u8> { self.get_payload().get_bytes() }
@@ -143,7 +148,7 @@ impl fmt::Display for PacketHeader {
 
 #[derive(Clone)]
 pub struct Payload {
-    sender_msg_seq_no: SenderMsgSeqNo,  // Unique identifier of this message
+    unique_msg_id: UniqueMsgId,  // Unique identifier of this message
     size: PacketNo, // Number of packets remaining in message if not last packet
                     // Number of bytes in last packet if last packet, 0 => Error
     is_last: bool,
@@ -151,23 +156,23 @@ pub struct Payload {
     wrapped_header: Stack<PacketHeader>,
 }
 impl Payload {
-    pub fn new(sender_msg_seq_no: SenderMsgSeqNo, size: PacketNo,
+    pub fn new(unique_msg_id: UniqueMsgId, size: PacketNo,
                is_last: bool, data_bytes: Vec<u8>) -> Payload {
         let mut bytes = [0 as u8; PAYLOAD_MAX];
         // Next line recommended by clippy, but I think the loop is clearer
         //bytes[..min(data_bytes.len(), PAYLOAD_MAX)].clone_from_slice(&data_bytes[..min(data_bytes.len(), PAYLOAD_MAX)]);
         for i in 0..min(data_bytes.len(), PAYLOAD_MAX) { bytes[i] = data_bytes[i]; }
-        Payload { sender_msg_seq_no, size, is_last, bytes, wrapped_header: Stack::new() }
+        Payload { unique_msg_id, size, is_last, bytes, wrapped_header: Stack::new() }
     }
     fn get_bytes(&self) -> Vec<u8> { self.bytes.iter().cloned().collect() }
-    fn get_sender_msg_seq_no(&self) -> SenderMsgSeqNo { self.sender_msg_seq_no }
+    fn get_unique_msg_id(&self) -> UniqueMsgId { self.unique_msg_id }
     fn get_size(&self) -> PacketNo { self.size }
     fn is_last_packet(&self) -> bool { self.is_last }
     fn _get_wrapped_header(&self) -> &Stack<PacketHeader> { &self.wrapped_header }
 }
 impl fmt::Display for Payload {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let mut s = format!("Sender Msg Seq No {}", *self.sender_msg_seq_no);
+        let mut s = format!("Sender Msg Seq No {}", *self.unique_msg_id);
         if self.is_last_packet() { s = s + ", Last packet"; }
         else                     { s = s + ", Not last packet"; }
         s = s + &format!(", Size {}", *self.size);
@@ -185,7 +190,7 @@ impl Serialize for Payload {
     {
         let body = self.bytes.to_hex();
         let mut state = serializer.serialize_struct("Payload", 5)?;
-        state.serialize_field("sender_msg_seq_no", &self.sender_msg_seq_no)?;
+        state.serialize_field("unique_msg_id", &self.unique_msg_id)?;
         state.serialize_field("size", &self.size)?;
         state.serialize_field("is_last", &self.is_last)?;
         state.serialize_field("bytes", &body)?;
@@ -214,7 +219,7 @@ impl Packetizer {
         let mtu = Packetizer::packet_payload_size(msg_bytes.len());
         let num_packets = (msg_bytes.len() + mtu - 1)/ mtu; // Poor man's ceiling
         let frag = msg_bytes.len() - (num_packets - 1) * mtu;
-        let sender_msg_seq_no = SenderMsgSeqNo(rand::random()); // Can't use hash in case two cells send the same message
+        let unique_msg_id = UniqueMsgId(rand::random()); // Can't use hash in case two cells send the same message
         let mut packets = Vec::new();
         for i in 0..num_packets {
             let (size, is_last_packet) = if i == (num_packets-1) {
@@ -228,7 +233,7 @@ impl Packetizer {
                 if i*mtu + j == msg_bytes.len() { break; }
                 packet_bytes[j] = msg_bytes[i*mtu + j];
             }
-            let packet = Packet::new(sender_msg_seq_no, uuid, PacketNo(size as u16),
+            let packet = Packet::new(unique_msg_id, uuid, PacketNo(size as u16),
                                      is_last_packet, packet_bytes);
             //println!("Packet: packet {} for msg {}", packet.get_packet_count(), msg.get_count());
             packets.push(packet);
@@ -258,27 +263,13 @@ impl Packetizer {
 }
 #[derive(Debug, Clone)]
 pub struct PacketAssembler {
-    sender_msg_seq_no: SenderMsgSeqNo,
+    unique_msg_id: UniqueMsgId,
     packets: Vec<Packet>,
 }
 impl PacketAssembler {
-    pub fn new(sender_msg_seq_no: SenderMsgSeqNo) -> PacketAssembler {
-        PacketAssembler { sender_msg_seq_no, packets: Vec::new() }
+    pub fn new(unique_msg_id: UniqueMsgId) -> PacketAssembler {
+        PacketAssembler { unique_msg_id, packets: Vec::new() }
     }
-//    pub fn create(sender_msg_seq_no: SenderMsgSeqNo, packets: &Vec<Packet>) -> PacketAssembler {
-//        PacketAssembler { sender_msg_seq_no, packets: packets.clone() }
-//    }
-/*
-    pub fn get_sender_msg_seq_no(&self) -> SenderMsgSeqNo { self.sender_msg_seq_no }
-    pub fn get_packets(&self) -> &Vec<Packet> { &self.packets }
-    pub fn get_tree_uuid(&self) -> Option<Uuid> {
-        if let Some(packet) = self.packets.get(0) {
-            Some(packet.get_header().get_tree_uuid())
-        } else {
-            None
-        }
-    }
-*/
     pub fn add(&mut self, packet: Packet) -> (bool, &Vec<Packet>) {
         let is_last = packet.is_last_packet(); // Because I move packet on next line
         self.packets.push(packet);
