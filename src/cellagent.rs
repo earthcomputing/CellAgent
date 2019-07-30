@@ -527,7 +527,7 @@ impl CellAgent {
             {
                 if CONFIG.trace_options.all || CONFIG.trace_options.ca {
                     let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "ca_from_vm_app" };
-                    let trace = json!({ "cell_id": &self.cell_id, "app_msg": app_msg.to_string() });
+                    let trace = json!({ "cell_id": &self.cell_id, "app_msg": app_msg });
                     let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
                 }
             }
@@ -660,7 +660,7 @@ impl CellAgent {
                         PortToCaMsg::AppMsg(port_no, bytes) => {
                             let ec_msg: Box<dyn AppMessage> = serde_json::from_str(&bytes.to_string()?)?;
                             let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "ca_from_port_bytes" };
-                            let trace = json!({ "cell_id": self.cell_id, "port": port_no, "ec_msg": ec_msg.to_string() });
+                            let trace = json!({ "cell_id": self.cell_id, "port": port_no, "ec_msg": ec_msg });
                             let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
                         },
                         PortToCaMsg::Status(port_no, status) => {
@@ -714,7 +714,7 @@ impl CellAgent {
                         CmToCaBytes::Bytes((port_no, _, _, bytes)) => {
                             let ec_msg: Box<dyn Message> = serde_json::from_str(&bytes.to_string()?)?;
                             let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "ca_from_cm_bytes" };
-                            let trace = json!({ "cell_id": self.cell_id, "port": port_no, "ec_msg": ec_msg.to_string() });
+                            let trace = json!({ "cell_id": self.cell_id, "port": port_no, "ec_msg": ec_msg });
                             let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
                         },
                         CmToCaBytes::Status((port_no, is_border, number_of_packets, status)) => {
@@ -725,13 +725,13 @@ impl CellAgent {
                         CmToCaBytes::TunnelPort((port_no, bytes)) => {
                             let app_msg: Box<dyn AppMessage> = serde_json::from_str(&bytes.to_string()?)?;
                             let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "ca_from_cm_bytes(port)" };
-                            let trace = json!({ "cell_id": self.cell_id, "port": port_no, "app_msg": app_msg.to_string() });
+                            let trace = json!({ "cell_id": self.cell_id, "port": port_no, "app_msg": app_msg });
                             let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
                         },
                         CmToCaBytes::TunnelUp((sender_id, bytes)) => {
                             let app_msg: Box<dyn AppMessage> = serde_json::from_str(&bytes.to_string()?)?;
                             let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "ca_from_cm_bytes(up)" };
-                            let trace = json!({ "cell_id": self.cell_id, "sender_id": sender_id, "app_msg": app_msg.to_string() });
+                            let trace = json!({ "cell_id": self.cell_id, "sender_id": sender_id, "app_msg": app_msg });
                             let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
                         }
                     }
@@ -813,7 +813,7 @@ impl CellAgent {
         {
             if CONFIG.trace_options.all || CONFIG.trace_options.ca {
                 let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "ca_to_vm_app" };
-                let trace = json!({ "cell_id": &self.cell_id, "app_msg": app_msg.to_string() });
+                let trace = json!({ "cell_id": &self.cell_id, "app_msg": app_msg });
                 let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
             }
         }
@@ -1142,7 +1142,7 @@ impl CellAgent {
         };
         if child_ports.len() == 0 {  // I am a leaf on the new tree
             let user_mask = Mask::new(port_number);
-            let join = gvm_xtnd || gvm_send || gvm_recv;
+            let join_tree = gvm_xtnd || gvm_send || gvm_recv;
             let in_reply_to = msg.get_sender_msg_seq_no();
             // TODO: Make work for VMs as well as from outside
             if self.is_border_port(&port_number) {
@@ -1165,7 +1165,7 @@ impl CellAgent {
                 ca_to_port.send(bytes)?;
             } else {
                 let new_msg = StackTreeDMsg::new(in_reply_to, sender_id, new_port_tree_id,
-                                                 parent_port_tree_id, join);
+                                                 parent_port_tree_id, join_tree);
                 self.send_msg(self.get_connected_tree_id(), &new_msg, user_mask)?;
             }
         } else {
@@ -1398,7 +1398,7 @@ impl CellAgent {
         {
             if CONFIG.debug_options.all || CONFIG.debug_options.process_msg {
                 let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "ca_got_stack_tree_app_msg" };
-                let trace = json!({ "cell_id": &self.cell_id, "new_tree_id": new_tree_id, "msg": app_msg.to_string() });
+                let trace = json!({ "cell_id": &self.cell_id, "new_tree_id": new_tree_id, "msg": app_msg });
                 let _ = add_to_trace(TraceType::Debug, trace_params, &trace, _f);
                 println!("Cellagent {}: {} sending on tree {} stack tree app_msg {}", self.cell_id, _f, parent_tree_id, app_msg);
                 println!("Cellagent {}: {} new tree id {}", self.cell_id, _f, new_tree_id);
@@ -1593,8 +1593,7 @@ impl CellAgent {
                 let ports = user_mask.get_port_nos();
                 let msg: Box<dyn Message> = serde_json::from_str(&bytes.to_string()?)?;
                 let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "ca_to_cm_bytes" };
-                //println!("Cellagent {}: {} msg {}", self.cell_id, _f, msg); // Should be msg.value()
-                let trace = json!({ "cell_id": &self.cell_id, "tree_id": &tree_id, "ports": ports, "msg": msg.to_string() });
+                let trace = json!({ "cell_id": &self.cell_id, "tree_id": &tree_id, "ports": ports, "msg": msg });
                 let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
             }
         }
