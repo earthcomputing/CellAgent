@@ -57,7 +57,7 @@ use crate::gvm_equation::{GvmEqn};
 use crate::app_message_formats::{ApplicationToNoc};
 use crate::link::Link;
 use crate::uptree_spec::{AllowedTree, ContainerSpec, Manifest, UpTreeSpec, VmSpec};
-use crate::utility::{CellConfig, CellNo, Edge, S, TraceHeader, _print_hash_map, sleep};
+use crate::utility::{CellConfig, CellNo, Edge, S, _print_hash_map, sleep};
 
 fn main() -> Result<(), Error> {
     let _f = "main";
