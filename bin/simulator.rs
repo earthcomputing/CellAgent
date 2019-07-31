@@ -1,6 +1,5 @@
 #![warn(bare_trait_objects)]
 #![deny(unused_must_use)]
-#![deny(bare_trait_objects)]
 //#![allow(dead_code)]
 //#![allow(unused_variables)]
 //#![allow(unused_imports)]
@@ -46,7 +45,7 @@ pub mod utility;
 pub mod uuid_ec;
 pub mod vm;
 
-use std::{io::{stdin, stdout, Write},
+use std::{io::{stdin, stdout, Read, Write},
           fs::{File,},
           collections::{HashSet},
 };
@@ -58,7 +57,7 @@ use crate::gvm_equation::{GvmEqn};
 use crate::app_message_formats::{ApplicationToNoc};
 use crate::link::Link;
 use crate::uptree_spec::{AllowedTree, ContainerSpec, Manifest, UpTreeSpec, VmSpec};
-use crate::utility::{CellConfig, CellNo, Edge, S, TraceHeader, _print_hash_map, sleep};
+use crate::utility::{CellConfig, CellNo, Edge, S, _print_hash_map, sleep};
 
 fn main() -> Result<(), Error> {
     let _f = "main";
@@ -214,8 +213,6 @@ fn deployment_demo() -> Result<(), Error> {
 }
 // Errors
 use failure::{Error, ResultExt};
-use std::io::Read;
-use rdkafka::message::ToBytes;
 
 #[derive(Debug, Fail)]
 pub enum MainError {
