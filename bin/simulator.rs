@@ -60,14 +60,8 @@ use crate::link::Link;
 use crate::uptree_spec::{AllowedTree, ContainerSpec, Manifest, UpTreeSpec, VmSpec};
 use crate::utility::{CellConfig, CellNo, Edge, S, TraceHeader, _print_hash_map, sleep};
 
-struct Foo {
-    foo: Vec<u8>,
-    bar: [u8; 3]
-}
-
 fn main() -> Result<(), Error> {
     let _f = "main";
-    println!("{:?}", Foo { foo: vec![0x1, 0x2, 0x3], bar: [0x4, 0x5, 0x6] });
     println!("\nMulticell trace and debug output to file {}", CONFIG.output_file_name);
     println!("{:?} Quenching of Discover messages", CONFIG.quench);
     println!("\nMain: {} ports for each of {} cells", CONFIG.num_ports_per_cell , CONFIG.num_cells);
@@ -221,6 +215,7 @@ fn deployment_demo() -> Result<(), Error> {
 // Errors
 use failure::{Error, ResultExt};
 use std::io::Read;
+use rdkafka::message::ToBytes;
 
 #[derive(Debug, Fail)]
 pub enum MainError {
