@@ -1,5 +1,5 @@
+#![warn(bare_trait_objects)]
 #![deny(unused_must_use)]
-#![deny(bare_trait_objects)]
 //#![allow(dead_code)]
 //#![allow(unused_variables)]
 //#![allow(unused_imports)]
