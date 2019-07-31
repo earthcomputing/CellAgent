@@ -111,9 +111,6 @@ impl TreeID {
             Some(_) => Err(NameError::Format { name: S(name), func_name: "TreeID::new" }.into())
         }
     }
-    pub fn default() -> TreeID {
-        TreeID { name: str_to_chars("Default"), uuid: Uuid::new() }
-    }
     pub fn to_port_tree_id(&self, port_number: PortNumber) -> PortTreeID {
         let mut uuid = self.uuid;
         uuid.set_port_number(port_number);
@@ -129,6 +126,11 @@ impl Name for TreeID {
     fn get_name(&self) -> String { str_from_chars(self.name) }
     fn get_uuid(&self) -> Uuid { self.uuid }
     fn create_from_string(&self, name: &str) -> TreeID { TreeID { name: str_to_chars(name), uuid: Uuid::new() } }
+}
+impl Default for TreeID {
+    fn default() -> TreeID {
+        TreeID { name: str_to_chars("Default"), uuid: Uuid::new() }
+    }
 }
 impl fmt::Display for TreeID {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {

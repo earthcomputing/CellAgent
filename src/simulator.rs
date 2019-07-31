@@ -1,6 +1,6 @@
 #[macro_use] extern crate failure;
 
-use std::{io::{stdin, stdout, Write},
+use std::{io::{stdin, stdout, Read, Write},
           fs::{File,},
           collections::{HashSet},
 };
@@ -168,8 +168,6 @@ fn deployment_demo() -> Result<(), Error> {
 }
 // Errors
 use failure::{Error, ResultExt};
-use std::io::Read;
-use rdkafka::message::ToBytes;
 
 #[derive(Debug, Fail)]
 pub enum MainError {
