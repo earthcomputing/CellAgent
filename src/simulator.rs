@@ -1,63 +1,18 @@
-#![warn(bare_trait_objects)]
-#![deny(unused_must_use)]
-//#![allow(dead_code)]
-//#![allow(unused_variables)]
-//#![allow(unused_imports)]
-//#![warn(rust_2018_idioms)]
-#![recursion_limit="1024"]
-#[macro_use] extern crate crossbeam;
 #[macro_use] extern crate failure;
-#[macro_use] extern crate serde_derive;
-#[macro_use] extern crate serde_json;
-
-pub mod app_message;
-pub mod app_message_formats;
-pub mod blueprint;
-pub mod cellagent;
-pub mod cmodel;
-pub mod config;
-pub mod container;
-pub mod dal;
-pub mod datacenter;
-pub mod dumpstack;
-pub mod errors;
-pub mod gvm_equation;
-pub mod link;
-pub mod ec_message;
-pub mod ec_message_formats;
-pub mod nalcell;
-pub mod name;
-pub mod noc;
-pub mod packet;
-pub mod packet_engine;
-pub mod port;
-pub mod port_tree;
-pub mod rack;
-pub mod routing_table;
-pub mod routing_table_entry;
-pub mod service;
-pub mod tenant;
-pub mod traph;
-pub mod traph_element;
-pub mod tree;
-pub mod uptree_spec;
-pub mod utility;
-pub mod uuid_ec;
-pub mod vm;
 
 use std::{io::{stdin, stdout, Read, Write},
           fs::{File,},
           collections::{HashSet},
 };
 
-use crate::blueprint::{Blueprint};
-use crate::config::{CONFIG};
-use crate::datacenter::{Datacenter};
-use crate::gvm_equation::{GvmEqn};
-use crate::app_message_formats::{ApplicationToNoc};
-use crate::link::Link;
-use crate::uptree_spec::{AllowedTree, ContainerSpec, Manifest, UpTreeSpec, VmSpec};
-use crate::utility::{CellConfig, CellNo, Edge, S, _print_hash_map, sleep};
+use multicell_simulator::app_message_formats::{ApplicationToNoc};
+use multicell_simulator::blueprint::{Blueprint};
+use multicell_simulator::config::{CONFIG};
+use multicell_simulator::datacenter::{Datacenter};
+use multicell_simulator::gvm_equation::{GvmEqn};
+use multicell_simulator::link::Link;
+use multicell_simulator::uptree_spec::{AllowedTree, ContainerSpec, Manifest, UpTreeSpec, VmSpec};
+use multicell_simulator::utility::{CellConfig, CellNo, Edge, S, _print_hash_map, sleep};
 
 fn main() -> Result<(), Error> {
     let _f = "main";
