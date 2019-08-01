@@ -3,14 +3,13 @@
 use std::{io::{stdin, stdout, Read, Write},
           collections::{HashMap, HashSet},
           fs::{File, OpenOptions},
-          sync::mpsc::channel,
 	      iter::FromIterator};
 
 use ec_fabrix::config::{CONFIG, PortQty};
 use ec_fabrix::gvm_equation::{GvmEqn};
 use ec_fabrix::nalcell::{NalCell};
 use ec_fabrix::uptree_spec::{AllowedTree, ContainerSpec, Manifest, UpTreeSpec, VmSpec};
-use ec_fabrix::utility::{_print_vec, CellConfig, CellType, PortNo, S};
+use ec_fabrix::utility::{_print_vec, CellConfig, CellType, PortNo, S, TraceHeader};
 
 fn main() -> Result<(), Error> {
     let _f = "main";

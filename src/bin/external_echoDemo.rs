@@ -12,7 +12,7 @@ use ec_fabrix::config::{CONFIG, CellQty, PortQty};
 use ec_fabrix::gvm_equation::{GvmEqn};
 use ec_fabrix::noc::Noc;
 use ec_fabrix::uptree_spec::{AllowedTree, ContainerSpec, Manifest, UpTreeSpec, VmSpec};
-use ec_fabrix::utility::{CellConfig, CellNo, PortNo, S, is2e, _print_vec};
+use ec_fabrix::utility::{CellConfig, CellNo, PortNo, S, TraceHeader, is2e, _print_vec};
 
 fn main() -> Result<(), Error> {
     let _f = "main";
