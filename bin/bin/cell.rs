@@ -1,3 +1,5 @@
+#[macro_use] extern crate failure;
+
 use std::{io::{stdin, stdout, Read, Write},
           collections::{HashMap, HashSet},
           fs::{File, OpenOptions},

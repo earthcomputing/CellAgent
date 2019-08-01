@@ -302,7 +302,7 @@ impl fmt::Display for NalCell {
 impl Drop for NalCell {
     fn drop(&mut self) {
         match self.ecnl {
-            Some(_) => {
+            Some(ecnl_session) => {
                 #[cfg(feature = "cell")]
                 unsafe {
                     free_ecnl_session(ecnl_session);
