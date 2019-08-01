@@ -39,14 +39,14 @@ pub fn capture_stack() -> Vec<CFrame> {
     cframes
 }
 use std::thread;
-use crate::TraceHeader;
+use crate::utility::TraceHeader;
 #[allow(dead_code)]
 pub fn dumpstack() {
     let thread_id = TraceHeader::parse(thread::current().id());
     let mut v = capture_stack();
     // trim first couple of frames
-    if  v[0].f.starts_with("multicell::traph::captureStack::") &&
-        v[1].f.starts_with("multicell::traph::dumpstack::") {
+    if  v[0].f.starts_with("ec_fabrix::traph::captureStack::") &&
+        v[1].f.starts_with("ec_fabrix::traph::dumpstack::") {
             let chop = v.drain(2..).collect();
             v = chop;
     }
