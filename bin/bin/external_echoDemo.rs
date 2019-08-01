@@ -1,118 +1,39 @@
-#[macro_use] extern crate failure;
-
 use std::{io::{stdin, stdout, Read, Write},
-          fs::{File,},
-          collections::{HashSet},
-};
+          collections::{HashMap, HashSet},
+          fs::{File, OpenOptions},
+          sync::mpsc::channel};
 
-use multicell_simulator::app_message_formats::{ApplicationToNoc};
-use multicell_simulator::blueprint::{Blueprint};
-use multicell_simulator::config::{CONFIG};
-use multicell_simulator::datacenter::{Datacenter};
-use multicell_simulator::gvm_equation::{GvmEqn};
-use multicell_simulator::link::Link;
-use multicell_simulator::uptree_spec::{AllowedTree, ContainerSpec, Manifest, UpTreeSpec, VmSpec};
-use multicell_simulator::utility::{CellConfig, CellNo, Edge, S, _print_hash_map, sleep};
+use ec_fabrix::app_message_formats::{ApplicationFromNoc, ApplicationToNoc, NocFromApplication, NocToApplication};
+use ec_fabrix::blueprint::{Blueprint};
+use ec_fabrix::config::{CONFIG, CellQty, PortQty};
+use ec_fabrix::gvm_equation::{GvmEqn};
+use ec_fabrix::noc::Noc;
+use ec_fabrix::uptree_spec::{AllowedTree, ContainerSpec, Manifest, UpTreeSpec, VmSpec};
+use ec_fabrix::utility::{CellConfig, CellNo, PortNo, S, TraceHeader, is2e, _print_vec};
 
 fn main() -> Result<(), Error> {
     let _f = "main";
-    println!("\nMulticell trace and debug output to file {}", CONFIG.output_file_name);
+    println!("Multicell Routing: Output to file {} (set in config.rs)", CONFIG.output_file_name);
     println!("{:?} Quenching of Discover messages", CONFIG.quench);
-    println!("\nMain: {} ports for each of {} cells", CONFIG.num_ports_per_cell , CONFIG.num_cells);
-    let mut dc =
-        match Datacenter::construct(Blueprint::new(CONFIG.num_cells,
-                                                   &CONFIG.edge_list,
-                                                   CONFIG.num_ports_per_cell,
-                                                   &CONFIG.cell_port_exceptions,
-                                                   &CONFIG.border_cell_ports,
-        )?) {
-            Ok(dc) => dc,
-            Err(err) => panic!("Datacenter construction failure: {}", err)
-        };
+    let _ = OpenOptions::new()
+        .write(true)
+        .truncate(true)
+        .open(&CONFIG.output_file_name);
+    let cell_port_exceptions = HashMap::new();
+    let mut border_cell_ports = HashMap::new();
+    border_cell_ports.insert(CellNo(0), vec![PortNo(2)]);
+    let blueprint = Blueprint::new(CellQty(3), &vec![is2e(0,1), is2e(1,2), is2e(0,2)], PortQty(3), &cell_port_exceptions, &border_cell_ports).context(MainError::Chain { func_name: "run", comment: S("") })?;
+    println!("{}", blueprint);
     if false { deployment_demo()?; }    // Demonstrate features of deployment spec
-    if CONFIG.auto_break.is_some() { break_link(&mut dc)?; }
-    loop {
-        stdout().write(b"\nType:
-            d to print datacenter
-            c to print cells
-            l to print links
-            p to print forwarding table
-            m to deploy an application
-            x to exit program\n\n").context(MainError::Chain { func_name: "run", comment: S("") })?;
-        let mut print_opt = String::new();
-        stdin().read_line(&mut print_opt).context(MainError::Chain { func_name: _f, comment: S("") })?;
-        if print_opt.len() > 1 {
-            match print_opt.trim() {
-                "d" => {
-                    println!("{}", dc.get_rack());
-                    Ok(())
-                },
-                "c" => show_ca(&dc),
-                "l" => break_link(&mut dc),
-                "p" => show_pe(&dc),
-                "m" => deploy(&dc.get_application_to_noc().clone()),
-                "x" => std::process::exit(0),
-                _   => {
-                    println!("Invalid input {}", print_opt);
-                    Ok(())
-                }
-            }?;
-        }
-    }
-}
-fn show_ca(dc: &Datacenter) -> Result<(), Error> {
-    let rack = dc.get_rack();
-    let cells = rack.get_cells();
-    _print_hash_map(&rack.get_cell_ids());
-    let _ = stdout().write(b"Enter cell to display cell\n")?;
-    let cell_no = read_int()?;
-    cells.get(&CellNo(cell_no))
-        .map_or_else(|| println!("{} is not a valid input", cell_no),
-                     |cell| {
-                         println!("{}", cell);
-                     });
+    let (application_to_noc, noc_from_application): (ApplicationToNoc, NocFromApplication) = channel();
+    let (noc_to_application, _application_from_noc): (NocToApplication, ApplicationFromNoc) = channel();
+    let mut noc = Noc::new(noc_to_application)?;
+    let (port_to_noc, port_from_noc) = noc.initialize(&blueprint, noc_from_application).context(MainError::Chain { func_name: "run", comment: S("") })?;
+    deploy(&application_to_noc.clone())?; /* Deploy Echo */
+    /* Send Ping request */
     Ok(())
 }
-fn show_pe(dc: &Datacenter) -> Result<(), Error> {
-    let rack = dc.get_rack();
-    let cells = rack.get_cells();
-    _print_hash_map(&rack.get_cell_ids());
-    let _ = stdout().write(b"Enter cell to display forwarding table\n")?;
-    let cell_no = read_int()?;
-    cells.get(&CellNo(cell_no))
-        .map_or_else(|| println!("{} is not a valid input", cell_no),
-                     |cell| {
-                         println!("{}", cell.get_packet_engine());
-                     });
-    Ok(())
-}
-fn break_link(dc: &mut Datacenter) -> Result<(), Error> {
-    let rack = dc.get_rack_mut();
-    let edge: Edge = match CONFIG.auto_break {
-        Some(edge) => {
-            // TODO: Wait until discover is done before automatically breaking link, should be removed
-            println!("---> Sleeping to let discover finish before automatically breaking link");
-            sleep(6);
-            println!("---> Automatically break link {}", edge);
-            edge
-        },
-        None => {
-            let link_ids = rack.get_link_ids();
-            _print_hash_map(&link_ids);
-            let _ = stdout().write(b"Enter first cell number of link to break\n")?;
-            let left: usize = read_int()?;
-            let _ = stdout().write(b"Enter second cell number of link to break\n")?;
-            let right: usize = read_int()?;
-            Edge(CellNo(left), CellNo(right))
-        },
-    };
-    let links = rack.get_links_mut();
-    links.get_mut(&edge)
-        .map_or_else(|| -> Result<(), Error> { println!("{} is not a valid input", edge); Ok(()) },
-                     |link: &mut Link| -> Result<(), Error> { link.break_link()?; Ok(()) }
-        )?;
-    Ok(())
-}
+
 fn read_int() -> Result<usize, Error> {
     let _f = "read_int";
     let mut char = String::new();
@@ -126,7 +47,6 @@ fn read_int() -> Result<usize, Error> {
     }
 }
 fn deploy(application_to_noc: &ApplicationToNoc) -> Result<(), Error> {
-    let _f = "deploy";
     stdout().write(b"Enter the name of a file containing a manifest\n").context(MainError::Chain { func_name: "run", comment: S("") })?;
     let mut filename = String::new();
     stdin().read_line(&mut filename).context(MainError::Chain { func_name: "run", comment: S("") })?;
@@ -168,7 +88,6 @@ fn deployment_demo() -> Result<(), Error> {
 }
 // Errors
 use failure::{Error, ResultExt};
-
 #[derive(Debug, Fail)]
 pub enum MainError {
     #[fail(display = "MainError::Chain {} {}", func_name, comment)]

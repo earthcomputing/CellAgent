@@ -1,56 +1,14 @@
-#![deny(unused_must_use)]
-//#![warn(rust_2018_idioms)]
-#![recursion_limit="1024"]
-#![allow(dead_code)]
-#![allow(unused_variables)]
-#![allow(unused_imports)]
-#[macro_use] extern crate failure;
-#[macro_use] extern crate serde_derive;
-#[macro_use] extern crate serde_json;
-
-pub mod app_message;
-pub mod app_message_formats;
-pub mod blueprint;
-pub mod cellagent;
-pub mod cmodel;
-pub mod config;
-pub mod container;
-pub mod dal;
-pub mod dumpstack;
-pub mod errors;
-pub mod gvm_equation;
-pub mod ec_message;
-pub mod ec_message_formats;
-pub mod nalcell;
-pub mod name;
-pub mod noc;
-pub mod packet;
-pub mod packet_engine;
-pub mod port;
-pub mod port_tree;
-pub mod routing_table;
-pub mod routing_table_entry;
-pub mod service;
-pub mod tenant;
-pub mod traph;
-pub mod traph_element;
-pub mod tree;
-pub mod uptree_spec;
-pub mod utility;
-pub mod uuid_ec;
-pub mod vm;
-
 use std::{io::{stdin, stdout, Read, Write},
           collections::{HashMap, HashSet},
           fs::{File, OpenOptions},
           sync::mpsc::channel,
 	      iter::FromIterator};
 
-use crate::config::{CONFIG, PortQty};
-use crate::gvm_equation::{GvmEqn};
-use crate::nalcell::{NalCell};
-use crate::uptree_spec::{AllowedTree, ContainerSpec, Manifest, UpTreeSpec, VmSpec};
-use crate::utility::{_print_vec, CellConfig, CellType, PortNo, S, TraceHeader};
+use ec_fabrix::config::{CONFIG, PortQty};
+use ec_fabrix::gvm_equation::{GvmEqn};
+use ec_fabrix::nalcell::{NalCell};
+use ec_fabrix::uptree_spec::{AllowedTree, ContainerSpec, Manifest, UpTreeSpec, VmSpec};
+use ec_fabrix::utility::{_print_vec, CellConfig, CellType, PortNo, S, TraceHeader};
 
 fn main() -> Result<(), Error> {
     let _f = "main";

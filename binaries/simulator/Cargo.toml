@@ -1,17 +1,23 @@
 [package]
-name = "multicell-simulator"
+name = "ec_fabrix"
 version = "0.1.0"
 authors = ["Alan Karp <alan@earthcomputing.io>"]
 edition = "2018"
-#build = "build.rs"
+build = "build.rs"
 
 [features]
+cell = []
+noc = []
 simulator = []
 
 [[bin]]
 name = "simulator"
-required-features = ["simulator"]
-path = "src/simulator.rs"
+
+[[bin]]
+name = "cell"
+
+[[bin]]
+name = "external_echoDemo"
 
 [[test]]
 name = "test"
