@@ -4,7 +4,7 @@ FROM rust:latest
 
 RUN apt-get update && \
     apt-get dist-upgrade -y && \
-    apt-get install -y csh colordiff less vim && \
+    apt-get install -y csh colordiff less vim cargo && \
     rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/* && \
     apt-get clean
 
