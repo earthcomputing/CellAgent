@@ -1,5 +1,5 @@
 [package]
-name = "multicell-external_echoDemo"
+name = "ec_fabrix"
 version = "0.1.0"
 authors = ["Alan Karp <alan@earthcomputing.io>"]
 edition = "2018"
