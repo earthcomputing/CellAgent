@@ -12,12 +12,15 @@ simulator = []
 
 [[bin]]
 name = "simulator"
+required-features = ["simulator"]
 
 [[bin]]
 name = "cell"
+required-features = ["cell"]
 
 [[bin]]
 name = "external_echoDemo"
+required-features = ["noc"]
 
 [[test]]
 name = "test"
