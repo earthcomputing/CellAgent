@@ -16,7 +16,7 @@ pub struct Datacenter {
 impl Datacenter {
     pub fn construct(blueprint: Blueprint) -> Result<Datacenter, Error> {
         println!("{}", blueprint);
-        let (mut rack, _join_handles) = Rack::construct(&blueprint).context(DatacenterError::Chain { func_name: "initialize", comment: S("")})?;
+        let mut rack = Rack::construct(&blueprint).context(DatacenterError::Chain { func_name: "initialize", comment: S("")})?;
         let (application_to_noc, noc_from_application): (ApplicationToNoc, NocFromApplication) = channel();
         let (noc_to_application, application_from_noc): (NocToApplication, ApplicationFromNoc) = channel();
         let mut noc = Noc::new(noc_to_application)?;

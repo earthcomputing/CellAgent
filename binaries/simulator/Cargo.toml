@@ -33,6 +33,7 @@ backtrace = "0.3" # used in dumpstack.rs
 #bincode = "1.1.2" # for binary serialization
 #chrono = { version = "0.4.3", features = ["serde"] }
 crossbeam = "0.7.1"
+crossbeam-utils = "0.6.6"
 c_string = "0.7.0"
 #ditto = "0.2.0" # CRDT library
 either = "1.5"

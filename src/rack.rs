@@ -3,8 +3,8 @@ use multi_mut::{HashMapMultiMut};
 use std::{fmt, fmt::Write,
           collections::{HashMap, HashSet},
           iter::FromIterator,
-          //sync::mpsc::channel,
-          thread, thread::{JoinHandle}};
+          thread};
+
 use crossbeam::crossbeam_channel::unbounded as channel;
 
 use crate::app_message_formats::{PortToNoc, PortFromNoc};
@@ -25,7 +25,7 @@ pub struct Rack {
 }
 impl Rack {
     pub fn new() -> Rack { Rack { cells: HashMap::new(), links: HashMap::new() } }
-    pub fn initialize(&mut self, blueprint: &Blueprint)  -> Result<Vec<JoinHandle<()>>, Error> {
+    pub fn initialize(&mut self, blueprint: &Blueprint)  -> Result<(), Error> {
         let _f = "initialize";
         let num_cells = blueprint.get_ncells();
         let geometry = get_geometry(num_cells);  // A cheat used for visualization
@@ -38,19 +38,19 @@ impl Rack {
             .iter()
             .map(|border_cell| -> Result<(CellNo, NalCell), Error> {
                 let cell_no = border_cell.get_cell_no();
-                let nal_cell = NalCell::new(&border_cell.get_name(),
+                let (_join_handle, nalcell) = NalCell::new(&border_cell.get_name(),
                                             Some(border_cell.get_num_phys_ports()),
                                             &HashSet::from_iter(border_cell.get_border_ports().clone()),
                                             CellConfig::Large)?;
                 {
                     if CONFIG.trace_options.all || CONFIG.trace_options.dc {
                         let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "border_cell_start" };
-                        let cell_id = nal_cell.get_id();
+                        let cell_id = nalcell.get_id();
                         let trace = json!({ "cell_id": cell_id, "cell_number": cell_no, "location":  geometry.2.get(*cell_no)});
                         let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
                     }
                 }
-                Ok((cell_no, nal_cell))
+                Ok((cell_no, nalcell))
             })
             .collect::<Result<Vec<(CellNo, NalCell)>, Error>>().context(RackError::Chain { func_name: "initialize", comment: S("border")})?;
         for (cell_no, border_nal_cell) in labeled_border_nal_cells {
@@ -62,17 +62,18 @@ impl Rack {
             .iter()
             .map(|interior_cell| -> Result<(CellNo, NalCell), Error> {
                 let cell_no = interior_cell.get_cell_no();
-                let nal_cell = NalCell::new(&interior_cell.get_name(), Some(interior_cell.get_num_phys_ports()),
+                let (_join_handle, nalcell) = NalCell::new(&interior_cell.get_name(),
+                                           Some(interior_cell.get_num_phys_ports()),
                                             &HashSet::new(), CellConfig::Large)?;
                 {
                     if CONFIG.trace_options.all || CONFIG.trace_options.dc {
                         let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "interior_cell_start" };
-                        let cell_id = nal_cell.get_id();
+                        let cell_id = nalcell.get_id();
                         let trace = json!({ "cell_id": cell_id, "cell_number": cell_no, "location": geometry.2.get(*cell_no as usize) });
                         let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
                     }
                 }
-                Ok((cell_no, nal_cell))
+                Ok((cell_no, nalcell))
             })
             .collect::<Result<Vec<(CellNo, NalCell)>, Error>>().context(RackError::Chain { func_name: "initialize", comment: S("interior")})?;
         for (cell_no, interior_nal_cell) in labeled_interior_nal_cells {
@@ -115,12 +116,12 @@ impl Rack {
             self.links.insert(*edge, link);
         }
         println!("Rack {}: Links started", _f);
-        Ok(link_handles)
+        Ok(())
     }
-    pub fn construct(blueprint: &Blueprint) -> Result<(Rack, Vec<JoinHandle<()>>), Error> {
+    pub fn construct(blueprint: &Blueprint) -> Result<Rack, Error> {
         let mut rack = Rack::new();
-        let join_handles = rack.initialize(blueprint).context(RackError::Chain { func_name: "build_rack", comment: S("")})?;
-        Ok((rack, join_handles))
+        rack.initialize(blueprint).context(RackError::Chain { func_name: "build_rack", comment: S("")})?;
+        Ok(rack)
     }
     pub fn get_cells(&self) -> &HashMap<CellNo, NalCell> { &self.cells }
     pub fn get_links_mut(&mut self) -> &mut HashMap<Edge, Link> { &mut self.links }

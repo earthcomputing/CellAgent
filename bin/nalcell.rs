@@ -5,11 +5,10 @@ use std::{
     fmt, fmt::Write,
     collections::{HashMap, HashSet},
     os::raw::{c_void},
-//    sync::mpsc::channel,
     thread,
+    thread::JoinHandle,
     iter::FromIterator
 };
-use crossbeam::crossbeam_channel::unbounded as channel;
 
 #[cfg(feature = "cell")]
 use libc::{free};
@@ -20,6 +19,7 @@ use std::{
     ffi::CStr,
 };
 
+use crossbeam::crossbeam_channel::unbounded as channel;
 use either::Either;
 
 use crate::cellagent::{CellAgent};
@@ -62,8 +62,9 @@ pub struct NalCell {
 }
 
 impl NalCell {
-    pub fn new(name: &str, simulated_options: Option<PortQty>, border_port_nos: &HashSet<PortNo>, config: CellConfig)
-            -> Result<NalCell, Error> {
+    pub fn new(name: &str, simulated_options: Option<PortQty>, border_port_nos: &HashSet<PortNo>
+               , config: CellConfig)
+            -> Result<(JoinHandle<()>, Self), Error> {
         let _f = "new";
         let ecnl =
             match simulated_options {
@@ -166,8 +167,9 @@ impl NalCell {
         NalCell::start_cmodel(&cmodel, cm_from_ca, cm_from_pe);
         let packet_engine = PacketEngine::new(cell_id, cell_agent.get_connected_tree_id(),
                                               pe_to_cm, pe_to_ports, border_port_nos).context(NalcellError::Chain { func_name: "new", comment: S("packet engine create") })?;
-        NalCell::start_packet_engine(&packet_engine, pe_from_cm, pe_from_ports);
-        Ok(NalCell {
+        let join_handle = NalCell::start_packet_engine(&packet_engine, pe_from_cm, pe_from_ports)?;
+        Ok((join_handle,
+            NalCell {
             id: cell_id,
             cell_type,
             config,
@@ -179,7 +181,7 @@ impl NalCell {
             ports_from_pe,
             ports_from_ca,
             ecnl
-        })
+        }))
     }
     // SPAWN THREAD (ca.initialize)
     fn start_cell(cell_agent: &CellAgent, ca_from_cm: CaFromCm, ca_from_ports: CaFromPort) {
@@ -222,7 +224,8 @@ impl NalCell {
     }
 
     // SPAWN THREAD (pe.initialize)
-    fn start_packet_engine(packet_engine: &PacketEngine, pe_from_cm: PeFromCm, pe_from_ports: PeFromPort) {
+    fn start_packet_engine(packet_engine: &PacketEngine, pe_from_cm: PeFromCm,
+                           pe_from_ports: PeFromPort) -> Result<JoinHandle<()>, Error>{
         let _f = "start_packet_engine";
         {
             if CONFIG.trace_options.all || CONFIG.trace_options.nal {
@@ -234,11 +237,12 @@ impl NalCell {
         let mut pe = packet_engine.clone();
         let child_trace_header = fork_trace_header();
         let thread_name = format!("PacketEngine {}", packet_engine.get_cell_id());
-        thread::Builder::new().name(thread_name).spawn( move || {
+        let join_handle = thread::Builder::new().name(thread_name).spawn( move || {
             update_trace_header(child_trace_header);
             let _ = pe.initialize(pe_from_cm, pe_from_ports).map_err(|e| write_err("nalcell", &e));
             if CONFIG.continue_on_error { } // Don't automatically restart packet engine if it crashes
         }).expect("thread failed");
+        Ok(join_handle)
     }
 
     pub fn get_id(&self) -> CellID { self.id }
@@ -301,6 +305,7 @@ impl fmt::Display for NalCell {
 }
 impl Drop for NalCell {
     fn drop(&mut self) {
+        #[allow(unused_variables)]
         match self.ecnl {
             Some(ecnl_session) => {
                 #[cfg(feature = "cell")]
