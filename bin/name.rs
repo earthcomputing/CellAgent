@@ -1,6 +1,7 @@
 use std::{fmt, marker::Sized};
 use std::string::String;
 
+use arrayvec::ArrayString;
 use serde::{Deserialize, Deserializer, Serializer};
 
 use crate::config::{MAX_CHARS, SEPARATOR};
@@ -8,7 +9,7 @@ use crate::utility::{PortNo, PortNumber, S};
 use crate::uuid_ec::Uuid;
 
 const DEFAULT_CHAR: char = '\n';
-type NameType = [char; MAX_CHARS];
+type NameType = ArrayString<[u8; MAX_CHARS]>;
 
 fn name_string<S: Serializer>(name: &NameType, s: S) -> Result<S::Ok, S::Error> {
     s.serialize_str(&str_from_chars(*name))
@@ -20,20 +21,11 @@ fn string_name<'de, D: Deserializer<'de>>(deserializer: D) -> Result<NameType, D
 }
 fn str_to_chars(string: &str) -> NameType {
     let _f = "str_to_chars";
-    if string.len() > MAX_CHARS {
-        // Should never reach here because check is done when name is created
-        panic!(format!("String |{}| is longer than {} characters {}", string, MAX_CHARS, string.len()))
-    }
-    let mut char_slice = [DEFAULT_CHAR; MAX_CHARS];
-    string.char_indices()
-        .for_each(|(i, c)| char_slice[i] = c);
-    char_slice
+    ArrayString::from(string).expect(&format!("String |{}| is longer than {} characters {}", string, MAX_CHARS, string.len()))
 }
 fn str_from_chars(chars: NameType) -> String {
     let _f = "str_from_chars";
-    chars.iter()
-        .take_while(|&c| *c != DEFAULT_CHAR )
-        .fold(S(""), |mut acc, &c| { acc.push(c); acc } )
+    chars.as_str().to_owned()
 }
 
 pub trait Name: Sized {
@@ -59,8 +51,6 @@ pub trait Name: Sized {
 }
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct CellID {
-    #[serde(serialize_with = "name_string")]
-    #[serde(deserialize_with = "string_name")]
     name: NameType,
     uuid: Uuid
 }

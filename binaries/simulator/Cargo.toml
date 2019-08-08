@@ -28,6 +28,7 @@ test = true
 path = "src/test.rs"
 
 [dependencies]
+arrayvec = {version = "0.4.11", features = ["serde-1"]}
 backtrace = "0.3" # used in dumpstack.rs
 #bimap = {version = "0.3.1", features = ["serde"]} # bi-directional hashmap h: H(A,B), h.get_by_left(a: A), h.get_by_right(b: B)
 #bincode = "1.1.2" # for binary serialization
@@ -54,7 +55,7 @@ reqwest = "0.9.11"
 #rusoto_s3 = "0.36.0" # Library for AWS S3
 #schema = { path = "/Users/alan/Documents/Eclipse/schema" }  # JSON schema
 #schema_derive = { path = "/Users/alan/Documents/Eclipse/schema-derive" }
-serde = { version = "1.0.27", features = ["rc"] }
+serde = { version = "1.0.98", features = ["rc"] }
 serde_derive = "1.0.27"
 serde_json = "1.0.9"
 strum = "0.15.0" # Enum operations
