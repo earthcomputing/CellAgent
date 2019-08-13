@@ -9,6 +9,7 @@ build = "build.rs"
 cell = []
 noc = []
 simulator = []
+delete_tree = [] # Used to test deleting a tree
 
 [[bin]]
 name = "simulator"

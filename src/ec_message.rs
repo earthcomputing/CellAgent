@@ -20,12 +20,13 @@ pub type MsgTreeMap = HashMap<String, TreeID>; // Must be String for serializati
 #[derive(Debug, Copy, Clone, Hash, Eq, PartialEq, Serialize, Deserialize)]
 pub enum MsgType {
     Entl,        // Needed for the msg_type hack, otherwise panic
-    Interapplication,
+    DeleteTree,
     Discover,
     DiscoverD,
     Failover,
     FailoverD,
     Hello,
+    Interapplication,
     Manifest,
     StackTree,
     StackTreeD,
@@ -54,6 +55,7 @@ impl MsgType {
     // A hack for finding the message type
     pub fn msg_type(packet: &Packet) -> MsgType {
         if      MsgType::is_type(packet, MsgType::Interapplication) { MsgType::Interapplication }
+        else if MsgType::is_type(packet, MsgType::DeleteTree)  { MsgType::DeleteTree }
         else if MsgType::is_type(packet, MsgType::Discover)    { MsgType::Discover }
         else if MsgType::is_type(packet, MsgType::DiscoverD)   { MsgType::DiscoverD }
         else if MsgType::is_type(packet, MsgType::Failover)    { MsgType::Failover }
@@ -70,12 +72,13 @@ impl fmt::Display for MsgType {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let s = match *self {
             MsgType::Entl              => "Entl",
-            MsgType::Interapplication  => "Interapplication",
+            MsgType::DeleteTree        => "DeleteTree",
             MsgType::Discover          => "Discover",
             MsgType::DiscoverD         => "DiscoverD",
             MsgType::Failover          => "Failover",
             MsgType::FailoverD         => "FailoverD",
             MsgType::Hello             => "Hello",
+            MsgType::Interapplication  => "Interapplication",
             MsgType::Manifest          => "Manifest",
             MsgType::StackTree         => "StackTree",
             MsgType::StackTreeD        => "StackTreeD",
@@ -547,6 +550,59 @@ impl fmt::Display for HelloMsgPayload {
     }
 }
 #[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DeleteTreeMsg {
+    header: MsgHeader,
+    payload: DeleteTreeMsgPayload
+}
+impl DeleteTreeMsg {
+    pub fn new(sender_id: SenderID, delete_tree_id: TreeID) -> DeleteTreeMsg {
+        let header = MsgHeader::new(
+            sender_id, false, &HashMap::new(),
+            MsgType::DeleteTree,
+            MsgDirection::Leafward);
+        let payload = DeleteTreeMsgPayload::new(delete_tree_id);
+        DeleteTreeMsg { header, payload }
+    }
+    pub fn get_delete_tree_id(&self) -> &TreeID { &self.payload.get_delete_tree_id() }
+}
+#[typetag::serde]
+impl Message for DeleteTreeMsg {
+    fn get_header(&self) -> &MsgHeader { &self.header }
+    fn get_payload(&self) -> &dyn MsgPayload { &self.payload }
+    fn get_msg_type(&self) -> MsgType { self.header.msg_type }
+    fn value(&self) -> serde_json::Value {
+        serde_json::to_value(self).expect("I don't know how to handle errors in msg.value()")
+    }
+    fn process_ca(&mut self, cell_agent: &mut CellAgent, _port_no: PortNo,
+                  _msg_port_tree_id: PortTreeID, _is_ait: bool) -> Result<(), Error> {
+        let delete_tree_id = self.get_delete_tree_id();
+        cell_agent.process_delete_tree_msg(delete_tree_id)
+    }
+}
+impl fmt::Display for DeleteTreeMsg {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let s = format!("{}: {}", self.get_header(), self.get_payload());
+        write!(f, "{}", s)
+    }
+}
+#[derive(Debug, Clone, Serialize, Deserialize)]
+struct DeleteTreeMsgPayload {
+    delete_tree_id: TreeID
+}
+impl DeleteTreeMsgPayload {
+    pub fn new(delete_tree_id: TreeID) -> DeleteTreeMsgPayload {
+        DeleteTreeMsgPayload { delete_tree_id }
+    }
+    fn get_delete_tree_id(&self) -> &TreeID { &self.delete_tree_id }
+}
+#[typetag::serde]
+impl MsgPayload for DeleteTreeMsgPayload {}
+impl fmt::Display for DeleteTreeMsgPayload {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.delete_tree_id)
+    }
+}
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct StackTreeMsg {
     header: MsgHeader,
     payload: StackTreeMsgPayload
@@ -556,7 +612,8 @@ impl StackTreeMsg {
                direction: MsgDirection, gvm_eqn: &GvmEquation) -> StackTreeMsg {
         let header = MsgHeader::new( sender_id, true, &HashMap::new(),
                                      MsgType::StackTree, direction);
-        let payload = StackTreeMsgPayload::new(new_tree_name, new_tree_id, parent_tree_id, gvm_eqn);
+        let payload = StackTreeMsgPayload::new(new_tree_name,
+                                               new_tree_id, parent_tree_id, gvm_eqn);
         StackTreeMsg { header, payload}
     }
     pub fn get_payload(&self) -> &StackTreeMsgPayload { &self.payload }

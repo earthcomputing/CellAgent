@@ -56,8 +56,13 @@ impl Traph {
     pub fn _get_cell_id(&self) -> &CellID { &self.cell_id }
     pub fn get_tree(&self, tree_uuid: &Uuid) -> Result<Tree, Error> {
         let _f = "get_tree";
-         self.stacked_trees.lock().unwrap().get(tree_uuid).cloned()
+        self.stacked_trees.lock().unwrap().get(tree_uuid).cloned()
             .ok_or(TraphError::Tree { cell_id: self.cell_id.clone(), func_name: _f, tree_uuid: *tree_uuid }.into())
+    }
+    pub fn delete_tree(&self, tree_uuid: &Uuid) {
+        let _f = "delete_tree";
+        let mut locked = self.stacked_trees.lock().unwrap();
+        locked.remove(tree_uuid);
     }
     pub fn _get_port_tree(&self, port_tree_id: PortTreeID) -> Result<&PortTree, Error> {
         let _f = "get_port_tree";
