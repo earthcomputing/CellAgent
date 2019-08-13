@@ -19,8 +19,10 @@ pub type PACKET = Packet;
 //pub type PePeError = mpsc::SendError<PeToPePacket>;
 // CellAgent to Cmodel (index, tree_uuid, user_mask, direction, bytes)
 #[derive(Debug, Clone, Serialize)]
-pub enum CaToCmBytes { Entry(RoutingTableEntry),
+pub enum CaToCmBytes {
     Bytes(CATOCM),
+    Delete(Uuid),
+    Entry(RoutingTableEntry),
     Reroute(REROUTE),
     Status(STATUS),
     TunnelPort(TUNNELPORT),
@@ -32,6 +34,7 @@ pub type CmFromCa = mpsc::Receiver<CaToCmBytes>;
 // Cmodel to PacketEngine
 #[derive(Debug, Clone, Serialize)]
 pub enum CmToPePacket {
+    Delete(Uuid),
     Entry(RoutingTableEntry),
     Packet((Mask, Packet)),
     Reroute(REROUTE),

@@ -17,6 +17,7 @@ use crate::config::{CONFIG, BASE_TREE_NAME, CONNECTED_PORTS_TREE_NAME, CONTROL_T
 use crate::dal::{add_to_trace, fork_trace_header, update_trace_header};
 use crate::ec_message::{Message, MsgHeader, MsgTreeMap, MsgType,
               InterapplicationMsg,
+              DeleteTreeMsg,
               DiscoverMsg, DiscoverDMsg, DiscoverDType,
               FailoverMsg, FailoverDMsg, FailoverMsgPayload, FailoverResponse,
               HelloMsg,
@@ -263,6 +264,28 @@ impl CellAgent {
         name_map.insert(allowed_tree_id, allowed_tree.clone());
         locked.insert(sender_id, name_map);
     }
+    fn get_sender_ids(&self) -> Vec<SenderID> {
+        let locked = self.tree_name_map.lock().unwrap();
+        locked.keys().cloned().collect::<Vec<SenderID>>()
+    }
+    fn delete_tree_name_map_item(&mut self, delete_tree_id: &TreeID)
+            -> Result<(), Error> {
+        let mut locked1 = self.tree_name_map.lock().unwrap();
+        let keys = self.get_sender_ids();
+        keys
+            .iter()
+            .for_each(|sender_id|
+                if let Some(tree_name_map) = locked1.get_mut(&sender_id) {
+                    if let Some(name) = tree_name_map.remove(delete_tree_id) {
+                        let mut locked2 = self.name_tree_map.lock().unwrap();
+                        if let Some(name_tree_map) = locked2.get_mut(&sender_id) {
+                            name_tree_map.remove(name.get_name());
+                        }
+                    }
+                }
+            );
+        Ok(())
+    }
     fn name_from_tree(&self, sender_id: SenderID, tree_id: TreeID) -> Result<AllowedTree, Error> {
         let _f = "name_from_tree";
         let locked = self.tree_name_map.lock().unwrap();
@@ -297,6 +320,25 @@ impl CellAgent {
         }
         self.base_tree_map.insert(stacked_tree_id, base_tree_id);
         self.tree_map.insert(stacked_tree_id.get_uuid(), base_tree_id.get_uuid());
+    }
+    fn get_tree(&self, port_tree_id: PortTreeID) -> Result<Option<Tree>, Error> {
+        let _f = "get_tree";
+        Ok(self.get_traph(port_tree_id)?
+            .get_stacked_trees().lock().unwrap()
+            .get(&port_tree_id.get_uuid())
+            .cloned())
+    }
+    fn get_parent_tree_entry(&self, child_port_tree_id: PortTreeID)
+            -> Result<Option<RoutingTableEntry>, Error> {
+        let _f = "get_parent_tree_entry";
+        Ok(self.get_tree(child_port_tree_id)?
+            .map(|tree| tree.get_table_entry()))
+    }
+    fn get_parent_tree_id(&self, child_port_tree_id: PortTreeID) -> Result<Option<TreeID>, Error> {
+        Ok(self.get_tree(child_port_tree_id)?
+            .map(|tree| tree
+                .get_parent_port_tree_id()
+                .to_tree_id()))
     }
     fn get_base_tree_id(&self, port_tree_id: PortTreeID) -> Result<TreeID, Error> {
         let _f = "get_base_tree_id";
@@ -824,6 +866,34 @@ impl CellAgent {
         }
         Ok(())
     }
+    fn delete_tree(&mut self, delete_tree_id: &TreeID) -> Result<(), Error>{
+        let _f = "delete_tree";
+        let uuid = delete_tree_id.get_uuid();
+        self.ca_to_cm.send(CaToCmBytes::Delete(uuid)).context(CellagentError::Chain { func_name: _f, comment: S("")})?;
+        println!("Cellagent {}: {} deleting tree {}", self.cell_id, _f, delete_tree_id);
+        let traph = self.get_traph_mut(delete_tree_id.to_port_tree_id_0())?;
+        traph.delete_tree(&uuid);
+        // The following is needed to protect against reused tree names
+        self.delete_tree_name_map_item(delete_tree_id)?;
+        Ok(())
+    }
+    pub fn process_delete_tree_msg(&mut self, delete_tree_id: &TreeID)
+            -> Result<(), Error> {
+        let _f = "process_delete_tree_msg";
+        if *delete_tree_id != self.my_tree_id { // Can't delete a black tree from an app message
+            self.delete_tree(delete_tree_id)?;
+            {
+                if CONFIG.trace_options.all || CONFIG.trace_options.ca {
+                    let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "ca_to_vm_app" };
+                    let trace = json!({ "cell_id": &self.cell_id, "delete_tree": delete_tree_id });
+                    let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
+                }
+            }
+        } else {
+            return Err(CellagentError::MayNotDelete { func_name: _f, cell_id: self.cell_id, tree_id: delete_tree_id.clone() }.into());
+        }
+        Ok(())
+    }
     pub fn process_discover_msg(&mut self, msg: &DiscoverMsg, port_no: PortNo)
             -> Result<(), Error> {
         let _f = "process_discover_msg";
@@ -1344,10 +1414,36 @@ impl CellAgent {
         self.send_msg(tree_id, &msg, DEFAULT_USER_MASK)?;
         Ok(())
     }
-    pub fn app_delete_tree(&self, _app_msg: &AppDeleteTreeMsg, _sender_id: SenderID) -> Result<(), Error> {
+    pub fn app_delete_tree(&mut self, app_msg: &AppDeleteTreeMsg, sender_id: SenderID) -> Result<(), Error> {
         let _f = "app_delete_tree";
-        // Needs may_send test
-        Err(UtilityError::Unimplemented { func_name: _f, feature: S("AppMsgType::DeleteTreeMsg")}.into())
+        let delete_tree_name = app_msg.get_delete_tree_name();
+        let delete_tree_id = self.tree_from_name(sender_id, delete_tree_name)?;
+        println!("Cellagent {}: {} deleting tree {}", self.cell_id, _f, delete_tree_id);
+        let delete_port_tree_id = delete_tree_id.to_port_tree_id_0();
+        if delete_tree_name.get_name() != BASE_TREE_NAME {  // Can't delete base tree
+            // Must send on parent tree since some tree members can't read on delete_tree
+            if let Some(parent_tree_id) = self.get_parent_tree_id(delete_port_tree_id)? {
+                if let Some(is_root) = self.get_parent_tree_entry(delete_port_tree_id)?
+                    .map(|entry| entry.get_parent() == PortNo(0)) {
+                    if is_root {
+                        let msg = DeleteTreeMsg::new(sender_id, delete_tree_id);
+                        {
+                            if CONFIG.debug_options.all || CONFIG.debug_options.process_msg {   // Debug
+                                let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "ca_got_app_interapplication_msg" };
+                                let trace = json!({ "cell_id": &self.cell_id, "delete_tree_id": delete_tree_id, "msg": msg.value() });
+                                let _ = add_to_trace(TraceType::Debug, trace_params, &trace, _f);
+                                println!("Cellagent {}: {} sending on tree {} delete tree msg {}", self.cell_id, _f, parent_tree_id, msg);
+                            }
+                        }
+                        self.send_msg(parent_tree_id, &msg, DEFAULT_USER_MASK)?;
+                        self.delete_tree(&delete_tree_id)?;
+                    }
+                }
+            }
+        } else {
+            return Err(CellagentError::TreeNotAllowed { func_name: _f, cell_id: self.cell_id, sender_id, target_tree: delete_tree_name.clone() }.into());
+        }
+        Ok(())
     }
     pub fn app_manifest(&mut self, app_msg: &AppManifestMsg, sender_id: SenderID) -> Result<(), Error> {
         let _f = "app_manifest";
@@ -1642,6 +1738,8 @@ pub enum CellagentError {
     FailoverPort { func_name: &'static str, cell_id: CellID, port_tree_id: PortTreeID },
 //    #[fail(display = "CellagentError::ManifestVms {}: No VMs in manifest for cell {}", func_name, cell_id)]
 //    ManifestVms { cell_id: CellID, func_name: &'static str },
+    #[fail(display = "CellagentError::MayNotSend {}: Cell {} does not have permission to delete tree {}", func_name, cell_id, tree_id)]
+    MayNotDelete { cell_id: CellID, func_name: &'static str, tree_id: TreeID },
     #[fail(display = "CellagentError::MayNotSend {}: Cell {} does not have permission to send on tree {}", func_name, cell_id, tree_id)]
     MayNotSend { cell_id: CellID, func_name: &'static str, tree_id: TreeID },
     #[fail(display = "CellagentError::Message {}: Malformed request {:?} from border port on cell {}", func_name, msg, cell_id)]

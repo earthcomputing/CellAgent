@@ -183,17 +183,16 @@ pub struct AppDeleteTreeMsg {
     payload: AppDeleteTreeMsgPayload
 }
 impl AppDeleteTreeMsg {
-    pub fn new(sender_name: &str, is_ait: bool, target_tree: &AllowedTree,
-               delete_tree_name: &AllowedTree, direction: AppMsgDirection)
+    pub fn new(sender_name: &str, is_ait: bool, target_tree: &AllowedTree, direction: AppMsgDirection)
             -> AppDeleteTreeMsg {
-        let allowed_trees = &vec![delete_tree_name.clone()];
+        let allowed_trees = &vec![target_tree.clone()];
         let msg_type = AppMsgType::AppDeleteTreeMsg;
         let header = AppMsgHeader::new(sender_name, target_tree, is_ait,
                                        msg_type, direction, allowed_trees);
-        let payload = AppDeleteTreeMsgPayload::new(&delete_tree_name);
+        let payload = AppDeleteTreeMsgPayload::new();
         AppDeleteTreeMsg { header, payload }
     }
-    pub fn get_delete_tree_name(&self) -> &AllowedTree { self.payload.get_delete_tree_name() }
+    pub fn get_delete_tree_name(&self) -> &AllowedTree { self.header.get_target_tree_name() }
 }
 #[typetag::serde]
 impl AppMessage for AppDeleteTreeMsg {
@@ -219,20 +218,17 @@ impl fmt::Display for AppDeleteTreeMsg {
     }
 }
 #[derive(Debug, Clone, Hash, Serialize, Deserialize)]
-pub struct AppDeleteTreeMsgPayload {
-    delete_tree_name: AllowedTree,
-}
+pub struct AppDeleteTreeMsgPayload {}
 impl AppDeleteTreeMsgPayload {
-    fn new(delete_tree_name: &AllowedTree) -> AppDeleteTreeMsgPayload {
-        AppDeleteTreeMsgPayload { delete_tree_name: delete_tree_name.clone() }
+    fn new() -> AppDeleteTreeMsgPayload {
+        AppDeleteTreeMsgPayload {}
     }
-    pub fn get_delete_tree_name(&self) -> &AllowedTree { &self.delete_tree_name }
 }
 #[typetag::serde]
 impl AppMsgPayload for AppDeleteTreeMsgPayload {}
 impl fmt::Display for AppDeleteTreeMsgPayload {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "Delete tree {}", self.delete_tree_name)
+        write!(f, "")
     }
 }
 #[derive(Debug, Clone, Serialize, Deserialize)]

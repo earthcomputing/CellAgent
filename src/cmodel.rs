@@ -68,6 +68,11 @@ impl Cmodel {
                         let trace = json!({"cell_id": &self.cell_id, "bytes": bytes });
                         let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
                     },
+                    CaToCmBytes::Delete(uuid) => {
+                        let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "cm_from_ca_bytes(delete)" };
+                        let trace = json!({ "cell_id": &self.cell_id, "uuid": uuid });
+                        let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
+                    },
                     CaToCmBytes::Entry(entry) => {
                         let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "cm_from_ca_bytes(entry)" };
                         let trace = json!({ "cell_id": &self.cell_id, "entry": entry });
@@ -107,6 +112,16 @@ impl Cmodel {
                     }
                 }
                 self.cm_to_pe.send(CmToPePacket::Reroute((broken_port, new_parent, number_of_packets)))?;
+            },
+            CaToCmBytes::Delete(uuid) => {
+                {
+                    if CONFIG.trace_options.all || CONFIG.trace_options.cm {
+                        let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "cm_to_pe_delete" };
+                        let trace = json!({ "cell_id": &self.cell_id, "uuid": uuid });
+                        let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
+                    }
+                }
+                self.cm_to_pe.send(CmToPePacket::Delete(uuid))?;
             },
             CaToCmBytes::Entry(entry) => {
                 {
@@ -157,12 +172,14 @@ impl Cmodel {
                     }
                 }
                 for packet in packets {
-                    if CONFIG.trace_options.all || CONFIG.trace_options.cm {
-                        let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "cm_to_pe_packet" };
-                        let trace = json!({ "cell_id": &self.cell_id, "msg": packet });
-                        let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
+                    {
+                        if CONFIG.trace_options.all || CONFIG.trace_options.cm {
+                            let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "cm_to_pe_packet" };
+                            let trace = json!({ "cell_id": &self.cell_id, "user_mask": user_mask, "msg": packet });
+                            let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
+                        }
+                        self.cm_to_pe.send(CmToPePacket::Packet((user_mask, packet)))?;
                     }
-                    self.cm_to_pe.send(CmToPePacket::Packet((user_mask, packet)))?;
                 }
             },
         }
@@ -236,7 +253,7 @@ packets: Vec<Packet>,
                 if CONFIG.trace_options.all || CONFIG.trace_options.cm {
                     let msg: Box<dyn Message> = serde_json::from_str(&bytes.to_string()?)?;
                     let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "cm_to_ca_bytes" };
-                    let trace = json!({ "cell_id": &self.cell_id, "msg": msg.to_string() });
+                    let trace = json!({ "cell_id": &self.cell_id, "msg": msg });
                     let _ = add_to_trace(TraceType::Debug, trace_params, &trace, _f); // sender side, dup
                     if CONFIG.debug_options.all || CONFIG.debug_options.cm_to_ca {
                         let packet_count = packets[0].get_count();
