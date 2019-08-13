@@ -30,14 +30,18 @@ impl RoutingTable {
         if !self.entries.contains_key(&uuid) { self.order.push(uuid); } // So I can print entries in order
         self.entries.insert(uuid, entry);
     }
+    pub fn delete_entry(&mut self, uuid: Uuid) {
+        let _f = "delete_entry";
+        self.entries.remove(&uuid);
+    }
 }
 impl fmt::Display for RoutingTable {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let mut s = format!("\nRouting Table");
         write!(s, "\n Tree UUID  In Use Send? Parent Mask ")?;
         for key in &self.order {
-            let entry = self.entries[key];
-            write!(s, "\n{}", entry)?;
+            let entry = self.entries.get(key);
+            if entry.is_some() { write!(s, "\n{}", entry.unwrap())?; }
         }
         write!(f, "{}", s)
     }
