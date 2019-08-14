@@ -26,6 +26,9 @@ impl Tree {
     }
     pub fn get_port_tree_id(&self) -> PortTreeID { self.port_tree_id }
     pub fn get_parent_port_tree_id(&self) -> PortTreeID { self.parent_port_tree_id }
+    pub fn set_parent_port_tree_id(&mut self, new_parent_port_tree_id: PortTreeID) {
+        self.parent_port_tree_id = new_parent_port_tree_id;
+    }
     //pub fn get_base_tree_id(&self) -> TreeID { self.base_tree_id }/pub fn get_parent_tree_id(&self) -> TreeID { self.parent_tree_id }
     pub fn get_stacked_tree_ids(&self) -> &Vec<PortTreeID> { &self.stacked_tree_ids }
     pub fn get_uuid(&self) -> Uuid { self.port_tree_id.get_uuid() }
