@@ -872,7 +872,7 @@ impl CellAgent {
         self.ca_to_cm.send(CaToCmBytes::Delete(uuid)).context(CellagentError::Chain { func_name: _f, comment: S("")})?;
         println!("Cellagent {}: {} deleting tree {}", self.cell_id, _f, delete_tree_id);
         let traph = self.get_traph_mut(delete_tree_id.to_port_tree_id_0())?;
-        traph.delete_tree(&uuid);
+        traph.delete_tree(delete_tree_id);
         // The following is needed to protect against reused tree names
         self.delete_tree_name_map_item(delete_tree_id)?;
         Ok(())

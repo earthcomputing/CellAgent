@@ -59,10 +59,22 @@ impl Traph {
         self.stacked_trees.lock().unwrap().get(tree_uuid).cloned()
             .ok_or(TraphError::Tree { cell_id: self.cell_id.clone(), func_name: _f, tree_uuid: *tree_uuid }.into())
     }
-    pub fn delete_tree(&self, tree_uuid: &Uuid) {
+    pub fn delete_tree(&self, delete_tree_id: &TreeID) {
         let _f = "delete_tree";
+        let delete_tree_uuid = delete_tree_id.get_uuid();
         let mut locked = self.stacked_trees.lock().unwrap();
-        locked.remove(tree_uuid);
+        if let Some(tree) = locked.remove(&delete_tree_uuid) {
+            // Reset parent for any tree stacked on deleted tree
+            let parent_port_tree_id = tree.get_parent_port_tree_id();
+            locked
+                .iter_mut()
+                .for_each(|(_uuid, tree)| {
+                    if parent_port_tree_id.to_tree_id().get_uuid() == delete_tree_uuid {
+                        tree.set_parent_port_tree_id(parent_port_tree_id);
+                    }
+                });
+        }
+        
     }
     pub fn _get_port_tree(&self, port_tree_id: PortTreeID) -> Result<&PortTree, Error> {
         let _f = "get_port_tree";
