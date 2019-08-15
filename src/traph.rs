@@ -35,7 +35,7 @@ impl Traph {
         let mut elements = Vec::new();
         for i in 0..=*no_ports {
             let port_number = PortNo(i as u8).make_port_number(no_ports).context(TraphError::Chain { func_name: "new", comment: S("")})?;
-            elements.push(TraphElement::default(port_number));
+            elements.push(TraphElement::default_for_port(port_number));
         }
         let mut entry = RoutingTableEntry::default();
         entry.add_child(PortNumber::new0());
@@ -438,6 +438,7 @@ pub enum PortState {
     Pruned,
     Broken
 }
+impl Default for PortState { fn default() -> Self { PortState::Unknown } }
 impl fmt::Display for PortState {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let s = match *self {

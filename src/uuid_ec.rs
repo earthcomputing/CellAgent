@@ -20,7 +20,7 @@ const AIT_BYTE: usize = 0;
 const PORT_NO_BYTE: usize = 1;
 
 type Bytes = [u8; 16];
-#[derive(Copy, Clone, Hash, Eq, Serialize, Deserialize)]
+#[derive(Copy, Clone, Default, Hash, Eq, Serialize, Deserialize)]
 pub struct Uuid {
     uuid: uuid::Uuid
 }
