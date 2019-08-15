@@ -20,12 +20,6 @@ impl RoutingTableEntry {
         RoutingTableEntry { tree_uuid: port_tree_id.get_uuid(), parent: parent.get_port_no(),
             may_send, inuse, mask }
     }
-    pub fn default() -> RoutingTableEntry {
-        let port_number = PortNumber::new0();
-        let tree_id = TreeID::new("default").expect("The string 'default' is always a valid tree name");
-        let port_tree_id = tree_id.to_port_tree_id_0();
-        RoutingTableEntry::new(port_tree_id, false, port_number, Mask::empty(), true)
-    }
     pub fn is_in_use(&self) -> bool { self.inuse }
     pub fn may_send(&self) -> bool { self.may_send }
     pub fn enable_send(&mut self) { self.may_send = true; }
@@ -69,6 +63,14 @@ impl RoutingTableEntry {
     }
     fn or_with_mask(&mut self, mask: Mask) { self.mask = self.mask.or(mask); }
     fn and_with_mask(&mut self, mask: Mask) { self.mask = self.mask.and(mask); }
+}
+impl Default for RoutingTableEntry {
+    fn default() -> Self {
+        let tree_id = TreeID::default();
+        let port_tree_id = tree_id.to_port_tree_id_0();
+        RoutingTableEntry::new(port_tree_id, false, PortNumber::default(),
+                               Mask::default(), true)
+    }
 }
 impl fmt::Display for RoutingTableEntry {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {

@@ -4,7 +4,7 @@ use crate::config::{CellQty, PathLength};
 use crate::traph::{PortState};
 use crate::utility::{Path, PortNo, PortNumber};
 
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, Default)]
 pub struct TraphElement {
     port_no: PortNo,
     is_connected: bool,
@@ -19,13 +19,13 @@ impl TraphElement {
         let _f = "new";
         TraphElement { port_no,  is_connected, is_broken: false, state: status, hops, path }
     }
-    pub fn default(port_number: PortNumber) -> TraphElement {
-        let _f = "default";
-        let port_no = port_number.get_port_no();
-        TraphElement::new(false, port_no, PortState::Unknown,
-                          PathLength(CellQty(0)), Path::new0())
+    pub fn default_for_port(port_number: PortNumber) -> TraphElement {
+        let mut element = TraphElement::default();
+        element.set_port_no(port_number);
+        element
     }
     pub fn get_port_no(&self) -> PortNo { self.port_no }
+    pub fn set_port_no(&mut self, port_number: PortNumber) { self.port_no = port_number.get_port_no(); }
     pub fn get_hops(&self) -> PathLength { self.hops }
     pub fn hops_plus_one(&self) -> PathLength { PathLength(CellQty((self.hops.0).0 + 1)) }
     pub fn get_path(&self) -> Path { self.path }

@@ -104,7 +104,7 @@ impl Name for TreeID {
     fn create_from_string(&self, name: &str) -> TreeID { TreeID { name: str_to_chars(name), uuid: Uuid::new() } }
 }
 impl Default for TreeID {
-    fn default() -> TreeID {
+    fn default() -> Self {
         TreeID { name: str_to_chars("Default"), uuid: Uuid::new() }
     }
 }
@@ -136,6 +136,11 @@ impl Name for PortTreeID {
     fn get_name(&self) -> String { str_from_chars(self.name) }
     fn get_uuid(&self) -> Uuid { self.uuid }
     fn create_from_string(&self, _name: &str) -> PortTreeID { unimplemented!() }
+}
+impl Default for PortTreeID {
+    fn default() -> Self {
+        TreeID::default().to_port_tree_id_0()
+    }
 }
 impl fmt::Display for PortTreeID {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
