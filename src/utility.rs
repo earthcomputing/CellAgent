@@ -61,6 +61,7 @@ impl Mask {
             .collect::<Vec<_>>()
     }
 }
+impl Default for Mask { fn default() -> Self { Mask::empty() } }
 impl fmt::Display for Mask {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, " {:016.b}", *self.mask)
@@ -74,6 +75,7 @@ impl PortNo {
     }
     pub fn as_usize(self) -> usize { self.0 as usize }
 }
+impl Default for PortNo { fn default() -> Self { PortNo(0) } }
 impl Deref for PortNo { type Target = u8; fn deref(&self) -> &Self::Target { &self.0 } }
 impl fmt::Display for PortNo {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -94,7 +96,7 @@ impl fmt::Display for CellType {
         write!(f, "{}", s)
     }
 }
-#[derive(Debug, Copy, Clone, Hash, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Copy, Clone, Default, Hash, PartialEq, Eq, Serialize, Deserialize)]
 pub struct PortNumber { port_no: PortNo }
 impl PortNumber {
     pub fn new(no: PortNo, no_ports: PortQty) -> Result<PortNumber, Error> {
@@ -111,7 +113,7 @@ impl PortNumber {
 impl fmt::Display for PortNumber {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result { write!(f, "{}", *self.port_no) }
 }
-#[derive(Debug, Copy, Clone, Eq, PartialEq, Hash, Serialize, Deserialize)]
+#[derive(Debug, Copy, Clone, Default, Eq, PartialEq, Hash, Serialize, Deserialize)]
 pub struct Path { port_number: PortNumber }
 impl Path {
     pub fn new(port_no: PortNo, no_ports: PortQty) -> Result<Path, Error> {

@@ -108,7 +108,7 @@ impl CellAgent {
         let mut no_packets = Vec::new();
         (1..=(*CONFIG.max_num_phys_ports_per_cell) as usize)
             .for_each(|_| no_packets.push(NumberOfPackets::new()));
-        let my_entry = RoutingTableEntry::default().add_child(PortNumber::new0());
+        let my_entry = RoutingTableEntry::default().add_child(PortNumber::default());
         Ok(CellAgent { cell_id, my_tree_id, cell_type, config, no_ports,
             control_tree_id, connected_tree_id, tree_vm_map: HashMap::new(), ca_to_vms: HashMap::new(),
             traphs: HashMap::new(), traphs_mutex: Arc::new(Mutex::new(HashMap::new())),
@@ -833,6 +833,24 @@ impl CellAgent {
             self.add_tree_name_map_item(sender_id, allowed_tree, tree_id);
         }
     }
+    fn delete_tree(&mut self, delete_tree_id: &TreeID) -> Result<(), Error>{
+        let _f = "delete_tree";
+        {
+            if CONFIG.trace_options.all || CONFIG.trace_options.ca {
+                let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "ca_to_cm_delete_tree" };
+                let trace = json!({ "cell_id": &self.cell_id, "delete_tree": delete_tree_id });
+                let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
+            }
+        }
+        let uuid = delete_tree_id.get_uuid();
+        self.ca_to_cm.send(CaToCmBytes::Delete(uuid)).context(CellagentError::Chain { func_name: _f, comment: S("")})?;
+        println!("Cellagent {}: {} deleting tree {}", self.cell_id, _f, delete_tree_id);
+        let traph = self.get_traph_mut(delete_tree_id.to_port_tree_id_0())?;
+        traph.delete_tree(delete_tree_id);
+        // The following is needed to protect against reused tree names
+        self.delete_tree_name_map_item(delete_tree_id)?;
+        Ok(())
+    }
     pub fn process_interapplication_msg(&mut self, ec_app_msg: &InterapplicationMsg, port_no: PortNo)
             -> Result<(), Error> {
         let _f = "process_interapplication_msg";
@@ -866,29 +884,11 @@ impl CellAgent {
         }
         Ok(())
     }
-    fn delete_tree(&mut self, delete_tree_id: &TreeID) -> Result<(), Error>{
-        let _f = "delete_tree";
-        let uuid = delete_tree_id.get_uuid();
-        self.ca_to_cm.send(CaToCmBytes::Delete(uuid)).context(CellagentError::Chain { func_name: _f, comment: S("")})?;
-        println!("Cellagent {}: {} deleting tree {}", self.cell_id, _f, delete_tree_id);
-        let traph = self.get_traph_mut(delete_tree_id.to_port_tree_id_0())?;
-        traph.delete_tree(delete_tree_id);
-        // The following is needed to protect against reused tree names
-        self.delete_tree_name_map_item(delete_tree_id)?;
-        Ok(())
-    }
     pub fn process_delete_tree_msg(&mut self, delete_tree_id: &TreeID)
             -> Result<(), Error> {
         let _f = "process_delete_tree_msg";
         if *delete_tree_id != self.my_tree_id { // Can't delete a black tree from an app message
             self.delete_tree(delete_tree_id)?;
-            {
-                if CONFIG.trace_options.all || CONFIG.trace_options.ca {
-                    let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "ca_to_vm_app" };
-                    let trace = json!({ "cell_id": &self.cell_id, "delete_tree": delete_tree_id });
-                    let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
-                }
-            }
         } else {
             return Err(CellagentError::MayNotDelete { func_name: _f, cell_id: self.cell_id, tree_id: delete_tree_id.clone() }.into());
         }
