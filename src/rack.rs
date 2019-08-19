@@ -16,7 +16,7 @@ use crate::link::{Link};
 use crate::nalcell::{NalCell};
 use crate::name::{CellID, LinkID};
 use crate::port::{Port};
-use crate::utility::{CellNo, CellConfig, Edge, S, TraceHeaderParams, TraceType, get_geometry};
+use crate::utility::{CellNo, CellConfig, Edge, S, TraceHeaderParams, TraceType};
 
 #[derive(Debug)]
 pub struct Rack {
@@ -28,7 +28,6 @@ impl Rack {
     pub fn initialize(&mut self, blueprint: &Blueprint)  -> Result<Vec<JoinHandle<()>>, Error> {
         let _f = "initialize";
         let num_cells = blueprint.get_ncells();
-        let geometry = get_geometry(num_cells);  // A cheat used for visualization
         let edge_list = blueprint.get_edge_list();
         if *num_cells < 1  { return Err(RackError::Cells{ num_cells, func_name: _f }.into()); }
         if edge_list.len() < *num_cells - 1 { return Err(RackError::Edges { nlinks: LinkQty(edge_list.len()), func_name: _f }.into() ); }
@@ -46,7 +45,7 @@ impl Rack {
                     if CONFIG.trace_options.all || CONFIG.trace_options.dc {
                         let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "border_cell_start" };
                         let cell_id = nal_cell.get_id();
-                        let trace = json!({ "cell_id": cell_id, "cell_number": cell_no, "location":  geometry.2.get(*cell_no)});
+                        let trace = json!({ "cell_id": cell_id, "cell_number": cell_no, "location":  CONFIG.geometry.get(*cell_no)});
                         let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
                     }
                 }
@@ -68,7 +67,7 @@ impl Rack {
                     if CONFIG.trace_options.all || CONFIG.trace_options.dc {
                         let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "interior_cell_start" };
                         let cell_id = nal_cell.get_id();
-                        let trace = json!({ "cell_id": cell_id, "cell_number": cell_no, "location": geometry.2.get(*cell_no as usize) });
+                        let trace = json!({ "cell_id": cell_id, "cell_number": cell_no, "location": CONFIG.geometry.get(*cell_no as usize) });
                         let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
                     }
                 }
