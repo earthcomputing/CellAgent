@@ -366,8 +366,9 @@ pub fn _string_to_object(string: &str) -> Result<Value, Error> {
     Ok(v)
 }
 // Used to get nice layouts in display - gives (row,col) for each cell
-pub fn get_geometry(num_cells: CellQty) -> (usize, usize, Vec<(usize, usize)>) {
-    let geometry = match num_cells {
+pub fn get_geometry(num_cells: CellQty) -> (usize, usize) {
+    // Keep these definitions here so they don't get lost, actually defined in config file
+    let _geometry = match num_cells {
         CellQty(3)  => vec![(0,0), (0,2), (1,1)],
         CellQty(4)  => vec![(0,0), (0,1), (1,0), (1,1)],
         CellQty(10) => vec![(0,0), (0,1), (0,2), (0,3), (0,4),
@@ -380,18 +381,18 @@ pub fn get_geometry(num_cells: CellQty) -> (usize, usize, Vec<(usize, usize)>) {
                             (5,0), (5,1), (5,2), (5,3), (5,4), (5,6)],
         _ => panic!("Invalid number of cells")
     };
-    let max_x = geometry
+    let max_x = CONFIG.geometry
         .iter()
         .max_by_key(|xy| xy.0)
         .map(|xy| xy.0 +1)
         .unwrap_or(0);
-    let max_y = geometry
+    let max_y = CONFIG.geometry
         .iter()
         .max_by_key(|xy| xy.1)
         .map(|xy| xy.1 + 1)
         .unwrap_or(0);
-    if geometry.len() != *num_cells { panic!(format!("Topology has {} entries for {} cells", geometry.len(), *num_cells)) };
-    (max_x, max_y, geometry)
+    if CONFIG.geometry.len() != *num_cells { panic!(format!("Topology has {} entries for {} cells", CONFIG.geometry.len(), *num_cells)) };
+    (max_x, max_y)
 }
 pub fn _dbg_get_thread_id() -> u64 { TraceHeader::parse(thread::current().id()) }
 // There are so many places in my code where it's more convenient

@@ -38,7 +38,7 @@ impl Noc {
         {
             if CONFIG.trace_options.all || CONFIG.trace_options.noc {
                 // For reasons I can't understand, the trace record doesn't show up when generated from main.
-                let (rows, cols, _geometry) = get_geometry(blueprint.get_ncells());
+                let (rows, cols) = get_geometry(blueprint.get_ncells());
                 let trace_params = &TraceHeaderParams { module: "src/main.rs", line_no: line!(), function: "MAIN", format: "trace_schema" };
                 let trace = json!({ "schema_version": SCHEMA_VERSION, "ncells": blueprint.get_ncells(), "rows": rows, "cols": cols });
                 let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
