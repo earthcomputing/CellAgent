@@ -1,7 +1,9 @@
 Cargo.lock
-actix_server.iml
+manifest.txt
 out
 target
+test.json
 .idea
+node_modules
 .vscode
 bin
