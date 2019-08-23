@@ -1,14 +1,17 @@
 // This file contains hacks that represent functions of the DAL.
 // which will be replaced by actual distributed storage algorithms.
 use std::{cell::RefCell,
+          collections::{HashSet},
           fs::{File, OpenOptions},
           io::Write};
 
+use actix_rt::{System, SystemRunner};
+use actix_web::client::{Client};
+use futures::{future::lazy, Future};
 use lazy_static::lazy_static;
 use rdkafka::{config::ClientConfig, producer::{FutureProducer, FutureRecord}};
 use serde_json;
 use serde_json::{Value};
-use futures::Future;
 
 use crate::config::{CONFIG};
 use crate::utility::{S, TraceHeader, TraceHeaderParams, TraceType};
@@ -28,6 +31,9 @@ lazy_static! {
                         .create()
                         .expect("Dal: Problem setting up Kafka");
 }
+thread_local!{ static SYSTEM: RefCell<SystemRunner> = RefCell::new(System::new("Tracer")); }
+thread_local!{ static CLIENT: Client = Client::new(); }
+thread_local!{ static SKIP: RefCell<HashSet<String>> = RefCell::new(HashSet::new()); }
 
 pub fn add_to_trace(trace_type: TraceType, trace_params: &TraceHeaderParams,
                     trace_body: &Value, caller: &str) -> Result<(), Error> {
@@ -52,6 +58,7 @@ pub fn add_to_trace(trace_type: TraceType, trace_params: &TraceHeaderParams,
     });
     let trace_header = TRACE_HEADER.with(|t| t.borrow().clone());
     let trace_record = TraceRecord { header: &trace_header, body: trace_body };
+    trace_it(&trace_record)?;
     let line = if FOR_EVAL {
         serde_json::to_string(&trace_record).context(DalError::Chain { func_name: "add_to_trace", comment: S(caller) })?
     } else {
@@ -70,6 +77,43 @@ pub fn add_to_trace(trace_type: TraceType, trace_params: &TraceHeaderParams,
                 Err(e) => Err(DalError::Kafka { func_name: _f, kafka_error: S(e) }.into())
             }
         });
+    Ok(())
+}
+fn trace_it(trace_record: &TraceRecord) -> Result<(), Error> {
+    let _f = "trace_it";
+    let header = trace_record.header;
+    let body = trace_record.body;
+    let cell_id = body.get("cell_id");
+    let format = S(header.format());
+     SKIP.with(|skip| {
+        let mut s = skip.borrow_mut();
+        if !s.contains(&format) {
+            println!("Cell {:?}: Format {}", cell_id, format);
+            let _ = SYSTEM.with(|sys| {
+                let mut system = sys.borrow_mut();
+                system.block_on(lazy(|| {
+                    CLIENT.with(|client| {
+                        client.post("http://localhost:8088/add")
+                            .header("User-Agent", "Actix-web")
+                            .send_json(&json!({"id":3,"row":7,"col":8}))
+                            .map_err(|e| println!("Error from server {:?}", e))
+                            .and_then(|response| {
+                                if !response.status().is_success() {
+                                    s.insert(format.clone());
+                                }
+                                Ok(())
+                            })
+                    })
+                }))
+            });
+        }
+    });
+    SKIP.with(|skip| {
+        let mut s = skip.borrow_mut();
+        if !s.contains(&format) {
+            s.insert(format.clone());
+        }
+    });
     Ok(())
 }
 #[derive(Debug, Clone, Serialize)]
