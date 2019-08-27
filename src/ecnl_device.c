@@ -872,6 +872,13 @@ static void set_next_id(struct sk_buff *skb, u32 nextID) {
     eth->h_source[5] = 0xff & (nextID);
 }
 
+static void fetch_entry(ecnl_device_t *e_dev, u32 id, ecnl_table_entry_t *entry) {
+    unsigned long flags;
+    spin_lock_irqsave(&e_dev->ecnl_lock, flags);
+    memcpy(entry, &e_dev->ecnl_current_table[id], sizeof(ecnl_table_entry_t));
+    spin_unlock_irqrestore(&e_dev->ecnl_lock, flags);
+}
+
 static int ecnl_receive_skb(int module_id, int index, struct sk_buff *skb) {
     struct net_device *plug_in = ecnl_devices[module_id];
     if (plug_in == NULL) {
@@ -910,10 +917,7 @@ static int ecnl_receive_skb(int module_id, int index, struct sk_buff *skb) {
     }
 
     ecnl_table_entry_t entry; // FIXME
-    unsigned long flags;
-    spin_lock_irqsave(&e_dev->ecnl_lock, flags);
-    memcpy(&entry, &e_dev->ecnl_current_table[id], sizeof(ecnl_table_entry_t));
-    spin_unlock_irqrestore(&e_dev->ecnl_lock, flags);
+    fetch_entry(e_dev, id, &entry);
 
     u16 port_vector = entry.info.port_vector;
     if (direction == 0) {  // forward direction
@@ -1048,10 +1052,7 @@ static void ecnl_forward_ait_message(int module_id, int drv_index, struct sk_buf
             u16 port_vector;
 
             ecnl_table_entry_t entry; // FIXME
-            unsigned long flags;
-            spin_lock_irqsave(&e_dev->ecnl_lock, flags);
-            memcpy(&entry, &e_dev->ecnl_current_table[id], sizeof(ecnl_table_entry_t));
-            spin_unlock_irqrestore(&e_dev->ecnl_lock, flags);
+            fetch_entry(e_dev, id, &entry);
 
             port_vector = entry.info.port_vector;
             if (direction == 0) {  // forward direction
@@ -1217,10 +1218,7 @@ static int ecnl_hard_start_xmit(struct sk_buff *skb, struct net_device *plug_in)
     }
 
     ecnl_table_entry_t entry; // FIXME
-    unsigned long flags;
-    spin_lock_irqsave(&e_dev->ecnl_lock, flags);
-    memcpy(&entry, &e_dev->ecnl_current_table[id], sizeof(ecnl_table_entry_t));
-    spin_unlock_irqrestore(&e_dev->ecnl_lock, flags);
+    fetch_entry(e_dev, id, &entry);
 
     u16 port_vector = entry.info.port_vector;
     if (direction == 0) {  // forward direction
