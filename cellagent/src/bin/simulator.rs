@@ -82,7 +82,7 @@ fn show_pe(dc: &Datacenter) -> Result<(), Error> {
     cells.get(&CellNo(cell_no))
         .map_or_else(|| println!("{} is not a valid input", cell_no),
                      |cell| {
-                         println!("{}", cell.get_packet_engine());
+                         println!("{}", cell.get_cell_agent().get_cmodel().get_packet_engine());
                      });
     Ok(())
 }

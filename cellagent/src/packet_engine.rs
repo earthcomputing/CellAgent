@@ -1,10 +1,12 @@
 use std::{fmt, fmt::Write,
           collections::{HashMap, HashSet, VecDeque},
           sync::{Arc, Mutex},
+          thread,
+          thread::JoinHandle,
           };
 
 use crate::config::{CONFIG};
-use crate::dal::{add_to_trace};
+use crate::dal::{add_to_trace, fork_trace_header, update_trace_header};
 use crate::ec_message::{MsgType};
 use crate::ec_message_formats::{PeFromCm, PeToCm,
                                 PeToPort, PeFromPort, PortToPePacket,
@@ -14,7 +16,7 @@ use crate::packet::Packet;
 use crate::port::PortStatus;
 use crate::routing_table::RoutingTable;
 use crate::routing_table_entry::{RoutingTableEntry};
-use crate::utility::{Mask, PortNo, S, TraceHeaderParams, TraceType};
+use crate::utility::{Mask, PortNo, S, TraceHeaderParams, TraceType, write_err };
 use crate::uuid_ec::{AitState, Uuid};
 
 // I need one slot per port, but ports use 1-based indexing.  I could subtract 1 all the time,
@@ -49,13 +51,13 @@ impl PacketEngine {
     // NEW
     pub fn new(cell_id: CellID, connected_tree_id: TreeID, pe_to_cm: PeToCm,
                pe_to_ports: HashMap<PortNo, PeToPort>,
-               border_port_nos: &HashSet<PortNo>) -> Result<PacketEngine, Error> {
+               border_port_nos: &HashSet<PortNo>) -> PacketEngine {
         let routing_table = RoutingTable::new(cell_id);
         let routing_table_mutex = Arc::new(Mutex::new(routing_table.clone()));
         let mut array = vec![];
         for _ in 0..MAX_SLOTS { array.push(VecDeque::new()); }
         let count = [0; MAX_SLOTS];
-        Ok(PacketEngine {
+        PacketEngine {
             cell_id,
             connected_tree_uuid: connected_tree_id.get_uuid(),
             routing_table,
@@ -69,10 +71,30 @@ impl PacketEngine {
             port_got_event: [false; MAX_SLOTS],
             reroute: [PortNo(0); MAX_SLOTS],
             pe_to_cm,
-            pe_to_ports
-        })
+            pe_to_ports,
+        }
     }
     
+    // SPAWN THREAD (pe.initialize)
+    pub fn start(&self, pe_from_cm: PeFromCm, pe_from_ports: PeFromPort) -> JoinHandle<()> {
+        let _f = "start_packet_engine";
+        {
+            if CONFIG.trace_options.all || CONFIG.trace_options.nal {
+                let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "nalcell_start_pe" };
+                let trace = json!({ "cell_id": self.get_cell_id() });
+                let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
+            }
+        }
+        let mut pe = self.clone();
+        let child_trace_header = fork_trace_header();
+        let thread_name = format!("PacketEngine {}", self.get_cell_id());
+        thread::Builder::new().name(thread_name).spawn( move || {
+            update_trace_header(child_trace_header);
+            let _ = pe.initialize(pe_from_cm, pe_from_ports).map_err(|e| write_err("nalcell", &e));
+            if CONFIG.continue_on_error { } // Don't automatically restart packet engine if it crashes
+        }).expect("thread failed")
+    }
+
     // INIT (PeFromCm PeFromPort)
     // WORKER (PacketEngine)
     pub fn initialize(&mut self, pe_from_cm: PeFromCm, pe_from_ports: PeFromPort) -> Result<(), Error> {
