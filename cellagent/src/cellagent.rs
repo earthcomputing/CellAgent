@@ -801,13 +801,13 @@ impl CellAgent {
                         },
                         CmToCaBytes::TunnelPort((port_no, bytes)) => {
                             let app_msg: Box<dyn AppMessage> = serde_json::from_str(&bytes.to_string()?)?;
-                            let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "ca_from_cm_bytes(port)" };
+                            let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "ca_from_cm_bytes_port" };
                             let trace = json!({ "cell_id": self.cell_id, "port": port_no, "app_msg": app_msg });
                             let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
                         },
                         CmToCaBytes::TunnelUp((sender_id, bytes)) => {
                             let app_msg: Box<dyn AppMessage> = serde_json::from_str(&bytes.to_string()?)?;
-                            let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "ca_from_cm_bytes(up)" };
+                            let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "ca_from_cm_bytes_up" };
                             let trace = json!({ "cell_id": self.cell_id, "sender_id": sender_id, "app_msg": app_msg });
                             let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
                         }

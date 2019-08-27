@@ -21,6 +21,7 @@ pub fn fork_trace_header() -> TraceHeader { TRACE_HEADER.with(|t| t.borrow_mut()
 pub fn update_trace_header(child_trace_header: TraceHeader) { TRACE_HEADER.with(|t| *t.borrow_mut() = child_trace_header); }
 
 const FOR_EVAL: bool = true;
+const SERVER_URL: &'static str = "http://localhost:8088/";
 
 // TODO: Integrate with log crate
 
@@ -32,7 +33,6 @@ lazy_static! {
                         .expect("Dal: Problem setting up Kafka");
 }
 thread_local!{ static SYSTEM: RefCell<SystemRunner> = RefCell::new(System::new("Tracer")); }
-thread_local!{ static CLIENT: Client = Client::new(); }
 thread_local!{ static SKIP: RefCell<HashSet<String>> = RefCell::new(HashSet::new()); }
 
 pub fn add_to_trace(trace_type: TraceType, trace_params: &TraceHeaderParams,
@@ -82,36 +82,29 @@ pub fn add_to_trace(trace_type: TraceType, trace_params: &TraceHeaderParams,
 fn trace_it(trace_record: &TraceRecord) -> Result<(), Error> {
     let _f = "trace_it";
     let header = trace_record.header;
-    let body = trace_record.body;
-    let cell_id = body.get("cell_id");
-    let format = S(header.format());
-     SKIP.with(|skip| {
+    let format = header.format();
+    let server_url = format!("{}{}", SERVER_URL, format);
+    let server_url_clone = server_url.clone();
+    let value = serde_json::to_value(trace_record)?;
+    SKIP.with(|skip| {
         let mut s = skip.borrow_mut();
-        if !s.contains(&format) {
-            println!("Cell {:?}: Format {}", cell_id, format);
+        if !s.contains(format) {
+            let client = Client::new();
             let _ = SYSTEM.with(|sys| {
                 let mut system = sys.borrow_mut();
                 system.block_on(lazy(|| {
-                    CLIENT.with(|client| {
-                        client.post("http://localhost:8088/add")
-                            .header("User-Agent", "Actix-web")
-                            .send_json(&json!({"id":3,"row":7,"col":8}))
-                            .map_err(|e| println!("Error from server {:?}", e))
-                            .and_then(|response| {
-                                if !response.status().is_success() {
-                                    s.insert(format.clone());
-                                }
-                                Ok(())
-                            })
-                    })
+                    client.post(server_url)
+                        .header("User-Agent", "Actix-web")
+                        .send_json(&value)
+                        .map_err(|e| println!("Error from server {:?}", e))
+                        .and_then(|response| {
+                            if !response.status().is_success() {
+                                s.insert(format.to_owned());
+                            }
+                            Ok(())
+                        })
                 }))
             });
-        }
-    });
-    SKIP.with(|skip| {
-        let mut s = skip.borrow_mut();
-        if !s.contains(&format) {
-            s.insert(format.clone());
         }
     });
     Ok(())

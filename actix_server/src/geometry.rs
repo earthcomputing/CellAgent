@@ -3,11 +3,11 @@ use std::{cmp::max,
           fmt, fmt::Write
 };
 
-use actix_web::{Error, HttpRequest, HttpResponse, Responder, FromRequest};
-use serde::Serialize;
+use actix_web::{Error, HttpRequest, HttpResponse, Responder};
+use serde::{Deserialize, Serialize};
 
 type Size = usize;
-#[derive(Debug, Copy, Clone, Default, Eq, PartialEq, Serialize)]
+#[derive(Debug, Copy, Clone, Default, Eq, PartialEq, Serialize, Deserialize)]
 pub struct Id(Size);
 impl Id {
     pub fn new(id: Size) -> Id { Id(id) }
@@ -20,7 +20,7 @@ impl fmt::Display for Id {
 #[derive(Debug, Copy, Clone, Default, Eq, PartialEq, Serialize)]
 pub struct Location { row: Size, col: Size }
 impl Location {
-    pub fn new(row: Size, col: Size) -> Location { Location { row, col } }
+    pub fn new(rowcol: [Size; 2]) -> Location { Location { row: rowcol[0], col: rowcol[1] } }
 }
 impl fmt::Display for Location {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -42,7 +42,7 @@ impl Geometry {
         self.maxcol = max(self.maxrow, rowcol.col);
         self.rowcol.insert(id.0, rowcol); 
     }
-    pub fn limits(&self) -> Location { Location::new(self.maxrow, self.maxcol) }
+    pub fn limits(&self) -> Location { Location::new([self.maxrow, self.maxcol]) }
     pub fn location(&self, id: Size) -> Option<&Location> { self.rowcol.get(&id) }
 }
 
