@@ -334,7 +334,7 @@ static int nl_ecnl_fill_table(struct sk_buff *skb, struct genl_info *info) {
 
     char *p = (char *) &ecnl_table[location];
     nla_memcpy(p, info->attrs[NL_ECNL_ATTR_TABLE_CONTENT], sizeof(struct ecnl_table_entry) * size);
-    // memcpy(p, (char*) nla_data(info->attrs[NL_ECNL_ATTR_TABLE_CONTENT]), sizeof(struct ecnl_table_entry) * size); // nla_get_unspec, nla_len
+    // memcpy(p, (char *) nla_data(info->attrs[NL_ECNL_ATTR_TABLE_CONTENT]), sizeof(struct ecnl_table_entry) * size); // nla_get_unspec, nla_len
 
     struct sk_buff *rskb = genlmsg_new(NLMSG_GOODSIZE, GFP_KERNEL);
     if (!rskb) return -ENOMEM;
@@ -363,8 +363,8 @@ static int nl_ecnl_fill_table_entry(struct sk_buff *skb, struct genl_info *info)
 
     ecnl_table_entry_t *p = &ecnl_table[location];
     nla_memcpy(p, info->attrs[NL_ECNL_ATTR_TABLE_ENTRY], sizeof(struct ecnl_table_entry));
-    // char *entry = (char*) nla_data(info->attrs[NL_ECNL_ATTR_TABLE_ENTRY]); // nla_get_unspec, nla_len
-    // memcpy((char*)&ecnl_table[location], entry, sizeof(struct ecnl_table_entry));
+    // char *entry = (char *) nla_data(info->attrs[NL_ECNL_ATTR_TABLE_ENTRY]); // nla_get_unspec, nla_len
+    // memcpy((char *) &ecnl_table[location], entry, sizeof(struct ecnl_table_entry));
 
     struct sk_buff *rskb = genlmsg_new(NLMSG_GOODSIZE, GFP_KERNEL);
     if (!rskb) return -ENOMEM;
@@ -453,7 +453,7 @@ static int nl_ecnl_map_ports(struct sk_buff *skb, struct genl_info *info) {
 }
 
 // UNUSED ??
-static struct entl_driver * find_driver(ecnl_device_t *e_dev, char *name) {
+static struct entl_driver *find_driver(ecnl_device_t *e_dev, char *name) {
     for (int i = 0; i < e_dev->ecnl_num_ports; i++) {
         struct entl_driver *e_driver = &e_dev->ecnl_drivers[i];
         if (strcmp(e_driver->eda_name, name) == 0) return e_driver;
@@ -504,7 +504,7 @@ static int nl_ecnl_send_ait_message(struct sk_buff *skb, struct genl_info *info)
     struct ec_ait_data ait_data; memset(&ait_data, 0, sizeof(struct ec_ait_data));
     ait_data.ecad_message_len = nla_get_u32(info->attrs[NL_ECNL_ATTR_MESSAGE_LENGTH]);
     nla_memcpy(ait_data.ecad_data, info->attrs[NL_ECNL_ATTR_MESSAGE], ait_data.ecad_message_len);
-    // memcpy(ait_data.ecad_data, (char*)nla_data(info->attrs[NL_ECNL_ATTR_MESSAGE]), ait_data.ecad_message_len); // nla_get_unspec, nla_len
+    // memcpy(ait_data.ecad_data, (char *) nla_data(info->attrs[NL_ECNL_ATTR_MESSAGE]), ait_data.ecad_message_len); // nla_get_unspec, nla_len
 
     struct entl_driver *e_driver = &e_dev->ecnl_drivers[port_id];
     if (!e_driver) return -EINVAL;
@@ -996,7 +996,7 @@ static int ecnl_receive_skb(int module_id, int index, struct sk_buff *skb) {
 
 // entl e_driver received a discovery message
 static int ecnl_receive_dsc(int module_id, int index, struct sk_buff *skb) {
-    struct ethhdr *eth = (struct ethhdr *)skb->data;
+    struct ethhdr *eth = (struct ethhdr *) skb->data;
     struct net_device *plug_in = ecnl_devices[module_id];
     ecnl_device_t *e_dev = (ecnl_device_t *) netdev_priv(plug_in);
 
@@ -1030,7 +1030,7 @@ static void ecnl_forward_ait_message(int module_id, int drv_index, struct sk_buf
     struct net_device *plug_in = ecnl_devices[module_id];
     ecnl_device_t *e_dev = (ecnl_device_t *) netdev_priv(plug_in);
 
-    struct ethhdr *eth = (struct ethhdr *)skb->data;
+    struct ethhdr *eth = (struct ethhdr *) skb->data;
     u32 alo_command = (uint32_t) eth->h_dest[2] << 8
                     | (uint32_t) eth->h_dest[3];
 
@@ -1128,7 +1128,7 @@ static void ecnl_forward_ait_message(int module_id, int drv_index, struct sk_buf
 }
 
 static void ecnl_got_ait_message(int module_id, int drv_index, int num_message) {
-    //struct ethhdr *eth = (struct ethhdr *)skb->data;
+    //struct ethhdr *eth = (struct ethhdr *) skb->data;
     struct net_device *plug_in = ecnl_devices[module_id];
     ecnl_device_t *e_dev = (ecnl_device_t *) netdev_priv(plug_in);
     struct entl_driver *e_driver = &e_dev->ecnl_drivers[drv_index];
@@ -1145,7 +1145,7 @@ static void ecnl_got_ait_message(int module_id, int drv_index, int num_message) 
 }
 
 static void ecnl_got_alo_update(int module_id, int index) {
-    //struct ethhdr *eth = (struct ethhdr *)skb->data;
+    //struct ethhdr *eth = (struct ethhdr *) skb->data;
     struct net_device *plug_in = ecnl_devices[module_id];
     ecnl_device_t *e_dev = (ecnl_device_t *) netdev_priv(plug_in);
 
@@ -1374,6 +1374,7 @@ static void inject_dev(struct net_device *n_dev) {
     }
 }
 
+// FIXME: validate here
 static void hack_init(void) {
     int module_id = 0; // ecnl0
     struct entl_driver_funcs *funcs = &entl_adapt_funcs;
