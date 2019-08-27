@@ -37,7 +37,7 @@ impl Rack {
             .iter()
             .map(|border_cell| -> Result<(CellNo, NalCell), Error> {
                 let cell_no = border_cell.get_cell_no();
-                let nal_cell = NalCell::new(&border_cell.get_name(),
+                let (nal_cell, _join_handle) = NalCell::new(&border_cell.get_name(),
                                             Some(border_cell.get_num_phys_ports()),
                                             &HashSet::from_iter(border_cell.get_border_ports().clone()),
                                             CellConfig::Large)?;
@@ -61,7 +61,7 @@ impl Rack {
             .iter()
             .map(|interior_cell| -> Result<(CellNo, NalCell), Error> {
                 let cell_no = interior_cell.get_cell_no();
-                let nal_cell = NalCell::new(&interior_cell.get_name(), Some(interior_cell.get_num_phys_ports()),
+                let (nal_cell, _join_handle) = NalCell::new(&interior_cell.get_name(), Some(interior_cell.get_num_phys_ports()),
                                             &HashSet::new(), CellConfig::Large)?;
                 {
                     if CONFIG.trace_options.all || CONFIG.trace_options.dc {

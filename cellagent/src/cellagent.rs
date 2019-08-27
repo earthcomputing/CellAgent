@@ -1,6 +1,7 @@
 use std::{fmt, fmt::Write,
           sync::{Arc, Mutex},
           thread,
+          thread::JoinHandle,
           collections::{HashMap, HashSet}};
 
 use crossbeam::crossbeam_channel::unbounded as channel;
@@ -12,6 +13,7 @@ use crate::app_message::{AppMsgDirection, AppMessage, AppMsgType,
                          AppQueryMsg, AppStackTreeMsg, AppTreeNameMsg};
 use crate::app_message_formats::{CaToPort, PortToCaMsg,
                                  CaToVm, VmFromCa, VmToCa, CaFromVm};
+use crate::cmodel::{Cmodel};
 use crate::config::{CONFIG, BASE_TREE_NAME, CONNECTED_PORTS_TREE_NAME, CONTROL_TREE_NAME,
                     CellQty, PathLength, PortQty};
 use crate::dal::{add_to_trace, fork_trace_header, update_trace_header};
@@ -23,7 +25,7 @@ use crate::ec_message::{Message, MsgHeader, MsgTreeMap, MsgType,
               HelloMsg,
               ManifestMsg,
               StackTreeMsg, StackTreeDMsg};
-use crate::ec_message_formats::{CaToCm, CaFromCm, CaToCmBytes, CmToCaBytes};
+use crate::ec_message_formats::{CaToCm, CaFromCm, CmToCa, CmFromCa, PeToCm, CmFromPe, CaToCmBytes, CmToCaBytes, PeToPort, PeFromPort };
 use crate::gvm_equation::{GvmEquation, GvmEqn};
 use crate::name::{Name, CellID, SenderID, PortTreeID, TreeID, UptreeID, VmID};
 use crate::packet_engine::NumberOfPackets;
@@ -59,6 +61,7 @@ pub struct CellAgent {
     cell_id: CellID,
     cell_type: CellType,
     config: CellConfig,
+    cmodel: Cmodel,
     cell_info: CellInfo,
     no_ports: PortQty,
     my_tree_id: TreeID,
@@ -94,8 +97,9 @@ pub struct CellAgent {
 }
 impl CellAgent {
     pub fn new(cell_id: CellID, cell_type: CellType, config: CellConfig, no_ports: PortQty,
-               ca_to_ports: HashMap<PortNo, CaToPort>, ca_to_cm: CaToCm )
-               -> Result<CellAgent, Error> {
+               ca_to_ports: HashMap<PortNo, CaToPort>, cm_to_ca: CmToCa, pe_from_ports: PeFromPort, pe_to_ports: HashMap<PortNo, PeToPort>,
+               border_port_nos: &HashSet<PortNo> )
+               -> Result<(CellAgent, JoinHandle<()>), Error> {
         let _f = "new";
         let tenant_masks = vec![BASE_TENANT_MASK];
         let my_tree_id = TreeID::new(&cell_id.get_name()).context(CellagentError::Chain { func_name: _f, comment: S("my_tree_id")})?;
@@ -109,8 +113,14 @@ impl CellAgent {
         (1..=(*CONFIG.max_num_phys_ports_per_cell) as usize)
             .for_each(|_| no_packets.push(NumberOfPackets::new()));
         let my_entry = RoutingTableEntry::default().add_child(PortNumber::default());
-        Ok(CellAgent { cell_id, my_tree_id, cell_type, config, no_ports,
+        let (ca_to_cm, cm_from_ca): (CaToCm, CmFromCa) = channel();
+        let (pe_to_cm, cm_from_pe): (PeToCm, CmFromPe) = channel();
+        let (cmodel, _pe_join_handle) = Cmodel::new(cell_id, connected_tree_id, pe_to_cm, cm_to_ca, pe_from_ports, pe_to_ports, border_port_nos );
+        let cm_join_handle = cmodel.start(cm_from_ca, cm_from_pe);
+        Ok((CellAgent {
+            cell_id, my_tree_id, cell_type, config, no_ports,
             control_tree_id, connected_tree_id, tree_vm_map: HashMap::new(), ca_to_vms: HashMap::new(),
+            cmodel,
             traphs: HashMap::new(), traphs_mutex: Arc::new(Mutex::new(HashMap::new())),
             vm_id_no: 0, tree_id_map: HashMap::new(), tree_map: HashMap::new(),
             name_tree_map: Arc::new(Mutex::new(HashMap::new())),
@@ -123,8 +133,28 @@ impl CellAgent {
             up_traphs_clist: HashMap::new(), ca_to_cm, ca_to_ports,
             failover_reply_ports: HashMap::new(),
             no_packets,
-            child_ports: HashMap::new() }
-        )
+            child_ports: HashMap::new()
+        }, cm_join_handle))
+    }
+
+    // SPAWN THREAD (ca.initialize)
+    pub fn start(&self, ca_from_cm: CaFromCm, ca_from_ports: CaFromPort) -> JoinHandle<()> {
+        let _f = "start_cell";
+        {
+            if CONFIG.trace_options.all || CONFIG.trace_options.nal {
+                let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "nalcell_start_ca" };
+                let trace = json!({ "cell_id": self.get_cell_id() });
+                let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
+            }
+        }
+        let mut ca = self.clone();
+        let child_trace_header = fork_trace_header();
+        let thread_name = format!("CellAgent {}", self.get_cell_id());
+        thread::Builder::new().name(thread_name).spawn( move || {
+            update_trace_header(child_trace_header);
+            let _ = ca.initialize(ca_from_cm, ca_from_ports).map_err(|e| write_err("nalcell", &e));
+            if CONFIG.continue_on_error {} // Don't automatically restart cell agent if it crashes
+        }).expect("cellagent thread failed")
     }
 
     // WORKER (CellAgent)
@@ -141,14 +171,12 @@ impl CellAgent {
         let port_number = PortNumber::new0();
         let hops = PathLength(CellQty(0));
         let path = Path::new0();
-        let control_tree_id = self.control_tree_id;
-        let connected_tree_id = self.connected_tree_id;
         let my_tree_id = self.my_tree_id;
-        self.tree_id_map.insert(control_tree_id.get_uuid(), control_tree_id.to_port_tree_id_0());
-        self.tree_id_map.insert(connected_tree_id.get_uuid(), connected_tree_id.to_port_tree_id_0());
+        self.tree_id_map.insert(self.control_tree_id.get_uuid(), self.control_tree_id.to_port_tree_id_0());
+        self.tree_id_map.insert(self.connected_tree_id.get_uuid(), self.connected_tree_id.to_port_tree_id_0());
         self.tree_id_map.insert(my_tree_id.get_uuid(), my_tree_id.to_port_tree_id_0());
-        self.tree_map.insert(control_tree_id.get_uuid(), control_tree_id.get_uuid());
-        self.tree_map.insert(connected_tree_id.get_uuid(), connected_tree_id.get_uuid());
+        self.tree_map.insert(self.control_tree_id.get_uuid(), self.control_tree_id.get_uuid());
+        self.tree_map.insert(self.connected_tree_id.get_uuid(), self.connected_tree_id.get_uuid());
         self.tree_map.insert(my_tree_id.get_uuid(), my_tree_id.get_uuid());
         let mut eqns = HashSet::new();
         eqns.insert(GvmEqn::Recv("true"));
@@ -156,7 +184,7 @@ impl CellAgent {
         eqns.insert(GvmEqn::Xtnd("true"));
         eqns.insert(GvmEqn::Save("false"));
         let gvm_equation = GvmEquation::new(&eqns, &Vec::new());
-        self.update_traph(control_tree_id.to_port_tree_id_0(), port_number,
+        self.update_traph(self.control_tree_id.to_port_tree_id_0(), port_number,
                           PortState::Parent, &gvm_equation,
                           HashSet::new(), hops, path)?;
         let mut eqns = HashSet::new();
@@ -165,7 +193,7 @@ impl CellAgent {
         eqns.insert(GvmEqn::Xtnd("true"));
         eqns.insert(GvmEqn::Save("false"));
         let gvm_equation = GvmEquation::new(&eqns, &Vec::new());
-        let connected_tree_entry = self.update_traph(connected_tree_id.to_port_tree_id_0(),
+        let connected_tree_entry = self.update_traph(self.connected_tree_id.to_port_tree_id_0(),
                                                      port_number,
                                                      PortState::Parent, &gvm_equation,
                                                      HashSet::new(), hops, path)?;
@@ -180,10 +208,19 @@ impl CellAgent {
         self.my_entry = self.update_traph(my_tree_id.to_port_tree_id_0(), port_number,
                                           PortState::Parent, &gvm_eqn,
                                           HashSet::new(), hops, path)?;
-        self.listen_cm(ca_from_cm)?;
-        if self.is_border() { self.listen_port(ca_from_ports)?; }
-        Ok(self)
+        let ca_cm_join_handle: JoinHandle<()> = self.listen_cm(ca_from_cm);
+        if self.is_border() {
+            match self.listen_port(ca_from_ports).join() {
+                Ok(()) => (),
+                Err(_e) => panic!("Error waiting on cellagent ports thread")
+            };
+        }
+        match ca_cm_join_handle.join() {
+            Ok(()) => Ok(self),
+            Err(e) => Err(CellagentError::Chain { func_name: _f, comment: format!("{:?}", e) }.into())
+        }
     }
+    pub fn get_cmodel(&self) -> &Cmodel { &self.cmodel }
     fn get_no_ports(&self) -> PortQty { self.no_ports }
     pub fn get_cell_id(&self) -> CellID { self.cell_id }
     pub fn get_connected_tree_id(&self) -> TreeID { self. connected_tree_id }
@@ -673,7 +710,7 @@ impl CellAgent {
     }
 
     // SPAWN THREAD (listen_port_loop)
-    fn listen_port(&mut self, ca_from_ports: CaFromPort) -> Result<(), Error> {
+    fn listen_port(&mut self, ca_from_ports: CaFromPort) -> JoinHandle<()> {
         let _f = "listen_port";
         let mut ca = self.clone();
         let child_trace_header = fork_trace_header();
@@ -682,8 +719,7 @@ impl CellAgent {
             update_trace_header(child_trace_header);
             let _ = ca.listen_port_loop(&ca_from_ports).map_err(|e| write_err("cellagent", &e));
             if CONFIG.continue_on_error { let _ = ca.listen_port(ca_from_ports); }
-        })?;
-        Ok(())
+        }).expect("cellagent port thread failed")
     }
     fn listen_port_loop(&mut self, ca_from_port: &CaFromPort) -> Result<(), Error> {
         let _f = "listen_port_loop";
@@ -725,7 +761,7 @@ impl CellAgent {
         }
     }
     // SPAWN THREAD (listen_cm_loop)
-    fn listen_cm(&mut self, ca_from_cm: CaFromCm) -> Result<(), Error>{
+    fn listen_cm(&mut self, ca_from_cm: CaFromCm) -> JoinHandle<()> {
         let _f = "listen_cm";
         let mut ca = self.clone();
         let child_trace_header = fork_trace_header();
@@ -734,8 +770,7 @@ impl CellAgent {
             update_trace_header(child_trace_header);
             let _ = ca.listen_cm_loop(&ca_from_cm).map_err(|e| write_err("cellagent", &e));
             if CONFIG.continue_on_error { let _ = ca.listen_cm(ca_from_cm); }
-        })?;
-        Ok(())
+        }).expect("cellagent cmodel thread failed")
     }
 
     // WORKER (CaFromCm)

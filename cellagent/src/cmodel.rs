@@ -1,20 +1,26 @@
-use std::{fmt,
-          thread};
+use std::{fmt, fmt::Write,
+          collections::{HashMap, HashSet},
+          thread,
+          thread::JoinHandle,
+};
 
 use failure::{Error, ResultExt};
+use crossbeam::crossbeam_channel::unbounded as channel;
 
 use crate::config::{CONFIG};
-use crate::dal::{add_to_trace};
+use crate::dal::{add_to_trace, fork_trace_header, update_trace_header};
 use crate::ec_message::{Message, MsgType};
-use crate::ec_message_formats::{CaToCmBytes, CmToCa, CmFromCa, CmToPe, CmFromPe, PeToCmPacket,
-                                CmToPePacket, CmToCaBytes};
-use crate::name::{Name, CellID};
+use crate::ec_message_formats::{CaToCmBytes, CmToCa, CmFromCa, CmToPe, CmFromPe, PeToCm, PeFromCm, PeToPort, PeFromPort, 
+                                PeToCmPacket, CmToPePacket, CmToCaBytes};
+use crate::name::{Name, CellID, TreeID};
+use crate::packet_engine::{PacketEngine};
 use crate::packet::{Packet, PacketAssembler, PacketAssemblers, Packetizer};
 use crate::utility::{PortNo, S, TraceHeader, TraceHeaderParams, TraceType};
 
 #[derive(Debug, Clone)]
 pub struct Cmodel {
     cell_id: CellID,
+    packet_engine: PacketEngine,
     packet_assemblers: PacketAssemblers,
     cm_to_ca: CmToCa,
     cm_to_pe: CmToPe,
@@ -23,8 +29,36 @@ impl Cmodel {
     pub fn get_name(&self) -> String { self.cell_id.get_name() }
     pub fn get_cell_id(&self) -> &CellID { &self.cell_id }
     // NEW
-    pub fn new(cell_id: CellID, cm_to_ca: CmToCa, cm_to_pe: CmToPe) -> Cmodel {
-        Cmodel { cell_id, packet_assemblers: PacketAssemblers::new(), cm_to_ca, cm_to_pe }
+    pub fn new(cell_id: CellID, connected_tree_id: TreeID, pe_to_cm: PeToCm, cm_to_ca: CmToCa, pe_from_ports: PeFromPort, pe_to_ports: HashMap<PortNo, PeToPort>, border_port_nos: &HashSet<PortNo> ) -> (Cmodel, JoinHandle<()>) {
+        let packet_engine = PacketEngine::new(cell_id, connected_tree_id,
+                                              pe_to_cm, pe_to_ports, &border_port_nos);
+        let (cm_to_pe, pe_from_cm): (CmToPe, PeFromCm) = channel();
+        let pe_join_handle = packet_engine.start(pe_from_cm, pe_from_ports);
+        (Cmodel { cell_id,
+                  packet_engine,
+                  packet_assemblers: PacketAssemblers::new(),
+                  cm_to_ca, cm_to_pe },
+         pe_join_handle)
+    }
+
+    // SPAWN THREAD (cm.initialize)
+    pub fn start(&self, cm_from_ca: CmFromCa, cm_from_pe: CmFromPe) -> JoinHandle<()> {
+        let _f = "start_cmodel";
+        {
+            if CONFIG.trace_options.all || CONFIG.trace_options.nal {
+                let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "nalcell_start_cmodel" };
+                let trace = json!({ "cell_id": self.get_cell_id() });
+                let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
+            }
+        }
+        let mut cm = self.clone();
+        let child_trace_header = fork_trace_header();
+        let thread_name = format!("Cmodel {}", self.get_name());
+        thread::Builder::new().name(thread_name).spawn( move || {
+            update_trace_header(child_trace_header);
+            let _ = cm.initialize(cm_from_ca, cm_from_pe);
+            if CONFIG.continue_on_error { } // Don't automatically restart cmodel if it crashes
+        }).expect("cmodel thread failed")
     }
 
     // INIT (CmFromCa, CmFromPe)
@@ -273,11 +307,13 @@ packets: Vec<Packet>,
         }
         Ok(())
     }
+    pub fn get_packet_engine(&self) -> &PacketEngine { &self.packet_engine }
 }
 
 impl fmt::Display for Cmodel {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let s = format!("\nCmodel {}", self.cell_id.get_name());
+        let mut s = format!("\nCmodel {}", self.cell_id.get_name());
+        write!(s, "\n{}", self.packet_engine)?;
         write!(f, "{}", s)
     }
 }
