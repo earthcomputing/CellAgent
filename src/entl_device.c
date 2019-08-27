@@ -509,6 +509,16 @@ static void entl_watchdog(unsigned long data) {
     schedule_work(&dev->edev_watchdog_task); // use global kernel work queue
 }
 
+static inline void notify_listener(int subscriber, int sigusr) {
+    struct siginfo info = {
+        .si_signo = SIGIO,
+        .si_int = 1,
+        .si_code = SI_QUEUE
+    };
+    struct task_struct *task = pid_task(find_vpid(subscriber), PIDTYPE_PID);
+    if (task != NULL) send_sig_info(sigusr, &info, task);
+}
+
 static void entl_watchdog_task(struct work_struct *work) {
     unsigned long wakeup = 1 * HZ;  // one second
 
@@ -521,27 +531,15 @@ static void entl_watchdog_task(struct work_struct *work) {
     }
 
     int subscriber = dev->edev_user_pid;
-    if ((dev->edev_flag & ENTL_DEVICE_FLAG_SIGNAL) && subscriber) {
-        dev->edev_flag &= ~(uint32_t) ENTL_DEVICE_FLAG_SIGNAL;
-
-        struct task_struct *task = pid_task(find_vpid(subscriber), PIDTYPE_PID);
-        struct siginfo info = {
-            .si_signo = SIGIO,
-            .si_int = 1,
-            .si_code = SI_QUEUE
-        };
-        if (task != NULL) send_sig_info(SIGUSR1, &info, task);
-    }
-    else if ((dev->edev_flag & ENTL_DEVICE_FLAG_SIGNAL2) && subscriber) {
-        dev->edev_flag &= ~(uint32_t) ENTL_DEVICE_FLAG_SIGNAL2;
-
-        struct task_struct *task = pid_task(find_vpid(subscriber), PIDTYPE_PID);
-        struct siginfo info = {
-            .si_signo = SIGIO,
-            .si_int = 1,
-            .si_code = SI_QUEUE
-        };
-        if (task != NULL) send_sig_info(SIGUSR2, &info, task);
+    if (subscriber) {
+        if (dev->edev_flag & ENTL_DEVICE_FLAG_SIGNAL) {
+            dev->edev_flag &= ~(uint32_t) ENTL_DEVICE_FLAG_SIGNAL;
+            notify_listener(subscriber, SIGUSR1);
+        }
+        else if (dev->edev_flag & ENTL_DEVICE_FLAG_SIGNAL2) {
+            dev->edev_flag &= ~(uint32_t) ENTL_DEVICE_FLAG_SIGNAL2;
+            notify_listener(subscriber, SIGUSR2);
+        }
     }
 
     // notice carrier (i.e. link up)
