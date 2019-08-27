@@ -10,6 +10,11 @@ int doit(struct nl_sock *sock, struct nl_msg *msg) {
     uint32_t actual_port_id = 0;
     uint32_t num_ports = -1;
 
+    alo_reg_t alo_reg = {
+        .ar_no = 0,
+        .ar_data = 0,
+    };
+
     buf_desc_t buf = {
         .len = 0,
         .frame = NULL,
