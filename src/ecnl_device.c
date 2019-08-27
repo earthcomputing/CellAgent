@@ -1295,13 +1295,6 @@ static struct net_device_ops ecnl_netdev_ops = {
 
 // --
 
-// ref: linux/netdevice.h - enum netdev_tx
-netdev_tx_t adapt_start_xmit(struct sk_buff *skb, struct net_device *e1000e) { return NETDEV_TX_BUSY; }
-int adapt_send_AIT(struct sk_buff *skb, struct net_device *e1000e) { return -1; }
-int adapt_retrieve_AIT(struct net_device *e1000e, ec_ait_data_t *data) { return -1; }
-int adapt_write_alo_reg(struct net_device *e1000e, ec_alo_reg_t *reg) { return -1; }
-int adapt_read_alo_regs(struct net_device *e1000e, ec_alo_regs_t *regs) { return -1; }
-
 #if 0
 // The data structre represents the internal state of ENTL
 typedef struct ec_state {
