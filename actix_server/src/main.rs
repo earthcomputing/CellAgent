@@ -1,14 +1,12 @@
 mod geometry;
 
-use std::{fmt};
-use std::sync::{Arc, Mutex};
+use std::{fmt, env};
 
-use actix_web::{get, post, web, App, HttpRequest, HttpResponse, HttpServer, Responder};
-use failure::{Error};
+use actix_web::{get, post, web, App, HttpResponse, HttpServer, Responder};
 use serde::{Serialize, Deserialize};
 use serde_json::Value;
 
-use geometry::{Geometry, Id, Location};
+use geometry::{cell_geometry, AppGeometry};
 
 #[get("/")]
 fn index() -> impl Responder {
@@ -42,23 +40,10 @@ fn show_discover_d() -> impl Responder {
 struct TraceRecord {
     record: Value
 }
-#[derive(Debug, Clone, Serialize)]
-struct AppGeometry {
-    geometry: Arc<Mutex<Geometry>>
-}
-impl Responder for AppGeometry {
-    type Error = actix_web::Error;
-    type Future = Result<HttpResponse, actix_web::Error>;
-    
-    fn respond_to(self, _req: &HttpRequest) -> Self::Future {
-        let body = serde_json::to_string(&self)?;
-        Ok(HttpResponse::Ok()
-            .content_type("application/json")
-            .body(body))
-    }
-}
 fn main() {
-    let app_geometry = AppGeometry { geometry: Arc::new(Mutex::new(Geometry::default())) };
+    let server_url = env::var("SERVER_URL").expect("Environment variable SERVER_URL not found");
+    println!("Server at {}", server_url);
+    let app_geometry = AppGeometry::default();
     HttpServer::new(move || {
         let state = web::Data::new(app_geometry.clone());
         App::new()
@@ -69,25 +54,10 @@ fn main() {
             .service(border_cell_start)
             .service(interior_cell_start)
     })
-        .bind("127.0.0.1:8088")
+        .bind(server_url)
         .unwrap()
         .run()
         .unwrap();
-}
-fn cell_geometry(path: &str, state: web::Data<AppGeometry>, record: web::Json<Value>)
-    -> Result<impl Responder, Error> {
-    #[derive(Debug, Copy, Clone, Deserialize)]
-    struct GeoStruct {
-        cell_number: usize,
-        location: [usize; 2]
-    }
-    let app_geometry = state.get_ref();
-    if let Some(body) = record.get("body") {
-        let geo = serde_json::from_value::<GeoStruct>(body.clone())?;
-        app_geometry.geometry.lock().unwrap().add(Id::new(geo.cell_number),
-                                              Location::new(geo.location));
-    }
-    Ok(HttpResponse::Ok().body(format!("{} adding {}\n{:?}\n", path, record, app_geometry)))
 }
 fn _err_msg(path: &str, record: &Value) -> String {
     format!("{}: Bad trace record {}", path, record)
