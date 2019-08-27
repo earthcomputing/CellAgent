@@ -1,7 +1,7 @@
 
 ## e1000e device driver with "Atomic Link" (tm?) modifications
 
-    In order to minimize maintenance cost, rather than putting all source files under git control, a slight more compilicated build is used.  The build starts with media files (tarballs) downloaded directly from Intel, to which Earth Computing specific patches are applied (i.e. via a single patch file).
+    In order to minimize maintenance cost, rather than putting all source files under git control, a slightly more compilicated build is used.  The build starts with media files (tarballs) downloaded directly from Intel, to which Earth Computing specific patches are applied (i.e. via a single patch file).
 
     The build then combines the patch intel files with a set of Earth Computing additional files.
 
