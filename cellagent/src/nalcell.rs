@@ -6,7 +6,8 @@ use std::{
     collections::{HashMap, HashSet},
     os::raw::{c_void},
     thread,
-    iter::FromIterator
+    thread::JoinHandle,
+    iter::FromIterator,
 };
 use crossbeam::crossbeam_channel::unbounded as channel;
 
@@ -22,14 +23,11 @@ use std::{
 use either::Either;
 
 use crate::cellagent::{CellAgent};
-use crate::cmodel::{Cmodel};
 use crate::config::{CONFIG, PortQty};
 use crate::dal::{add_to_trace, fork_trace_header, update_trace_header};
-use crate::ec_message_formats::{PortToPe, PeFromPort, PeToPort,PortFromPe,
-                                CaToCm, CmFromCa, CmToCa, CaFromCm,
-                                CmToPe, PeFromCm, PeToCm, CmFromPe};
+use crate::ec_message_formats::{PortToPe, PeFromPort, PeToPort, PortFromPe,
+                                CmToCa, CaFromCm };
 use crate::name::{CellID};
-use crate::packet_engine::{PacketEngine};
 use crate::port::{Port};
 use crate::utility::{CellConfig, CellType, PortNo, S, TraceHeaderParams, TraceType, write_err};
 use crate::vm::VirtualMachine;
@@ -52,8 +50,6 @@ pub struct NalCell {
     config: CellConfig,
     ports: Box<[Port]>,
     cell_agent: CellAgent,
-    cmodel: Cmodel,
-    packet_engine: PacketEngine,
     vms: Vec<VirtualMachine>,
     ports_from_pe: HashMap<PortNo, PortFromPe>,
     ports_from_ca: HashMap<PortNo, PortFromCa>,
@@ -62,7 +58,7 @@ pub struct NalCell {
 
 impl NalCell {
     pub fn new(name: &str, simulated_options: Option<PortQty>, border_port_nos: &HashSet<PortNo>, config: CellConfig)
-            -> Result<NalCell, Error> {
+            -> Result<(NalCell, JoinHandle<()>), Error> {
         let _f = "new";
         let ecnl =
             match simulated_options {
@@ -112,10 +108,7 @@ impl NalCell {
             return Err(NalcellError::NumberPorts { num_phys_ports, func_name: "new", max_num_phys_ports: CONFIG.max_num_phys_ports_per_cell }.into())
         }
         let cell_id = CellID::new(name).context(NalcellError::Chain { func_name: "new", comment: S("cell_id") })?;
-        let (ca_to_cm, cm_from_ca): (CaToCm, CmFromCa) = channel();
         let (cm_to_ca, ca_from_cm): (CmToCa, CaFromCm) = channel();
-        let (cm_to_pe, pe_from_cm): (CmToPe, PeFromCm) = channel();
-        let (pe_to_cm, cm_from_pe): (PeToCm, CmFromPe) = channel();
         let (port_to_pe, pe_from_ports): (PortToPe, PeFromPort) = channel();
         let (port_to_ca, ca_from_ports): (PortToCa, CaFromPort) = channel();
         let port_list: Vec<PortNo> = (0..*num_phys_ports)
@@ -159,93 +152,25 @@ impl NalCell {
             ports.push(port);
         }
         let boxed_ports: Box<[Port]> = ports.into_boxed_slice();
-        let cell_agent = CellAgent::new(cell_id, cell_type, config, num_phys_ports, ca_to_ports, ca_to_cm).context(NalcellError::Chain { func_name: "new", comment: S("cell agent create") })?;
-        NalCell::start_cell(&cell_agent, ca_from_cm, ca_from_ports);
-        let cmodel = Cmodel::new(cell_id, cm_to_ca, cm_to_pe);
-        NalCell::start_cmodel(&cmodel, cm_from_ca, cm_from_pe);
-        let packet_engine = PacketEngine::new(cell_id, cell_agent.get_connected_tree_id(),
-                                              pe_to_cm, pe_to_ports, border_port_nos).context(NalcellError::Chain { func_name: "new", comment: S("packet engine create") })?;
-        NalCell::start_packet_engine(&packet_engine, pe_from_cm, pe_from_ports);
-        Ok(NalCell {
+        let (cell_agent, _cm_join_handle) = CellAgent::new(cell_id, cell_type, config, num_phys_ports, ca_to_ports, cm_to_ca, pe_from_ports, pe_to_ports, border_port_nos).context(NalcellError::Chain { func_name: "new", comment: S("cell agent create") })?;
+        let ca_join_handle = cell_agent.start(ca_from_cm, ca_from_ports);
+        Ok((NalCell {
             id: cell_id,
             cell_type,
             config,
-            cmodel,
             ports: boxed_ports,
             cell_agent,
             vms: Vec::new(),
-            packet_engine,
             ports_from_pe,
             ports_from_ca,
             ecnl
-        })
-    }
-    // SPAWN THREAD (ca.initialize)
-    fn start_cell(cell_agent: &CellAgent, ca_from_cm: CaFromCm, ca_from_ports: CaFromPort) {
-        let _f = "start_cell";
-        {
-            if CONFIG.trace_options.all || CONFIG.trace_options.nal {
-                let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "nalcell_start_ca" };
-                let trace = json!({ "cell_id": &cell_agent.get_cell_id() });
-                let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
-            }
-        }
-        let mut ca = cell_agent.clone();
-        let child_trace_header = fork_trace_header();
-        let thread_name = format!("CellAgent {}", cell_agent.get_cell_id());
-        thread::Builder::new().name(thread_name).spawn( move || {
-            update_trace_header(child_trace_header);
-            let _ = ca.initialize(ca_from_cm, ca_from_ports).map_err(|e| write_err("nalcell", &e));
-            if CONFIG.continue_on_error { } // Don't automatically restart cell agent if it crashes
-        }).expect("thread failed");
-    }
-
-    // SPAWN THREAD (cm.initialize)
-    fn start_cmodel(cmodel: &Cmodel, cm_from_ca: CmFromCa, cm_from_pe: CmFromPe) {
-        let _f = "start_cmodel";
-        {
-            if CONFIG.trace_options.all || CONFIG.trace_options.nal {
-                let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "nalcell_start_cmodel" };
-                let trace = json!({ "cell_id": cmodel.get_cell_id() });
-                let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
-            }
-        }
-        let mut cm = cmodel.clone();
-        let child_trace_header = fork_trace_header();
-        let thread_name = format!("Cmodel {}", cmodel.get_name());
-        thread::Builder::new().name(thread_name).spawn( move || {
-            update_trace_header(child_trace_header);
-            let _ = cm.initialize(cm_from_ca, cm_from_pe);
-            if CONFIG.continue_on_error { } // Don't automatically restart cmodel if it crashes
-        }).expect("thread failed");
-    }
-
-    // SPAWN THREAD (pe.initialize)
-    fn start_packet_engine(packet_engine: &PacketEngine, pe_from_cm: PeFromCm, pe_from_ports: PeFromPort) {
-        let _f = "start_packet_engine";
-        {
-            if CONFIG.trace_options.all || CONFIG.trace_options.nal {
-                let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "nalcell_start_pe" };
-                let trace = json!({ "cell_id": packet_engine.get_cell_id() });
-                let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
-            }
-        }
-        let mut pe = packet_engine.clone();
-        let child_trace_header = fork_trace_header();
-        let thread_name = format!("PacketEngine {}", packet_engine.get_cell_id());
-        thread::Builder::new().name(thread_name).spawn( move || {
-            update_trace_header(child_trace_header);
-            let _ = pe.initialize(pe_from_cm, pe_from_ports).map_err(|e| write_err("nalcell", &e));
-            if CONFIG.continue_on_error { } // Don't automatically restart packet engine if it crashes
-        }).expect("thread failed");
+        }, ca_join_handle))
     }
 
     pub fn get_id(&self) -> CellID { self.id }
     fn _get_name(&self) -> String { self.id.get_name() }                     // Used only in tests
     fn _get_num_ports(&self) -> PortQty { PortQty(self.ports.len() as u8) }  // Used only in tests
     pub fn _get_cell_agent(&self) -> &CellAgent { &self.cell_agent }
-    pub fn _get_cmodel(&self) -> &Cmodel { &self.cmodel }
-    pub fn get_packet_engine(&self) -> &PacketEngine { &self.packet_engine }
     pub fn take_port_from_ca(&mut self, port_no: PortNo) -> Option<PortFromCa> {
         self.ports_from_ca.remove(&port_no)
     }
@@ -295,7 +220,6 @@ impl fmt::Display for NalCell {
         }
         write!(s, " {}", self.config)?;
         write!(s, "\n{}", self.cell_agent)?;
-        write!(s, "\n{}", self.packet_engine)?;
         write!(f, "{}", s) }
 }
 impl Drop for NalCell {

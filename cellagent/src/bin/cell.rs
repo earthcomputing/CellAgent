@@ -1,15 +1,14 @@
 #[macro_use] extern crate failure;
 
-use std::{io::{stdin, stdout, Read, Write},
+use std::{io::{stdin, stdout, Read},
           collections::{HashMap, HashSet},
           fs::{File, OpenOptions},
 	      iter::FromIterator};
 
 use ec_fabrix::config::{CONFIG, PortQty};
-use ec_fabrix::gvm_equation::{GvmEqn};
 use ec_fabrix::nalcell::{NalCell};
 use ec_fabrix::uptree_spec::{AllowedTree, ContainerSpec, Manifest, UpTreeSpec, VmSpec};
-use ec_fabrix::utility::{_print_vec, CellConfig, CellType, PortNo, S, TraceHeader};
+use ec_fabrix::utility::{_print_vec, CellConfig, PortNo};
 
 fn main() -> Result<(), Error> {
     let _f = "main";
@@ -20,13 +19,15 @@ fn main() -> Result<(), Error> {
         .truncate(true)
 	.open(&CONFIG.output_file_name);
     let cell_name = "Alice"; /* if needed, can read cell name from config file */
-    let num_phys_ports = PortQty(3);
     let border_port_list : Vec<PortNo> = vec![2u8]
         .iter()
         .map(|i| PortNo(*i as u8))
 	.collect();
-    let nal_cell = NalCell::new(cell_name, None, &HashSet::from_iter(border_port_list.clone()), CellConfig::Large);
-    Ok(())
+    let (_nal_cell, join_handle) = NalCell::new(cell_name, None, &HashSet::from_iter(border_port_list.clone()), CellConfig::Large)?;
+    match join_handle.join() {
+        Ok(_) => Ok(()),
+        Err(e) => Err(MainError::Chain { func_name: _f, comment: format!("{:?}", e) }.into())
+    }
 }
 
 // fn deployment_demo() -> Result<(), Error> {
@@ -60,7 +61,7 @@ fn main() -> Result<(), Error> {
 //     Ok(())
 // }
 // Errors
-use failure::{Error, ResultExt};
+use failure::{Error};
 #[derive(Debug, Fail)]
 pub enum MainError {
     #[fail(display = "MainError::Chain {} {}", func_name, comment)]
