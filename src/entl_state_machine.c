@@ -156,7 +156,7 @@ int entl_received(entl_state_machine_t *mcn, uint16_t from_hi, uint32_t from_lo,
                 set_error(mcn, ENTL_ERROR_FLAG_SEQUENCE);
                 unicorn(mcn, ENTL_STATE_HELLO);
                 set_update_time(mcn, ts);
-                ret_action = 0;
+                ret_action = 0; // ENTL_ACTION_NOP
             }
         }
         break;
