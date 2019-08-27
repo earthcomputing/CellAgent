@@ -1146,6 +1146,11 @@ static int adapt_send_AIT(struct sk_buff *skb, struct net_device *e1000e) {
 
 // mimic IOCTL:
 #if 0
+    int q_space = entl_send_AIT_message(stm, ait_data);
+    ait_data->num_messages = q_space;
+    if (q_space < 0) {
+        kfree(ait_data); // FIXME: check for memory leak?
+    }
 #endif
     return 0;
 }
@@ -1156,6 +1161,18 @@ static int adapt_retrieve_AIT(struct net_device *e1000e, ec_ait_data_t *data) {
 
 // mimic IOCTL:
 #if 0
+    struct entt_ioctl_ait_data *ait_data = entl_read_AIT_message(stm);
+    if (ait_data) {
+        copy_to(data, ait_data, sizeof(struct entt_ioctl_ait_data));
+        kfree(ait_data);
+    }
+    else {
+        struct entt_ioctl_ait_data dt;
+        dt.num_messages = 0;
+        dt.message_len = 0;
+        dt.num_queued = entl_num_queued(stm);
+        copy_to(data, &dt, sizeof(struct entt_ioctl_ait_data));
+    }
 #endif
     return 0;
 }
