@@ -1122,11 +1122,15 @@ static int adapt_validate(struct net_device *e1000e, int magic) {
     return (magic == ENCL_ENTL_MAGIC) ? 1 : -1; // ENCL_ENTL_MAGIC 0x5affdead
 }
 
+// ref: linux/netdevice.h - enum netdev_tx
 static netdev_tx_t adapt_start_xmit(struct sk_buff *skb, struct net_device *e1000e) {
     ADAPT_INFO("adapt_start_xmit e1000e \"%s\"", e1000e->name);
     if (skb == NULL) return -1;
 
-    return NETDEV_TX_BUSY;
+#if 0
+    return NETDEV_TX_OK; // 0x00
+#endif
+    return NETDEV_TX_BUSY; // 0x10
 }
 
 static int adapt_send_AIT(struct sk_buff *skb, struct net_device *e1000e) {
@@ -1140,6 +1144,9 @@ static int adapt_send_AIT(struct sk_buff *skb, struct net_device *e1000e) {
     entl_state_machine_t *stm = &entl_dev->edev_stm;
     if (stm == NULL) return -1;
 
+// mimic IOCTL:
+#if 0
+#endif
     return 0;
 }
 
@@ -1147,6 +1154,9 @@ static int adapt_retrieve_AIT(struct net_device *e1000e, ec_ait_data_t *data) {
     ADAPT_INFO("adapt_retrieve_AIT e1000e \"%s\"", e1000e->name);
     if (data == NULL) return -1;
 
+// mimic IOCTL:
+#if 0
+#endif
     return 0;
 }
 
@@ -1154,6 +1164,8 @@ static int adapt_write_reg(struct net_device *e1000e, ec_alo_reg_t *reg) {
     ADAPT_INFO("adapt_write_reg e1000e \"%s\"", e1000e->name);
     if (reg == NULL) return -1;
 
+#if 0
+#endif
     return 0;
 }
 
@@ -1161,6 +1173,8 @@ static int adapt_read_regset(struct net_device *e1000e, ec_alo_regs_t *regs) {
     ADAPT_INFO("adapt_read_regset e1000e \"%s\"", e1000e->name);
     if (regs == NULL) return -1;
 
+#if 0
+#endif
     return 0;
 }
 
