@@ -21,11 +21,12 @@ pub fn fork_trace_header() -> TraceHeader { TRACE_HEADER.with(|t| t.borrow_mut()
 pub fn update_trace_header(child_trace_header: TraceHeader) { TRACE_HEADER.with(|t| *t.borrow_mut() = child_trace_header); }
 
 const FOR_EVAL: bool = true;
-const SERVER_URL: &'static str = "http://localhost:8088/";
 
 // TODO: Integrate with log crate
 
 lazy_static! {
+    static ref FOO: usize = 10;
+    static ref SERVER_URL: String = ::std::env::var("SERVER_URL").expect("Environment variable SERVER_URL not set");
     static ref PRODUCER_RD: FutureProducer = ClientConfig::new()
                         .set("bootstrap.servers", &CONFIG.kafka_server)
                         .set("message.timeout.ms", "5000")
@@ -83,8 +84,7 @@ fn trace_it(trace_record: &TraceRecord) -> Result<(), Error> {
     let _f = "trace_it";
     let header = trace_record.header;
     let format = header.format();
-    let server_url = format!("{}{}", SERVER_URL, format);
-    let server_url_clone = server_url.clone();
+    let server_url = format!("{}/{}", *SERVER_URL, format);
     let value = serde_json::to_value(trace_record)?;
     SKIP.with(|skip| {
         let mut s = skip.borrow_mut();

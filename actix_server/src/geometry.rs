@@ -1,12 +1,46 @@
 use std::{cmp::max,
           collections::HashMap,
-          fmt, fmt::Write
+          fmt, fmt::Write,
+          sync::{Arc, Mutex}
 };
 
-use actix_web::{Error, HttpRequest, HttpResponse, Responder};
+use actix_web::{web, Error, HttpRequest, HttpResponse, Responder};
 use serde::{Deserialize, Serialize};
+use serde_json::Value;
 
 type Size = usize;
+
+pub fn cell_geometry(path: &str, state: web::Data<AppGeometry>, record: web::Json<Value>)
+                 -> Result<impl Responder, Error> {
+    let app_geometry = state.get_ref();
+    if let Some(body) = record.get("body") {
+        let geo = serde_json::from_value::<GeoStruct>(body.clone())?;
+        app_geometry.geometry.lock().unwrap().add(Id::new(geo.cell_number),
+                                                  Location::new(geo.location));
+    }
+    Ok(HttpResponse::Ok().body(format!("{} adding {}\n{:?}\n", path, record, app_geometry)))
+}
+#[derive(Debug, Copy, Clone, Deserialize)]
+struct GeoStruct {
+    cell_number: usize,
+    location: [usize; 2]
+}
+#[derive(Debug, Clone, Default, Serialize)]
+pub struct AppGeometry {
+    geometry: Arc<Mutex<Geometry>>
+}
+impl Responder for AppGeometry {
+    type Error = actix_web::Error;
+    type Future = Result<HttpResponse, actix_web::Error>;
+    
+    fn respond_to(self, _req: &HttpRequest) -> Self::Future {
+        let body = serde_json::to_string(&self)?;
+        Ok(HttpResponse::Ok()
+            .content_type("application/json")
+            .body(body))
+    }
+}
+
 #[derive(Debug, Copy, Clone, Default, Eq, PartialEq, Serialize, Deserialize)]
 pub struct Id(Size);
 impl Id {
@@ -42,8 +76,6 @@ impl Geometry {
         self.maxcol = max(self.maxrow, rowcol.col);
         self.rowcol.insert(id.0, rowcol); 
     }
-    pub fn limits(&self) -> Location { Location::new([self.maxrow, self.maxcol]) }
-    pub fn location(&self, id: Size) -> Option<&Location> { self.rowcol.get(&id) }
 }
 
 impl Responder for Geometry {
