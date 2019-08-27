@@ -1144,6 +1144,8 @@ static int adapt_send_AIT(struct sk_buff *skb, struct net_device *e1000e) {
     entl_state_machine_t *stm = &entl_dev->edev_stm;
     if (stm == NULL) return -1;
 
+    ADAPT_INFO("%s send_AIT skb: %px\n", e1000e->name, skb);
+
 // mimic IOCTL:
 #if 0
     int q_space = entl_send_AIT_message(stm, ait_data);
@@ -1158,6 +1160,8 @@ static int adapt_send_AIT(struct sk_buff *skb, struct net_device *e1000e) {
 static int adapt_retrieve_AIT(struct net_device *e1000e, ec_ait_data_t *data) {
     ADAPT_INFO("adapt_retrieve_AIT e1000e \"%s\"", e1000e->name);
     if (data == NULL) return -1;
+
+    ADAPT_INFO("%s retr_AIT skb: %px\n", e1000e->name, data);
 
 // mimic IOCTL:
 #if 0
@@ -1213,7 +1217,9 @@ static int adapt_get_state(struct net_device *e1000e, ec_state_t *state) {
     ADAPT_INFO("  entl_dev->edev_queue_stopped: %d", entl_dev->edev_queue_stopped);
 
     char *nic_name = adapter->netdev->name;
-    if (netif_carrier_ok(e1000e)) {
+    int link_state = netif_carrier_ok(e1000e);
+    state->ecs_link_state = link_state; // FIXME: raw data for now
+    if (link_state) {
         int link_speed = adapter->link_speed;
         int link_duplex = adapter->link_duplex;
         ADAPT_INFO("\"%s\" NIC Link is Up %d Mbps %s Duplex", nic_name, link_speed, (link_duplex == FULL_DUPLEX) ? "Full" : "Half");
