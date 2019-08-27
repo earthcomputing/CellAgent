@@ -296,7 +296,7 @@ impl Port {
             let mut packet = port_from_pe.recv().context(PortError::Chain { func_name: _f, comment: S(self.id.get_name()) + " port_from_pe"})?;
             {
                 if CONFIG.trace_options.all || CONFIG.trace_options.port {
-                    let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "port from pe" };
+                    let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "port_from_pe" };
                     let trace = json!({ "id": self.get_id().get_name(), "packet": packet });
                     let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
                 }

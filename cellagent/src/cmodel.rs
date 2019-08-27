@@ -103,32 +103,32 @@ impl Cmodel {
                         let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
                     },
                     CaToCmBytes::Delete(uuid) => {
-                        let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "cm_from_ca_bytes(delete)" };
+                        let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "cm_from_ca_bytes_delete" };
                         let trace = json!({ "cell_id": &self.cell_id, "uuid": uuid });
                         let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
                     },
                     CaToCmBytes::Entry(entry) => {
-                        let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "cm_from_ca_bytes(entry)" };
+                        let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "cm_from_ca_bytes_entry" };
                         let trace = json!({ "cell_id": &self.cell_id, "entry": entry });
                         let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
                     },
                     CaToCmBytes::Reroute((broken_port, new_parent, number_of_packets)) => {
-                        let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "cm_from_ca_bytes(reroute)" };
+                        let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "cm_from_ca_bytes_reroute" };
                         let trace = json!({ "cell_id": &self.cell_id, "broken_port": broken_port, "new_parent": new_parent, "no_packets": number_of_packets });
                         let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
                     },
                     CaToCmBytes::Status((port_no, is_border, _number_of_packets, status)) => {
-                        let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "cm_from_ca_bytes(status)" };
+                        let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "cm_from_ca_bytes_status" };
                         let trace = json!({"cell_id": &self.cell_id, "port_no": port_no, "is_border": is_border, "status": status });
                         let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
                     },
                     CaToCmBytes::TunnelPort((port_no, bytes)) => {
-                        let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "cm_from_ca_bytes(port tunnel)" };
+                        let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "cm_from_ca_bytes_port_tunnel" };
                         let trace = json!({"cell_id": &self.cell_id, "port_no": port_no, "app_msg": bytes });
                         let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
                     }
                     CaToCmBytes::TunnelUp((sender_id, bytes)) => {
-                        let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "cm_from_ca_bytes(up tunnel)" };
+                        let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "cm_from_ca_bytes_up_tunnel" };
                         let trace = json!({"cell_id": &self.cell_id, "sender id": sender_id, "app_msg": bytes });
                         let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
                     }
