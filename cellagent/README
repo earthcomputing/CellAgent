@@ -7,8 +7,8 @@ sudo depmod -ae && sudo update-initramfs -u
 Then reboot.  RECOMMENT THE LINE IN /etc/modprobe.d/e1000e.conf AND RERUN ABOVE LINE WHEN DONE!
 
 After turning on cell:
-$ sudo insmod ../bjackson-e1000e/e1000e-3.3.4/src/e1000e.ko
-$ sudo insmod ../bjackson-ecnl/src/ecnl_device.ko
+$ sudo insmod ../../bjackson-e1000e/e1000e-3.3.4/src/e1000e.ko
+$ sudo insmod ../../bjackson-ecnl/src/ecnl_device.ko
 
 
 Make the driver interface code in C:
