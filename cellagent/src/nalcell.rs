@@ -5,7 +5,6 @@ use std::{
     fmt, fmt::Write,
     collections::{HashMap, HashSet},
     os::raw::{c_void},
-    thread,
     thread::JoinHandle,
     iter::FromIterator,
 };

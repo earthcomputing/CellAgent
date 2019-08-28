@@ -5,10 +5,9 @@ use std::{io::{stdin, stdout, Read},
           fs::{File, OpenOptions},
 	      iter::FromIterator};
 
-use ec_fabrix::config::{CONFIG, PortQty};
+use ec_fabrix::config::{CONFIG};
 use ec_fabrix::nalcell::{NalCell};
-use ec_fabrix::uptree_spec::{AllowedTree, ContainerSpec, Manifest, UpTreeSpec, VmSpec};
-use ec_fabrix::utility::{_print_vec, CellConfig, PortNo};
+use ec_fabrix::utility::{CellConfig, PortNo};
 
 fn main() -> Result<(), Error> {
     let _f = "main";
