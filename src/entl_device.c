@@ -26,6 +26,14 @@ static void entl_watchdog(unsigned long data);
 static void entl_watchdog_task(struct work_struct *work);
 // static void dump_state(char *type, entl_state_t *st, int flag); // debug
 
+static inline int locked_inject(entl_device_t *dev, struct e1000_adapter *adapter, uint16_t emsg_raw, uint32_t seqno, int send_action) {
+    unsigned long flags;
+    spin_lock_irqsave(&adapter->entl_txring_lock, flags);
+    int inject_action = inject_message(dev, emsg_raw, seqno, send_action);
+    spin_unlock_irqrestore(&adapter->entl_txring_lock, flags);
+    return inject_action;
+}
+
 // inline helpers:
 static inline void unpack_eth(const uint8_t *p, uint16_t *u, uint32_t *l) {
     uint16_t mac_hi = (uint16_t) p[0] << 8
@@ -168,11 +176,7 @@ ENTL_DEBUG("%s process_rx - entl_new_AIT_message\n", stm->name);
                 int send_action = entl_next_send(stm, &emsg_raw, &seqno);
 
                 if (get_entl_msg(emsg_raw) != ENTL_MESSAGE_NOP_U) {
-                    unsigned long flags;
-                    spin_lock_irqsave(&adapter->entl_txring_lock, flags);
-                    int inject_action = inject_message(dev, emsg_raw, seqno, send_action);
-                    spin_unlock_irqrestore(&adapter->entl_txring_lock, flags);
-
+                    int inject_action = locked_inject(dev, adapter, emsg_raw, seqno, send_action);
                     // failed inject, invoke task
                     if (inject_action == 1) {
                         // resource error, retry
@@ -207,11 +211,7 @@ ENTL_DEBUG("%s process_rx - entl_new_AIT_message\n", stm->name);
             int send_action = entl_next_send(stm, &emsg_raw, &seqno);
 
             if (get_entl_msg(emsg_raw) != ENTL_MESSAGE_NOP_U) {
-                unsigned long flags;
-                spin_lock_irqsave(&adapter->entl_txring_lock, flags);
-                int inject_action = inject_message(dev, emsg_raw, seqno, send_action);
-                spin_unlock_irqrestore(&adapter->entl_txring_lock, flags);
-
+                int inject_action = locked_inject(dev, adapter, emsg_raw, seqno, send_action);
                 // failed inject, invoke task
                 if (inject_action == 1) {
                     // resource error, so retry
@@ -563,14 +563,10 @@ static void entl_watchdog_task(struct work_struct *work) {
         ||  (entl_state == ENTL_STATE_AM)
         ||  (entl_state == ENTL_STATE_BH)) {
             uint16_t emsg_raw = (uint16_t) -1; uint32_t seqno = (uint32_t) -1;
-            int hello_action = entl_get_hello(stm, &emsg_raw, &seqno);
-            if (hello_action) {
-                unsigned long flags;
-                spin_lock_irqsave(&adapter->entl_txring_lock, flags);
-                int recv_action = inject_message(dev, emsg_raw, seqno, hello_action);
-                spin_unlock_irqrestore(&adapter->entl_txring_lock, flags);
-
-                if (recv_action == 0) {
+            int send_action = entl_get_hello(stm, &emsg_raw, &seqno);
+            if (send_action) {
+                int inject_action = locked_inject(dev, adapter, emsg_raw, seqno, send_action);
+                if (inject_action == 0) {
                     dev->edev_flag &= ~(uint32_t) ENTL_DEVICE_FLAG_HELLO;
                 }
             }
@@ -589,12 +585,9 @@ static void entl_watchdog_task(struct work_struct *work) {
         // uint16_t emsg_raw = dev->edev_u_addr;
         // uint32_t seqno = dev->edev_l_addr;
         // int action = dev->edev_action;
-        unsigned long flags;
-        spin_lock_irqsave(&adapter->entl_txring_lock, flags);
-        int recv_action = inject_message(dev, dev->edev_u_addr, dev->edev_l_addr, dev->edev_action);
-        spin_unlock_irqrestore(&adapter->entl_txring_lock, flags);
+        int inject_action = locked_inject(dev, adapter, dev->edev_u_addr, dev->edev_l_addr, dev->edev_action);
 
-        if (recv_action == 0) {
+        if (inject_action == 0) {
             dev->edev_flag &= ~(uint32_t) ENTL_DEVICE_FLAG_RETRY;
             dev->edev_flag &= ~(uint32_t) ENTL_DEVICE_FLAG_WAITING;
         }
