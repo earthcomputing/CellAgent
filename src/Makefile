@@ -13,6 +13,7 @@ ifneq (4.18.0-25-generic,$(BIONIC_KERNEL))
 EARTH_CUSTOM=3.3.4
 else
 EARTH_CUSTOM=3.4.2.1
+ccflags-y += -DBIONIC
 endif
 
 ENTL_E1000E=../../bjackson-e1000e/e1000e-$(EARTH_CUSTOM)/src
