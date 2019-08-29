@@ -225,7 +225,7 @@ diff -r -u intel-e1000e-3.4.2.1/src/netdev.c e1000e-3.4.2.1/src/netdev.c
  	unsigned int f;
  	__be16 protocol = vlan_get_protocol(skb);
 +#ifdef ENTL
-+	unsigned long flags;
++	unsigned long flags = 0; // FIMXE uninitialized ?
 +#endif
  
  	if (test_bit(__E1000_DOWN, &adapter->state)) {
@@ -363,11 +363,13 @@ diff -r -u intel-e1000e-3.4.2.1/src/netdev.c e1000e-3.4.2.1/src/netdev.c
  
  #ifndef USE_REBOOT_NOTIFIER
  	return pci_register_driver(&e1000_driver);
-@@ -8743,8 +8882,17 @@
+@@ -8743,8 +8882,19 @@
  }
  module_exit(e1000_exit_module);
  
 +#ifdef ENTL
++#define BIONIC_3421
++#include <linux/sched/signal.h>
 +#include "entl_device.c"
 +#endif
 +

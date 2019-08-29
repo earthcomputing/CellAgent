@@ -22,7 +22,11 @@ static void entl_e1000_configure_rx(struct e1000_adapter *adapter);
 
 // forward declarations (internal/private)
 static int inject_message(entl_device_t *dev, uint16_t emsg_raw, uint32_t seqno, int send_action);
+#ifndef BIONIC_3421
 static void entl_watchdog(unsigned long data);
+#else
+static void entl_watchdog(struct timer_list *t);
+#endif
 static void entl_watchdog_task(struct work_struct *work);
 // static void dump_state(char *type, entl_state_t *st, int flag); // debug
 
@@ -61,9 +65,14 @@ static inline void encode_dest(uint8_t *h_dest, uint16_t mac_hi, uint32_t mac_lo
 static void entl_device_init(entl_device_t *dev) {
     memset(dev, 0, sizeof(struct entl_device));
     // watchdog timer & task setup
+#ifndef BIONIC_3421
     init_timer(&dev->edev_watchdog_timer);
     dev->edev_watchdog_timer.function = entl_watchdog;
     dev->edev_watchdog_timer.data = (unsigned long) dev;
+#else
+    struct e1000_adapter *adapter = container_of(dev, struct e1000_adapter, entl_dev);
+    timer_setup(&adapter->watchdog_timer, entl_watchdog, 0);
+#endif
     INIT_WORK(&dev->edev_watchdog_task, entl_watchdog_task);
     ENTL_skb_queue_init(&dev->edev_tx_skb_queue);
     dev->edev_queue_stopped = 0;
@@ -504,10 +513,17 @@ ENTL_DEBUG("%s inject - entl_next_AIT_message\n", stm->name);
     return 0;
 }
 
+#ifndef BIONIC_3421
 static void entl_watchdog(unsigned long data) {
     entl_device_t *dev = (entl_device_t *)data;
     schedule_work(&dev->edev_watchdog_task); // use global kernel work queue
 }
+#else
+static void entl_watchdog(struct timer_list *t) {
+    struct e1000_adapter *adapter = from_timer(adapter, t, watchdog_timer); // FIXME : is this right?
+    schedule_work(&adapter->watchdog_task);
+}
+#endif
 
 static inline void notify_listener(int subscriber, int sigusr) {
     struct siginfo info = {
