@@ -1,6 +1,6 @@
 diff -r -u intel-e1000e-3.4.2.1/src/Makefile e1000e-3.4.2.1/src/Makefile
 --- intel-e1000e-3.4.2.1/src/Makefile	2018-08-26 08:33:30.000000000 +0000
-+++ e1000e-3.4.2.1/src/Makefile	2019-08-29 09:24:11.157530699 +0000
++++ e1000e-3.4.2.1/src/Makefile	2019-08-29 09:34:52.132602900 +0000
 @@ -6,11 +6,16 @@
  FAMILYC = 82571.c ich8lan.c 80003es2lan.c
  FAMILYH = 82571.h ich8lan.h 80003es2lan.h
@@ -20,3 +20,364 @@ diff -r -u intel-e1000e-3.4.2.1/src/Makefile e1000e-3.4.2.1/src/Makefile
  ifeq (,$(BUILD_KERNEL))
  BUILD_KERNEL=$(shell uname -r)
  endif
+diff -r -u intel-e1000e-3.4.2.1/src/e1000.h e1000e-3.4.2.1/src/e1000.h
+--- intel-e1000e-3.4.2.1/src/e1000.h	2018-08-26 08:33:30.000000000 +0000
++++ e1000e-3.4.2.1/src/e1000.h	2019-08-29 09:49:11.587258921 +0000
+@@ -30,6 +30,8 @@
+ #endif
+ #include "hw.h"
+ 
++#include "entl_device.h"
++
+ struct e1000_info;
+ 
+ #define e_dbg(format, arg...) \
+@@ -391,6 +393,10 @@
+ #endif
+ 	s32 ptp_delta;
+ 	u16 eee_advert;
++
++	u32 entl_flag;
++	entl_device_t entl_dev;
++	spinlock_t entl_txring_lock;
+ };
+ 
+ struct e1000_info {
+diff -r -u intel-e1000e-3.4.2.1/src/netdev.c e1000e-3.4.2.1/src/netdev.c
+--- intel-e1000e-3.4.2.1/src/netdev.c	2018-08-26 08:33:30.000000000 +0000
++++ e1000e-3.4.2.1/src/netdev.c	2019-08-29 10:37:35.253705162 +0000
+@@ -27,12 +27,16 @@
+ #endif
+ #include <linux/prefetch.h>
+ 
++#ifdef ENTL
++#define _IN_NETDEV_C_
++#endif
++
+ #include "e1000.h"
+ 
+ #ifdef CONFIG_E1000E_NAPI
+-#define DRV_EXTRAVERSION "" "-NAPI"
++#define DRV_EXTRAVERSION "" "-NAPI-ENTL"
+ #else
+-#define DRV_EXTRAVERSION ""
++#define DRV_EXTRAVERSION "-ENTL"
+ #endif
+ 
+ #define DRV_VERSION "3.4.2.1" DRV_EXTRAVERSION
+@@ -1082,6 +1086,24 @@
+ 		total_rx_bytes += length;
+ 		total_rx_packets++;
+ 
++#ifdef ENTL
++		if (adapter->entl_flag) {
++			skb_put(skb, length);
++			// ENTL only, do not forward
++			if (!entl_device_process_rx_packet(&adapter->entl_dev, skb)) {
++				buffer_info->skb = skb; // recycle
++				goto next_desc;
++			}
++
++			// drop non-EC types
++			struct ethhdr *eth = (struct ethhdr *) skb->data;
++			if (eth->h_proto != ETH_P_ECLP && eth->h_proto != ETH_P_ECLD) {
++				buffer_info->skb = skb; // recycle
++				goto next_desc;
++			}
++		}
++#endif
++
+ 		/* code added for copybreak, this should improve
+ 		 * performance for small packets with large amounts
+ 		 * of reassembly being done in the stack
+@@ -1489,6 +1511,16 @@
+ 			goto next_desc;
+ 		}
+ 
++#ifdef ENTL
++		if (adapter->entl_flag) {
++			// ENTL only, do not forward
++			if (!entl_device_process_rx_packet(&adapter->entl_dev, skb)) {
++				dev_kfree_skb_irq(skb);
++				goto next_desc;
++			}
++		}
++#endif
++
+ 		/* Good Receive */
+ 		skb_put(skb, length);
+ 
+@@ -1698,6 +1730,15 @@
+ 			rx_ring->rx_skb_top = NULL;
+ 			goto next_desc;
+ 		}
++#ifdef ENTL
++		if (adapter->entl_flag) {
++			// ENTL only, do not forward
++			if (!entl_device_process_rx_packet(&adapter->entl_dev, skb)) {
++				buffer_info->skb = skb; // recycle
++				goto next_desc;
++			}
++		}
++#endif
+ #define rxtop (rx_ring->rx_skb_top)
+ 		if (!(staterr & E1000_RXD_STAT_EOP)) {
+ 			/* this descriptor is only the beginning (or middle) */
+@@ -2109,7 +2150,11 @@
+ 	/* guard against interrupt when we're going down */
+ 	if (!test_bit(__E1000_DOWN, &adapter->state)) {
+ 		mod_timer(&adapter->watchdog_timer, jiffies + 1);
++#ifdef ENTL
++		ew32(IMS, E1000_IMS_OTHER | E1000_IMS_LSC);
++#else
+ 		ew32(IMS, E1000_IMS_OTHER);
++#endif
+ 	}
+ 
+ 	return IRQ_HANDLED;
+@@ -3853,7 +3898,11 @@
+ 	/* clear the affected bits */
+ 	rctl &= ~(E1000_RCTL_UPE | E1000_RCTL_MPE);
+ 
++#ifdef ENTL
++	if (adapter->entl_flag || netdev->flags & IFF_PROMISC) {
++#else
+ 	if (netdev->flags & IFF_PROMISC) {
++#endif
+ 		rctl |= (E1000_RCTL_UPE | E1000_RCTL_MPE);
+ #ifdef HAVE_VLAN_RX_REGISTER
+ 		rctl &= ~E1000_RCTL_VFE;
+@@ -4699,7 +4748,17 @@
+ void e1000e_up(struct e1000_adapter *adapter)
+ {
+ 	/* hardware has been reset, we need to reload some things */
++#ifdef ENTL
++	if (adapter->entl_flag) {
++		entl_e1000_configure(adapter);
++		entl_device_link_up(&adapter->entl_dev);
++	}
++	else {
++		e1000_configure(adapter);
++	}
++#else
+ 	e1000_configure(adapter);
++#endif
+ 
+ 	clear_bit(__E1000_DOWN, &adapter->state);
+ 
+@@ -4757,6 +4816,11 @@
+ 	set_bit(__E1000_DOWN, &adapter->state);
+ 
+ 	netif_carrier_off(netdev);
++#ifdef ENTL
++	if (adapter->entl_flag) {
++		entl_device_link_down(&adapter->entl_dev);
++	}
++#endif
+ #ifdef DYNAMIC_LTR_SUPPORT
+ 	adapter->c10_demote_ltr = false;
+ 	e1000_demote_ltr(hw, false, false);
+@@ -5161,7 +5225,16 @@
+ 	 * as soon as we call pci_request_irq, so we have to setup our
+ 	 * clean_rx handler before we do so.
+ 	 */
++#ifdef ENTL
++	if (adapter->entl_flag) {
++		entl_e1000_configure(adapter);
++	}
++	else {
++		e1000_configure(adapter);
++	}
++#else
+ 	e1000_configure(adapter);
++#endif
+ 
+ 	err = e1000_request_irq(adapter);
+ 	if (err)
+@@ -5909,7 +5982,11 @@
+ 				phy->ops.cfg_on_link_up(hw);
+ 
+ 			netif_carrier_on(netdev);
+-
++#ifdef ENTL
++			if (adapter->entl_flag) {
++				entl_device_link_up(&adapter->entl_dev);
++			}
++#endif
+ 			if (!test_bit(__E1000_DOWN, &adapter->state))
+ 				mod_timer(&adapter->phy_info_timer,
+ 					  round_jiffies(jiffies + 2 * HZ));
+@@ -5924,7 +6001,11 @@
+ 			if (!test_bit(__E1000_DOWN, &adapter->state))
+ 				mod_timer(&adapter->phy_info_timer,
+ 					  round_jiffies(jiffies + 2 * HZ));
+-
++#ifdef ENTL
++			if (adapter->entl_flag) {
++				entl_device_link_down(&adapter->entl_dev);
++			}
++#endif
+ 			/* 8000ES2LAN requires a Rx packet buffer work-around
+ 			 * on link down event; reset the controller to flush
+ 			 * the Rx packet buffer.
+@@ -6441,6 +6522,9 @@
+ 	int tso;
+ 	unsigned int f;
+ 	__be16 protocol = vlan_get_protocol(skb);
++#ifdef ENTL
++	unsigned long flags;
++#endif
+ 
+ 	if (test_bit(__E1000_DOWN, &adapter->state)) {
+ 		dev_kfree_skb_any(skb);
+@@ -6458,6 +6542,12 @@
+ 	if (skb_put_padto(skb, 17))
+ 		return NETDEV_TX_OK;
+ 
++#ifdef ENTL
++	if (adapter->entl_flag) {
++		entl_device_process_tx_packet(&adapter->entl_dev, skb);
++	}
++#endif
++
+ #ifdef NETIF_F_TSO
+ 	mss = skb_shinfo(skb)->gso_size;
+ 	if (mss) {
+@@ -6505,11 +6595,19 @@
+ 	if (adapter->hw.mac.tx_pkt_filtering)
+ 		e1000_transfer_dhcp_info(adapter, skb);
+ 
++#ifndef ENTL_TX_ON_ENTL_ENABLE
+ 	/* need: count + 2 desc gap to keep tail from touching
+ 	 * head, otherwise try next time
+ 	 */
+-	if (e1000_maybe_stop_tx(tx_ring, count + 2))
++	if (e1000_maybe_stop_tx(tx_ring, count + 2)) {
++#ifdef ENTL
++		if (adapter->entl_flag) {
++			spin_unlock_irqrestore(&adapter->entl_txring_lock, flags);
++		}
++#endif
+ 		return NETDEV_TX_BUSY;
++	}
++#endif
+ 
+ #if defined(NETIF_F_HW_VLAN_TX) || defined(NETIF_F_HW_VLAN_CTAG_TX)
+ 	if (skb_vlan_tag_present(skb)) {
+@@ -6518,6 +6616,11 @@
+ 			     E1000_TX_FLAGS_VLAN_SHIFT);
+ 	}
+ #endif
++#ifdef ENTL
++	if (adapter->entl_flag) {
++		spin_lock_irqsave(&adapter->entl_txring_lock, flags);
++	}
++#endif
+ 	first = tx_ring->next_to_use;
+ 
+ 	tso = e1000_tso(tx_ring, skb, protocol);
+@@ -6618,6 +6721,11 @@
+ 	netdev->trans_start = jiffies;
+ #endif
+ 
++#ifdef ENTL
++	if (adapter->entl_flag) {
++		spin_unlock_irqrestore(&adapter->entl_txring_lock, flags);
++	}
++#endif
+ 	return NETDEV_TX_OK;
+ }
+ 
+@@ -6962,6 +7070,16 @@
+ 	case SIOCETHTOOL:
+ 		return ethtool_ioctl(ifr);
+ #endif
++#ifdef ENTL
++	case SIOCDEVPRIVATE_ENTL_RD_CURRENT:
++	case SIOCDEVPRIVATE_ENTL_RD_ERROR:
++	case SIOCDEVPRIVATE_ENTL_SET_SIGRCVR:
++	case SIOCDEVPRIVATE_ENTL_GEN_SIGNAL:
++	case SIOCDEVPRIVATE_ENTL_DO_INIT:
++	case SIOCDEVPRIVATE_ENTT_SEND_AIT:
++	case SIOCDEVPRIVATE_ENTT_READ_AIT:
++	return entl_do_ioctl(netdev, ifr, cmd); 
++#endif
+ 	default:
+ 		return -EOPNOTSUPP;
+ 	}
+@@ -7955,7 +8073,11 @@
+ static const struct net_device_ops e1000e_netdev_ops = {
+ 	.ndo_open		= e1000e_open,
+ 	.ndo_stop		= e1000e_close,
++#ifdef ENTL_TX_ON_ENTL_ENABLE
++	.ndo_start_xmit		= entl_tx_transmit,
++#else
+ 	.ndo_start_xmit		= e1000_xmit_frame,
++#endif
+ #ifdef HAVE_NDO_GET_STATS64
+ 	.ndo_get_stats64	= e1000e_get_stats64,
+ #else /* HAVE_NDO_GET_STATS64 */
+@@ -8092,6 +8214,11 @@
+ 	adapter->hw.mac.type = ei->mac;
+ 	adapter->max_hw_frame_size = ei->max_hw_frame_size;
+ 	adapter->msg_enable = netif_msg_init(debug, DEFAULT_MSG_ENABLE);
++#ifdef ENTL
++	spin_lock_init(&adapter->entl_txring_lock);
++	entl_device_init(&adapter->entl_dev);
++	adapter->entl_flag = 1;
++#endif
+ 
+ 	/* Workaround FLR issues for 82579
+ 	 * This code disables the FLR (Function Level Reset) via PCIe, in order
+@@ -8143,7 +8270,11 @@
+ #else
+ 	netdev->open = &e1000e_open;
+ 	netdev->stop = &e1000e_close;
++#ifdef ENTL_TX_ON_ENTL_ENABLE
++	netdev->hard_start_xmit = &entl_tx_transmit;
++#else
+ 	netdev->hard_start_xmit = &e1000_xmit_frame;
++#endif
+ 	netdev->get_stats = &e1000_get_stats;
+ #ifdef HAVE_SET_RX_MODE
+ 	netdev->set_rx_mode = &e1000e_set_rx_mode;
+@@ -8334,6 +8465,10 @@
+ 		goto err_eeprom;
+ 	}
+ 
++#ifdef ENTL
++	entl_e1000_set_my_addr(adapter, netdev->dev_addr);
++#endif
++
+ 	timer_setup(&adapter->watchdog_timer, e1000_watchdog, 0);
+ 
+ 	timer_setup(&adapter->phy_info_timer, e1000_update_phy_info, 0);
+@@ -8716,6 +8851,10 @@
+ 	pr_info("Intel(R) PRO/1000 Network Driver - %s\n",
+ 		e1000e_driver_version);
+ 	pr_info("Copyright(c) 1999 - 2018 Intel Corporation.\n");
++#ifdef ENTL
++	pr_info("Earth Computing ENTL extension\n");
++	pr_info("Copyright(c) 2016 - 2019 Earth Computing.\n");
++#endif
+ 
+ #ifndef USE_REBOOT_NOTIFIER
+ 	return pci_register_driver(&e1000_driver);
+@@ -8743,8 +8882,17 @@
+ }
+ module_exit(e1000_exit_module);
+ 
++#ifdef ENTL
++#include "entl_device.c"
++#endif
++
++#ifdef ENTL
++MODULE_AUTHOR("Intel Corporation, <linux.nics@intel.com> + Earth Computing");
++MODULE_DESCRIPTION("Intel(R) PRO/1000 Network Driver with Earth Computing Extension(s)");
++#else
+ MODULE_AUTHOR("Intel Corporation, <linux.nics@intel.com>");
+ MODULE_DESCRIPTION("Intel(R) PRO/1000 Network Driver");
++#endif
+ MODULE_LICENSE("GPL");
+ MODULE_VERSION(DRV_VERSION);
+ 
