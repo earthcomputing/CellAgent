@@ -20,25 +20,14 @@ pub fn cell_geometry(path: &str, state: web::Data<AppGeometry>, record: web::Jso
     }
     Ok(HttpResponse::Ok().body(format!("{} adding {}\n{:?}\n", path, record, app_geometry)))
 }
-#[derive(Debug, Copy, Clone, Deserialize)]
+#[derive(Debug, Copy, Clone, Serialize, Deserialize)]
 struct GeoStruct {
     cell_number: usize,
     location: [usize; 2]
 }
-#[derive(Debug, Clone, Default, Serialize)]
+#[derive(Debug, Default, Serialize)]
 pub struct AppGeometry {
-    geometry: Arc<Mutex<Geometry>>
-}
-impl Responder for AppGeometry {
-    type Error = actix_web::Error;
-    type Future = Result<HttpResponse, actix_web::Error>;
-    
-    fn respond_to(self, _req: &HttpRequest) -> Self::Future {
-        let body = serde_json::to_string(&self)?;
-        Ok(HttpResponse::Ok()
-            .content_type("application/json")
-            .body(body))
-    }
+    geometry: Mutex<Geometry>
 }
 
 #[derive(Debug, Copy, Clone, Default, Eq, PartialEq, Serialize, Deserialize)]
@@ -75,18 +64,6 @@ impl Geometry {
         self.maxrow = max(self.maxrow, rowcol.row);
         self.maxcol = max(self.maxrow, rowcol.col);
         self.rowcol.insert(id.0, rowcol); 
-    }
-}
-
-impl Responder for Geometry {
-    type Error = Error;
-    type Future =Result<HttpResponse, Error>;
-    
-    fn respond_to(self, _req: &HttpRequest) -> Self::Future {
-        let body = serde_json::to_string(&self)?;
-        Ok(HttpResponse::Ok()
-            .content_type("application/json")
-            .body(body))
     }
 }
 impl fmt::Display for Geometry {
