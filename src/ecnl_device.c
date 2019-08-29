@@ -102,6 +102,7 @@ static void nl_ecnl_post_doit(const struct genl_ops *ops, struct sk_buff *skb, s
     // return 0;
 }
 
+#ifndef BIONIC
 static struct genl_family nl_ecnd_fam = {
     .id = GENL_ID_GENERATE,
     .name = ECNL_GENL_NAME,
@@ -112,6 +113,9 @@ static struct genl_family nl_ecnd_fam = {
     .pre_doit = nl_ecnl_pre_doit,
     .post_doit = nl_ecnl_post_doit,
 };
+#else
+static struct genl_family nl_ecnd_fam;
+#endif
 
 #define GENLMSG_DATA(nh) ((void *) (((char *) nlmsg_data(nh)) + GENL_HDRLEN))
 #define NLA_DATA(na) ((void *) (((char *) (na)) + NLA_HDRLEN))
@@ -121,7 +125,11 @@ static struct genl_family nl_ecnd_fam = {
 
 // on the user side, prefer: env NLCB=debug
 static void dump_skbuff(void *user_hdr) {
+#ifndef BIONIC
     struct nlmsghdr *nh = genlmsg_nlhdr(user_hdr, &nl_ecnd_fam);
+#else
+    struct nlmsghdr *nh = genlmsg_nlhdr(user_hdr);
+#endif
     struct genlmsghdr *gh = nlmsg_data(nh);
     struct nlattr *head = (struct nlattr *) GENLMSG_DATA(nh);
     void *after = (void *) (((char *) nh) + nh->nlmsg_len);
@@ -235,12 +243,22 @@ static int add_link_state(struct sk_buff *rskb, ecnl_device_t *e_dev, struct ent
     NLAPUT_CHECKED(nla_put_string(rskb, NL_ECNL_ATTR_PORT_NAME, e_driver->eda_name));
 
     NLAPUT_CHECKED(nla_put_u32(rskb, NL_ECNL_ATTR_PORT_LINK_STATE, state->ecs_link_state));
+#ifndef BIONIC
     NLAPUT_CHECKED(nla_put_u64(rskb, NL_ECNL_ATTR_PORT_S_COUNTER, state->ecs_s_count));
     NLAPUT_CHECKED(nla_put_u64(rskb, NL_ECNL_ATTR_PORT_R_COUNTER, state->ecs_r_count));
     NLAPUT_CHECKED(nla_put_u64(rskb, NL_ECNL_ATTR_PORT_RECOVER_COUNTER, state->ecs_recover_count));
     NLAPUT_CHECKED(nla_put_u64(rskb, NL_ECNL_ATTR_PORT_RECOVERED_COUNTER, state->ecs_recovered_count));
     NLAPUT_CHECKED(nla_put_u64(rskb, NL_ECNL_ATTR_PORT_ENTT_COUNT, state->ecs_recover_count));
     NLAPUT_CHECKED(nla_put_u64(rskb, NL_ECNL_ATTR_PORT_AOP_COUNT, state->ecs_recovered_count));
+#else
+    int padattr = 0; // FIXME ??
+    NLAPUT_CHECKED(nla_put_u64_64bit(rskb, NL_ECNL_ATTR_PORT_S_COUNTER, state->ecs_s_count, padattr));
+    NLAPUT_CHECKED(nla_put_u64_64bit(rskb, NL_ECNL_ATTR_PORT_R_COUNTER, state->ecs_r_count, padattr));
+    NLAPUT_CHECKED(nla_put_u64_64bit(rskb, NL_ECNL_ATTR_PORT_RECOVER_COUNTER, state->ecs_recover_count, padattr));
+    NLAPUT_CHECKED(nla_put_u64_64bit(rskb, NL_ECNL_ATTR_PORT_RECOVERED_COUNTER, state->ecs_recovered_count, padattr));
+    NLAPUT_CHECKED(nla_put_u64_64bit(rskb, NL_ECNL_ATTR_PORT_ENTT_COUNT, state->ecs_recover_count, padattr));
+    NLAPUT_CHECKED(nla_put_u64_64bit(rskb, NL_ECNL_ATTR_PORT_AOP_COUNT, state->ecs_recovered_count, padattr));
+#endif
     NLAPUT_CHECKED(nla_put_u32(rskb, NL_ECNL_ATTR_NUM_AIT_MESSAGES, state->ecs_num_queued));
     return 0;
 }
@@ -761,6 +779,20 @@ static const struct genl_ops nl_ecnl_ops[] = {
     },
 
 };
+
+#ifdef BIONIC
+static struct genl_family nl_ecnd_fam = {
+    // .id = GENL_ID_GENERATE,
+    .name = ECNL_GENL_NAME,
+    .hdrsize = 0,
+    .version = 1,
+    .maxattr = NL_ECNL_ATTR_MAX,
+    .netnsok = true,
+    .pre_doit = nl_ecnl_pre_doit,
+    .post_doit = nl_ecnl_post_doit,
+    .ops = nl_ecnl_ops,
+};
+#endif
 
 // unused ?
 static int ecnl_driver_index(unsigned char *ecnl_name) {
@@ -1406,7 +1438,11 @@ static int __init ecnl_init_module(void) {
     pr_info("Earth Computing Generic Netlink Module - %s\n", ECNL_DEVICE_DRIVER_VERSION);
     pr_info("Copyright(c) 2018, 2019 Earth Computing\n");
 
+#ifndef BIONIC
     int err = genl_register_family_with_ops_groups(&nl_ecnd_fam, nl_ecnl_ops, nl_ecnd_mcgrps);
+#else
+    int err = genl_register_family(&nl_ecnd_fam); // , nl_ecnl_ops, nl_ecnd_mcgrps);
+#endif
     if (err) {
         ECNL_DEBUG("ecnl_init_module failed register genetlink family: \"%s\"", nl_ecnd_fam.name);
         return -EINVAL;
