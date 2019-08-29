@@ -5,4 +5,7 @@
 //#![allow(unused_imports)]
 //#![warn(rust_2018_idioms)]
 
+pub mod discoverd;
 pub mod geometry;
+pub mod hello;
+pub mod trace_record;

@@ -16,16 +16,11 @@ use serde_json::{Value};
 use crate::config::{CONFIG};
 use crate::utility::{S, TraceHeader, TraceHeaderParams, TraceType};
 
-thread_local!(static TRACE_HEADER: RefCell<TraceHeader> = RefCell::new(TraceHeader::new()));
-pub fn fork_trace_header() -> TraceHeader { TRACE_HEADER.with(|t| t.borrow_mut().fork_trace()) }
-pub fn update_trace_header(child_trace_header: TraceHeader) { TRACE_HEADER.with(|t| *t.borrow_mut() = child_trace_header); }
-
 const FOR_EVAL: bool = true;
 
 // TODO: Integrate with log crate
 
 lazy_static! {
-    static ref FOO: usize = 10;
     static ref SERVER_URL: String = ::std::env::var("SERVER_URL").expect("Environment variable SERVER_URL not set");
     static ref PRODUCER_RD: FutureProducer = ClientConfig::new()
                         .set("bootstrap.servers", &CONFIG.kafka_server)
@@ -35,6 +30,9 @@ lazy_static! {
 }
 thread_local!{ static SYSTEM: RefCell<SystemRunner> = RefCell::new(System::new("Tracer")); }
 thread_local!{ static SKIP: RefCell<HashSet<String>> = RefCell::new(HashSet::new()); }
+thread_local!(static TRACE_HEADER: RefCell<TraceHeader> = RefCell::new(TraceHeader::new()));
+pub fn fork_trace_header() -> TraceHeader { TRACE_HEADER.with(|t| t.borrow_mut().fork_trace()) }
+pub fn update_trace_header(child_trace_header: TraceHeader) { TRACE_HEADER.with(|t| *t.borrow_mut() = child_trace_header); }
 
 pub fn add_to_trace(trace_type: TraceType, trace_params: &TraceHeaderParams,
                     trace_body: &Value, caller: &str) -> Result<(), Error> {
@@ -85,6 +83,7 @@ fn trace_it(trace_record: &TraceRecord) -> Result<(), Error> {
     let header = trace_record.header;
     let format = header.format();
     let server_url = format!("{}/{}", *SERVER_URL, format);
+    let server_url_clone = server_url.clone(); // So I can print as part of en error response
     let value = serde_json::to_value(trace_record)?;
     SKIP.with(|skip| {
         let mut s = skip.borrow_mut();
@@ -99,6 +98,9 @@ fn trace_it(trace_record: &TraceRecord) -> Result<(), Error> {
                         .map_err(|e| println!("Error from server {:?}", e))
                         .and_then(|response| {
                             if !response.status().is_success() {
+                                if response.status() != 404 {
+                                    println!("Error {}: {:?}", server_url_clone, response);
+                                }
                                 s.insert(format.to_owned());
                             }
                             Ok(())

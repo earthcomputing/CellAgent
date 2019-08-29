@@ -791,7 +791,7 @@ impl CellAgent {
                         CmToCaBytes::Bytes((port_no, _, _, bytes)) => {
                             let ec_msg: Box<dyn Message> = serde_json::from_str(&bytes.to_string()?)?;
                             let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "ca_from_cm_bytes" };
-                            let trace = json!({ "cell_id": self.cell_id, "port": port_no, "ec_msg": ec_msg });
+                            let trace = json!({ "cell_id": self.cell_id, "port": port_no, "msg": ec_msg });
                             let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
                         },
                         CmToCaBytes::Status((port_no, is_border, number_of_packets, status)) => {
@@ -802,7 +802,7 @@ impl CellAgent {
                         CmToCaBytes::TunnelPort((port_no, bytes)) => {
                             let app_msg: Box<dyn AppMessage> = serde_json::from_str(&bytes.to_string()?)?;
                             let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "ca_from_cm_bytes_port" };
-                            let trace = json!({ "cell_id": self.cell_id, "port": port_no, "app_msg": app_msg });
+                            let trace = json!({ "cell_id": self.cell_id, "port": port_no, "msg": app_msg });
                             let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
                         },
                         CmToCaBytes::TunnelUp((sender_id, bytes)) => {
@@ -1164,6 +1164,13 @@ impl CellAgent {
     pub fn process_hello_msg(&mut self, msg: &HelloMsg, port_no: PortNo)
             -> Result<(), Error> {
         let _f = "process_hello_msg";
+        {
+            if CONFIG.trace_options.all || CONFIG.trace_options.ca {
+                let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "ca_process_hello_msg" };
+                let trace = json!({ "cell_id": &self.cell_id, "port_no": port_no, "msg": msg.value() });
+                let _ = add_to_trace(TraceType::Debug, trace_params, &trace, _f);
+            }
+        }
         let payload = msg.get_payload();
         let neighbor_cell_id = payload.get_cell_id();
         let neigbor_port_no = payload.get_port_no();
