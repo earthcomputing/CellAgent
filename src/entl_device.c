@@ -1142,6 +1142,12 @@ static netdev_tx_t adapt_start_xmit(struct sk_buff *skb, struct net_device *e100
     return NETDEV_TX_BUSY; // 0x10
 }
 
+#if 0
+static inline unsigned long copy_to(void *to, const void *from, unsigned long n) {
+    return 0;
+}
+#endif
+
 static int adapt_send_AIT(struct sk_buff *skb, struct net_device *e1000e) {
     ADAPT_INFO("adapt_send_AIT e1000e \"%s\"", e1000e->name);
     if (skb == NULL) return -1;
@@ -1157,11 +1163,17 @@ static int adapt_send_AIT(struct sk_buff *skb, struct net_device *e1000e) {
 
 // mimic IOCTL:
 #if 0
-    ec_ait_data_t *data; // copy from skb
-    int q_space = entl_send_AIT_message(stm, ait_data); // sendq_push
-    ait_data->num_messages = q_space;
+    // FIXME : real data AND buffer mgmt ??
+    struct entt_ioctl_ait_data ait_data;
+    int nbytes = 0;
+    copy_to(&ait_data.data, skb, sizeof(struct entt_ioctl_ait_data));
+    ait_data.message_len = nbytes; // inject_message : memcpy(payload, ait_data->data, ait_data->message_len);
+    int q_space = entl_send_AIT_message(stm, &ait_data); // sendq_push
+    ait_data.num_messages = q_space;
+    // FIXME : return q_space to caller ??
     if (q_space < 0) {
-        kfree(ait_data); // FIXME: check for memory leak?
+        // kfree(ait_data); // FIXME: check for memory leak?
+        return -1;
     }
 #endif
     return 0;
