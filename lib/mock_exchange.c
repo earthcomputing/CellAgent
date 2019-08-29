@@ -2,6 +2,9 @@
 
 #define CLEAR_MSG { nlmsg_free(msg); msg = nlmsg_alloc(); }
 
+int send_port_id = 3; // enp7s0
+int retr_port_id = 2; // enp9s0
+
 int doit(struct nl_sock *sock, struct nl_msg *msg) {
     uint32_t module_id = 0;
     uint32_t actual_module_id;
@@ -38,6 +41,8 @@ int doit(struct nl_sock *sock, struct nl_msg *msg) {
         if (rc < 0) fatal_error(rc, "get_port_state");
         if (actual_module_id != module_id) fatal_error(-1, "module mismatch: %d, %d", module_id, actual_module_id);
         if (actual_port_id != port_id) fatal_error(-1, "port mismatch: %d, %d", port_id, actual_port_id);
+
+        printf("Link is %s - '%s' (%d)\n", (link_state.port_link_state) ? "Up" : "Down", link_state.port_name, port_id);
     }
 
     {
@@ -58,20 +63,20 @@ int doit(struct nl_sock *sock, struct nl_msg *msg) {
         printf("send_ait_message\n");
         uint32_t message_length;
         uint8_t *frame;
-        int rc = send_ait_message(sock, msg, module_id, port_id, buf, &actual_module_id, &actual_port_id);
+        int rc = send_ait_message(sock, msg, module_id, send_port_id, buf, &actual_module_id, &actual_port_id);
         if (rc < 0) fatal_error(rc, "send_ait_message");
         if (actual_module_id != module_id) fatal_error(-1, "module mismatch: %d, %d", module_id, actual_module_id);
-        if (actual_port_id != port_id) fatal_error(-1, "port mismatch: %d, %d", port_id, actual_port_id);
+        if (actual_port_id != send_port_id) fatal_error(-1, "port mismatch: %d, %d", send_port_id, actual_port_id);
     }
 
     {
         CLEAR_MSG;
         printf("retrieve_ait_message\n");
         buf_desc_t actual_buf; memset(&actual_buf, 0, sizeof(buf_desc_t));
-        int rc = retrieve_ait_message(sock, msg, module_id, port_id, alo_reg, &actual_module_id, &actual_port_id, &actual_buf);
+        int rc = retrieve_ait_message(sock, msg, module_id, retr_port_id, alo_reg, &actual_module_id, &actual_port_id, &actual_buf);
         if (rc < 0) fatal_error(rc, "retrieve_ait_message");
         if (actual_module_id != module_id) fatal_error(-1, "module mismatch: %d, %d", module_id, actual_module_id);
-        if (actual_port_id != port_id) fatal_error(-1, "port mismatch: %d, %d", port_id, actual_port_id);
+        if (actual_port_id != retr_port_id) fatal_error(-1, "port mismatch: %d, %d", retr_port_id, actual_port_id);
 
         printf("retr: %d '%s'\n", actual_buf.len, (char *) actual_buf.frame); // assumes c-string
     }
