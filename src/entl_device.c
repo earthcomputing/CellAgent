@@ -1141,7 +1141,8 @@ static int adapt_send_AIT(struct sk_buff *skb, struct net_device *e1000e) {
 
 // mimic IOCTL:
 #if 0
-    int q_space = entl_send_AIT_message(stm, ait_data);
+    ec_ait_data_t *data; // copy from skb
+    int q_space = entl_send_AIT_message(stm, ait_data); // sendq_push
     ait_data->num_messages = q_space;
     if (q_space < 0) {
         kfree(ait_data); // FIXME: check for memory leak?
@@ -1154,11 +1155,18 @@ static int adapt_retrieve_AIT(struct net_device *e1000e, ec_ait_data_t *data) {
     ADAPT_INFO("adapt_retrieve_AIT e1000e \"%s\"", e1000e->name);
     if (data == NULL) return -1;
 
+    struct e1000_adapter *adapter = netdev_priv(e1000e);
+    if (adapter == NULL) return -1;
+    entl_device_t *entl_dev = &adapter->entl_dev;
+    if (entl_dev == NULL) return -1;
+    entl_state_machine_t *stm = &entl_dev->edev_stm;
+    if (stm == NULL) return -1;
+
     ADAPT_INFO("%s retr_AIT skb: %px\n", e1000e->name, data);
 
 // mimic IOCTL:
 #if 0
-    struct entt_ioctl_ait_data *ait_data = entl_read_AIT_message(stm);
+    struct entt_ioctl_ait_data *ait_data = entl_read_AIT_message(stm); // recvq_pop
     if (ait_data) {
         copy_to(data, ait_data, sizeof(struct entt_ioctl_ait_data));
         kfree(ait_data);
