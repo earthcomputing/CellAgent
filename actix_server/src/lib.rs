@@ -8,4 +8,5 @@
 pub mod discoverd;
 pub mod geometry;
 pub mod hello;
+pub mod index;
 pub mod trace_record;
