@@ -791,6 +791,9 @@ static struct genl_family nl_ecnd_fam = {
     .pre_doit = nl_ecnl_pre_doit,
     .post_doit = nl_ecnl_post_doit,
     .ops = nl_ecnl_ops,
+    .n_ops = ARRAY_SIZE(nl_ecnl_ops),
+    .mcgrps = nl_ecnd_mcgrps,
+    .n_mcgrps = ARRAY_SIZE(nl_ecnd_mcgrps),
 };
 #endif
 
@@ -1387,6 +1390,7 @@ e1000e_hackery_t e1000e_ports[] = {
     { .index = 2, .name = "enp8s0", .e1000e = NULL, },
     { .index = 3, .name = "enp9s0", .e1000e = NULL, },
     { .index = 4, .name = "enp7s0", .e1000e = NULL, },
+    { .index = 5, .name = "eno1",   .e1000e = NULL, },
 };
 
 // FIXME : should instead auto-detect compatible instances
@@ -1403,6 +1407,7 @@ static void hack_init(void) {
     struct entl_driver_funcs *funcs = &entl_adapt_funcs;
     for (int i = 0; i < ARRAY_SIZE(e1000e_ports); i++) {
         e1000e_hackery_t *p = &e1000e_ports[i];
+        if (!p->e1000e) continue;
         int port_no = ecnl_register_port(module_id, p->name, p->e1000e, funcs);
         if (port_no < 0) { ECNL_INFO("failed to register \"%s\"", p->name); }
     }

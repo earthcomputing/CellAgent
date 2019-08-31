@@ -2,8 +2,13 @@
 
 #define CLEAR_MSG { nlmsg_free(msg); msg = nlmsg_alloc(); }
 
+#ifndef BIONIC
 int send_port_id = 3; // enp7s0
 int retr_port_id = 2; // enp9s0
+#else
+int send_port_id = 0; // enp6s0 or eno1
+int retr_port_id = 0; // enp6s0 or eno1
+#endif
 
 int doit(struct nl_sock *sock, struct nl_msg *msg) {
     uint32_t module_id = 0;
@@ -43,6 +48,7 @@ int doit(struct nl_sock *sock, struct nl_msg *msg) {
         if (actual_port_id != port_id) fatal_error(-1, "port mismatch: %d, %d", port_id, actual_port_id);
 
         printf("Link is %s - '%s' (%d)\n", (link_state.port_link_state) ? "Up" : "Down", link_state.port_name, port_id);
+        printf("\n");
     }
 
     {
@@ -85,16 +91,10 @@ int doit(struct nl_sock *sock, struct nl_msg *msg) {
 int main(int argc, char *argv[]) {
     int err;
 
-    struct nl_sock *sock = init_sock();
     printf("init_sock\n");
+    struct nl_sock *sock = init_sock();
 
-    char *nlctrl = "nlctrl";
-    if (genl_ctrl_resolve(sock, nlctrl) != GENL_ID_CTRL) {
-        fatal_error(NLE_INVAL, "Resolving of \"%s\" failed", nlctrl);
-    }
-
-    printf("genl_ctrl_resolve(nlctrl)\n");
-
+    printf("nlmsg_alloc\n");
     struct nl_msg *msg = nlmsg_alloc();
     if (msg == NULL) {
         fatal_error(NLE_NOMEM, "Unable to allocate netlink message");
