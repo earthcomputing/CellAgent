@@ -61,14 +61,12 @@ int doit(struct nl_sock *sock, struct nl_msg *msg) {
     }
 
     {
-        char FRAME[] = "Plain Text Message";
+        char FRAME[] = "Plain Text Message"; // 506c61696e2054657874204d65737361676500
         buf.len = strlen(FRAME) + 1; // include NUL
         buf.frame = (uint8_t *) FRAME;
 
         CLEAR_MSG;
         printf("send_ait_message\n");
-        uint32_t message_length;
-        uint8_t *frame;
         int rc = send_ait_message(sock, msg, module_id, send_port_id, buf, &actual_module_id, &actual_port_id);
         if (rc < 0) fatal_error(rc, "send_ait_message");
         if (actual_module_id != module_id) fatal_error(-1, "module mismatch: %d, %d", module_id, actual_module_id);
