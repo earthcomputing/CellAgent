@@ -288,7 +288,7 @@ extern int get_module_info(struct nl_sock *sock, struct nl_msg *msg, uint32_t mo
 {
     callback_index_t cbi = { .magic = 0x5a5a };
     if ((err = nl_socket_modify_cb(sock, NL_CB_VALID, NL_CB_CUSTOM, parse_cb, &cbi)) < 0) { fatal_error(err, "Unable to modify valid message callback"); }
-    if ((err = nl_recvmsgs_default(sock)) < 0) { fatal_error(err, "Unable to receive message: %s", nl_geterror(err)); }
+    if ((err = nl_recvmsgs_default(sock)) < 0) { fatal_error(err, "get_module_info(\"%s\", %d) : Unable to receive message: %s", ops.o_name, ops.o_id, nl_geterror(err)); }
     printf("nl_recvmsgs_default: %d msgs processed\n\n", err);
     uint32_t module_id = nla_get_u32(cbi.tb[NL_ECNL_ATTR_MODULE_ID]);
     char *module_name = nla_strdup(cbi.tb[NL_ECNL_ATTR_MODULE_NAME]); // nla_get_string
@@ -319,12 +319,12 @@ extern int get_port_state(struct nl_sock *sock, struct nl_msg *msg, uint32_t mod
     printf("nl_recvmsgs_default: %d msgs processed\n\n", err);
     uint32_t module_id = nla_get_u32(cbi.tb[NL_ECNL_ATTR_MODULE_ID]);
     uint32_t port_id = nla_get_u32(cbi.tb[NL_ECNL_ATTR_PORT_ID]);
-    link_state_t ls; memset(&ls, 0, sizeof(link_state_t)); get_link_state(cbi.tb, &ls);
     *mp = module_id;
     *pp = port_id;
 #if 0
-    *lp = ls; // FIXME: copy?
+    link_state_t ls; memset(&ls, 0, sizeof(link_state_t)); get_link_state(cbi.tb, &ls);
 #endif
+    get_link_state(cbi.tb, lp);
 }
 WAIT_ACK;
     return 0;
@@ -787,5 +787,6 @@ extern struct nl_sock *init_sock() {
         fatal_error(err, "Unable to resolve family: \"%s\"", ops.o_name);
     }
 
+    printf("genl_ops_resolve: \"%s\" => %d\n", ops.o_name, ops.o_id);
     return sock;
 }
