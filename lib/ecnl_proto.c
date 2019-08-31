@@ -115,7 +115,7 @@ static int parse_generic(struct nl_cache_ops *unused, struct genl_cmd *cmd, stru
         case NLA_U32: printf("%s(%ld): %d\n", tp->a, attr, nla_get_u32(na)); continue;
         case NLA_U64: printf("%s(%ld): %ld\n", tp->a, attr, nla_get_u64(na)); continue;
         case NLA_NUL_STRING: printf("%s(%ld): \"%s\"\n", tp->a, attr, nla_get_string(na)); continue;
-        case NL_ECNL_ATTR_UNSPEC: printf("%s(%ld)\n", tp->a, attr); dump_block(nla_data(na), nla_len(na)); continue;
+        case NL_ECNL_ATTR_UNSPEC: printf("%s(%ld): block ", tp->a, attr); dump_block(nla_data(na), nla_len(na)); continue;
         }
         printf("%s (%ld)\n", tp->a, attr);
     }
@@ -589,6 +589,11 @@ extern int retrieve_ait_message(struct nl_sock *sock, struct nl_msg *msg, uint32
     uint8_t p[4096]; memset(p, 0, sizeof(p)); nla_memcpy(p, cbi.tb[NL_ECNL_ATTR_MESSAGE], message_length); // nla_get_unspec
     *mp = module_id;
     *pp = port_id;
+
+
+    printf("retr buffer: ");
+    dump_block(p, message_length);
+
     buf->len = message_length;
     buf->frame = NULL;
 #if 0
@@ -634,6 +639,9 @@ extern int send_ait_message(struct nl_sock *sock, struct nl_msg *msg, uint32_t m
     NLAPUT_CHECKED(nla_put(msg, NL_ECNL_ATTR_MESSAGE, buf.len, buf.frame));
     nl_complete_msg(sock, msg);
     if ((err = nl_send(sock, msg)) < 0) { fatal_error(err, "Unable to send message: %s", nl_geterror(err)); }
+
+    printf("send buffer: ");
+    dump_block(buf.frame, buf.len);
 
 {
     callback_index_t cbi = { .magic = 0x5a5a };
