@@ -1,5 +1,11 @@
 
+BIONIC_KERNEL=$(shell uname -r)
+ifneq (4.18.0-25-generic,$(BIONIC_KERNEL))
 EARTH_CUSTOM=3.3.4
+else
+EARTH_CUSTOM=3.4.2.1
+endif
+
 MEDIA=media/intel-e1000e-$(EARTH_CUSTOM).tar.gz
 
 ccflags-y += -std=gnu99
