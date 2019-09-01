@@ -1183,12 +1183,7 @@ static netdev_tx_t adapt_start_xmit(struct sk_buff *skb, struct net_device *e100
     return NETDEV_TX_BUSY; // 0x10
 }
 
-#if 0
-static inline unsigned long copy_to(void *to, const void *from, unsigned long n) {
-    return 0;
-}
-#endif
-
+// edf_send_AIT
 static int adapt_send_AIT(struct sk_buff *skb, struct net_device *e1000e) {
     ADAPT_INFO("adapt_send_AIT e1000e \"%s\"", e1000e->name);
     if (skb == NULL) return -1;
@@ -1200,16 +1195,22 @@ static int adapt_send_AIT(struct sk_buff *skb, struct net_device *e1000e) {
     entl_state_machine_t *stm = &entl_dev->edev_stm;
     if (stm == NULL) return -1;
 
-    ADAPT_INFO("%s send_AIT skb: %px\n", e1000e->name, skb);
+    // FIXME : nl_ecnl_send_ait_message and ecnl_forward_ait_message disagree about the type of 'skb' here.
+    struct ec_ait_data *dt = (struct ec_ait_data *) skb;
 
-// mimic IOCTL:
-#if 0
-    // FIXME : real data AND buffer mgmt ??
+    int nbytes = dt->ecad_message_len;
+    if (nbytes > MAX_AIT_MESSAGE_SIZE) {
+        nbytes = MAX_AIT_MESSAGE_SIZE;
+        ADAPT_INFO("e1000e \"%s\" - adapt_send_AIT oversize frame: %d truncated (%d)", e1000e->name, dt->ecad_message_len, nbytes);
+    }
+
     struct entt_ioctl_ait_data ait_data;
-    int nbytes = 0;
-    copy_to(&ait_data.data, skb, sizeof(struct entt_ioctl_ait_data));
+    memcpy(ait_data.data, dt->ecad_data, nbytes);
     ait_data.message_len = nbytes; // inject_message : memcpy(payload, ait_data->data, ait_data->message_len);
+
+// ADAPT_INFO("%s send_AIT skb: %px\n", e1000e->name, skb);
 dump_block(stm, "sendq_push", ait_data.data, ait_data.message_len);
+
     int q_space = entl_send_AIT_message(stm, &ait_data); // sendq_push
     ait_data.num_messages = q_space;
     // FIXME : return q_space to caller ??
@@ -1217,10 +1218,11 @@ dump_block(stm, "sendq_push", ait_data.data, ait_data.message_len);
         // kfree(ait_data); // FIXME: check for memory leak?
         return -1;
     }
-#endif
+
     return 0;
 }
 
+// edf_retrieve_AIT
 static int adapt_retrieve_AIT(struct net_device *e1000e, ec_ait_data_t *data) {
     ADAPT_INFO("adapt_retrieve_AIT e1000e \"%s\"", e1000e->name);
     if (data == NULL) return -1;
@@ -1232,14 +1234,13 @@ static int adapt_retrieve_AIT(struct net_device *e1000e, ec_ait_data_t *data) {
     entl_state_machine_t *stm = &entl_dev->edev_stm;
     if (stm == NULL) return -1;
 
-    ADAPT_INFO("%s retr_AIT skb: %px\n", e1000e->name, data);
-
-// mimic IOCTL:
-#if 0
     struct entt_ioctl_ait_data *ait_data = entl_read_AIT_message(stm); // recvq_pop
     if (ait_data) {
-dump_block(stm, "sendq_push", ait_data->data, ait_data->message_len);
-        copy_to(data, ait_data, sizeof(struct entt_ioctl_ait_data));
+
+// ADAPT_INFO("%s retr_AIT skb: %px\n", e1000e->name, data);
+dump_block(stm, "recvq_pop", ait_data->data, ait_data->message_len);
+
+        memcpy(data, ait_data, sizeof(struct entt_ioctl_ait_data));
         kfree(ait_data);
     }
     else {
@@ -1247,9 +1248,9 @@ dump_block(stm, "sendq_push", ait_data->data, ait_data->message_len);
         dt.num_messages = 0;
         dt.message_len = 0;
         dt.num_queued = entl_num_queued(stm);
-        copy_to(data, &dt, sizeof(struct entt_ioctl_ait_data));
+        memcpy(data, &dt, sizeof(struct entt_ioctl_ait_data));
     }
-#endif
+
     return 0;
 }
 
