@@ -30,12 +30,45 @@ static void entl_watchdog(struct timer_list *t);
 static void entl_watchdog_task(struct work_struct *work);
 // static void dump_state(char *type, entl_state_t *st, int flag); // debug
 
+// in theory, only the STM can do 'inject_message',
+// however we also have to guard against other driver actions (interrupts, hw maint)
+// STM_LOCK - stm->state_lock
 static inline int locked_inject(entl_device_t *dev, struct e1000_adapter *adapter, uint16_t emsg_raw, uint32_t seqno, int send_action) {
     unsigned long flags;
     spin_lock_irqsave(&adapter->entl_txring_lock, flags);
     int inject_action = inject_message(dev, emsg_raw, seqno, send_action);
     spin_unlock_irqrestore(&adapter->entl_txring_lock, flags);
     return inject_action;
+}
+
+static char *emsg_names[] = {
+    "HELLO", // 0x0000
+    "EVENT", // 0x0001
+    "NOP",   // 0x0002
+    "AIT",   // 0x0003
+    "ACK"    // 0x0004
+};
+
+static inline char *emsg_op(uint16_t u_daddr) {
+    int opnum = get_entl_msg(u_daddr);
+    return (opnum < 5) ? emsg_names[opnum] : "??";
+}
+
+static char *letters = "0123456789abcdef";
+extern void dump_block(entl_state_machine_t *stm, char *tag, void *d, int nbytes) {
+    char window[3*41];
+    int f = 0;
+    for (int i = 0; i < nbytes; i++) {
+        char ch = ((char *) d)[i] & 0xff;
+        int n0 = (ch & 0xf0) >> 4;
+        int n1 = (ch & 0x0f);
+        window[f+0] = ' ';
+        window[f+1] = letters[n0];
+        window[f+2] = letters[n1];
+        f += 3;
+        if (f >= 3*40) break;
+    }
+    ENTL_DEBUG("%s: %s - nbytes: %d - %s", stm->name, tag, nbytes, window);
 }
 
 // inline helpers:
@@ -144,20 +177,21 @@ static bool entl_device_process_rx_packet(entl_device_t *dev, struct sk_buff *sk
             unsigned char *data = skb->data + sizeof(struct ethhdr);
             uint32_t nbytes;
             memcpy(&nbytes, data, sizeof(uint32_t));
-            // FIXME: MAX_AIT_MESSAGE_SIZE 256
+// FIXME: MAX_AIT_MESSAGE_SIZE 256
             if ((nbytes > 0) && (nbytes < MAX_AIT_MESSAGE_SIZE)) {
                 unsigned char *payload = data + sizeof(uint32_t);
                 ait_data->message_len = nbytes;
                 memcpy(ait_data->data, payload, nbytes);
                 // ait_data->num_messages = 0;
                 // ait_data->num_queued = 0;
+dump_block(stm, "recv", ait_data->data, ait_data->message_len); // data from skb ??
             }
             else {
                 ait_data->message_len = 0;
                 // ait_data->num_messages = 0;
                 // ait_data->num_queued = 0;
             }
-ENTL_DEBUG("%s process_rx - entl_new_AIT_message\n", stm->name);
+ENTL_DEBUG("%s process_rx - message 0x%04x (%s) seqno %d\n", stm->name, emsg_raw, emsg_op(emsg_raw), seqno);
             entl_new_AIT_message(stm, ait_data);
         }
     }
@@ -265,7 +299,7 @@ static void entl_device_process_tx_packet(entl_device_t *dev, struct sk_buff *sk
             dev->edev_flag |= ENTL_DEVICE_FLAG_SIGNAL2; // AIT send completion signal
         }
         if (emsg_raw != ENTL_MESSAGE_NOP_U) {
-ENTL_DEBUG("%s process_tx - message 0x%04x seqno %d\n", stm->name, emsg_raw, seqno);
+ENTL_DEBUG("%s process_tx - message 0x%04x (%s) seqno %d\n", stm->name, emsg_raw, emsg_op(emsg_raw), seqno);
             dev->edev_flag &= ~(uint32_t) ENTL_DEVICE_FLAG_WAITING;
         }
     }
@@ -418,6 +452,10 @@ static netdev_tx_t entl_tx_transmit(struct sk_buff *skb, struct net_device *netd
 
 // internal
 
+// FIXME - I hate to do debug printf's here but:
+// https://github.com/torvalds/linux/blob/master/kernel/printk/printk.c#L2023
+// process_tx - message 0x0000 seqno 0
+
 // emsg_raw, seqno
 static int inject_message(entl_device_t *dev, uint16_t emsg_raw, uint32_t seqno, int send_action) {
     struct e1000_adapter *adapter = container_of(dev, struct e1000_adapter, entl_dev);
@@ -433,9 +471,10 @@ static int inject_message(entl_device_t *dev, uint16_t emsg_raw, uint32_t seqno,
     struct entt_ioctl_ait_data *ait_data;
     int len;
     if (send_action & ENTL_ACTION_SEND_AIT) {
-ENTL_DEBUG("%s inject - entl_next_AIT_message\n", stm->name);
-        ait_data = entl_next_AIT_message(stm);
+ENTL_DEBUG("%s inject - entl_next_AIT_message (%s)\n", stm->name, emsg_op(emsg_raw));
+        ait_data = entl_next_AIT_message(stm); // fetch payload data
         len = ETH_HLEN + ait_data->message_len + sizeof(uint32_t);
+// FIXME: here we know how bit the actual frame will be ; last chance to discard it
         if (len < ETH_ZLEN) len = ETH_ZLEN; // min 60 - include/uapi/linux/if_ether.h
     }
     else {
@@ -457,11 +496,13 @@ ENTL_DEBUG("%s inject - entl_next_AIT_message\n", stm->name);
     encode_dest(eth->h_dest, emsg_raw, seqno);
     eth->h_proto = 0; // protocol type is not used anyway
 
+    // copy ait_data payload into skb
     if (send_action & ENTL_ACTION_SEND_AIT) {
         unsigned char *cp = skb->data + sizeof(struct ethhdr);
         unsigned char *payload = cp + sizeof(uint32_t);
         memcpy(cp, &ait_data->message_len, sizeof(uint32_t));
         memcpy(payload, ait_data->data, ait_data->message_len);
+dump_block(stm, "inject", ait_data->data, ait_data->message_len); // data from skb ??
     }
 
     int i = adapter->tx_ring->next_to_use;
@@ -1168,6 +1209,7 @@ static int adapt_send_AIT(struct sk_buff *skb, struct net_device *e1000e) {
     int nbytes = 0;
     copy_to(&ait_data.data, skb, sizeof(struct entt_ioctl_ait_data));
     ait_data.message_len = nbytes; // inject_message : memcpy(payload, ait_data->data, ait_data->message_len);
+dump_block(stm, "sendq_push", ait_data.data, ait_data.message_len);
     int q_space = entl_send_AIT_message(stm, &ait_data); // sendq_push
     ait_data.num_messages = q_space;
     // FIXME : return q_space to caller ??
@@ -1196,6 +1238,7 @@ static int adapt_retrieve_AIT(struct net_device *e1000e, ec_ait_data_t *data) {
 #if 0
     struct entt_ioctl_ait_data *ait_data = entl_read_AIT_message(stm); // recvq_pop
     if (ait_data) {
+dump_block(stm, "sendq_push", ait_data->data, ait_data->message_len);
         copy_to(data, ait_data, sizeof(struct entt_ioctl_ait_data));
         kfree(ait_data);
     }
