@@ -33,7 +33,7 @@ static inline int get_entl_msg(uint16_t u_daddr) { return u_daddr & ENTL_MESSAGE
 #define ENTL_STATE_BH       8
 #define ENTL_STATE_ERROR    9
 
-// uint32_t entl_state = FETCH_STATE(stm);
+// uint32_t entl_state = FETCH_STATE(p);
 
 #include "entt_queue.h"
 #include "entl_state.h"
