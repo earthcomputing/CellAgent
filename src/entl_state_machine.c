@@ -347,7 +347,12 @@ int entl_received(entl_state_machine_t *mcn, uint16_t from_hi, uint32_t from_lo,
                     set_update_time(mcn, ts);
                     STM_TDEBUG("ACK: seqno %d, BH -> SEND", seqno);
 // add to recvq
-STM_TDEBUG("recvq_push");
+// STM_TDEBUG("recvq_push");
+{
+    extern void dump_block(entl_state_machine_t *p, char *tag, void *d, int nbytes);
+    struct entt_ioctl_ait_data *dt = mcn->receive_buffer;
+    dump_block(mcn, "recvq_push", dt->data, dt->message_len);
+}
                     int recv_space = recvq_push(mcn);
                     // FIXME: what about when q is full?
                     mcn->receive_buffer = NULL;
@@ -728,6 +733,7 @@ STM_TDEBUG("recvq_pop");
             dt->num_messages = recvq_count(mcn);
             dt->num_queued = sendq_count(mcn);
         }
+// FIXME: should allocate and return an 'empty' dt w/counts
     STM_UNLOCK;
     return dt;
 }
