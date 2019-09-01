@@ -60,6 +60,9 @@ typedef struct entl_state_machine {
     uint8_t hello_valid;
 } entl_state_machine_t;
 
+// FIXME: fields should have prefix (i.e. esm_)
+static inline char *get_esm_name(entl_state_machine_t *mcn) { return mcn->name; }
+
 static inline void set_update_time(entl_state_machine_t *mcn, struct timespec ts) { memcpy(&mcn->current_state.update_time, &ts, sizeof(struct timespec)); }
 static inline int get_atomic_state(entl_state_machine_t *mcn) { return mcn->current_state.current_state; }
 static inline void set_atomic_state(entl_state_machine_t *mcn, int value) { mcn->current_state.current_state = value; }
