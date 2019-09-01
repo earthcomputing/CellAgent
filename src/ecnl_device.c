@@ -509,6 +509,23 @@ static int nl_ecnl_stop_forwarding(struct sk_buff *skb, struct genl_info *info) 
     return genlmsg_reply(rskb, info);
 }
 
+static char *letters = "0123456789abcdef";
+static void dump_block(char *tag, void *d, int nbytes) {
+    char window[3*41];
+    int f = 0;
+    for (int i = 0; i < nbytes; i++) {
+        char ch = ((char *) d)[i] & 0xff;
+        int n0 = (ch & 0xf0) >> 4;
+        int n1 = (ch & 0x0f);
+        window[f+0] = ' ';
+        window[f+1] = letters[n0];
+        window[f+2] = letters[n1];
+        f += 3;
+        if (f >= 3*40) break;
+    }
+    ECNL_INFO("%s: nbytes: %d - %s", tag, nbytes, window);
+}
+
 static int nl_ecnl_send_ait_message(struct sk_buff *skb, struct genl_info *info) {
     ecnl_device_t *e_dev = fetch_ecnl_device(info);
     if (!e_dev) return -ENODEV;
@@ -529,6 +546,9 @@ static int nl_ecnl_send_ait_message(struct sk_buff *skb, struct genl_info *info)
     struct net_device *e1000e = e_driver->eda_device;
     struct entl_driver_funcs *funcs = e_driver->eda_funcs;
     if (!e1000e || !funcs) return -EINVAL;
+
+// DEBUG
+    dump_block("nl_ecnl_send", ait_data.ecad_data, ait_data.ecad_message_len);
 
     funcs->edf_send_AIT((struct sk_buff *) &ait_data, e1000e);
 
@@ -565,6 +585,9 @@ static int nl_ecnl_retrieve_ait_message(struct sk_buff *skb, struct genl_info *i
 
     struct ec_ait_data ait_data; memset(&ait_data, 0, sizeof(struct ec_ait_data));
     funcs->edf_retrieve_AIT(e1000e, &ait_data);
+
+// DEBUG
+    dump_block("nl_ecnl_retr", ait_data.ecad_data, ait_data.ecad_message_len);
 
     struct sk_buff *rskb = genlmsg_new(NLMSG_GOODSIZE, GFP_KERNEL);
     if (!rskb) return -ENOMEM;
@@ -1093,7 +1116,7 @@ static void ecnl_forward_ait_message(int module_id, int drv_index, struct sk_buf
             if (direction == 0) {  // forward direction
                 if (port_vector == 0) {
                     ECNL_DEBUG("ecnl_forward_ait_message no forward bit module-id %d xx %08x", module_id, drv_index);
-                    to_host = 1;				
+                    to_host = 1;
                 }
                 else {
                     if (port_vector & 1) to_host = 1;
@@ -1453,7 +1476,7 @@ static int __init ecnl_init_module(void) {
         return -EINVAL;
     }
 
-    ECNL_DEBUG("registered genetlink family: \"%s\"", nl_ecnd_fam.name);        	
+    ECNL_DEBUG("registered genetlink family: \"%s\"", nl_ecnd_fam.name);
 
     struct net_device *plug_in = alloc_netdev(sizeof(ecnl_device_t), MAIN_DRIVER_NAME, NET_NAME_UNKNOWN, ecnl_setup);
     ecnl_device_t *this_device = (ecnl_device_t *) netdev_priv(plug_in);
@@ -1485,7 +1508,7 @@ static void __exit ecnl_cleanup_module(void) {
         device_busy = 0;
     }
     else {
-        ECNL_DEBUG("ecnl_cleanup_module non-busy");		
+        ECNL_DEBUG("ecnl_cleanup_module non-busy");
     }
 }
 
