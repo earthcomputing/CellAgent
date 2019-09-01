@@ -84,6 +84,22 @@ int doit(struct nl_sock *sock, struct nl_msg *msg) {
 
         printf("retr: %d '%s'\n", actual_buf.len, (char *) actual_buf.frame); // assumes c-string
     }
+
+
+    // extra test - full binary buffer
+    // char ecad_data[EC_MESSAGE_MAX]; // 9000
+    {
+        uint16_t FRAME[9000 / 2]; for (int i = 0; i < 9000 / 2; i++) { FRAME[i] = i; } // might want: i | 0x8080 ?
+        buf.len = 1500 + 26; // MTU + ethernet header
+        buf.frame = (uint8_t *) FRAME;
+
+        CLEAR_MSG;
+        printf("send_ait_message\n");
+        int rc = send_ait_message(sock, msg, module_id, send_port_id, buf, &actual_module_id, &actual_port_id);
+        if (rc < 0) fatal_error(rc, "send_ait_message");
+        if (actual_module_id != module_id) fatal_error(-1, "module mismatch: %d, %d", module_id, actual_module_id);
+        if (actual_port_id != send_port_id) fatal_error(-1, "port mismatch: %d, %d", send_port_id, actual_port_id);
+    }
 }
 
 int main(int argc, char *argv[]) {
