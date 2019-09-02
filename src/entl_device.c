@@ -103,8 +103,7 @@ static void entl_device_init(entl_device_t *dev) {
     dev->edev_watchdog_timer.function = entl_watchdog;
     dev->edev_watchdog_timer.data = (unsigned long) dev;
 #else
-    struct e1000_adapter *adapter = container_of(dev, struct e1000_adapter, entl_dev);
-    timer_setup(&adapter->watchdog_timer, entl_watchdog, 0);
+    timer_setup(&dev->edev_watchdog_timer, entl_watchdog, 0);
 #endif
     INIT_WORK(&dev->edev_watchdog_task, entl_watchdog_task);
     ENTL_skb_queue_init(&dev->edev_tx_skb_queue);
@@ -561,8 +560,8 @@ static void entl_watchdog(unsigned long data) {
 }
 #else
 static void entl_watchdog(struct timer_list *t) {
-    struct e1000_adapter *adapter = from_timer(adapter, t, watchdog_timer); // FIXME : is this right?
-    schedule_work(&adapter->watchdog_task);
+    entl_device_t *dev = from_timer(dev, t, edev_watchdog_timer);
+    schedule_work(&dev->edev_watchdog_task); // use global kernel work queue
 }
 #endif
 
