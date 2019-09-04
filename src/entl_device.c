@@ -1,6 +1,11 @@
 
 #define FETCH_STATE(stm) 0 /* ((stm)->current_state.current_state) */
+
 #define ENTL_DEBUG(fmt, args...) printk(KERN_ALERT "ENTL: " fmt, ## args)
+#define ADAPT_INFO(fmt, args...) printk(KERN_INFO "ADAPT: " fmt, ## args)
+#define ENTL_DEBUG_NAME(_name, fmt, args...) ENTL_DEBUG("%s " fmt, _name, ## args)
+#define ADAPT_INFO_NAME(_name, fmt, args...) ADAPT_INFO("%s " fmt, _name, ## args)
+#define ADAPTER_DEBUG(adapter, fmt, args...) ENTL_DEBUG_NAME(adapter->netdev->name, fmt, ## args)
 
 #include "entl_skb_queue.h"
 #include "entl_state_machine.h"
@@ -68,7 +73,7 @@ extern void dump_block(entl_state_machine_t *stm, char *tag, void *d, int nbytes
         f += 3;
         if (f >= 3*40) break;
     }
-    ENTL_DEBUG("%s: %s - nbytes: %d - %s", stm->name, tag, nbytes, window);
+    ENTL_DEBUG_NAME(stm->name, "%s - nbytes: %d - %s", tag, nbytes, window);
 }
 
 // inline helpers:
@@ -142,7 +147,7 @@ static bool entl_device_process_rx_packet(entl_device_t *dev, struct sk_buff *sk
     unsigned int len = skb->len;
     if (len <= sizeof(struct ethhdr)) {
         // FIXME
-        ENTL_DEBUG("%s process_rx - runt len %d\n", dev->edev_stm.name, len);
+        ENTL_DEBUG_NAME(dev->edev_stm.name, "process_rx - runt len %d", len);
     }
 
     uint16_t smac_hi; uint32_t smac_lo; unpack_eth(eth->h_source, &smac_hi, &smac_lo);
@@ -173,12 +178,12 @@ static bool entl_device_process_rx_packet(entl_device_t *dev, struct sk_buff *sk
         }
         else {
             struct entt_ioctl_ait_data *ait_data = kzalloc(sizeof(struct entt_ioctl_ait_data), GFP_ATOMIC);
-            unsigned char *data = skb->data + sizeof(struct ethhdr);
+            unsigned char *level0 = skb->data + sizeof(struct ethhdr);
             uint32_t nbytes;
-            memcpy(&nbytes, data, sizeof(uint32_t));
+            memcpy(&nbytes, level0, sizeof(uint32_t));
 // FIXME: MAX_AIT_MESSAGE_SIZE 256
             if ((nbytes > 0) && (nbytes < MAX_AIT_MESSAGE_SIZE)) {
-                unsigned char *payload = data + sizeof(uint32_t);
+                unsigned char *payload = level0 + sizeof(uint32_t);
                 ait_data->message_len = nbytes;
                 memcpy(ait_data->data, payload, nbytes);
                 // ait_data->num_messages = 0;
@@ -190,7 +195,7 @@ dump_block(stm, "recv", ait_data->data, ait_data->message_len); // data from skb
                 // ait_data->num_messages = 0;
                 // ait_data->num_queued = 0;
             }
-ENTL_DEBUG("%s process_rx - message 0x%04x (%s) seqno %d\n", stm->name, emsg_raw, emsg_op(emsg_raw), seqno);
+ENTL_DEBUG_NAME(stm->name, "process_rx - message 0x%04x (%s) seqno %d", emsg_raw, emsg_op(emsg_raw), seqno);
             entl_new_AIT_message(stm, ait_data);
         }
     }
@@ -298,7 +303,7 @@ static void entl_device_process_tx_packet(entl_device_t *dev, struct sk_buff *sk
             dev->edev_flag |= ENTL_DEVICE_FLAG_SIGNAL2; // AIT send completion signal
         }
         if (emsg_raw != ENTL_MESSAGE_NOP_U) {
-ENTL_DEBUG("%s process_tx - message 0x%04x (%s) seqno %d\n", stm->name, emsg_raw, emsg_op(emsg_raw), seqno);
+ENTL_DEBUG_NAME(stm->name, "process_tx - message 0x%04x (%s) seqno %d", emsg_raw, emsg_op(emsg_raw), seqno);
             dev->edev_flag &= ~(uint32_t) ENTL_DEVICE_FLAG_WAITING;
         }
     }
@@ -358,7 +363,7 @@ static int entl_do_ioctl(struct net_device *netdev, struct ifreq *ifr, int cmd) 
         struct entt_ioctl_ait_data *ait_data = kzalloc(sizeof(struct entt_ioctl_ait_data), GFP_ATOMIC);
         copy_from_user(ait_data, ifr->ifr_data, sizeof(struct entt_ioctl_ait_data));
 
-ENTL_DEBUG("%s ioctl - entl_send_AIT_message\n", stm->name);
+ENTL_DEBUG_NAME(stm->name, "ioctl - entl_send_AIT_message");
         int q_space = entl_send_AIT_message(stm, ait_data);
         ait_data->num_messages = q_space;
         copy_to_user(ifr->ifr_data, ait_data, sizeof(struct entt_ioctl_ait_data));
@@ -370,7 +375,7 @@ ENTL_DEBUG("%s ioctl - entl_send_AIT_message\n", stm->name);
     break;
 
     case SIOCDEVPRIVATE_ENTT_READ_AIT: {
-ENTL_DEBUG("%s ioctl - entl_read_AIT_message\n", stm->name);
+ENTL_DEBUG_NAME(stm->name, "ioctl - entl_read_AIT_message");
         struct entt_ioctl_ait_data *ait_data = entl_read_AIT_message(stm);
         if (ait_data) {
             copy_to_user(ifr->ifr_data, ait_data, sizeof(struct entt_ioctl_ait_data));
@@ -387,7 +392,7 @@ ENTL_DEBUG("%s ioctl - entl_read_AIT_message\n", stm->name);
     break;
 
     default:
-        ENTL_DEBUG("%s ioctl error: undefined cmd %d\n", netdev->name, cmd);
+        ENTL_DEBUG_NAME(netdev->name, "ioctl error: undefined cmd %d", cmd);
         break;
     }
 
@@ -395,7 +400,7 @@ ENTL_DEBUG("%s ioctl - entl_read_AIT_message\n", stm->name);
 }
 
 static void entl_e1000_set_my_addr(struct e1000_adapter *adapter, const uint8_t *addr) {
-    ENTL_DEBUG("%s macaddr %02x:%02x:%02x:%02x:%02x:%02x\n", adapter->netdev->name, addr[0], addr[1], addr[2], addr[3], addr[4], addr[5]);
+    ENTL_DEBUG_NAME(adapter->netdev->name, "macaddr %02x:%02x:%02x:%02x:%02x:%02x", addr[0], addr[1], addr[2], addr[3], addr[4], addr[5]);
     entl_device_t *edev = &adapter->entl_dev;
     entl_state_machine_t *stm = &edev->edev_stm;
     uint16_t u_addr; uint32_t l_addr; unpack_eth(addr, &u_addr, &l_addr);
@@ -405,7 +410,7 @@ static void entl_e1000_set_my_addr(struct e1000_adapter *adapter, const uint8_t 
 static void edev_init(struct e1000_adapter *adapter) {
     struct net_device *netdev = adapter->netdev;
     entl_device_t *edev = &adapter->entl_dev;
-    ENTL_DEBUG("%s edev_init\n", netdev->name);
+    ENTL_DEBUG_NAME(netdev->name, "edev_init");
     size_t elen = strlcpy(edev->edev_name, netdev->name, sizeof(edev->edev_name));
 
     entl_state_machine_t *stm = &edev->edev_stm;
@@ -470,7 +475,7 @@ static int inject_message(entl_device_t *dev, uint16_t emsg_raw, uint32_t seqno,
     struct entt_ioctl_ait_data *ait_data;
     int len;
     if (send_action & ENTL_ACTION_SEND_AIT) {
-ENTL_DEBUG("%s inject - entl_next_AIT_message (%s)\n", stm->name, emsg_op(emsg_raw));
+ENTL_DEBUG_NAME(stm->name, "inject - entl_next_AIT_message (%s)", emsg_op(emsg_raw));
         ait_data = entl_next_AIT_message(stm); // fetch payload data
         len = ETH_HLEN + ait_data->message_len + sizeof(uint32_t);
 // FIXME: here we know how bit the actual frame will be ; last chance to discard it
@@ -493,13 +498,13 @@ ENTL_DEBUG("%s inject - entl_next_AIT_message (%s)\n", stm->name, emsg_op(emsg_r
     memcpy(eth->h_source, netdev->dev_addr, ETH_ALEN);
     emsg_raw |= 0x8000; // message only
     encode_dest(eth->h_dest, emsg_raw, seqno);
-    eth->h_proto = 0; // protocol type is not used anyway
+    eth->h_proto = 0; // ETH_P_ECLP : protocol type is not used anyway
 
     // copy ait_data payload into skb
     if (send_action & ENTL_ACTION_SEND_AIT) {
-        unsigned char *cp = skb->data + sizeof(struct ethhdr);
-        unsigned char *payload = cp + sizeof(uint32_t);
-        memcpy(cp, &ait_data->message_len, sizeof(uint32_t));
+        unsigned char *level0 = skb->data + sizeof(struct ethhdr);
+        unsigned char *payload = level0 + sizeof(uint32_t);
+        memcpy(level0, &ait_data->message_len, sizeof(uint32_t));
         memcpy(payload, ait_data->data, ait_data->message_len);
 dump_block(stm, "inject", ait_data->data, ait_data->message_len); // data from skb ??
     }
@@ -676,8 +681,7 @@ static void dump_state(char *type, entl_state_t *st, int flag) {
         " error_flag %x"
         " p_error %x"
         " error_count %d"
-        " @ %ld.%ld"
-        "\n",
+        " @ %ld.%ld",
 
         type,
         st->event_i_know,
@@ -691,13 +695,13 @@ static void dump_state(char *type, entl_state_t *st, int flag) {
     );
 
     if (st->error_flag) {
-        ENTL_DEBUG("  Error time: %ld.%ld\n", st->error_time.tv_sec, st->error_time.tv_nsec);
+        ENTL_DEBUG("  Error time: %ld.%ld", st->error_time.tv_sec, st->error_time.tv_nsec);
     }
 #ifdef ENTL_SPEED_CHECK
     if (flag) {
-        ENTL_DEBUG("  interval_time    : %ld.%ld\n", st->interval_time.tv_sec, st->interval_time.tv_nsec);
-        ENTL_DEBUG("  max_interval_time: %ld.%ld\n", st->max_interval_time.tv_sec, st->max_interval_time.tv_nsec);
-        ENTL_DEBUG("  min_interval_time: %ld.%ld\n", st->min_interval_time.tv_sec, st->min_interval_time.tv_nsec);
+        ENTL_DEBUG("  interval_time    : %ld.%ld", st->interval_time.tv_sec, st->interval_time.tv_nsec);
+        ENTL_DEBUG("  max_interval_time: %ld.%ld", st->max_interval_time.tv_sec, st->max_interval_time.tv_nsec);
+        ENTL_DEBUG("  min_interval_time: %ld.%ld", st->min_interval_time.tv_sec, st->min_interval_time.tv_nsec);
     }
 #endif
 }
@@ -735,8 +739,6 @@ static void entl_e1000_configure(struct e1000_adapter *adapter) {
 #endif
 }
 
-#define ADAPTER_DEBUG(fmt, args...) printk(KERN_ALERT "ENTL: %s " fmt, adapter->netdev->name, ## args)
-
 /**
  * entl_e1000e_set_rx_mode - ENTL versin, always set Promiscuous mode
  * @netdev: network interface device structure
@@ -768,7 +770,7 @@ static void entl_e1000e_set_rx_mode(struct net_device *netdev)
 	e1000e_vlan_filter_disable(adapter);
 #endif /* HAVE_VLAN_RX_REGISTER */
 
-    ADAPTER_DEBUG("entl_e1000e_set_rx_mode  RCTL = %08x\n", rctl);
+    ADAPTER_DEBUG(adapter, "entl_e1000e_set_rx_mode  RCTL = %08x", rctl);
 #else
 	/* clear the affected bits */
 	rctl &= ~(E1000_RCTL_UPE | E1000_RCTL_MPE);
@@ -865,11 +867,11 @@ static void entl_e1000_setup_rctl(struct e1000_adapter *adapter)
 
 	/* Enable Long Packet receive */
 	if (adapter->netdev->mtu <= ETH_DATA_LEN) {
-		ADAPTER_DEBUG("entl_e1000_setup_rctl %d <= %d\n", adapter->netdev->mtu, ETH_DATA_LEN);
+		ADAPTER_DEBUG(adapter, "entl_e1000_setup_rctl %d <= %d", adapter->netdev->mtu, ETH_DATA_LEN);
 		rctl &= ~E1000_RCTL_LPE;
 	}
 	else {
-		ADAPTER_DEBUG("entl_e1000_setup_rctl %d > %d\n", adapter->netdev->mtu, ETH_DATA_LEN);
+		ADAPTER_DEBUG(adapter, "entl_e1000_setup_rctl %d > %d", adapter->netdev->mtu, ETH_DATA_LEN);
 		rctl |= E1000_RCTL_LPE;
 	}
 
@@ -885,7 +887,7 @@ static void entl_e1000_setup_rctl(struct e1000_adapter *adapter)
 		u32 mac_data;
 		u16 phy_data;
 
-		ADAPTER_DEBUG("entl_e1000_setup_rctl Workaround Si errata on 82577/82578 - configure IPG for jumbos\n");
+		ADAPTER_DEBUG(adapter, "entl_e1000_setup_rctl Workaround Si errata on 82577/82578 - configure IPG for jumbos");
 
 		e1e_rphy(hw, PHY_REG(770, 26), &phy_data);
 		phy_data &= 0xfff8;
@@ -912,20 +914,20 @@ static void entl_e1000_setup_rctl(struct e1000_adapter *adapter)
 	switch (adapter->rx_buffer_len) {
 	case 2048:
 	default:
-		ADAPTER_DEBUG("entl_e1000_setup_rctl E1000_RCTL_SZ_2048\n");
+		ADAPTER_DEBUG(adapter, "entl_e1000_setup_rctl E1000_RCTL_SZ_2048");
 		rctl |= E1000_RCTL_SZ_2048;
 		rctl &= ~E1000_RCTL_BSEX;
 		break;
 	case 4096:
-		ADAPTER_DEBUG("entl_e1000_setup_rctl E1000_RCTL_SZ_4096\n");
+		ADAPTER_DEBUG(adapter, "entl_e1000_setup_rctl E1000_RCTL_SZ_4096");
 		rctl |= E1000_RCTL_SZ_4096;
 		break;
 	case 8192:
-		ADAPTER_DEBUG("entl_e1000_setup_rctl E1000_RCTL_SZ_8192\n");
+		ADAPTER_DEBUG(adapter, "entl_e1000_setup_rctl E1000_RCTL_SZ_8192");
 		rctl |= E1000_RCTL_SZ_8192;
 		break;
 	case 16384:
-		ADAPTER_DEBUG("entl_e1000_setup_rctl E1000_RCTL_SZ_16384\n");
+		ADAPTER_DEBUG(adapter, "entl_e1000_setup_rctl E1000_RCTL_SZ_16384");
 		rctl |= E1000_RCTL_SZ_16384;
 		break;
 	}
@@ -955,7 +957,7 @@ static void entl_e1000_setup_rctl(struct e1000_adapter *adapter)
 	else
 		adapter->rx_ps_pages = 0;
 
-	ADAPTER_DEBUG("entl_e1000_setup_rctl rx_ps_pages = %d\n", adapter->rx_ps_pages);
+	ADAPTER_DEBUG(adapter, "entl_e1000_setup_rctl rx_ps_pages = %d", adapter->rx_ps_pages);
 
 	if (adapter->rx_ps_pages) {
 		u32 psrctl = 0;
@@ -996,7 +998,7 @@ static void entl_e1000_setup_rctl(struct e1000_adapter *adapter)
 		 * and that breaks VLANs.
 		 */
 	}
-    ADAPTER_DEBUG("entl_e1000_setup_rctl  RCTL = %08x\n", rctl);
+    ADAPTER_DEBUG(adapter, "entl_e1000_setup_rctl  RCTL = %08x", rctl);
 
 	ew32(RCTL, rctl);
 	/* just started the receive unit, no need to restart */
@@ -1022,19 +1024,19 @@ static void entl_e1000_configure_rx(struct e1000_adapter *adapter)
 		    sizeof(union e1000_rx_desc_packet_split);
 		adapter->clean_rx = e1000_clean_rx_irq_ps;
 		adapter->alloc_rx_buf = e1000_alloc_rx_buffers_ps;
-		ADAPTER_DEBUG("entl_e1000_configure_rx use e1000_alloc_rx_buffers_ps\n");
+		ADAPTER_DEBUG(adapter, "entl_e1000_configure_rx use e1000_alloc_rx_buffers_ps");
 #ifdef CONFIG_E1000E_NAPI
 	} else if (adapter->netdev->mtu > ETH_FRAME_LEN + ETH_FCS_LEN) {
 		rdlen = rx_ring->count * sizeof(union e1000_rx_desc_extended);
 		adapter->clean_rx = e1000_clean_jumbo_rx_irq;
 		adapter->alloc_rx_buf = e1000_alloc_jumbo_rx_buffers;
-		ADAPTER_DEBUG("entl_e1000_configure_rx use e1000_alloc_jumbo_rx_buffers\n");
+		ADAPTER_DEBUG(adapter, "entl_e1000_configure_rx use e1000_alloc_jumbo_rx_buffers");
 #endif
 	} else {
 		rdlen = rx_ring->count * sizeof(union e1000_rx_desc_extended);
 		adapter->clean_rx = e1000_clean_rx_irq;
 		adapter->alloc_rx_buf = e1000_alloc_rx_buffers;
-		ADAPTER_DEBUG("entl_e1000_configure_rx use e1000_alloc_rx_buffers\n");
+		ADAPTER_DEBUG(adapter, "entl_e1000_configure_rx use e1000_alloc_rx_buffers");
 	}
 
 	/* disable receives while setting up the descriptors */
@@ -1045,7 +1047,7 @@ static void entl_e1000_configure_rx(struct e1000_adapter *adapter)
 	usleep_range(10000, 20000);
 
 	if (adapter->flags2 & FLAG2_DMA_BURST) {
-		ADAPTER_DEBUG("entl_e1000_configure_rx set DMA burst\n");
+		ADAPTER_DEBUG(adapter, "entl_e1000_configure_rx set DMA burst");
 		/* set the writeback threshold (only takes effect if the RDTR
 		 * is set). set GRAN=1 and write back up to 0x4 worth, and
 		 * enable prefetching of 0x20 Rx descriptors
@@ -1067,11 +1069,11 @@ static void entl_e1000_configure_rx(struct e1000_adapter *adapter)
 	}
 
 	/* set the Receive Delay Timer Register */
-	ADAPTER_DEBUG("entl_e1000_configure_rx set Receive Delay Timer Register = %d\n", adapter->rx_int_delay);
+	ADAPTER_DEBUG(adapter, "entl_e1000_configure_rx set Receive Delay Timer Register = %d", adapter->rx_int_delay);
 	ew32(RDTR, adapter->rx_int_delay);
 
 	/* irq moderation */
-	ADAPTER_DEBUG("entl_e1000_configure_rx set Abs Delay Timer Register = %d\n", adapter->rx_abs_int_delay);
+	ADAPTER_DEBUG(adapter, "entl_e1000_configure_rx set Abs Delay Timer Register = %d", adapter->rx_abs_int_delay);
 	ew32(RADV, adapter->rx_abs_int_delay);
 	if ((adapter->itr_setting != 0) && (adapter->itr != 0))
 		e1000e_write_itr(adapter, adapter->itr);
@@ -1117,7 +1119,7 @@ static void entl_e1000_configure_rx(struct e1000_adapter *adapter)
 		    ((er32(PBA) & E1000_PBA_RXA_MASK) * 1024 -
 		     adapter->max_frame_size) * 8 / 1000;
 
-		ADAPTER_DEBUG("entl_e1000_configure_rx adapter->netdev->mtu %d > ETH_DATA_LEN %d lat = %d\n", adapter->netdev->mtu, ETH_DATA_LEN, lat);
+		ADAPTER_DEBUG(adapter, "entl_e1000_configure_rx adapter->netdev->mtu %d > ETH_DATA_LEN %d lat = %d", adapter->netdev->mtu, ETH_DATA_LEN, lat);
 
 		if (adapter->flags & FLAG_IS_ICH) {
 			u32 rxdctl = er32(RXDCTL(0));
@@ -1133,7 +1135,7 @@ static void entl_e1000_configure_rx(struct e1000_adapter *adapter)
 					  adapter->netdev->name, lat);
 #endif
 	} else {
-		ADAPTER_DEBUG("entl_e1000_configure_rx adapter->netdev->mtu %d <= ETH_DATA_LEN %d default qos = %d\n", adapter->netdev->mtu, ETH_DATA_LEN, PM_QOS_DEFAULT_VALUE);
+		ADAPTER_DEBUG(adapter, "entl_e1000_configure_rx adapter->netdev->mtu %d <= ETH_DATA_LEN %d default qos = %d", adapter->netdev->mtu, ETH_DATA_LEN, PM_QOS_DEFAULT_VALUE);
 
 #ifdef HAVE_PM_QOS_REQUEST_LIST_NEW
 		pm_qos_update_request(&adapter->pm_qos_req,
@@ -1147,7 +1149,7 @@ static void entl_e1000_configure_rx(struct e1000_adapter *adapter)
 					  PM_QOS_DEFAULT_VALUE);
 #endif
 	}
-	ADAPTER_DEBUG("entl_e1000_configure_rx  RCTL = %08x\n", rctl);
+	ADAPTER_DEBUG(adapter, "entl_e1000_configure_rx  RCTL = %08x", rctl);
 
 	/* Enable Receives */
 	ew32(RCTL, rctl);
@@ -1155,11 +1157,9 @@ static void entl_e1000_configure_rx(struct e1000_adapter *adapter)
 
 // ENTL - ECNL linkage
 
-#define ADAPT_INFO(fmt, args...) printk(KERN_INFO "ADAPT: " fmt "\n", ## args)
-
 // minimal i/f compatibility
 static int adapt_validate(struct net_device *e1000e, int magic) {
-    ADAPT_INFO("adapt_validate e1000e \"%s\"", e1000e->name);
+    ADAPT_INFO_NAME(e1000e->name, "adapt_validate");
 
     struct e1000_adapter *adapter = netdev_priv(e1000e);
     if (adapter == NULL) return -1;
@@ -1173,7 +1173,7 @@ static int adapt_validate(struct net_device *e1000e, int magic) {
 
 // ref: linux/netdevice.h - enum netdev_tx
 static netdev_tx_t adapt_start_xmit(struct sk_buff *skb, struct net_device *e1000e) {
-    ADAPT_INFO("adapt_start_xmit e1000e \"%s\"", e1000e->name);
+    ADAPT_INFO_NAME(e1000e->name, "adapt_start_xmit");
     if (skb == NULL) return -1;
 
 #if 0
@@ -1184,7 +1184,7 @@ static netdev_tx_t adapt_start_xmit(struct sk_buff *skb, struct net_device *e100
 
 // edf_send_AIT
 static int adapt_send_AIT(struct sk_buff *skb, struct net_device *e1000e) {
-    ADAPT_INFO("adapt_send_AIT e1000e \"%s\"", e1000e->name);
+    ADAPT_INFO_NAME(e1000e->name, "adapt_send_AIT");
     if (skb == NULL) return -1;
 
     struct e1000_adapter *adapter = netdev_priv(e1000e);
@@ -1200,14 +1200,14 @@ static int adapt_send_AIT(struct sk_buff *skb, struct net_device *e1000e) {
     int nbytes = dt->ecad_message_len;
     if (nbytes > MAX_AIT_MESSAGE_SIZE) {
         nbytes = MAX_AIT_MESSAGE_SIZE;
-        ADAPT_INFO("e1000e \"%s\" - adapt_send_AIT oversize frame: %d truncated (%d)", e1000e->name, dt->ecad_message_len, nbytes);
+        ADAPT_INFO_NAME(e1000e->name, "adapt_send_AIT oversize frame: %d truncated (%d)", dt->ecad_message_len, nbytes);
     }
 
     struct entt_ioctl_ait_data ait_data;
     memcpy(ait_data.data, dt->ecad_data, nbytes);
     ait_data.message_len = nbytes; // inject_message : memcpy(payload, ait_data->data, ait_data->message_len);
 
-// ADAPT_INFO("%s send_AIT skb: %px\n", e1000e->name, skb);
+// ADAPT_INFO_NAME(e1000e->name, "send_AIT skb: %px", skb);
 dump_block(stm, "sendq_push", ait_data.data, ait_data.message_len);
 
     int q_space = entl_send_AIT_message(stm, &ait_data); // sendq_push
@@ -1223,7 +1223,7 @@ dump_block(stm, "sendq_push", ait_data.data, ait_data.message_len);
 
 // edf_retrieve_AIT
 static int adapt_retrieve_AIT(struct net_device *e1000e, ec_ait_data_t *data) {
-    ADAPT_INFO("adapt_retrieve_AIT e1000e \"%s\"", e1000e->name);
+    ADAPT_INFO_NAME(e1000e->name, "adapt_retrieve_AIT");
     if (data == NULL) return -1;
 
     struct e1000_adapter *adapter = netdev_priv(e1000e);
@@ -1236,7 +1236,7 @@ static int adapt_retrieve_AIT(struct net_device *e1000e, ec_ait_data_t *data) {
     struct entt_ioctl_ait_data *ait_data = entl_read_AIT_message(stm); // recvq_pop
     if (ait_data) {
 
-// ADAPT_INFO("%s retr_AIT skb: %px\n", e1000e->name, data);
+// ADAPT_INFO_NAME(e1000e->name, "retr_AIT skb: %px", data);
 dump_block(stm, "recvq_pop", ait_data->data, ait_data->message_len);
 
         memcpy(data, ait_data, sizeof(struct entt_ioctl_ait_data));
@@ -1254,7 +1254,7 @@ dump_block(stm, "recvq_pop", ait_data->data, ait_data->message_len);
 }
 
 static int adapt_write_reg(struct net_device *e1000e, ec_alo_reg_t *reg) {
-    ADAPT_INFO("adapt_write_reg e1000e \"%s\"", e1000e->name);
+    ADAPT_INFO_NAME(e1000e->name, "adapt_write_reg");
     if (reg == NULL) return -1;
 
 #if 0
@@ -1263,7 +1263,7 @@ static int adapt_write_reg(struct net_device *e1000e, ec_alo_reg_t *reg) {
 }
 
 static int adapt_read_regset(struct net_device *e1000e, ec_alo_regs_t *regs) {
-    ADAPT_INFO("adapt_read_regset e1000e \"%s\"", e1000e->name);
+    ADAPT_INFO_NAME(e1000e->name, "adapt_read_regset");
     if (regs == NULL) return -1;
 
 #if 0
@@ -1272,17 +1272,17 @@ static int adapt_read_regset(struct net_device *e1000e, ec_alo_regs_t *regs) {
 }
 
 static int adapt_get_state(struct net_device *e1000e, ec_state_t *state) {
-    ADAPT_INFO("adapt_get_state e1000e \"%s\"", e1000e->name);
+    ADAPT_INFO_NAME(e1000e->name, "adapt_get_state");
 
     if (state == NULL) return -1;
 
     // ref: e1000e-3.3.4/src/e1000.h
     struct e1000_adapter *adapter = netdev_priv(e1000e);
-    // ADAPT_INFO("net_device: \"%s\", adapter: %p", e1000e->name, adapter);
+    // ADAPT_INFO("  adapter: %p", adapter);
     if (adapter == NULL) return -1;
 
     entl_device_t *entl_dev = &adapter->entl_dev;
-    // ADAPT_INFO("entl_dev: %p", entl_dev);
+    // ADAPT_INFO("  entl_dev: %p", entl_dev);
     if (entl_dev == NULL) return -1;
 
     ADAPT_INFO("  entl_dev->edev_name: \"%s\"", entl_dev->edev_name);
@@ -1294,10 +1294,10 @@ static int adapt_get_state(struct net_device *e1000e, ec_state_t *state) {
     if (link_state) {
         int link_speed = adapter->link_speed;
         int link_duplex = adapter->link_duplex;
-        ADAPT_INFO("\"%s\" NIC Link is Up %d Mbps %s Duplex", nic_name, link_speed, (link_duplex == FULL_DUPLEX) ? "Full" : "Half");
+        ADAPT_INFO_NAME(nic_name, "NIC Link is Up %d Mbps %s Duplex", link_speed, (link_duplex == FULL_DUPLEX) ? "Full" : "Half");
     }
     else {
-        ADAPT_INFO("\"%s\" NIC Link is Down", nic_name);
+        ADAPT_INFO_NAME(nic_name, "NIC Link is Down");
     }
 
     entl_state_machine_t *stm = &entl_dev->edev_stm;
