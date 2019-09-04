@@ -1,0 +1,53 @@
+#viz-canvas {
+    background-color: #f8f8f8;
+    width : 1000px;
+    height : 1000px;
+}
+.link {
+    stroke : green;
+    stroke-width : 4px;
+}
+.node {
+    stroke : black;
+    fill : lightgreen;
+    stroke-width : 2px;
+}
+.linktree {
+    stroke : black;
+    stroke-width : 6px;
+    marker-end: url(#arrow-head);
+}
+.nodetree {
+    stroke : black;
+    stroke-width : 2px;
+}
+.noderoot {
+    fill : black;
+}
+.linkbroken {
+    stroke : red;
+}
+.nodebroken {
+    fill : red;
+}
+#tooltip {
+    font-size: 150%;
+    position: fixed;
+    top: 30%;
+    left: 50;
+    width: auto;
+    height: auto;
+    padding: 10px;
+    background-color: lightblue;
+    -webkit-border-radius: 10px;
+    -moz-border-radius: 10px;
+    border-radius: 10px;
+    -webkit-box-shadow: 4px 4px 10px rgba(0, 0, 0, 0.4);
+    -moz-box-shadow: 4px 4px 10px rgba(0, 0, 0, 0.4);
+    box-shadow: 4px 4px 10px rgba(0, 0, 0, 0.4);
+    pointer-events: none;
+}
+#tooltip.hidden {
+    position : absolute;
+    display : none;
+}
