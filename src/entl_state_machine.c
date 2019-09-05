@@ -11,6 +11,7 @@
 // FIXME: duplicate defn
 #define ENTL_DEBUG(fmt, args...) printk(KERN_ALERT "ENTL:" fmt, ## args)
 #define STM_TDEBUG(fmt, args...) ENTL_DEBUG(" %ld %s " fmt "\n", ts.tv_sec, mcn->name, ## args)
+#define STM_TDEBUG_ERROR(mcn, fmt, args...) STM_TDEBUG("error pending: flag %d count %d" fmt, mcn->error_state.error_flag, mcn->error_state.error_count, ## args)
 
 #define STM_LOCK unsigned long flags; spin_lock_irqsave(&mcn->state_lock, flags)
 #define STM_UNLOCK spin_unlock_irqrestore(&mcn->state_lock, flags)
@@ -57,7 +58,7 @@ int entl_received(entl_state_machine_t *mcn, uint16_t from_hi, uint32_t from_lo,
     }
 
     if (mcn->error_state.error_count) {
-        STM_TDEBUG("message 0x%04x, error count %d", emsg_raw, mcn->error_state.error_count);
+        STM_TDEBUG_ERROR(mcn, "message 0x%04x", emsg_raw);
         return ENTL_ACTION_SIG_ERR;
     }
 
@@ -406,7 +407,7 @@ int entl_get_hello(entl_state_machine_t *mcn, uint16_t *emsg_raw, uint32_t *seqn
     struct timespec ts = current_kernel_time();
 
     if (mcn->error_state.error_count) {
-        STM_TDEBUG("entl_get_hello, error count %d", mcn->error_state.error_count);
+        STM_TDEBUG_ERROR(mcn, "entl_get_hello");
         return ENTL_ACTION_NOP;
     }
 
@@ -456,7 +457,7 @@ int entl_next_send(entl_state_machine_t *mcn, uint16_t *emsg_raw, uint32_t *seqn
     if (mcn->error_state.error_count) {
         int ret_action;
         respond_with(ENTL_MESSAGE_NOP_U, 0, ENTL_ACTION_NOP);
-        STM_TDEBUG("entl_next_send, error count %d", mcn->error_state.error_count);
+        STM_TDEBUG_ERROR(mcn, "entl_next_send");
         return ret_action;
     }
 
@@ -554,10 +555,11 @@ STM_TDEBUG("sendq_pop");
 int entl_next_send_tx(entl_state_machine_t *mcn, uint16_t *emsg_raw, uint32_t *seqno) {
     struct timespec ts = current_kernel_time();
 
+    // might be offline(no carrier), or be newly online after offline ??
     if (mcn->error_state.error_count) {
         int ret_action;
         respond_with(ENTL_MESSAGE_NOP_U, 0, ENTL_ACTION_NOP);
-        STM_TDEBUG("entl_next_send_tx, error count %d", mcn->error_state.error_count);
+        STM_TDEBUG_ERROR(mcn, "entl_next_send_tx");
         return ret_action;
     }
 
@@ -683,7 +685,7 @@ void entl_link_up(entl_state_machine_t *mcn) {
             STM_TDEBUG("Link Up, state %d, ignored", get_atomic_state(mcn));
         }
         else if (mcn->error_state.error_count != 0) {
-            STM_TDEBUG("Link Up, error count %d, ignored", mcn->error_state.error_count);
+            STM_TDEBUG_ERROR(mcn, "Link Up, error ignored");
         }
         else {
             STM_TDEBUG("Link Up, IDLE -> HELLO");

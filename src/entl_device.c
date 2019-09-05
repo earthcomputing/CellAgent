@@ -70,6 +70,7 @@ extern void dump_block(entl_state_machine_t *stm, char *tag, void *d, int nbytes
         window[f+0] = ' ';
         window[f+1] = letters[n0];
         window[f+2] = letters[n1];
+        window[f+3] = '\0';
         f += 3;
         if (f >= 3*40) break;
     }
@@ -283,6 +284,7 @@ ENTL_DEBUG_NAME(stm->name, "process_rx - message 0x%04x (%s) seqno %d", emsg_raw
     return retval;
 }
 
+// from patch/netdev.c:
 // Assumes NOT interrupt context
 // process packet being sent. The ENTL message can only be sent over the single (non MSS) packet
 static void entl_device_process_tx_packet(entl_device_t *dev, struct sk_buff *skb) {
@@ -295,6 +297,7 @@ static void entl_device_process_tx_packet(entl_device_t *dev, struct sk_buff *sk
     else {
         entl_state_machine_t *stm = &dev->edev_stm;
 
+// might be offline(no carrier), or be newly online after offline ??
         uint16_t emsg_raw = (uint16_t) -1; uint32_t seqno = (uint32_t) -1;
         int send_action = entl_next_send_tx(stm, &emsg_raw, &seqno);
         encode_dest(eth->h_dest, emsg_raw, seqno);
@@ -302,6 +305,7 @@ static void entl_device_process_tx_packet(entl_device_t *dev, struct sk_buff *sk
         if (send_action & ENTL_ACTION_SIG_AIT) {
             dev->edev_flag |= ENTL_DEVICE_FLAG_SIGNAL2; // AIT send completion signal
         }
+
         if (emsg_raw != ENTL_MESSAGE_NOP_U) {
 ENTL_DEBUG_NAME(stm->name, "process_tx - message 0x%04x (%s) seqno %d", emsg_raw, emsg_op(emsg_raw), seqno);
             dev->edev_flag &= ~(uint32_t) ENTL_DEVICE_FLAG_WAITING;
@@ -365,7 +369,7 @@ static int entl_do_ioctl(struct net_device *netdev, struct ifreq *ifr, int cmd) 
 
 ENTL_DEBUG_NAME(stm->name, "ioctl - entl_send_AIT_message");
         int q_space = entl_send_AIT_message(stm, ait_data);
-        ait_data->num_messages = q_space;
+        ait_data->num_messages = q_space; // result data
         copy_to_user(ifr->ifr_data, ait_data, sizeof(struct entt_ioctl_ait_data));
 
         if (q_space < 0) {
@@ -500,13 +504,15 @@ ENTL_DEBUG_NAME(stm->name, "inject - entl_next_AIT_message (%s)", emsg_op(emsg_r
     encode_dest(eth->h_dest, emsg_raw, seqno);
     eth->h_proto = 0; // ETH_P_ECLP : protocol type is not used anyway
 
-    // copy ait_data payload into skb
-    if (send_action & ENTL_ACTION_SEND_AIT) {
-        unsigned char *level0 = skb->data + sizeof(struct ethhdr);
-        unsigned char *payload = level0 + sizeof(uint32_t);
-        memcpy(level0, &ait_data->message_len, sizeof(uint32_t));
-        memcpy(payload, ait_data->data, ait_data->message_len);
+    if (ait_data) {
+        // copy ait_data payload into skb
+        if (send_action & ENTL_ACTION_SEND_AIT) {
+            unsigned char *level0 = skb->data + sizeof(struct ethhdr);
+            unsigned char *payload = level0 + sizeof(uint32_t);
+            memcpy(level0, &ait_data->message_len, sizeof(uint32_t));
+            memcpy(payload, ait_data->data, ait_data->message_len);
 dump_block(stm, "inject", ait_data->data, ait_data->message_len); // data from skb ??
+        }
     }
 
     int i = adapter->tx_ring->next_to_use;
