@@ -9,9 +9,9 @@
 #include "entl_user_api.h"
 
 // FIXME: duplicate defn
-#define ENTL_DEBUG(fmt, args...) printk(KERN_ALERT "ENTL:" fmt, ## args)
-#define STM_TDEBUG(fmt, args...) ENTL_DEBUG(" %ld %s " fmt "\n", ts.tv_sec, mcn->name, ## args)
-#define STM_TDEBUG_ERROR(mcn, fmt, args...) STM_TDEBUG("error pending: flag %d count %d" fmt, mcn->error_state.error_flag, mcn->error_state.error_count, ## args)
+#define ENTL_DEBUG(fmt, args...) printk(KERN_ALERT "ENTL: " fmt, ## args)
+#define STM_TDEBUG(fmt, args...) ENTL_DEBUG("%ld %s " fmt "\n", ts.tv_sec, mcn->name, ## args)
+#define STM_TDEBUG_ERROR(mcn, fmt, args...) STM_TDEBUG("error pending: flag %d count %d " fmt, mcn->error_state.error_flag, mcn->error_state.error_count, ## args)
 
 #define STM_LOCK unsigned long flags; spin_lock_irqsave(&mcn->state_lock, flags)
 #define STM_UNLOCK spin_unlock_irqrestore(&mcn->state_lock, flags)
