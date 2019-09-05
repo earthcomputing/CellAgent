@@ -9,7 +9,8 @@
 #include "entl_user_api.h"
 
 // FIXME: duplicate defn
-#define ENTL_DEBUG(fmt, args...) printk(KERN_ALERT "ENTL: " fmt, ## args)
+// newline should be unnecessary here - https://lwn.net/Articles/732420/
+#define ENTL_DEBUG(fmt, args...) printk(KERN_ALERT "ENTL: " fmt "\n", ## args)
 #define STM_TDEBUG(fmt, args...) ENTL_DEBUG("%ld %s " fmt "\n", ts.tv_sec, mcn->name, ## args)
 #define STM_TDEBUG_ERROR(mcn, fmt, args...) STM_TDEBUG("error pending: flag %d count %d " fmt, mcn->error_state.error_flag, mcn->error_state.error_count, ## args)
 

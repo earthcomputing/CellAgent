@@ -1,8 +1,9 @@
 
 #define FETCH_STATE(stm) 0 /* ((stm)->current_state.current_state) */
 
-#define ENTL_DEBUG(fmt, args...) printk(KERN_ALERT "ENTL: " fmt, ## args)
-#define ADAPT_INFO(fmt, args...) printk(KERN_INFO "ADAPT: " fmt, ## args)
+// newline should be unnecessary here - https://lwn.net/Articles/732420/
+#define ENTL_DEBUG(fmt, args...) printk(KERN_ALERT "ENTL: " fmt "\n", ## args)
+#define ADAPT_INFO(fmt, args...) printk(KERN_INFO "ADAPT: " fmt "\n", ## args)
 #define ENTL_DEBUG_NAME(_name, fmt, args...) ENTL_DEBUG("%s " fmt, _name, ## args)
 #define ADAPT_INFO_NAME(_name, fmt, args...) ADAPT_INFO("%s " fmt, _name, ## args)
 #define ADAPTER_DEBUG(adapter, fmt, args...) ENTL_DEBUG_NAME(adapter->netdev->name, fmt, ## args)
