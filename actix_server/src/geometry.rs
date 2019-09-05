@@ -29,11 +29,11 @@ struct Body {
 pub struct CellID {
     name: String
 }
-#[derive(Debug, Default, Serialize)]
+#[derive(Debug, Default, Serialize, Deserialize)]
 pub struct AppGeometry {
     geometry: Mutex<Geometry>
 }
-#[derive(Debug, Copy, Clone, Default, Eq, PartialEq, Serialize)]
+#[derive(Debug, Copy, Clone, Default, Eq, PartialEq, Serialize, Deserialize)]
 pub struct Location { row: Size, col: Size }
 impl Location {
     pub fn new(rowcol: [Size; 2]) -> Location { Location { row: rowcol[0], col: rowcol[1] } }
@@ -41,7 +41,7 @@ impl Location {
 
 type RowCol = HashMap<String, Location>;
 
-#[derive(Debug, Clone, Eq, PartialEq, Default, Serialize)]
+#[derive(Debug, Clone, Eq, PartialEq, Default, Serialize, Deserialize)]
 pub struct Geometry {
     maxrow: Size,
     maxcol: Size,
