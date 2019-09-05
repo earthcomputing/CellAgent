@@ -15,7 +15,6 @@ fn main() {
     let index_data = web::Data::new(html_file_name);
     let geo_data = geometry::data();
     let hello_data = hello::data();
-    let css = fs::read_to_string("./html/visualizer.css").expect("Cannot read CSS file");
     HttpServer::new(move || {
         App::new()
             .route("/visualizer.css", web::get().to(get_css))
