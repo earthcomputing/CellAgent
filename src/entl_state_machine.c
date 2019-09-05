@@ -351,9 +351,8 @@ int entl_received(entl_state_machine_t *mcn, uint16_t from_hi, uint32_t from_lo,
 // add to recvq
 // STM_TDEBUG("recvq_push");
 {
-    extern void dump_block(entl_state_machine_t *p, char *tag, void *d, int nbytes);
     struct entt_ioctl_ait_data *dt = mcn->receive_buffer;
-    dump_block(mcn, "recvq_push", dt->data, dt->message_len);
+    dump_ait_data(mcn, "stm - recvq_push", dt);
 }
                     int recv_space = recvq_push(mcn);
                     // FIXME: what about when q is full?
