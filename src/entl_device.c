@@ -61,7 +61,11 @@ static inline char *emsg_op(uint16_t u_daddr) {
 }
 
 static char *letters = "0123456789abcdef";
-extern void dump_block(entl_state_machine_t *stm, char *tag, void *d, int nbytes) {
+extern void dump_block(entl_state_machine_t *stm, char *tag, struct entt_ioctl_ait_data *ait_data) {
+    void *d = ait_data->data;
+    int nbytes = ait_data->message_len;
+    int msgs = ait_data->num_messages;
+    int queued = ait_data->num_queued;
     char window[3*41];
     int f = 0;
     for (int i = 0; i < nbytes; i++) {
@@ -75,7 +79,7 @@ extern void dump_block(entl_state_machine_t *stm, char *tag, void *d, int nbytes
         f += 3;
         if (f >= 3*40) break;
     }
-    ENTL_DEBUG_NAME(stm->name, "%s - nbytes: %d - %s", tag, nbytes, window);
+    ENTL_DEBUG_NAME(stm->name, "%s - msgs: %d queued: %d nbytes: %d - %s", tag, msgs, queued, nbytes, window);
 }
 
 // inline helpers:
@@ -190,7 +194,7 @@ static bool entl_device_process_rx_packet(entl_device_t *dev, struct sk_buff *sk
                 memcpy(ait_data->data, payload, nbytes);
                 // ait_data->num_messages = 0;
                 // ait_data->num_queued = 0;
-dump_block(stm, "recv", ait_data->data, ait_data->message_len); // data from skb ??
+dump_block(stm, "process_rx - recv", ait_data);
             }
             else {
                 ait_data->message_len = 0;
@@ -370,8 +374,11 @@ static int entl_do_ioctl(struct net_device *netdev, struct ifreq *ifr, int cmd) 
 
 ENTL_DEBUG_NAME(stm->name, "ioctl - entl_send_AIT_message");
         int q_space = entl_send_AIT_message(stm, ait_data);
-        ait_data->num_messages = q_space; // result data
+        // result data
+        ait_data->num_messages = q_space;
+        ait_data->num_queued = -1;
         copy_to_user(ifr->ifr_data, ait_data, sizeof(struct entt_ioctl_ait_data));
+dump_block(stm, "ioctl - sendq_push", ait_data);
 
         if (q_space < 0) {
             kfree(ait_data); // FIXME: check for memory leak?
@@ -381,15 +388,16 @@ ENTL_DEBUG_NAME(stm->name, "ioctl - entl_send_AIT_message");
 
     case SIOCDEVPRIVATE_ENTT_READ_AIT: {
 ENTL_DEBUG_NAME(stm->name, "ioctl - entl_read_AIT_message");
-        struct entt_ioctl_ait_data *ait_data = entl_read_AIT_message(stm);
+        struct entt_ioctl_ait_data *ait_data = entl_read_AIT_message(stm); // recvq_pop
         if (ait_data) {
+dump_block(stm, "ioctl - recvq_pop", ait_data);
             copy_to_user(ifr->ifr_data, ait_data, sizeof(struct entt_ioctl_ait_data));
             kfree(ait_data);
         }
         else {
             struct entt_ioctl_ait_data dt;
-            dt.num_messages = 0;
             dt.message_len = 0;
+            dt.num_messages = 0;
             dt.num_queued = entl_num_queued(stm);
             copy_to_user(ifr->ifr_data, &dt, sizeof(struct entt_ioctl_ait_data));
         }
@@ -512,7 +520,7 @@ ENTL_DEBUG_NAME(stm->name, "inject - entl_next_AIT_message (%s)", emsg_op(emsg_r
             unsigned char *payload = level0 + sizeof(uint32_t);
             memcpy(level0, &ait_data->message_len, sizeof(uint32_t));
             memcpy(payload, ait_data->data, ait_data->message_len);
-dump_block(stm, "inject", ait_data->data, ait_data->message_len); // data from skb ??
+dump_block(stm, "tx_ring - inject", ait_data);
         }
     }
 
@@ -1210,15 +1218,17 @@ static int adapt_send_AIT(struct sk_buff *skb, struct net_device *e1000e) {
         ADAPT_INFO_NAME(e1000e->name, "adapt_send_AIT oversize frame: %d truncated (%d)", dt->ecad_message_len, nbytes);
     }
 
-    struct entt_ioctl_ait_data ait_data;
-    memcpy(ait_data.data, dt->ecad_data, nbytes);
-    ait_data.message_len = nbytes; // inject_message : memcpy(payload, ait_data->data, ait_data->message_len);
+    struct entt_ioctl_ait_data *ait_data = kzalloc(sizeof(struct entt_ioctl_ait_data), GFP_ATOMIC);
+    memcpy(ait_data->data, dt->ecad_data, nbytes);
+    ait_data->message_len = nbytes; // inject_message : memcpy(payload, ait_data->data, ait_data->message_len);
+
+    int q_space = entl_send_AIT_message(stm, ait_data); // sendq_push
+    ait_data->num_messages = q_space;
+    ait_data->num_queued = -1;
 
 // ADAPT_INFO_NAME(e1000e->name, "send_AIT skb: %px", skb);
-dump_block(stm, "sendq_push", ait_data.data, ait_data.message_len);
+dump_block(stm, "adapt_send - sendq_push", ait_data);
 
-    int q_space = entl_send_AIT_message(stm, &ait_data); // sendq_push
-    ait_data.num_messages = q_space;
     // FIXME : return q_space to caller ??
     if (q_space < 0) {
         // kfree(ait_data); // FIXME: check for memory leak?
@@ -1244,15 +1254,15 @@ static int adapt_retrieve_AIT(struct net_device *e1000e, ec_ait_data_t *data) {
     if (ait_data) {
 
 // ADAPT_INFO_NAME(e1000e->name, "retr_AIT skb: %px", data);
-dump_block(stm, "recvq_pop", ait_data->data, ait_data->message_len);
+dump_block(stm, "adapt_retr - recvq_pop", ait_data);
 
         memcpy(data, ait_data, sizeof(struct entt_ioctl_ait_data));
         kfree(ait_data);
     }
     else {
         struct entt_ioctl_ait_data dt;
-        dt.num_messages = 0;
         dt.message_len = 0;
+        dt.num_messages = 0;
         dt.num_queued = entl_num_queued(stm);
         memcpy(data, &dt, sizeof(struct entt_ioctl_ait_data));
     }
