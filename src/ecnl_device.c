@@ -520,6 +520,7 @@ static void dump_block(char *tag, void *d, int nbytes) {
         window[f+0] = ' ';
         window[f+1] = letters[n0];
         window[f+2] = letters[n1];
+        window[f+3] = '\0';
         f += 3;
         if (f >= 3*40) break;
     }
