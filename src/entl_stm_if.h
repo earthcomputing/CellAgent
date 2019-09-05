@@ -16,6 +16,6 @@ extern void entl_read_error_state(entl_state_machine_t *p, entl_state_t *st, ent
 extern void entl_set_my_adder(entl_state_machine_t *p, uint16_t mac_hi, uint32_t mac_lo); 
 extern void entl_state_error(entl_state_machine_t *p, uint32_t error_flag); // enter error state
 
-extern void dump_ait_data(entl_state_machine_t *stm, char *tag, struct entt_ioctl_ait_data *ait_data) {
+extern void dump_ait_data(entl_state_machine_t *stm, char *tag, struct entt_ioctl_ait_data *ait_data);
 
 #endif
