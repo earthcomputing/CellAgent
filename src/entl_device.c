@@ -105,20 +105,28 @@ static inline void encode_dest(uint8_t *h_dest, uint16_t mac_hi, uint32_t mac_lo
     memcpy(h_dest, mac_addr, ETH_ALEN);
 }
 
-// netdev entry points:
-static void entl_device_init(entl_device_t *dev) {
-    memset(dev, 0, sizeof(struct entl_device));
+// netdev entry points: (from e1000_probe) w/adapter->entl_dev
+static void entl_device_init(entl_device_t *edev) {
+    memset(edev, 0, sizeof(struct entl_device));
+
+    entl_state_machine_t *stm = &edev->edev_stm;
+    entl_state_machine_init(stm); // FIXME: huh?
+
+    // FIXME: name not set until register_netdev ??
+    // size_t elen = strlcpy(edev->edev_name, edev->name, sizeof(edev->edev_name));
+    // size_t slen = strlcpy(stm->name, edev->edev_name, sizeof(stm->name));
+
     // watchdog timer & task setup
 #ifndef BIONIC_3421
-    init_timer(&dev->edev_watchdog_timer);
-    dev->edev_watchdog_timer.function = entl_watchdog;
-    dev->edev_watchdog_timer.data = (unsigned long) dev;
+    init_timer(&edev->edev_watchdog_timer);
+    edev->edev_watchdog_timer.function = entl_watchdog;
+    edev->edev_watchdog_timer.data = (unsigned long) edev;
 #else
-    timer_setup(&dev->edev_watchdog_timer, entl_watchdog, 0);
+    timer_setup(&edev->edev_watchdog_timer, entl_watchdog, 0);
 #endif
-    INIT_WORK(&dev->edev_watchdog_task, entl_watchdog_task);
-    ENTL_skb_queue_init(&dev->edev_tx_skb_queue);
-    dev->edev_queue_stopped = 0;
+    INIT_WORK(&edev->edev_watchdog_task, entl_watchdog_task);
+    ENTL_skb_queue_init(&edev->edev_tx_skb_queue);
+    edev->edev_queue_stopped = 0;
 }
 
 static void entl_device_link_down(entl_device_t *dev) {
@@ -412,22 +420,26 @@ dump_ait_data(stm, "ioctl - recvq_pop", ait_data);
     return 0;
 }
 
+// name here is problematical - called before register_netdev (but after netdev->name = pci_name)
 static void entl_e1000_set_my_addr(struct e1000_adapter *adapter, const uint8_t *addr) {
     ENTL_DEBUG_NAME(adapter->netdev->name, "macaddr %02x:%02x:%02x:%02x:%02x:%02x", addr[0], addr[1], addr[2], addr[3], addr[4], addr[5]);
     entl_device_t *edev = &adapter->entl_dev;
     entl_state_machine_t *stm = &edev->edev_stm;
     uint16_t u_addr; uint32_t l_addr; unpack_eth(addr, &u_addr, &l_addr);
-    entl_set_my_adder(stm, u_addr, l_addr);
+    entl_set_my_adder(stm, u_addr, l_addr); // FIXME: mcn name not set up ??
 }
 
+// netdev entry points: (from entl_e1000_configure)
 static void edev_init(struct e1000_adapter *adapter) {
     struct net_device *netdev = adapter->netdev;
-    entl_device_t *edev = &adapter->entl_dev;
     ENTL_DEBUG_NAME(netdev->name, "edev_init");
+
+    // FIXME: rename ??
+    entl_device_t *edev = &adapter->entl_dev;
     size_t elen = strlcpy(edev->edev_name, netdev->name, sizeof(edev->edev_name));
 
     entl_state_machine_t *stm = &edev->edev_stm;
-    entl_state_machine_init(stm);
+    // entl_state_machine_init(stm); // FIXME: huh?
     size_t slen = strlcpy(stm->name, edev->edev_name, sizeof(stm->name));
     entl_e1000_set_my_addr(adapter, netdev->dev_addr);
 

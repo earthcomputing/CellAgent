@@ -10,8 +10,8 @@
 
 // FIXME: duplicate defn
 // newline should be unnecessary here - https://lwn.net/Articles/732420/
-#define ENTL_DEBUG(fmt, args...) printk(KERN_ALERT "ENTL: " fmt "\n", ## args)
-#define STM_TDEBUG(fmt, args...) ENTL_DEBUG("%ld %s " fmt "\n", ts.tv_sec, mcn->name, ## args)
+#define MCN_DEBUG(_name, _time, fmt, args...) printk(KERN_ALERT "%ld %s STM: " fmt "\n", _time, _name, ## args)
+#define STM_TDEBUG(fmt, args...) MCN_DEBUG(mcn->name, ts.tv_sec, fmt, ## args)
 #define STM_TDEBUG_ERROR(mcn, fmt, args...) STM_TDEBUG("error pending: flag %d count %d " fmt, mcn->error_state.error_flag, mcn->error_state.error_count, ## args)
 
 #define STM_LOCK unsigned long flags; spin_lock_irqsave(&mcn->state_lock, flags)
@@ -28,7 +28,7 @@ static inline int cmp_addr(uint16_t l_high, uint32_t l_low, uint16_t r_high, uin
 
 void entl_set_my_adder(entl_state_machine_t *mcn, uint16_t mac_hi, uint32_t mac_lo) {
     struct timespec ts = current_kernel_time();
-    STM_TDEBUG("set macaddr %04x %08x", mac_hi, mac_lo);
+    STM_TDEBUG("set macaddr %04x %08x", mac_hi, mac_lo); // FIXME: mcn name not set up ??
     STM_LOCK;
         mcn->mac_hi = mac_hi;
         mcn->mac_lo = mac_lo;
