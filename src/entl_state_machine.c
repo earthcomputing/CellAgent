@@ -676,7 +676,7 @@ void entl_state_error(entl_state_machine_t *mcn, uint32_t error_flag) {
             clear_intervals(mcn);
         }
     STM_UNLOCK;
-    STM_TDEBUG("entl_state_error %d, state %d", error_flag, get_atomic_state(mcn));
+    STM_TDEBUG("entl_state_error - flag %d, state %d", error_flag, get_atomic_state(mcn));
 }
 
 void entl_read_current_state(entl_state_machine_t *mcn, entl_state_t *st, entl_state_t *err) {
@@ -700,10 +700,11 @@ void entl_link_up(entl_state_machine_t *mcn) {
     struct timespec ts = current_kernel_time();
     STM_LOCK;
         if (get_atomic_state(mcn) != ENTL_STATE_IDLE) {
-            STM_TDEBUG("Link Up, state %d, ignored", get_atomic_state(mcn));
+            STM_TDEBUG("Link Up, state %d, unexpected, ignored", get_atomic_state(mcn));
         }
         else if (mcn->error_state.error_count != 0) {
-            STM_TDEBUG_ERROR(mcn, "Link Up, error ignored");
+// FIXME: is error 'DOWN' ??
+            STM_TDEBUG_ERROR(mcn, "Link Up, error lock");
         }
         else {
             STM_TDEBUG("Link Up, IDLE -> HELLO");
