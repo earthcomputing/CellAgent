@@ -12,7 +12,7 @@
 // newline should be unnecessary here - https://lwn.net/Articles/732420/
 #define MCN_DEBUG(_name, _time, fmt, args...) printk(KERN_ALERT "%ld %s STM: " fmt "\n", _time, _name, ## args)
 #define STM_TDEBUG(fmt, args...) MCN_DEBUG(mcn->name, ts.tv_sec, fmt, ## args)
-#define STM_TDEBUG_ERROR(mcn, fmt, args...) STM_TDEBUG("error pending: flag %d count %d " fmt, mcn->error_state.error_flag, mcn->error_state.error_count, ## args)
+#define STM_TDEBUG_ERROR(mcn, fmt, args...) STM_TDEBUG("error pending: flag %d (%s) count %d " fmt, mcn->error_state.error_flag, mcn_flag2name(mcn->error_state.error_flag), mcn->error_state.error_count, ## args)
 
 #define STM_LOCK unsigned long flags; spin_lock_irqsave(&mcn->state_lock, flags)
 #define STM_UNLOCK spin_unlock_irqrestore(&mcn->state_lock, flags)
@@ -43,6 +43,26 @@ uint32_t get_entl_state(entl_state_machine_t *mcn) {
         uint16_t ret_state = (mcn->error_state.error_count) ? ENTL_STATE_ERROR : get_atomic_state(mcn);
     STM_UNLOCK; // OOPS_STM_UNLOCK;
     return ret_state;
+}
+
+// https://www.kernel.org/doc/html/latest/core-api/printk-formats.html
+static char *error_bits[] = {
+    "FLAG_SEQUENCE", // 0x0001 1 << 0
+    "FLAG_LINKDONW", // 0x0002 1 << 1
+    "FLAG_TIMEOUT",  // 0x0004 1 << 2
+    "SAME_ADDRESS",  // 0x0008 1 << 3
+    "UNKOWN_CMD",    // 0x0010 1 << 4
+    "UNKOWN_STATE",  // 0x0020 1 << 5
+    "UNEXPECTED_LU", // 0x0040 1 << 6
+    "FATAL"          // 0x8000 1 << 15
+};
+
+static inline char *mcn_flag2name(uint32_t s) {
+    for (int i = 0; i < 7; i++) {
+        if (s == (1 << i)) return error_bits[i];
+    }
+    if (s == 0x8000) return error_bits[7];
+    return "??";
 }
 
 static char *mcn_names[] = {
@@ -409,7 +429,8 @@ int entl_received(entl_state_machine_t *mcn, uint16_t from_hi, uint32_t from_lo,
         break;
 
         default: {
-            STM_TDEBUG("wrong state %d", get_atomic_state(mcn));
+            uint32_t code = get_atomic_state(mcn);
+            STM_TDEBUG("wrong state %d (%s)", code, mcn_state2name(code));
             set_error(mcn, ENTL_ERROR_UNKOWN_STATE);
             unicorn(mcn, ENTL_STATE_IDLE);
             set_update_time(mcn, ts);
@@ -577,7 +598,8 @@ int entl_next_send_tx(entl_state_machine_t *mcn, uint16_t *emsg_raw, uint32_t *s
     if (mcn->error_state.error_count) {
         int ret_action;
         respond_with(ENTL_MESSAGE_NOP_U, 0, ENTL_ACTION_NOP);
-        STM_TDEBUG_ERROR(mcn, "entl_next_send_tx");
+        uint32_t code = get_atomic_state(mcn);
+        STM_TDEBUG_ERROR(mcn, "entl_next_send_tx - state %d (%s)", code, mcn_state2name(code));
         return ret_action;
     }
 
@@ -662,7 +684,8 @@ STM_TDEBUG("sendq_pop");
 void entl_state_error(entl_state_machine_t *mcn, uint32_t error_flag) {
     struct timespec ts = current_kernel_time();
 
-    if (error_flag == ENTL_ERROR_FLAG_LINKDONW && get_atomic_state(mcn) == ENTL_STATE_IDLE) return;
+    uint32_t code = get_atomic_state(mcn);
+    if ((error_flag == ENTL_ERROR_FLAG_LINKDONW) && (code == ENTL_STATE_IDLE)) return;
 
     STM_LOCK;
         set_error(mcn, error_flag);
@@ -676,7 +699,8 @@ void entl_state_error(entl_state_machine_t *mcn, uint32_t error_flag) {
             clear_intervals(mcn);
         }
     STM_UNLOCK;
-    STM_TDEBUG("entl_state_error - flag %d, state %d", error_flag, get_atomic_state(mcn));
+    uint32_t now = get_atomic_state(mcn);
+    STM_TDEBUG("entl_state_error - flag %d (%s), was %d (%s), now %d (%s)", error_flag, mcn_flag2name(error_flag), code, mcn_state2name(code), now, mcn_state2name(now));
 }
 
 void entl_read_current_state(entl_state_machine_t *mcn, entl_state_t *st, entl_state_t *err) {
@@ -699,15 +723,16 @@ void entl_read_error_state(entl_state_machine_t *mcn, entl_state_t *st, entl_sta
 void entl_link_up(entl_state_machine_t *mcn) {
     struct timespec ts = current_kernel_time();
     STM_LOCK;
-        if (get_atomic_state(mcn) != ENTL_STATE_IDLE) {
-            STM_TDEBUG("Link Up, state %d, unexpected, ignored", get_atomic_state(mcn));
+        uint32_t code = get_atomic_state(mcn);
+        if (code != ENTL_STATE_IDLE) {
+            STM_TDEBUG("Link Up, state %d (%s), unexpected, ignored", code, mcn_state2name(code));
         }
         else if (mcn->error_state.error_count != 0) {
 // FIXME: is error 'DOWN' ??
-            STM_TDEBUG_ERROR(mcn, "Link Up, error lock");
+            STM_TDEBUG_ERROR(mcn, "Link Up, error lock - state %d (%s)", code, mcn_state2name(code));
         }
         else {
-            STM_TDEBUG("Link Up, IDLE -> HELLO");
+            STM_TDEBUG("Link Up, IDLE -> HELLO, state %d (%s)", code, mcn_state2name(code));
             unicorn(mcn, ENTL_STATE_HELLO);
             set_update_time(mcn, ts);
             clear_error(mcn);
