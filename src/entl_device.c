@@ -797,7 +797,7 @@ static void entl_e1000e_set_rx_mode(struct net_device *netdev)
 	e1000e_vlan_filter_disable(adapter);
 #endif /* HAVE_VLAN_RX_REGISTER */
 
-    ADAPTER_DEBUG(adapter, "entl_e1000e_set_rx_mode  RCTL = %08x", rctl);
+        ADAPTER_DEBUG(adapter, "entl_e1000e_set_rx_mode RCTL = %08x", rctl);
 #else
 	/* clear the affected bits */
 	rctl &= ~(E1000_RCTL_UPE | E1000_RCTL_MPE);
@@ -1025,7 +1025,7 @@ static void entl_e1000_setup_rctl(struct e1000_adapter *adapter)
 		 * and that breaks VLANs.
 		 */
 	}
-    ADAPTER_DEBUG(adapter, "entl_e1000_setup_rctl  RCTL = %08x", rctl);
+        ADAPTER_DEBUG(adapter, "entl_e1000_setup_rctl RCTL = %08x", rctl);
 
 	ew32(RCTL, rctl);
 	/* just started the receive unit, no need to restart */
@@ -1176,7 +1176,7 @@ static void entl_e1000_configure_rx(struct e1000_adapter *adapter)
 					  PM_QOS_DEFAULT_VALUE);
 #endif
 	}
-	ADAPTER_DEBUG(adapter, "entl_e1000_configure_rx  RCTL = %08x", rctl);
+	ADAPTER_DEBUG(adapter, "entl_e1000_configure_rx RCTL = %08x", rctl);
 
 	/* Enable Receives */
 	ew32(RCTL, rctl);
