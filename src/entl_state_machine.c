@@ -45,6 +45,24 @@ uint32_t get_entl_state(entl_state_machine_t *mcn) {
     return ret_state;
 }
 
+static char *mcn_names[] = {
+    "IDLE",     // 0
+    "HELLO",    // 1
+    "WAIT",     // 2
+    "SEND",     // 3
+    "RECEIVE",  // 4
+    "AM",       // 5
+    "BM",       // 6
+    "AH",       // 7
+    "BH",       // 8
+    "ERROR"     // 9
+};
+
+static inline char *mcn_state2name(uint32_t s) {
+    return (s < 10) ? mcn_names[s] : "??";
+}
+
+// FIXME: emsg_op(emsg_type)
 static inline char *msg_nick(int emsg_type) { return (emsg_type == ENTL_MESSAGE_EVENT_U) ? "EVENT" : (emsg_type == ENTL_MESSAGE_ACK_U) ? "ACK" : "??"; }
 
 int entl_received(entl_state_machine_t *mcn, uint16_t from_hi, uint32_t from_lo, uint16_t emsg_raw, uint32_t seqno) {
