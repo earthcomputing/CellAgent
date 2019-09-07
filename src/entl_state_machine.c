@@ -47,9 +47,9 @@ uint32_t get_entl_state(entl_state_machine_t *mcn) {
 
 // https://www.kernel.org/doc/html/latest/core-api/printk-formats.html
 static char *error_bits[] = {
-    "FLAG_SEQUENCE", // 0x0001 1 << 0
-    "FLAG_LINKDONW", // 0x0002 1 << 1
-    "FLAG_TIMEOUT",  // 0x0004 1 << 2
+    "SEQUENCE",      // 0x0001 1 << 0
+    "LINKDONW",      // 0x0002 1 << 1
+    "TIMEOUT",       // 0x0004 1 << 2
     "SAME_ADDRESS",  // 0x0008 1 << 3
     "UNKOWN_CMD",    // 0x0010 1 << 4
     "UNKOWN_STATE",  // 0x0020 1 << 5
