@@ -11,6 +11,7 @@
     stroke : black;
     fill : lightgreen;
     stroke-width : 2px;
+    r: 10;
 }
 .linktree {
     stroke : black;
@@ -20,15 +21,23 @@
 .nodetree {
     stroke : black;
     stroke-width : 2px;
+    fill: lightgreen;
+    r: 10;
 }
 .noderoot {
+    stroke : black;
+    stroke-width : 2px;
     fill : black;
+    r: 10;
 }
 .linkbroken {
     stroke : red;
 }
 .nodebroken {
+    stroke : black;
+    stroke-width : 2px;
     fill : red;
+    r: 10;
 }
 #tooltip {
     font-size: 150%;

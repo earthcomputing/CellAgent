@@ -1,34 +1,76 @@
+const x0 = 50;
+const y0 = 50;
+const scale = 50;
+let cells = {};
+let canvas;
+window.onload = function() {
+    canvas = document.getElementById("viz-canvas");
+}
 function visualize() {
-    let canvas = document.getElementById("viz-canvas");
-    //canvas.innerHTML = '<line id="line" class="link" x1="50" y1="50" x2="50" y2="100">';
-    let line = document.createElement("line");
-    line.setAttribute("id", "line");
-    line.setAttribute("class", "link");
-    line.setAttribute("x1", "50");
-    line.setAttribute("y1", "50");
-    line.setAttribute("x2", "50");
-    line.setAttribute("y2", "100");
-    canvas.appendChild(line);
-    //canvas.innerHTML = '<circle id="circle" class="node" cx="50" cy="50" r="40">';
-    let circle = document.createElement("circle");
-    circle.setAttribute("id", "circle");
-    circle.setAttribute("class", "node");
-    circle.setAttribute("cx", "50");
-    circle.setAttribute("cy", "50");
-    circle.setAttribute("r", "10");
-    canvas.appendChild(circle);
-    canvas.innerHTML = canvas.innerHTML;
     const Http = new XMLHttpRequest();
-    const url = 'http://127.0.0.1:8088/geometry';
-    Http.open("GET", url);
+    const url = 'http://127.0.0.1:8088/';
+    Http.open("GET", url + "geometry");
     Http.send();
     Http.onreadystatechange = (e) => {
         if ( Http.readyState == 4 && Http.status == 200 ) {
-            draw_geometry(Http.responseText);
+            setup_geometry(Http.responseText);
+            Http.open("GET", url + "topology");
+            Http.send();
+            Http.onreadystatechange = (e) => {
+                if ( Http.readyState == 4 && Http.status == 200 ) {
+                   setup_topology(Http.responseText);
+                }
+            }
+
         }
     }
 }
-function draw_geometry(geometry_text) {
-        let geometry = JSON.parse(geometry_text);
-        console.log(geometry.geometry)
+function setup_geometry(geometry_text) {
+    let geometry = JSON.parse(geometry_text);
+    let rowcol = geometry.geometry.rowcol;
+    for (cell in rowcol) {
+        cells[cell] = rowcol[cell];
+    }
+}
+function setup_topology(topology_text) {
+    let topology = JSON.parse(topology_text);
+    let allNeighbors = topology.neighbors;
+    for (cellID in allNeighbors) {
+        let cellNeighbors = allNeighbors[cellID];
+        for (neighborIndex in cellNeighbors.neighbors) {
+            let neighbor = cellNeighbors.neighbors[neighborIndex];
+            let neighborID = neighbor.cell_id.name;
+            if ( cellID < neighborID ) {
+                let id = cellID + ":" + neighborID;
+                create_line_at(id, cellID, neighborID);
+                for (cell in cells) {
+                    create_node_at(cell);
+                }
+            }
+        }
+    }
+}
+function create_line_at(id, cellID1, cellID2) {
+    let line = document.createElement("line");
+    line.setAttribute("id", id);
+    line.setAttribute("class", "link");
+    line.setAttribute("y1", x0 + scale*cells[cellID1].row);
+    line.setAttribute("x1", y0 + scale*cells[cellID1].col);
+    line.setAttribute("y2", x0 + scale*cells[cellID2].row);
+    line.setAttribute("x2", y0 + scale*cells[cellID2].col);
+    canvas.appendChild(line);
+    canvas.innerHTML = canvas.innerHTML;
+    return line;
+}
+function create_node_at(id) {
+    let x = cells[id].col;
+    let y = cells[id].row;
+    let circle = document.createElement("circle");
+    circle.setAttribute("id", id);
+    circle.setAttribute("class", "node");
+    circle.setAttribute("cx", x0 + x*scale);
+    circle.setAttribute("cy", y0 + y*scale);
+    canvas.appendChild(circle);
+    canvas.innerHTML = canvas.innerHTML;
+    return circle;
 }
