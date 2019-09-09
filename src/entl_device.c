@@ -435,21 +435,21 @@ static void entl_e1000_set_my_addr(struct e1000_adapter *adapter, const uint8_t 
 // netdev entry points: (from entl_e1000_configure)
 static void edev_init(struct e1000_adapter *adapter) {
     struct net_device *netdev = adapter->netdev;
+    entl_device_t *edev = &adapter->entl_dev;
+    entl_state_machine_t *stm = &edev->edev_stm;
+
     ENTL_DEBUG_NAME(netdev->name, "edev_init");
 
-    // FIXME: rename ??
-    entl_device_t *edev = &adapter->entl_dev;
+    // update name(s) to match adapter->netdev->name
     size_t elen = strlcpy(edev->edev_name, netdev->name, sizeof(edev->edev_name));
-
-    entl_state_machine_t *stm = &edev->edev_stm;
-    // entl_state_machine_init(stm); // FIXME: huh?
     size_t slen = strlcpy(stm->name, edev->edev_name, sizeof(stm->name));
-    entl_e1000_set_my_addr(adapter, netdev->dev_addr);
 
-    // FIXME: is this really needed?
-    // force to check the link status on kernel task
+    entl_e1000_set_my_addr(adapter, netdev->dev_addr);
+#if 0
+    // force to check the link status on kernel task (taken care of elsewhere)
     struct e1000_hw *hw = &adapter->hw;
     hw->mac.get_link_status = true;
+#endif
 }
 
 #ifdef ENTL_TX_ON_ENTL_ENABLE
