@@ -40,7 +40,7 @@ void entl_set_my_adder(entl_state_machine_t *mcn, uint16_t mac_hi, uint32_t mac_
 // unused ??
 uint32_t get_entl_state(entl_state_machine_t *mcn) {
     STM_LOCK;
-        uint16_t ret_state = (mcn->error_state.error_count) ? ENTL_STATE_ERROR : get_atomic_state(mcn);
+        uint16_t ret_state = (current_error_pending(mcn)) ? ENTL_STATE_ERROR : get_atomic_state(mcn);
     STM_UNLOCK; // OOPS_STM_UNLOCK;
     return ret_state;
 }
@@ -99,7 +99,7 @@ int entl_received(entl_state_machine_t *mcn, uint16_t from_hi, uint32_t from_lo,
         return ENTL_ACTION_NOP;
     }
 
-    if (mcn->error_state.error_count) {
+    if (current_error_pending(mcn)) {
         STM_TDEBUG_ERROR(mcn, "message 0x%04x", emsg_raw);
         return ENTL_ACTION_SIG_ERR;
     }
@@ -410,7 +410,7 @@ int entl_received(entl_state_machine_t *mcn, uint16_t from_hi, uint32_t from_lo,
 int entl_get_hello(entl_state_machine_t *mcn, uint16_t *emsg_raw, uint32_t *seqno) {
     struct timespec ts = current_kernel_time();
 
-    if (mcn->error_state.error_count) {
+    if (current_error_pending(mcn)) {
         STM_TDEBUG_ERROR(mcn, "entl_get_hello");
         return ENTL_ACTION_NOP;
     }
@@ -460,7 +460,7 @@ int entl_get_hello(entl_state_machine_t *mcn, uint16_t *emsg_raw, uint32_t *seqn
 int entl_next_send(entl_state_machine_t *mcn, uint16_t *emsg_raw, uint32_t *seqno) {
     struct timespec ts = current_kernel_time();
 
-    if (mcn->error_state.error_count) {
+    if (current_error_pending(mcn)) {
         int ret_action;
         uint32_t was_state = get_atomic_state(mcn);
         respond_with(ENTL_MESSAGE_NOP_U, 0, ENTL_ACTION_NOP);
@@ -572,7 +572,7 @@ int entl_next_send_tx(entl_state_machine_t *mcn, uint16_t *emsg_raw, uint32_t *s
     struct timespec ts = current_kernel_time();
 
     // might be offline(no carrier), or be newly online after offline ??
-    if (mcn->error_state.error_count) {
+    if (current_error_pending(mcn)) {
         int ret_action;
         uint32_t was_state = get_atomic_state(mcn);
         respond_with(ENTL_MESSAGE_NOP_U, 0, ENTL_ACTION_NOP);
@@ -713,7 +713,7 @@ void entl_link_up(entl_state_machine_t *mcn) {
         if (was_state != ENTL_STATE_IDLE) {
             STM_TDEBUG("Link Up, state %d (%s), unexpected, ignored", was_state, mcn_state2name(was_state));
         }
-        else if (mcn->error_state.error_count != 0) {
+        else if (current_error_pending(mcn)) {
 // FIXME: is error 'DOWN' ??
             STM_TDEBUG_ERROR(mcn, "Link Up, error lock - state %d (%s)", was_state, mcn_state2name(was_state));
         }
