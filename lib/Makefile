@@ -19,7 +19,7 @@ CFLAGS += -I../src
 
 OBJS=ecnl_proto.o genl_sample.o
 
-all: genl_sample mock_exchange
+all: genl_sample mock_exchange route-repair
 
 genl_sample: $(OBJS)
 
