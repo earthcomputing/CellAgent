@@ -446,7 +446,7 @@ static void edev_init(struct e1000_adapter *adapter) {
 
     entl_e1000_set_my_addr(adapter, netdev->dev_addr);
 #if 0
-    // force to check the link status on kernel task (taken care of elsewhere)
+    // force link status check by watchdog (taken care of elsewhere)
     struct e1000_hw *hw = &adapter->hw;
     hw->mac.get_link_status = true;
 #endif
