@@ -334,10 +334,15 @@ static int entl_do_ioctl(struct net_device *netdev, struct ifreq *ifr, int cmd) 
 
     switch (cmd) {
     case SIOCDEVPRIVATE_ENTL_RD_CURRENT: {
+        // FIXME: switch to public API ?
+        // e1000e_has_link(struct e1000_adapter *adapter)
+        // or netif_carrier_ok(struct net_device *netdev = adapter->netdev;)
         struct e1000_hw *hw = &adapter->hw;
-        uint32_t link = !hw->mac.get_link_status; // FIXME: carrier?
+        uint32_t link = !hw->mac.get_link_status;
         struct entl_ioctl_data entl_data;
         entl_data.link_state = link;
+
+        // FIXME: CLEARS error_state!!
         entl_read_current_state(stm, &entl_data.state, &entl_data.error_state);
         entl_data.num_queued = entl_num_queued(stm);
         copy_to_user(ifr->ifr_data, &entl_data, sizeof(struct entl_ioctl_data));
