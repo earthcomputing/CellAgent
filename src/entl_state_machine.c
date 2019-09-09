@@ -704,6 +704,20 @@ void entl_read_error_state(entl_state_machine_t *mcn, entl_state_t *st, entl_sta
         memcpy(err, &mcn->error_state, sizeof(entl_state_t));
         memset(&mcn->error_state, 0, sizeof(entl_state_t));
     STM_UNLOCK;
+    uint32_t was_state = st->current_state;
+    uint32_t count = err->error_count;
+    uint32_t error_flag = err->error_flag;
+    uint32_t mask = err->p_error_flag;
+    STM_TDEBUG("read-and-clear error_state -"
+        " state %d (%s)"
+        " flag 0x%04x (%s)"
+        " count %d"
+        " mask 0x%04x",
+        was_state, mcn_state2name(was_state),
+        error_flag, mcn_flag2name(error_flag),
+        count,
+        mask
+    );
 }
 
 void entl_link_up(entl_state_machine_t *mcn) {
