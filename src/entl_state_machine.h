@@ -92,6 +92,10 @@ static inline void clear_intervals(entl_state_machine_t *mcn) {
 #endif
 }
 
+static inline int current_error_pending(entl_state_machine_t *mcn) {
+    return mcn->error_state.error_count;
+}
+
 static inline void clear_error(entl_state_machine_t *mcn) {
     mcn->current_state.error_flag = 0;
     mcn->current_state.error_count = 0;
