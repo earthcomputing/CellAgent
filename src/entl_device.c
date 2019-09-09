@@ -421,12 +421,15 @@ dump_ait_data(stm, "ioctl - recvq_pop", ait_data);
 }
 
 // name here is problematical - called before register_netdev (but after netdev->name = pci_name)
+// called both from netdev (patch) and edev_init
 static void entl_e1000_set_my_addr(struct e1000_adapter *adapter, const uint8_t *addr) {
-    ENTL_DEBUG_NAME(adapter->netdev->name, "macaddr %02x:%02x:%02x:%02x:%02x:%02x", addr[0], addr[1], addr[2], addr[3], addr[4], addr[5]);
+    ENTL_DEBUG_NAME(adapter->netdev->name, "init - macaddr %02x:%02x:%02x:%02x:%02x:%02x", addr[0], addr[1], addr[2], addr[3], addr[4], addr[5]);
+    uint16_t u_addr; uint32_t l_addr; unpack_eth(addr, &u_addr, &l_addr);
+
+    // FIXME: mcn name not set up ??
     entl_device_t *edev = &adapter->entl_dev;
     entl_state_machine_t *stm = &edev->edev_stm;
-    uint16_t u_addr; uint32_t l_addr; unpack_eth(addr, &u_addr, &l_addr);
-    entl_set_my_adder(stm, u_addr, l_addr); // FIXME: mcn name not set up ??
+    entl_set_my_adder(stm, u_addr, l_addr);
 }
 
 // netdev entry points: (from entl_e1000_configure)
