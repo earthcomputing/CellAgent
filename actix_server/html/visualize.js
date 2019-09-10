@@ -8,6 +8,14 @@ window.onload = function() {
     canvas = document.getElementById("viz-canvas");
 }
 function visualize() {
+    canvas.innerHTML = 
+        '<defs>\
+             <!-- From http://stackoverflow.com/questions/26789005/drawing-arrows-using-d3 -->\
+             <marker id="arrow-head" markerWidth="10" markerHeight="10"\
+                   refx="10" refy="3" orient="auto" markerUnits="strokeWidth" viewBox="0 0 20 20">\
+               <path d="M0,0 L0,6 L9,3 z" fill="black"/>\
+             </marker>\
+         </defs>';
     const Http = new XMLHttpRequest();
     const url = 'http://127.0.0.1:8088/';
     Http.open("GET", url + "geometry");
