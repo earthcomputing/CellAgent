@@ -8,11 +8,11 @@
 #include "entl_stm_if.h"
 #include "entl_user_api.h"
 
-// FIXME: duplicate defn
 // newline should be unnecessary here - https://lwn.net/Articles/732420/
 #define MCN_DEBUG(_name, _time, fmt, args...) printk(KERN_ALERT "%ld %s STM: " fmt "\n", _time, _name, ## args)
 #define STM_TDEBUG(fmt, args...) MCN_DEBUG(mcn->name, ts.tv_sec, fmt, ## args)
 #define STM_TDEBUG_ERROR(mcn, fmt, args...) STM_TDEBUG("error pending: flag %d (%s) count %d " fmt, mcn->error_state.error_flag, mcn_flag2name(mcn->error_state.error_flag), mcn->error_state.error_count, ## args)
+// FIXME: add STM_TDEBUG_STATE, STM_TDEBUG_TRANSITION
 
 #define STM_LOCK unsigned long flags; spin_lock_irqsave(&mcn->state_lock, flags)
 #define STM_UNLOCK spin_unlock_irqrestore(&mcn->state_lock, flags)
@@ -162,7 +162,8 @@ int entl_received(entl_state_machine_t *mcn, uint16_t from_hi, uint32_t from_lo,
                 }
             }
             else {
-                STM_TDEBUG("message 0x%04x, %s", emsg_raw, mcn_state2name(was_state));
+                STM_TDEBUG("message 0x%04x (%s) neighbor %04x %08x seqno %d, %s", emsg_raw, msg_nick(emsg_type), from_hi, from_lo, seqno, mcn_state2name(was_state));
+                // FIXME: dump whole packet here?
                 ret_action = ENTL_ACTION_NOP;
             }
         }
