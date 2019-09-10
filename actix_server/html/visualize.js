@@ -2,6 +2,7 @@ const x0 = 50;
 const y0 = 50;
 const scale = 50;
 let cells = {};
+let allNeighbors = {};
 let canvas;
 window.onload = function() {
     canvas = document.getElementById("viz-canvas");
@@ -34,14 +35,15 @@ function setup_geometry(geometry_text) {
 }
 function setup_topology(topology_text) {
     let topology = JSON.parse(topology_text);
-    let allNeighbors = topology.neighbors;
+    allNeighbors = topology.neighbors;
     for (cellID in allNeighbors) {
         let cellNeighbors = allNeighbors[cellID];
         for (neighborIndex in cellNeighbors.neighbors) {
             let neighbor = cellNeighbors.neighbors[neighborIndex];
             let neighborID = neighbor.cell_id.name;
             if ( cellID < neighborID ) {
-                let id = cellID + ":" + neighborID;
+                let neighborPort = neighbor.port;
+                let id = cellID + ":P"+ neighborIndex + "-" + neighborID + ":P" + neighborPort;
                 create_line_at(id, cellID, neighborID);
                 for (cell in cells) {
                     create_node_at(cell);
