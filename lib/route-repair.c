@@ -7,6 +7,7 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <string.h>
+#include <time.h>
 #include <sys/ioctl.h>
 #include <sys/types.h>
 #include <unistd.h>
@@ -103,7 +104,9 @@ static void dump_data(char *name, struct entl_ioctl_data *q) {
         // max_interval_time;
         // min_interval_time;
 
-    printf("%s dump_data:"
+    struct timespec ts;
+    clock_gettime(CLOCK_MONOTONIC_RAW, &ts); // maybe: CLOCK_REALTIME, ignoring errors
+    printf("%ld %s dump_data:"
         " link %s"
         " nqueue %d"
         " state %d"
@@ -116,6 +119,7 @@ static void dump_data(char *name, struct entl_ioctl_data *q) {
         " mask 0x%04x"
         " count %d"
         "\n",
+        ts.tv_sec,
         name,
         link,
         nqueue,
