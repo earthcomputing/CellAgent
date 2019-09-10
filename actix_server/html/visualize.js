@@ -19,11 +19,10 @@ function visualize() {
             Http.send();
             Http.onreadystatechange = (e) => {
                 if ( Http.readyState == 4 && Http.status == 200 ) {
-                   setup_topology(Http.responseText);
+                    setup_topology(Http.responseText);
+                    draw();
                 }
-                draw();
             }
-
         }
     }
 }
@@ -46,11 +45,11 @@ function setup_topology(topology_text) {
                 let neighborPort = neighbor.port;
                 let id = cellID + ":P"+ neighborIndex + "-" + neighborID + ":P" + neighborPort;
                 create_line_at(id, cellID, neighborID);
-                for (cell in cells) {
-                    create_node_at(cell);
-                }
             }
         }
+    }
+    for (cellID in allNeighbors) {
+        create_node_at(cellID);
     }
 }
 function create_line_at(id, cellID1, cellID2) {
@@ -61,6 +60,8 @@ function create_line_at(id, cellID1, cellID2) {
     line.setAttribute("x1", y0 + scale*cells[cellID1].col);
     line.setAttribute("y2", x0 + scale*cells[cellID2].row);
     line.setAttribute("x2", y0 + scale*cells[cellID2].col);
+    line.setAttribute("onclick", "link_click(evt)");
+    line.setAttribute("ondblclick", "link_dblclick(evt)")
     canvas.appendChild(line);
     return line;
 }
@@ -72,7 +73,21 @@ function create_node_at(id) {
     circle.setAttribute("class", "node");
     circle.setAttribute("cx", x0 + x*scale);
     circle.setAttribute("cy", y0 + y*scale);
+    circle.setAttribute("onclick", "cell_click(evt)");
+    circle.setAttribute("ondblclick", "cell_dblclick(evt)");
     canvas.appendChild(circle);
     return circle;
 }
 function draw() { canvas.innerHTML = canvas.innerHTML; }
+function cell_click(evt) {
+    evt.target.setAttribute("class", "noderoot");
+}
+function cell_dblclick(evt) {
+    evt.target.setAttribute("class", "nodebroken");
+}
+function link_click(evt) {
+    evt.target.setAttribute("class", "linktree");
+}
+function link_dblclick(evt) {
+    evt.target.setAttribute("class", "linkbroken")
+}
