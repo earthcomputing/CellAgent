@@ -131,6 +131,9 @@ static void entl_device_init(entl_device_t *edev) {
 
 static void entl_device_link_down(entl_device_t *dev) {
     entl_state_machine_t *stm = &dev->edev_stm;
+
+    // FIXME : hello_valid is never checked!
+    stm->hello_valid = 0; // invalidate neighbor
     entl_state_error(stm, ENTL_ERROR_FLAG_LINKDONW);
     dev->edev_flag = ENTL_DEVICE_FLAG_SIGNAL;
     mod_timer(&dev->edev_watchdog_timer, jiffies + 1);
@@ -143,6 +146,8 @@ static void entl_device_link_up(entl_device_t *dev) {
     mod_timer(&dev->edev_watchdog_timer, jiffies + 1);
 
     // FIXME: why redundant watchdog ??
+    // mod_timer(&dev->edev_watchdog_timer, jiffies + 1);
+
     uint32_t entl_state = FETCH_STATE(stm);
     if (entl_state == ENTL_STATE_HELLO) {
         dev->edev_flag |= ENTL_DEVICE_FLAG_HELLO;
@@ -605,7 +610,9 @@ static void entl_watchdog(struct timer_list *t) {
 }
 #endif
 
+// ref: sigaction.2 - void handler(int sig, siginfo_t *info, void *ucontext)
 static inline void notify_listener(int subscriber, int sigusr) {
+    // POSIX.1b signals - siginfo_t.h
     struct siginfo info = {
         .si_signo = SIGIO,
         .si_int = 1,
