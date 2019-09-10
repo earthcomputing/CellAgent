@@ -21,6 +21,7 @@ function visualize() {
                 if ( Http.readyState == 4 && Http.status == 200 ) {
                    setup_topology(Http.responseText);
                 }
+                draw();
             }
 
         }
@@ -61,7 +62,6 @@ function create_line_at(id, cellID1, cellID2) {
     line.setAttribute("y2", x0 + scale*cells[cellID2].row);
     line.setAttribute("x2", y0 + scale*cells[cellID2].col);
     canvas.appendChild(line);
-    canvas.innerHTML = canvas.innerHTML;
     return line;
 }
 function create_node_at(id) {
@@ -73,6 +73,6 @@ function create_node_at(id) {
     circle.setAttribute("cx", x0 + x*scale);
     circle.setAttribute("cy", y0 + y*scale);
     canvas.appendChild(circle);
-    canvas.innerHTML = canvas.innerHTML;
     return circle;
 }
+function draw() { canvas.innerHTML = canvas.innerHTML; }
