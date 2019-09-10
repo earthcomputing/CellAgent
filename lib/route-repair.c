@@ -83,37 +83,50 @@ static int register_handler(struct ifreq *r) {
 }
 
 static void dump_data(char *name, struct entl_ioctl_data *q) {
-    printf("%s dump_data:\n", name);
     char *link = (q->link_state) ? "UP" : "DOWN"; ; // int, 0: down, 1: up
     int nqueue = q->num_queued; // uint32_t
-    printf("    link: %s\n", link);
-    printf("    nqueue: %d\n", nqueue);
     // q->state;
     entl_state_t *s = &q->state;
         uint32_t current_state = s->current_state; // 0:idle 1:H 2:W 3:S 4:R
         uint32_t seqno_recv = s->event_i_know;       // last event received
         uint32_t seqno_sent = s->event_i_sent;       // last event sent
         uint32_t seqno_next = s->event_send_next;    // next event sent
-    printf("  current state::\n");
-    printf("    code: %d\n", current_state);
-    printf("    seqno_recv: %d\n", seqno_recv);
-    printf("    seqno_sent: %d\n", seqno_sent);
-    printf("    seqno_next: %d\n", seqno_next);
     // q->error_state;
     entl_state_t *err = &q->error_state;
         uint32_t flag = err->error_flag;         // first error
         uint32_t mask = err->p_error_flag;       // when multiple, union of error bits
         uint32_t count = err->error_count;        // multiple errors
-    printf("  error state::\n");
-    printf("    flag: 0x%04x\n", flag);
-    printf("    mask: 0x%04x\n", mask);
-    printf("    count: %d\n", count);
         struct timespec first = err->error_time;  // first error detected (usec), struct timespec
         struct timespec recent = err->update_time; // last updated (usec), struct timespec
     // ENTL_SPEED_CHECK
         // interval_time; // duration between S <-> R transition
         // max_interval_time;
         // min_interval_time;
+
+    printf("%s dump_data:"
+        " link %s"
+        " nqueue %d"
+        " state %d"
+        " seqno:"
+        " _recv %d"
+        " _sent %d"
+        " o_next %d"
+        " error:"
+        " flag 0x%04x"
+        " mask 0x%04x"
+        " count %d"
+        "\n",
+        name,
+        link,
+        nqueue,
+        current_state,
+        seqno_recv,
+        seqno_sent,
+        seqno_next,
+        flag,
+        mask,
+        count
+    );
 }
 
 // FIXME: this is where "route repair" would happen
