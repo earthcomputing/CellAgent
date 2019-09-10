@@ -9,7 +9,7 @@
 #include "entl_user_api.h"
 
 // newline should be unnecessary here - https://lwn.net/Articles/732420/
-#define MCN_DEBUG(_name, _time, fmt, args...) printk(KERN_ALERT "%ld %s STM: " fmt "\n", _time, _name, ## args)
+#define MCN_DEBUG(_name, _time, fmt, args...) printk(KERN_ALERT "%ld STM: %s " fmt "\n", _time, _name, ## args)
 #define STM_TDEBUG(fmt, args...) MCN_DEBUG(mcn->name, ts.tv_sec, fmt, ## args)
 #define STM_TDEBUG_ERROR(mcn, fmt, args...) STM_TDEBUG("error pending: flag %d (%s) count %d " fmt, mcn->error_state.error_flag, mcn_flag2name(mcn->error_state.error_flag), mcn->error_state.error_count, ## args)
 // FIXME: add STM_TDEBUG_STATE, STM_TDEBUG_TRANSITION
