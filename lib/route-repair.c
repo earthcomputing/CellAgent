@@ -113,7 +113,7 @@ static void dump_data(char *name, struct entl_ioctl_data *q) {
         " seqno:"
         " _recv %d"
         " _sent %d"
-        " o_next %d"
+        " _next %d"
         " error:"
         " flag 0x%04x"
         " mask 0x%04x"
