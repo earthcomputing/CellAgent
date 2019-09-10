@@ -100,7 +100,8 @@ int entl_received(entl_state_machine_t *mcn, uint16_t from_hi, uint32_t from_lo,
     }
 
     if (current_error_pending(mcn)) {
-        STM_TDEBUG_ERROR(mcn, "message 0x%04x", emsg_raw);
+        uint32_t was_state = get_atomic_state(mcn); // cheat - no locking
+        STM_TDEBUG_ERROR(mcn, "message 0x%04x (%s) neighbor %04x %08x seqno %d, %s", emsg_raw, msg_nick(emsg_type), from_hi, from_lo, seqno, mcn_state2name(was_state));
         return ENTL_ACTION_SIG_ERR;
     }
 
@@ -109,7 +110,7 @@ int entl_received(entl_state_machine_t *mcn, uint16_t from_hi, uint32_t from_lo,
         uint32_t was_state = get_atomic_state(mcn);
         switch (was_state) {
         case ENTL_STATE_IDLE: {
-            STM_TDEBUG("message 0x%04x, IDLE", emsg_raw);
+            STM_TDEBUG("message 0x%04x (%s) neighbor %04x %08x seqno %d, %s", emsg_raw, msg_nick(emsg_type), from_hi, from_lo, seqno, mcn_state2name(was_state));
         }
         ret_action = ENTL_ACTION_NOP;
         break;
