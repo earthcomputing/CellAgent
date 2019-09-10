@@ -8,7 +8,7 @@ window.onload = function() {
     canvas = document.getElementById("viz-canvas");
 }
 function visualize() {
-    canvas.innerHTML = 
+    canvas.innerHTML =
         '<defs>\
              <!-- From http://stackoverflow.com/questions/26789005/drawing-arrows-using-d3 -->\
              <marker id="arrow-head" markerWidth="10" markerHeight="10"\
@@ -88,13 +88,21 @@ function create_node_at(id) {
 }
 function draw() { canvas.innerHTML = canvas.innerHTML; }
 function cell_click(evt) {
-    evt.target.setAttribute("class", "noderoot");
+    if (evt.target.getAttribute("class") == "node") {
+        evt.target.setAttribute("class", "noderoot");
+    } else {
+        evt.target.setAttribute("class", "node");
+    }
 }
 function cell_dblclick(evt) {
     evt.target.setAttribute("class", "nodebroken");
 }
 function link_click(evt) {
-    evt.target.setAttribute("class", "linktree");
+    if (evt.target.getAttribute("class") == "link") {
+        evt.target.setAttribute("class", "linktree");
+    } else {
+        evt.target.setAttribute("class", "link");
+    }
 }
 function link_dblclick(evt) {
     evt.target.setAttribute("class", "linkbroken")
