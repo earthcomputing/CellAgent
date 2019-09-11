@@ -1013,42 +1013,44 @@ impl CellAgent {
             self.send_msg(self.get_connected_tree_id(),
                           &discoverd_msg, mask).context(CellagentError::Chain { func_name: "process_ca", comment: S("DiscoverMsg") })?;
         }
-        let discover_type = msg.get_discover_type();
-        if discover_type == DiscoverDType::Subsequent {
-            let traph = self.get_traph_mut(port_tree_id)?;
-            let element = traph.get_element_mut(port_no)?;
-            element.set_connected();
-            if element.is_state(PortState::Unknown) {
-                element.mark_pruned();
-            }
-            return Ok(());
-        }
-        let path = msg.get_path();
-        let port_number = port_no.make_port_number(self.no_ports)?;
-        let children = [port_number].iter().cloned().collect::<HashSet<_>>();
-        let port_state = PortState::Child;
-        let mut eqns = HashSet::new();
-        eqns.insert(GvmEqn::Recv("true"));
-        eqns.insert(GvmEqn::Send("true"));
-        eqns.insert(GvmEqn::Xtnd("false"));
-        eqns.insert(GvmEqn::Save("false"));
-        let gvm_eqn = GvmEquation::new(&eqns, &Vec::new());
-        {
-            if CONFIG.debug_options.all || CONFIG.debug_options.discoverd {
-                let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "ca_process_discover_d_msg" };
-                let trace = json!({ "cell_id": &self.cell_id, "port_tree_id": port_tree_id, "# Hello": count,
+        match msg.get_discover_type() {
+            DiscoverDType::Subsequent => {
+                let traph = self.get_traph_mut(port_tree_id)?;
+                let element = traph.get_element_mut(port_no)?;
+                element.set_connected();
+                if element.is_state(PortState::Unknown) {
+                    element.mark_pruned();
+                }
+            },
+            DiscoverDType::First => {
+                let path = msg.get_path();
+                let port_number = port_no.make_port_number(self.no_ports)?;
+                let children = [port_number].iter().cloned().collect::<HashSet<_>>();
+                let port_state = PortState::Child;
+                let mut eqns = HashSet::new();
+                eqns.insert(GvmEqn::Recv("true"));
+                eqns.insert(GvmEqn::Send("true"));
+                eqns.insert(GvmEqn::Xtnd("false"));
+                eqns.insert(GvmEqn::Save("false"));
+                let gvm_eqn = GvmEquation::new(&eqns, &Vec::new());
+                {
+                    if CONFIG.debug_options.all || CONFIG.debug_options.discoverd {
+                        let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "ca_process_discover_d_msg" };
+                        let trace = json!({ "cell_id": &self.cell_id, "port_tree_id": port_tree_id, "# Hello": count,
                     "# neighbors": self.get_no_neighbors(), "port_no": port_no, "msg": msg.value() });
-                let _ = add_to_trace(TraceType::Debug, trace_params, &trace, _f);
+                        let _ = add_to_trace(TraceType::Debug, trace_params, &trace, _f);
+                    }
+                }
+                let _ = self.update_traph(port_tree_id, port_number, port_state, &gvm_eqn,
+                                          children, PathLength(CellQty(0)), path)?;
+                if tree_id == self.my_tree_id &&
+                    self.is_border_port_connected &&
+                    !self.sent_to_noc &&
+                    self.is_border() &&
+                    self.is_discover_done() {
+                    self.send_base_tree_to_noc()?;
+                }
             }
-        }
-        let _ = self.update_traph(port_tree_id, port_number, port_state, &gvm_eqn,
-                                  children, PathLength(CellQty(0)), path)?;
-        if tree_id == self.my_tree_id   &&
-                      self.is_border_port_connected &&
-                      !self.sent_to_noc &&
-                      self.is_border()  &&
-                      self.is_discover_done() {
-            self.send_base_tree_to_noc()?;
         }
         Ok(())
     }
