@@ -95,7 +95,7 @@ int entl_received(entl_state_machine_t *mcn, uint16_t from_hi, uint32_t from_lo,
     if (emsg_type == ENTL_MESSAGE_NOP_U) return ENTL_ACTION_NOP;
 
     if (mcn->mac_valid == 0) {
-        STM_TDEBUG("invalid, macaddr %04x %08x", mcn->mac_hi, mcn->mac_lo);
+        STM_TDEBUG("invalid macaddr %04x %08x", mcn->mac_hi, mcn->mac_lo);
         return ENTL_ACTION_NOP;
     }
 
@@ -122,7 +122,7 @@ int entl_received(entl_state_machine_t *mcn, uint16_t from_hi, uint32_t from_lo,
                 mcn->hello_lo = from_lo;
                 mcn->hello_valid = 1;
 
-                STM_TDEBUG("neighbor %04x %08x", from_hi, from_lo);
+                STM_TDEBUG("%04x %08x - neighbor %04x %08x", mcn->mac_hi, mcn->mac_lo, from_hi, from_lo);
 
                 // symmetry breaking : master / slave
                 int ordering = cmp_addr(mcn->mac_hi, mcn->mac_lo, from_hi, from_lo);
