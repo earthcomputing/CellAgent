@@ -233,9 +233,10 @@ int entl_received(entl_state_machine_t *mcn, uint16_t from_hi, uint32_t from_lo,
                     set_atomic_state(mcn, ENTL_STATE_SEND);
                     ret_action = ENTL_ACTION_SEND;
 
-                    // send queue non-empty
-                    if (!sendq_count(mcn)) { // AIT has priority
-                        STM_TDEBUG("EVENT: advance - seqno %d, %s -> SEND (data)", seqno, mcn_state2name(was_state));
+                    // send queue empty
+                    if (sendq_count(mcn) == 0) { // AIT has priority
+                        // this is way too noisy to log!
+                        // STM_TDEBUG("EVENT: advance - seqno %d, %s -> SEND (data)", seqno, mcn_state2name(was_state));
                         ret_action |= ENTL_ACTION_SEND_DAT; // data send as optional
                     }
                     set_update_time(mcn, ts);
