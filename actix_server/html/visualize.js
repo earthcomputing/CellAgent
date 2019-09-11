@@ -37,6 +37,7 @@ function visualize() {
 function setup_geometry(geometry_text) {
     let geometry = JSON.parse(geometry_text);
     let rowcol = geometry.geometry.rowcol;
+    if ( Object.keys(rowcol).length == 0 ) { alert("Nothing to show.  Run simulator, and try again."); }
     for (cell in rowcol) {
         cells[cell] = rowcol[cell];
     }
@@ -70,6 +71,9 @@ function create_line_at(id, cellID1, cellID2) {
     line.setAttribute("x2", y0 + scale*cells[cellID2].col);
     line.setAttribute("onclick", "link_click(evt)");
     line.setAttribute("ondblclick", "link_dblclick(evt)")
+    let tooltipID = addTooltip(id);
+    line.setAttribute("onmouseover", "showTooltip(" + tooltipID + ")");
+    line.setAttribute("onmouseleave","hideTooltip(" + tooltipID + ")")
     canvas.appendChild(line);
     return line;
 }
@@ -83,8 +87,17 @@ function create_node_at(id) {
     circle.setAttribute("cy", y0 + y*scale);
     circle.setAttribute("onclick", "cell_click(evt)");
     circle.setAttribute("ondblclick", "cell_dblclick(evt)");
+    let tooltipID = addTooltip(id);
+    circle.setAttribute("onmouseover", "showTooltip(" + tooltipID + ")");
+    circle.setAttribute("onmouseleave","hideTooltip(" + tooltipID + ")")
     canvas.appendChild(circle);
     return circle;
+}
+function showTooltip(elem) {
+    elem.style.display = "block";
+}
+function hideTooltip(elem) {
+    elem.style.display = "none";
 }
 function draw() { canvas.innerHTML = canvas.innerHTML; }
 function cell_click(evt) {
@@ -106,4 +119,15 @@ function link_click(evt) {
 }
 function link_dblclick(evt) {
     evt.target.setAttribute("class", "linkbroken")
+}
+function addTooltip(id) {
+    let tooltipID = "tooltip" + id.replace(/:/g, "").replace(/-/g, "");
+    let tooltip = document.createElement("div");
+    tooltip.id = tooltipID;
+    tooltip.style.display = "none";
+    tooltip.setAttribute("class", "tooltip");
+    tooltip.innerHTML = id;
+    let body = document.getElementById("body");
+    body.appendChild(tooltip);
+    return tooltipID;
 }

@@ -40,7 +40,7 @@
     fill : red;
     r: 10;
 }
-#tooltip {
+.tooltip {
     font-size: 150%;
     position: fixed;
     top: 30%;
@@ -57,7 +57,7 @@
     box-shadow: 4px 4px 10px rgba(0, 0, 0, 0.4);
     pointer-events: none;
 }
-#tooltip.hidden {
+.tooltip.hidden {
     position : absolute;
     display : none;
 }
