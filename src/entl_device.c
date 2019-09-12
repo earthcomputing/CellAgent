@@ -201,7 +201,9 @@ static bool entl_device_process_rx_packet(entl_device_t *dev, struct sk_buff *sk
             uint32_t nbytes;
             memcpy(&nbytes, level0, sizeof(uint32_t));
 // FIXME: MAX_AIT_MESSAGE_SIZE 256
-            if ((nbytes > 0) && (nbytes < MAX_AIT_MESSAGE_SIZE)) {
+// entt_ioctl_ait_data_t should really be dynamically sized (kzalloc'ed)
+// NOTE: invariant: MAX_AIT_MESSAGE_SIZE <= sizeof(ait_data->data)
+            if ((nbytes > 0) && (nbytes <= MAX_AIT_MESSAGE_SIZE)) {
                 unsigned char *payload = level0 + sizeof(uint32_t);
                 ait_data->message_len = nbytes;
                 memcpy(ait_data->data, payload, nbytes);
@@ -1266,7 +1268,7 @@ dump_ait_data(stm, "adapt_send - sendq_push", ait_data);
 }
 
 // edf_retrieve_AIT
-static int adapt_retrieve_AIT(struct net_device *e1000e, ec_ait_data_t *data) {
+static int adapt_retrieve_AIT(struct net_device *e1000e, entt_ioctl_ait_data_t *data) {
     ADAPT_INFO_NAME(e1000e->name, "adapt_retrieve_AIT");
     if (data == NULL) return -1;
 
@@ -1277,19 +1279,19 @@ static int adapt_retrieve_AIT(struct net_device *e1000e, ec_ait_data_t *data) {
     entl_state_machine_t *stm = &entl_dev->edev_stm;
     if (stm == NULL) return -1;
 
+    // send/retr differ: egrep 'typedef struct (ec_ait_data|entt_ioctl_ait_data)'
     struct entt_ioctl_ait_data *ait_data = entl_read_AIT_message(stm); // recvq_pop
     if (ait_data) {
-
-// ADAPT_INFO_NAME(e1000e->name, "retr_AIT skb: %px", data);
-dump_ait_data(stm, "adapt_retr - recvq_pop", ait_data);
-
+        // ADAPT_INFO_NAME(e1000e->name, "retr_AIT skb: %px", data);
+        dump_ait_data(stm, "adapt_retr - recvq_pop", ait_data);
         memcpy(data, ait_data, sizeof(struct entt_ioctl_ait_data));
         kfree(ait_data);
     }
     else {
-        struct entt_ioctl_ait_data dt;
-        dt.message_len = 0;
-        dt.num_messages = 0;
+        struct entt_ioctl_ait_data dt; memset(&dt, 0, sizeof(struct entt_ioctl_ait_data));
+        // dt.data[0..MAX_AIT_MESSAGE_SIZE] = 0;
+        // dt.message_len = 0;
+        // dt.num_messages = 0;
         dt.num_queued = entl_num_queued(stm);
         memcpy(data, &dt, sizeof(struct entt_ioctl_ait_data));
     }

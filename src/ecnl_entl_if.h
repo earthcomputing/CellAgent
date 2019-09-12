@@ -41,7 +41,7 @@ typedef struct entl_driver_funcs {
     int (*edf_validate)           (struct net_device *dev, int magic);
     netdev_tx_t (*edf_start_xmit) (struct sk_buff *skb, struct net_device *dev);
     int (*edf_send_AIT)           (struct sk_buff *skb, struct net_device *dev);
-    int (*edf_retrieve_AIT)       (struct net_device *dev, ec_ait_data_t *data);
+    int (*edf_retrieve_AIT)       (struct net_device *dev, entt_ioctl_ait_data_t *data);
     int (*edf_write_reg)          (struct net_device *dev, ec_alo_reg_t *reg);
     int (*edf_read_regset)        (struct net_device *dev, ec_alo_regs_t *regs);
     int (*edf_get_state)          (struct net_device *dev, ec_state_t *state);
@@ -51,7 +51,7 @@ typedef struct entl_driver_funcs {
 static int adapt_validate(struct net_device *dev, int magic); // { return 1; }
 static netdev_tx_t adapt_start_xmit(struct sk_buff *skb, struct net_device *e1000e); // { return NETDEV_TX_BUSY; }
 static int adapt_send_AIT(struct sk_buff *skb, struct net_device *e1000e); // { return -1; }
-static int adapt_retrieve_AIT(struct net_device *e1000e, ec_ait_data_t *data); // { return -1; }
+static int adapt_retrieve_AIT(struct net_device *e1000e, entt_ioctl_ait_data_t *data); // { return -1; }
 static int adapt_write_reg(struct net_device *e1000e, ec_alo_reg_t *reg); // { return -1; }
 static int adapt_read_regset(struct net_device *e1000e, ec_alo_regs_t *regs); // { return -1; }
 static int adapt_get_state(struct net_device *dev, ec_state_t *state); // { return -1; }
