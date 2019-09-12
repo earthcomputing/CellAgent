@@ -3,6 +3,13 @@
 
 #define CLEAR_MSG { nlmsg_free(msg); msg = nlmsg_alloc(); }
 
+typedef struct {
+    char *name;
+    uint32_t port_id;
+} endpoint_t;
+
+endpoint_t port_pair[2];
+
 #ifndef BIONIC
 int send_port_id = 3; // enp7s0
 int retr_port_id = 2; // enp9s0
@@ -49,8 +56,23 @@ int doit(struct nl_sock *sock, struct nl_msg *msg) {
         if (actual_port_id != port_id) fatal_error(-1, "port mismatch: %d, %d", port_id, actual_port_id);
 
         printf("Link is %s - '%s' (%d)\n", (link_state.port_link_state) ? "Up" : "Down", link_state.port_name, port_id);
+
+        for (int i = 0; i < 2; i++) {
+            endpoint_t *p = &port_pair[i];
+            if (!p->name && p->port_id == port_id) {
+                p->name = link_state.port_name; // fill in name
+                continue;
+            }
+            if (p->name && strcmp(link_state.port_name, p->name)) {
+                p->port_id = port_id; // determine port_id
+            }
+        }
         printf("\n");
     }
+
+    printf("send: %s\n", port_pair[0].name);
+    printf("recv: %s\n", port_pair[1].name);
+    printf("\n");
 
     {
         CLEAR_MSG;
@@ -67,7 +89,7 @@ int doit(struct nl_sock *sock, struct nl_msg *msg) {
         buf.frame = (uint8_t *) FRAME;
 
         CLEAR_MSG;
-        printf("send_ait_message\n");
+        printf("send_ait_message (asciz %d) %d (%s)\n", buf.len, send_port_id, port_pair[0].name);
         int rc = send_ait_message(sock, msg, module_id, send_port_id, buf, &actual_module_id, &actual_port_id);
         if (rc < 0) fatal_error(rc, "send_ait_message");
         if (actual_module_id != module_id) fatal_error(-1, "module mismatch: %d, %d", module_id, actual_module_id);
@@ -78,14 +100,14 @@ sleep(1);
 
     {
         CLEAR_MSG;
-        printf("retrieve_ait_message\n");
+        printf("retrieve_ait_message %d (%s)\n", retr_port_id, port_pair[1].name);
         buf_desc_t actual_buf; memset(&actual_buf, 0, sizeof(buf_desc_t));
         int rc = retrieve_ait_message(sock, msg, module_id, retr_port_id, alo_reg, &actual_module_id, &actual_port_id, &actual_buf);
         if (rc < 0) fatal_error(rc, "retrieve_ait_message");
         if (actual_module_id != module_id) fatal_error(-1, "module mismatch: %d, %d", module_id, actual_module_id);
         if (actual_port_id != retr_port_id) fatal_error(-1, "port mismatch: %d, %d", retr_port_id, actual_port_id);
 
-        printf("retr: %d '%s'\n", actual_buf.len, (char *) actual_buf.frame); // assumes c-string
+        printf("retr: (asciz %d) '%s'\n", actual_buf.len, (char *) actual_buf.frame); // assumes c-string
     }
 
 
@@ -97,7 +119,7 @@ sleep(1);
         buf.frame = (uint8_t *) FRAME;
 
         CLEAR_MSG;
-        printf("send_ait_message\n");
+        printf("send_ait_message (blob %d) %d (%s)\n", buf.len, send_port_id, port_pair[0].name);
         int rc = send_ait_message(sock, msg, module_id, send_port_id, buf, &actual_module_id, &actual_port_id);
         if (rc < 0) fatal_error(rc, "send_ait_message");
         if (actual_module_id != module_id) fatal_error(-1, "module mismatch: %d, %d", module_id, actual_module_id);
@@ -108,19 +130,32 @@ sleep(1);
 
     {
         CLEAR_MSG;
-        printf("retrieve_ait_message\n");
+        printf("retrieve_ait_message %d (%s)\n", retr_port_id, port_pair[1].name);
         buf_desc_t actual_buf; memset(&actual_buf, 0, sizeof(buf_desc_t));
         int rc = retrieve_ait_message(sock, msg, module_id, retr_port_id, alo_reg, &actual_module_id, &actual_port_id, &actual_buf);
         if (rc < 0) fatal_error(rc, "retrieve_ait_message");
         if (actual_module_id != module_id) fatal_error(-1, "module mismatch: %d, %d", module_id, actual_module_id);
         if (actual_port_id != retr_port_id) fatal_error(-1, "port mismatch: %d, %d", retr_port_id, actual_port_id);
 
-        printf("retr: %d '%s'\n", actual_buf.len, (char *) actual_buf.frame); // assumes c-string
+        printf("retr: (blob %d)\n", actual_buf.len); // dump?
     }
 }
 
+// e.g. usage: mock_exchange enp7s0 enp9s0
 int main(int argc, char *argv[]) {
-    int err;
+    port_pair[0].port_id = send_port_id;
+    port_pair[1].port_id = retr_port_id;
+
+    if (argc > 1) {
+        port_pair[0].name = argv[1];
+        port_pair[1].name = argv[1];
+        // printf("send: %s\n", port_pair[0].name);
+    }
+
+    if (argc > 2) {
+        port_pair[1].name = argv[2];
+        // printf("recv: %s\n", port_pair[1].name);
+    }
 
     printf("init_sock\n");
     struct nl_sock *sock = init_sock();
