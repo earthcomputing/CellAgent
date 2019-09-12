@@ -70,8 +70,12 @@ int doit(struct nl_sock *sock, struct nl_msg *msg) {
         printf("\n");
     }
 
-    printf("send: %s\n", port_pair[0].name);
-    printf("recv: %s\n", port_pair[1].name);
+    // should replace these variables:
+    send_port_id = port_pair[0].port_id;
+    retr_port_id = port_pair[1].port_id;
+
+    printf("send: %s (%d)\n", port_pair[0].name, send_port_id);
+    printf("recv: %s (%d)\n", port_pair[1].name, retr_port_id);
     printf("\n");
 
     {
