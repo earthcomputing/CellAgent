@@ -587,11 +587,14 @@ static int nl_ecnl_retrieve_ait_message(struct sk_buff *skb, struct genl_info *i
     struct entl_driver_funcs *funcs = e_driver->eda_funcs;
     if (!e1000e || !funcs) return -EINVAL;
 
-    struct ec_ait_data ait_data; memset(&ait_data, 0, sizeof(struct ec_ait_data));
+    // send/retr differ: egrep 'typedef struct (ec_ait_data|entt_ioctl_ait_data)'
+    struct entt_ioctl_ait_data ait_data; memset(&ait_data, 0, sizeof(struct entt_ioctl_ait_data));
     funcs->edf_retrieve_AIT(e1000e, &ait_data);
 
 // DEBUG
-    dump_block(e1000e, "nl_ecnl_retr", ait_data.ecad_data, ait_data.ecad_message_len);
+    dump_block(e1000e, "nl_ecnl_retr", ait_data.data, ait_data.message_len);
+    // struct net_device *plug_in = ecnl_devices[e_dev->ecnl_index]; // module_id
+    // PLUG_DEBUG(plug_in, "nl_ecnl_retr - msgs %d, nqueued %d", ait_data.num_messages, ait_data.num_queued);
 
     struct sk_buff *rskb = genlmsg_new(NLMSG_GOODSIZE, GFP_KERNEL);
     if (!rskb) return -ENOMEM;
@@ -599,8 +602,8 @@ static int nl_ecnl_retrieve_ait_message(struct sk_buff *skb, struct genl_info *i
     void *user_hdr = genlmsg_put(rskb, info->snd_portid, info->snd_seq, &nl_ecnd_fam, 0, NL_ECNL_CMD_RETRIEVE_AIT_MESSAGE);
     NLAPUT_CHECKED(nla_put_u32(rskb, NL_ECNL_ATTR_MODULE_ID, e_dev->ecnl_index)); // module_id
     NLAPUT_CHECKED(nla_put_u32(rskb, NL_ECNL_ATTR_PORT_ID, port_id));
-    NLAPUT_CHECKED(nla_put_u32(rskb, NL_ECNL_ATTR_MESSAGE_LENGTH, ait_data.ecad_message_len));
-    NLAPUT_CHECKED(nla_put(rskb, NL_ECNL_ATTR_MESSAGE, ait_data.ecad_message_len, ait_data.ecad_data));
+    NLAPUT_CHECKED(nla_put_u32(rskb, NL_ECNL_ATTR_MESSAGE_LENGTH, ait_data.message_len));
+    NLAPUT_CHECKED(nla_put(rskb, NL_ECNL_ATTR_MESSAGE, ait_data.message_len, ait_data.data));
     genlmsg_end(rskb, user_hdr);
     return genlmsg_reply(rskb, info);
 }

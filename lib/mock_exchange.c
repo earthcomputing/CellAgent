@@ -1,3 +1,4 @@
+#include <unistd.h>
 #include "ecnl_proto.h"
 
 #define CLEAR_MSG { nlmsg_free(msg); msg = nlmsg_alloc(); }
@@ -73,6 +74,8 @@ int doit(struct nl_sock *sock, struct nl_msg *msg) {
         if (actual_port_id != send_port_id) fatal_error(-1, "port mismatch: %d, %d", send_port_id, actual_port_id);
     }
 
+sleep(1);
+
     {
         CLEAR_MSG;
         printf("retrieve_ait_message\n");
@@ -99,6 +102,20 @@ int doit(struct nl_sock *sock, struct nl_msg *msg) {
         if (rc < 0) fatal_error(rc, "send_ait_message");
         if (actual_module_id != module_id) fatal_error(-1, "module mismatch: %d, %d", module_id, actual_module_id);
         if (actual_port_id != send_port_id) fatal_error(-1, "port mismatch: %d, %d", send_port_id, actual_port_id);
+    }
+
+sleep(1);
+
+    {
+        CLEAR_MSG;
+        printf("retrieve_ait_message\n");
+        buf_desc_t actual_buf; memset(&actual_buf, 0, sizeof(buf_desc_t));
+        int rc = retrieve_ait_message(sock, msg, module_id, retr_port_id, alo_reg, &actual_module_id, &actual_port_id, &actual_buf);
+        if (rc < 0) fatal_error(rc, "retrieve_ait_message");
+        if (actual_module_id != module_id) fatal_error(-1, "module mismatch: %d, %d", module_id, actual_module_id);
+        if (actual_port_id != retr_port_id) fatal_error(-1, "port mismatch: %d, %d", retr_port_id, actual_port_id);
+
+        printf("retr: %d '%s'\n", actual_buf.len, (char *) actual_buf.frame); // assumes c-string
     }
 }
 
