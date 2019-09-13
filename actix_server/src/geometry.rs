@@ -7,9 +7,10 @@ use actix_web::{web, Error, HttpResponse, Responder, Scope};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
+type RowCol = HashMap<String, Location>;
 type Size = usize;
 
-pub fn cell_geometry(path: &str, state: web::Data<AppGeometry>, record: web::Json<Value>)
+pub fn cell_geometry(path: &str, is_border: bool, state: web::Data<AppGeometry>, record: web::Json<Value>)
                  -> Result<impl Responder, Error> {
     let trace_body = record.get("body").expect("HelloMsg: bad trace record");
     let body: Body = serde_json::from_value(trace_body.clone())?;
@@ -17,7 +18,7 @@ pub fn cell_geometry(path: &str, state: web::Data<AppGeometry>, record: web::Jso
     let location = body.location;
     let app_geometry = state.get_ref();
     app_geometry.geometry.lock().unwrap().add(CellID { name },
-                                              Location { row: location[0], col: location[1] });
+                                              Location { row: location[0], col: location[1], is_border });
     Ok(HttpResponse::Ok().body(format!("{} adding {}\n{:?}\n", path, record, app_geometry)))
 }
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -34,21 +35,18 @@ pub struct AppGeometry {
     geometry: Mutex<Geometry>
 }
 #[derive(Debug, Copy, Clone, Default, Eq, PartialEq, Serialize, Deserialize)]
-pub struct Location { row: Size, col: Size }
-impl Location {
-    pub fn new(rowcol: [Size; 2]) -> Location { Location { row: rowcol[0], col: rowcol[1] } }
-}
-
-type RowCol = HashMap<String, Location>;
+pub struct Location { row: Size, col: Size, is_border: bool }
 
 #[derive(Debug, Clone, Eq, PartialEq, Default, Serialize, Deserialize)]
 pub struct Geometry {
+    is_border: bool,
     maxrow: Size,
     maxcol: Size,
     rowcol: RowCol
 }
 impl Geometry {
     pub fn add(&mut self, cell_id: CellID, rowcol: Location) {
+        self.is_border = rowcol.is_border;
         self.maxrow = max(self.maxrow, rowcol.row);
         self.maxcol = max(self.maxrow, rowcol.col);
         self.rowcol.insert(cell_id.name, rowcol);
@@ -57,12 +55,12 @@ impl Geometry {
 fn border_cell_start(state: web::Data<AppGeometry>, record: web::Json<Value>)
                      ->impl Responder {
     let path = "border_cell_start";
-    cell_geometry(path, state, record)
+    cell_geometry(path, true, state, record)
 }
 fn interior_cell_start(state: web::Data<AppGeometry>, record: web::Json<Value>)
                        -> impl Responder {
     let path = "interior_cell_start";
-    cell_geometry(path, state, record)
+    cell_geometry(path, false, state, record)
 }
 fn show_geometry(state: web::Data<AppGeometry>) -> Result<HttpResponse, actix_web::Error> {
     let geo = state.get_ref();

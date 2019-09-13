@@ -13,10 +13,11 @@
     stroke-width : 2px;
     r: 10;
 }
-.linktree {
-    stroke : black;
-    stroke-width : 6px;
-    marker-end: url(#arrow-head);
+.nodeborder {
+    stroke : orange;
+    stroke-width : 2px;
+    fill : lightgreen;
+    r: 10;
 }
 .nodetree {
     stroke : black;
@@ -33,12 +34,6 @@
 .linkbroken {
     stroke : red;
     stroke-width: 4px;
-}
-.nodebroken {
-    stroke : black;
-    stroke-width : 2px;
-    fill : red;
-    r: 10;
 }
 .tooltip {
     font-size: 150%;

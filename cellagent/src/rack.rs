@@ -37,15 +37,17 @@ impl Rack {
             .iter()
             .map(|border_cell| -> Result<(CellNo, NalCell), Error> {
                 let cell_no = border_cell.get_cell_no();
+                let border_ports = border_cell.get_border_ports();
                 let (nal_cell, _join_handle) = NalCell::new(&border_cell.get_name(),
                                             Some(border_cell.get_num_phys_ports()),
-                                            &HashSet::from_iter(border_cell.get_border_ports().clone()),
+                                            &HashSet::from_iter(border_ports.clone()),
                                             CellConfig::Large)?;
                 {
                     if CONFIG.trace_options.all || CONFIG.trace_options.dc {
                         let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "border_cell_start" };
                         let cell_id = nal_cell.get_id();
-                        let trace = json!({ "cell_id": cell_id, "cell_number": cell_no, "location":  CONFIG.geometry.get(*cell_no)});
+                        let trace = json!({ "cell_id": cell_id, "cell_number": cell_no,
+                            "border_ports": border_ports, "location":  CONFIG.geometry.get(*cell_no)});
                         let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
                     }
                 }
