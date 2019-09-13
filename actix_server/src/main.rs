@@ -5,7 +5,7 @@ use actix_files;
 
 use actix_web::{web, App, HttpServer, Responder, HttpResponse};
 
-use ec_trace_analyzer::{geometry, hello, index};
+use ec_trace_analyzer::{discoverd, geometry, hello, index};
 
 fn main() {
     let server_url = env::var("SERVER_URL").expect("Environment variable SERVER_URL not found");
@@ -15,6 +15,7 @@ fn main() {
     let index_data = web::Data::new(html_file_name);
     let geo_data = geometry::data();
     let hello_data = hello::data();
+    let discoverd_data = discoverd::data();
     HttpServer::new(move || {
         App::new()
             .route("/visualizer.css", web::get().to(get_css))
@@ -31,6 +32,10 @@ fn main() {
             .register_data(hello_data.clone())
             .service(hello::get())
             .service(hello::post())
+        
+            .register_data(discoverd_data.clone())
+            .service(discoverd::get())
+            .service(discoverd::post())
     })
         .bind(server_url)
         .unwrap()

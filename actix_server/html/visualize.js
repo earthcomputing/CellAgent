@@ -2,7 +2,6 @@ const x0 = 50;
 const y0 = 50;
 const scale = 50;
 let cells = {};
-let allNeighbors = {};
 let canvas;
 window.onload = function() {
     canvas = document.getElementById("viz-canvas");
@@ -40,13 +39,16 @@ function setup_geometry(geometry_text) {
     if ( Object.keys(rowcol).length == 0 ) { alert("Nothing to show.  Run simulator, and try again."); }
     for (cell in rowcol) {
         cells[cell] = rowcol[cell];
+        cells[cell].neighbors = {};
+        cells[cell].trees = {};
     }
 }
 function setup_topology(topology_text) {
     let topology = JSON.parse(topology_text);
-    allNeighbors = topology.neighbors;
+    let allNeighbors = topology.neighbors;
     for (cellID in allNeighbors) {
         let cellNeighbors = allNeighbors[cellID];
+        cells[cellID].neighbors = cellNeighbors.neighbors;
         for (neighborIndex in cellNeighbors.neighbors) {
             let neighbor = cellNeighbors.neighbors[neighborIndex];
             let neighborID = neighbor.cell_id.name;
@@ -82,7 +84,11 @@ function create_node_at(id) {
     let y = cells[id].row;
     let circle = document.createElement("circle");
     circle.setAttribute("id", id);
-    circle.setAttribute("class", "node");
+    if (cells[id].is_border) {
+        circle.setAttribute("class", "nodeborder");
+    } else {
+        circle.setAttribute("class", "node");
+    }
     circle.setAttribute("cx", x0 + x*scale);
     circle.setAttribute("cy", y0 + y*scale);
     circle.setAttribute("onclick", "cell_click(evt)");
