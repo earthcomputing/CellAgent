@@ -1,20 +1,27 @@
 // route-repair
+// man/3/daemon
+// man/3/syslog
 
 #include <errno.h>
-#include <net/if.h> // for struct ifreq
 #include <pthread.h>
 #include <signal.h>
 #include <stdint.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
+#include <syslog.h>
 #include <time.h>
+#include <unistd.h>
+#include <net/if.h> // for struct ifreq
 #include <sys/ioctl.h>
 #include <sys/types.h>
-#include <unistd.h>
 extern void perror (const char *__s); //usr/include/stdio.h
 
 #include "entl_ioctl.h"
 
+int priority = LOG_DAEMON | LOG_INFO;
+// #define SYSLOG(fmt, ...) printf(fmt, ...)
+#define SYSLOG(fmt, args...) syslog(priority, fmt, ## args)
 
 #ifdef BIONIC
 #define NUM_INTERFACES 1
@@ -106,38 +113,58 @@ static void dump_data(char *name, struct entl_ioctl_data *q) {
 
     struct timespec ts;
     clock_gettime(CLOCK_MONOTONIC_RAW, &ts); // maybe: CLOCK_REALTIME, ignoring errors
-    printf("%ld %s dump_data:"
-        " link %s"
-        " nqueue %d"
-        " state %d"
-        " seqno:"
-        " _recv %d"
-        " _sent %d"
-        " _next %d"
-        " error:"
-        " flag 0x%04x"
-        " mask 0x%04x"
-        " count %d"
-        "\n",
-        ts.tv_sec,
-        name,
-        link,
-        nqueue,
-        current_state,
-        seqno_recv,
-        seqno_sent,
-        seqno_next,
-        flag,
-        mask,
-        count
-    );
+    if (flag != 0) {
+        SYSLOG("%ld %s dump_data:"
+            " link %s"
+            " nqueue %d"
+            " state %d"
+            " seqno:"
+            " _recv %d"
+            " _sent %d"
+            " _next %d"
+            " error:"
+            " flag 0x%04x"
+            " mask 0x%04x"
+            " count %d"
+            "\n",
+            ts.tv_sec, name,
+            link,
+            nqueue,
+            current_state,
+            seqno_recv,
+            seqno_sent,
+            seqno_next,
+            flag,
+            mask,
+            count
+        );
+    }
+    else {
+        SYSLOG("%ld %s dump_data:"
+            " link %s"
+            " nqueue %d"
+            " state %d"
+            " seqno:"
+            " _recv %d"
+            " _sent %d"
+            " _next %d"
+            "\n",
+            ts.tv_sec, name,
+            link,
+            nqueue,
+            current_state,
+            seqno_recv,
+            seqno_sent,
+            seqno_next
+        );
+    }
 }
 
 // FIXME: this is where "route repair" would happen
 static void service_device(struct ifreq *r) {
-    printf("%s: service_device\n", r->ifr_name);
+    // SYSLOG("%s: service_device\n", r->ifr_name);
     int rc = read_error(r);
-    if (rc == -1) { printf("%s: read_error failed\n", r->ifr_name); return; }
+    if (rc == -1) { SYSLOG("%s: service_device - read_error failed\n", r->ifr_name); return; }
 
     struct entl_ioctl_data *q = (void *) r->ifr_data;
     dump_data(r->ifr_name, q);
@@ -155,7 +182,19 @@ static void error_handler(int signum) {
 // FIXME: could have instance list be CLI arguments
 // that would allow for multiple listeners (donno if driver supports that?)
 int main(int argc, char *argv[]) {
-    if ((sock = socket(AF_INET, SOCK_DGRAM, 0)) < 0) { perror("socket"); return 0; }
+    if ((sock = socket(AF_INET, SOCK_DGRAM, 0)) < 0) { perror("socket"); exit(-1); }
+
+    int nochdir = 0; // cwd root
+    int noclose = 0; // close 0/1/2
+    if (daemon(nochdir, noclose) < 0) { perror("daemon"); exit(-1); }
+
+    const char *base = strrchr(argv[0], '/');
+    const char *ident = (base) ? &base[1] : argv[0];
+    int option = LOG_PID;
+    int facility = LOG_DAEMON | LOG_INFO;
+    openlog(ident, option, facility);
+
+    SYSLOG("starting ...");
 
 #if 0
     // initialize data structure - links
@@ -199,7 +238,7 @@ int main(int argc, char *argv[]) {
     for (int i = 0; i < NUM_INTERFACES; i++) {
         struct ifreq *r = &entl_device[i];
         int rc = register_handler(r);
-        if (rc == -1) { printf("%s: register_handler failed\n", r->ifr_name); return -1; } // exit
+        if (rc == -1) { SYSLOG("%s: register_handler failed\n", r->ifr_name); exit(-1); }
     }
 
     // get initial state (may have missed last signal)
@@ -207,12 +246,14 @@ int main(int argc, char *argv[]) {
         struct ifreq *r = &entl_device[i];
         service_device(r);
         // int rc = read_error(r);
-        // if (rc == -1) { printf("%s: read_error failed\n", r->ifr_name); return -1; } // exit
+        // if (rc == -1) { SYSLOG("%s: read_error failed\n", r->ifr_name); exit(-1); }
     }
 
     while (1) {
         sleep(1);
     }
 
-    return 0;
+    // NOTREACHED
+    closelog();
+    return 0; // normal exit
 }
