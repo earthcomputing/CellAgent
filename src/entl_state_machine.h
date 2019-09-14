@@ -102,6 +102,7 @@ static inline void clear_error(entl_state_machine_t *mcn) {
 }
 
 static inline int recvq_count(entl_state_machine_t *mcn) { return mcn->receive_ATI_queue.count; }
+static inline int recvq_space(entl_state_machine_t *mcn) { return ENTT_queue_space(&mcn->receive_ATI_queue); }
 static inline int recvq_full(entl_state_machine_t *mcn) { return ENTT_queue_full(&mcn->receive_ATI_queue); }
 static inline void* recvq_pop(entl_state_machine_t *mcn) { return ENTT_queue_front_pop(&mcn->receive_ATI_queue); }
 static inline int recvq_push(entl_state_machine_t *mcn) { return ENTT_queue_back_push(&mcn->receive_ATI_queue, mcn->receive_buffer); }
