@@ -20,20 +20,22 @@ extern void perror (const char *__s); //usr/include/stdio.h
 #include "entl_ioctl.h"
 
 int priority = LOG_DAEMON | LOG_INFO;
-// #define SYSLOG(fmt, ...) printf(fmt, ...)
-#define SYSLOG(fmt, args...) syslog(priority, fmt, ## args)
+// #define SYSLOG(fmt, ...) printf(fmt "\n", ...)
+#define SYSLOG(fmt, args...) syslog(priority, fmt "\n", ## args)
 
 #ifdef BIONIC
 #define NUM_INTERFACES 1
-static char *port_name[NUM_INTERFACES] = { "eno1" };
+static char *fixed_names[] = { "eno1" };
 #else
 #define NUM_INTERFACES 4
-static char *port_name[NUM_INTERFACES] = { "enp6s0", "enp7s0", "enp8s0", "enp9s0" };
+static char *fixed_names[] = { "enp6s0", "enp7s0", "enp8s0", "enp9s0" };
 #endif
 
 // logical port(s):
-static struct ifreq entl_device[NUM_INTERFACES];
-static struct entl_ioctl_data ioctl_data[NUM_INTERFACES];
+int nchan; //  = NUM_INTERFACES;
+char **port_name; // [NUM_INTERFACES];
+static struct ifreq *entl_device; // [NUM_INTERFACES];
+static struct entl_ioctl_data *ioctl_data; // [NUM_INTERFACES];
 
 #if 0
 typedef struct {
@@ -46,7 +48,7 @@ typedef struct {
     char json[512];
 } link_device_t;
 
-static link_device_t links[NUM_INTERFACES];
+static link_device_t *links; // [NUM_INTERFACES];
 
 static void init_link(link_device_t *link, char *n) {
     memset(link, 0, sizeof(link_device_t));
@@ -125,8 +127,7 @@ static void dump_data(char *name, struct entl_ioctl_data *q) {
             " error:"
             " flag 0x%04x"
             " mask 0x%04x"
-            " count %d"
-            "\n",
+            " count %d",
             ts.tv_sec, name,
             link,
             nqueue,
@@ -147,8 +148,7 @@ static void dump_data(char *name, struct entl_ioctl_data *q) {
             " seqno:"
             " _recv %d"
             " _sent %d"
-            " _next %d"
-            "\n",
+            " _next %d",
             ts.tv_sec, name,
             link,
             nqueue,
@@ -164,7 +164,7 @@ static void dump_data(char *name, struct entl_ioctl_data *q) {
 static void service_device(struct ifreq *r) {
     // SYSLOG("%s: service_device\n", r->ifr_name);
     int rc = read_error(r);
-    if (rc == -1) { SYSLOG("%s: service_device - read_error failed\n", r->ifr_name); return; }
+    if (rc == -1) { SYSLOG("%s: service_device - read_error failed", r->ifr_name); return; }
 
     struct entl_ioctl_data *q = (void *) r->ifr_data;
     dump_data(r->ifr_name, q);
@@ -173,16 +173,26 @@ static void service_device(struct ifreq *r) {
 // FIXME: we don't know which entl_device instance (port/link) sent us a signal ??
 static void error_handler(int signum) {
     if (SIGUSR1 != signum) return;
-    for (int i = 0; i < NUM_INTERFACES; i++) {
+    for (int i = 0; i < nchan; i++) {
         struct ifreq *r = &entl_device[i];
         service_device(r);
     }
 }
 
-// FIXME: could have instance list be CLI arguments
-// that would allow for multiple listeners (donno if driver supports that?)
 int main(int argc, char *argv[]) {
     if ((sock = socket(AF_INET, SOCK_DGRAM, 0)) < 0) { perror("socket"); exit(-1); }
+
+    port_name = fixed_names;
+    nchan = NUM_INTERFACES;
+
+    if (argc > 1) {
+        port_name = &argv[1];
+        nchan = argc - 1;
+    }
+
+    entl_device = calloc(sizeof(struct ifreq), nchan); if (!entl_device) { perror("calloc"); exit(-1); }
+    ioctl_data = calloc(sizeof(struct entl_ioctl_data), nchan); if (!ioctl_data) { perror("calloc"); exit(-1); }
+    // links = calloc(sizeof(link_device_t), nchan); if (!links) { perror("calloc"); exit(-1); }
 
     int nochdir = 0; // cwd root
     int noclose = 0; // close 0/1/2
@@ -198,7 +208,7 @@ int main(int argc, char *argv[]) {
 
 #if 0
     // initialize data structure - links
-    for (int i = 0; i < NUM_INTERFACES; i++) {
+    for (int i = 0; i < nchan; i++) {
         char *n = port_name[i];
         link_device_t *link = &links[i];
         init_link(link, n);
@@ -206,7 +216,7 @@ int main(int argc, char *argv[]) {
 
     // share initial state
     // FIXME: redundant w/get initial state unless read_error failed ??
-    for (int i = 0; i < NUM_INTERFACES; i++) {
+    for (int i = 0; i < nchan; i++) {
         link_device_t *link = &links[i];
         int len = toJSON(link);
         toServer(link->json);
@@ -215,14 +225,14 @@ int main(int argc, char *argv[]) {
 
     // initialize data structure - ioctl_data
     int pid = getpid();
-    for (int i = 0; i < NUM_INTERFACES; i++) {
+    for (int i = 0; i < nchan; i++) {
         struct entl_ioctl_data *q = &ioctl_data[i];
         memset(q, 0, sizeof(struct entl_ioctl_data));
         q->pid = pid;
     }
 
     // initialize data structure - entl_device
-    for (int i = 0; i < NUM_INTERFACES; i++) {
+    for (int i = 0; i < nchan; i++) {
         char *n = port_name[i];
         struct entl_ioctl_data *q = &ioctl_data[i];
         struct ifreq *r = &entl_device[i];
@@ -235,18 +245,19 @@ int main(int argc, char *argv[]) {
     signal(SIGUSR1, error_handler);
 
     // register for signal(s)
-    for (int i = 0; i < NUM_INTERFACES; i++) {
+    for (int i = 0; i < nchan; i++) {
         struct ifreq *r = &entl_device[i];
         int rc = register_handler(r);
-        if (rc == -1) { SYSLOG("%s: register_handler failed\n", r->ifr_name); exit(-1); }
+        if (rc == -1) { SYSLOG("%s: register_handler failed", r->ifr_name); exit(-1); }
+        SYSLOG("%s start", r->ifr_name);
     }
 
     // get initial state (may have missed last signal)
-    for (int i = 0; i < NUM_INTERFACES; i++) {
+    for (int i = 0; i < nchan; i++) {
         struct ifreq *r = &entl_device[i];
         service_device(r);
         // int rc = read_error(r);
-        // if (rc == -1) { SYSLOG("%s: read_error failed\n", r->ifr_name); exit(-1); }
+        // if (rc == -1) { SYSLOG("%s: read_error failed", r->ifr_name); exit(-1); }
     }
 
     while (1) {
