@@ -16,6 +16,10 @@ static inline void ENTT_queue_init(ENTT_queue_t *q) {
     q->head = q->tail = 0;
 }
 
+static inline int ENTT_queue_space(ENTT_queue_t *q) {
+    return q->size - q->count;
+}
+
 static inline int ENTT_queue_full(ENTT_queue_t *q) {
     return (q->size == q->count) ? 1 : 0;
 }
