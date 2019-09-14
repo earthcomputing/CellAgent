@@ -233,8 +233,10 @@ int entl_received(entl_state_machine_t *mcn, uint16_t from_hi, uint32_t from_lo,
                     set_atomic_state(mcn, ENTL_STATE_SEND);
                     ret_action = ENTL_ACTION_SEND;
 
+// FIXME: really ??
                     // send queue empty
-                    if (sendq_count(mcn) == 0) { // AIT has priority
+                    int num_queued = sendq_count(mcn);
+                    if (num_queued == 0) { // AIT has priority
                         // this is way too noisy to log!
                         // STM_TDEBUG("%s -> SEND (data) EVENT: advance - seqno %d", mcn_state2name(was_state), seqno);
                         ret_action |= ENTL_ACTION_SEND_DAT; // data send as optional
@@ -258,6 +260,7 @@ int entl_received(entl_state_machine_t *mcn, uint16_t from_hi, uint32_t from_lo,
                     set_atomic_state(mcn, ENTL_STATE_AH);
                     ret_action = ENTL_ACTION_PROC_AIT;
 
+                    // int avail = recvq_space();
                     // recv queue space avail
                     if (!recvq_full(mcn)) {
                         STM_TDEBUG("%s -> AH (data) AIT: advance - seqno %d", mcn_state2name(was_state), seqno);
@@ -367,12 +370,12 @@ int entl_received(entl_state_machine_t *mcn, uint16_t from_hi, uint32_t from_lo,
                     set_atomic_state(mcn, ENTL_STATE_SEND);
                     set_update_time(mcn, ts);
 // add to recvq
-// STM_TDEBUG("recvq_push");
 {
     struct entt_ioctl_ait_data *dt = mcn->receive_buffer;
     dump_ait_data(mcn, "stm - recvq_push", dt);
 }
                     int recv_space = recvq_push(mcn);
+STM_TDEBUG("recvq_push - space %d", recv_space);
                     // FIXME: what about when q is full?
                     mcn->receive_buffer = NULL;
                     ret_action = ENTL_ACTION_SEND | ENTL_ACTION_SIG_AIT;
@@ -445,6 +448,7 @@ int entl_get_hello(entl_state_machine_t *mcn, uint16_t *emsg_raw, uint32_t *seqn
         break;
 
         case ENTL_STATE_BH:
+            // int avail = recvq_space();
             // recv queue space avail
             if (!recvq_full(mcn)) {
                 respond_with(ENTL_MESSAGE_ACK_U, get_i_sent(mcn), ENTL_ACTION_SEND);
@@ -502,10 +506,11 @@ int entl_next_send(entl_state_machine_t *mcn, uint16_t *emsg_raw, uint32_t *seqn
             set_update_time(mcn, ts);
             // Avoid sending AIT on first exchange, neighbor will be in Hello state
             // send queue non-empty
-            if (event_i_know && event_i_sent && sendq_count(mcn)) {
+            int num_queued;
+            if (event_i_know && event_i_sent && (num_queued = sendq_count(mcn))) {
                 set_atomic_state(mcn, ENTL_STATE_AM);
                 respond_with(ENTL_MESSAGE_AIT_U, get_i_sent(mcn), ENTL_ACTION_SEND | ENTL_ACTION_SEND_AIT);
-                STM_TDEBUG("%s -> AM AIT(out) - seqno %d", mcn_state2name(was_state), *seqno);
+                STM_TDEBUG("%s -> AM AIT(out) - nqueued %d seqno %d", mcn_state2name(was_state), num_queued, *seqno);
             }
             else {
                 set_atomic_state(mcn, ENTL_STATE_RECEIVE);
@@ -535,15 +540,19 @@ int entl_next_send(entl_state_machine_t *mcn, uint16_t *emsg_raw, uint32_t *seqn
             set_update_time(mcn, ts);
 
             // discard off send queue
-            STM_TDEBUG("sendq_pop");
             struct entt_ioctl_ait_data *ait_data = sendq_pop(mcn);
             if (ait_data) {
+                STM_TDEBUG("sendq_pop - msgs %d nqueued %d", ait_data->num_messages, ait_data->num_queued);
                 kfree(ait_data);
+            }
+            else {
+                STM_TDEBUG("sendq_pop");
             }
         }
         break;
 
         case ENTL_STATE_AH: {
+            // int avail = recvq_space();
             // recv queue space avail
             if (!recvq_full(mcn)) {
                 zebra(mcn); advance_send_next(mcn);
@@ -638,13 +647,20 @@ int entl_next_send_tx(entl_state_machine_t *mcn, uint16_t *emsg_raw, uint32_t *s
             set_update_time(mcn, ts);
 
             // discard off send queue
-            STM_TDEBUG("sendq_pop");
             struct entt_ioctl_ait_data *ait_data = sendq_pop(mcn);
-            // FIXME: memory leak?
+            if (ait_data) {
+                STM_TDEBUG("sendq_pop - msgs %d nqueued %d", ait_data->num_messages, ait_data->num_queued);
+                // FIXME: memory leak?
+                // kfree(ait_data);
+            }
+            else {
+                STM_TDEBUG("sendq_pop");
+            }
         }
         break;
 
         case ENTL_STATE_AH: {
+            // int avail = recvq_space();
             // recv queue space avail
             if (!recvq_full(mcn)) {
                 zebra(mcn); advance_send_next(mcn);
@@ -752,7 +768,6 @@ void entl_link_up(entl_state_machine_t *mcn) {
 // add AIT message to send queue, return 0 when OK, -1 when queue full
 int entl_send_AIT_message(entl_state_machine_t *mcn, struct entt_ioctl_ait_data *data) {
     struct timespec ts = current_kernel_time();
-STM_TDEBUG("sendq_push");
     STM_LOCK;
         int send_space = sendq_push(mcn, (void *) data);
     STM_UNLOCK;
@@ -763,11 +778,18 @@ STM_TDEBUG("sendq_push");
 // peek at next AIT message to xmit
 struct entt_ioctl_ait_data *entl_next_AIT_message(entl_state_machine_t *mcn) {
     struct timespec ts = current_kernel_time();
-STM_TDEBUG("sendq_peek");
     STM_LOCK;
         struct entt_ioctl_ait_data *dt = (struct entt_ioctl_ait_data *) sendq_peek(mcn);
     STM_UNLOCK;
-    // if (dt) STM_TDEBUG("sendq_peek"); // counts
+    if (dt) {
+// FIXME: access not under lock:
+        dt->num_messages = recvq_count(mcn);
+        dt->num_queued = sendq_count(mcn);
+        STM_TDEBUG("sendq_peek - msgs %d nqueued %d", dt->num_messages, dt->num_queued);
+    }
+    else {
+        STM_TDEBUG("sendq_peek");
+    }
     return dt;
 }
 
@@ -781,24 +803,30 @@ void entl_new_AIT_message(entl_state_machine_t *mcn, struct entt_ioctl_ait_data 
 // Read (consume) AIT message, return NULL when queue empty
 struct entt_ioctl_ait_data *entl_read_AIT_message(entl_state_machine_t *mcn) {
     struct timespec ts = current_kernel_time();
-STM_TDEBUG("recvq_pop");
     STM_LOCK;
         struct entt_ioctl_ait_data *dt = recvq_pop(mcn);
-        if (dt) {
-            dt->num_messages = recvq_count(mcn);
-            dt->num_queued = sendq_count(mcn);
-            STM_TDEBUG("recvq_pop - msgs %d nqueued %d", dt->num_messages, dt->num_queued);
-        }
-// FIXME: should allocate and return an 'empty' dt w/counts
     STM_UNLOCK;
+    if (dt) {
+// FIXME: access not under lock:
+        dt->num_messages = recvq_count(mcn);
+        dt->num_queued = sendq_count(mcn);
+        STM_TDEBUG("recvq_pop - msgs %d nqueued %d", dt->num_messages, dt->num_queued);
+    }
+    else {
+        // FIXME: should allocate and return an 'empty' dt w/counts
+        STM_TDEBUG("recvq_pop");
+    }
     return dt;
 }
 
 // number of pending xmits
 uint16_t entl_num_queued(entl_state_machine_t *mcn) {
+    // struct timespec ts = current_kernel_time();
     STM_LOCK;
         uint16_t count = sendq_count(mcn);
     STM_UNLOCK;
+    // don't log because only used for info, not logic
+    // STM_TDEBUG("sendq_count %d", count);
     return count;
 }
 
