@@ -54,7 +54,7 @@ function setup_topology(topology_text) {
             let neighborID = neighbor.cell_name;
             if ( cellID < neighborID ) {
                 let neighborPort = neighbor.port;
-                let id = cellID + ":P"+ neighborIndex + "-" + neighborID + ":P" + neighborPort;
+                let id = make_link_id(cellID, neighborIndex, neighborID , neighborPort);
                 create_line_at(id, cellID, neighborID);
             }
         }
@@ -62,6 +62,9 @@ function setup_topology(topology_text) {
     for (cellID in appcells) {
         create_node_at(cellID);
     }
+}
+function make_link_id(cellID1, index1, cellID2, index2) {
+    return cellID1 + ":P" + index1 + "-" + cellID2 + ":P" + index2;
 }
 function create_line_at(id, cellID1, cellID2) {
     let line = document.createElement("line");
