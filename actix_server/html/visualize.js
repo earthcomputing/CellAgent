@@ -45,9 +45,9 @@ function setup_geometry(geometry_text) {
 }
 function setup_topology(topology_text) {
     let topology = JSON.parse(topology_text);
-    let allNeighbors = topology.neighbors;
-    for (cellID in allNeighbors) {
-        let cellNeighbors = allNeighbors[cellID];
+    let appcells = topology.appcells;
+    for (cellID in appcells) {
+        let cellNeighbors = appcells[cellID].neighbors;
         cells[cellID].neighbors = cellNeighbors.neighbors;
         for (neighborIndex in cellNeighbors.neighbors) {
             let neighbor = cellNeighbors.neighbors[neighborIndex];
@@ -59,7 +59,7 @@ function setup_topology(topology_text) {
             }
         }
     }
-    for (cellID in allNeighbors) {
+    for (cellID in appcells) {
         create_node_at(cellID);
     }
 }
