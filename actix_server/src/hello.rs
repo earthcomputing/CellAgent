@@ -25,7 +25,7 @@ pub fn process_hello(appcells: web::Data<AppCells>, record: web::Json<Value>)
     let sending_cell_id = CellID { name: body.msg.payload.cell_id.name };
     let my_port_no = body.port_no;
     let other_port_no = body.msg.payload.port_no;
-    let neighbor = Neighbor { cell_id: sending_cell_id, port: other_port_no};
+    let neighbor = Neighbor { cell_name: sending_cell_id.name, port: other_port_no};
     let mut cells = appcells
         .get_ref()
         .appcells.lock().unwrap();
@@ -33,8 +33,7 @@ pub fn process_hello(appcells: web::Data<AppCells>, record: web::Json<Value>)
         .entry(this_cell_id)
         .or_insert(Default::default());
     let neighbors = appcell.neighbors_mut();
-    neighbors.neighbors.insert(my_port_no, neighbor.clone());
-    println!("HelloMsg: my_port_no {}, neighbor {:?}, neighbors {:?}", my_port_no, neighbor, neighbors);
+    neighbors.neighbors.insert(my_port_no, neighbor);
     Ok(HttpResponse::Ok().body(format!("Adding hello")))
 }
 // Message data
@@ -60,37 +59,44 @@ struct CellID {
 // Server data
 #[derive(Debug, Default, Serialize)]
 pub struct AppCells {
-    appcells: Mutex<HashMap<String,AppCell>>
+    pub appcells: Mutex<HashMap<String,AppCell>>
 }
 #[derive(Debug, Clone, Eq, Default, PartialEq, Serialize, Deserialize)]
-struct AppCell {
-    row: usize,
-    col: usize,
-    neighbors: Neighbors,
-    trees: Trees
+pub struct AppCell {
+    pub neighbors: Neighbors,
+    pub trees: Trees
 }
 impl AppCell {
-    fn neighbors_mut(&mut self) -> &mut Neighbors { &mut self.neighbors }
+    pub fn neighbors(&self) -> &HashMap<Size, Neighbor> { &self.neighbors.neighbors }
+    pub fn neighbors_mut(&mut self) -> &mut Neighbors { &mut self.neighbors }
+    pub fn trees(&self) -> &HashMap<String, Tree> { &self.trees.trees }
+    pub fn trees_mut(&mut self) -> &mut HashMap<String, Tree> { &mut self.trees.trees }
 }
 #[derive(Debug, Clone, Eq, Default, PartialEq, Serialize, Deserialize)]
-struct Neighbors {
-    neighbors: HashMap<Size, Neighbor>
+pub struct Neighbors {
+    pub neighbors: HashMap<Size, Neighbor>
 }
 #[derive(Debug, Clone, Eq, Default, PartialEq, Serialize, Deserialize)]
-struct Neighbor {
-    cell_id: CellID,
-    port: Size
+pub struct Neighbor {
+    pub cell_name: String,
+    pub port: Size
+}
+impl Neighbor {
+    pub fn cell_name(&self) -> &String { &self.cell_name }
 }
 #[derive(Debug, Clone, Eq, Default, PartialEq, Serialize, Deserialize)]
-struct Trees {
+pub struct Trees {
     trees: HashMap<String, Tree>
 }
 #[derive(Debug, Clone, Eq, Default, PartialEq, Serialize, Deserialize)]
-struct Tree {
+pub struct Tree {
     tree: HashMap<usize, LinkType>
 }
-#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
-enum LinkType {
+impl Tree {
+    pub fn tree_mut(&mut self) -> &mut HashMap<usize, LinkType> { &mut self.tree }
+}
+#[derive(Debug, Copy, Clone, Eq, PartialEq, Serialize, Deserialize)]
+pub enum LinkType {
     Child, Parent, Pruned
 }
 impl Default for LinkType {
