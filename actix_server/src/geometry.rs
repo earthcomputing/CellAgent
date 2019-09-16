@@ -8,7 +8,6 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
 type RowCol = HashMap<String, Location>;
-type Size = usize;
 
 pub fn cell_geometry(path: &str, is_border: bool, state: web::Data<AppGeometry>, record: web::Json<Value>)
                  -> Result<impl Responder, Error> {
@@ -35,13 +34,13 @@ pub struct AppGeometry {
     geometry: Mutex<Geometry>
 }
 #[derive(Debug, Copy, Clone, Default, Eq, PartialEq, Serialize, Deserialize)]
-pub struct Location { row: Size, col: Size, is_border: bool }
+pub struct Location { row: usize, col: usize, is_border: bool }
 
 #[derive(Debug, Clone, Eq, PartialEq, Default, Serialize, Deserialize)]
 pub struct Geometry {
     is_border: bool,
-    maxrow: Size,
-    maxcol: Size,
+    maxrow: usize,
+    maxcol: usize,
     rowcol: RowCol
 }
 impl Geometry {

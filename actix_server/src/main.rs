@@ -33,9 +33,9 @@ fn main() {
             .service(hello::get())
             .service(hello::post())
         
-            .register_data(discoverd_data.clone())
-            .service(discoverd::get())
-            .service(discoverd::post())
+            //.register_data(discoverd_data.clone())
+            //.service(discoverd::get())
+            //.service(discoverd::post())
     })
         .bind(server_url)
         .unwrap()

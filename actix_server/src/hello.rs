@@ -28,13 +28,16 @@ pub fn process_hello(appcells: web::Data<AppCells>, record: web::Json<Value>)
     let neighbor = Neighbor { cell_id: sending_cell_id, port: other_port_no};
     let mut cells = appcells
         .get_ref()
-        .neighbors.lock().unwrap();
-    let neighbors = cells
+        .appcells.lock().unwrap();
+    let appcell = cells
         .entry(this_cell_id)
         .or_insert(Default::default());
-    neighbors.neighbors.insert(my_port_no, neighbor);
+    let neighbors = appcell.neighbors_mut();
+    neighbors.neighbors.insert(my_port_no, neighbor.clone());
+    println!("HelloMsg: my_port_no {}, neighbor {:?}, neighbors {:?}", my_port_no, neighbor, neighbors);
     Ok(HttpResponse::Ok().body(format!("Adding hello")))
 }
+// Message data
 #[derive(Debug, Clone, Serialize, Deserialize)]
 struct Body {
     cell_id: CellID, // Reciving cell
@@ -50,13 +53,24 @@ struct Payload {
     cell_id:CellID,  // Sending cell
     port_no: usize   // Sending cell's port
 }
-#[derive(Debug, Default, Serialize)]
-pub struct AppCells {
-    neighbors: Mutex<HashMap<String,Neighbors>>
-}
 #[derive(Debug, Clone, Default, Eq, PartialEq, Serialize, Deserialize)]
 struct CellID {
     name: String
+}
+// Server data
+#[derive(Debug, Default, Serialize)]
+pub struct AppCells {
+    appcells: Mutex<HashMap<String,AppCell>>
+}
+#[derive(Debug, Clone, Eq, Default, PartialEq, Serialize, Deserialize)]
+struct AppCell {
+    row: usize,
+    col: usize,
+    neighbors: Neighbors,
+    trees: Trees
+}
+impl AppCell {
+    fn neighbors_mut(&mut self) -> &mut Neighbors { &mut self.neighbors }
 }
 #[derive(Debug, Clone, Eq, Default, PartialEq, Serialize, Deserialize)]
 struct Neighbors {
@@ -67,6 +81,22 @@ struct Neighbor {
     cell_id: CellID,
     port: Size
 }
+#[derive(Debug, Clone, Eq, Default, PartialEq, Serialize, Deserialize)]
+struct Trees {
+    trees: HashMap<String, Tree>
+}
+#[derive(Debug, Clone, Eq, Default, PartialEq, Serialize, Deserialize)]
+struct Tree {
+    tree: HashMap<usize, LinkType>
+}
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
+enum LinkType {
+    Child, Parent, Pruned
+}
+impl Default for LinkType {
+    fn default() -> LinkType { LinkType::Pruned }
+}
+
 pub fn get() -> Scope {
     web::scope("/topology")
         .data(web::Data::new(AppCells::default()))
