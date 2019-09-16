@@ -582,23 +582,38 @@ extern int retrieve_ait_message(struct nl_sock *sock, struct nl_msg *msg, uint32
     if ((err = nl_socket_modify_cb(sock, NL_CB_VALID, NL_CB_CUSTOM, parse_cb, &cbi)) < 0) { fatal_error(err, "Unable to modify valid message callback"); }
     if ((err = nl_recvmsgs_default(sock)) < 0) { fatal_error(err, "Unable to receive message: %s", nl_geterror(err)); }
     printf("nl_recvmsgs_default: %d msgs processed\n\n", err);
+
     uint32_t module_id = nla_get_u32(cbi.tb[NL_ECNL_ATTR_MODULE_ID]);
     uint32_t port_id = nla_get_u32(cbi.tb[NL_ECNL_ATTR_PORT_ID]);
     uint32_t message_length = nla_get_u32(cbi.tb[NL_ECNL_ATTR_MESSAGE_LENGTH]);
     int nbytes = nla_len(cbi.tb[NL_ECNL_ATTR_MESSAGE]);
-    uint8_t p[4096]; memset(p, 0, sizeof(p)); nla_memcpy(p, cbi.tb[NL_ECNL_ATTR_MESSAGE], message_length); // nla_get_unspec
+
     *mp = module_id;
     *pp = port_id;
 
-
     printf("retr buffer: ");
-    dump_block(p, message_length);
+    dump_block(cbi.tb[NL_ECNL_ATTR_MESSAGE], message_length);
 
-    buf->len = message_length;
-    buf->frame = NULL;
-#if 0
-    *buf->frame = p; // FIXME
-#endif
+    if (!buf) {
+        printf("retrieve_ait_message - no result buffer ?");
+        return 0;
+    }
+
+    if (!buf->frame) {
+        printf("retrieve_ait_message - allocating return buffer (%d)", message_length);
+        buf->frame = malloc(message_length);
+        if (!buf->frame) { perror("malloc"); return -1; }
+        buf->len = message_length;
+    }
+
+    if (buf->len < message_length) {
+        printf("retrieve_ait_message - return buffer too small (%d), reallocated (%d)", buf->len, message_length);
+        buf->frame = malloc(message_length);
+        if (!buf->frame) { perror("malloc"); return -1; }
+        buf->len = message_length;
+    }
+
+    nla_memcpy(buf->frame, cbi.tb[NL_ECNL_ATTR_MESSAGE], buf->len); // nla_get_unspec
 }
 WAIT_ACK;
     return 0;
