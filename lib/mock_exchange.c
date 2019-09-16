@@ -40,30 +40,39 @@ int scanbuf(unsigned char *buf, int len) {
     return 1;
 }
 
-void do_read(struct nl_sock *sock, struct nl_msg *msg, uint32_t module_id, uint32_t port_id) {
+int do_read_async(struct nl_sock *sock, struct nl_msg *msg, uint32_t module_id, uint32_t retr_port_id, buf_desc_t *actual_buf) {
     alo_reg_t alo_reg = {
         .ar_no = 0,
         .ar_data = 0,
     };
+
     uint32_t actual_module_id;
     uint32_t actual_port_id = 0;
 
     CLEAR_MSG;
     printf("retrieve_ait_message %d (%s)\n", retr_port_id, port_pair[1].name);
+    int rc = retrieve_ait_message(sock, msg, module_id, retr_port_id, alo_reg, &actual_module_id, &actual_port_id, actual_buf);
+    if (rc < 0) fatal_error(rc, "retrieve_ait_message");
+    if (actual_module_id != module_id) fatal_error(-1, "module mismatch: %d, %d", module_id, actual_module_id);
+    if (actual_port_id != retr_port_id) fatal_error(-1, "port mismatch: %d, %d", retr_port_id, actual_port_id);
+}
+
+void do_read(struct nl_sock *sock, struct nl_msg *msg, uint32_t module_id, uint32_t retr_port_id, int nsecs) {
     buf_desc_t actual_buf; memset(&actual_buf, 0, sizeof(buf_desc_t));
     // actual_buf.frame = xx; // who's responsible for buffer mgmt ??
     // at the moment, the serialization layer 'adapts'; 
     // this implies client is responsible for freeing buffers
     // and needs to determine if lower layer re-allocated the buf
 
-    int rc = retrieve_ait_message(sock, msg, module_id, retr_port_id, alo_reg, &actual_module_id, &actual_port_id, &actual_buf);
-    if (rc < 0) fatal_error(rc, "retrieve_ait_message");
-    if (actual_module_id != module_id) fatal_error(-1, "module mismatch: %d, %d", module_id, actual_module_id);
-    if (actual_port_id != retr_port_id) fatal_error(-1, "port mismatch: %d, %d", retr_port_id, actual_port_id);
+    for (int i = 0; i < nsecs; i++) {
+        do_read_async(sock, msg, module_id, retr_port_id, &actual_buf);
 
-    if ((actual_buf.len < 1) || (!actual_buf.frame)) {
-        printf("retr: NO DATA ??\n");
-        return;
+        if ((actual_buf.len < 1) || (!actual_buf.frame)) {
+            // printf("retr: NO DATA ??\n");
+            sleep(1);
+            continue;
+        }
+        break;
     }
 
     int asciz = scanbuf((unsigned char *) actual_buf.frame, actual_buf.len);
@@ -77,7 +86,7 @@ void do_read(struct nl_sock *sock, struct nl_msg *msg, uint32_t module_id, uint3
     printf("\n");
 }
 
-void do_xmit(struct nl_sock *sock, struct nl_msg *msg, uint32_t module_id, uint32_t port_id, buf_desc_t buf) {
+void do_xmit(struct nl_sock *sock, struct nl_msg *msg, uint32_t module_id, uint32_t send_port_id, buf_desc_t buf) {
     uint32_t actual_module_id;
     uint32_t actual_port_id = 0;
 
@@ -96,18 +105,12 @@ int doit(struct nl_sock *sock, struct nl_msg *msg) {
     uint32_t module_id = 0;
     uint32_t actual_module_id;
 
-    uint32_t port_id = 0;
     uint32_t actual_port_id = 0;
     uint32_t num_ports = -1;
 
     alo_reg_t alo_reg = {
         .ar_no = 0,
         .ar_data = 0,
-    };
-
-    buf_desc_t buf = {
-        .len = 0,
-        .frame = NULL,
     };
 
     // determine num_ports
@@ -154,27 +157,27 @@ int doit(struct nl_sock *sock, struct nl_msg *msg) {
     printf("recv: %s (%d) %s\n", port_pair[1].name, retr_port_id, (port_pair[1].up_down) ? "Up" : "Down");
     printf("\n");
 
-    {
-        char FRAME[] = "Plain Text Message"; // 506c61696e2054657874204d65737361676500
-        buf.len = strlen(FRAME) + 1; // include NUL
-        buf.frame = (uint8_t *) FRAME;
+// VALIDATION CODE:
 
-        do_xmit(sock, msg, module_id, port_id, buf);
-    }
-
-    sleep(1); do_read(sock, msg, module_id, port_id);
+    char asciz_FRAME[] = "Plain Text Message"; // 506c61696e2054657874204d65737361676500
+    buf_desc_t asciz_buf = {
+        .len = strlen(asciz_FRAME) + 1, // include NUL
+        .frame = (uint8_t *) asciz_FRAME
+    };
 
     // extra test - full binary buffer
     // char ecad_data[EC_MESSAGE_MAX]; // 9000
-    {
-        uint16_t FRAME[9000 / 2]; for (int i = 0; i < 9000 / 2; i++) { FRAME[i] = i; } // might want: i | 0x8080 ?
-        buf.len = 1500 + 26; // MTU + ethernet header
-        buf.frame = (uint8_t *) FRAME;
+    uint16_t blob_FRAME[9000 / 2]; for (int i = 0; i < 9000 / 2; i++) { blob_FRAME[i] = i; } // might want: i | 0x8080 ?
+    buf_desc_t blob_buf = {
+        .len = 1500 + 26, // MTU + ethernet header
+        .frame = (uint8_t *) blob_FRAME
+    };
 
-        do_xmit(sock, msg, module_id, port_id, buf);
-    }
+    do_xmit(sock, msg, module_id, send_port_id, asciz_buf);
+    do_xmit(sock, msg, module_id, send_port_id, blob_buf);
 
-    sleep(1); do_read(sock, msg, module_id, port_id);
+    do_read(sock, msg, module_id, retr_port_id, 2);
+    do_read(sock, msg, module_id, retr_port_id, 2);
 }
 
 // e.g. usage: mock_exchange enp7s0 enp9s0
