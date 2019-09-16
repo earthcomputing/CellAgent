@@ -51,6 +51,11 @@ void do_read(struct nl_sock *sock, struct nl_msg *msg, uint32_t module_id, uint3
     CLEAR_MSG;
     printf("retrieve_ait_message %d (%s)\n", retr_port_id, port_pair[1].name);
     buf_desc_t actual_buf; memset(&actual_buf, 0, sizeof(buf_desc_t));
+    // actual_buf.frame = xx; // who's responsible for buffer mgmt ??
+    // at the moment, the serialization layer 'adapts'; 
+    // this implies client is responsible for freeing buffers
+    // and needs to determine if lower layer re-allocated the buf
+
     int rc = retrieve_ait_message(sock, msg, module_id, retr_port_id, alo_reg, &actual_module_id, &actual_port_id, &actual_buf);
     if (rc < 0) fatal_error(rc, "retrieve_ait_message");
     if (actual_module_id != module_id) fatal_error(-1, "module mismatch: %d, %d", module_id, actual_module_id);
