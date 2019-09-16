@@ -277,6 +277,13 @@ extern int get_link_state(struct nlattr **tb, link_state_t *lp) {
     return 0;
 }
 
+#define ANALYZE_REPLY(fmt, args...) \
+    callback_index_t cbi = { .magic = 0x5a5a }; \
+    struct nl_cb *s_cb = nl_socket_get_cb(sock); \
+    if ((err = nl_socket_modify_cb(sock, NL_CB_VALID, NL_CB_CUSTOM, parse_cb, &cbi)) < 0) { fatal_error(err, "Unable to modify valid message callback"); } \
+    if ((err = nl_recvmsgs_report(sock, s_cb)) < 0) { fatal_error(err, fmt "Unable to receive message: %s", ##args, nl_geterror(err)); } \
+    printf("nl_recvmsgs_report: %d msgs processed\n\n", err);
+
 // "ecnl0"
 // GET_MODULE_INFO(uint32_t module_id)
 extern int get_module_info(struct nl_sock *sock, struct nl_msg *msg, uint32_t module_id, module_info_t *mip) {
@@ -286,10 +293,7 @@ extern int get_module_info(struct nl_sock *sock, struct nl_msg *msg, uint32_t mo
     nl_complete_msg(sock, msg);
     if ((err = nl_send(sock, msg)) < 0) { fatal_error(err, "Unable to send message: %s", nl_geterror(err)); }
 {
-    callback_index_t cbi = { .magic = 0x5a5a };
-    if ((err = nl_socket_modify_cb(sock, NL_CB_VALID, NL_CB_CUSTOM, parse_cb, &cbi)) < 0) { fatal_error(err, "Unable to modify valid message callback"); }
-    if ((err = nl_recvmsgs_default(sock)) < 0) { fatal_error(err, "get_module_info(\"%s\", %d) : Unable to receive message: %s", ops.o_name, ops.o_id, nl_geterror(err)); }
-    printf("nl_recvmsgs_default: %d msgs processed\n\n", err);
+    ANALYZE_REPLY("get_module_info(\"%s\", %d) : ", ops.o_name, ops.o_id);
     uint32_t module_id = nla_get_u32(cbi.tb[NL_ECNL_ATTR_MODULE_ID]);
     char *module_name = nla_strdup(cbi.tb[NL_ECNL_ATTR_MODULE_NAME]); // nla_get_string
     uint32_t num_ports = nla_get_u32(cbi.tb[NL_ECNL_ATTR_NUM_PORTS]);
@@ -313,10 +317,7 @@ extern int get_port_state(struct nl_sock *sock, struct nl_msg *msg, uint32_t mod
     if ((err = nl_send(sock, msg)) < 0) { fatal_error(err, "Unable to send message: %s", nl_geterror(err)); }
 
 {
-    callback_index_t cbi = { .magic = 0x5a5a };
-    if ((err = nl_socket_modify_cb(sock, NL_CB_VALID, NL_CB_CUSTOM, parse_cb, &cbi)) < 0) { fatal_error(err, "Unable to modify valid message callback"); }
-    if ((err = nl_recvmsgs_default(sock)) < 0) { fatal_error(err, "Unable to receive message: %s", nl_geterror(err)); }
-    printf("nl_recvmsgs_default: %d msgs processed\n\n", err);
+    ANALYZE_REPLY("get_port_state");
     uint32_t module_id = nla_get_u32(cbi.tb[NL_ECNL_ATTR_MODULE_ID]);
     uint32_t port_id = nla_get_u32(cbi.tb[NL_ECNL_ATTR_PORT_ID]);
     *mp = module_id;
@@ -341,10 +342,7 @@ extern int alloc_driver(struct nl_sock *sock, struct nl_msg *msg, char *module_n
     if ((err = nl_send(sock, msg)) < 0) { fatal_error(err, "Unable to send message: %s", nl_geterror(err)); }
 
 {
-    callback_index_t cbi = { .magic = 0x5a5a };
-    if ((err = nl_socket_modify_cb(sock, NL_CB_VALID, NL_CB_CUSTOM, parse_cb, &cbi)) < 0) { fatal_error(err, "Unable to modify valid message callback"); }
-    if ((err = nl_recvmsgs_default(sock)) < 0) { fatal_error(err, "Unable to receive message: %s", nl_geterror(err)); }
-    printf("nl_recvmsgs_default: %d msgs processed\n\n", err);
+    ANALYZE_REPLY("alloc_driver");
     uint32_t module_id = nla_get_u32(cbi.tb[NL_ECNL_ATTR_MODULE_ID]);
     *mp = module_id;
 }
@@ -362,10 +360,7 @@ extern int alloc_table(struct nl_sock *sock, struct nl_msg *msg, uint32_t module
     if ((err = nl_send(sock, msg)) < 0) { fatal_error(err, "Unable to send message: %s", nl_geterror(err)); }
 
 {
-    callback_index_t cbi = { .magic = 0x5a5a };
-    if ((err = nl_socket_modify_cb(sock, NL_CB_VALID, NL_CB_CUSTOM, parse_cb, &cbi)) < 0) { fatal_error(err, "Unable to modify valid message callback"); }
-    if ((err = nl_recvmsgs_default(sock)) < 0) { fatal_error(err, "Unable to receive message: %s", nl_geterror(err)); }
-    printf("nl_recvmsgs_default: %d msgs processed\n\n", err);
+    ANALYZE_REPLY("alloc_table");
     uint32_t module_id = nla_get_u32(cbi.tb[NL_ECNL_ATTR_MODULE_ID]);
     uint32_t table_id = nla_get_u32(cbi.tb[NL_ECNL_ATTR_TABLE_ID]);
     *mp = module_id;
@@ -385,10 +380,7 @@ extern int dealloc_table(struct nl_sock *sock, struct nl_msg *msg, uint32_t modu
     if ((err = nl_send(sock, msg)) < 0) { fatal_error(err, "Unable to send message: %s", nl_geterror(err)); }
 
 {
-    callback_index_t cbi = { .magic = 0x5a5a };
-    if ((err = nl_socket_modify_cb(sock, NL_CB_VALID, NL_CB_CUSTOM, parse_cb, &cbi)) < 0) { fatal_error(err, "Unable to modify valid message callback"); }
-    if ((err = nl_recvmsgs_default(sock)) < 0) { fatal_error(err, "Unable to receive message: %s", nl_geterror(err)); }
-    printf("nl_recvmsgs_default: %d msgs processed\n\n", err);
+    ANALYZE_REPLY("dealloc_table");
     uint32_t module_id = nla_get_u32(cbi.tb[NL_ECNL_ATTR_MODULE_ID]);
     uint32_t table_id = nla_get_u32(cbi.tb[NL_ECNL_ATTR_TABLE_ID]);
     *mp = module_id;
@@ -408,10 +400,7 @@ extern int select_table(struct nl_sock *sock, struct nl_msg *msg, uint32_t modul
     if ((err = nl_send(sock, msg)) < 0) { fatal_error(err, "Unable to send message: %s", nl_geterror(err)); }
 
 {
-    callback_index_t cbi = { .magic = 0x5a5a };
-    if ((err = nl_socket_modify_cb(sock, NL_CB_VALID, NL_CB_CUSTOM, parse_cb, &cbi)) < 0) { fatal_error(err, "Unable to modify valid message callback"); }
-    if ((err = nl_recvmsgs_default(sock)) < 0) { fatal_error(err, "Unable to receive message: %s", nl_geterror(err)); }
-    printf("nl_recvmsgs_default: %d msgs processed\n\n", err);
+    ANALYZE_REPLY("select_table");
     uint32_t module_id = nla_get_u32(cbi.tb[NL_ECNL_ATTR_MODULE_ID]);
     uint32_t table_id = nla_get_u32(cbi.tb[NL_ECNL_ATTR_TABLE_ID]);
     *mp = module_id;
@@ -434,10 +423,7 @@ extern int fill_table(struct nl_sock *sock, struct nl_msg *msg, uint32_t module_
     if ((err = nl_send(sock, msg)) < 0) { fatal_error(err, "Unable to send message: %s", nl_geterror(err)); }
 
 {
-    callback_index_t cbi = { .magic = 0x5a5a };
-    if ((err = nl_socket_modify_cb(sock, NL_CB_VALID, NL_CB_CUSTOM, parse_cb, &cbi)) < 0) { fatal_error(err, "Unable to modify valid message callback"); }
-    if ((err = nl_recvmsgs_default(sock)) < 0) { fatal_error(err, "Unable to receive message: %s", nl_geterror(err)); }
-    printf("nl_recvmsgs_default: %d msgs processed\n\n", err);
+    ANALYZE_REPLY("fill_table");
     uint32_t module_id = nla_get_u32(cbi.tb[NL_ECNL_ATTR_MODULE_ID]);
     uint32_t table_id = nla_get_u32(cbi.tb[NL_ECNL_ATTR_TABLE_ID]);
     *mp = module_id;
@@ -459,10 +445,7 @@ extern int fill_table_entry(struct nl_sock *sock, struct nl_msg *msg, uint32_t m
     if ((err = nl_send(sock, msg)) < 0) { fatal_error(err, "Unable to send message: %s", nl_geterror(err)); }
 
 {
-    callback_index_t cbi = { .magic = 0x5a5a };
-    if ((err = nl_socket_modify_cb(sock, NL_CB_VALID, NL_CB_CUSTOM, parse_cb, &cbi)) < 0) { fatal_error(err, "Unable to modify valid message callback"); }
-    if ((err = nl_recvmsgs_default(sock)) < 0) { fatal_error(err, "Unable to receive message: %s", nl_geterror(err)); }
-    printf("nl_recvmsgs_default: %d msgs processed\n\n", err);
+    ANALYZE_REPLY("fill_table_entry");
     uint32_t module_id = nla_get_u32(cbi.tb[NL_ECNL_ATTR_MODULE_ID]);
     uint32_t table_id = nla_get_u32(cbi.tb[NL_ECNL_ATTR_TABLE_ID]);
     *mp = module_id;
@@ -482,10 +465,7 @@ extern int map_ports(struct nl_sock *sock, struct nl_msg *msg, uint32_t module_i
     if ((err = nl_send(sock, msg)) < 0) { fatal_error(err, "Unable to send message: %s", nl_geterror(err)); }
 
 {
-    callback_index_t cbi = { .magic = 0x5a5a };
-    if ((err = nl_socket_modify_cb(sock, NL_CB_VALID, NL_CB_CUSTOM, parse_cb, &cbi)) < 0) { fatal_error(err, "Unable to modify valid message callback"); }
-    if ((err = nl_recvmsgs_default(sock)) < 0) { fatal_error(err, "Unable to receive message: %s", nl_geterror(err)); }
-    printf("nl_recvmsgs_default: %d msgs processed\n\n", err);
+    ANALYZE_REPLY("map_ports");
     uint32_t module_id = nla_get_u32(cbi.tb[NL_ECNL_ATTR_MODULE_ID]);
     *mp = module_id;
 }
@@ -502,10 +482,7 @@ extern int start_forwarding(struct nl_sock *sock, struct nl_msg *msg, uint32_t m
     if ((err = nl_send(sock, msg)) < 0) { fatal_error(err, "Unable to send message: %s", nl_geterror(err)); }
 
 {
-    callback_index_t cbi = { .magic = 0x5a5a };
-    if ((err = nl_socket_modify_cb(sock, NL_CB_VALID, NL_CB_CUSTOM, parse_cb, &cbi)) < 0) { fatal_error(err, "Unable to modify valid message callback"); }
-    if ((err = nl_recvmsgs_default(sock)) < 0) { fatal_error(err, "Unable to receive message: %s", nl_geterror(err)); }
-    printf("nl_recvmsgs_default: %d msgs processed\n\n", err);
+    ANALYZE_REPLY("start_forwarding");
     uint32_t module_id = nla_get_u32(cbi.tb[NL_ECNL_ATTR_MODULE_ID]);
     *mp = module_id;
 }
@@ -522,10 +499,7 @@ extern int stop_forwarding(struct nl_sock *sock, struct nl_msg *msg, uint32_t mo
     if ((err = nl_send(sock, msg)) < 0) { fatal_error(err, "Unable to send message: %s", nl_geterror(err)); }
 
 {
-    callback_index_t cbi = { .magic = 0x5a5a };
-    if ((err = nl_socket_modify_cb(sock, NL_CB_VALID, NL_CB_CUSTOM, parse_cb, &cbi)) < 0) { fatal_error(err, "Unable to modify valid message callback"); }
-    if ((err = nl_recvmsgs_default(sock)) < 0) { fatal_error(err, "Unable to receive message: %s", nl_geterror(err)); }
-    printf("nl_recvmsgs_default: %d msgs processed\n\n", err);
+    ANALYZE_REPLY("stop_forwarding");
     uint32_t module_id = nla_get_u32(cbi.tb[NL_ECNL_ATTR_MODULE_ID]);
     *mp = module_id;
 }
@@ -545,10 +519,7 @@ extern int read_alo_registers(struct nl_sock *sock, struct nl_msg *msg, uint32_t
     if ((err = nl_send(sock, msg)) < 0) { fatal_error(err, "Unable to send message: %s", nl_geterror(err)); }
 
 {
-    callback_index_t cbi = { .magic = 0x5a5a };
-    if ((err = nl_socket_modify_cb(sock, NL_CB_VALID, NL_CB_CUSTOM, parse_cb, &cbi)) < 0) { fatal_error(err, "Unable to modify valid message callback"); }
-    if ((err = nl_recvmsgs_default(sock)) < 0) { fatal_error(err, "Unable to receive message: %s", nl_geterror(err)); }
-    printf("nl_recvmsgs_default: %d msgs processed\n\n", err);
+    ANALYZE_REPLY("read_alo_registers");
     uint32_t module_id = nla_get_u32(cbi.tb[NL_ECNL_ATTR_MODULE_ID]);
     uint32_t port_id = nla_get_u32(cbi.tb[NL_ECNL_ATTR_PORT_ID]);
     uint32_t alo_flag = nla_get_u32(cbi.tb[NL_ECNL_ATTR_ALO_FLAG]);
@@ -578,10 +549,7 @@ extern int retrieve_ait_message(struct nl_sock *sock, struct nl_msg *msg, uint32
     if ((err = nl_send(sock, msg)) < 0) { fatal_error(err, "Unable to send message: %s", nl_geterror(err)); }
 
 {
-    callback_index_t cbi = { .magic = 0x5a5a };
-    if ((err = nl_socket_modify_cb(sock, NL_CB_VALID, NL_CB_CUSTOM, parse_cb, &cbi)) < 0) { fatal_error(err, "Unable to modify valid message callback"); }
-    if ((err = nl_recvmsgs_default(sock)) < 0) { fatal_error(err, "Unable to receive message: %s", nl_geterror(err)); }
-    printf("nl_recvmsgs_default: %d msgs processed\n\n", err);
+    ANALYZE_REPLY("retrieve_ait_message");
 
     uint32_t module_id = nla_get_u32(cbi.tb[NL_ECNL_ATTR_MODULE_ID]);
     uint32_t port_id = nla_get_u32(cbi.tb[NL_ECNL_ATTR_PORT_ID]);
@@ -631,10 +599,7 @@ extern int write_alo_register(struct nl_sock *sock, struct nl_msg *msg, uint32_t
     if ((err = nl_send(sock, msg)) < 0) { fatal_error(err, "Unable to send message: %s", nl_geterror(err)); }
 
 {
-    callback_index_t cbi = { .magic = 0x5a5a };
-    if ((err = nl_socket_modify_cb(sock, NL_CB_VALID, NL_CB_CUSTOM, parse_cb, &cbi)) < 0) { fatal_error(err, "Unable to modify valid message callback"); }
-    if ((err = nl_recvmsgs_default(sock)) < 0) { fatal_error(err, "Unable to receive message: %s", nl_geterror(err)); }
-    printf("nl_recvmsgs_default: %d msgs processed\n\n", err);
+    ANALYZE_REPLY("write_alo_register");
     uint32_t module_id = nla_get_u32(cbi.tb[NL_ECNL_ATTR_MODULE_ID]);
     uint32_t port_id = nla_get_u32(cbi.tb[NL_ECNL_ATTR_PORT_ID]);
     *mp = module_id;
@@ -659,10 +624,7 @@ extern int send_ait_message(struct nl_sock *sock, struct nl_msg *msg, uint32_t m
     dump_block(buf.frame, buf.len);
 
 {
-    callback_index_t cbi = { .magic = 0x5a5a };
-    if ((err = nl_socket_modify_cb(sock, NL_CB_VALID, NL_CB_CUSTOM, parse_cb, &cbi)) < 0) { fatal_error(err, "Unable to modify valid message callback"); }
-    if ((err = nl_recvmsgs_default(sock)) < 0) { fatal_error(err, "Unable to receive message: %s", nl_geterror(err)); }
-    printf("nl_recvmsgs_default: %d msgs processed\n\n", err);
+    ANALYZE_REPLY("send_ait_message");
     uint32_t module_id = nla_get_u32(cbi.tb[NL_ECNL_ATTR_MODULE_ID]);
     uint32_t port_id = nla_get_u32(cbi.tb[NL_ECNL_ATTR_PORT_ID]);
     *mp = module_id;
@@ -781,10 +743,7 @@ extern int signal_ait_message(struct nl_sock *sock, struct nl_msg *msg, uint32_t
     if ((err = nl_send(sock, msg)) < 0) { fatal_error(err, "Unable to send message: %s", nl_geterror(err)); }
 
 {
-    callback_index_t cbi = { .magic = 0x5a5a };
-    if ((err = nl_socket_modify_cb(sock, NL_CB_VALID, NL_CB_CUSTOM, parse_cb, &cbi)) < 0) { fatal_error(err, "Unable to modify valid message callback"); }
-    if ((err = nl_recvmsgs_default(sock)) < 0) { fatal_error(err, "Unable to receive message: %s", nl_geterror(err)); }
-    printf("nl_recvmsgs_default: %d msgs processed\n\n", err);
+    ANALYZE_REPLY("signal_ait_message");
     uint32_t module_id = nla_get_u32(cbi.tb[NL_ECNL_ATTR_MODULE_ID]);
     uint32_t port_id = nla_get_u32(cbi.tb[NL_ECNL_ATTR_PORT_ID]);
     *mp = module_id;
