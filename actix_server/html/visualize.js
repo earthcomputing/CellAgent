@@ -51,7 +51,7 @@ function setup_topology(topology_text) {
         cells[cellID].neighbors = cellNeighbors.neighbors;
         for (neighborIndex in cellNeighbors.neighbors) {
             let neighbor = cellNeighbors.neighbors[neighborIndex];
-            let neighborID = neighbor.cell_id.name;
+            let neighborID = neighbor.cell_name;
             if ( cellID < neighborID ) {
                 let neighborPort = neighbor.port;
                 let id = cellID + ":P"+ neighborIndex + "-" + neighborID + ":P" + neighborPort;
