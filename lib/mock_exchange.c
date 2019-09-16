@@ -73,6 +73,8 @@ void do_read(struct nl_sock *sock, struct nl_msg *msg, uint32_t module_id, uint3
     else {
         printf("retr: (blob %d)\n", actual_buf.len); // dump?
     }
+
+    printf("\n");
 }
 
 void do_xmit(struct nl_sock *sock, struct nl_msg *msg, uint32_t module_id, uint32_t port_id, buf_desc_t buf) {
