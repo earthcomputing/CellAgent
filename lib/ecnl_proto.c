@@ -595,19 +595,19 @@ extern int retrieve_ait_message(struct nl_sock *sock, struct nl_msg *msg, uint32
     dump_block(cbi.tb[NL_ECNL_ATTR_MESSAGE], message_length);
 
     if (!buf) {
-        printf("retrieve_ait_message - no result buffer ?");
+        printf("retrieve_ait_message - no result buffer ?\n");
         return 0;
     }
 
     if (!buf->frame) {
-        printf("retrieve_ait_message - allocating return buffer (%d)", message_length);
+        printf("retrieve_ait_message - allocating return buffer (%d)\n", message_length);
         buf->frame = malloc(message_length);
         if (!buf->frame) { perror("malloc"); return -1; }
         buf->len = message_length;
     }
 
     if (buf->len < message_length) {
-        printf("retrieve_ait_message - return buffer too small (%d), reallocated (%d)", buf->len, message_length);
+        printf("retrieve_ait_message - return buffer too small (%d), reallocated (%d)\n", buf->len, message_length);
         buf->frame = malloc(message_length);
         if (!buf->frame) { perror("malloc"); return -1; }
         buf->len = message_length;
