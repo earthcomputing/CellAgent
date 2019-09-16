@@ -3,10 +3,6 @@
     width : 1000px;
     height : 1000px;
 }
-.link {
-    stroke : green;
-    stroke-width : 4px;
-}
 .node {
     stroke : black;
     fill : lightgreen;
@@ -42,7 +38,12 @@
     stroke-width : 2px;
     fill : black;
     r: 10;
-}.linkbroken {
+}
+.link {
+    stroke : green;
+    stroke-width : 4px;
+}
+.linkbroken {
     stroke : red;
     stroke-width: 4px;
 }
