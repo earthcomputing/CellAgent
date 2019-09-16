@@ -15,7 +15,6 @@ fn main() {
     let index_data = web::Data::new(html_file_name);
     let geo_data = geometry::data();
     let hello_data = hello::data();
-    let discoverd_data = discoverd::data();
     HttpServer::new(move || {
         App::new()
             .route("/visualizer.css", web::get().to(get_css))
@@ -33,9 +32,8 @@ fn main() {
             .service(hello::get())
             .service(hello::post())
         
-            //.register_data(discoverd_data.clone())
-            //.service(discoverd::get())
-            //.service(discoverd::post())
+            .service(discoverd::get())
+            .service(discoverd::post())
     })
         .bind(server_url)
         .unwrap()
