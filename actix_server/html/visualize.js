@@ -107,10 +107,15 @@ function hideTooltip(elem) {
 }
 function draw() { canvas.innerHTML = canvas.innerHTML; }
 function cell_click(evt) {
-    if (evt.target.getAttribute("class") == "node") {
+    let c = evt.target.getAttribute("class");
+    if ( c == "node") {
         evt.target.setAttribute("class", "noderoot");
-    } else {
-        evt.target.setAttribute("class", "node");
+    } else if ( c == "noderoot" ) {
+        evt.target.setAttribute("class", "node")
+    } else if ( c == "nodeborder" ) {
+        evt.target.setAttribute("class", "noderootborder");
+    } else if ( c == "noderootborder" ) {
+        evt.target.setAttribute("class", "nodeborder")
     }
 }
 function cell_dblclick(evt) {
