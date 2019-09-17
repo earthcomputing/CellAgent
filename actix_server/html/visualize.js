@@ -124,9 +124,9 @@ function draw() { canvas.innerHTML = canvas.innerHTML; }
 function cell_click(evt) {
     let links = document.querySelectorAll(".linktree");
     for (link of links) { link.setAttribute("class", "link"); }
-    let nodes = document.querySelectorAll(".nodetree");
+    let nodes = document.querySelectorAll(".noderoot");
     for (node of nodes) { node.setAttribute("class", "node"); }
-    let bordernodes = document.querySelectorAll(".nodetreeborder");
+    let bordernodes = document.querySelectorAll(".noderootborder");
     for (node of bordernodes) { node.setAttribute("class", "nodeborder"); }
     let c = evt.target.getAttribute("class");
     if ( c == "node") {
