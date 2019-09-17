@@ -163,7 +163,7 @@ int entl_received(entl_state_machine_t *mcn, uint16_t from_hi, uint32_t from_lo,
                 }
             }
             else {
-                STM_TDEBUG("%s message %s (0x%04x) neighbor %04x %08x seqno %d", mcn_state2name(was_state), msg_nick(emsg_type), emsg_raw, from_hi, from_lo, seqno);
+                STM_TDEBUG("%s WTF? message %s (0x%04x) neighbor %04x %08x seqno %d (0x%08x)", mcn_state2name(was_state), msg_nick(emsg_type), emsg_raw, from_hi, from_lo, seqno, seqno);
                 // FIXME: dump whole packet here?
                 ret_action = ENTL_ACTION_NOP;
             }
