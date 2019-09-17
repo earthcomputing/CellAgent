@@ -126,7 +126,7 @@ static inline void entl_state_machine_init(entl_state_machine_t *mcn) {
         memset(&mcn->current_state.error_time, 0, sizeof(struct timespec));
         clear_intervals(mcn); //  interval_time, max_interval_time, min_interval_time
     // error_state
-    mcn->error_state.current_state = 0;
+    mcn->error_state.current_state = 0; // ENTL_STATE_IDLE
     mcn->error_state.error_flag = 0;
     // return_state
     mcn->user_pid = 0;
