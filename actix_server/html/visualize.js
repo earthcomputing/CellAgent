@@ -169,12 +169,15 @@ function link_dblclick(evt) {
 }
 function addTooltip(id) {
     let tooltipID = "tooltip" + id.replace(/:/g, "").replace(/-/g, "");
-    let tooltip = document.createElement("div");
-    tooltip.id = tooltipID;
-    tooltip.style.display = "none";
-    tooltip.setAttribute("class", "tooltip");
-    tooltip.innerHTML = id;
-    let body = document.getElementById("body");
-    body.appendChild(tooltip);
+    let element = document.getElementById(tooltipID);
+    if (typeof(element) == "undefined" || element == null) {
+        let tooltip = document.createElement("div");
+        tooltip.id = tooltipID;
+        tooltip.style.display = "none";
+        tooltip.setAttribute("class", "tooltip");
+        tooltip.innerHTML = id;
+        let body = document.getElementById("body");
+        body.appendChild(tooltip);
+    }
     return tooltipID;
 }
