@@ -1,11 +1,10 @@
 use std::{env,
           fs,
 };
-use actix_files;
 
 use actix_web::{web, App, HttpServer, Responder, HttpResponse};
 
-use ec_trace_analyzer::{discoverd, geometry, hello, index};
+use ec_trace_analyzer::{discoverd, geometry, hello, index, stacktreed};
 
 fn main() {
     let server_url = env::var("SERVER_URL").expect("Environment variable SERVER_URL not found");
@@ -34,6 +33,9 @@ fn main() {
         
             .service(discoverd::get())
             .service(discoverd::post())
+        
+            .service(stacktreed::get())
+            .service(stacktreed::post())
     })
         .bind(server_url)
         .unwrap()
