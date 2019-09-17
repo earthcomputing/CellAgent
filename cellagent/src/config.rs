@@ -2,7 +2,7 @@ use std;
 use std::{fmt,
           collections::HashMap,
           env::args,
-          fs::{File, OpenOptions, create_dir, remove_dir_all},
+          fs::{OpenOptions, create_dir, remove_dir_all},
           path::Path,
           ops::{Deref}};
 
@@ -56,7 +56,7 @@ impl Config {
             .next()
             .unwrap_or(S("configs/10cell_config.json"));
         println!("\nReading configuratation from {}", config_file_name);
-        let config_file = File::open(config_file_name)?;//.context(ConfigError::File { func_name: _f, file_name: config_file_name})?;
+        let config_file = OpenOptions::new().read(true).open(config_file_name)?;//.context(ConfigError::File { func_name: _f, file_name: config_file_name})?;
         let config: Config = serde_json::from_reader(config_file)?;//.context(ConfigError::Chain { func_name: _f, comment: S("") })?;
         if Path::new(&config.output_dir_name).exists() {
             remove_dir_all(&config.output_dir_name)?;
