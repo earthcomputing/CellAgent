@@ -150,7 +150,7 @@ int entl_received(entl_state_machine_t *mcn, uint16_t from_hi, uint32_t from_lo,
             }
             else if (emsg_type == ENTL_MESSAGE_EVENT_U) {
                 if (seqno != 0) {
-                    STM_TDEBUG("%s EVENT: Out of Sequence - seqno %d", mcn_state2name(was_state), seqno);
+                    STM_TDEBUG("%s EVENT(in): Out of Sequence - seqno %d", mcn_state2name(was_state), seqno);
                     ret_action = ENTL_ACTION_NOP;
                 }
                 else {
@@ -182,7 +182,7 @@ int entl_received(entl_state_machine_t *mcn, uint16_t from_hi, uint32_t from_lo,
             else if (emsg_type == ENTL_MESSAGE_EVENT_U) {
                 // hmm, this should be exactly 1, not sent+1
                 if (seqno == get_i_sent(mcn) + 1) {
-                    STM_TDEBUG("%s (master) -> SEND EVENT: advance - seqno %d", mcn_state2name(was_state), seqno);
+                    STM_TDEBUG("%s (master) -> SEND EVENT(in): advance - seqno %d", mcn_state2name(was_state), seqno);
                     set_i_know(mcn, seqno); set_send_next(mcn, seqno + 1);
                     set_atomic_state(mcn, ENTL_STATE_SEND);
                     set_update_time(mcn, ts);
@@ -190,7 +190,7 @@ int entl_received(entl_state_machine_t *mcn, uint16_t from_hi, uint32_t from_lo,
                     ret_action = ENTL_ACTION_SEND;
                 }
                 else {
-                    STM_TDEBUG("%s -> HELLO EVENT: wrong seqno %d", mcn_state2name(was_state), seqno);
+                    STM_TDEBUG("%s -> HELLO EVENT(in): wrong seqno %d", mcn_state2name(was_state), seqno);
                     unicorn(mcn, ENTL_STATE_HELLO); set_update_time(mcn, ts);
                     clear_intervals(mcn);
                     ret_action = ENTL_ACTION_NOP;
@@ -209,11 +209,11 @@ int entl_received(entl_state_machine_t *mcn, uint16_t from_hi, uint32_t from_lo,
             if (emsg_type == ENTL_MESSAGE_EVENT_U
             ||  emsg_type == ENTL_MESSAGE_ACK_U) {
                 if (seqno == get_i_know(mcn)) {
-                    STM_TDEBUG("%s same seqno %d, SEND", msg_nick(emsg_type), seqno);
+                    STM_TDEBUG("%s(in) same seqno %d, SEND", msg_nick(emsg_type), seqno);
                     ret_action = ENTL_ACTION_NOP;
                 }
                 else {
-                    STM_TDEBUG("%s -> HELLO %s: Out of Sequence - seqno %d", mcn_state2name(was_state), msg_nick(emsg_type), seqno);
+                    STM_TDEBUG("%s -> HELLO %s(in): Out of Sequence - seqno %d", mcn_state2name(was_state), msg_nick(emsg_type), seqno);
                     seqno_error(mcn, ENTL_ACTION_ERROR);
                 }
             }
@@ -228,7 +228,7 @@ int entl_received(entl_state_machine_t *mcn, uint16_t from_hi, uint32_t from_lo,
             if (emsg_type == ENTL_MESSAGE_EVENT_U) {
                 if (get_i_know(mcn) + 2 == seqno) {
                     // FIXME : too frequent to log
-                    // STM_TDEBUG("%s -> SEND EVENT: advance - seqno %d", mcn_state2name(was_state), seqno);
+                    // STM_TDEBUG("%s -> SEND EVENT(in): advance - seqno %d", mcn_state2name(was_state), seqno);
                     set_i_know(mcn, seqno); set_send_next(mcn, seqno + 1);
                     set_atomic_state(mcn, ENTL_STATE_SEND);
                     ret_action = ENTL_ACTION_SEND;
@@ -238,24 +238,24 @@ int entl_received(entl_state_machine_t *mcn, uint16_t from_hi, uint32_t from_lo,
                     int num_queued = sendq_count(mcn);
                     if (num_queued == 0) { // AIT has priority
                         // this is way too noisy to log!
-                        // STM_TDEBUG("%s -> SEND (data) EVENT: advance - seqno %d", mcn_state2name(was_state), seqno);
+                        // STM_TDEBUG("%s -> SEND (data) EVENT(in): advance - seqno %d", mcn_state2name(was_state), seqno);
                         ret_action |= ENTL_ACTION_SEND_DAT; // data send as optional
                     }
                     set_update_time(mcn, ts);
                 }
                 else if (get_i_know(mcn) == seqno) {
-                    STM_TDEBUG("%s EVENT: unchanged - seqno %d", mcn_state2name(was_state), seqno);
+                    STM_TDEBUG("%s EVENT(in): unchanged - seqno %d", mcn_state2name(was_state), seqno);
                     ret_action = ENTL_ACTION_NOP;
                 }
                 else {
-                    STM_TDEBUG("%s -> HELLO EVENT: Out of Sequence - seqno %d", mcn_state2name(was_state), seqno);
+                    STM_TDEBUG("%s -> HELLO EVENT(in): Out of Sequence - seqno %d", mcn_state2name(was_state), seqno);
                     seqno_error(mcn, ENTL_ACTION_ERROR);
                 }
             }
             else if (emsg_type == ENTL_MESSAGE_AIT_U) {
                 if (get_i_know(mcn) + 2 == seqno) {
                     // FIXME : too frequent to log
-                    // STM_TDEBUG("%s -> AH EVENT: advance - seqno %d", mcn_state2name(was_state), seqno);
+                    // STM_TDEBUG("%s -> AH EVENT(in): advance - seqno %d", mcn_state2name(was_state), seqno);
                     set_i_know(mcn, seqno); set_send_next(mcn, seqno + 1);
                     set_atomic_state(mcn, ENTL_STATE_AH);
                     ret_action = ENTL_ACTION_PROC_AIT;
@@ -263,20 +263,20 @@ int entl_received(entl_state_machine_t *mcn, uint16_t from_hi, uint32_t from_lo,
                     // int avail = recvq_space();
                     // recv queue space avail
                     if (!recvq_full(mcn)) {
-                        STM_TDEBUG("%s -> AH (data) AIT: advance - seqno %d", mcn_state2name(was_state), seqno);
+                        STM_TDEBUG("%s -> AH (data) AIT(in): advance - seqno %d", mcn_state2name(was_state), seqno);
                         ret_action |= ENTL_ACTION_SEND;
                     }
                     else {
-                        STM_TDEBUG("%s -> AH (hold) AIT: queue full - seqno %d", mcn_state2name(was_state), seqno);
+                        STM_TDEBUG("%s -> AH (hold) AIT(in): queue full - seqno %d", mcn_state2name(was_state), seqno);
                     }
                     set_update_time(mcn, ts);
                 }
                 else if (get_i_know(mcn) == seqno) {
-                    STM_TDEBUG("%s AIT: unchanged - seqno %d", mcn_state2name(was_state), seqno);
+                    STM_TDEBUG("%s AIT(in): unchanged - seqno %d", mcn_state2name(was_state), seqno);
                     ret_action = ENTL_ACTION_NOP;
                 }
                 else {
-                    STM_TDEBUG("%s -> HELLO AIT: Out of Sequence - seqno %d", mcn_state2name(was_state), seqno);
+                    STM_TDEBUG("%s -> HELLO AIT(in): Out of Sequence - seqno %d", mcn_state2name(was_state), seqno);
                     seqno_error(mcn, ENTL_ACTION_ERROR);
                 }
             }
@@ -291,25 +291,25 @@ int entl_received(entl_state_machine_t *mcn, uint16_t from_hi, uint32_t from_lo,
         case ENTL_STATE_AM: {
             if (emsg_type == ENTL_MESSAGE_ACK_U) {
                 if (get_i_know(mcn) + 2 == seqno) {
-                    STM_TDEBUG("%s -> BM ACK: advance - seqno %d", mcn_state2name(was_state), seqno);
+                    STM_TDEBUG("%s -> BM ACK(in): advance - seqno %d", mcn_state2name(was_state), seqno);
                     set_i_know(mcn, seqno); set_send_next(mcn, seqno + 1);
                     set_atomic_state(mcn, ENTL_STATE_BM);
                     set_update_time(mcn, ts);
                     ret_action = ENTL_ACTION_SEND;
                 }
                 else {
-                    STM_TDEBUG("%s -> HELLO ACK: Out of Sequence - seqno %d", mcn_state2name(was_state), seqno);
+                    STM_TDEBUG("%s -> HELLO ACK(in): Out of Sequence - seqno %d", mcn_state2name(was_state), seqno);
                     seqno_error(mcn, ENTL_ACTION_ERROR);
                 }
             }
             else if (emsg_type == ENTL_MESSAGE_EVENT_U) {
                 if (get_i_know(mcn) == seqno) {
-                    STM_TDEBUG("%s EVENT: unchanged - seqno %d", mcn_state2name(was_state), seqno);
+                    STM_TDEBUG("%s EVENT(in): unchanged - seqno %d", mcn_state2name(was_state), seqno);
                     ret_action = ENTL_ACTION_NOP;
                 }
                 else {
                     // FIXME: is this just a 'normal' Out of Sequence ??
-                    STM_TDEBUG("%s -> HELLO EVENT: wrong message 0x%04x - seqno %d", mcn_state2name(was_state), emsg_raw, seqno);
+                    STM_TDEBUG("%s -> HELLO EVENT(in): wrong message 0x%04x - seqno %d", mcn_state2name(was_state), emsg_raw, seqno);
                     seqno_error(mcn, ENTL_ACTION_ERROR);
                 }
             }
@@ -324,12 +324,12 @@ int entl_received(entl_state_machine_t *mcn, uint16_t from_hi, uint32_t from_lo,
         case ENTL_STATE_BM: {
             if (emsg_type == ENTL_MESSAGE_ACK_U) {
                 if (get_i_know(mcn) == seqno) {
-                    STM_TDEBUG("%s ACK: unchanged - seqno %d", mcn_state2name(was_state), seqno);
+                    STM_TDEBUG("%s ACK(in): unchanged - seqno %d", mcn_state2name(was_state), seqno);
                     ret_action = ENTL_ACTION_NOP;
                 }
                 else {
                     // FIXME: is this just a 'normal' Out of Sequence ??
-                    STM_TDEBUG("%s -> HELLO ACK: wrong message 0x%04x - seqno %d", mcn_state2name(was_state), emsg_raw, seqno);
+                    STM_TDEBUG("%s -> HELLO ACK(in): wrong message 0x%04x - seqno %d", mcn_state2name(was_state), emsg_raw, seqno);
                     seqno_error(mcn, ENTL_ACTION_ERROR);
                 }
             }
@@ -344,11 +344,11 @@ int entl_received(entl_state_machine_t *mcn, uint16_t from_hi, uint32_t from_lo,
         case ENTL_STATE_AH: {
             if (emsg_type == ENTL_MESSAGE_AIT_U) {
                 if (get_i_know(mcn) == seqno) {
-                    STM_TDEBUG("%s AIT: unchanged - seqno %d", mcn_state2name(was_state), seqno);
+                    STM_TDEBUG("%s AIT(in): unchanged - seqno %d", mcn_state2name(was_state), seqno);
                     ret_action = ENTL_ACTION_NOP;
                 }
                 else {
-                    STM_TDEBUG("%s -> HELLO AIT: Out of Sequence - seqno %d", mcn_state2name(was_state), seqno);
+                    STM_TDEBUG("%s -> HELLO AIT(in): Out of Sequence - seqno %d", mcn_state2name(was_state), seqno);
                     seqno_error(mcn, ENTL_ACTION_ERROR);
                 }
             }
@@ -365,7 +365,7 @@ int entl_received(entl_state_machine_t *mcn, uint16_t from_hi, uint32_t from_lo,
         case ENTL_STATE_BH: {
             if (emsg_type == ENTL_MESSAGE_ACK_U) {
                 if (get_i_know(mcn) + 2 == seqno) {
-                    STM_TDEBUG("%s -> SEND ACK: advance - seqno %d", mcn_state2name(was_state), seqno);
+                    STM_TDEBUG("%s -> SEND ACK(in): advance - seqno %d", mcn_state2name(was_state), seqno);
                     set_i_know(mcn, seqno); set_send_next(mcn, seqno + 1);
                     set_atomic_state(mcn, ENTL_STATE_SEND);
                     set_update_time(mcn, ts);
@@ -381,17 +381,17 @@ STM_TDEBUG("recvq_push - space %d", recv_space);
                     ret_action = ENTL_ACTION_SEND | ENTL_ACTION_SIG_AIT;
                 }
                 else {
-                    STM_TDEBUG("%s -> HELLO ACK: Out of Sequence - seqno %d", mcn_state2name(was_state), seqno);
+                    STM_TDEBUG("%s -> HELLO ACK(in): Out of Sequence - seqno %d", mcn_state2name(was_state), seqno);
                     seqno_error(mcn, ENTL_ACTION_ERROR);
                 }
             }
             else if (emsg_type == ENTL_MESSAGE_AIT_U) {
                 if (get_i_know(mcn) == seqno) {
-                    STM_TDEBUG("%s AIT: unchanged - seqno %d", mcn_state2name(was_state), seqno);
+                    STM_TDEBUG("%s AIT(in): unchanged - seqno %d", mcn_state2name(was_state), seqno);
                     ret_action = ENTL_ACTION_NOP;
                 }
                 else {
-                    STM_TDEBUG("%s -> HELLO AIT: Out of Sequence - seqno %d", mcn_state2name(was_state), seqno);
+                    STM_TDEBUG("%s -> HELLO AIT(in): Out of Sequence - seqno %d", mcn_state2name(was_state), seqno);
                     seqno_error(mcn, ENTL_ACTION_ERROR);
                 }
             }
