@@ -155,6 +155,36 @@ static void entl_device_link_up(entl_device_t *dev) {
     }
 }
 
+// tx queue empty, inject a new packet
+void entl_sent_inject(entl_device_t *dev, struct e1000_adapter *adapter, entl_state_machine_t *stm) {
+    uint16_t emsg_raw = (uint16_t) -1; uint32_t seqno = (uint32_t) -1;
+    int send_action = entl_next_send(stm, &emsg_raw, &seqno);
+
+    if (get_entl_msg(emsg_raw) != ENTL_MESSAGE_NOP_U) {
+        int inject_action = locked_inject(dev, adapter, emsg_raw, seqno, send_action);
+        // failed inject, invoke task
+        if (inject_action == 1) {
+            // resource error, retry
+            dev->edev_u_addr = emsg_raw;
+            dev->edev_l_addr = seqno;
+            dev->edev_action = send_action;
+            dev->edev_flag |= ENTL_DEVICE_FLAG_RETRY;
+            mod_timer(&dev->edev_watchdog_timer, jiffies + 1);
+        }
+        else if (inject_action == -1) {
+            entl_state_error(stm, ENTL_ERROR_FATAL);
+            dev->edev_flag |= ENTL_DEVICE_FLAG_SIGNAL;
+            mod_timer(&dev->edev_watchdog_timer, jiffies + 1);
+        }
+        else {
+            dev->edev_flag &= ~(uint32_t) ENTL_DEVICE_FLAG_WAITING;
+        }
+    }
+    else {
+        // ENTL_MESSAGE_NOP_U
+    }
+}
+
 // ISR context
 // returns
 // true when netdev.c should continue to process packet
@@ -239,33 +269,7 @@ ENTL_DEBUG_NAME(stm->name, "process_rx - message 0x%04x (%s) seqno %d payload le
                 e1000_xmit_frame(dt, adapter->netdev);
             }
             else {
-                // tx queue empty, inject a new packet
-                uint16_t emsg_raw = (uint16_t) -1; uint32_t seqno = (uint32_t) -1;
-                int send_action = entl_next_send(stm, &emsg_raw, &seqno);
-
-                if (get_entl_msg(emsg_raw) != ENTL_MESSAGE_NOP_U) {
-                    int inject_action = locked_inject(dev, adapter, emsg_raw, seqno, send_action);
-                    // failed inject, invoke task
-                    if (inject_action == 1) {
-                        // resource error, retry
-                        dev->edev_u_addr = emsg_raw;
-                        dev->edev_l_addr = seqno;
-                        dev->edev_action = send_action;
-                        dev->edev_flag |= ENTL_DEVICE_FLAG_RETRY;
-                        mod_timer(&dev->edev_watchdog_timer, jiffies + 1);
-                    }
-                    else if (inject_action == -1) {
-                        entl_state_error(stm, ENTL_ERROR_FATAL);
-                        dev->edev_flag |= ENTL_DEVICE_FLAG_SIGNAL;
-                        mod_timer(&dev->edev_watchdog_timer, jiffies + 1);
-                    }
-                    else {
-                        dev->edev_flag &= ~(uint32_t) ENTL_DEVICE_FLAG_WAITING;
-                    }
-                }
-                else {
-                    // ENTL_MESSAGE_NOP_U
-                }
+                entl_sent_inject(dev, adapter, stm);
             }
 
             // netif queue handling for flow control
@@ -275,29 +279,7 @@ ENTL_DEBUG_NAME(stm->name, "process_rx - message 0x%04x (%s) seqno %d payload le
             }
         }
         else {
-            uint16_t emsg_raw = (uint16_t) -1; uint32_t seqno = (uint32_t) -1;
-            int send_action = entl_next_send(stm, &emsg_raw, &seqno);
-
-            if (get_entl_msg(emsg_raw) != ENTL_MESSAGE_NOP_U) {
-                int inject_action = locked_inject(dev, adapter, emsg_raw, seqno, send_action);
-                // failed inject, invoke task
-                if (inject_action == 1) {
-                    // resource error, so retry
-                    dev->edev_u_addr = emsg_raw;
-                    dev->edev_l_addr = seqno;
-                    dev->edev_action = send_action;
-                    dev->edev_flag |= ENTL_DEVICE_FLAG_RETRY;
-                    mod_timer(&dev->edev_watchdog_timer, jiffies + 1);
-                }
-                else if (inject_action == -1) {
-                    entl_state_error(stm, ENTL_ERROR_FATAL);
-                    dev->edev_flag |= ENTL_DEVICE_FLAG_SIGNAL;
-                    mod_timer(&dev->edev_watchdog_timer, jiffies + 1);
-                }
-                else {
-                    dev->edev_flag &= ~(uint32_t) ENTL_DEVICE_FLAG_WAITING;
-                }
-            }
+            entl_sent_inject(dev, adapter, stm);
         }
     }
 
