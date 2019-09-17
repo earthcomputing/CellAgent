@@ -26,7 +26,9 @@
 #include "ecnl_protocol.h"
 
 
-#define ECNL_INFO(fmt, args...) printk(KERN_INFO "ECNL: " fmt "\n", ## args)
+#define DEFMOD_DEBUG(fmt, args...) ECNL_DEBUG("%s " fmt, MAIN_DRIVER_NAME, ## args);
+#define PLUG_DEBUG(plug_in, fmt, args...) ECNL_DEBUG("%s " fmt, plug_in->name, ## args);
+#define ECNL_INFO(_name, fmt, args...) printk(KERN_INFO "ECNL: %s " fmt "\n", _name, ## args)
 
 
 #define DRV_NAME        "ecnl"
@@ -86,6 +88,7 @@ static struct net_device *ecnl_devices[ECNL_DRIVER_MAX];
 static int num_ecnl_devices = 0;
 static int device_busy = 0;
 
+// ecnl_device_t *e_dev = (ecnl_device_t *) netdev_priv(plug_in); // e_dev->ecnl_index
 static struct net_device *find_ecnl_device(unsigned char *name) {
     for (int i = 0; i < num_ecnl_devices; i++) {
         struct net_device *plug_in = ecnl_devices[i];
@@ -267,31 +270,31 @@ static int nl_ecnl_get_port_state(struct sk_buff *skb, struct genl_info *info) {
     ecnl_device_t *e_dev = fetch_ecnl_device(info);
     if (!e_dev) return -ENODEV;
 
+    // ECNL_INFO(e_dev->ecnl_name, "nl_ecnl_get_port_state");
+
     if (!info->attrs[NL_ECNL_ATTR_PORT_ID]) return -EINVAL;
 
     u32 port_id = nla_get_u32(info->attrs[NL_ECNL_ATTR_PORT_ID]);
+    // ECNL_INFO(e_dev->ecnl_name, "nl_ecnl_get_port_state - port_id %d", port_id);
     if (port_id >= e_dev->ecnl_num_ports) return -EINVAL;
-
-    // ECNL_INFO("nl_ecnl_get_port_state: \"%s\" %d", e_dev->ecnl_name, port_id);
 
     struct entl_driver *e_driver = &e_dev->ecnl_drivers[port_id];
     if (!e_driver) return -EINVAL;
+    // ECNL_INFO(e_dev->ecnl_name, "entl_driver \"%s\"", e_driver->eda_name);
 
     struct net_device *e1000e = e_driver->eda_device;
     struct entl_driver_funcs *funcs = e_driver->eda_funcs;
-    // ECNL_INFO("entl_driver: \"%s\" e1000e: %p, funcs: %p", e_driver->eda_name, e1000e, funcs);
     if (!e1000e || !funcs) return -EINVAL;
-
-    // ECNL_INFO("net_device: \"%s\"", e1000e->name);
+    // ECNL_INFO(e_dev->ecnl_name, "e1000e: %p, funcs: %p", e1000e, funcs);
+    // ECNL_INFO(e_dev->ecnl_name, "net_device: \"%s\"", e1000e->name);
 
     ec_state_t state; memset(&state, 0, sizeof(ec_state_t));
     int err = funcs->edf_get_state(e1000e, &state);
     if (err) return -EINVAL;
 
-    // ECNL_INFO("reply e_dev: \"%s\" (%d)", e_dev->ecnl_name, e_dev->ecnl_index); // module_id
-    // ECNL_INFO("reply e_driver: \"%s\" (%d)", e_driver->eda_name, e_driver->eda_index); // port_id
-
-    // ECNL_INFO("state:");
+    // ECNL_INFO(e_dev->ecnl_name, "reply module_id %d", e_dev->ecnl_index);
+    // ECNL_INFO(e_driver->eda_name, "reply port_id %d", e_driver->eda_index);
+    // ECNL_INFO(e_driver->eda_name, "state:");
 
     // return data packet back to caller
     struct sk_buff *rskb = genlmsg_new(NLMSG_GOODSIZE, GFP_KERNEL);
@@ -510,7 +513,7 @@ static int nl_ecnl_stop_forwarding(struct sk_buff *skb, struct genl_info *info) 
 }
 
 static char *letters = "0123456789abcdef";
-static void dump_block(char *tag, void *d, int nbytes) {
+static void dump_block(struct net_device *e1000e, char *tag, void *d, int nbytes) {
     char window[3*41];
     int f = 0;
     for (int i = 0; i < nbytes; i++) {
@@ -520,10 +523,11 @@ static void dump_block(char *tag, void *d, int nbytes) {
         window[f+0] = ' ';
         window[f+1] = letters[n0];
         window[f+2] = letters[n1];
+        window[f+3] = '\0';
         f += 3;
         if (f >= 3*40) break;
     }
-    ECNL_INFO("%s: nbytes: %d - %s", tag, nbytes, window);
+    ECNL_INFO(e1000e->name, "%s: nbytes: %d - %s", tag, nbytes, window);
 }
 
 static int nl_ecnl_send_ait_message(struct sk_buff *skb, struct genl_info *info) {
@@ -548,7 +552,7 @@ static int nl_ecnl_send_ait_message(struct sk_buff *skb, struct genl_info *info)
     if (!e1000e || !funcs) return -EINVAL;
 
 // DEBUG
-    dump_block("nl_ecnl_send", ait_data.ecad_data, ait_data.ecad_message_len);
+    dump_block(e1000e, "nl_ecnl_send", ait_data.ecad_data, ait_data.ecad_message_len);
 
     funcs->edf_send_AIT((struct sk_buff *) &ait_data, e1000e);
 
@@ -583,11 +587,14 @@ static int nl_ecnl_retrieve_ait_message(struct sk_buff *skb, struct genl_info *i
     struct entl_driver_funcs *funcs = e_driver->eda_funcs;
     if (!e1000e || !funcs) return -EINVAL;
 
-    struct ec_ait_data ait_data; memset(&ait_data, 0, sizeof(struct ec_ait_data));
+    // send/retr differ: egrep 'typedef struct (ec_ait_data|entt_ioctl_ait_data)'
+    struct entt_ioctl_ait_data ait_data; memset(&ait_data, 0, sizeof(struct entt_ioctl_ait_data));
     funcs->edf_retrieve_AIT(e1000e, &ait_data);
 
 // DEBUG
-    dump_block("nl_ecnl_retr", ait_data.ecad_data, ait_data.ecad_message_len);
+    dump_block(e1000e, "nl_ecnl_retr", ait_data.data, ait_data.message_len);
+    // struct net_device *plug_in = ecnl_devices[e_dev->ecnl_index]; // module_id
+    // PLUG_DEBUG(plug_in, "nl_ecnl_retr - msgs %d, nqueued %d", ait_data.num_messages, ait_data.num_queued);
 
     struct sk_buff *rskb = genlmsg_new(NLMSG_GOODSIZE, GFP_KERNEL);
     if (!rskb) return -ENOMEM;
@@ -595,8 +602,8 @@ static int nl_ecnl_retrieve_ait_message(struct sk_buff *skb, struct genl_info *i
     void *user_hdr = genlmsg_put(rskb, info->snd_portid, info->snd_seq, &nl_ecnd_fam, 0, NL_ECNL_CMD_RETRIEVE_AIT_MESSAGE);
     NLAPUT_CHECKED(nla_put_u32(rskb, NL_ECNL_ATTR_MODULE_ID, e_dev->ecnl_index)); // module_id
     NLAPUT_CHECKED(nla_put_u32(rskb, NL_ECNL_ATTR_PORT_ID, port_id));
-    NLAPUT_CHECKED(nla_put_u32(rskb, NL_ECNL_ATTR_MESSAGE_LENGTH, ait_data.ecad_message_len));
-    NLAPUT_CHECKED(nla_put(rskb, NL_ECNL_ATTR_MESSAGE, ait_data.ecad_message_len, ait_data.ecad_data));
+    NLAPUT_CHECKED(nla_put_u32(rskb, NL_ECNL_ATTR_MESSAGE_LENGTH, ait_data.message_len));
+    NLAPUT_CHECKED(nla_put(rskb, NL_ECNL_ATTR_MESSAGE, ait_data.message_len, ait_data.data));
     genlmsg_end(rskb, user_hdr);
     return genlmsg_reply(rskb, info);
 }
@@ -824,7 +831,7 @@ static struct genl_family nl_ecnd_fam = {
 static int ecnl_driver_index(unsigned char *ecnl_name) {
     struct net_device *plug_in = find_ecnl_device(ecnl_name);
     if (plug_in == NULL) {
-        ECNL_DEBUG("ecnl_driver_index module \"%s\" not found", ecnl_name);
+        DEFMOD_DEBUG("ecnl_driver_index - module \"%s\" not found", ecnl_name);
         return -EINVAL;
     }
 
@@ -835,7 +842,7 @@ static int ecnl_driver_index(unsigned char *ecnl_name) {
 static int ecnl_register_port(int module_id, unsigned char *name, struct net_device *e1000e, struct entl_driver_funcs *funcs) {
     struct net_device *plug_in = ecnl_devices[module_id];
     if (plug_in == NULL) {
-        ECNL_DEBUG("ecnl_register_port module-id %d not found", module_id);
+        DEFMOD_DEBUG("ecnl_register_port - module-id %d not found", module_id);
         return -EINVAL;
     }
 
@@ -844,14 +851,14 @@ static int ecnl_register_port(int module_id, unsigned char *name, struct net_dev
     int port_id = -1;
     unsigned long flags;
     spin_lock_irqsave(&e_dev->ecnl_lock, flags);
-    // ECNL_DEBUG("ecnl_register_port \"%s\" port-id %d", name, e_dev->ecnl_num_ports);
+    // PLUG_DEBUG(plug_in, "ecnl_register_port - port-name \"%s\" port-id %d", name, e_dev->ecnl_num_ports);
     if (e_dev->ecnl_num_ports < ECNL_DRIVER_MAX) {
         // FIXME: ENCL_FW_TABLE_ENTRY_ARRAY
         port_id = e_dev->ecnl_num_ports++;
 
         e_dev->ecnl_fw_map[port_id] = port_id; // default map by register order
 
-        ECNL_DEBUG("ecnl_register_port module-id %d port-name \"%s\" port-id %d", module_id, name, port_id);
+        PLUG_DEBUG(plug_in, "ecnl_register_port - port-name \"%s\" port-id %d", name, port_id);
         struct entl_driver *e_driver = &e_dev->ecnl_drivers[port_id];
         e_driver->eda_index = port_id; // port_id
         e_driver->eda_name = name;
@@ -859,7 +866,7 @@ static int ecnl_register_port(int module_id, unsigned char *name, struct net_dev
         e_driver->eda_funcs = funcs;
     }
     else {
-        ECNL_DEBUG("ecnl_register_port module-id %d table overflow %d", module_id, e_dev->ecnl_num_ports);
+        PLUG_DEBUG(plug_in, "ecnl_register_port - table overflow %d", e_dev->ecnl_num_ports);
     }
     spin_unlock_irqrestore(&e_dev->ecnl_lock, flags);
 
@@ -869,7 +876,7 @@ static int ecnl_register_port(int module_id, unsigned char *name, struct net_dev
 static void ecnl_deregister_ports(int module_id) {
     struct net_device *plug_in = ecnl_devices[module_id];
     if (plug_in == NULL) {
-        ECNL_DEBUG("ecnl_deregister_ports module-id %d not found", module_id);
+        DEFMOD_DEBUG("ecnl_deregister_ports - module-id %d not found", module_id);
         return;
     }
 
@@ -940,7 +947,7 @@ static void fetch_entry(ecnl_device_t *e_dev, u32 id, ecnl_table_entry_t *entry)
 static int ecnl_receive_skb(int module_id, int index, struct sk_buff *skb) {
     struct net_device *plug_in = ecnl_devices[module_id];
     if (plug_in == NULL) {
-        ECNL_DEBUG("ecnl_receive_skb module-id %d not found", module_id);
+        DEFMOD_DEBUG("ecnl_receive_skb - module-id %d not found", module_id);
         return -EINVAL;
     }
 
@@ -969,7 +976,7 @@ static int ecnl_receive_skb(int module_id, int index, struct sk_buff *skb) {
 
     // table miss, send to host
     if (!e_dev->ecnl_current_table || id >= e_dev->ecnl_current_table_size) {
-        ECNL_DEBUG("ecnl_receive_skb module-id %d can't forward packet id %d", module_id, id);
+        PLUG_DEBUG(plug_in, "ecnl_receive_skb - can't forward packet id %d", id);
         netif_rx(skb);
         return 0;
     }
@@ -980,7 +987,7 @@ static int ecnl_receive_skb(int module_id, int index, struct sk_buff *skb) {
     u16 port_vector = entry.info.port_vector;
     if (direction == 0) {  // forward direction
         if (port_vector == 0) {
-            ECNL_DEBUG("ecnl_receive_skb no forward bit, module-id %d %08x", module_id, index);
+            PLUG_DEBUG(plug_in, "ecnl_receive_skb no forward bit %08x", index);
             return -EINVAL;
         }
 
@@ -1115,7 +1122,7 @@ static void ecnl_forward_ait_message(int module_id, int drv_index, struct sk_buf
             port_vector = entry.info.port_vector;
             if (direction == 0) {  // forward direction
                 if (port_vector == 0) {
-                    ECNL_DEBUG("ecnl_forward_ait_message no forward bit module-id %d xx %08x", module_id, drv_index);
+                    PLUG_DEBUG(plug_in, "ecnl_forward_ait_message - no forward bit xx %08x", drv_index);
                     to_host = 1;
                 }
                 else {
@@ -1245,13 +1252,13 @@ EXPORT_SYMBOL(ecnl_api_funcs);
 
 // net_device interface functions
 static int ecnl_open(struct net_device *plug_in) {
-    ECNL_DEBUG("ecnl_open \"%s\"", plug_in->name);
+    PLUG_DEBUG(plug_in, "ecnl_open");
     netif_start_queue(plug_in);
     return 0;
 }
 
 static int ecnl_stop(struct net_device *plug_in) {
-    ECNL_DEBUG("ecnl_stop \"%s\"", plug_in->name);
+    PLUG_DEBUG(plug_in, "ecnl_stop");
     netif_stop_queue(plug_in);
     return 0;
 }
@@ -1271,7 +1278,7 @@ static int ecnl_hard_start_xmit(struct sk_buff *skb, struct net_device *plug_in)
     // FIXME: direct mapped table ??
 
     if (!e_dev->ecnl_current_table || id >= e_dev->ecnl_current_table_size) {
-        ECNL_DEBUG("ecnl_hard_start_xmit \"%s\" can't forward packet", e_dev->ecnl_name);
+        PLUG_DEBUG(plug_in, "ecnl_hard_start_xmit \"%s\" can't forward packet", e_dev->ecnl_name);
         return -EINVAL;
     }
 
@@ -1311,7 +1318,7 @@ static int ecnl_hard_start_xmit(struct sk_buff *skb, struct net_device *plug_in)
         u8 parent = entry.info.parent;
         if (parent == 0) {
             // send to this host
-            ECNL_DEBUG("ecnl_hard_start_xmit \"%s\" forwarding packet to self", e_dev->ecnl_name);
+            PLUG_DEBUG(plug_in, "ecnl_hard_start_xmit \"%s\" forwarding packet to self", e_dev->ecnl_name);
             return -EINVAL;
         }
         else {
@@ -1425,26 +1432,27 @@ static void inject_dev(struct net_device *n_dev) {
 }
 
 // FIXME: validate here
-static void hack_init(void) {
-    int module_id = 0; // ecnl0
+static void hack_init(struct net_device *plug_in) {
+    ecnl_device_t *e_dev = (ecnl_device_t *) netdev_priv(plug_in); // e_dev->ecnl_index
+    int module_id = e_dev->ecnl_index;
     struct entl_driver_funcs *funcs = &entl_adapt_funcs;
     for (int i = 0; i < ARRAY_SIZE(e1000e_ports); i++) {
         e1000e_hackery_t *p = &e1000e_ports[i];
         if (!p->e1000e) continue;
         int port_no = ecnl_register_port(module_id, p->name, p->e1000e, funcs);
-        if (port_no < 0) { ECNL_INFO("failed to register \"%s\"", p->name); }
+        if (port_no < 0) { PLUG_DEBUG(plug_in, "failed to register \"%s\"", p->name); }
     }
 }
 
 // Q: what locking is required here?
 // /Users/bjackson/git-projects/ubuntu-bionic/include/linux/netdevice.h
 extern struct net init_net;
-static void scan_netdev(void) {
+static void scan_netdev(struct net_device *plug_in) {
     read_lock(&dev_base_lock);
     const struct net *net = &init_net;
     struct net_device *n_dev; for_each_netdev(net, n_dev) {
     // for (struct net_device *n_dev = first_net_device(net); n_dev; n_dev = next_net_device(n_dev)) {
-        ECNL_DEBUG("scan_netdev considering [%s]", n_dev->name);
+        PLUG_DEBUG(plug_in, "scan_netdev considering [%s]", n_dev->name);
         inject_dev(n_dev);
     }
     read_unlock(&dev_base_lock);
@@ -1459,7 +1467,7 @@ static void ecnl_setup(struct net_device *plug_in) {
 
 static int __init ecnl_init_module(void) {
     if (device_busy) {
-        ECNL_DEBUG("ecnl_init_module called on busy state");
+        DEFMOD_DEBUG("ecnl_init_module - called on busy state");
         return -EINVAL;
     }
 
@@ -1472,11 +1480,11 @@ static int __init ecnl_init_module(void) {
     int err = genl_register_family(&nl_ecnd_fam); // , nl_ecnl_ops, nl_ecnd_mcgrps);
 #endif
     if (err) {
-        ECNL_DEBUG("ecnl_init_module failed register genetlink family: \"%s\"", nl_ecnd_fam.name);
+        DEFMOD_DEBUG("ecnl_init_module - failed register genetlink family: \"%s\"", nl_ecnd_fam.name);
         return -EINVAL;
     }
 
-    ECNL_DEBUG("registered genetlink family: \"%s\"", nl_ecnd_fam.name);
+    DEFMOD_DEBUG("registered genetlink family: \"%s\"", nl_ecnd_fam.name);
 
     struct net_device *plug_in = alloc_netdev(sizeof(ecnl_device_t), MAIN_DRIVER_NAME, NET_NAME_UNKNOWN, ecnl_setup);
     ecnl_device_t *this_device = (ecnl_device_t *) netdev_priv(plug_in);
@@ -1490,25 +1498,25 @@ static int __init ecnl_init_module(void) {
     //inter_module_register("ecnl_driver_funcs", THIS_MODULE, ecnl_funcs);
 
     if (register_netdev(plug_in)) {
-        ECNL_DEBUG("ecnl_init_module failed register net_dev: \"%s\"", this_device->ecnl_name);
+        DEFMOD_DEBUG("ecnl_init_module - failed register net_dev: \"%s\"", this_device->ecnl_name);
     }
 
     ecnl_devices[num_ecnl_devices++] = plug_in;
 
-    scan_netdev();
-    hack_init();
+    scan_netdev(plug_in);
+    hack_init(plug_in);
     return 0;
 }
 
 // FIXME: clean up data
 static void __exit ecnl_cleanup_module(void) {
     if (device_busy) {
-        ECNL_DEBUG("ecnl_cleanup_module busy");
+        DEFMOD_DEBUG("ecnl_cleanup_module - busy");
         //inter_module_unregister("ecnl_driver_funcs");
         device_busy = 0;
     }
     else {
-        ECNL_DEBUG("ecnl_cleanup_module non-busy");
+        DEFMOD_DEBUG("ecnl_cleanup_module - non-busy");
     }
 }
 
