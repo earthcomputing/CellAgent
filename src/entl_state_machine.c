@@ -154,7 +154,7 @@ int entl_received(entl_state_machine_t *mcn, uint16_t from_hi, uint32_t from_lo,
                     ret_action = ENTL_ACTION_NOP;
                 }
                 else {
-                    STM_TDEBUG("%s (slave) -> SEND - EVENT: advance - seqno %d", mcn_state2name(was_state), seqno);
+                    STM_TDEBUG("%s (slave) -> SEND EVENT: advance - seqno %d", mcn_state2name(was_state), seqno);
                     set_i_know(mcn, seqno); set_send_next(mcn, seqno + 1);
                     set_atomic_state(mcn, ENTL_STATE_SEND);
                     calc_intervals(mcn);
@@ -515,7 +515,7 @@ int entl_next_send(entl_state_machine_t *mcn, uint16_t *emsg_raw, uint32_t *seqn
             else {
                 set_atomic_state(mcn, ENTL_STATE_RECEIVE);
                 respond_with(ENTL_MESSAGE_EVENT_U, get_i_sent(mcn), ENTL_ACTION_SEND | ENTL_ACTION_SEND_DAT); // data send as optional
-                // STM_TDEBUG("%s -> AM EVENT(out) - seqno %d", mcn_state2name(was_state), *seqno);
+                // STM_TDEBUG("%s -> RECEIVE EVENT(out) - seqno %d", mcn_state2name(was_state), *seqno);
             }
         }
         break;
@@ -704,13 +704,14 @@ void entl_state_error(entl_state_machine_t *mcn, uint32_t error_flag) {
             set_atomic_state(mcn, ENTL_STATE_IDLE);
         }
         else if (error_flag == ENTL_ERROR_FLAG_SEQUENCE) {
-// FIXME : seems redundant ?
+            // FIXME : seems redundant ?
             unicorn(mcn, ENTL_STATE_HELLO); set_update_time(mcn, ts);
             clear_error(mcn);
             clear_intervals(mcn);
         }
+        // FIXME: what about other values for error_flag ??
+        uint32_t now = get_atomic_state(mcn);
     STM_UNLOCK;
-    uint32_t now = get_atomic_state(mcn);
     STM_TDEBUG("%s -> %s entl_state_error - flag %s (%d)", mcn_state2name(was_state), mcn_state2name(now), mcn_flag2name(error_flag), error_flag);
 }
 
