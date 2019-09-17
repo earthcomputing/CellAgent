@@ -43,6 +43,11 @@
     stroke : green;
     stroke-width : 4px;
 }
+.linktree {
+    stroke : black;
+    stroke-width : 6px;
+    marker-end: url(#arrow-head);
+}
 .linkbroken {
     stroke : red;
     stroke-width: 4px;

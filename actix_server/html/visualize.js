@@ -7,14 +7,7 @@ window.onload = function() {
     canvas = document.getElementById("viz-canvas");
 }
 function visualize() {
-    canvas.innerHTML =
-        '<defs>\
-             <!-- From http://stackoverflow.com/questions/26789005/drawing-arrows-using-d3 -->\
-             <marker id="arrow-head" markerWidth="10" markerHeight="10"\
-                   refx="10" refy="3" orient="auto" markerUnits="strokeWidth" viewBox="0 0 20 20">\
-               <path d="M0,0 L0,6 L9,3 z" fill="black"/>\
-             </marker>\
-         </defs>';
+    canvas.innerHTML = "";
     const Http = new XMLHttpRequest();
     const url = 'http://127.0.0.1:8088/';
     Http.open("GET", url + "geometry");
@@ -28,6 +21,13 @@ function visualize() {
                 if ( Http.readyState == 4 && Http.status == 200 ) {
                     setup_topology(Http.responseText);
                     draw();
+                    Http.open("GET", url + "black_tree");
+                    Http.send();
+                    Http.onreadystatechange = (e) => {
+                        if ( Http.readyState == 4 && Http.status == 200 ) {
+                            setup_trees(Http.responseText);
+                        }
+                    }
                 }
             }
         }
@@ -63,8 +63,20 @@ function setup_topology(topology_text) {
         create_node_at(cellID);
     }
 }
+function setup_trees(trees_text) {
+    let trees = JSON.parse(trees_text);
+    let appcells = trees.appcells;
+    for (cellID in appcells) {
+        let cellTrees = appcells[cellID].trees;
+        cells[cellID].trees = cellTrees.trees;
+    }
+}
 function make_link_id(cellID1, index1, cellID2, index2) {
-    return cellID1 + ":P" + index1 + "-" + cellID2 + ":P" + index2;
+    if ( cellID1 < cellID2 ) {
+        return cellID1 + ":P" + index1 + "-" + cellID2 + ":P" + index2;
+    } else {
+        return cellID2 + ":P" + index2 + "-" + cellID1 + ":P" + index1;
+    }
 }
 function create_line_at(id, cellID1, cellID2) {
     let line = document.createElement("line");
@@ -113,12 +125,27 @@ function cell_click(evt) {
     let c = evt.target.getAttribute("class");
     if ( c == "node") {
         evt.target.setAttribute("class", "noderoot");
-    } else if ( c == "noderoot" ) {
-        evt.target.setAttribute("class", "node")
     } else if ( c == "nodeborder" ) {
         evt.target.setAttribute("class", "noderootborder");
-    } else if ( c == "noderootborder" ) {
-        evt.target.setAttribute("class", "nodeborder")
+    }
+    let my_id = evt.target.getAttribute("id");
+    draw_tree(my_id, "Tree:" + my_id);
+}
+function draw_tree(my_id, tree_id) {
+    let cell = cells[my_id];
+    let trees = cell.trees;
+    let tree = trees[tree_id].tree;
+    let neighbors = cell.neighbors;
+    for (my_port in tree) {
+        let neighbor_cell_id = neighbors[my_port].cell_name;
+        if ( tree[my_port] == "Parent") {
+            let neighbor_port = neighbors[my_port].port;
+            let link_id = make_link_id(my_id, my_port, neighbor_cell_id, neighbor_port);
+            document.getElementById(link_id).setAttribute("class", "linktree");
+        }
+        if ( tree[my_port] == "Child" ) {
+            draw_tree(neighbor_cell_id, tree_id);
+        }
     }
 }
 function cell_dblclick(evt) {

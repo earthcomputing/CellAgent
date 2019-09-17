@@ -15,10 +15,9 @@ type Size = usize;
 
 fn show_black_tree(appcells: web::Data<AppCells>) -> Result<HttpResponse, actix_web::Error> {
     println!("Show black tree");
-    let cells = appcells.get_ref().appcells.lock().unwrap();
-    let trees = cells.get("C:2").unwrap().trees();
-    println!("DiscoverDMsg: {:?}", trees);
-    Ok(HttpResponse::Ok().body(serde_json::to_string(trees)?))
+    let appcells = appcells.get_ref();
+    let string = serde_json::to_string(appcells)?;
+    Ok(HttpResponse::Ok().body(string))
 }
 fn process_discoverd(appcells: web::Data<AppCells>, record: web::Json<Value>)
                      -> Result<impl Responder, Error> {
