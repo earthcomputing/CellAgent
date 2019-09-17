@@ -14,7 +14,6 @@ use crate::hello::{AppCell, AppCells, LinkType, Neighbor};
 type Size = usize;
 
 fn show_black_tree(appcells: web::Data<AppCells>) -> Result<HttpResponse, actix_web::Error> {
-    println!("Show black tree");
     let appcells = appcells.get_ref();
     let string = serde_json::to_string(appcells)?;
     Ok(HttpResponse::Ok().body(string))
