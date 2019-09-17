@@ -34,11 +34,12 @@ use crate::vm::VirtualMachine;
 #[cfg(feature = "cell")]
 #[allow(improper_ctypes)]
 #[link(name = ":ecnl_sdk.o")]
+#[link(name = ":ecnl_proto.o")]
 #[link(name = ":libnl-3.so")]
 #[link(name = ":libnl-genl-3.so")]
 extern {
     pub fn alloc_ecnl_session(ecnl_session_ptr: *const *mut c_void) -> c_int;
-    pub fn get_module_info(ecnl_session: *mut c_void, mipp: *const *const ModuleInfo) -> c_int;
+    pub fn ecnl_get_module_info(ecnl_session: *mut c_void, mipp: *const *const ModuleInfo) -> c_int;
     pub fn free_ecnl_session(ecnl_session: *mut c_void) -> c_int;
 }
 
@@ -87,7 +88,7 @@ impl NalCell {
                     #[cfg(feature = "cell")]
                         unsafe
                         {
-                            get_module_info(ecnl.unwrap(), &mip);
+                            ecnl_get_module_info(ecnl.unwrap(), &mip);
                             let module_id = (*mip).module_id as u8;
                             println!("Module id: {:?} ", module_id);
                             let module_name = CStr::from_ptr((*mip).module_name).to_string_lossy().into_owned();
