@@ -226,27 +226,30 @@ static bool entl_device_process_rx_packet(entl_device_t *dev, struct sk_buff *sk
             // FIXME
         }
         else {
-            struct entt_ioctl_ait_data *ait_data = kzalloc(sizeof(struct entt_ioctl_ait_data), GFP_ATOMIC);
+            // level0 protocol layout: { ethhdr nbytes payload }
             unsigned char *level0 = skb->data + sizeof(struct ethhdr);
+            unsigned char *payload = level0 + sizeof(uint32_t);
+
             uint32_t nbytes;
             memcpy(&nbytes, level0, sizeof(uint32_t));
-// FIXME: MAX_AIT_MESSAGE_SIZE 256
-// entt_ioctl_ait_data_t should really be dynamically sized (kzalloc'ed)
-// NOTE: invariant: MAX_AIT_MESSAGE_SIZE <= sizeof(ait_data->data)
+
+            // FIXME: MAX_AIT_MESSAGE_SIZE 256
+            // entt_ioctl_ait_data_t should really be dynamically sized (kzalloc'ed)
+            // NOTE: invariant: MAX_AIT_MESSAGE_SIZE <= sizeof(ait_data->data)
+            struct entt_ioctl_ait_data *ait_data = kzalloc(sizeof(struct entt_ioctl_ait_data), GFP_ATOMIC);
             if ((nbytes > 0) && (nbytes <= MAX_AIT_MESSAGE_SIZE)) {
-                unsigned char *payload = level0 + sizeof(uint32_t);
                 ait_data->message_len = nbytes;
                 memcpy(ait_data->data, payload, nbytes);
                 // ait_data->num_messages = 0;
                 // ait_data->num_queued = 0;
-dump_ait_data(stm, "process_rx - recv", ait_data);
+                dump_ait_data(stm, "process_rx - recv", ait_data);
             }
             else {
                 ait_data->message_len = 0;
                 // ait_data->num_messages = 0;
                 // ait_data->num_queued = 0;
             }
-ENTL_DEBUG_NAME(stm->name, "process_rx - message 0x%04x (%s) seqno %d payload len %d", emsg_raw, emsg_op(emsg_raw), seqno, ait_data->message_len);
+            ENTL_DEBUG_NAME(stm->name, "process_rx - message 0x%04x (%s) seqno %d payload len %d", emsg_raw, emsg_op(emsg_raw), seqno, ait_data->message_len);
             entl_new_AIT_message(stm, ait_data);
         }
     }
@@ -256,11 +259,13 @@ ENTL_DEBUG_NAME(stm->name, "process_rx - message 0x%04x (%s) seqno %d payload le
     }
 
     if (recv_action & ENTL_ACTION_SEND) {
-        // SEND_DAT is set on SEND state to check if TX queue has data
+        // SEND_DAT - check if TX queue has data
         if (recv_action & ENTL_ACTION_SEND_DAT && ENTL_skb_queue_has_data(&dev->edev_tx_skb_queue)) {
             // TX queue has data, so transfer with data
             struct sk_buff *dt = ENTL_skb_queue_front_pop(&dev->edev_tx_skb_queue);
-            while (NULL != dt && skb_is_gso(dt)) { // GSO can't be used for ENTL
+
+            // skip: GSO can't be used for ENTL
+            while (NULL != dt && skb_is_gso(dt)) {
                 e1000_xmit_frame(dt, adapter->netdev);
                 dt = ENTL_skb_queue_front_pop(&dev->edev_tx_skb_queue);
             }
