@@ -559,9 +559,6 @@ extern int retrieve_ait_message(struct nl_sock *sock, struct nl_msg *msg, uint32
     *mp = module_id;
     *pp = port_id;
 
-    printf("retr buffer: ");
-    dump_block(cbi.tb[NL_ECNL_ATTR_MESSAGE], message_length);
-
     if (!buf) {
         printf("retrieve_ait_message - no result buffer ?\n");
         return 0;
@@ -582,6 +579,10 @@ extern int retrieve_ait_message(struct nl_sock *sock, struct nl_msg *msg, uint32
     }
 
     nla_memcpy(buf->frame, cbi.tb[NL_ECNL_ATTR_MESSAGE], buf->len); // nla_get_unspec
+
+    printf("retr buffer: ");
+    dump_block(buf->frame, buf->len); // ugh: cbi.tb[NL_ECNL_ATTR_MESSAGE], message_length
+
 }
 WAIT_ACK;
     return 0;
