@@ -48,6 +48,11 @@
     stroke-width : 6px;
     marker-end: url(#arrow-head);
 }
+.linkstackedtree {
+    stroke : blue;
+    stroke-width : 6px;
+    marker-end: url(#arrow-head);
+}
 .linkbroken {
     stroke : red;
     stroke-width: 4px;
