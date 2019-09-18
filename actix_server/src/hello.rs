@@ -64,13 +64,16 @@ pub struct AppCells {
 #[derive(Debug, Clone, Eq, Default, PartialEq, Serialize, Deserialize)]
 pub struct AppCell {
     pub neighbors: Neighbors,
-    pub trees: Trees
+    pub black_trees: Trees,
+    pub stacked_trees: Trees,
 }
 impl AppCell {
     pub fn neighbors(&self) -> &HashMap<Size, Neighbor> { &self.neighbors.neighbors }
     pub fn neighbors_mut(&mut self) -> &mut Neighbors { &mut self.neighbors }
-    pub fn trees(&self) -> &HashMap<String, Tree> { &self.trees.trees }
-    pub fn trees_mut(&mut self) -> &mut HashMap<String, Tree> { &mut self.trees.trees }
+    pub fn black_trees(&self) -> &HashMap<String, Tree> { &self.black_trees.trees }
+    pub fn black_trees_mut(&mut self) -> &mut HashMap<String, Tree> { &mut self.black_trees.trees }
+    pub fn stacked_trees(&self) -> &HashMap<String, Tree> { &self.stacked_trees.trees }
+    pub fn stacked_trees_mut(&mut self) -> &mut HashMap<String, Tree> { &mut self.stacked_trees.trees }
 }
 #[derive(Debug, Clone, Eq, Default, PartialEq, Serialize, Deserialize)]
 pub struct Neighbors {

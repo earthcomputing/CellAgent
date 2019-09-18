@@ -45,7 +45,7 @@ fn update_tree<'a>(cells: &'a mut MutexGuard<HashMap<String, AppCell>>, cell_nam
         .entry(cell_name.clone())
         .or_insert(Default::default());
     appcell
-        .trees_mut()
+        .black_trees_mut()
         .entry(tree_name.clone())
         .or_insert(Default::default())
         .tree_mut()

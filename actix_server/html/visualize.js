@@ -25,7 +25,12 @@ function visualize() {
                     Http.send();
                     Http.onreadystatechange = (e) => {
                         if ( Http.readyState == 4 && Http.status == 200 ) {
-                            setup_trees(Http.responseText);
+                            setup_black_trees(Http.responseText);
+                            Http.open("GET", url + "stack_treed");
+                            Http.send();
+                            if ( Http.readyState == 4 && Http.status == 200 ) {
+                                setup_stacked_trees(Http.responseText);
+                            }
                         }
                     }
                 }
@@ -40,7 +45,8 @@ function setup_geometry(geometry_text) {
     for (cell in rowcol) {
         cells[cell] = rowcol[cell];
         cells[cell].neighbors = {};
-        cells[cell].trees = {};
+        cells[cell].black_trees = {};
+        cells[cell].stacked_trees = {}
     }
 }
 function setup_topology(topology_text) {
@@ -63,12 +69,12 @@ function setup_topology(topology_text) {
         create_node_at(cellID);
     }
 }
-function setup_trees(trees_text) {
+function setup_black_trees(trees_text) {
     let trees = JSON.parse(trees_text);
     let appcells = trees.appcells;
     for (cellID in appcells) {
-        let cellTrees = appcells[cellID].trees;
-        cells[cellID].trees = cellTrees.trees;
+        let cellTrees = appcells[cellID].black_trees;
+        cells[cellID].black_trees = cellTrees.trees;
     }
 }
 function make_link_id(cellID1, index1, cellID2, index2) {
@@ -139,7 +145,7 @@ function cell_click(evt) {
 }
 function draw_tree(my_id, tree_id) {
     let cell = cells[my_id];
-    let trees = cell.trees;
+    let trees = cell.black_trees;
     let tree = trees[tree_id].tree;
     let neighbors = cell.neighbors;
     for (my_port in tree) {
