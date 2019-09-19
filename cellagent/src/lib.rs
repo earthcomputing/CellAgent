@@ -35,7 +35,7 @@ pub mod packet;
 pub mod packet_engine;
 pub mod port;
 pub mod port_tree;
-#[cfg(any(feature = "simulator", feature = "cell"))]
+#[cfg(any(feature = "simulator"))]
 pub mod rack;
 pub mod routing_table;
 pub mod routing_table_entry;
