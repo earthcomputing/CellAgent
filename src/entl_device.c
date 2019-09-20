@@ -64,8 +64,8 @@ static char *letters = "0123456789abcdef";
 extern void dump_ait_data(entl_state_machine_t *stm, char *tag, struct entt_ioctl_ait_data *ait_data) {
     void *d = ait_data->data;
     int nbytes = ait_data->message_len;
-    int msgs = ait_data->num_messages;
     int queued = ait_data->num_queued;
+    int space = ait_data->num_messages;
     char window[3*41];
     int f = 0;
     for (int i = 0; i < nbytes; i++) {
@@ -79,7 +79,7 @@ extern void dump_ait_data(entl_state_machine_t *stm, char *tag, struct entt_ioct
         f += 3;
         if (f >= 3*40) break;
     }
-    ENTL_DEBUG_NAME(stm->name, "%s - msgs: %d queued: %d nbytes: %d - %s", tag, msgs, queued, nbytes, window);
+    ENTL_DEBUG_NAME(stm->name, "%s - queued: %d space: %d nbytes: %d - %s", tag, queued, space, nbytes, window);
 }
 
 // inline helpers:
@@ -381,11 +381,12 @@ static int entl_do_ioctl(struct net_device *netdev, struct ifreq *ifr, int cmd) 
 
 ENTL_DEBUG_NAME(stm->name, "ioctl - entl_send_AIT_message");
         int q_space = entl_send_AIT_message(stm, ait_data);
+        int pending = sendq_count(stm); // cheat
         // result data
+        ait_data->num_queued = pending;
         ait_data->num_messages = q_space;
-        ait_data->num_queued = -1;
+        dump_ait_data(stm, "ioctl - sendq_push", ait_data);
         copy_to_user(ifr->ifr_data, ait_data, sizeof(struct entt_ioctl_ait_data));
-dump_ait_data(stm, "ioctl - sendq_push", ait_data);
 
         if (q_space < 0) {
             kfree(ait_data); // FIXME: check for memory leak?
@@ -397,7 +398,7 @@ dump_ait_data(stm, "ioctl - sendq_push", ait_data);
 ENTL_DEBUG_NAME(stm->name, "ioctl - entl_read_AIT_message");
         struct entt_ioctl_ait_data *ait_data = entl_read_AIT_message(stm); // recvq_pop
         if (ait_data) {
-dump_ait_data(stm, "ioctl - recvq_pop", ait_data);
+            dump_ait_data(stm, "ioctl - recvq_pop", ait_data);
             copy_to_user(ifr->ifr_data, ait_data, sizeof(struct entt_ioctl_ait_data));
             kfree(ait_data);
         }
@@ -534,7 +535,7 @@ ENTL_DEBUG_NAME(stm->name, "inject - entl_next_AIT_message (%s)", emsg_op(emsg_r
             unsigned char *payload = level0 + sizeof(uint32_t);
             memcpy(level0, &ait_data->message_len, sizeof(uint32_t));
             memcpy(payload, ait_data->data, ait_data->message_len);
-dump_ait_data(stm, "tx_ring - inject", ait_data);
+            dump_ait_data(stm, "tx_ring - inject", ait_data);
         }
     }
 
@@ -1239,11 +1240,13 @@ static int adapt_send_AIT(struct sk_buff *skb, struct net_device *e1000e) {
     ait_data->message_len = nbytes; // inject_message : memcpy(payload, ait_data->data, ait_data->message_len);
 
     int q_space = entl_send_AIT_message(stm, ait_data); // sendq_push
+    int pending = sendq_count(stm); // cheat
+    // result data
+    ait_data->num_queued = pending;
     ait_data->num_messages = q_space;
-    ait_data->num_queued = -1;
 
-// ADAPT_INFO_NAME(e1000e->name, "send_AIT skb: %px", skb);
-dump_ait_data(stm, "adapt_send - sendq_push", ait_data);
+    // ADAPT_INFO_NAME(e1000e->name, "send_AIT skb: %px", skb);
+    dump_ait_data(stm, "adapt_send - sendq_push", ait_data);
 
     // FIXME : return q_space to caller ??
     if (q_space < 0) {
