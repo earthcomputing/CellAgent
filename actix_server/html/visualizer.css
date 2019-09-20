@@ -39,6 +39,18 @@
     fill : black;
     r: 10;
 }
+.nodestacked {
+    stroke : black;
+    stroke-width : 2px;
+    fill : #8888FF;
+    r: 10;
+}
+.nodestackedborder {
+    stroke : orange;
+    stroke-width : 2px;
+    fill : #8888FF;
+    r: 10;
+}
 .link {
     stroke : green;
     stroke-width : 4px;
@@ -50,7 +62,7 @@
 }
 .linkstackedtree {
     stroke : blue;
-    stroke-width : 6px;
+    stroke-width : 4px;
     marker-end: url(#arrow-head);
 }
 .linkbroken {

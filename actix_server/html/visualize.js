@@ -28,8 +28,10 @@ function visualize() {
                             setup_black_trees(Http.responseText);
                             Http.open("GET", url + "stack_treed");
                             Http.send();
-                            if ( Http.readyState == 4 && Http.status == 200 ) {
-                                setup_stacked_trees(Http.responseText);
+                            Http.onreadystatechange = (e) => {
+                                if ( Http.readyState == 4 && Http.status == 200 ) {
+                                    setup_stacked_trees(Http.responseText);
+                                }
                             }
                         }
                     }
@@ -69,12 +71,31 @@ function setup_topology(topology_text) {
         create_node_at(cellID);
     }
 }
-function setup_black_trees(trees_text) {
-    let trees = JSON.parse(trees_text);
+function setup_black_trees(black_trees_text) {
+    let trees = JSON.parse(black_trees_text);
     let appcells = trees.appcells;
     for (cellID in appcells) {
         let cellTrees = appcells[cellID].black_trees;
         cells[cellID].black_trees = cellTrees.trees;
+    }
+}
+function setup_stacked_trees(stacked_trees_text) {
+    let trees = JSON.parse(stacked_trees_text);
+    let appcells = trees.appcells;
+    let buttons = document.getElementById("buttons");
+    for (cellID in appcells) {
+        let cell = cells[cellID];
+        cell.stacked_trees = appcells[cellID].stacked_trees;
+        let stacked_trees = cell.stacked_trees;
+        for (stacked_tree in stacked_trees.trees) {
+            if (!document.getElementById(stacked_tree)) {
+                let button = document.createElement("BUTTON");
+                button.id = stacked_tree;
+                button.innerText = stacked_tree;
+                button.onclick = stacked_tree_button_click;
+                buttons.appendChild(button);
+            }
+        }
     }
 }
 function make_link_id(cellID1, index1, cellID2, index2) {
@@ -127,11 +148,20 @@ function hideTooltip(elem) {
     elem.style.display = "none";
 }
 function draw() { canvas.innerHTML = canvas.innerHTML; }
+function reset_view() {
+    let swap = {".linktree": "link",
+                ".linkstackedtree": "link",
+                ".noderoot": "node",
+                ".noderootborder": "nodeborder",
+                ".nodestacked": "node",
+                ".nodestackedborder": "nodeborder"};
+    for (item in swap) {
+        let elements = document.querySelectorAll(item);
+        if (elements.length > 0 ) { for (e of elements) { e.setAttribute("class", swap[item]); } }
+    }
+}
 function cell_click(evt) {
-    let links = document.querySelectorAll(".linktree");
-    for (link of links) { link.setAttribute("class", "link"); }
-    let nodes = document.querySelectorAll(".noderoot");
-    for (node of nodes) { node.setAttribute("class", "node"); }
+    reset_view();
     let bordernodes = document.querySelectorAll(".noderootborder");
     for (node of bordernodes) { node.setAttribute("class", "nodeborder"); }
     let c = evt.target.getAttribute("class");
@@ -141,9 +171,9 @@ function cell_click(evt) {
         evt.target.setAttribute("class", "noderootborder");
     }
     let my_id = evt.target.getAttribute("id");
-    draw_tree(my_id, "Tree:" + my_id);
+    draw_black_tree(my_id, "Tree:" + my_id);
 }
-function draw_tree(my_id, tree_id) {
+function draw_black_tree(my_id, tree_id) {
     let cell = cells[my_id];
     let trees = cell.black_trees;
     let tree = trees[tree_id].tree;
@@ -156,9 +186,64 @@ function draw_tree(my_id, tree_id) {
             document.getElementById(link_id).setAttribute("class", "linktree");
         }
         if ( tree[my_port] == "Child" ) {
-            draw_tree(neighbor_cell_id, tree_id);
+            draw_black_tree(neighbor_cell_id, tree_id);
         }
     }
+}
+function stacked_tree_button_click(evt) {
+    let stacked_tree_id = evt.target.getAttribute("id");
+    let root_cell_id = find_root(stacked_tree_id);
+    reset_view();
+    draw_stacked_tree(root_cell_id,stacked_tree_id);
+}
+function draw_stacked_tree(cellID, stacked_tree_id){
+    let cell = cells[cellID];
+    let trees = cell.stacked_trees;
+    let tree_test = trees.trees[stacked_tree_id];
+    if (tree_test == null || tree_test == "undefined") { return; }
+    let tree = tree_test.tree;
+    let node = document.getElementById(cellID);
+    if (node.getAttribute("class") == "node") {
+        node.setAttribute("class", "nodestacked");
+    } else if (node.getAttribute("class") == "nodeborder") {
+        node.setAttribute("class", "nodestackedborder");
+    }
+    let neighbors = cell.neighbors;
+    for (my_port in tree) {
+        let neighbor_cell_id = neighbors[my_port].cell_name;
+        if ( tree[my_port] == "Parent") {
+            let neighbor = neighbors[my_port];
+            if (has_stacked_tree(neighbor_cell_id, stacked_tree_id)) {
+                let neighbor_port = neighbor.port;
+                let link_id = make_link_id(cellID, my_port, neighbor_cell_id, neighbor_port);
+                document.getElementById(link_id).setAttribute("class", "linkstackedtree");
+            }
+        }
+        if ( tree[my_port] == "Child" ) {
+            draw_stacked_tree(neighbor_cell_id, stacked_tree_id);
+        }
+    }
+}
+function has_stacked_tree(cellID, tree_id) {
+    let tree = cells[cellID].stacked_trees.trees[tree_id];
+    return tree != null && tree != "undefined"
+}
+function find_root(id) {
+    for (cellID in cells) {
+        let is_root = true;
+        let stacked_tree = cells[cellID].stacked_trees.trees[id];
+        if (stacked_tree != null && stacked_tree != "undefined") {
+            for (port in stacked_tree.tree) {
+                if (stacked_tree.tree[port] == "Parent") {
+                    is_root = false;
+                }
+            }
+        } else {
+            is_root = false;
+        }
+        if (is_root) return cellID;
+    }
+    alert("No root cell found for " + id);
 }
 function cell_dblclick(evt) {
     evt.target.setAttribute("class", "nodebroken");

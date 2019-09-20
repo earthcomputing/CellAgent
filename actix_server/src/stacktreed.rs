@@ -25,6 +25,7 @@ fn process_stack_treed(appcells: web::Data<AppCells>, record: web::Json<Value>)
     let this_cell_name = body.cell_id.name;
     let recv_port = body.port_no;
     let tree_name = body.msg.payload.port_tree_id.name;
+    let join = body.msg.payload.join;
     let mut cells = appcells
         .get_ref()
         .appcells.lock().unwrap();
@@ -32,9 +33,11 @@ fn process_stack_treed(appcells: web::Data<AppCells>, record: web::Json<Value>)
         update_tree(&mut cells, &this_cell_name, &tree_name, recv_port, LinkType::Child)
             .get(&recv_port).expect("StackTreeDMsg: missing neighbor")
     }.clone(); // Avoid borrow error on next update_tree call
-    let other_cell_name = other_cell.cell_name();
-    let other_cell_port = other_cell.port;
-    update_tree(&mut cells, other_cell_name, &tree_name, other_cell_port, LinkType::Parent);
+    if join {
+        let other_cell_name = other_cell.cell_name();
+        let other_cell_port = other_cell.port;
+        update_tree(&mut cells, other_cell_name, &tree_name, other_cell_port, LinkType::Parent);
+    }
     Ok(HttpResponse::Ok().body("process_stack_treed".to_owned()))
 }
 fn update_tree<'a>(cells: &'a mut MutexGuard<HashMap<String, AppCell>>, cell_name: &String,
@@ -62,7 +65,8 @@ struct EcMsg {
 }
 #[derive(Debug, Clone, Serialize, Deserialize)]
 struct Payload {
-    port_tree_id: TreeID
+    port_tree_id: TreeID,
+    join: bool
 }
 #[derive(Debug, Clone, Default, Eq, PartialEq, Serialize, Deserialize)]
 struct CellID {
