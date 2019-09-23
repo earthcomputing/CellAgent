@@ -2,6 +2,7 @@ const x0 = 50;
 const y0 = 50;
 const scale = 50;
 let cells = {};
+let all_stacked_trees = [];
 let canvas;
 window.onload = function() {
     canvas = document.getElementById("viz-canvas");
@@ -89,6 +90,7 @@ function setup_stacked_trees(stacked_trees_text) {
         let stacked_trees = cell.stacked_trees;
         for (stacked_tree in stacked_trees.trees) {
             if (!document.getElementById(stacked_tree)) {
+                all_stacked_trees.push(stacked_tree);
                 let button = document.createElement("BUTTON");
                 button.id = stacked_tree;
                 button.innerText = stacked_tree;
