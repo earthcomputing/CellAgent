@@ -10,6 +10,7 @@ window.onload = function() {
 function visualize() {
     canvas.innerHTML = "";
     const Http = new XMLHttpRequest();
+    clear_buttons();
     const url = 'http://127.0.0.1:8088/';
     Http.open("GET", url + "geometry");
     Http.send();
@@ -41,10 +42,21 @@ function visualize() {
         }
     }
 }
+function clear_buttons() {
+    let buttons = document.querySelectorAll(".stackedtreebutton");
+    if (buttons.length > 0 ) {
+        for (button of buttons) {
+            button.parentNode.removeChild(button);
+        }
+    }
+}
 function setup_geometry(geometry_text) {
     let geometry = JSON.parse(geometry_text);
     let rowcol = geometry.geometry.rowcol;
-    if ( Object.keys(rowcol).length == 0 ) { alert("Nothing to show.  Run simulator, and try again."); }
+    if ( Object.keys(rowcol).length == 0 ) {
+        alert("Nothing to show.  Run simulator, and try again.");
+        return 1;
+    }
     for (cell in rowcol) {
         cells[cell] = rowcol[cell];
         cells[cell].neighbors = {};

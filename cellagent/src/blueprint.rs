@@ -6,7 +6,7 @@ use std::{fmt, fmt::Write,
 use crate::config::{CONFIG, CellQty, PortQty};
 use crate::utility::{CellNo, CellType, Edge, PortNo};
 
-#[derive(Debug)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct Blueprint {
     interior_cells: Vec<InteriorCell>,
     border_cells: Vec<BorderCell>,
@@ -132,7 +132,7 @@ pub trait Cell {
     fn get_num_phys_ports(&self) -> PortQty;
     fn get_interior_ports(&self) -> &Vec<PortNo>;
 }
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct BorderCell {
     cell_no: CellNo,
     cell_type: CellType,
@@ -161,7 +161,7 @@ impl fmt::Display for BorderCell {
         write!(f, "{}", s)
     }
 }
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct InteriorCell {
     cell_no: CellNo,
     cell_type: CellType,
