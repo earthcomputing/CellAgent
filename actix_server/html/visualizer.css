@@ -69,6 +69,11 @@
     stroke : red;
     stroke-width: 4px;
 }
+.stackedtreebutton {
+    stroke: black;
+    stroke-width: 4px;
+    background: lightblue;
+}
 .tooltip {
     font-size: 100%;
     position: fixed;

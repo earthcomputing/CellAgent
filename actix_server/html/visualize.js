@@ -91,11 +91,13 @@ function setup_stacked_trees(stacked_trees_text) {
         for (stacked_tree in stacked_trees.trees) {
             if (!document.getElementById(stacked_tree)) {
                 all_stacked_trees.push(stacked_tree);
-                let button = document.createElement("BUTTON");
+                let button = document.createElement("button");
                 button.id = stacked_tree;
                 button.innerText = stacked_tree;
                 button.onclick = stacked_tree_button_click;
                 buttons.appendChild(button);
+                let this_button = document.getElementById(stacked_tree);
+                this_button.setAttribute("class", "stackedtreebutton");
             }
         }
     }

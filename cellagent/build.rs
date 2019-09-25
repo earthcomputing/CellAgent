@@ -2,6 +2,7 @@
 use std::env::var;
 
 fn main() {
+    println!("cargo:rerun-if-changed=/Users/alan/Documents/Eclipse/multicell/cellagent/src");
     #[cfg(feature = "cell")]
     let cell_agent_dir = var("CELL_AGENT_DIR").expect("Must set CELL_AGENT_DIR environment variable");
     #[cfg(feature = "cell")]
