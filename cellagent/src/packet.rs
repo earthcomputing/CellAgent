@@ -35,7 +35,7 @@ pub struct Packet {
     packet_count: usize
 }
 impl Packet {
-    fn new(unique_msg_id: UniqueMsgId, uuid: &Uuid, size: PacketNo,
+    pub fn new(unique_msg_id: UniqueMsgId, uuid: &Uuid, size: PacketNo,
            is_last_packet: bool, data_bytes: Vec<u8>) -> Packet {
         let header = PacketHeader::new(uuid);
         let payload = Payload::new(unique_msg_id, size, is_last_packet, data_bytes);

@@ -3,17 +3,20 @@ use std::{fmt,
           thread::JoinHandle,
           sync::{atomic::AtomicBool, Arc, atomic::Ordering::SeqCst}};
 
-use either::Either;
+use either::{Either, Left, Right};
 
 use crate::app_message_formats::{PortToNoc, PortFromNoc, PortToCa, PortToCaMsg, PortFromCa};
-use crate::config::{CONFIG};
+use crate::config::{CONFIG, PacketNo};
 use crate::dal::{add_to_trace, fork_trace_header, update_trace_header};
 use crate::ec_message_formats::{PortToLink, PortFromLink, PortToPe, PortFromPe, LinkToPortPacket,
                                 PortToPePacket};
+use crate::ecnl::{ECNL_Session};
 use crate::name::{Name, PortID, CellID};
+#[cfg(feature = "cell")]
+use crate::packet::{Packet, UniqueMsgId};
 use crate::utility::{ByteArray, PortNo, PortNumber, S, TraceHeader, TraceHeaderParams, TraceType,
                      write_err};
-use crate::uuid_ec::AitState;
+use crate::uuid_ec::{Uuid, AitState};
 
 // TODO: There is no distinction between a broken link and a disconnected one.  We may want to revisit.
 #[derive(Debug, Copy, Clone, Serialize)]
@@ -156,31 +159,48 @@ impl Port {
     }
 
     // SPAWN THREAD (listen_link, listen_pe)
-    pub fn link_channel(&self, port_to_link: PortToLink, port_from_link: PortFromLink,
+    pub fn link_channel(&self, port_link_channel_or_ecnl: Either<(PortToLink, PortFromLink), ECNL_Session>,
                         port_from_pe: PortFromPe) {
         let _f = "link_channel";
         let mut port = self.clone();
         let child_trace_header = fork_trace_header();
         let thread_name = format!("Port {} listen_link", self.get_id().get_name());
-        let port_to_link_clone = port_to_link.clone();
+        #[cfg(feature = "simulator")]
+        let port_link_channel_clone_or_ecnl = {
+            let (port_to_link, port_from_link) = port_link_channel_or_ecnl.clone().left().expect("ecnl in simulator");
+            let port_to_link_clone = port_to_link.clone();
+            Either::Left((port_to_link_clone, port_from_link))
+        };
+        #[cfg(feature = "cell")]
+        let port_link_channel_clone_or_ecnl = {
+            Either::Right(port_link_channel_or_ecnl.clone().right().unwrap())
+        };
         thread::Builder::new().name(thread_name).spawn( move || {
             update_trace_header(child_trace_header);
-            let _ = port.listen_link_loop(&port_from_link, &port_to_link_clone).map_err(|e| write_err("port", &e));
+            let _ = port.listen_link_loop(port_link_channel_clone_or_ecnl.clone()).map_err(|e| write_err("port", &e));
             if CONFIG.continue_on_error { }
         }).expect("thread failed");
-
         let port = self.clone();
         let child_trace_header = fork_trace_header();
         let thread_name = format!("Port {} listen_pe", self.get_id().get_name());
         thread::Builder::new().name(thread_name).spawn( move || {
             update_trace_header(child_trace_header);
-            let _ = port.listen_pe_loop(&port_to_link, &port_from_pe).map_err(|e| write_err("port", &e));
+            #[cfg(feature = "simulator")]
+            let port_to_link_or_ecnl = {
+                let (port_to_link, port_from_link) = port_link_channel_or_ecnl.left().expect("ecnl in simulator");
+                Either::Left(port_to_link)
+            };
+            #[cfg(feature = "cell")]
+            let port_to_link_or_ecnl = {
+                Either::Right(port_link_channel_or_ecnl.clone().right().unwrap())
+            };
+            let _ = port.listen_pe_loop(&port_to_link_or_ecnl, &port_from_pe).map_err(|e| write_err("port", &e));
             if CONFIG.continue_on_error { }
         }).expect("thread failed");
     }
 
     // WORKER (PortFromLink)
-    fn listen_link_loop(&mut self, port_from_link: &PortFromLink, port_to_link: &PortToLink) -> Result<(), Error> {
+    fn listen_link_loop(&mut self, port_link_channel_or_ecnl: Either<(PortToLink, PortFromLink), ECNL_Session>) -> Result<(), Error> {
         let _f = "listen_link_loop";
         {
             if CONFIG.trace_options.all || CONFIG.trace_options.port {
@@ -189,7 +209,10 @@ impl Port {
                 let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
             }
         }
+        let port_to_pe = self.port_to_pe_or_ca.clone().left().expect("Port: Sender to Pe must be set");
+        #[cfg(feature = "simulator")]
         loop {
+            let (port_to_link, port_from_link) = port_link_channel_or_ecnl.clone().left().expect("ecnl in simulator");
             let msg = port_from_link.recv().context(PortError::Chain { func_name: _f, comment: S(self.id.get_name()) + " recv from link"})?;
             {
                 if CONFIG.trace_options.all || CONFIG.trace_options.port {
@@ -208,7 +231,6 @@ impl Port {
                     }
                 }
             }
-            let port_to_pe = self.port_to_pe_or_ca.clone().left().expect("Port: Sender to Pe must be set");
             match msg {
                 LinkToPortPacket::Status(status) => {
                     match status {
@@ -280,9 +302,15 @@ impl Port {
                 }
             }
         }
+        #[cfg(feature = "cell")]
+        loop {
+            let ecnl = port_link_channel_or_ecnl.clone().right();
+            let packet = Packet::new(UniqueMsgId(0), &Uuid::new(), PacketNo(1500), true, Vec::new());
+            port_to_pe.send(PortToPePacket::Packet((self.port_number.get_port_no(), packet)))?;
+        }
     }
     // WORKER (PortFromPe)
-    fn listen_pe_loop(&self, port_to_link: &PortToLink, port_from_pe: &PortFromPe) -> Result<(), Error> {
+    fn listen_pe_loop(&self, port_to_link_or_ecnl: &Either<PortToLink, ECNL_Session>, port_from_pe: &PortFromPe) -> Result<(), Error> {
         let _f = "listen_pe_loop";
         {
             if CONFIG.trace_options.all || CONFIG.trace_options.port {
@@ -293,7 +321,7 @@ impl Port {
         }
         loop {
             //println!("Port {}: waiting for packet from pe", id);
-            let mut packet = port_from_pe.recv().context(PortError::Chain { func_name: _f, comment: S(self.id.get_name()) + " port_from_pe"})?;
+            let packet = port_from_pe.recv().context(PortError::Chain { func_name: _f, comment: S(self.id.get_name()) + " port_from_pe"})?;
             {
                 if CONFIG.trace_options.all || CONFIG.trace_options.port {
                     let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "port_from_pe" };
@@ -301,29 +329,36 @@ impl Port {
                     let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
                 }
             }
-            let ait_state = packet.get_ait_state();
-            match ait_state {
-                AitState::AitD |
-                AitState::Tick |
-                AitState::Tock |
-                AitState::Tack |
-                AitState::Teck => return Err(PortError::Ait { func_name: _f, ait_state }.into()), // Not allowed here
-                
-                AitState::Ait => {
-                    packet.next_ait_state()?;
-                },
-                AitState::Entl | // Only needed for simulator, should be handled by port
-                AitState::Normal => ()
-            }
+            #[cfg(feature = "simulator")]
             {
-                if CONFIG.trace_options.all | CONFIG.trace_options.port {
-                    let ait_state = packet.get_ait_state();
-                    let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "port_to_link" };
-                    let trace = json!({ "id": self.get_id().get_name(), "ait_state": ait_state, "packet": packet });
-                    let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
+                let ait_state = packet.get_ait_state();
+                match ait_state {
+                    AitState::AitD |
+                    AitState::Tick |
+                    AitState::Tock |
+                    AitState::Tack |
+                    AitState::Teck => return Err(PortError::Ait { func_name: _f, ait_state }.into()), // Not allowed here
+                
+                    AitState::Ait => {
+                        packet.next_ait_state()?;
+                    },
+                    AitState::Entl | // Only needed for simulator, should be handled by port
+                    AitState::Normal => ()
                 }
+                {
+                    if CONFIG.trace_options.all | CONFIG.trace_options.port {
+                        let ait_state = packet.get_ait_state();
+                        let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "port_to_link" };
+                        let trace = json!({ "id": self.get_id().get_name(), "ait_state": ait_state, "packet": packet });
+                        let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
+                    }
+                }
+                port_to_link_or_ecnl.clone().left().expect("ecnl in simulator").send(packet)?;
             }
-            port_to_link.send(packet)?;
+            #[cfg(feature = "cell")]
+            {
+                let ecnl = port_to_link_or_ecnl.clone().right();
+            }
         }
     }
     fn send_to_noc(&self, port_to_noc: &PortToNoc, bytes: ByteArray) -> Result<(), Error> {

@@ -4,20 +4,11 @@ extern crate libc;
 use std::{
     fmt, fmt::Write,
     collections::{HashMap, HashSet},
-    os::raw::{c_void},
     thread::JoinHandle,
     iter::FromIterator,
+    rc::Rc,
 };
 use crossbeam::crossbeam_channel::unbounded as channel;
-
-#[cfg(feature = "cell")]
-use libc::{free};
-#[cfg(feature = "cell")]
-use std::{
-    os::raw::{c_char, c_int, c_uchar, c_uint},
-    ptr::{null, null_mut},	  
-    ffi::CStr,
-};
 
 use either::Either;
 
@@ -26,22 +17,11 @@ use crate::config::{CONFIG, PortQty};
 use crate::dal::{add_to_trace};
 use crate::ec_message_formats::{PortToPe, PeFromPort, PeToPort, PortFromPe,
                                 CmToCa, CaFromCm };
+use crate::ecnl::{ECNL_Session};
 use crate::name::{CellID};
 use crate::port::{Port};
 use crate::utility::{CellConfig, CellType, PortNo, S, TraceHeaderParams, TraceType};
 use crate::vm::VirtualMachine;
-
-#[cfg(feature = "cell")]
-#[allow(improper_ctypes)]
-#[link(name = ":ecnl_sdk.o")]
-#[link(name = ":ecnl_proto.o")]
-#[link(name = ":libnl-3.so")]
-#[link(name = ":libnl-genl-3.so")]
-extern {
-    pub fn alloc_ecnl_session(ecnl_session_ptr: *const *mut c_void) -> c_int;
-    pub fn ecnl_get_module_info(ecnl_session: *mut c_void, mipp: *const *const ModuleInfo) -> c_int;
-    pub fn free_ecnl_session(ecnl_session: *mut c_void) -> c_int;
-}
 
 #[derive(Debug)]
 pub struct NalCell {
@@ -53,7 +33,7 @@ pub struct NalCell {
     vms: Vec<VirtualMachine>,
     ports_from_pe: HashMap<PortNo, PortFromPe>,
     ports_from_ca: HashMap<PortNo, PortFromCa>,
-    ecnl: Option<*mut c_void>,
+    ecnl: Option<Rc<ECNL_Session>>,
 }
 
 impl NalCell {
@@ -66,12 +46,7 @@ impl NalCell {
                 None => {
                     #[cfg(feature = "cell")]
                         {
-                            let ecnl_session: *mut c_void = null_mut();
-                            let ecnl_session_ptr: *const *mut c_void = &ecnl_session;
-                            unsafe {
-                                alloc_ecnl_session(ecnl_session_ptr);
-                                Some(*ecnl_session_ptr)
-                            }
+                            Some(Rc::new(ECNL_Session::new()))
                         }
                     #[cfg(feature = "simulator")]
                         {
@@ -84,24 +59,15 @@ impl NalCell {
                 Some(num_phys_ports) => num_phys_ports,
                 None => {
                     #[cfg(feature = "cell")]
-                        let mip: *const ModuleInfo = null();
-                    #[cfg(feature = "cell")]
-                        unsafe
-                        {
-                            ecnl_get_module_info(ecnl.unwrap(), &mip);
-                            let module_id = (*mip).module_id as u8;
-                            println!("Module id: {:?} ", module_id);
-                            let module_name = CStr::from_ptr((*mip).module_name).to_string_lossy().into_owned();
-                            println!("Module name: {:?} ", module_name);
-                            let num_phys_ports = (*mip).num_ports as u8;
-                            println!("Num phys ports: {:?} ", num_phys_ports);
-                            free(mip as *mut libc::c_void);
-                            PortQty(num_phys_ports)
-                        }
+                    {
+                        let num_ecnl_ports = ecnl.clone().unwrap().get_num_ecnl_ports();
+                        println!("Num ecnl ports: {:?} ", num_ecnl_ports);
+                        num_ecnl_ports
+                    }
                     #[cfg(feature = "simulator")]
-                        {
-                            PortQty(0)
-                        }
+                    {
+                        PortQty(0)
+                    }
                 }
             };
         if *num_phys_ports > *CONFIG.max_num_phys_ports_per_cell {
@@ -224,27 +190,17 @@ impl fmt::Display for NalCell {
         write!(s, "\n{}", self.cell_agent)?;
         write!(f, "{}", s) }
 }
+
 impl Drop for NalCell {
     fn drop(&mut self) {
-        #[cfg(feature = "cell")]
-            match self.ecnl {
+        match &self.ecnl {
             Some(ecnl_session) => {
-                unsafe {
-                    free_ecnl_session(ecnl_session);
-                }
+                drop(ecnl_session);
             },
             None => {
             },
         }
     }
-}
-
-#[cfg(feature = "cell")]
-#[repr(C)]
-pub struct ModuleInfo {
-    module_id: c_uint,
-    module_name: *const c_char,
-    num_ports: c_uint,
 }
 
 

@@ -1,5 +1,5 @@
+use either::{Either, Left, Right};
 use multi_mut::{HashMapMultiMut};
-
 use std::{fmt, fmt::Write,
           collections::{HashMap, HashSet},
           iter::FromIterator,
@@ -93,8 +93,8 @@ impl Rack {
             let (left_to_link, link_from_left): (PortToLink, LinkFromPort) = channel();
             let (link_to_rite, rite_from_link): (LinkToPort, PortFromLink) = channel();
             let (rite_to_link, link_from_rite): (PortToLink, LinkFromPort) = channel();
-            left_port.link_channel(left_to_link, left_from_link, left_from_pe);
-            rite_port.link_channel(rite_to_link, rite_from_link, rite_from_pe);
+            left_port.link_channel(Either::Left((left_to_link, left_from_link)).clone(), left_from_pe);
+            rite_port.link_channel(Either::Left((rite_to_link, rite_from_link)).clone(), rite_from_pe);
             let link = Link::new(left_port.get_id(), rite_port.get_id(),
                                            link_to_left, link_to_rite)?;
             {
