@@ -21,6 +21,7 @@ pub mod dal;
 #[cfg(any(feature = "simulator"))]
 pub mod datacenter;
 pub mod dumpstack;
+pub mod ecnl;
 pub mod errors;
 pub mod gvm_equation;
 pub mod link;
