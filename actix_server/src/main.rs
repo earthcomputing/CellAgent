@@ -5,6 +5,8 @@ use std::{env,
 use actix_web::{web, App, HttpServer, Responder, HttpResponse};
 
 use ec_trace_analyzer::{discoverd, geometry, hello, index, stacktreed};
+use geometry::{AppGeometry, RowCol};
+use hello::{AppCells, Neighbors, Trees};
 
 fn main() {
     let server_url = env::var("SERVER_URL").expect("Environment variable SERVER_URL not found");
@@ -21,6 +23,8 @@ fn main() {
             
             .register_data(index_data.clone())
             .route("/",web::get().to(index::index))
+            
+            .route("/reset", web::post().to(reset))
             
             .register_data(geo_data.clone())
             .service(geometry::get())
@@ -41,6 +45,20 @@ fn main() {
         .unwrap()
         .run()
         .unwrap();
+}
+fn reset(appcells: web::Data<AppCells>, geometry: web::Data<AppGeometry>) {
+    let mut cells = appcells
+        .get_ref()
+        .appcells.lock().unwrap();
+    for (_, appcell) in cells.iter_mut() {
+        appcell.black_trees = Trees::default();
+        appcell.neighbors = Neighbors::default();
+        appcell.stacked_trees = Trees::default();
+    }
+    let mut geometry = geometry
+        .get_ref()
+        .geometry.lock().unwrap();
+    geometry.rowcol = RowCol::default();
 }
 fn get_css() -> impl Responder {
     let css = fs::read_to_string("./html/visualizer.css").expect("Cannot read CSS file");

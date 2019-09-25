@@ -82,7 +82,7 @@ impl fmt::Display for PortNo {
         write!(f, "P:{}", self.0)
     }
 }
-#[derive(Debug, Copy, Clone, Eq, PartialEq)]
+#[derive(Debug, Copy, Clone, Eq, PartialEq, Serialize, Deserialize)]
 pub enum CellType {
     Border,
     Interior

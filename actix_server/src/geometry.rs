@@ -7,7 +7,7 @@ use actix_web::{web, Error, HttpResponse, Responder, Scope};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
-type RowCol = HashMap<String, Location>;
+pub type RowCol = HashMap<String, Location>;
 
 pub fn cell_geometry(path: &str, is_border: bool, state: web::Data<AppGeometry>, record: web::Json<Value>)
                  -> Result<impl Responder, Error> {
@@ -31,17 +31,17 @@ pub struct CellID {
 }
 #[derive(Debug, Default, Serialize, Deserialize)]
 pub struct AppGeometry {
-    geometry: Mutex<Geometry>
+    pub geometry: Mutex<Geometry>
 }
 #[derive(Debug, Copy, Clone, Default, Eq, PartialEq, Serialize, Deserialize)]
 pub struct Location { row: usize, col: usize, is_border: bool }
 
 #[derive(Debug, Clone, Eq, PartialEq, Default, Serialize, Deserialize)]
 pub struct Geometry {
-    is_border: bool,
-    maxrow: usize,
-    maxcol: usize,
-    rowcol: RowCol
+    pub is_border: bool,
+    pub maxrow: usize,
+    pub maxcol: usize,
+    pub rowcol: RowCol
 }
 impl Geometry {
     pub fn add(&mut self, cell_id: CellID, rowcol: Location) {
