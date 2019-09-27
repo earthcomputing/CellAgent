@@ -210,7 +210,7 @@ function stacked_tree_button_click(evt) {
     let stacked_tree_id = evt.target.getAttribute("id");
     let root_cell_id = find_root(stacked_tree_id);
     reset_view();
-    draw_stacked_tree(root_cell_id,stacked_tree_id);
+    draw_stacked_tree(root_cell_id, stacked_tree_id);
 }
 function draw_stacked_tree(cellID, stacked_tree_id){
     let cell = cells[cellID];
