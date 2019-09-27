@@ -52,7 +52,7 @@
     r: 10;
 }
 .link {
-    stroke : green;
+    stroke : lightgreen;
     stroke-width : 4px;
 }
 .linktree {
@@ -75,9 +75,9 @@
     background: lightblue;
 }
 .tooltip {
-    font-size: 100%;
+    font-size: 80%;
     position: fixed;
-    top: 30%;
+    top: 26%;
     left: 50;
     width: auto;
     height: auto;
