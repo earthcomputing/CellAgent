@@ -73,7 +73,9 @@ function setup_topology(topology_text) {
         for (neighborIndex in cellNeighbors.neighbors) {
             let neighbor = cellNeighbors.neighbors[neighborIndex];
             let neighborID = neighbor.cell_name;
-            if ( cellID < neighborID ) {
+            let cellIDint = parseInt(cellID.split(":")[1], 10);
+            let neighborIDint = parseInt(neighborID.split(":")[1], 10);
+            if ( cellIDint < neighborIDint ) {
                 let neighborPort = neighbor.port;
                 let id = make_link_id(cellID, neighborIndex, neighborID , neighborPort);
                 create_line_at(id, cellID, neighborID);

@@ -6,7 +6,7 @@ use std::{cell::RefCell,
           io::Write};
 
 use actix_rt::{System, SystemRunner};
-use actix_web::client::{Client};
+use actix_web::client::{ClientBuilder};
 use futures::{future::lazy, Future};
 use lazy_static::lazy_static;
 use rdkafka::{config::ClientConfig, producer::{FutureProducer, FutureRecord}};
@@ -88,7 +88,8 @@ fn trace_it(trace_record: &TraceRecord) -> Result<(), Error> {
     SKIP.with(|skip| {
         let mut s = skip.borrow_mut();
         if !s.contains(format) {
-            let client = Client::new();
+            let client_builder = ClientBuilder::new();
+            let client = client_builder.disable_timeout().finish();
             let _ = SYSTEM.with(|sys| {
                 let mut system = sys.borrow_mut();
                 system.block_on(lazy(|| {
