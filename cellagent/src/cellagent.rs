@@ -907,7 +907,6 @@ impl CellAgent {
                 println!("Cellagent {}: {} tree {} port {} ec_app_msg {}", self.cell_id, _f, port_tree_id, *port_no, ec_app_msg);
             }
         }
-        let senders = self.get_vm_senders(port_tree_id.to_tree_id()).context(CellagentError::Chain { func_name: _f, comment: S("") })?;
         {
             if CONFIG.trace_options.all || CONFIG.trace_options.ca {
                 let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "ca_to_vm_app" };
@@ -915,6 +914,7 @@ impl CellAgent {
                 let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
             }
         }
+        let senders = self.get_vm_senders(port_tree_id.to_tree_id()).context(CellagentError::Chain { func_name: _f, comment: S("") })?;
         let serialized = serde_json::to_string(app_msg as &dyn AppMessage)?;
         let bytes = ByteArray::new(&serialized);
         for sender in senders {
