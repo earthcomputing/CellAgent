@@ -41,6 +41,7 @@ fn main() {
             .service(stacktreed::get())
             .service(stacktreed::post())
     })
+        .keep_alive(100)
         .bind(server_url)
         .unwrap()
         .run()

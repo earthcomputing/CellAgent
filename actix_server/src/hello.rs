@@ -39,7 +39,7 @@ pub fn process_hello(appcells: web::Data<AppCells>, record: web::Json<Value>)
 // Message data
 #[derive(Debug, Clone, Serialize, Deserialize)]
 struct Body {
-    cell_id: CellID, // Reciving cell
+    cell_id: CellID, // Receiving cell
     port_no: Size,   // Receive port
     msg: EcMsg
 }
