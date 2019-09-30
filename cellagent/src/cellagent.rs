@@ -445,7 +445,10 @@ impl CellAgent {
             PortState::Pruned | PortState::Broken => {
                 let element = traph.get_parent_element().context(CellagentError::Chain { func_name: _f, comment: S("") })?;
                 element.get_hops()
-            }
+            },
+            // It's tempting to use min(hops, element.get_hops()), but I think it's better to
+            // stick with the value associated with the first DiscoverMsg.  Most of the time
+            // it will be the smallest, anyway.
             PortState::Parent | PortState::Unknown => hops,
         };
         let traph_status = traph.get_port_status(port_number);
@@ -980,7 +983,8 @@ impl CellAgent {
             self.update_traph(new_port_tree_id, port_number, port_state, &gvm_equation,
                               HashSet::new(), hops, path).context(CellagentError::Chain { func_name: "process_ca", comment: S("DiscoverMsg") })?;
         }
-        if quench { return Ok(()); }
+        // Don't forward if it's my tree_id, since I send them in process_hello_msg
+        if quench | (new_tree_id == self.my_tree_id) { return Ok(()); }
         // Forward Discover on all except port_no with updated hops and path
         let updated_msg = msg.update(self.cell_id);
         let user_mask = DEFAULT_USER_MASK.all_but_port(port_no.make_port_number(self.no_ports).context(CellagentError::Chain { func_name: "process_ca", comment: S("DiscoverMsg") })?);
@@ -1047,6 +1051,7 @@ impl CellAgent {
                         let _ = add_to_trace(TraceType::Debug, trace_params, &trace, _f);
                     }
                 }
+                // Setting hops to 0 is a hack so I can use update_traph()
                 let _ = self.update_traph(port_tree_id, port_number, port_state, &gvm_eqn,
                                           children, PathLength(CellQty(0)), path)?;
                 if tree_id == self.my_tree_id &&
@@ -1649,14 +1654,9 @@ impl CellAgent {
             self.update_entry(&self.connected_tree_entry)?;
             let hello_msg = HelloMsg::new(sender_id, self.cell_id, port_no);
             self.send_msg(self.connected_tree_id, &hello_msg, user_mask)?;
-            let path = Path::new(port_no, self.no_ports)?;
-            let hops = PathLength(CellQty(1));
             let my_port_tree_id = self.my_tree_id.to_port_tree_id(port_number);
             self.update_base_tree_map(my_port_tree_id, self.my_tree_id);
-            let discover_msg = DiscoverMsg::new(sender_id, my_port_tree_id,
-                                                self.cell_id, hops, path);
-            self.send_msg(self.connected_tree_id, &discover_msg, user_mask).context(CellagentError::Chain { func_name: _f, comment: S(self.cell_id) })?;
-            self.forward_discover(user_mask).context(CellagentError::Chain { func_name: _f, comment: S(self.cell_id) })?;
+            // I was sending DiscoverMsg here, but now I send it when processing HelloMsg
             Ok(())
         }
     }
