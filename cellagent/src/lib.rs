@@ -14,7 +14,6 @@ pub mod app_message;
 pub mod app_message_formats;
 pub mod blueprint;
 pub mod cellagent;
-#[cfg(any(feature = "simulator", feature = "cell"))]
 pub mod cmodel;
 pub mod config;
 pub mod container;
