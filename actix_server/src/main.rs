@@ -4,7 +4,7 @@ use std::{env,
 
 use actix_web::{web, App, HttpServer, Responder, HttpResponse};
 
-use ec_trace_analyzer::{discoverd, geometry, hello, index, stacktreed};
+use ec_trace_analyzer::{discoverd, geometry, hello, index, replay, stacktreed};
 use geometry::{AppGeometry, RowCol};
 use hello::{AppCells, Neighbors, Trees};
 
@@ -40,6 +40,8 @@ fn main() {
         
             .service(stacktreed::get())
             .service(stacktreed::post())
+        
+            .service(replay::post())
     })
         .keep_alive(100)
         .bind(server_url)

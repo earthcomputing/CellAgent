@@ -3,7 +3,9 @@
 use std::{cell::RefCell,
           collections::{HashSet},
           fs::{File, OpenOptions},
-          io::Write};
+          io::Write,
+          sync::atomic::{AtomicBool, Ordering}
+};
 
 use actix_rt::{System, SystemRunner};
 use actix_web::client::{ClientBuilder};
@@ -22,6 +24,7 @@ const FOR_EVAL: bool = true;
 
 lazy_static! {
     static ref SERVER_URL: String = ::std::env::var("SERVER_URL").expect("Environment variable SERVER_URL not set");
+    static ref SERVER_ERROR: AtomicBool = AtomicBool::new(false);
     static ref PRODUCER_RD: FutureProducer = ClientConfig::new()
                         .set("bootstrap.servers", &CONFIG.kafka_server)
                         .set("message.timeout.ms", "5000")
@@ -30,7 +33,8 @@ lazy_static! {
 }
 thread_local!{ static SYSTEM: RefCell<SystemRunner> = RefCell::new(System::new("Tracer")); }
 thread_local!{ static SKIP: RefCell<HashSet<String>> = RefCell::new(HashSet::new()); }
-thread_local!(static TRACE_HEADER: RefCell<TraceHeader> = RefCell::new(TraceHeader::new()));
+thread_local!{ static TRACE_HEADER: RefCell<TraceHeader> = RefCell::new(TraceHeader::new()) }
+
 pub fn fork_trace_header() -> TraceHeader { TRACE_HEADER.with(|t| t.borrow_mut().fork_trace()) }
 pub fn update_trace_header(child_trace_header: TraceHeader) { TRACE_HEADER.with(|t| *t.borrow_mut() = child_trace_header); }
 
@@ -80,6 +84,7 @@ pub fn add_to_trace(trace_type: TraceType, trace_params: &TraceHeaderParams,
 }
 fn trace_it(trace_record: &TraceRecord) -> Result<(), Error> {
     let _f = "trace_it";
+    if SERVER_ERROR.load(Ordering::SeqCst) { return Ok(()); }
     let header = trace_record.header;
     let format = header.format();
     let server_url = format!("{}/{}", *SERVER_URL, format);
@@ -96,7 +101,10 @@ fn trace_it(trace_record: &TraceRecord) -> Result<(), Error> {
                     client.post(server_url)
                         .header("User-Agent", "Actix-web")
                         .send_json(&value)
-                        .map_err(|e| println!("Error from server {:?}", e))
+                        .map_err(|e| {
+                            println!("\nError from server {:?}\n", e);
+                            SERVER_ERROR.swap(true, Ordering::SeqCst);
+                        })
                         .and_then(|response| {
                             if !response.status().is_success() {
                                 if response.status() != 404 {
@@ -119,6 +127,7 @@ struct TraceRecord<'a> {
 }
 // Errors
 use failure::{Error, ResultExt};
+
 #[derive(Debug, Fail)]
 pub enum DalError {
     #[fail(display = "DalError::Chain {} {}", func_name, comment)]

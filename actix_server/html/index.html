@@ -8,6 +8,10 @@
 <h1 id="title">EARTH Computing Trace Visualizer</h1>
 <div id="buttons">
     <button id="displayButton" onclick="visualize()">Show Datacenter</button>
+    <form action="/replay">
+        <input type="submit" value="Replay from file">
+        <input type="text" name="filename">
+    </form>
 </div>
 <div id="viz-container">
     <div id="tooltip" style="display:none">
