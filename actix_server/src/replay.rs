@@ -27,30 +27,30 @@ fn replay_from_file(appcells: web::Data<AppCells>, appgeometry: web::Data<AppGeo
         foo.pop();
         let trace_record: TraceRecord = serde_json::from_str(&foo)?;
         let header = trace_record.header();
-        let body = serde_json::to_string(trace_record.body())?;
+        let body = trace_record.body().clone();
         match header.format() {
             "ca_process_discoverd_msg" => {
-                let body: discoverd::Body = serde_json::from_str(&body)?;
+                let body: discoverd::Body = serde_json::from_value(body)?;
                 discoverd::process_discoverd_body(appcells.clone(), body)?;
             },
             "border_cell_start" => {
-                let body: geometry::Body = serde_json::from_str(&body)?;
+                let body: geometry::Body = serde_json::from_value(body)?;
                 let path = "border_cell_start";
                 let is_border = true;
                 geometry::cell_geometry_body(path, is_border, appgeometry.clone(), body)?;
             },
             "interior_cell_start" => {
-                let body: geometry::Body = serde_json::from_str(&body)?;
+                let body: geometry::Body = serde_json::from_value(body)?;
                 let path = "interior_cell_start";
                 let is_border = false;
                 geometry::cell_geometry_body(path, is_border, appgeometry.clone(), body)?;
             },
             "ca_process_stack_treed_msg" => {
-                let body: stacktreed::Body = serde_json::from_str(&body)?;
+                let body: stacktreed::Body = serde_json::from_value(body)?;
                 stacktreed::process_stack_treed_body(appcells.clone(), body)?;
             },
             "ca_process_hello_msg" => {
-                let body: hello::Body = serde_json::from_str(&body)?;
+                let body: hello::Body = serde_json::from_value(body)?;
                 hello::process_hello_body(appcells.clone(), body)?;
             }
             _ => ()
@@ -64,14 +64,12 @@ pub fn reset(appcells: web::Data<AppCells>, geometry: web::Data<AppGeometry>) {
     let mut cells = appcells
         .get_ref()
         .appcells.lock().unwrap();
-    for (_, appcell) in cells.iter_mut() {
-        appcell.black_trees = Trees::default();
-        appcell.neighbors = Neighbors::default();
-        appcell.stacked_trees = Trees::default();
-    }
+    cells.clear();
     let mut geometry = geometry
         .get_ref()
         .geometry.lock().unwrap();
+    geometry.maxcol = 0;
+    geometry.maxrow = 0;
     geometry.rowcol = RowCol::default();
 }
 pub fn post() -> Scope {

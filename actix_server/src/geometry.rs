@@ -37,6 +37,11 @@ pub struct CellID {
 pub struct AppGeometry {
     pub geometry: Mutex<Geometry>
 }
+impl AppGeometry {
+    pub fn clear(&mut self) {
+        self.geometry = Mutex::new(Geometry::default());
+    }
+}
 #[derive(Debug, Copy, Clone, Default, Eq, PartialEq, Serialize, Deserialize)]
 pub struct Location { row: usize, col: usize, is_border: bool }
 
