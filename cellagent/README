@@ -1,4 +1,4 @@
-Assuming this file is in top level of CellAgent repository.
+Assuming this file is in cellagent directory of CellAgent repository.
 An environment variable CELL_AGENT_DIR must be set.
 
 To load new driver:
