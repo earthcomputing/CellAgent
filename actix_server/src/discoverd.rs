@@ -22,6 +22,10 @@ fn process_discoverd(appcells: web::Data<AppCells>, record: web::Json<Value>)
                      -> Result<impl Responder, Error> {
     let trace_body = record.get("body").expect("DiscoverDMsg: bad trace record");
     let body: Body = serde_json::from_value(trace_body.clone())?;
+    process_discoverd_body(appcells, body)
+}
+pub fn process_discoverd_body(appcells: web::Data<AppCells>, body: Body)
+        -> Result<impl Responder, Error> {
     if body.msg.payload.discover_type == "First" {
         let this_cell_name = body.cell_id.name;
         let recv_port = body.port_no;
@@ -54,7 +58,7 @@ fn update_tree<'a>(cells: &'a mut MutexGuard<HashMap<String, AppCell>>, cell_nam
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-struct Body {
+pub struct Body {
     cell_id: CellID, // Receiving cell
     port_no: Size,   // Receive port
     msg: EcMsg

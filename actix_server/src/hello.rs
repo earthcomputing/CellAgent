@@ -21,6 +21,10 @@ pub fn process_hello(appcells: web::Data<AppCells>, record: web::Json<Value>)
                      -> Result<impl Responder, Error> {
     let trace_body = record.get("body").expect("HelloMsg: bad trace record");
     let body: Body = serde_json::from_value(trace_body.clone())?;
+    process_hello_body(appcells, body)
+}
+pub fn process_hello_body(appcells: web::Data<AppCells>, body: Body)
+        -> Result<impl Responder, Error> {
     let this_cell_id = body.cell_id.name;
     let sending_cell_id = CellID { name: body.msg.payload.cell_id.name };
     let my_port_no = body.port_no;
@@ -38,7 +42,7 @@ pub fn process_hello(appcells: web::Data<AppCells>, record: web::Json<Value>)
 }
 // Message data
 #[derive(Debug, Clone, Serialize, Deserialize)]
-struct Body {
+pub struct Body {
     cell_id: CellID, // Receiving cell
     port_no: Size,   // Receive port
     msg: EcMsg

@@ -24,7 +24,7 @@ fn main() {
             .register_data(index_data.clone())
             .route("/",web::get().to(index::index))
             
-            .route("/reset", web::post().to(reset))
+            .route("/reset", web::post().to(replay::reset))
             
             .register_data(geo_data.clone())
             .service(geometry::get())
@@ -48,20 +48,6 @@ fn main() {
         .unwrap()
         .run()
         .unwrap();
-}
-fn reset(appcells: web::Data<AppCells>, geometry: web::Data<AppGeometry>) {
-    let mut cells = appcells
-        .get_ref()
-        .appcells.lock().unwrap();
-    for (_, appcell) in cells.iter_mut() {
-        appcell.black_trees = Trees::default();
-        appcell.neighbors = Neighbors::default();
-        appcell.stacked_trees = Trees::default();
-    }
-    let mut geometry = geometry
-        .get_ref()
-        .geometry.lock().unwrap();
-    geometry.rowcol = RowCol::default();
 }
 fn get_css() -> impl Responder {
     let css = fs::read_to_string("./html/visualizer.css").expect("Cannot read CSS file");
