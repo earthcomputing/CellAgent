@@ -43,22 +43,23 @@ int alloc_ecnl_session(void **ecnl_session_ptr) {
     ecnl_session->module_id = 0;
 };
 
-int free_ecnl_session(void *ecnl_session) {
-    struct nl_sock *sock = ((ecnl_session_t *) ecnl_session)->sock;
-    struct nl_msg *msg = ((ecnl_session_t *) ecnl_session)->msg;
-    uint32_t module_id = ((ecnl_session_t *) ecnl_session)->module_id;
+int free_ecnl_session(void *ecnl_session_void) {
+    ecnl_session_t *ecnl_session = ((ecnl_session_t *) ecnl_session_void);
+    struct nl_sock *sock = ecnl_session->sock;
+    struct nl_msg *msg = ecnl_session->msg;
     nlmsg_free(msg);
     nl_close(sock);
     nl_socket_free(sock);
-    free((ecnl_session_t *) ecnl_session);
+    free(ecnl_session);
 };
 
 
-int ecnl_get_module_info(void *ecnl_session, const module_info_t **mipp) {
-    struct nl_sock *sock = ((ecnl_session_t *) ecnl_session)->sock;
-    struct nl_msg *msg = ((ecnl_session_t *) ecnl_session)->msg;
+int ecnl_get_module_info(void *ecnl_session_void, const module_info_t **mipp) {
+    ecnl_session_t *ecnl_session = ((ecnl_session_t *) ecnl_session_void);
+    struct nl_sock *sock = ecnl_session->sock;
+    struct nl_msg *msg = ecnl_session->msg;
     CLEAR_MSG;
-    uint32_t module_id = ((ecnl_session_t *) ecnl_session)->module_id;
+    uint32_t module_id = ecnl_session->module_id;
     *mipp = malloc(sizeof(module_info_t));
     if (*mipp != NULL) {
         // memset(*mipp, 0, sizeof(module_info_t));
@@ -71,11 +72,12 @@ int ecnl_get_module_info(void *ecnl_session, const module_info_t **mipp) {
 }
 
 
-int ecnl_get_port_state(void *ecnl_session, uint32_t port_id, const link_state_t **lspp) {
-    struct nl_sock *sock = ((ecnl_session_t *) ecnl_session)->sock;
-    struct nl_msg *msg = ((ecnl_session_t *) ecnl_session)->msg;
+int ecnl_get_port_state(void *ecnl_session_void, uint32_t port_id, const link_state_t **lspp) {
+    ecnl_session_t *ecnl_session = ((ecnl_session_t *) ecnl_session_void);
+    struct nl_sock *sock = ecnl_session->sock;
+    struct nl_msg *msg = ecnl_session->msg;
     CLEAR_MSG;
-    uint32_t module_id = ((ecnl_session_t *) ecnl_session)->module_id;
+    uint32_t module_id = ecnl_session->module_id;
     uint32_t actual_module_id;
     uint32_t actual_port_id;
     *lspp = malloc(sizeof(link_state_t));
@@ -100,11 +102,12 @@ static int ecnl_alloc_driver(struct nl_sock *sock, struct nl_msg *msg, char *mod
     return 0;
 }
 
-int ecnl_alloc_table(void *ecnl_session, uint32_t table_size, const uint32_t **table_id_p) {
-    struct nl_sock *sock = ((ecnl_session_t *) ecnl_session)->sock;
-    struct nl_msg *msg = ((ecnl_session_t *) ecnl_session)->msg;
+int ecnl_alloc_table(void *ecnl_session_void, uint32_t table_size, const uint32_t **table_id_p) {
+    ecnl_session_t *ecnl_session = ((ecnl_session_t *) ecnl_session_void);
+    struct nl_sock *sock = ecnl_session->sock;
+    struct nl_msg *msg = ecnl_session->msg;
     CLEAR_MSG;
-    uint32_t module_id = ((ecnl_session_t *) ecnl_session)->module_id;
+    uint32_t module_id = ecnl_session->module_id;
     uint32_t actual_module_id;
     *table_id_p = malloc(sizeof(uint32_t));
     if (*table_id_p != NULL) {
@@ -118,11 +121,12 @@ int ecnl_alloc_table(void *ecnl_session, uint32_t table_size, const uint32_t **t
     fatal_error(-1, "table allocation");
 }
 
-int ecnl_dealloc_table(void *ecnl_session, uint32_t table_id) {
-    struct nl_sock *sock = ((ecnl_session_t *) ecnl_session)->sock;
-    struct nl_msg *msg = ((ecnl_session_t *) ecnl_session)->msg;
+int ecnl_dealloc_table(void *ecnl_session_void, uint32_t table_id) {
+    ecnl_session_t *ecnl_session = ((ecnl_session_t *) ecnl_session_void);
+    struct nl_sock *sock = ecnl_session->sock;
+    struct nl_msg *msg = ecnl_session->msg;
     CLEAR_MSG;
-    uint32_t module_id = ((ecnl_session_t *) ecnl_session)->module_id;
+    uint32_t module_id = ecnl_session->module_id;
     uint32_t actual_module_id;
     uint32_t actual_table_id;
     int rc = dealloc_table(sock, msg, module_id, table_id, &actual_module_id, &actual_table_id);
@@ -132,11 +136,12 @@ int ecnl_dealloc_table(void *ecnl_session, uint32_t table_id) {
     return 0;
 }
 
-int ecnl_select_table(void *ecnl_session, uint32_t table_id) {
-    struct nl_sock *sock = ((ecnl_session_t *) ecnl_session)->sock;
-    struct nl_msg *msg = ((ecnl_session_t *) ecnl_session)->msg;
+int ecnl_select_table(void *ecnl_session_void, uint32_t table_id) {
+    ecnl_session_t *ecnl_session = ((ecnl_session_t *) ecnl_session_void);
+    struct nl_sock *sock = ecnl_session->sock;
+    struct nl_msg *msg = ecnl_session->msg;
     CLEAR_MSG;
-    uint32_t module_id = ((ecnl_session_t *) ecnl_session)->module_id;
+    uint32_t module_id = ecnl_session->module_id;
     uint32_t actual_module_id;
     uint32_t actual_table_id;
     int rc = select_table(sock, msg, module_id, table_id, &actual_module_id, &actual_table_id);
@@ -146,11 +151,12 @@ int ecnl_select_table(void *ecnl_session, uint32_t table_id) {
     return 0;
 }
 
-int ecnl_fill_table(void *ecnl_session, uint32_t table_id, uint32_t table_location, uint32_t table_content_size, ecnl_table_entry_t *table_content) {
-    struct nl_sock *sock = ((ecnl_session_t *) ecnl_session)->sock;
-    struct nl_msg *msg = ((ecnl_session_t *) ecnl_session)->msg;
+int ecnl_fill_table(void *ecnl_session_void, uint32_t table_id, uint32_t table_location, uint32_t table_content_size, ecnl_table_entry_t *table_content) {
+    ecnl_session_t *ecnl_session = ((ecnl_session_t *) ecnl_session_void);
+    struct nl_sock *sock = ecnl_session->sock;
+    struct nl_msg *msg = ecnl_session->msg;
     CLEAR_MSG;
-    uint32_t module_id = ((ecnl_session_t *) ecnl_session)->module_id;
+    uint32_t module_id = ecnl_session->module_id;
     uint32_t actual_module_id;
     uint32_t actual_table_id;
     int rc = fill_table(sock, msg, module_id, table_id, table_location, table_content_size, table_content,  &actual_module_id, &actual_table_id);
@@ -160,11 +166,12 @@ int ecnl_fill_table(void *ecnl_session, uint32_t table_id, uint32_t table_locati
     return 0;
 }
 
-int ecnl_fill_table_entry(void *ecnl_session, uint32_t table_id, uint32_t table_location, ecnl_table_entry_t *table_entry) {
-    struct nl_sock *sock = ((ecnl_session_t *) ecnl_session)->sock;
-    struct nl_msg *msg = ((ecnl_session_t *) ecnl_session)->msg;
+int ecnl_fill_table_entry(void *ecnl_session_void, uint32_t table_id, uint32_t table_location, ecnl_table_entry_t *table_entry) {
+    ecnl_session_t *ecnl_session = ((ecnl_session_t *) ecnl_session_void);
+    struct nl_sock *sock = ecnl_session->sock;
+    struct nl_msg *msg = ecnl_session->msg;
     CLEAR_MSG;
-    uint32_t module_id = ((ecnl_session_t *) ecnl_session)->module_id;
+    uint32_t module_id = ecnl_session->module_id;
     uint32_t actual_module_id;
     uint32_t actual_table_id;
     int rc = fill_table_entry(sock, msg, module_id, table_id, table_location, table_entry,  &actual_module_id, &actual_table_id);
@@ -174,11 +181,12 @@ int ecnl_fill_table_entry(void *ecnl_session, uint32_t table_id, uint32_t table_
     return 0;
 }
 
-int ecnl_map_ports(void *ecnl_session, uint32_t **table_map_p) {
-    struct nl_sock *sock = ((ecnl_session_t *) ecnl_session)->sock;
-    struct nl_msg *msg = ((ecnl_session_t *) ecnl_session)->msg;
+int ecnl_map_ports(void *ecnl_session_void, uint32_t **table_map_p) {
+    ecnl_session_t *ecnl_session = ((ecnl_session_t *) ecnl_session_void);
+    struct nl_sock *sock = ecnl_session->sock;
+    struct nl_msg *msg = ecnl_session->msg;
     CLEAR_MSG;
-    uint32_t module_id = ((ecnl_session_t *) ecnl_session)->module_id;
+    uint32_t module_id = ecnl_session->module_id;
     uint32_t actual_module_id;
     *table_map_p = malloc(sizeof(uint32_t));
     if (*table_map_p != NULL) {
@@ -192,11 +200,12 @@ int ecnl_map_ports(void *ecnl_session, uint32_t **table_map_p) {
     fatal_error(-1, "table allocation");
 }
 
-int ecnl_start_forwarding(void *ecnl_session) {
-    struct nl_sock *sock = ((ecnl_session_t *) ecnl_session)->sock;
-    struct nl_msg *msg = ((ecnl_session_t *) ecnl_session)->msg;
+int ecnl_start_forwarding(void *ecnl_session_void) {
+    ecnl_session_t *ecnl_session = ((ecnl_session_t *) ecnl_session_void);
+    struct nl_sock *sock = ecnl_session->sock;
+    struct nl_msg *msg = ecnl_session->msg;
     CLEAR_MSG;
-    uint32_t module_id = ((ecnl_session_t *) ecnl_session)->module_id;
+    uint32_t module_id = ecnl_session->module_id;
     uint32_t actual_module_id;
     int rc = start_forwarding(sock, msg, module_id, &actual_module_id);
     if (rc < 0) fatal_error(rc, "start forwarding");
@@ -204,11 +213,12 @@ int ecnl_start_forwarding(void *ecnl_session) {
     return 0;
 }
 
-int ecnl_stop_forwarding(void *ecnl_session) {
-    struct nl_sock *sock = ((ecnl_session_t *) ecnl_session)->sock;
-    struct nl_msg *msg = ((ecnl_session_t *) ecnl_session)->msg;
+int ecnl_stop_forwarding(void *ecnl_session_void) {
+    ecnl_session_t *ecnl_session = ((ecnl_session_t *) ecnl_session_void);
+    struct nl_sock *sock = ecnl_session->sock;
+    struct nl_msg *msg = ecnl_session->msg;
     CLEAR_MSG;
-    uint32_t module_id = ((ecnl_session_t *) ecnl_session)->module_id;
+    uint32_t module_id = ecnl_session->module_id;
     uint32_t actual_module_id;
     int rc = stop_forwarding(sock, msg, module_id, &actual_module_id);
     if (rc < 0) fatal_error(rc, "stop forwarding");
@@ -216,11 +226,12 @@ int ecnl_stop_forwarding(void *ecnl_session) {
     return 0;
 }
 
-int ecnl_read_alo_register(void *ecnl_session, uint32_t port_id, uint32_t alo_reg_no, uint64_t *alo_reg_data_p) {
-    struct nl_sock *sock = ((ecnl_session_t *) ecnl_session)->sock;
-    struct nl_msg *msg = ((ecnl_session_t *) ecnl_session)->msg;
+int ecnl_read_alo_register(void *ecnl_session_void, uint32_t port_id, uint32_t alo_reg_no, uint64_t *alo_reg_data_p) {
+    ecnl_session_t *ecnl_session = ((ecnl_session_t *) ecnl_session_void);
+    struct nl_sock *sock = ecnl_session->sock;
+    struct nl_msg *msg = ecnl_session->msg;
     CLEAR_MSG;
-    uint32_t module_id = ((ecnl_session_t *) ecnl_session)->module_id;
+    uint32_t module_id = ecnl_session->module_id;
     uint32_t actual_module_id;
     uint32_t actual_port_id;
     alo_reg_t settable_alo_reg;
@@ -238,11 +249,12 @@ int ecnl_read_alo_register(void *ecnl_session, uint32_t port_id, uint32_t alo_re
     return rc;
 }
 
-int ecnl_retrieve_ait_message(void *ecnl_session, uint32_t port_id, buf_desc_t **buf_desc_pp) {
-    struct nl_sock *sock = ((ecnl_session_t *) ecnl_session)->sock;
-    struct nl_msg *msg = ((ecnl_session_t *) ecnl_session)->msg;
+int ecnl_retrieve_ait_message(void *ecnl_session_void, uint32_t port_id, buf_desc_t **buf_desc_pp) {
+    ecnl_session_t *ecnl_session = ((ecnl_session_t *) ecnl_session_void);
+    struct nl_sock *sock = ecnl_session->sock;
+    struct nl_msg *msg = ecnl_session->msg;
     CLEAR_MSG;
-    uint32_t module_id = ((ecnl_session_t *) ecnl_session)->module_id;
+    uint32_t module_id = ecnl_session->module_id;
     uint32_t actual_module_id;
     uint32_t actual_port_id;
     alo_reg_t alo_reg;
@@ -260,11 +272,12 @@ int ecnl_retrieve_ait_message(void *ecnl_session, uint32_t port_id, buf_desc_t *
     fatal_error(-1, "link_state allocation");
 }
 
-int ecnl_write_alo_register(void *ecnl_session, uint32_t port_id, uint32_t alo_reg_no, uint64_t alo_reg_data) {
-    struct nl_sock *sock = ((ecnl_session_t *) ecnl_session)->sock;
-    struct nl_msg *msg = ((ecnl_session_t *) ecnl_session)->msg;
+int ecnl_write_alo_register(void *ecnl_session_void, uint32_t port_id, uint32_t alo_reg_no, uint64_t alo_reg_data) {
+    ecnl_session_t *ecnl_session = ((ecnl_session_t *) ecnl_session_void);
+    struct nl_sock *sock = ecnl_session->sock;
+    struct nl_msg *msg = ecnl_session->msg;
     CLEAR_MSG;
-    uint32_t module_id = ((ecnl_session_t *) ecnl_session)->module_id;
+    uint32_t module_id = ecnl_session->module_id;
     uint32_t actual_module_id;
     uint32_t actual_port_id;
     alo_reg_t alo_reg;
@@ -277,11 +290,12 @@ int ecnl_write_alo_register(void *ecnl_session, uint32_t port_id, uint32_t alo_r
     return 0;
 }
 
-int ecnl_send_ait_message(void *ecnl_session, uint32_t port_id, buf_desc_t buf_desc) {
-    struct nl_sock *sock = ((ecnl_session_t *) ecnl_session)->sock;
-    struct nl_msg *msg = ((ecnl_session_t *) ecnl_session)->msg;
+int ecnl_send_ait_message(void *ecnl_session_void, uint32_t port_id, buf_desc_t buf_desc) {
+    ecnl_session_t *ecnl_session = ((ecnl_session_t *) ecnl_session_void);
+    struct nl_sock *sock = ecnl_session->sock;
+    struct nl_msg *msg = ecnl_session->msg;
     CLEAR_MSG;
-    uint32_t module_id = ((ecnl_session_t *) ecnl_session)->module_id;
+    uint32_t module_id = ecnl_session->module_id;
     uint32_t actual_module_id;
     uint32_t actual_port_id;
     int rc = send_ait_message(sock, msg, module_id, port_id, buf_desc, &actual_module_id, &actual_port_id);
@@ -294,11 +308,12 @@ int ecnl_send_ait_message(void *ecnl_session, uint32_t port_id, buf_desc_t buf_d
 // fire-and-forget (i.e. no response)
 
 // SEND_DISCOVER_MESSAGE(uint32_t module_id, uint32_t port_id, uint32_t message_length, uint8_t *message)
-int ecnl_send_discover_message(void *ecnl_session, uint32_t port_id, buf_desc_t buf_desc) {
-    struct nl_sock *sock = ((ecnl_session_t *) ecnl_session)->sock;
-    struct nl_msg *msg = ((ecnl_session_t *) ecnl_session)->msg;
+int ecnl_send_discover_message(void *ecnl_session_void, uint32_t port_id, buf_desc_t buf_desc) {
+    ecnl_session_t *ecnl_session = ((ecnl_session_t *) ecnl_session_void);
+    struct nl_sock *sock = ecnl_session->sock;
+    struct nl_msg *msg = ecnl_session->msg;
     CLEAR_MSG;
-    uint32_t module_id = ((ecnl_session_t *) ecnl_session)->module_id;
+    uint32_t module_id = ecnl_session->module_id;
     // This one doesn't take mp, pp?
     int rc = send_discover_message(sock, msg, module_id, port_id, buf_desc);
     if (rc < 0) fatal_error(rc, "send_discover_message");
@@ -309,11 +324,12 @@ int ecnl_send_discover_message(void *ecnl_session, uint32_t port_id, buf_desc_t 
 
 // dummy func ?? (aka send_ait_message)
 
-int ecnl_signal_ait_message(void *ecnl_session, uint32_t port_id, buf_desc_t buf_desc) {
-    struct nl_sock *sock = ((ecnl_session_t *) ecnl_session)->sock;
-    struct nl_msg *msg = ((ecnl_session_t *) ecnl_session)->msg;
+int ecnl_signal_ait_message(void *ecnl_session_void, uint32_t port_id, buf_desc_t buf_desc) {
+    ecnl_session_t *ecnl_session = ((ecnl_session_t *) ecnl_session_void);
+    struct nl_sock *sock = ecnl_session->sock;
+    struct nl_msg *msg = ecnl_session->msg;
     CLEAR_MSG;
-    uint32_t module_id = ((ecnl_session_t *) ecnl_session)->module_id;
+    uint32_t module_id = ecnl_session->module_id;
     uint32_t actual_module_id;
     uint32_t actual_port_id;
     int rc = signal_ait_message(sock, msg, module_id, port_id, buf_desc, &actual_module_id, &actual_port_id);
