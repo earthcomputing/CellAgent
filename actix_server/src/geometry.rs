@@ -13,15 +13,19 @@ pub fn cell_geometry(path: &str, is_border: bool, state: web::Data<AppGeometry>,
                  -> Result<impl Responder, Error> {
     let trace_body = record.get("body").expect("HelloMsg: bad trace record");
     let body: Body = serde_json::from_value(trace_body.clone())?;
+    cell_geometry_body(path, is_border, state, body)
+}
+pub fn cell_geometry_body(path: &str, is_border: bool, state: web::Data<AppGeometry>, body: Body)
+        -> Result<impl Responder, Error>{
     let name = body.cell_id.name;
     let location = body.location;
     let app_geometry = state.get_ref();
-    app_geometry.geometry.lock().unwrap().add(CellID { name },
+    app_geometry.geometry.lock().unwrap().add(CellID { name: name.clone() },
                                               Location { row: location[0], col: location[1], is_border });
-    Ok(HttpResponse::Ok().body(format!("{} adding {}\n{:?}\n", path, record, app_geometry)))
+    Ok(HttpResponse::Ok().body(format!("{} adding {}\n{:?}\n", path, name, app_geometry)))
 }
 #[derive(Debug, Clone, Serialize, Deserialize)]
-struct Body {
+pub struct Body {
     cell_id: CellID,
     location: [usize; 2]
 }

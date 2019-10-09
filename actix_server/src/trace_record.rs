@@ -1,18 +1,18 @@
-use serde_json::Value;
 use serde::{Deserialize};
+use serde_json::Value;
 
-#[derive(Deserialize)]
+#[derive(Debug, Deserialize)]
 pub struct TraceRecord {
-    header: Header,
+    header: TraceHeader,
     pub body: Value
 }
 impl TraceRecord {
-    pub fn header(&self) -> &Header { &self.header }
+    pub fn header(&self) -> &TraceHeader { &self.header }
     pub fn body(&self) -> &Value { &self.body }
 }
 
-#[derive(Deserialize)]
-pub struct Header {
+#[derive(Debug, Deserialize)]
+pub struct TraceHeader {
     starting_epoch: u64,
     epoch: u64,
     spawning_thread_id: usize,
@@ -24,4 +24,7 @@ pub struct Header {
     function: String,
     format: String,
     repo: String,
+}
+impl TraceHeader {
+    pub fn format(&self) -> &str { &self.format }
 }
