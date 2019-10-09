@@ -65,6 +65,11 @@ struct CellID {
 pub struct AppCells {
     pub appcells: Mutex<HashMap<String,AppCell>>
 }
+impl AppCells {
+    pub fn clear(&mut self) {
+        self.appcells = Mutex::new(HashMap::default());
+    }
+}
 #[derive(Debug, Clone, Eq, Default, PartialEq, Serialize, Deserialize)]
 pub struct AppCell {
     pub neighbors: Neighbors,

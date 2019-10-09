@@ -5,8 +5,6 @@ use std::{env,
 use actix_web::{web, App, HttpServer, Responder, HttpResponse};
 
 use ec_trace_analyzer::{discoverd, geometry, hello, index, replay, stacktreed};
-use geometry::{AppGeometry, RowCol};
-use hello::{AppCells, Neighbors, Trees};
 
 fn main() {
     let server_url = env::var("SERVER_URL").expect("Environment variable SERVER_URL not found");

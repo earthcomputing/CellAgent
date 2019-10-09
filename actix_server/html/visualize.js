@@ -7,10 +7,32 @@ let canvas;
 window.onload = function() {
     canvas = document.getElementById("viz-canvas");
 }
+function clear_dispay() {
+    let buttons = document.querySelectorAll(".stackedtreebutton");
+    if (buttons.length > 0 ) {
+        for (button of buttons) {
+            button.parentNode.removeChild(button);
+        }
+    }
+    let lines = document.querySelectorAll(".line");
+    if (lines.length > 0) {
+        for (line_index of lines) {
+            let line = lines[line_indes]
+            line.parentNode.removeChild(line)
+        }
+    }
+    let circles = document.querySelectorAll(".circle");
+    if (circles.length > 0) {
+        for (circle_index of circles) {
+            let circle = circles[circle_index];
+            circle.parentNode.removeChild(circle);
+        }
+    }
+}
 function visualize() {
     canvas.innerHTML = "";
     const Http = new XMLHttpRequest();
-    clear_buttons();
+    clear_dispay();
     const url = 'http://127.0.0.1:8088/';
     Http.open("GET", url + "geometry");
     Http.send();
@@ -39,14 +61,6 @@ function visualize() {
                     }
                 }
             }
-        }
-    }
-}
-function clear_buttons() {
-    let buttons = document.querySelectorAll(".stackedtreebutton");
-    if (buttons.length > 0 ) {
-        for (button of buttons) {
-            button.parentNode.removeChild(button);
         }
     }
 }
