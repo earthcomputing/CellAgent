@@ -4,12 +4,12 @@ use std::{
           io::{prelude::*, BufReader},
 };
 
-use actix_web::{web, Error, Responder, HttpResponse, Scope};
+use actix_web::{http, web, Error, Responder, HttpResponse, Scope};
 use serde::{Deserialize, Serialize};
 
 use crate::{discoverd, geometry, hello, stacktreed};
 use crate::geometry::{AppGeometry, RowCol};
-use crate::hello::{AppCells, Neighbors, Trees};
+use crate::hello::{AppCells};
 use crate::trace_record::TraceRecord;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -56,7 +56,8 @@ fn replay_from_file(appcells: web::Data<AppCells>, appgeometry: web::Data<AppGeo
             _ => ()
         }
     }
-    Ok(HttpResponse::Ok()
+    Ok(HttpResponse::Found()
+        .header(http::header::LOCATION, "/")
         .content_type("text/plain")
         .body(format!("Replay from file {}", filename)))
 }
