@@ -948,7 +948,8 @@ impl CellAgent {
             let sender_id = SenderID::new(self.cell_id, "CellAgent")?;
             let in_reply_to = msg.get_sender_msg_seq_no();
             let discoverd_msg = DiscoverDMsg::new(in_reply_to, sender_id,
-                       self.cell_id, new_port_tree_id, path, DiscoverDType::Subsequent);
+                       self.cell_id, new_port_tree_id, path,
+                                     DiscoverDType::Subsequent);
             let mask = Mask::new(port_number);
             self.send_msg(self.get_connected_tree_id(),
                           &discoverd_msg, mask).context(CellagentError::Chain { func_name: "process_ca", comment: S("DiscoverMsg") })?;
@@ -1018,12 +1019,13 @@ impl CellAgent {
             let element = traph.get_element(port_no)?;
             let path = element.get_path();
             let discoverd_msg = DiscoverDMsg::new(in_reply_to, sender_id,
-                                                  self.cell_id, port_tree_id, path, DiscoverDType::First);
+                                                  self.cell_id, port_tree_id, path,
+                                                  DiscoverDType::First);
             let mask = Mask::new(port_number);
             self.send_msg(self.get_connected_tree_id(),
                           &discoverd_msg, mask).context(CellagentError::Chain { func_name: "process_ca", comment: S("DiscoverMsg") })?;
         }
-        match msg.get_discover_type() {
+        match msg.get_discoverd_type() {
             DiscoverDType::Subsequent => {
                 let traph = self.get_traph_mut(port_tree_id)?;
                 let element = traph.get_element_mut(port_no)?;
@@ -1035,7 +1037,10 @@ impl CellAgent {
             DiscoverDType::First => {
                 let path = msg.get_path();
                 let port_number = port_no.make_port_number(self.no_ports)?;
-                let children = [port_number].iter().cloned().collect::<HashSet<_>>();
+                let children = [port_number]
+                    .iter()
+                    .cloned()
+                    .collect::<HashSet<_>>();
                 let port_state = PortState::Child;
                 let mut eqns = HashSet::new();
                 eqns.insert(GvmEqn::Recv("true"));
@@ -1055,10 +1060,10 @@ impl CellAgent {
                 let _ = self.update_traph(port_tree_id, port_number, port_state, &gvm_eqn,
                                           children, PathLength(CellQty(0)), path)?;
                 if tree_id == self.my_tree_id &&
-                    self.is_border_port_connected &&
-                    !self.sent_to_noc &&
-                    self.is_border() &&
-                    self.is_discover_done() {
+                              self.is_border_port_connected &&
+                              !self.sent_to_noc &&
+                              self.is_border() &&
+                              self.is_discover_done() {
                     self.send_base_tree_to_noc()?;
                 }
             }
