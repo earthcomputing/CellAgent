@@ -1,5 +1,8 @@
 #include "ecnl_proto.h"
 
+int ecp_verbose = 1;
+#define ECP_DEBUG(fmt, args...) if (ecp_verbose) { printf(fmt, ## args); } else { }
+
 #define __ADD(id, name) { .i = id, .a = #name }
 
 typedef struct {
@@ -81,12 +84,12 @@ extern void fatal_error(int err, const char *fmt, ...) {
 }
 
 static void dump_block(void *d, int nbytes) {
-    printf("nbytes: %d\n        ", nbytes);
+    ECP_DEBUG("nbytes: %d\n        ", nbytes);
     for (int i = 0; i < nbytes; i++) {
-        printf("%02x", ((char *) d)[i] & 0xff);
-        if (i % 16 == 15) printf("\n        ");
+        ECP_DEBUG("%02x", ((char *) d)[i] & 0xff);
+        if (i % 16 == 15) ECP_DEBUG("\n        ");
     }
-    printf("\n");
+    ECP_DEBUG("\n");
 }
 
 // .genlhdr
@@ -97,12 +100,12 @@ static int parse_generic(struct nl_cache_ops *unused, struct genl_cmd *cmd, stru
     if (cbi->magic != 0x5a5a) fatal_error(-1, "garbled callback arg");
     struct nlmsghdr *nlh = info->nlh;
 
-    printf("parse_generic:\n");
+    ECP_DEBUG("parse_generic:\n");
 
-    if (nlh->nlmsg_type == NLMSG_ERROR) { printf("NLMSG_ERROR\n"); return -1; } // FIXME: should this be NL_OK ??
+    if (nlh->nlmsg_type == NLMSG_ERROR) { ECP_DEBUG("NLMSG_ERROR\n"); return -1; } // FIXME: should this be NL_OK ??
 
     int err = genlmsg_parse(nlh, 0, &cbi->tb[0], NL_ECNL_ATTR_MAX, attr_policy);
-    if (err < 0) { printf("genlmsg_parse error\n"); return NL_SKIP; } // FIXME: what return code here ??
+    if (err < 0) { ECP_DEBUG("genlmsg_parse error\n"); return NL_SKIP; } // FIXME: what return code here ??
 
     for (int i = 0; i < ARRAY_SIZE(attr_names); i++) {
         const trans_tbl_t *tp = &attr_names[i];
@@ -112,12 +115,12 @@ static int parse_generic(struct nl_cache_ops *unused, struct genl_cmd *cmd, stru
         struct nla_policy *pp = &attr_policy[attr];
         switch (pp->type) {
         // NLA_FLAG NLA_U8 NLA_U16 NLA_MSECS NLA_STRING NLA_UNSPEC NLA_NESTED
-        case NLA_U32: printf("%s(%ld): %d\n", tp->a, attr, nla_get_u32(na)); continue;
-        case NLA_U64: printf("%s(%ld): %ld\n", tp->a, attr, nla_get_u64(na)); continue;
-        case NLA_NUL_STRING: printf("%s(%ld): \"%s\"\n", tp->a, attr, nla_get_string(na)); continue;
-        case NL_ECNL_ATTR_UNSPEC: printf("%s(%ld): block ", tp->a, attr); dump_block(nla_data(na), nla_len(na)); continue;
+        case NLA_U32: ECP_DEBUG("%s(%ld): %d\n", tp->a, attr, nla_get_u32(na)); continue;
+        case NLA_U64: ECP_DEBUG("%s(%ld): %ld\n", tp->a, attr, nla_get_u64(na)); continue;
+        case NLA_NUL_STRING: ECP_DEBUG("%s(%ld): \"%s\"\n", tp->a, attr, nla_get_string(na)); continue;
+        case NL_ECNL_ATTR_UNSPEC: ECP_DEBUG("%s(%ld): block ", tp->a, attr); dump_block(nla_data(na), nla_len(na)); continue;
         }
-        printf("%s (%ld)\n", tp->a, attr);
+        ECP_DEBUG("%s (%ld)\n", tp->a, attr);
     }
     return NL_OK;
 }
@@ -144,7 +147,7 @@ static int parse_cmd_new(struct nl_cache_ops *unused, struct genl_cmd *cmd, stru
 /*
     if (attrs[xx]) {
         struct yy *yy = nla_data(attrs[xx]);
-        printf("%s pid %u uid %u gid %u parent %u\n", yy->ac_comm, yy->ac_pid, yy->ac_uid, yy->ac_gid, yy->ac_ppid);
+        ECP_DEBUG("%s pid %u uid %u gid %u parent %u\n", yy->ac_comm, yy->ac_pid, yy->ac_uid, yy->ac_gid, yy->ac_ppid);
     }
 */
 
@@ -282,7 +285,7 @@ extern int get_link_state(struct nlattr **tb, link_state_t *lp) {
     struct nl_cb *s_cb = nl_socket_get_cb(sock); \
     if ((err = nl_socket_modify_cb(sock, NL_CB_VALID, NL_CB_CUSTOM, parse_cb, &cbi)) < 0) { fatal_error(err, "Unable to modify valid message callback"); } \
     if ((err = nl_recvmsgs_report(sock, s_cb)) < 0) { fatal_error(err, fmt "Unable to receive message: %s", ##args, nl_geterror(err)); } \
-    printf("nl_recvmsgs_report: %d msgs processed\n\n", err);
+    ECP_DEBUG("nl_recvmsgs_report: %d msgs processed\n\n", err);
 
 // "ecnl0"
 // GET_MODULE_INFO(uint32_t module_id)
@@ -560,19 +563,19 @@ extern int retrieve_ait_message(struct nl_sock *sock, struct nl_msg *msg, uint32
     *pp = port_id;
 
     if (!buf) {
-        printf("retrieve_ait_message - no result buffer ?\n");
+        ECP_DEBUG("retrieve_ait_message - no result buffer ?\n");
         return 0;
     }
 
     if (!buf->frame) {
-        printf("retrieve_ait_message - allocating return buffer (%d)\n", message_length);
+        ECP_DEBUG("retrieve_ait_message - allocating return buffer (%d)\n", message_length);
         buf->frame = malloc(message_length);
         if (!buf->frame) { perror("malloc"); return -1; }
         buf->len = message_length;
     }
 
     if (buf->len < message_length) {
-        printf("retrieve_ait_message - return buffer too small (%d), reallocated (%d)\n", buf->len, message_length);
+        ECP_DEBUG("retrieve_ait_message - return buffer too small (%d), reallocated (%d)\n", buf->len, message_length);
         buf->frame = malloc(message_length);
         if (!buf->frame) { perror("malloc"); return -1; }
         buf->len = message_length;
@@ -580,7 +583,7 @@ extern int retrieve_ait_message(struct nl_sock *sock, struct nl_msg *msg, uint32
 
     nla_memcpy(buf->frame, cbi.tb[NL_ECNL_ATTR_MESSAGE], buf->len); // nla_get_unspec
 
-    printf("retr buffer: ");
+    ECP_DEBUG("retr buffer: ");
     dump_block(buf->frame, buf->len); // ugh: cbi.tb[NL_ECNL_ATTR_MESSAGE], message_length
 
 }
@@ -621,7 +624,7 @@ extern int send_ait_message(struct nl_sock *sock, struct nl_msg *msg, uint32_t m
     nl_complete_msg(sock, msg);
     if ((err = nl_send(sock, msg)) < 0) { fatal_error(err, "Unable to send message: %s", nl_geterror(err)); }
 
-    printf("send buffer: ");
+    ECP_DEBUG("send buffer: ");
     dump_block(buf.frame, buf.len);
 
 {
@@ -754,6 +757,8 @@ WAIT_ACK;
     return 0;
 }
 
+static int registered = 1;
+
 extern struct nl_sock *init_sock() {
     int err;
 
@@ -761,15 +766,22 @@ extern struct nl_sock *init_sock() {
     nl_connect(sock, NETLINK_GENERIC);
     // nl_socket_disable_seq_check(sock); // FIXME: resp seqno = req seqno
 
+if (!registered) {
+    registered++;
+}
+
     // ref: lib/genl/mngt.c
     if ((err = genl_register_family(&ops)) < 0) {
-        fatal_error(err, "Unable to register Generic Netlink family: \"%s\"", ops.o_name);
+        // fatal_error(err, "Unable to register Generic Netlink family: \"%s\"", ops.o_name);
+        ECP_DEBUG("genl_register_family: %d\n", err);
     }
 
     if ((err = genl_ops_resolve(sock, &ops)) < 0) {
-        fatal_error(err, "Unable to resolve family: \"%s\"", ops.o_name);
+        // fatal_error(err, "Unable to resolve family: \"%s\"", ops.o_name);
+        ECP_DEBUG("genl_ops_resolve: %d\n", err);
     }
 
-    printf("genl_ops_resolve: \"%s\" => %d\n", ops.o_name, ops.o_id);
+    ECP_DEBUG("genl_ops_resolve: \"%s\" => %d\n", ops.o_name, ops.o_id);
+    ECP_DEBUG("\n");
     return sock;
 }
