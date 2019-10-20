@@ -1,5 +1,6 @@
 # sudo env NLCB=debug NLDBG=4 ./genl_sample
 # sudo env NLCB=debug NLDBG=4 ./mock_exchange
+# sudo env NLCB=debug NLDBG=4 ./atomic_link
 
 CFLAGS += -fPIC
 CFLAGS += -I/usr/include/libnl3
@@ -25,4 +26,6 @@ all: genl_sample mock_exchange route-repair
 genl_sample: $(OBJS)
 
 mock_exchange: ecnl_proto.o mock_exchange.o
+
+atomic_link: ecnl_proto.o atomic_link.o
 
