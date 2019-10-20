@@ -76,6 +76,7 @@ extern int signal_ait_message(struct nl_sock *sock, struct nl_msg *msg, uint32_t
 
 #define ECNL_GENL_VERSION 0x0000 // "0.0.0.2"
 
+extern int ecp_verbose;
 extern void dump_msg(void *user_hdr);
 extern void fatal_error(int err, const char *fmt, ...);
 
