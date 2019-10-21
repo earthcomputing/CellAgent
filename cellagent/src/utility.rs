@@ -348,7 +348,7 @@ pub fn _print_vec<T: fmt::Display>(vector: &[T]) {
 pub fn _print_hash_set<T: fmt::Display + Eq + std::hash::Hash>(hashset: &HashSet<T>) {
     for v in hashset.iter() { println!("{}", v); }
 }
-pub fn _print_hash_map<K: fmt::Display + Eq + std::hash::Hash, T: fmt::Display + Eq + std::hash::Hash>(hashmap: &HashMap<K, T>) {
+pub fn print_hash_map<K: fmt::Display + Eq + std::hash::Hash, T: fmt::Display + Eq + std::hash::Hash>(hashmap: &HashMap<K, T>) {
     for (k, v) in hashmap.iter() { println!("{}: {}", k, v); }
 }
 pub fn new_hashset<T: Clone + Eq + std::hash::Hash>(values: &[T]) -> HashSet<T> {
