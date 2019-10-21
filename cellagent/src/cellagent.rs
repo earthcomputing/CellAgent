@@ -46,7 +46,7 @@ use crate::vm::VirtualMachine;
 use failure::{Error, ResultExt, Fail};
 use crate::app_message_formats::{CaFromPort};
 
-type BorderTreeIDMap = HashMap<PortNumber, (SenderID, TreeID)>;
+type BorderSenderIDMap = HashMap<PortNumber, SenderID>;
 type MsgNameMap = HashMap<TreeID, AllowedTree>;
 pub type PortTreeIDMap = HashMap<Uuid, PortTreeID>;
 pub type SavedDiscover = DiscoverMsg;
@@ -76,7 +76,7 @@ pub struct CellAgent {
     traphs: Traphs,
     traphs_mutex: Arc<Mutex<Traphs>>, // Needed so I can print from main() because I have to clone to get self.traphs into the thread
     tree_map: TreeMap, // Base tree for given stacked tree
-    border_port_tree_id_map: BorderTreeIDMap, // Find the tree id associated with a border port
+    border_port_tree_id_map: BorderSenderIDMap, // Find the tree id associated with a border port
     base_tree_map: HashMap<PortTreeID, TreeID>, // Find the black tree associated with any tree, needed for stacking
     tree_id_map: PortTreeIDMap,
     tenant_masks: Vec<Mask>,
@@ -280,7 +280,7 @@ impl CellAgent {
         let _f = "get_border_port";
         let entry = self.border_port_tree_id_map
             .iter()
-            .find(|(_, (sender_id, _))| test_sender_id == sender_id )
+            .find(|(_, sender_id)| test_sender_id == *sender_id )
             .ok_or(CellagentError::Sender { func_name: _f, cell_id: self.cell_id, sender_id: test_sender_id.clone() })?;
         Ok(*entry.0)
     }
@@ -841,8 +841,8 @@ impl CellAgent {
                     let port_number = port_no.make_port_number(self.no_ports).context(CellagentError::Chain { func_name: _f, comment: S(self.cell_id) + " PortNumber" })?;
                     let sender_id = self.border_port_tree_id_map
                         .get(&port_number)
-                        .ok_or::<Error>(CellagentError::Border { func_name: _f, cell_id: self.cell_id, port_no: *port_no }.into())?
-                        .0;
+                        .cloned()
+                        .ok_or::<Error>(CellagentError::Border { func_name: _f, cell_id: self.cell_id, port_no: *port_no }.into())?;
                     // Verify that this sender can name this tree
                     if !self.name_tree_map.lock().unwrap().contains_key(&sender_id) {
                         return Err(CellagentError::TreeNameMap { func_name: _f, cell_id: self.cell_id, sender_id }.into());
@@ -1318,7 +1318,7 @@ impl CellAgent {
         let _f = "process_stack_treed_msg";
         {
             if CONFIG.trace_options.all || CONFIG.trace_options.ca {
-                let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "stack_treed_msg" };
+                let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "ca_process_stack_treed_msg" };
                 let trace = json!({ "cell_id": &self.cell_id, "port_no": port_no, "msg": msg.value() });
                 let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
             }
@@ -1633,7 +1633,7 @@ impl CellAgent {
             let base_tree_name = AllowedTree::new(BASE_TREE_NAME);
             let sender_id = SenderID::new(self.cell_id, &format!("BorderPort+{}", *port_no))?;
             self.add_tree_name_map_item(sender_id,&base_tree_name, self.my_tree_id);
-            self.border_port_tree_id_map.insert(port_number, (sender_id, new_tree_id));
+            self.border_port_tree_id_map.insert(port_number, sender_id);
             self.is_border_port_connected = true;
             if !self.sent_to_noc &&
                 self.is_border_port_connected && // Just to remind myself
