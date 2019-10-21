@@ -30,6 +30,7 @@ pub fn process_stack_treed_body(appcells: web::Data<AppCells>, body: Body)
     let recv_port = body.port_no;
     let tree_name = body.msg.payload.port_tree_id.name;
     let join = body.msg.payload.join;
+    println!("stack tree: cell {} port {} tree {}", this_cell_name, recv_port, tree_name);
     let mut cells = appcells
         .get_ref()
         .appcells.lock().unwrap();
