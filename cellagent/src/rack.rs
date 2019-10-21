@@ -154,13 +154,13 @@ impl Rack {
 }
 impl fmt::Display for Rack {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let mut s = format!("Links");
+        let mut s = format!("\nLinks\n");
         for (_edge, link) in &self.links {
-            write!(s, "{}", link)?;
+            write!(s, "  {}\n", link)?;
         }
         s = s + "\nCells";
         for i in 0..self.cells.len() {
-            if i < 30 { write!(s, "\n{}", self.cells[&CellNo(i)])?; }
+            if i < 30 { write!(s, "\n{}\n", self.cells[&CellNo(i)])?; }
         }
         write!(f, "{}", s)
     }

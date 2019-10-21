@@ -12,7 +12,7 @@ use ec_fabrix::datacenter::{Datacenter};
 use ec_fabrix::gvm_equation::{GvmEqn};
 use ec_fabrix::link::Link;
 use ec_fabrix::uptree_spec::{AllowedTree, ContainerSpec, Manifest, UpTreeSpec, VmSpec};
-use ec_fabrix::utility::{CellConfig, CellNo, Edge, S, _print_hash_map, sleep};
+use ec_fabrix::utility::{CellConfig, CellNo, Edge, S, print_hash_map, sleep};
 
 fn main() -> Result<(), Error> {
     let _f = "main";
@@ -63,7 +63,7 @@ fn main() -> Result<(), Error> {
 fn show_ca(dc: &Datacenter) -> Result<(), Error> {
     let rack = dc.get_rack();
     let cells = rack.get_cells();
-    _print_hash_map(&rack.get_cell_ids());
+    print_hash_map(&rack.get_cell_ids());
     let _ = stdout().write(b"Enter cell to display cell\n")?;
     let cell_no = read_int()?;
     cells.get(&CellNo(cell_no))
@@ -76,7 +76,7 @@ fn show_ca(dc: &Datacenter) -> Result<(), Error> {
 fn show_pe(dc: &Datacenter) -> Result<(), Error> {
     let rack = dc.get_rack();
     let cells = rack.get_cells();
-    _print_hash_map(&rack.get_cell_ids());
+    print_hash_map(&rack.get_cell_ids());
     let _ = stdout().write(b"Enter cell to display forwarding table\n")?;
     let cell_no = read_int()?;
     cells.get(&CellNo(cell_no))
@@ -98,7 +98,7 @@ fn break_link(dc: &mut Datacenter) -> Result<(), Error> {
         },
         None => {
             let link_ids = rack.get_link_ids();
-            _print_hash_map(&link_ids);
+            print_hash_map(&link_ids);
             let _ = stdout().write(b"Enter first cell number of link to break\n")?;
             let left: usize = read_int()?;
             let _ = stdout().write(b"Enter second cell number of link to break\n")?;
