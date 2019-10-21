@@ -383,7 +383,8 @@ int entl_received(entl_state_machine_t *mcn, uint16_t from_hi, uint32_t from_lo,
 
                     // FIXME: what about when q is full?
                     // add to recvq
-                    STM_TDEBUG("recvq_push - delivered %d avail %d", delivered, avail);
+                    int recv_space = recvq_push(mcn);
+                    STM_TDEBUG("recvq_push - delivered %d avail %d xx %d", delivered, avail, recv_space);
                     mcn->receive_buffer = NULL;
                     ret_action = ENTL_ACTION_SEND | ENTL_ACTION_SIG_AIT;
                 }
