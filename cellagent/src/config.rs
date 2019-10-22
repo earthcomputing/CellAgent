@@ -111,7 +111,7 @@ pub struct DebugOptions {
     pub traph_entry:    bool,
 }
 // Size of various fields
-#[derive(Debug, Copy, Clone, Default, Eq, Hash, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Copy, Clone, Default, Eq, Hash, PartialEq, Ord, PartialOrd, Serialize, Deserialize)]
 pub struct CellQty(pub usize);
 impl Deref for CellQty { type Target = usize; fn deref(&self) -> &Self::Target { &self.0 } }
 impl fmt::Display for CellQty { fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result { write!(f, "{}", self.0)} }
@@ -130,7 +130,7 @@ impl Deref for MaskValue { type Target = u16; fn deref(&self) -> &Self::Target {
 #[derive(Debug, Copy, Clone, Default, Serialize)]
 pub struct PacketNo(pub u16);
 impl Deref for PacketNo { type Target = u16; fn deref(&self) -> &Self::Target { &self.0 } }
-#[derive(Debug, Copy, Clone, Default, Hash, Eq, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Copy, Clone, Default, Hash, Eq, PartialEq, Ord, PartialOrd, Serialize, Deserialize)]
 pub struct PathLength(pub CellQty);
 impl Deref for PathLength { type Target = CellQty; fn deref(&self) -> &Self::Target { &self.0 } }
 impl fmt::Display for PathLength { fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result { write!(f, "{}", *self.0)} }

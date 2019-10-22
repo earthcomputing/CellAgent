@@ -1,0 +1,124 @@
+#viz-canvas {
+    background-color: #f8f8f8;
+    width : 1000px;
+    height : 1000px;
+}
+.node {
+    stroke : black;
+    fill : lightgreen;
+    stroke-width : 2px;
+    r: 10;
+}
+.nodeborder {
+    stroke : orange;
+    stroke-width : 2px;
+    fill : lightgreen;
+    r: 10;
+}
+.nodetree {
+    stroke : black;
+    stroke-width : 2px;
+    fill: lightgreen;
+    r: 10;
+}
+.nodetreeborder {
+    stroke : orange;
+    stroke-width : 2px;
+    fill: lightgreen;
+    r: 10;
+}
+.noderoot {
+    stroke : black;
+    stroke-width : 2px;
+    fill : black;
+    r: 10;
+}
+.noderootborder {
+    stroke : orange;
+    stroke-width : 2px;
+    fill : black;
+    r: 10;
+}
+.nodestacked {
+    stroke : black;
+    stroke-width : 2px;
+    fill : #8888FF;
+    r: 10;
+}
+.nodestackedborder {
+    stroke : orange;
+    stroke-width : 2px;
+    fill : #8888FF;
+    r: 10;
+}
+.link {
+    stroke : lightgreen;
+    stroke-width : 4px;
+}
+.linktree {
+    stroke : black;
+    stroke-width : 6px;
+    marker-end: url(#arrow-head);
+}
+.linkstackedtree {
+    stroke : blue;
+    stroke-width : 4px;
+    marker-end: url(#arrow-head);
+}
+.linkbroken {
+    stroke : red;
+    stroke-width: 4px;
+}
+.stackedtreebutton {
+    stroke: black;
+    stroke-width: 4px;
+    background: lightblue;
+}
+.tooltip {
+    font-size: 80%;
+    position: fixed;
+    top: 26%;
+    left: 50;
+    width: auto;
+    height: auto;
+    padding: 10px;
+    background-color: lightblue;
+    -webkit-border-radius: 10px;
+    -moz-border-radius: 10px;
+    border-radius: 10px;
+    -webkit-box-shadow: 4px 4px 10px rgba(0, 0, 0, 0.4);
+    -moz-box-shadow: 4px 4px 10px rgba(0, 0, 0, 0.4);
+    box-shadow: 4px 4px 10px rgba(0, 0, 0, 0.4);
+    pointer-events: none;
+}
+.tooltip.hidden {
+    position : absolute;
+    display : none;
+}
+// https://www.w3schools.com/howto/tryit.asp?filename=tryhow_css_loader5
+#loader {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  z-index: 1;
+  width: 150px;
+  height: 150px;
+  margin: -75px 0 0 -75px;
+  border: 16px solid #f3f3f3;
+  border-radius: 50%;
+  border-top: 16px solid #3498db;
+  width: 120px;
+  height: 120px;
+  -webkit-animation: spin 2s linear infinite;
+  animation: spin 2s linear infinite;
+}
+
+@-webkit-keyframes spin {
+  0% { -webkit-transform: rotate(0deg); }
+  100% { -webkit-transform: rotate(360deg); }
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}

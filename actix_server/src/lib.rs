@@ -5,7 +5,10 @@
 //#![allow(unused_imports)]
 //#![warn(rust_2018_idioms)]
 
-#[macro_use] extern crate serde_derive;
-#[macro_use] extern crate serde_json;
-
+pub mod discoverd;
 pub mod geometry;
+pub mod hello;
+pub mod index;
+pub mod replay;
+pub mod stacktreed;
+pub mod trace_record;
