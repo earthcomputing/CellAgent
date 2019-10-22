@@ -1335,8 +1335,9 @@ impl CellAgent {
                 let _ = add_to_trace(TraceType::Debug, trace_params, &trace, _f);
             }
         }
-        child_ports.remove(&port_no);
-        if child_ports.len() == 0 {
+        let old_len = child_ports.len();
+        child_ports.remove(&port_no); // Can't move to after if-block due to borrow checker
+        if old_len == 1 {
             let port_number = parent_port.make_port_number(self.no_ports)?;
             if parent_port == PortNo(0) {
                 // I am the root of the tree.  I need to tell the sender.
