@@ -45,7 +45,31 @@ typedef struct {
 typedef struct {
     uint32_t magic;
     struct nlattr *tb[NL_ECNL_ATTR_MAX+1];
+
+    // "simple" attributes:
+    uint32_t alo_flag;
+    uint32_t message_length;
+    uint32_t module_id;
+    uint32_t num_ait_messages;
+    uint32_t num_ports;
+    uint32_t port_id;
+    uint32_t port_link_state;
+    uint32_t table_id;
+
+    uint64_t port_aop_count;
+    uint64_t port_entt_count;
+    uint64_t port_r_counter;
+    uint64_t port_recover_counter;
+    uint64_t port_recovered_counter;
+    uint64_t port_s_counter;
+
+    char *module_name;
+    char *port_name;
+
+    uint64_t regblk[32];
 } callback_index_t;
+
+#define ALO_REGBLK_SIZE sizeof(uint64_t) * 32
 
 extern struct nl_sock *init_sock();
 

@@ -92,6 +92,36 @@ static void dump_block(void *d, int nbytes) {
     ECP_DEBUG("\n");
 }
 
+static void grab_attr(callback_index_t *cbi, uint64_t attr) {
+    switch (attr) {
+    case NL_ECNL_ATTR_ALO_FLAG:               cbi->alo_flag =               nla_get_u32(cbi->tb[NL_ECNL_ATTR_ALO_FLAG]); break;
+    case NL_ECNL_ATTR_MESSAGE_LENGTH:         cbi->message_length =         nla_get_u32(cbi->tb[NL_ECNL_ATTR_MESSAGE_LENGTH]); break;
+    case NL_ECNL_ATTR_MODULE_ID:              cbi->module_id =              nla_get_u32(cbi->tb[NL_ECNL_ATTR_MODULE_ID]); break;
+    case NL_ECNL_ATTR_NUM_AIT_MESSAGES:       cbi->num_ait_messages =       nla_get_u32(cbi->tb[NL_ECNL_ATTR_NUM_AIT_MESSAGES]); break;
+    case NL_ECNL_ATTR_NUM_PORTS:              cbi->num_ports =              nla_get_u32(cbi->tb[NL_ECNL_ATTR_NUM_PORTS]); break;
+    case NL_ECNL_ATTR_PORT_ID:                cbi->port_id =                nla_get_u32(cbi->tb[NL_ECNL_ATTR_PORT_ID]); break;
+    case NL_ECNL_ATTR_PORT_LINK_STATE:        cbi->port_link_state =        nla_get_u32(cbi->tb[NL_ECNL_ATTR_PORT_LINK_STATE]); break;
+    case NL_ECNL_ATTR_TABLE_ID:               cbi->table_id =               nla_get_u32(cbi->tb[NL_ECNL_ATTR_TABLE_ID]); break;
+
+    case NL_ECNL_ATTR_PORT_AOP_COUNT:         cbi->port_aop_count =         nla_get_u64(cbi->tb[NL_ECNL_ATTR_PORT_AOP_COUNT]); break;
+    case NL_ECNL_ATTR_PORT_ENTT_COUNT:        cbi->port_entt_count =        nla_get_u64(cbi->tb[NL_ECNL_ATTR_PORT_ENTT_COUNT]); break;
+    case NL_ECNL_ATTR_PORT_R_COUNTER:         cbi->port_r_counter =         nla_get_u64(cbi->tb[NL_ECNL_ATTR_PORT_R_COUNTER]); break;
+    case NL_ECNL_ATTR_PORT_RECOVER_COUNTER:   cbi->port_recover_counter =   nla_get_u64(cbi->tb[NL_ECNL_ATTR_PORT_RECOVER_COUNTER]); break;
+    case NL_ECNL_ATTR_PORT_RECOVERED_COUNTER: cbi->port_recovered_counter = nla_get_u64(cbi->tb[NL_ECNL_ATTR_PORT_RECOVERED_COUNTER]); break;
+    case NL_ECNL_ATTR_PORT_S_COUNTER:         cbi->port_s_counter =         nla_get_u64(cbi->tb[NL_ECNL_ATTR_PORT_S_COUNTER]); break;
+
+    case NL_ECNL_ATTR_MODULE_NAME:            cbi->module_name =            nla_strdup(cbi->tb[NL_ECNL_ATTR_MODULE_NAME]); break; // nla_get_string
+    case NL_ECNL_ATTR_PORT_NAME:              cbi->port_name =              nla_strdup(cbi->tb[NL_ECNL_ATTR_PORT_NAME]); break; // nla_get_string
+
+    case NL_ECNL_ATTR_ALO_REG_VALUES: nla_memcpy(cbi->regblk, cbi->tb[NL_ECNL_ATTR_ALO_REG_VALUES], ALO_REGBLK_SIZE); break; // nla_get_unspec
+    }
+/*
+    uint8_t p[4096]; memset(p, 0, sizeof(p)); nla_memcpy(p, cbi->tb[NL_ECNL_ATTR_DISCOVERING_MSG], len); // nla_get_unspec
+                                              nla_memcpy(buf->frame, cbi->tb[NL_ECNL_ATTR_MESSAGE], buf->len); // nla_get_unspec
+    uint8_t p[4096]; memset(p, 0, sizeof(p)); nla_memcpy(p, cbi->tb[NL_ECNL_ATTR_MESSAGE], message_length); // nla_get_unspec
+*/
+}
+
 // .genlhdr
 // .userhdr
 // nl_cb_action - NL_OK, NL_SKIP, NL_STOP
@@ -112,6 +142,9 @@ static int parse_generic(struct nl_cache_ops *unused, struct genl_cmd *cmd, stru
         uint64_t attr = tp->i;
         struct nlattr *na = cbi->tb[attr];
         if (na == NULL) continue;
+
+        grab_attr(cbi, attr);
+
         struct nla_policy *pp = &attr_policy[attr];
         switch (pp->type) {
         // NLA_FLAG NLA_U8 NLA_U16 NLA_MSECS NLA_STRING NLA_UNSPEC NLA_NESTED
