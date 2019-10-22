@@ -4,6 +4,7 @@ use std::{fmt, fmt::Write,
           thread::JoinHandle,
           collections::{HashMap, HashSet}};
 
+use bimap::BiMap;
 use crossbeam::crossbeam_channel::unbounded as channel;
 use serde;
 use serde_json;
@@ -47,13 +48,12 @@ use failure::{Error, ResultExt, Fail};
 use crate::app_message_formats::{CaFromPort};
 
 type BorderSenderIDMap = HashMap<PortNumber, SenderID>;
-type MsgNameMap = HashMap<TreeID, AllowedTree>;
+type TreeIDNameMap = BiMap<TreeID, AllowedTree>;
 pub type PortTreeIDMap = HashMap<Uuid, PortTreeID>;
 pub type SavedDiscover = DiscoverMsg;
 pub type Traphs = HashMap<Uuid, Traph>;
 pub type TreeMap = HashMap<Uuid, Uuid>;
-pub type NameTreeMap = HashMap<SenderID, MsgTreeMap>;
-pub type TreeNameMap = HashMap<SenderID, MsgNameMap>;
+pub type TreeNameMap = HashMap<SenderID, TreeIDNameMap>;
 pub type TreeVmMap = HashMap<TreeID, Vec<CaToVm>>;
 
 #[derive(Debug, Clone)]
@@ -70,8 +70,7 @@ pub struct CellAgent {
     my_entry: RoutingTableEntry,
     connected_tree_entry: RoutingTableEntry,
     saved_discover: Vec<SavedDiscover>,
-    // Next 2 items shared between listen_uptree and listen_cmodel
-    name_tree_map: Arc<Mutex<NameTreeMap>>,
+    // Next item shared between listen_uptree and listen_cmodel threads
     tree_name_map: Arc<Mutex<TreeNameMap>>,
     traphs: Traphs,
     traphs_mutex: Arc<Mutex<Traphs>>, // Needed so I can print from main() because I have to clone to get self.traphs into the thread
@@ -123,7 +122,6 @@ impl CellAgent {
             cmodel,
             traphs: HashMap::new(), traphs_mutex: Arc::new(Mutex::new(HashMap::new())),
             vm_id_no: 0, tree_id_map: HashMap::new(), tree_map: HashMap::new(),
-            name_tree_map: Arc::new(Mutex::new(HashMap::new())),
             tree_name_map: Arc::new(Mutex::new(HashMap::new())),
             border_port_tree_id_map: HashMap::new(), saved_discover: Vec::new(),
             my_entry, base_tree_map, neighbors: HashMap::new(), discover_d_count: HashMap::new(),
@@ -286,13 +284,6 @@ impl CellAgent {
     }
     fn add_tree_name_map_item(&mut self, sender_id: SenderID, allowed_tree: &AllowedTree, allowed_tree_id: TreeID) {
         let _f = "add_tree_name_map_item";
-        let mut locked = self.name_tree_map.lock().unwrap();
-        let mut tree_map = locked
-            .get(&sender_id)
-            .cloned()
-            .unwrap_or_default();
-        tree_map.insert(allowed_tree.get_name().clone(), allowed_tree_id);
-        locked.insert(sender_id.clone(), tree_map);
         let mut locked = self.tree_name_map.lock().unwrap();
         let mut name_map = locked
             .get(&sender_id)
@@ -313,12 +304,7 @@ impl CellAgent {
             .iter()
             .for_each(|sender_id|
                 if let Some(tree_name_map) = locked1.get_mut(&sender_id) {
-                    if let Some(name) = tree_name_map.remove(delete_tree_id) {
-                        let mut locked2 = self.name_tree_map.lock().unwrap();
-                        if let Some(name_tree_map) = locked2.get_mut(&sender_id) {
-                            name_tree_map.remove(name.get_name());
-                        }
-                    }
+                    tree_name_map.remove_by_left(delete_tree_id);
                 }
             );
         Ok(())
@@ -330,18 +316,18 @@ impl CellAgent {
             .get(&sender_id)
             .ok_or::<Error>(CellagentError::TreeNameMap { cell_id: self.cell_id, func_name: _f, sender_id }.into())?;
         let new_tree_name = tree_name_map
-            .get(&tree_id)
+            .get_by_left(&tree_id)
             .ok_or::<Error>(CellagentError::TreeMap { cell_id: self.cell_id, func_name: _f, tree_id, sender_id }.into())?;
         Ok(new_tree_name.clone())
     }
     fn tree_from_name(&self, sender_id: SenderID, tree_name: &AllowedTree) -> Result<TreeID, Error> {
         let _f = "tree_from_name";
-        let locked = self.name_tree_map.lock().unwrap();
-        let name_tree_map = locked
+        let locked = self.tree_name_map.lock().unwrap();
+        let tree_name_map = locked
             .get(&sender_id)
             .ok_or::<Error>(CellagentError::TreeNameMap { cell_id: self.cell_id, func_name: _f, sender_id  }.into())?;
-        let tree_id = name_tree_map
-            .get(tree_name.get_name())
+        let tree_id = tree_name_map
+            .get_by_right(tree_name)
             .ok_or::<Error>(CellagentError::NameMap { cell_id: self.cell_id, func_name: _f, tree_name: tree_name.clone(), sender_id }.into())?;
         Ok(tree_id.clone())
     }
@@ -531,7 +517,7 @@ impl CellAgent {
     fn deploy(&mut self, sender_id: SenderID, deployment_port_tree_id: PortTreeID, _msg_tree_id: PortTreeID,
                   _msg_tree_map: &MsgTreeMap, manifest: &Manifest) -> Result<(), Error> {
         let _f = "deploy";
-        let name_tree_map = self.name_tree_map.lock().unwrap()
+        let tree_name_map = self.tree_name_map.lock().unwrap()
             .get(&sender_id)
             .cloned()
             .ok_or::<Error>(CellagentError::TreeNameMap { func_name: _f, cell_id: self.cell_id, sender_id }.into())?;
@@ -547,8 +533,8 @@ impl CellAgent {
             allowed_trees.insert(AllowedTree::new(CONTROL_TREE_NAME));
             let mut vm = VirtualMachine::new(&vm_id, vm_to_ca, vm_allowed_trees);
             for vm_allowed_tree in vm_allowed_trees {
-                name_tree_map
-                    .get(vm_allowed_tree.get_name())
+                tree_name_map
+                    .get_by_right(vm_allowed_tree)
                     .ok_or::<Error>(CellagentError::NameMap { cell_id: self.cell_id, func_name: "deploy(vm)", sender_id, tree_name: vm_allowed_tree.clone() }.into())
                     .map(|allowed_tree_id| {
                         allowed_trees.insert(vm_allowed_tree.clone());
@@ -844,7 +830,7 @@ impl CellAgent {
                         .cloned()
                         .ok_or::<Error>(CellagentError::Border { func_name: _f, cell_id: self.cell_id, port_no: *port_no }.into())?;
                     // Verify that this sender can name this tree
-                    if !self.name_tree_map.lock().unwrap().contains_key(&sender_id) {
+                    if !self.tree_name_map.lock().unwrap().contains_key(&sender_id) {
                         return Err(CellagentError::TreeNameMap { func_name: _f, cell_id: self.cell_id, sender_id }.into());
                     }
                     let serialized = bytes.to_string()?;
@@ -852,7 +838,7 @@ impl CellAgent {
                     app_msg.process_ca(self, sender_id)?;
                 }
                 CmToCaBytes::TunnelUp((sender_id, bytes)) => {
-                    if !self.name_tree_map.lock().unwrap().contains_key(&sender_id) {
+                    if !self.tree_name_map.lock().unwrap().contains_key(&sender_id) {
                         return Err(CellagentError::TreeNameMap { func_name: _f, cell_id: self.cell_id, sender_id }.into());
                     }
                     let serialized = bytes.to_string()?;

@@ -33,7 +33,7 @@ actix-web = "1.0.5"
 actix-rt = "0.2.4"
 arrayvec = {version = "0.4.11", features = ["serde-1"]}
 backtrace = "0.3" # used in dumpstack.rs
-#bimap = {version = "0.3.1", features = ["serde"]} # bi-directional hashmap h: H(A,B), h.get_by_left(a: A), h.get_by_right(b: B)
+bimap = {version = "0.3.1", features = ["serde"]} # bi-directional hashmap h: H(A,B), h.get_by_left(a: A), h.get_by_right(b: B)
 #bincode = "1.1.2" # for binary serialization
 #chrono = { version = "0.4.3", features = ["serde"] }
 crossbeam = "0.7.1"
