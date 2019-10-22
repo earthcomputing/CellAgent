@@ -1,10 +1,10 @@
 use std::{fmt, thread};
 use std::collections::HashSet;
 
-//use reqwest::Client::*;
-
 use crate::app_message_formats::{ContainerToVm, ContainerFromVm};
-use crate::app_message::{AppMsgDirection, AppDeleteTreeMsg, AppInterapplicationMsg, AppMessage};
+use crate::app_message::{AppMsgDirection, AppInterapplicationMsg, AppMessage};
+#[cfg(feature="delete_tree")]
+use crate::app_message::AppDeleteTreeMsg;
 use crate::config::{CONFIG};
 use crate::dal::{add_to_trace, fork_trace_header, update_trace_header};
 use crate::name::{ContainerID, UptreeID};
@@ -104,10 +104,7 @@ impl NocMaster {
                 let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
             }
         }
-        #[cfg(not(feature="delete_tree"))]
-        let mut first = false; // Skip testing of DeleteTreeMsg
-        #[cfg(feature="delete_tree")]
-        let mut first = true; // Test DeleteTreeMsg
+        let mut first = true; // Stack
         loop {
             let bytes = container_from_vm.recv().context(ServiceError::Chain { func_name: _f, comment: S("NocMaster from vm")})?;
             let serialized = bytes.to_string()?;
@@ -122,22 +119,26 @@ impl NocMaster {
             let body = app_msg.get_payload();
             println!("NocMaster on container {} got msg {}", self.container_id, body);
             if first {
-                println!("NocMaster on container {} sending delete tree {}", self.container_id, NOC_LISTEN_TREE_NAME);
                 first = false;
-                let target_tree = AllowedTree::new(NOC_LISTEN_TREE_NAME);
-                let delete_msg = AppDeleteTreeMsg::new(self.get_name(),
-                                                       false, &target_tree, AppMsgDirection::Rootward);
-                //println!("Service {} sending {}", self.container_id, msg);
-                let serialized = serde_json::to_string(&delete_msg as &dyn AppMessage)?;
-                let bytes = ByteArray::new(&serialized);
+                #[cfg(feature="delete_tree")]
                 {
-                    if CONFIG.trace_options.all || CONFIG.trace_options.svc {
-                        let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "NocAgent_to_vm" };
-                        let trace = json!({ "NocAgent": self.get_name(), "app_msg": delete_msg });
-                        let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
+                    println!("NocMaster on container {} sending delete tree {}", self.container_id, NOC_LISTEN_TREE_NAME);
+                    first = false;
+                    let target_tree = AllowedTree::new(NOC_LISTEN_TREE_NAME);
+                    let delete_msg = AppDeleteTreeMsg::new(self.get_name(),
+                                                           false, &target_tree, AppMsgDirection::Rootward);
+                    //println!("Service {} sending {}", self.container_id, msg);
+                    let serialized = serde_json::to_string(&delete_msg as &dyn AppMessage)?;
+                    let bytes = ByteArray::new(&serialized);
+                    {
+                        if CONFIG.trace_options.all || CONFIG.trace_options.svc {
+                            let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "NocAgent_to_vm" };
+                            let trace = json!({ "NocMaster": self.get_name(), "app_msg": delete_msg });
+                            let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
+                        }
                     }
+                    self.container_to_vm.send(bytes)?;
                 }
-                self.container_to_vm.send(bytes)?;
             }
             /*
             let foo = reqwest::Client::new()
@@ -239,6 +240,7 @@ impl fmt::Display for NocAgent {
 }
 // Errors
 use failure::{Error, ResultExt, Fail};
+
 #[derive(Debug, Fail)]
 pub enum ServiceError {
     #[fail(display = "ServiceError::Chain {} {}", func_name, comment)]

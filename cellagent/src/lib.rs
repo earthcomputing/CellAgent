@@ -3,7 +3,7 @@
 //#![allow(dead_code)]
 //#![allow(unused_variables)]
 //#![allow(unused_imports)]
-//#![warn(rust_2018_idioms)]
+#![warn(rust_2018_idioms)]
 #![recursion_limit="1024"]
 #[macro_use] extern crate crossbeam;
 #[macro_use] extern crate failure;
@@ -14,7 +14,6 @@ pub mod app_message;
 pub mod app_message_formats;
 pub mod blueprint;
 pub mod cellagent;
-#[cfg(any(feature = "simulator", feature = "cell"))]
 pub mod cmodel;
 pub mod config;
 pub mod container;

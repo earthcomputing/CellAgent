@@ -82,7 +82,7 @@ impl fmt::Display for PortNo {
         write!(f, "P:{}", self.0)
     }
 }
-#[derive(Debug, Copy, Clone, Eq, PartialEq)]
+#[derive(Debug, Copy, Clone, Eq, PartialEq, Serialize, Deserialize)]
 pub enum CellType {
     Border,
     Interior
@@ -391,7 +391,7 @@ pub fn get_geometry(num_cells: CellQty) -> (usize, usize) {
                             (3,1), (3,2), (3,4), (3,5), (3,8), (3,9), (3,10),
                             (4,0), (4,1), (4,2), (4,3), (4,4), (4,6), (4,7), (4,8), (4,9),
                             (5,0), (5,1), (5,2), (5,3), (5,4), (5,6)],
-        _ => panic!("Invalid number of cells")
+        _ => vec![]
     };
     let max_x = CONFIG.geometry
         .iter()

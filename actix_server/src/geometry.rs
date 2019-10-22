@@ -1,73 +1,94 @@
 use std::{cmp::max,
           collections::HashMap,
-          fmt, fmt::Write
+          sync::{Mutex}
 };
 
-use actix_web::{Error, HttpRequest, HttpResponse, Responder, FromRequest};
-use serde::Serialize;
+use actix_web::{web, Error, HttpResponse, Responder, Scope};
+use serde::{Deserialize, Serialize};
+use serde_json::Value;
 
-type Size = usize;
-#[derive(Debug, Copy, Clone, Default, Eq, PartialEq, Serialize)]
-pub struct Id(Size);
-impl Id {
-    pub fn new(id: Size) -> Id { Id(id) }
+pub type RowCol = HashMap<String, Location>;
+
+pub fn cell_geometry(path: &str, is_border: bool, state: web::Data<AppGeometry>, record: web::Json<Value>)
+                 -> Result<impl Responder, Error> {
+    let trace_body = record.get("body").expect("HelloMsg: bad trace record");
+    let body: Body = serde_json::from_value(trace_body.clone())?;
+    cell_geometry_body(path, is_border, state, body)
 }
-impl fmt::Display for Id {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "Id {}", self.0)
+pub fn cell_geometry_body(path: &str, is_border: bool, state: web::Data<AppGeometry>, body: Body)
+        -> Result<impl Responder, Error>{
+    let name = body.cell_id.name;
+    let location = body.location;
+    let app_geometry = state.get_ref();
+    app_geometry.geometry.lock().unwrap().add(CellID { name: name.clone() },
+                                              Location { row: location[0], col: location[1], is_border });
+    Ok(HttpResponse::Ok().body(format!("{} adding {}\n{:?}\n", path, name, app_geometry)))
+}
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Body {
+    cell_id: CellID,
+    location: [usize; 2]
+}
+#[derive(Debug, Clone, Hash, Eq, PartialEq, Serialize, Deserialize)]
+pub struct CellID {
+    name: String
+}
+#[derive(Debug, Default, Serialize, Deserialize)]
+pub struct AppGeometry {
+    pub geometry: Mutex<Geometry>
+}
+impl AppGeometry {
+    pub fn clear(&mut self) {
+        self.geometry = Mutex::new(Geometry::default());
     }
 }
-#[derive(Debug, Copy, Clone, Default, Eq, PartialEq, Serialize)]
-pub struct Location { row: Size, col: Size }
-impl Location {
-    pub fn new(row: Size, col: Size) -> Location { Location { row, col } }
-}
-impl fmt::Display for Location {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "Row {} Col {}", self.row, self.col)
-    }
-}
+#[derive(Debug, Copy, Clone, Default, Eq, PartialEq, Serialize, Deserialize)]
+pub struct Location { row: usize, col: usize, is_border: bool }
 
-type RowCol = HashMap<Size, Location>;
-
-#[derive(Debug, Clone, Eq, PartialEq, Default, Serialize)]
+#[derive(Debug, Clone, Eq, PartialEq, Default, Serialize, Deserialize)]
 pub struct Geometry {
-    maxrow: Size,
-    maxcol: Size,
-    rowcol: RowCol
+    pub is_border: bool,
+    pub maxrow: usize,
+    pub maxcol: usize,
+    pub rowcol: RowCol
 }
 impl Geometry {
-    pub fn add(&mut self, id: Id, rowcol: Location) { 
+    pub fn add(&mut self, cell_id: CellID, rowcol: Location) {
+        self.is_border = rowcol.is_border;
         self.maxrow = max(self.maxrow, rowcol.row);
         self.maxcol = max(self.maxrow, rowcol.col);
-        self.rowcol.insert(id.0, rowcol); 
+        self.rowcol.insert(cell_id.name, rowcol);
     }
-    pub fn limits(&self) -> Location { Location::new(self.maxrow, self.maxcol) }
-    pub fn location(&self, id: Size) -> Option<&Location> { self.rowcol.get(&id) }
+}
+fn border_cell_start(state: web::Data<AppGeometry>, record: web::Json<Value>)
+                     ->impl Responder {
+    let path = "border_cell_start";
+    cell_geometry(path, true, state, record)
+}
+fn interior_cell_start(state: web::Data<AppGeometry>, record: web::Json<Value>)
+                       -> impl Responder {
+    let path = "interior_cell_start";
+    cell_geometry(path, false, state, record)
+}
+fn show_geometry(state: web::Data<AppGeometry>) -> Result<HttpResponse, actix_web::Error> {
+    let geo = state.get_ref();
+    let string = serde_json::to_string(geo)?;
+    Ok(HttpResponse::Ok().body(string))
 }
 
-impl Responder for Geometry {
-    type Error = Error;
-    type Future =Result<HttpResponse, Error>;
-    
-    fn respond_to(self, _req: &HttpRequest) -> Self::Future {
-        let body = serde_json::to_string(&self)?;
-        Ok(HttpResponse::Ok()
-            .content_type("application/json")
-            .body(body))
-    }
+pub fn get() -> Scope {
+    web::scope("/geometry")
+        .data(web::Data::new(AppGeometry::default()))
+        .route("", web::get().to(show_geometry))
 }
-impl fmt::Display for Geometry {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let mut s = format!("\nCell layout");
-        if self.rowcol.is_empty() {
-            write!(f, "{}", "No cells")
-        } else {
-            write!(s, "\n\n    Cell  Row  Col")?;
-            for (id, rowcol) in &self.rowcol {
-                write!(s, "\n    {:4} {:4} {:4}", id, rowcol.row, rowcol.col)?;
-            }
-            write!(f, "{}\n", s)
-        }
-     }
+pub fn post_border() -> Scope {
+    web::scope("/border_cell_start")
+        .route("", web::post().to(border_cell_start))
+}
+pub fn post_interior() -> Scope {
+    web::scope("/interior_cell_start")
+        .route("", web::post().to(interior_cell_start))
+}
+pub fn data() -> web::Data<AppGeometry> {
+    web::Data::new(AppGeometry::default())
 }

@@ -2,7 +2,7 @@
     "//": "Common Parameters",
     "continue_on_error":false, "//": "true in production, false when debugging",
     "discover_quiescence_factor":6, "//": "Discover quiesced when #DiscoverD*factor > #HelloMsg",
-    "race_sleep":0, "//": "Seconds to sleep if discover_quiesce_factor doesn't work",
+    "race_sleep":2, "//": "Seconds to sleep if discover_quiesce_factor doesn't work",
     "kafka_server":"172.16.1.2",
     "kafka_topic":"CellAgent",
     "output_dir_name":"/tmp/multicell/",
@@ -48,7 +48,7 @@
 
     "//": "Simulator only parameters",
     "auto_break":null, "//": "Some(Edge), used when debugging with VSCode",
-    "border_cell_ports":{"2":[2],"7":[2]}, "//": "{cell_no: [border_ports]}",
+    "border_cell_ports":{"1":[1],"8":[2]}, "//": "{cell_no: [border_ports]}",
     "cell_port_exceptions":{"5":6}, "//": "{cell_no: no_physical_ports}",
     "max_num_phys_ports_per_cell":8, "//": "num_ports_per_cell <= max_num_ports_per_cell",
     "min_num_border_cells":1,

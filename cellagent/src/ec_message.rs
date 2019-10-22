@@ -289,7 +289,7 @@ impl DiscoverDMsg {
     pub fn get_in_reply_to(&self) -> SenderMsgSeqNo { self.payload.get_in_reply_to() }
     pub fn get_port_tree_id(&self) -> PortTreeID { self.payload.get_port_tree_id() }
     pub fn get_path(&self) -> Path { self.payload.get_path() }
-    pub fn get_discover_type(&self) -> DiscoverDType { self.payload.get_discover_type() }
+    pub fn get_discoverd_type(&self) -> DiscoverDType { self.payload.get_discover_type() }
 }
 #[typetag::serde]
 impl Message for DiscoverDMsg {
