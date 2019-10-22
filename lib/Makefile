@@ -2,6 +2,7 @@
 # sudo env NLCB=debug NLDBG=4 ./mock_exchange
 # sudo env NLCB=debug NLDBG=4 ./atomic_link
 
+CFLAGS += -g
 CFLAGS += -fPIC
 CFLAGS += -I/usr/include/libnl3
 LDLIBS += -lnl-genl-3 -lnl-3
