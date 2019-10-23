@@ -67,6 +67,12 @@ typedef struct {
     char *port_name;
 
     uint64_t regblk[32];
+
+    uint8_t *msg;
+    int msg_bytes;
+
+    uint8_t *disc_msg;
+    int disc_msg_bytes;
 } callback_index_t;
 
 #define ALO_REGBLK_SIZE sizeof(uint64_t) * 32

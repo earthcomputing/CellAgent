@@ -92,6 +92,24 @@ static void dump_block(void *d, int nbytes) {
     ECP_DEBUG("\n");
 }
 
+static void copy_unspec(callback_index_t *cbi, uint64_t attr) {
+    int nbytes = nla_len(cbi->tb[attr]);
+    uint8_t *p = malloc(nbytes); if (!p) { perror("malloc"); return; } // memset(p, 0, nbytes);
+    nla_memcpy(p, cbi->tb[attr], nbytes); // nla_get_unspec
+
+    if (attr == NL_ECNL_ATTR_MESSAGE) {
+        cbi->msg = p;
+        cbi->msg_bytes = nbytes;
+    }
+
+    if (attr == NL_ECNL_ATTR_DISCOVERING_MSG) {
+        cbi->disc_msg = p;
+        cbi->disc_msg_bytes = nbytes;
+    }
+}
+
+// nla_len nla_data nla_get_string
+// nla_get nla_put nla_memcpy
 static void grab_attr(callback_index_t *cbi, uint64_t attr) {
     switch (attr) {
     case NL_ECNL_ATTR_ALO_FLAG:               cbi->alo_flag =               nla_get_u32(cbi->tb[NL_ECNL_ATTR_ALO_FLAG]); break;
@@ -110,16 +128,14 @@ static void grab_attr(callback_index_t *cbi, uint64_t attr) {
     case NL_ECNL_ATTR_PORT_RECOVERED_COUNTER: cbi->port_recovered_counter = nla_get_u64(cbi->tb[NL_ECNL_ATTR_PORT_RECOVERED_COUNTER]); break;
     case NL_ECNL_ATTR_PORT_S_COUNTER:         cbi->port_s_counter =         nla_get_u64(cbi->tb[NL_ECNL_ATTR_PORT_S_COUNTER]); break;
 
-    case NL_ECNL_ATTR_MODULE_NAME:            cbi->module_name =            nla_strdup(cbi->tb[NL_ECNL_ATTR_MODULE_NAME]); break; // nla_get_string
-    case NL_ECNL_ATTR_PORT_NAME:              cbi->port_name =              nla_strdup(cbi->tb[NL_ECNL_ATTR_PORT_NAME]); break; // nla_get_string
+    case NL_ECNL_ATTR_MODULE_NAME:            cbi->module_name =            strdup(nla_get_string(cbi->tb[NL_ECNL_ATTR_MODULE_NAME])); break; // potential leak
+    case NL_ECNL_ATTR_PORT_NAME:              cbi->port_name =              strdup(nla_get_string(cbi->tb[NL_ECNL_ATTR_PORT_NAME]));   break; // potential leak
 
     case NL_ECNL_ATTR_ALO_REG_VALUES: nla_memcpy(cbi->regblk, cbi->tb[NL_ECNL_ATTR_ALO_REG_VALUES], ALO_REGBLK_SIZE); break; // nla_get_unspec
+
+    case NL_ECNL_ATTR_MESSAGE:                copy_unspec(cbi, NL_ECNL_ATTR_MESSAGE);         break; // potential leak
+    case NL_ECNL_ATTR_DISCOVERING_MSG:        copy_unspec(cbi, NL_ECNL_ATTR_DISCOVERING_MSG); break; // potential leak
     }
-/*
-    uint8_t p[4096]; memset(p, 0, sizeof(p)); nla_memcpy(p, cbi->tb[NL_ECNL_ATTR_DISCOVERING_MSG], len); // nla_get_unspec
-                                              nla_memcpy(buf->frame, cbi->tb[NL_ECNL_ATTR_MESSAGE], buf->len); // nla_get_unspec
-    uint8_t p[4096]; memset(p, 0, sizeof(p)); nla_memcpy(p, cbi->tb[NL_ECNL_ATTR_MESSAGE], message_length); // nla_get_unspec
-*/
 }
 
 // .genlhdr
@@ -143,7 +159,7 @@ static int parse_generic(struct nl_cache_ops *unused, struct genl_cmd *cmd, stru
         struct nlattr *na = cbi->tb[attr];
         if (na == NULL) continue;
 
-        grab_attr(cbi, attr);
+        grab_attr(cbi, attr); // module_name, port_name, msg, disc_msg -  need to be free'ed by client
 
         struct nla_policy *pp = &attr_policy[attr];
         switch (pp->type) {
@@ -558,30 +574,38 @@ extern int retrieve_ait_message(struct nl_sock *sock, struct nl_msg *msg, uint32
         return 0;
     }
 
-// FIXME (cbi.message aka frame)
-
     uint32_t message_length = cbi.message_length;
+    uint8_t *msg = cbi.msg;
+    size_t msg_bytes = cbi.msg_bytes;
+
+    if (!msg) {
+        ECP_DEBUG("retrieve_ait_message - no msg?\n");
+        return 0;
+    }
+
+    // 3 factors: buf->len, message_length, msg_bytes
+    if (message_length != msg_bytes) {
+        ECP_DEBUG("retrieve_ait_message - WARN: message_length (%d) != msg_bytes (%lu)\n", message_length, msg_bytes);
+        if (msg_bytes < message_length) message_length = msg_bytes;
+    }
 
     if (!buf->frame) {
         ECP_DEBUG("retrieve_ait_message - allocating return buffer (%d)\n", message_length);
-        buf->frame = malloc(message_length);
-        if (!buf->frame) { perror("malloc"); return -1; }
+        buf->frame = msg;
         buf->len = message_length;
     }
-
-    if (buf->len < message_length) {
+    else if (buf->len < message_length) {
         ECP_DEBUG("retrieve_ait_message - return buffer too small (%d), reallocated (%d)\n", buf->len, message_length);
-        buf->frame = malloc(message_length);
-        if (!buf->frame) { perror("malloc"); return -1; }
+        buf->frame = msg;
         buf->len = message_length;
     }
-
-    // int nbytes = nla_len(cbi.tb[NL_ECNL_ATTR_MESSAGE]);
-    nla_memcpy(buf->frame, cbi.tb[NL_ECNL_ATTR_MESSAGE], buf->len); // nla_get_unspec
+    else {
+        memcpy(buf->frame, msg, (size_t) message_length);
+        buf->len = message_length;
+    }
 
     ECP_DEBUG("retr buffer: ");
-    dump_block(buf->frame, buf->len); // ugh: cbi.tb[NL_ECNL_ATTR_MESSAGE], message_length
-
+    dump_block(buf->frame, buf->len);
 }
 WAIT_ACK;
     return 0;
@@ -636,9 +660,8 @@ WAIT_ACK;
 extern int event_receive_dsc(struct nlattr **tb, uint32_t *mp, uint32_t *pp, uint8_t *dp) {
     uint32_t module_id = nla_get_u32(tb[NL_ECNL_ATTR_MODULE_ID]);
     uint32_t port_id = nla_get_u32(tb[NL_ECNL_ATTR_PORT_ID]);
-int len = 0; // FIXME
     int nbytes = nla_len(tb[NL_ECNL_ATTR_DISCOVERING_MSG]);
-    uint8_t p[4096]; memset(p, 0, sizeof(p)); nla_memcpy(p, tb[NL_ECNL_ATTR_DISCOVERING_MSG], len); // nla_get_unspec
+    uint8_t p[4096]; memset(p, 0, sizeof(p)); nla_memcpy(p, tb[NL_ECNL_ATTR_DISCOVERING_MSG], nbytes); // nla_get_unspec
     *mp = module_id;
     *pp = port_id;
 #if 0
@@ -651,7 +674,7 @@ int len = 0; // FIXME
 extern int event_link_status_update(struct nlattr **tb, uint32_t *mp, uint32_t *pp, link_state_t *lp) {
     uint32_t module_id = nla_get_u32(tb[NL_ECNL_ATTR_MODULE_ID]);
     uint32_t port_id = nla_get_u32(tb[NL_ECNL_ATTR_PORT_ID]);
-    link_state_t ls; memset(&ls, 0, sizeof(link_state_t)); // get_link_state(&cbi, &ls); // FIXME: trash
+    link_state_t ls; memset(&ls, 0, sizeof(link_state_t)); // get_link_state(&cbi, &ls);
     *mp = module_id;
     *pp = port_id;
 #if 0
@@ -693,13 +716,12 @@ extern int event_got_ait_massage(struct nlattr **tb, uint32_t *mp, uint32_t *pp,
 extern int event_got_alo_update(struct nlattr **tb, uint32_t *mp, uint32_t *pp, uint64_t *vp, uint32_t *fp) {
     uint32_t module_id = nla_get_u32(tb[NL_ECNL_ATTR_MODULE_ID]);
     uint32_t port_id = nla_get_u32(tb[NL_ECNL_ATTR_PORT_ID]);
-    // int nbytes = nla_len(tb[NL_ECNL_ATTR_ALO_REG_VALUES]);
-    uint8_t p[4096]; memset(p, 0, sizeof(p)); nla_memcpy(p, tb[NL_ECNL_ATTR_ALO_REG_VALUES], sizeof(uint64_t) * 32); // nla_get_unspec
+    uint64_t regblk[32]; memset(regblk, 0, ALO_REGBLK_SIZE); nla_memcpy(regblk, tb[NL_ECNL_ATTR_ALO_REG_VALUES], ALO_REGBLK_SIZE); // nla_get_unspec
     uint32_t alo_flag = nla_get_u32(tb[NL_ECNL_ATTR_ALO_FLAG]);
     *mp = module_id;
     *pp = port_id;
 #if 0
-    *vp = p; // FIXME
+    *vp = regblk;
     *fp = alo_flag;
 #endif
     return 0;
