@@ -9,6 +9,7 @@ build = "build.rs"
 cell = []
 noc = []
 simulator = []
+webserver = []
 
 [[bin]]
 name = "simulator"
