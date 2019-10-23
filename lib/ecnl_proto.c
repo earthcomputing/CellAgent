@@ -591,17 +591,18 @@ extern int retrieve_ait_message(struct nl_sock *sock, struct nl_msg *msg, uint32
 
     if (!buf->frame) {
         ECP_DEBUG("retrieve_ait_message - allocating return buffer (%d)\n", message_length);
-        buf->frame = msg;
+        buf->frame = msg; // potential leak : client responsiblity
         buf->len = message_length;
     }
     else if (buf->len < message_length) {
         ECP_DEBUG("retrieve_ait_message - return buffer too small (%d), reallocated (%d)\n", buf->len, message_length);
-        buf->frame = msg;
+        buf->frame = msg; // definite leak : FIXME ??
         buf->len = message_length;
     }
     else {
         memcpy(buf->frame, msg, (size_t) message_length);
         buf->len = message_length;
+        free(cbi.msg); // cbi.msg_bytes
     }
 
     ECP_DEBUG("retr buffer: ");
