@@ -71,7 +71,7 @@ pub fn add_to_trace(trace_type: TraceType, trace_params: &TraceHeaderParams,
     let trace_header = TRACE_HEADER.with(|t| t.borrow().clone());
     let trace_record = TraceRecord { header: &trace_header, body: trace_body };
     #[cfg(feature="webserver")]
-        trace_it(&trace_record)?;
+    trace_it(&trace_record)?;
     let line = if FOR_EVAL {
         serde_json::to_string(&trace_record).context(DalError::Chain { func_name: "add_to_trace", comment: S(caller) })?
     } else {
