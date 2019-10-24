@@ -4,12 +4,17 @@ use std::{cell::RefCell,
           collections::{HashSet},
           fs::{File, OpenOptions},
           io::Write,
-          sync::atomic::{AtomicBool, Ordering}
+          sync::atomic::{AtomicBool}
+};
+#[cfg(feature="webserver")]
+use {
+    actix_rt::{System, SystemRunner},
+    actix_web::client::{ClientBuilder},
+    futures::{future::lazy},
+    std::sync::atomic::Ordering
 };
 
-use actix_rt::{System, SystemRunner};
-use actix_web::client::{ClientBuilder};
-use futures::{future::lazy, Future};
+use futures::Future;
 use lazy_static::lazy_static;
 use rdkafka::{config::ClientConfig, producer::{FutureProducer, FutureRecord}};
 use serde_json;
@@ -22,8 +27,11 @@ const FOR_EVAL: bool = true;
 
 // TODO: Integrate with log crate
 
+#[cfg(feature="webserver")]
 lazy_static! {
     static ref SERVER_URL: String = ::std::env::var("SERVER_URL").expect("Environment variable SERVER_URL not set");
+}
+lazy_static! {
     static ref SERVER_ERROR: AtomicBool = AtomicBool::new(false);
     static ref PRODUCER_RD: FutureProducer = ClientConfig::new()
                         .set("bootstrap.servers", &CONFIG.kafka_server)
@@ -31,6 +39,7 @@ lazy_static! {
                         .create()
                         .expect("Dal: Problem setting up Kafka");
 }
+#[cfg(feature="webserver")]
 thread_local!{ static SYSTEM: RefCell<SystemRunner> = RefCell::new(System::new("Tracer")); }
 thread_local!{ static SKIP: RefCell<HashSet<String>> = RefCell::new(HashSet::new()); }
 thread_local!{ static TRACE_HEADER: RefCell<TraceHeader> = RefCell::new(TraceHeader::new()) }
@@ -61,7 +70,8 @@ pub fn add_to_trace(trace_type: TraceType, trace_params: &TraceHeaderParams,
     });
     let trace_header = TRACE_HEADER.with(|t| t.borrow().clone());
     let trace_record = TraceRecord { header: &trace_header, body: trace_body };
-    trace_it(&trace_record)?;
+    #[cfg(feature="webserver")]
+        trace_it(&trace_record)?;
     let line = if FOR_EVAL {
         serde_json::to_string(&trace_record).context(DalError::Chain { func_name: "add_to_trace", comment: S(caller) })?
     } else {
@@ -70,9 +80,9 @@ pub fn add_to_trace(trace_type: TraceType, trace_params: &TraceHeaderParams,
     cell_id_handle.write(&(line.clone() + ",\n").into_bytes()).context(DalError::Chain { func_name: "add_to_trace", comment: S("Write cell record") })?;
     file_handle.write(   &(line.clone() + ",\n").into_bytes()).context(DalError::Chain { func_name: "add_to_trace", comment: S("Write record") })?;
     let _ = PRODUCER_RD.send(FutureRecord::to(&CONFIG.kafka_topic)
-            .payload(&line)
-            .key(&format!("{:?}", trace_header.get_event_id())),
-        0)
+                                 .payload(&line)
+                                 .key(&format!("{:?}", trace_header.get_event_id())),
+                             0)
         .then(|result| -> Result<(), Error> {
             match result {
                 Ok(Ok(_)) => Ok(()),
@@ -82,7 +92,8 @@ pub fn add_to_trace(trace_type: TraceType, trace_params: &TraceHeaderParams,
         });
     Ok(())
 }
-fn trace_it(trace_record: &TraceRecord) -> Result<(), Error> {
+#[cfg(feature="webserver")]
+fn trace_it(trace_record: &TraceRecord<'_>) -> Result<(), Error> {
     let _f = "trace_it";
     if SERVER_ERROR.load(Ordering::SeqCst) { return Ok(()); }
     let header = trace_record.header;
