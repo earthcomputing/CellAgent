@@ -1426,32 +1426,32 @@ e1000e_hackery_t e1000e_ports[] = {
 // FIXME : should instead auto-detect compatible instances
 static void inject_dev(struct net_device *n_dev) {
     for (int i = 0; i < ARRAY_SIZE(e1000e_ports); i++) {
-        e1000e_hackery_t *p = &e1000e_ports[i];
-        if (strcmp(n_dev->name, p->name) == 0) { p->e1000e = n_dev; } // inject reference
+        e1000e_hackery_t *hack = &e1000e_ports[i];
+        if (strcmp(n_dev->name, hack->name) == 0) { hack->e1000e = n_dev; } // inject reference
     }
 }
 
 typedef struct entl_mgr_plus {
     struct entl_mgr emp_base;
     struct net_device *emp_plug_in;
-    e1000e_hackery_t *emp_p;
+    e1000e_hackery_t *emp_hack;
 } entl_mgr_plus_t;
 
 // void (*emf_event)(struct entl_mgr *self, int sigusr); // called from watchdog, be careful
 static void adapt_event(struct entl_mgr *self, int sigusr) {
     entl_mgr_plus_t *priv = (entl_mgr_plus_t *) self;
     struct net_device *plug_in = priv->emp_plug_in;
-    e1000e_hackery_t *p = priv->emp_p;
+    e1000e_hackery_t *hack = priv->emp_hack;
 
-    PLUG_DEBUG(plug_in, "event %d \"%s\"", sigusr, p->name);
+    PLUG_DEBUG(plug_in, "event %d \"%s\"", sigusr, hack->name);
 
 // FIXME: is the port_id wrong here?
 
-    int port_id = p->index;
-    // char *name = p->name;
-    struct net_device *e1000e = p->e1000e;
+    int port_id = hack->index;
+    // char *name = hack->name;
+    struct net_device *e1000e = hack->e1000e;
 
-    PLUG_DEBUG(plug_in, "event %d \"%s\" (%d)", sigusr, p->name, port_id);
+    PLUG_DEBUG(plug_in, "event %d \"%s\" (%d)", sigusr, hack->name, port_id);
 
     // struct net_device *plug_in = ecnl_devices[module_id];
     ecnl_device_t *e_dev = (ecnl_device_t *) netdev_priv(plug_in);
@@ -1461,7 +1461,7 @@ static void adapt_event(struct entl_mgr *self, int sigusr) {
     struct entl_driver *e_driver = &e_dev->ecnl_drivers[port_id];
     if (!e_driver) return;
 
-    PLUG_DEBUG(plug_in, "event %d \"%s\" (%d) - %d", sigusr, p->name, port_id, module_id);
+    PLUG_DEBUG(plug_in, "event %d \"%s\" (%d) - %d", sigusr, hack->name, port_id, module_id);
 
     // struct net_device *e1000e = e_driver->eda_device;
     // int port_id = e_driver->eda_index;
@@ -1474,7 +1474,7 @@ static void adapt_event(struct entl_mgr *self, int sigusr) {
         ec_state_t state; memset(&state, 0, sizeof(ec_state_t));
         int err = funcs->edf_get_state(e1000e, &state);
         if (!err) {
-            PLUG_DEBUG(plug_in, "event %d \"%s\" (%d) - %d link: %d", sigusr, p->name, port_id, module_id, state.ecs_link_state);
+            PLUG_DEBUG(plug_in, "event %d \"%s\" (%d) - %d link: %d", sigusr, hack->name, port_id, module_id, state.ecs_link_state);
             PLUG_DEBUG(plug_in, "event -"
                 // PRIu64 - %llu - <inttypes.h>
                 " recover_count %llu"
@@ -1520,15 +1520,15 @@ static void hack_init(struct net_device *plug_in) {
     int module_id = e_dev->ecnl_index;
     struct entl_driver_funcs *funcs = &entl_adapt_funcs;
     for (int i = 0; i < ARRAY_SIZE(e1000e_ports); i++) {
-        e1000e_hackery_t *p = &e1000e_ports[i];
-        struct net_device *e1000e = p->e1000e;
+        e1000e_hackery_t *hack = &e1000e_ports[i];
+        struct net_device *e1000e = hack->e1000e;
         if (!e1000e) continue;
 
         entl_mgr_plus_t *mgr_plus = kzalloc(sizeof(struct entl_mgr_plus), GFP_ATOMIC);
         if (!mgr_plus) continue; // ENOMEM;
 
         mgr_plus->emp_plug_in = plug_in;
-        mgr_plus->emp_p = p;
+        mgr_plus->emp_hack = hack;
 
         entl_mgr_t *mgr = (entl_mgr_t *) mgr_plus; // i.e. mgr_plus.emp_base
         mgr->emf_event = adapt_event;
@@ -1537,12 +1537,12 @@ static void hack_init(struct net_device *plug_in) {
         int magic = ENCL_ENTL_MAGIC;
         int compat = funcs->edf_validate(e1000e, magic, mgr); // ref: entl_device.c
         if (compat < 0) {
-            PLUG_DEBUG(plug_in, "incompatible i/f 0x%x \"%s\" ??", magic, p->name);
+            PLUG_DEBUG(plug_in, "incompatible i/f 0x%x \"%s\" ??", magic, hack->name);
             continue;
         }
 
-        int port_no = ecnl_register_port(module_id, p->name, p->e1000e, funcs);
-        if (port_no < 0) { PLUG_DEBUG(plug_in, "failed to register \"%s\"", p->name); }
+        int port_no = ecnl_register_port(module_id, hack->name, hack->e1000e, funcs);
+        if (port_no < 0) { PLUG_DEBUG(plug_in, "failed to register \"%s\"", hack->name); }
     }
 }
 
