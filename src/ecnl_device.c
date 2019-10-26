@@ -1411,19 +1411,22 @@ typedef struct {
     int index;
     unsigned char *name;
     struct net_device *e1000e;
+    int port_id;
 } e1000e_hackery_t;
 
 // #define ARRAY_SIZE(X) (sizeof(X) / sizeof((X)[0])) // <linux/kernel.h>
 
+// map: name -> instance (e1000e)
 e1000e_hackery_t e1000e_ports[] = {
-    { .index = 1, .name = "enp6s0", .e1000e = NULL, },
-    { .index = 2, .name = "enp8s0", .e1000e = NULL, },
-    { .index = 3, .name = "enp9s0", .e1000e = NULL, },
-    { .index = 4, .name = "enp7s0", .e1000e = NULL, },
-    { .index = 5, .name = "eno1",   .e1000e = NULL, },
+    { .index = 1, .name = "enp6s0", .e1000e = NULL, .port_id = -1 },
+    { .index = 2, .name = "enp8s0", .e1000e = NULL, .port_id = -1 },
+    { .index = 3, .name = "enp9s0", .e1000e = NULL, .port_id = -1 },
+    { .index = 4, .name = "enp7s0", .e1000e = NULL, .port_id = -1 },
+    { .index = 5, .name = "eno1",   .e1000e = NULL, .port_id = -1 },
 };
 
 // FIXME : should instead auto-detect compatible instances
+// ref: scan_netdev - at init time search all devices to find instance we like/support
 static void inject_dev(struct net_device *n_dev) {
     for (int i = 0; i < ARRAY_SIZE(e1000e_ports); i++) {
         e1000e_hackery_t *hack = &e1000e_ports[i];
@@ -1432,22 +1435,21 @@ static void inject_dev(struct net_device *n_dev) {
 }
 
 typedef struct entl_mgr_plus {
-    struct entl_mgr emp_base;
-    struct net_device *emp_plug_in;
+    struct entl_mgr emp_base; // callback struct
+    struct net_device *emp_plug_in; // ecnl instance
     e1000e_hackery_t *emp_hack;
 } entl_mgr_plus_t;
 
 // void (*emf_event)(struct entl_mgr *self, int sigusr); // called from watchdog, be careful
 static void adapt_event(struct entl_mgr *self, int sigusr) {
     entl_mgr_plus_t *priv = (entl_mgr_plus_t *) self;
-    struct net_device *plug_in = priv->emp_plug_in;
+    struct net_device *plug_in = priv->emp_plug_in; // ecnl instance
     e1000e_hackery_t *hack = priv->emp_hack;
 
     PLUG_DEBUG(plug_in, "event %d \"%s\"", sigusr, hack->name);
 
-// FIXME: is the port_id wrong here?
-
-    int port_id = hack->index;
+    // int port_id = hack->index; // WRONG!
+    int port_id = hack->port_id;
     // char *name = hack->name;
     struct net_device *e1000e = hack->e1000e;
 
@@ -1461,7 +1463,7 @@ static void adapt_event(struct entl_mgr *self, int sigusr) {
     struct entl_driver *e_driver = &e_dev->ecnl_drivers[port_id];
     if (!e_driver) return;
 
-    PLUG_DEBUG(plug_in, "event %d \"%s\" (%d) - %d", sigusr, hack->name, port_id, module_id);
+    PLUG_DEBUG(plug_in, "event %d \"%s\" (%d) - module %d check: %s (%d)", sigusr, hack->name, port_id, module_id, e_driver->eda_name, e_driver->eda_index);
 
     // struct net_device *e1000e = e_driver->eda_device;
     // int port_id = e_driver->eda_index;
@@ -1515,22 +1517,35 @@ static void adapt_event(struct entl_mgr *self, int sigusr) {
 }
 
 // FIXME: validate here
+// once we've found e1000e instances, connect plug_in (ecnl_device_t) & e1000e (entl_device_t)
 static void hack_init(struct net_device *plug_in) {
     ecnl_device_t *e_dev = (ecnl_device_t *) netdev_priv(plug_in); // e_dev->ecnl_index
     int module_id = e_dev->ecnl_index;
-    struct entl_driver_funcs *funcs = &entl_adapt_funcs;
+
+    struct entl_driver_funcs *funcs = &entl_adapt_funcs; // backdoor into e1000e/entl (for ecnl use)
+
     for (int i = 0; i < ARRAY_SIZE(e1000e_ports); i++) {
         e1000e_hackery_t *hack = &e1000e_ports[i];
+
         struct net_device *e1000e = hack->e1000e;
         if (!e1000e) continue;
 
+        // data structures from e1000e driver side:
+        // struct e1000_adapter *adapter = netdev_priv(e1000e);
+        // entl_device_t *entl_dev = adapter->entl_dev;
+        // entl_state_machine_t *stm = entl_dev->edev_stm; // or mcn (within entl_state_machine.c)
+        // (dynamic) entl_mgr_t *mgr = entl_dev->edev_mgr
+        // e.g. mgr->emf_event
+
+        // ecnl private data (after shared data, 'mgr_plus.emp_base')
         entl_mgr_plus_t *mgr_plus = kzalloc(sizeof(struct entl_mgr_plus), GFP_ATOMIC);
         if (!mgr_plus) continue; // ENOMEM;
 
-        mgr_plus->emp_plug_in = plug_in;
+        mgr_plus->emp_plug_in = plug_in; // ecnl instance
         mgr_plus->emp_hack = hack;
 
-        entl_mgr_t *mgr = (entl_mgr_t *) mgr_plus; // i.e. mgr_plus.emp_base
+        // backdoor into encl (for e1000e/entl use)
+        entl_mgr_t *mgr = (entl_mgr_t *) mgr_plus; // i.e. mgr_plus.emp_base, callback struct
         mgr->emf_event = adapt_event;
         mgr->emf_private = mgr;
 
@@ -1541,11 +1556,21 @@ static void hack_init(struct net_device *plug_in) {
             continue;
         }
 
-        int port_no = ecnl_register_port(module_id, hack->name, hack->e1000e, funcs);
-        if (port_no < 0) { PLUG_DEBUG(plug_in, "failed to register \"%s\"", hack->name); }
+        int port_id = ecnl_register_port(module_id, hack->name, hack->e1000e, funcs);
+        if (port_id < 0) { PLUG_DEBUG(plug_in, "failed to register \"%s\"", hack->name); continue; }
+
+        // Q : how do we figure out port_id from e1000e ref ??
+        // NOT : int port_id = hack->index;
+        hack->port_id = port_id;
+
+        // data structures from the ecnl plug-in side:
+        // struct net_device *plug_in
+        // ecnl_device_t *e_dev = (ecnl_device_t *) netdev_priv(plug_in);
+        // struct entl_driver *e_driver = &e_dev->ecnl_drivers[port_id];
+        // e.g. e_driver->funcs : edf_validate, edf_get_state, edf_send_AIT, edf_retrieve_AIT w/eda_device (e1000e)
     }
 }
-
+    
 // Q: what locking is required here?
 // /Users/bjackson/git-projects/ubuntu-bionic/include/linux/netdevice.h
 extern struct net init_net;
