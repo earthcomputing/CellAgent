@@ -1431,6 +1431,21 @@ static void inject_dev(struct net_device *n_dev) {
     }
 }
 
+typedef struct entl_mgr_plus {
+    struct entl_mgr emp_base;
+    struct net_device *emp_plug_in;
+    e1000e_hackery_t *emp_p;
+} entl_mgr_plus_t;
+
+// void (*emf_event)(struct entl_mgr *self, int sigusr); // called from watchdog, be careful
+static void adapt_event(struct entl_mgr *self, int sigusr) {
+    entl_mgr_plus_t *priv = (entl_mgr_plus_t *) self;
+    struct net_device *plug_in = priv->emp_plug_in;
+    e1000e_hackery_t *p = priv->emp_p;
+    PLUG_DEBUG(plug_in, "event %d \"%s\"", sigusr, p->name);
+}
+
+
 // FIXME: validate here
 static void hack_init(struct net_device *plug_in) {
     ecnl_device_t *e_dev = (ecnl_device_t *) netdev_priv(plug_in); // e_dev->ecnl_index
@@ -1441,7 +1456,16 @@ static void hack_init(struct net_device *plug_in) {
         struct net_device *e1000e = p->e1000e;
         if (!e1000e) continue;
 
-        entl_mgr_t *mgr = NULL; // alloc();
+        entl_mgr_plus_t *mgr_plus = kzalloc(sizeof(struct entl_mgr_plus), GFP_ATOMIC);
+        if (!mgr_plus) continue; // ENOMEM;
+
+        mgr_plus->emp_plug_in = plug_in;
+        mgr_plus->emp_p = p;
+
+        entl_mgr_t *mgr = (entl_mgr_t *) mgr_plus; // i.e. mgr_plus.emp_base
+        mgr->emf_event = adapt_event;
+        mgr->emf_private = mgr;
+
         int magic = ENCL_ENTL_MAGIC;
         int compat = funcs->edf_validate(e1000e, magic, mgr); // ref: entl_device.c
         if (compat < 0) {
