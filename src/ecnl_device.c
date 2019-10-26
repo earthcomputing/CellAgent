@@ -1500,14 +1500,14 @@ static void adapt_event(struct entl_mgr *self, int sigusr) {
                 // timespec state.ecs_update_time,
             );
 // FIXME
-            // ecnl_link_status_update(module_id, port_id, &state); // NL_ECNL_MCGRP_LINKSTATUS
+            ecnl_link_status_update(module_id, port_id, &state); // NL_ECNL_MCGRP_LINKSTATUS
         }
     }
 
     // ENTL_DEVICE_FLAG_SIGNAL2, process_tx_packet, process_rx_packet
     if (sigusr == SIGUSR2 /*12*/) {
         int num_message = 1;
-        // ecnl_got_ait_message(module_id, port_id, num_message); // NL_ECNL_MCGRP_AIT
+        ecnl_got_ait_message(module_id, port_id, num_message); // NL_ECNL_MCGRP_AIT
     }
 
     // multicast
