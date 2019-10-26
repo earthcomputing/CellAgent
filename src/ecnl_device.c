@@ -1449,6 +1449,8 @@ static void adapt_event(struct entl_mgr *self, int sigusr) {
     // char *name = p->name;
     struct net_device *e1000e = p->e1000e;
 
+    PLUG_DEBUG(plug_in, "event %d \"%s\" (%d)", sigusr, p->name, port_id);
+
     // struct net_device *plug_in = ecnl_devices[module_id];
     ecnl_device_t *e_dev = (ecnl_device_t *) netdev_priv(plug_in);
     if (!e_dev) return;
@@ -1457,22 +1459,49 @@ static void adapt_event(struct entl_mgr *self, int sigusr) {
     struct entl_driver *e_driver = &e_dev->ecnl_drivers[port_id];
     if (!e_driver) return;
 
+    PLUG_DEBUG(plug_in, "event %d \"%s\" (%d) - %d", sigusr, p->name, port_id, module_id);
+
     // struct net_device *e1000e = e_driver->eda_device;
     struct entl_driver_funcs *funcs = e_driver->eda_funcs;
+    if (!funcs) return;
 
     // ENTL_DEVICE_FLAG_SIGNAL, i.e. link up/down, fatal error
     if (sigusr == SIGUSR1 /*10*/) {
         ec_state_t state; memset(&state, 0, sizeof(ec_state_t));
         int err = funcs->edf_get_state(e1000e, &state);
         if (!err) {
-            ecnl_link_status_update(module_id, port_id, &state); // NL_ECNL_MCGRP_LINKSTATUS
+            PLUG_DEBUG(plug_in, "event %d \"%s\" (%d) - %d link: %d", sigusr, p->name, port_id, module_id, state.ecs_link_state);
+            PLUG_DEBUG(plug_in, "event -"
+                // PRIu64 - %llu - <inttypes.h>
+                " recover_count %llu"
+                " recovered_count %llu"
+                " s_count %llu"
+                " r_count %llu"
+                " entt_count %llu"
+                " aop_count %llu"
+                " link_state %d"
+                " num_queued %d"
+                // " update_time"
+                ,
+                state.ecs_recover_count,
+                state.ecs_recovered_count,
+                state.ecs_s_count,
+                state.ecs_r_count,
+                state.ecs_entt_count,
+                state.ecs_aop_count,
+                state.ecs_link_state,
+                state.ecs_num_queued
+                // timespec state.ecs_update_time,
+            );
+// FIXME
+            // ecnl_link_status_update(module_id, port_id, &state); // NL_ECNL_MCGRP_LINKSTATUS
         }
     }
 
     // ENTL_DEVICE_FLAG_SIGNAL2, process_tx_packet, process_rx_packet
     if (sigusr == SIGUSR2 /*12*/) {
         int num_message = 1;
-        ecnl_got_ait_message(module_id, port_id, num_message); // NL_ECNL_MCGRP_AIT
+        // ecnl_got_ait_message(module_id, port_id, num_message); // NL_ECNL_MCGRP_AIT
     }
 
     // multicast
