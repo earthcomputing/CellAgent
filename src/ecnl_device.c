@@ -1442,20 +1442,35 @@ static void adapt_event(struct entl_mgr *self, int sigusr) {
     entl_mgr_plus_t *priv = (entl_mgr_plus_t *) self;
     struct net_device *plug_in = priv->emp_plug_in;
     e1000e_hackery_t *p = priv->emp_p;
+
     PLUG_DEBUG(plug_in, "event %d \"%s\"", sigusr, p->name);
+
+    int port_id = p->index;
+    // char *name = p->name;
+    struct net_device *e1000e = p->e1000e;
+
+    // struct net_device *plug_in = ecnl_devices[module_id];
+    ecnl_device_t *e_dev = (ecnl_device_t *) netdev_priv(plug_in);
+    if (!e_dev) return;
+
+    int module_id = e_dev->ecnl_index;
+    struct entl_driver *e_driver = &e_dev->ecnl_drivers[port_id];
+    if (!e_driver) return;
+
+    // struct net_device *e1000e = e_driver->eda_device;
+    struct entl_driver_funcs *funcs = e_driver->eda_funcs;
 
     // ENTL_DEVICE_FLAG_SIGNAL, i.e. link up/down, fatal error
     if (sigusr == SIGUSR1 /*10*/) {
-        int module_id = 0;
-        int port_id = p->index;
-        ec_state_t *state = NULL;
-        ecnl_link_status_update(module_id, port_id, state); // NL_ECNL_MCGRP_LINKSTATUS
+        ec_state_t state; memset(&state, 0, sizeof(ec_state_t));
+        int err = funcs->edf_get_state(e1000e, &state);
+        if (!err) {
+            ecnl_link_status_update(module_id, port_id, &state); // NL_ECNL_MCGRP_LINKSTATUS
+        }
     }
 
     // ENTL_DEVICE_FLAG_SIGNAL2, process_tx_packet, process_rx_packet
     if (sigusr == SIGUSR2 /*12*/) {
-        int module_id = 0;
-        int port_id = p->index;
         int num_message = 1;
         ecnl_got_ait_message(module_id, port_id, num_message); // NL_ECNL_MCGRP_AIT
     }
