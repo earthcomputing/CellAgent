@@ -612,6 +612,10 @@ static inline void notify_listener(int subscriber, int sigusr) {
     if (task != NULL) send_sig_info(sigusr, &info, task);
 }
 
+static inline void notify_manager(entl_mgr_t *mgr, int sigusr) {
+    mgr->emf_event(mgr, sigusr);
+}
+
 static void entl_watchdog_task(struct work_struct *work) {
     unsigned long wakeup = 1 * HZ;  // one second
 
@@ -623,15 +627,18 @@ static void entl_watchdog_task(struct work_struct *work) {
         goto restart_watchdog;
     }
 
+    entl_mgr_t *manager = dev->edev_mgr;
     int subscriber = dev->edev_user_pid;
-    if (subscriber) {
+    if (subscriber || manager) {
         if (dev->edev_flag & ENTL_DEVICE_FLAG_SIGNAL) {
             dev->edev_flag &= ~(uint32_t) ENTL_DEVICE_FLAG_SIGNAL;
-            notify_listener(subscriber, SIGUSR1);
+            if (subscriber) notify_listener(subscriber, SIGUSR1);
+            if (manager) notify_manager(manager, SIGUSR1);
         }
         else if (dev->edev_flag & ENTL_DEVICE_FLAG_SIGNAL2) {
             dev->edev_flag &= ~(uint32_t) ENTL_DEVICE_FLAG_SIGNAL2;
-            notify_listener(subscriber, SIGUSR2);
+            if (subscriber) notify_listener(subscriber, SIGUSR2);
+            if (manager) notify_manager(manager, SIGUSR2);
         }
     }
 
@@ -1190,7 +1197,7 @@ static void entl_e1000_configure_rx(struct e1000_adapter *adapter)
 // ENTL - ECNL linkage
 
 // minimal i/f compatibility
-static int adapt_validate(struct net_device *e1000e, int magic) {
+static int adapt_validate(struct net_device *e1000e, int magic, entl_mgr_t *mgr) {
     ADAPT_INFO_NAME(e1000e->name, "adapt_validate");
 
     struct e1000_adapter *adapter = netdev_priv(e1000e);
@@ -1200,7 +1207,10 @@ static int adapt_validate(struct net_device *e1000e, int magic) {
     entl_state_machine_t *stm = &entl_dev->edev_stm;
     if (stm == NULL) return -1;
 
-    return (magic == ENCL_ENTL_MAGIC) ? 1 : -1; // ENCL_ENTL_MAGIC 0x5affdead
+    int compat = (magic == ENCL_ENTL_MAGIC);
+    if (compat) entl_dev->edev_mgr = mgr;
+
+    return (compat) ? 1 : -1; // ENCL_ENTL_MAGIC 0x5affdead
 }
 
 // ref: linux/netdevice.h - enum netdev_tx

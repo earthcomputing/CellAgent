@@ -11,6 +11,11 @@
 #include "entl_skb_queue.h"
 #include "entl_state_machine.h"
 
+typedef struct entl_mgr {
+    void (*emf_event)(struct entl_mgr *self, int sigusr); // called from watchdog, be careful
+    void *emf_private;
+} entl_mgr_t;
+
 typedef struct entl_device {
     int edev_action;
     uint32_t edev_flag; // ENTL_DEVICE_FLAG
@@ -23,6 +28,7 @@ typedef struct entl_device {
     int edev_user_pid;
     struct timer_list edev_watchdog_timer;
     struct work_struct edev_watchdog_task;
+    entl_mgr_t *edev_mgr;
 } entl_device_t;
 
 #include "entl_user_api.h"

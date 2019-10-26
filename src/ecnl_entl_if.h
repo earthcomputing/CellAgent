@@ -36,9 +36,9 @@ typedef struct ec_alo_regs {
     uint32_t ecars_flags;
 } ec_alo_regs_t;
 
-#define ENCL_ENTL_MAGIC 0x5affdead
+#define ENCL_ENTL_MAGIC 0x5a00dead
 typedef struct entl_driver_funcs {
-    int (*edf_validate)           (struct net_device *dev, int magic);
+    int (*edf_validate)           (struct net_device *dev, int magic, entl_mgr_t *mgr);
     netdev_tx_t (*edf_start_xmit) (struct sk_buff *skb, struct net_device *dev);
     int (*edf_send_AIT)           (struct sk_buff *skb, struct net_device *dev);
     int (*edf_retrieve_AIT)       (struct net_device *dev, entt_ioctl_ait_data_t *data);
@@ -48,7 +48,7 @@ typedef struct entl_driver_funcs {
 } entl_driver_funcs_t;
 
 #ifdef ENTL_ADAPT_IMPL
-static int adapt_validate(struct net_device *dev, int magic); // { return 1; }
+static int adapt_validate(struct net_device *dev, int magic, entl_mgr_t *mgr); // { return 1; }
 static netdev_tx_t adapt_start_xmit(struct sk_buff *skb, struct net_device *e1000e); // { return NETDEV_TX_BUSY; }
 static int adapt_send_AIT(struct sk_buff *skb, struct net_device *e1000e); // { return -1; }
 static int adapt_retrieve_AIT(struct net_device *e1000e, entt_ioctl_ait_data_t *data); // { return -1; }
