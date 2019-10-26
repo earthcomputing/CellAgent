@@ -1443,8 +1443,28 @@ static void adapt_event(struct entl_mgr *self, int sigusr) {
     struct net_device *plug_in = priv->emp_plug_in;
     e1000e_hackery_t *p = priv->emp_p;
     PLUG_DEBUG(plug_in, "event %d \"%s\"", sigusr, p->name);
-}
 
+    // ENTL_DEVICE_FLAG_SIGNAL, i.e. link up/down, fatal error
+    if (sigusr == SIGUSR1 /*10*/) {
+        int module_id = 0;
+        int port_id = p->index;
+        ec_state_t *state = NULL;
+        ecnl_link_status_update(module_id, port_id, state); // NL_ECNL_MCGRP_LINKSTATUS
+    }
+
+    // ENTL_DEVICE_FLAG_SIGNAL2, process_tx_packet, process_rx_packet
+    if (sigusr == SIGUSR2 /*12*/) {
+        int module_id = 0;
+        int port_id = p->index;
+        int num_message = 1;
+        ecnl_got_ait_message(module_id, port_id, num_message); // NL_ECNL_MCGRP_AIT
+    }
+
+    // multicast
+    // ecnl_receive_dsc(int module_id, int index, struct sk_buff *skb); // NL_ECNL_MCGRP_DISCOVERY
+    // ecnl_forward_ait_message(int module_id, int drv_index, struct sk_buff *skb); // NL_ECNL_MCGRP_AIT
+    // ecnl_got_alo_update(int module_id, int index); // NL_ECNL_MCGRP_AIT
+}
 
 // FIXME: validate here
 static void hack_init(struct net_device *plug_in) {
