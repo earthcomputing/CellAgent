@@ -1438,7 +1438,17 @@ static void hack_init(struct net_device *plug_in) {
     struct entl_driver_funcs *funcs = &entl_adapt_funcs;
     for (int i = 0; i < ARRAY_SIZE(e1000e_ports); i++) {
         e1000e_hackery_t *p = &e1000e_ports[i];
-        if (!p->e1000e) continue;
+        struct net_device *e1000e = p->e1000e;
+        if (!e1000e) continue;
+
+        entl_mgr_t *mgr = NULL; // alloc();
+        int magic = ENCL_ENTL_MAGIC;
+        int compat = funcs->edf_validate(e1000e, magic, mgr); // ref: entl_device.c
+        if (compat < 0) {
+            PLUG_DEBUG(plug_in, "incompatible i/f 0x%x \"%s\" ??", magic, p->name);
+            continue;
+        }
+
         int port_no = ecnl_register_port(module_id, p->name, p->e1000e, funcs);
         if (port_no < 0) { PLUG_DEBUG(plug_in, "failed to register \"%s\"", p->name); }
     }
