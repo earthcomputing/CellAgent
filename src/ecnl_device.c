@@ -1507,6 +1507,7 @@ static void adapt_event(struct entl_mgr *self, int sigusr) {
     // ENTL_DEVICE_FLAG_SIGNAL2, process_tx_packet, process_rx_packet
     if (sigusr == SIGUSR2 /*12*/) {
         int num_message = 1;
+        PLUG_DEBUG(plug_in, "event %d \"%s\" (%d) - %d num_message: %d", sigusr, hack->name, port_id, module_id, num_message);
         ecnl_got_ait_message(module_id, port_id, num_message); // NL_ECNL_MCGRP_AIT
     }
 
