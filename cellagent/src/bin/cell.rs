@@ -1,8 +1,11 @@
 #[macro_use] extern crate failure;
 
 use std::{collections::{HashSet},
+          fmt,
           fs::{File, OpenOptions},
-	      iter::FromIterator};
+	  iter::FromIterator,
+          process::{Command, Stdio},
+};
 
 use ec_fabrix::config::{CONFIG};
 use ec_fabrix::nalcell::{NalCell};
@@ -17,6 +20,36 @@ fn main() -> Result<(), Error> {
         .truncate(true)
 	.open(&CONFIG.output_file_name);
     let cell_name = "Alice"; /* if needed, can read cell name from config file */
+    let mut wc_cmd_outer;
+    let num_phys_ports_str = {
+        let lspci_cmd = Command::new("lspci")
+            .stdin(Stdio::null())
+            .stdout(Stdio::piped())
+            .spawn()
+            .expect("lspci failed in identifying ethernet ports");
+        use std::process::*;
+        use std::io::*;
+        use std::os::unix::io::{AsRawFd, FromRawFd};
+        unsafe {
+            let grep_cmd = Command::new("grep")
+                .arg("Ethernet")
+                .stdin(Stdio::from_raw_fd(lspci_cmd.stdout.unwrap().as_raw_fd()))
+                .stdout(Stdio::piped())
+                .spawn()
+                .expect("grep failed in identifying ethernet ports");
+            let wc_cmd = Command::new("wc")
+                .arg("-l")
+                .stdin(Stdio::from_raw_fd(grep_cmd.stdout.unwrap().as_raw_fd()))
+                .stdout(Stdio::piped())
+                .output()
+                .expect("wc failed in identifying ethernet ports");
+            wc_cmd_outer = wc_cmd;
+        }
+//        println!(get_status(wc_cmd_outer));
+        String::from_utf8_lossy(&wc_cmd_outer.stdout)
+    };
+    println!("num_phys_ports: {}", num_phys_ports_str);
+    let num_phys_ports : u8 = num_phys_ports_str.trim().parse().unwrap();
     let border_port_list : Vec<PortNo> = vec![2u8]
         .iter()
         .map(|i| PortNo(*i as u8))
