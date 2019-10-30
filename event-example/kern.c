@@ -67,7 +67,7 @@ struct genl_family family = {
 };
 
 static unsigned char *msg = "TEST";
-static u32 foo = 12345
+static u32 foo = 12345;
 
 /*
  * The family has only one group, so the group ID is just the family's group offset.
@@ -92,7 +92,14 @@ end:
 }
 
 static void initialize_timer(void) {
+#ifdef BIONIC
     timer_setup(&timer, send_multicast, 0);
+#else
+    init_timer(&timer);
+    timer.function = send_multicast;
+    timer.expires = 0;
+    timer.data = 0;
+#endif
     mod_timer(&timer, jiffies + msecs_to_jiffies(2000));
 }
 

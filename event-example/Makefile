@@ -11,6 +11,11 @@ ccflags-y += -Wno-unused-function
 ## EXTRA_CFLAGS += -I$(src)
 ## generated-y += -I$(src)
 
+ifeq (4.18.0-25-generic,$(BIONIC_KERNEL))
+CFLAGS += -DBIONIC
+endif
+
+
 obj-m += kern.o
 
 all:

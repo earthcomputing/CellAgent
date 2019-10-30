@@ -37,7 +37,7 @@ static int cb(struct nl_msg *msg, void *arg) {
     int error = genlmsg_parse(nl_hdr, 0, attrs, __ATTR_MAX - 1, NULL);
     if (error) return nl_fail(error, "genlmsg_parse");
 
-    struct nlattr ap;
+    struct nlattr *ap;
     ap = attrs[ATTR_HELLO];
     if (ap) printf("ATTR_HELLO: len:%u type:%u data:%s\n", ap->nla_len, ap->nla_type, (char *)nla_data(ap));
     ap = attrs[ATTR_FOO];
@@ -45,18 +45,18 @@ static int cb(struct nl_msg *msg, void *arg) {
     return 0;
 }
 
+#define FAMILY_NAME "PotatoFamily"
+#define GROUP_NAME "PotatoGroup"
+
 /* register with multicast group*/
-static int do_listen(struct nl_sock *sk, char *family, char *group) {
-    int group = genl_ctrl_resolve_grp(sk, family, group);
-    if (group < 0) return nl_fail(group, "genl_ctrl_resolve_grp");
-    printf("group %u\n", group);
-    error = nl_socket_add_memberships(sk, group, 0);
-    if (error) { printf("nl_socket_add_memberships() failed: %d\n", error); return error; }
+static int do_listen(struct nl_sock *sk, char *family, char *group_name) {
+    int group = genl_ctrl_resolve_grp(sk, family, group_name);
+    if (group < 0) { printf(FAMILY_NAME " - genl_ctrl_resolve_grp (%s) failed: %s", group_name, nl_geterror(group)); return group; }
+    printf(FAMILY_NAME " - group %s (%d)", group_name, group);
+    int error = nl_socket_add_memberships(sk, group, 0);
+    if (error) { printf(FAMILY_NAME " - nl_socket_add_memberships failed: %d", error); return error; }
     return error;
 }
-
-#define FAMILY_NAME "PotatoFamily
-#define GROUP_NAME "PotatoGroup"
 
 static struct nl_sock *sk = NULL;
 
