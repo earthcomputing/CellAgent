@@ -27,18 +27,22 @@ extern struct nl_sock *init_sock_route() {
 }
 
 static int my_func(struct nl_msg *msg, void *arg) {
-    printf("my_funct" "\n");
+    printf(ECNL_GENL_NAME " my_func" "\n");
+    SYSLOG(ECNL_GENL_NAME " - event");
     return 0;
 }
 
 void forever(void) {
     struct nl_sock *sk = init_sock_route();
     nl_socket_modify_cb(sk, NL_CB_VALID, NL_CB_CUSTOM, my_func, NULL);
-    // nl_socket_add_memberships(sk, RTNLGRP_LINK, 0);
+    int rc = genl_ctrl_resolve(sk, ECNL_GENL_NAME);
+    if (rc < 0) { perror("genl_ctrl_resolve"); return; }
 #if 1
-    nl_socket_add_memberships(sk, NL_ECNL_MCGRP_LINKSTATUS, NL_ECNL_MCGRP_AIT, NL_ECNL_MCGRP_ALO, NL_ECNL_MCGRP_DISCOVERY, NL_ECNL_MCGRP_TEST, 0);
+    rc = nl_socket_add_memberships(sk, NL_ECNL_MCGRP_LINKSTATUS, NL_ECNL_MCGRP_AIT, NL_ECNL_MCGRP_ALO, NL_ECNL_MCGRP_DISCOVERY, NL_ECNL_MCGRP_TEST, 0);
+    if (rc < 0) { perror("nl_socket_add_memberships"); return; }
 #endif
 
+    SYSLOG(ECNL_GENL_NAME " - listening ...");
     while (1) {
         nl_recvmsgs_default(sk);
     }
@@ -51,7 +55,7 @@ int main(int argc, char *argv[]) {
     int facility = LOG_DAEMON | LOG_INFO;
     openlog(ident, option, facility);
 
-    SYSLOG("starting ...");
+    SYSLOG(ECNL_GENL_NAME " - starting ...");
 
     int nochdir = 0; // cwd root
     int noclose = 0; // close 0/1/2
@@ -60,4 +64,5 @@ int main(int argc, char *argv[]) {
     // ugh - fatal_error()
 
     forever();
+    return 0;
 }

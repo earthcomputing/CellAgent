@@ -475,8 +475,8 @@ static int nl_ecnl_map_ports(struct sk_buff *skb, struct genl_info *info) {
 
 // UNUSED ??
 static struct entl_driver *find_driver(ecnl_device_t *e_dev, char *name) {
-    for (int i = 0; i < e_dev->ecnl_num_ports; i++) {
-        struct entl_driver *e_driver = &e_dev->ecnl_drivers[i];
+    for (int port_id = 0; port_id < e_dev->ecnl_num_ports; port_id++) {
+        struct entl_driver *e_driver = &e_dev->ecnl_drivers[port_id];
         if (strcmp(e_driver->eda_name, name) == 0) return e_driver;
     }
     return NULL;
@@ -1006,11 +1006,11 @@ static int ecnl_receive_skb(int module_id, int index, struct sk_buff *skb) {
 
         for (int i = 0; i < ENCL_FW_TABLE_ENTRY_ARRAY; i++) {
             if (port_vector & 1) {
-                int id = e_dev->ecnl_fw_map[i];
-                u32 nextID = entry.nextID[id];
+                int port_id = e_dev->ecnl_fw_map[i];
+                u32 nextID = entry.nextID[port_id];
 
                 // FIXME : error or warning ??
-                struct entl_driver *e_driver = &e_dev->ecnl_drivers[id];
+                struct entl_driver *e_driver = &e_dev->ecnl_drivers[port_id];
                 if (!e_driver) continue;
                 struct net_device *e1000e = e_driver->eda_device;
                 struct entl_driver_funcs *funcs = e_driver->eda_funcs;
@@ -1042,11 +1042,11 @@ static int ecnl_receive_skb(int module_id, int index, struct sk_buff *skb) {
         }
 // FIXME: harden against ENCL_FW_TABLE_ENTRY_ARRAY ??
         if (parent > 0) {
-            int id = e_dev->ecnl_fw_map[parent];
-            u32 nextID = entry.nextID[id];
+            int port_id = e_dev->ecnl_fw_map[parent];
+            u32 nextID = entry.nextID[port_id];
             set_next_id(skb, nextID);
 
-            struct entl_driver *e_driver = &e_dev->ecnl_drivers[id];
+            struct entl_driver *e_driver = &e_dev->ecnl_drivers[port_id];
             if (!e_driver) return -EINVAL;
             struct net_device *e1000e = e_driver->eda_device;
             struct entl_driver_funcs *funcs = e_driver->eda_funcs;
@@ -1081,10 +1081,10 @@ static int ecnl_receive_dsc(int module_id, int index, struct sk_buff *skb) {
 }
 
 // entl e_driver has a link update
-static void ecnl_link_status_update(int module_id, int index, ec_state_t *state) {
+static void ecnl_link_status_update(int module_id, int port_id, ec_state_t *state) {
     struct net_device *plug_in = ecnl_devices[module_id];
     ecnl_device_t *e_dev = (ecnl_device_t *) netdev_priv(plug_in);
-    struct entl_driver *e_driver = &e_dev->ecnl_drivers[index];
+    struct entl_driver *e_driver = &e_dev->ecnl_drivers[port_id];
 
     struct sk_buff *rskb = genlmsg_new(NLMSG_GOODSIZE, GFP_KERNEL);
     if (!rskb) return; // -ENOMEM;
@@ -1134,11 +1134,11 @@ static void ecnl_forward_ait_message(int module_id, int drv_index, struct sk_buf
                     for (int i = 0; i < ENCL_FW_TABLE_ENTRY_ARRAY && port_vector > 0; i++, port_vector >>= 1) {
                         if ((port_vector & 1) == 0) continue;
 
-                        int id = e_dev->ecnl_fw_map[i];
-                        u32 nextID = entry.nextID[id];
+                        int port_id = e_dev->ecnl_fw_map[i];
+                        u32 nextID = entry.nextID[port_id];
 
                         // FIXME : error or warning ??
-                        struct entl_driver *e_driver = &e_dev->ecnl_drivers[id];
+                        struct entl_driver *e_driver = &e_dev->ecnl_drivers[port_id];
                         if (!e_driver) continue;
                         struct net_device *e1000e = e_driver->eda_device;
                         struct entl_driver_funcs *funcs = e_driver->eda_funcs;
@@ -1159,10 +1159,10 @@ static void ecnl_forward_ait_message(int module_id, int drv_index, struct sk_buf
                 }
                 int module_id = e_dev->ecnl_index;
                 if (parent > 0 && module_id != parent) {
-                    int id = e_dev->ecnl_fw_map[parent];
-                    u32 nextID = entry.nextID[id];
+                    int port_id = e_dev->ecnl_fw_map[parent];
+                    u32 nextID = entry.nextID[port_id];
 
-                    struct entl_driver *e_driver = &e_dev->ecnl_drivers[id];
+                    struct entl_driver *e_driver = &e_dev->ecnl_drivers[port_id];
                     if (!e_driver) return; // -1;
                     struct net_device *e1000e = e_driver->eda_device;
                     struct entl_driver_funcs *funcs = e_driver->eda_funcs;
@@ -1193,31 +1193,31 @@ static void ecnl_forward_ait_message(int module_id, int drv_index, struct sk_buf
     return; // -1;
 }
 
-static void ecnl_got_ait_message(int module_id, int drv_index, int num_message) {
+static void ecnl_got_ait_message(int module_id, int port_id, int num_message) {
     //struct ethhdr *eth = (struct ethhdr *) skb->data;
     struct net_device *plug_in = ecnl_devices[module_id];
     ecnl_device_t *e_dev = (ecnl_device_t *) netdev_priv(plug_in);
-    struct entl_driver *e_driver = &e_dev->ecnl_drivers[drv_index];
+    struct entl_driver *e_driver = &e_dev->ecnl_drivers[port_id];
 
     struct sk_buff *rskb = genlmsg_new(NLMSG_GOODSIZE, GFP_KERNEL);
     if (!rskb) return; // -ENOMEM;
 
     void *user_hdr = genlmsg_put(rskb, 0, 0, &nl_ecnd_fam, 0, NL_ECNL_CMD_SIGNAL_AIT_MESSAGE);
     NLAPUT_CHECKED_ZZ(nla_put_u32(rskb, NL_ECNL_ATTR_MODULE_ID, module_id));
-    NLAPUT_CHECKED_ZZ(nla_put_u32(rskb, NL_ECNL_ATTR_PORT_ID, drv_index));
+    NLAPUT_CHECKED_ZZ(nla_put_u32(rskb, NL_ECNL_ATTR_PORT_ID, port_id));
     NLAPUT_CHECKED_ZZ(nla_put_u32(rskb, NL_ECNL_ATTR_NUM_AIT_MESSAGES, num_message));
     genlmsg_end(rskb, user_hdr);
     genlmsg_multicast_allns(&nl_ecnd_fam, rskb, 0, NL_ECNL_MCGRP_AIT, GFP_KERNEL);
 }
 
-static void ecnl_got_alo_update(int module_id, int index) {
+static void ecnl_got_alo_update(int module_id, int port_id) {
     //struct ethhdr *eth = (struct ethhdr *) skb->data;
     struct net_device *plug_in = ecnl_devices[module_id];
     ecnl_device_t *e_dev = (ecnl_device_t *) netdev_priv(plug_in);
 
     struct ec_alo_regs alo_regs; memset(&alo_regs, 0, sizeof(struct ec_alo_regs));
 
-    struct entl_driver *e_driver = &e_dev->ecnl_drivers[index];
+    struct entl_driver *e_driver = &e_dev->ecnl_drivers[port_id];
     if (!e_driver) return; // -1;
     struct net_device *e1000e = e_driver->eda_device;
     struct entl_driver_funcs *funcs = e_driver->eda_funcs;
@@ -1230,7 +1230,7 @@ static void ecnl_got_alo_update(int module_id, int index) {
 
     void *user_hdr = genlmsg_put(rskb, 0, 0, &nl_ecnd_fam, 0, NL_ECNL_CMD_READ_ALO_REGISTERS);
     NLAPUT_CHECKED_ZZ(nla_put_u32(rskb, NL_ECNL_ATTR_MODULE_ID, module_id));
-    NLAPUT_CHECKED_ZZ(nla_put_u32(rskb, NL_ECNL_ATTR_PORT_ID, index));
+    NLAPUT_CHECKED_ZZ(nla_put_u32(rskb, NL_ECNL_ATTR_PORT_ID, port_id));
     NLAPUT_CHECKED_ZZ(nla_put(rskb, NL_ECNL_ATTR_ALO_REG_VALUES, sizeof(uint64_t)*32, alo_regs.ecars_regs));
     NLAPUT_CHECKED_ZZ(nla_put_u32(rskb, NL_ECNL_ATTR_ALO_FLAG, alo_regs.ecars_flags));
     genlmsg_end(rskb, user_hdr);
@@ -1291,10 +1291,10 @@ static int ecnl_hard_start_xmit(struct sk_buff *skb, struct net_device *plug_in)
 
         for (int i = 0; i < ENCL_FW_TABLE_ENTRY_ARRAY; i++) {
             if (port_vector & 1) {
-                int id = e_dev->ecnl_fw_map[i];
-                u32 nextID = entry.nextID[id];
+                int port_id = e_dev->ecnl_fw_map[i];
+                u32 nextID = entry.nextID[port_id];
 
-                struct entl_driver *e_driver = &e_dev->ecnl_drivers[id];
+                struct entl_driver *e_driver = &e_dev->ecnl_drivers[port_id];
                 if (!e_driver) return -EINVAL;
                 struct net_device *e1000e = e_driver->eda_device;
                 struct entl_driver_funcs *funcs = e_driver->eda_funcs;
@@ -1323,11 +1323,11 @@ static int ecnl_hard_start_xmit(struct sk_buff *skb, struct net_device *plug_in)
         }
         else {
 // FIXME: harden against ENCL_FW_TABLE_ENTRY_ARRAY ??
-            int id = e_dev->ecnl_fw_map[parent];
-            u32 nextID = entry.nextID[id];
+            int port_id = e_dev->ecnl_fw_map[parent];
+            u32 nextID = entry.nextID[port_id];
             set_next_id(skb, nextID);
 
-            struct entl_driver *e_driver = &e_dev->ecnl_drivers[id];
+            struct entl_driver *e_driver = &e_dev->ecnl_drivers[port_id];
             if (!e_driver) return -EINVAL;
             struct net_device *e1000e = e_driver->eda_device;
             struct entl_driver_funcs *funcs = e_driver->eda_funcs;
@@ -1411,39 +1411,167 @@ typedef struct {
     int index;
     unsigned char *name;
     struct net_device *e1000e;
+    int port_id;
 } e1000e_hackery_t;
 
 // #define ARRAY_SIZE(X) (sizeof(X) / sizeof((X)[0])) // <linux/kernel.h>
 
+// map: name -> instance (e1000e)
 e1000e_hackery_t e1000e_ports[] = {
-    { .index = 1, .name = "enp6s0", .e1000e = NULL, },
-    { .index = 2, .name = "enp8s0", .e1000e = NULL, },
-    { .index = 3, .name = "enp9s0", .e1000e = NULL, },
-    { .index = 4, .name = "enp7s0", .e1000e = NULL, },
-    { .index = 5, .name = "eno1",   .e1000e = NULL, },
+    { .index = 1, .name = "enp6s0", .e1000e = NULL, .port_id = -1 },
+    { .index = 2, .name = "enp8s0", .e1000e = NULL, .port_id = -1 },
+    { .index = 3, .name = "enp9s0", .e1000e = NULL, .port_id = -1 },
+    { .index = 4, .name = "enp7s0", .e1000e = NULL, .port_id = -1 },
+    { .index = 5, .name = "eno1",   .e1000e = NULL, .port_id = -1 },
 };
 
 // FIXME : should instead auto-detect compatible instances
+// ref: scan_netdev - at init time search all devices to find instance we like/support
 static void inject_dev(struct net_device *n_dev) {
     for (int i = 0; i < ARRAY_SIZE(e1000e_ports); i++) {
-        e1000e_hackery_t *p = &e1000e_ports[i];
-        if (strcmp(n_dev->name, p->name) == 0) { p->e1000e = n_dev; } // inject reference
+        e1000e_hackery_t *hack = &e1000e_ports[i];
+        if (strcmp(n_dev->name, hack->name) == 0) { hack->e1000e = n_dev; } // inject reference
     }
+}
+
+typedef struct entl_mgr_plus {
+    struct entl_mgr emp_base; // callback struct
+    struct net_device *emp_plug_in; // ecnl instance
+    e1000e_hackery_t *emp_hack;
+} entl_mgr_plus_t;
+
+// void (*emf_event)(struct entl_mgr *self, int sigusr); // called from watchdog, be careful
+static void adapt_event(struct entl_mgr *self, int sigusr) {
+    entl_mgr_plus_t *priv = (entl_mgr_plus_t *) self;
+    struct net_device *plug_in = priv->emp_plug_in; // ecnl instance
+    e1000e_hackery_t *hack = priv->emp_hack;
+
+    PLUG_DEBUG(plug_in, "event %d \"%s\"", sigusr, hack->name);
+
+    // int port_id = hack->index; // WRONG!
+    int port_id = hack->port_id;
+    // char *name = hack->name;
+    struct net_device *e1000e = hack->e1000e;
+
+    PLUG_DEBUG(plug_in, "event %d \"%s\" (%d)", sigusr, hack->name, port_id);
+
+    // struct net_device *plug_in = ecnl_devices[module_id];
+    ecnl_device_t *e_dev = (ecnl_device_t *) netdev_priv(plug_in);
+    if (!e_dev) return;
+
+    int module_id = e_dev->ecnl_index;
+    struct entl_driver *e_driver = &e_dev->ecnl_drivers[port_id];
+    if (!e_driver) return;
+
+    PLUG_DEBUG(plug_in, "event %d \"%s\" (%d) - module %d check: %s (%d)", sigusr, hack->name, port_id, module_id, e_driver->eda_name, e_driver->eda_index);
+
+    // struct net_device *e1000e = e_driver->eda_device;
+    // int port_id = e_driver->eda_index;
+    // char *name = e_driver->eda_name;
+    struct entl_driver_funcs *funcs = e_driver->eda_funcs;
+    if (!funcs) return;
+
+    // ENTL_DEVICE_FLAG_SIGNAL, i.e. link up/down, fatal error
+    if (sigusr == SIGUSR1 /*10*/) {
+        ec_state_t state; memset(&state, 0, sizeof(ec_state_t));
+        int err = funcs->edf_get_state(e1000e, &state);
+        if (!err) {
+            PLUG_DEBUG(plug_in, "event %d \"%s\" (%d) - %d link: %d", sigusr, hack->name, port_id, module_id, state.ecs_link_state);
+            PLUG_DEBUG(plug_in, "event -"
+                // PRIu64 - %llu - <inttypes.h>
+                " recover_count %llu"
+                " recovered_count %llu"
+                " s_count %llu"
+                " r_count %llu"
+                " entt_count %llu"
+                " aop_count %llu"
+                " link_state %d"
+                " num_queued %d"
+                // " update_time"
+                ,
+                state.ecs_recover_count,
+                state.ecs_recovered_count,
+                state.ecs_s_count,
+                state.ecs_r_count,
+                state.ecs_entt_count,
+                state.ecs_aop_count,
+                state.ecs_link_state,
+                state.ecs_num_queued
+                // timespec state.ecs_update_time,
+            );
+// FIXME
+            ecnl_link_status_update(module_id, port_id, &state); // NL_ECNL_MCGRP_LINKSTATUS
+        }
+    }
+
+    // ENTL_DEVICE_FLAG_SIGNAL2, process_tx_packet, process_rx_packet
+    if (sigusr == SIGUSR2 /*12*/) {
+        int num_message = 1;
+        PLUG_DEBUG(plug_in, "event %d \"%s\" (%d) - %d num_message: %d", sigusr, hack->name, port_id, module_id, num_message);
+        ecnl_got_ait_message(module_id, port_id, num_message); // NL_ECNL_MCGRP_AIT
+    }
+
+    // multicast
+    // ecnl_receive_dsc(int module_id, int index, struct sk_buff *skb); // NL_ECNL_MCGRP_DISCOVERY
+    // ecnl_forward_ait_message(int module_id, int drv_index, struct sk_buff *skb); // NL_ECNL_MCGRP_AIT
+    // ecnl_got_alo_update(int module_id, int index); // NL_ECNL_MCGRP_AIT
 }
 
 // FIXME: validate here
+// once we've found e1000e instances, connect plug_in (ecnl_device_t) & e1000e (entl_device_t)
 static void hack_init(struct net_device *plug_in) {
     ecnl_device_t *e_dev = (ecnl_device_t *) netdev_priv(plug_in); // e_dev->ecnl_index
     int module_id = e_dev->ecnl_index;
-    struct entl_driver_funcs *funcs = &entl_adapt_funcs;
+
+    struct entl_driver_funcs *funcs = &entl_adapt_funcs; // backdoor into e1000e/entl (for ecnl use)
+
     for (int i = 0; i < ARRAY_SIZE(e1000e_ports); i++) {
-        e1000e_hackery_t *p = &e1000e_ports[i];
-        if (!p->e1000e) continue;
-        int port_no = ecnl_register_port(module_id, p->name, p->e1000e, funcs);
-        if (port_no < 0) { PLUG_DEBUG(plug_in, "failed to register \"%s\"", p->name); }
+        e1000e_hackery_t *hack = &e1000e_ports[i];
+
+        struct net_device *e1000e = hack->e1000e;
+        if (!e1000e) continue;
+
+        // data structures from e1000e driver side:
+        // struct e1000_adapter *adapter = netdev_priv(e1000e);
+        // entl_device_t *entl_dev = adapter->entl_dev;
+        // entl_state_machine_t *stm = entl_dev->edev_stm; // or mcn (within entl_state_machine.c)
+        // (dynamic) entl_mgr_t *mgr = entl_dev->edev_mgr
+        // e.g. mgr->emf_event
+
+        // ecnl private data (after shared data, 'mgr_plus.emp_base')
+        entl_mgr_plus_t *mgr_plus = kzalloc(sizeof(struct entl_mgr_plus), GFP_ATOMIC);
+        if (!mgr_plus) continue; // ENOMEM;
+
+        mgr_plus->emp_plug_in = plug_in; // ecnl instance
+        mgr_plus->emp_hack = hack;
+
+        // backdoor into encl (for e1000e/entl use)
+        entl_mgr_t *mgr = (entl_mgr_t *) mgr_plus; // i.e. mgr_plus.emp_base, callback struct
+        mgr->emf_event = adapt_event;
+        mgr->emf_private = mgr;
+
+        int magic = ENCL_ENTL_MAGIC;
+        int compat = funcs->edf_validate(e1000e, magic, mgr); // ref: entl_device.c
+        if (compat < 0) {
+            PLUG_DEBUG(plug_in, "incompatible i/f 0x%x \"%s\" ??", magic, hack->name);
+            continue;
+        }
+
+        int port_id = ecnl_register_port(module_id, hack->name, hack->e1000e, funcs);
+        if (port_id < 0) { PLUG_DEBUG(plug_in, "failed to register \"%s\"", hack->name); continue; }
+
+        // Q : how do we figure out port_id from e1000e ref ??
+        // NOT : int port_id = hack->index;
+        hack->port_id = port_id;
+
+        // data structures from the ecnl plug-in side:
+        // struct net_device *plug_in
+        // ecnl_device_t *e_dev = (ecnl_device_t *) netdev_priv(plug_in);
+        // struct entl_driver *e_driver = &e_dev->ecnl_drivers[port_id];
+        // e.g. e_driver->funcs : edf_validate, edf_get_state, edf_send_AIT, edf_retrieve_AIT w/eda_device (e1000e)
     }
 }
-
+    
 // Q: what locking is required here?
 // /Users/bjackson/git-projects/ubuntu-bionic/include/linux/netdevice.h
 extern struct net init_net;

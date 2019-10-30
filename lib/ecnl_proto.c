@@ -92,6 +92,52 @@ static void dump_block(void *d, int nbytes) {
     ECP_DEBUG("\n");
 }
 
+static void copy_unspec(callback_index_t *cbi, uint64_t attr) {
+    int nbytes = nla_len(cbi->tb[attr]);
+    uint8_t *p = malloc(nbytes); if (!p) { perror("malloc"); return; } // memset(p, 0, nbytes);
+    nla_memcpy(p, cbi->tb[attr], nbytes); // nla_get_unspec
+
+    if (attr == NL_ECNL_ATTR_MESSAGE) {
+        cbi->msg = p;
+        cbi->msg_bytes = nbytes;
+    }
+
+    if (attr == NL_ECNL_ATTR_DISCOVERING_MSG) {
+        cbi->disc_msg = p;
+        cbi->disc_msg_bytes = nbytes;
+    }
+}
+
+// nla_len nla_data nla_get_string
+// nla_get nla_put nla_memcpy
+static void grab_attr(callback_index_t *cbi, uint64_t attr) {
+    switch (attr) {
+    case NL_ECNL_ATTR_ALO_FLAG:               cbi->alo_flag =               nla_get_u32(cbi->tb[NL_ECNL_ATTR_ALO_FLAG]); break;
+    case NL_ECNL_ATTR_MESSAGE_LENGTH:         cbi->message_length =         nla_get_u32(cbi->tb[NL_ECNL_ATTR_MESSAGE_LENGTH]); break;
+    case NL_ECNL_ATTR_MODULE_ID:              cbi->module_id =              nla_get_u32(cbi->tb[NL_ECNL_ATTR_MODULE_ID]); break;
+    case NL_ECNL_ATTR_NUM_AIT_MESSAGES:       cbi->num_ait_messages =       nla_get_u32(cbi->tb[NL_ECNL_ATTR_NUM_AIT_MESSAGES]); break;
+    case NL_ECNL_ATTR_NUM_PORTS:              cbi->num_ports =              nla_get_u32(cbi->tb[NL_ECNL_ATTR_NUM_PORTS]); break;
+    case NL_ECNL_ATTR_PORT_ID:                cbi->port_id =                nla_get_u32(cbi->tb[NL_ECNL_ATTR_PORT_ID]); break;
+    case NL_ECNL_ATTR_PORT_LINK_STATE:        cbi->port_link_state =        nla_get_u32(cbi->tb[NL_ECNL_ATTR_PORT_LINK_STATE]); break;
+    case NL_ECNL_ATTR_TABLE_ID:               cbi->table_id =               nla_get_u32(cbi->tb[NL_ECNL_ATTR_TABLE_ID]); break;
+
+    case NL_ECNL_ATTR_PORT_AOP_COUNT:         cbi->port_aop_count =         nla_get_u64(cbi->tb[NL_ECNL_ATTR_PORT_AOP_COUNT]); break;
+    case NL_ECNL_ATTR_PORT_ENTT_COUNT:        cbi->port_entt_count =        nla_get_u64(cbi->tb[NL_ECNL_ATTR_PORT_ENTT_COUNT]); break;
+    case NL_ECNL_ATTR_PORT_R_COUNTER:         cbi->port_r_counter =         nla_get_u64(cbi->tb[NL_ECNL_ATTR_PORT_R_COUNTER]); break;
+    case NL_ECNL_ATTR_PORT_RECOVER_COUNTER:   cbi->port_recover_counter =   nla_get_u64(cbi->tb[NL_ECNL_ATTR_PORT_RECOVER_COUNTER]); break;
+    case NL_ECNL_ATTR_PORT_RECOVERED_COUNTER: cbi->port_recovered_counter = nla_get_u64(cbi->tb[NL_ECNL_ATTR_PORT_RECOVERED_COUNTER]); break;
+    case NL_ECNL_ATTR_PORT_S_COUNTER:         cbi->port_s_counter =         nla_get_u64(cbi->tb[NL_ECNL_ATTR_PORT_S_COUNTER]); break;
+
+    case NL_ECNL_ATTR_MODULE_NAME:            cbi->module_name =            strdup(nla_get_string(cbi->tb[NL_ECNL_ATTR_MODULE_NAME])); break; // potential leak
+    case NL_ECNL_ATTR_PORT_NAME:              cbi->port_name =              strdup(nla_get_string(cbi->tb[NL_ECNL_ATTR_PORT_NAME]));   break; // potential leak
+
+    case NL_ECNL_ATTR_ALO_REG_VALUES: nla_memcpy(cbi->regblk, cbi->tb[NL_ECNL_ATTR_ALO_REG_VALUES], ALO_REGBLK_SIZE); break; // nla_get_unspec
+
+    case NL_ECNL_ATTR_MESSAGE:                copy_unspec(cbi, NL_ECNL_ATTR_MESSAGE);         break; // potential leak
+    case NL_ECNL_ATTR_DISCOVERING_MSG:        copy_unspec(cbi, NL_ECNL_ATTR_DISCOVERING_MSG); break; // potential leak
+    }
+}
+
 // .genlhdr
 // .userhdr
 // nl_cb_action - NL_OK, NL_SKIP, NL_STOP
@@ -112,6 +158,9 @@ static int parse_generic(struct nl_cache_ops *unused, struct genl_cmd *cmd, stru
         uint64_t attr = tp->i;
         struct nlattr *na = cbi->tb[attr];
         if (na == NULL) continue;
+
+        grab_attr(cbi, attr); // module_name, port_name, msg, disc_msg -  need to be free'ed by client
+
         struct nla_policy *pp = &attr_policy[attr];
         switch (pp->type) {
         // NLA_FLAG NLA_U8 NLA_U16 NLA_MSECS NLA_STRING NLA_UNSPEC NLA_NESTED
@@ -255,28 +304,17 @@ extern void dump_msg(void *user_hdr) {
 #define NLAPUT_CHECKED(putattr) { int rc = putattr; if (rc) return rc; }
 
 // FIXME: string leak
-extern int get_link_state(struct nlattr **tb, link_state_t *lp) {
-    char *module_name = nla_strdup(tb[NL_ECNL_ATTR_MODULE_NAME]); // nla_get_string
-    char *port_name = nla_strdup(tb[NL_ECNL_ATTR_PORT_NAME]); // nla_get_string
-    uint32_t port_link_state = nla_get_u32(tb[NL_ECNL_ATTR_PORT_LINK_STATE]);
-    uint64_t port_s_counter = nla_get_u64(tb[NL_ECNL_ATTR_PORT_S_COUNTER]);
-    uint64_t port_r_counter = nla_get_u64(tb[NL_ECNL_ATTR_PORT_R_COUNTER]);
-    uint64_t port_recover_counter = nla_get_u64(tb[NL_ECNL_ATTR_PORT_RECOVER_COUNTER]);
-    uint64_t port_recovered_counter = nla_get_u64(tb[NL_ECNL_ATTR_PORT_RECOVERED_COUNTER]);
-    uint64_t port_entt_count = nla_get_u64(tb[NL_ECNL_ATTR_PORT_ENTT_COUNT]);
-    uint64_t port_aop_count = nla_get_u64(tb[NL_ECNL_ATTR_PORT_AOP_COUNT]);
-    uint32_t num_ait_messages = nla_get_u32(tb[NL_ECNL_ATTR_NUM_AIT_MESSAGES]);
-
-    lp->module_name = module_name; // FIXME: leak
-    lp->port_name = port_name; // FIXME: leak
-    lp->port_link_state = port_link_state;
-    lp->port_s_counter = port_s_counter;
-    lp->port_r_counter = port_r_counter;
-    lp->port_recover_counter = port_recover_counter;
-    lp->port_recovered_counter = port_recovered_counter;
-    lp->port_entt_count = port_entt_count;
-    lp->port_aop_count = port_aop_count;
-    lp->num_ait_messages = num_ait_messages;
+extern int get_link_state(callback_index_t *cbi, link_state_t *lp) {
+    lp->module_name =            cbi->module_name; // FIXME: leak
+    lp->port_name =              cbi->port_name; // FIXME: leak
+    lp->port_link_state =        cbi->port_link_state;
+    lp->port_s_counter =         cbi->port_s_counter;
+    lp->port_r_counter =         cbi->port_r_counter;
+    lp->port_recover_counter =   cbi->port_recover_counter;
+    lp->port_recovered_counter = cbi->port_recovered_counter;
+    lp->port_entt_count =        cbi->port_entt_count;
+    lp->port_aop_count =         cbi->port_aop_count;
+    lp->num_ait_messages =       cbi->num_ait_messages;
     return 0;
 }
 
@@ -297,13 +335,10 @@ extern int get_module_info(struct nl_sock *sock, struct nl_msg *msg, uint32_t mo
     if ((err = nl_send(sock, msg)) < 0) { fatal_error(err, "Unable to send message: %s", nl_geterror(err)); }
 {
     ANALYZE_REPLY("get_module_info(\"%s\", %d) : ", ops.o_name, ops.o_id);
-    uint32_t module_id = nla_get_u32(cbi.tb[NL_ECNL_ATTR_MODULE_ID]);
-    char *module_name = nla_strdup(cbi.tb[NL_ECNL_ATTR_MODULE_NAME]); // nla_get_string
-    uint32_t num_ports = nla_get_u32(cbi.tb[NL_ECNL_ATTR_NUM_PORTS]);
     if (mip != NULL) {
-        mip->module_id = module_id;
-        mip->module_name = module_name; // FIXME leak
-        mip->num_ports = num_ports;
+        mip->module_id = cbi.module_id;
+        mip->module_name = cbi.module_name; // FIXME leak
+        mip->num_ports = cbi.num_ports;
     }
 }
 WAIT_ACK;
@@ -321,14 +356,9 @@ extern int get_port_state(struct nl_sock *sock, struct nl_msg *msg, uint32_t mod
 
 {
     ANALYZE_REPLY("get_port_state");
-    uint32_t module_id = nla_get_u32(cbi.tb[NL_ECNL_ATTR_MODULE_ID]);
-    uint32_t port_id = nla_get_u32(cbi.tb[NL_ECNL_ATTR_PORT_ID]);
-    *mp = module_id;
-    *pp = port_id;
-#if 0
-    link_state_t ls; memset(&ls, 0, sizeof(link_state_t)); get_link_state(cbi.tb, &ls);
-#endif
-    get_link_state(cbi.tb, lp);
+    *mp = cbi.module_id;
+    *pp = cbi.port_id;
+    get_link_state(&cbi, lp);
 }
 WAIT_ACK;
     return 0;
@@ -346,8 +376,7 @@ extern int alloc_driver(struct nl_sock *sock, struct nl_msg *msg, char *module_n
 
 {
     ANALYZE_REPLY("alloc_driver");
-    uint32_t module_id = nla_get_u32(cbi.tb[NL_ECNL_ATTR_MODULE_ID]);
-    *mp = module_id;
+    *mp = cbi.module_id;
 }
 WAIT_ACK;
     return 0;
@@ -364,10 +393,8 @@ extern int alloc_table(struct nl_sock *sock, struct nl_msg *msg, uint32_t module
 
 {
     ANALYZE_REPLY("alloc_table");
-    uint32_t module_id = nla_get_u32(cbi.tb[NL_ECNL_ATTR_MODULE_ID]);
-    uint32_t table_id = nla_get_u32(cbi.tb[NL_ECNL_ATTR_TABLE_ID]);
-    *mp = module_id;
-    *tp = table_id;
+    *mp = cbi.module_id;
+    *tp = cbi.table_id;
 }
 WAIT_ACK;
     return 0;
@@ -384,10 +411,8 @@ extern int dealloc_table(struct nl_sock *sock, struct nl_msg *msg, uint32_t modu
 
 {
     ANALYZE_REPLY("dealloc_table");
-    uint32_t module_id = nla_get_u32(cbi.tb[NL_ECNL_ATTR_MODULE_ID]);
-    uint32_t table_id = nla_get_u32(cbi.tb[NL_ECNL_ATTR_TABLE_ID]);
-    *mp = module_id;
-    *tp = table_id;
+    *mp = cbi.module_id;
+    *tp = cbi.table_id;
 }
 WAIT_ACK;
     return 0;
@@ -404,10 +429,8 @@ extern int select_table(struct nl_sock *sock, struct nl_msg *msg, uint32_t modul
 
 {
     ANALYZE_REPLY("select_table");
-    uint32_t module_id = nla_get_u32(cbi.tb[NL_ECNL_ATTR_MODULE_ID]);
-    uint32_t table_id = nla_get_u32(cbi.tb[NL_ECNL_ATTR_TABLE_ID]);
-    *mp = module_id;
-    *tp = table_id;
+    *mp = cbi.module_id;
+    *tp = cbi.table_id;
 }
 WAIT_ACK;
     return 0;
@@ -427,10 +450,8 @@ extern int fill_table(struct nl_sock *sock, struct nl_msg *msg, uint32_t module_
 
 {
     ANALYZE_REPLY("fill_table");
-    uint32_t module_id = nla_get_u32(cbi.tb[NL_ECNL_ATTR_MODULE_ID]);
-    uint32_t table_id = nla_get_u32(cbi.tb[NL_ECNL_ATTR_TABLE_ID]);
-    *mp = module_id;
-    *tp = table_id;
+    *mp = cbi.module_id;
+    *tp = cbi.table_id;
 }
 WAIT_ACK;
     return 0;
@@ -449,10 +470,8 @@ extern int fill_table_entry(struct nl_sock *sock, struct nl_msg *msg, uint32_t m
 
 {
     ANALYZE_REPLY("fill_table_entry");
-    uint32_t module_id = nla_get_u32(cbi.tb[NL_ECNL_ATTR_MODULE_ID]);
-    uint32_t table_id = nla_get_u32(cbi.tb[NL_ECNL_ATTR_TABLE_ID]);
-    *mp = module_id;
-    *tp = table_id;
+    *mp = cbi.module_id;
+    *tp = cbi.table_id;
 }
 WAIT_ACK;
     return 0;
@@ -469,8 +488,7 @@ extern int map_ports(struct nl_sock *sock, struct nl_msg *msg, uint32_t module_i
 
 {
     ANALYZE_REPLY("map_ports");
-    uint32_t module_id = nla_get_u32(cbi.tb[NL_ECNL_ATTR_MODULE_ID]);
-    *mp = module_id;
+    *mp = cbi.module_id;
 }
 WAIT_ACK;
     return 0;
@@ -486,8 +504,7 @@ extern int start_forwarding(struct nl_sock *sock, struct nl_msg *msg, uint32_t m
 
 {
     ANALYZE_REPLY("start_forwarding");
-    uint32_t module_id = nla_get_u32(cbi.tb[NL_ECNL_ATTR_MODULE_ID]);
-    *mp = module_id;
+    *mp = cbi.module_id;
 }
 WAIT_ACK;
     return 0;
@@ -503,8 +520,7 @@ extern int stop_forwarding(struct nl_sock *sock, struct nl_msg *msg, uint32_t mo
 
 {
     ANALYZE_REPLY("stop_forwarding");
-    uint32_t module_id = nla_get_u32(cbi.tb[NL_ECNL_ATTR_MODULE_ID]);
-    *mp = module_id;
+    *mp = cbi.module_id;
 }
 WAIT_ACK;
     return 0;
@@ -523,16 +539,12 @@ extern int read_alo_registers(struct nl_sock *sock, struct nl_msg *msg, uint32_t
 
 {
     ANALYZE_REPLY("read_alo_registers");
-    uint32_t module_id = nla_get_u32(cbi.tb[NL_ECNL_ATTR_MODULE_ID]);
-    uint32_t port_id = nla_get_u32(cbi.tb[NL_ECNL_ATTR_PORT_ID]);
-    uint32_t alo_flag = nla_get_u32(cbi.tb[NL_ECNL_ATTR_ALO_FLAG]);
-    int nbytes = nla_len(cbi.tb[NL_ECNL_ATTR_ALO_REG_VALUES]);
-    uint64_t p[32]; nla_memcpy(p, cbi.tb[NL_ECNL_ATTR_ALO_REG_VALUES], sizeof(uint64_t) * 32); // nla_get_unspec
-    *mp = module_id;
-    *pp = port_id;
+    *mp = cbi.module_id;
+    *pp = cbi.port_id;
 #if 0
-    *fp = alo_flag;
-    *vp = p; // FIXME
+    *fp = cbi.alo_flag;
+    *vp = cbi.p; // FIXME
+    *regblk = cbi.regblk;
 #endif
 }
 WAIT_ACK;
@@ -554,38 +566,47 @@ extern int retrieve_ait_message(struct nl_sock *sock, struct nl_msg *msg, uint32
 {
     ANALYZE_REPLY("retrieve_ait_message");
 
-    uint32_t module_id = nla_get_u32(cbi.tb[NL_ECNL_ATTR_MODULE_ID]);
-    uint32_t port_id = nla_get_u32(cbi.tb[NL_ECNL_ATTR_PORT_ID]);
-    uint32_t message_length = nla_get_u32(cbi.tb[NL_ECNL_ATTR_MESSAGE_LENGTH]);
-    int nbytes = nla_len(cbi.tb[NL_ECNL_ATTR_MESSAGE]);
-
-    *mp = module_id;
-    *pp = port_id;
+    *mp = cbi.module_id;
+    *pp = cbi.port_id;
 
     if (!buf) {
         ECP_DEBUG("retrieve_ait_message - no result buffer ?\n");
         return 0;
     }
 
+    uint32_t message_length = cbi.message_length;
+    uint8_t *msg = cbi.msg;
+    size_t msg_bytes = cbi.msg_bytes;
+
+    if (!msg) {
+        ECP_DEBUG("retrieve_ait_message - no msg?\n");
+        return 0;
+    }
+
+    // 3 factors: buf->len, message_length, msg_bytes
+    if (message_length != msg_bytes) {
+        ECP_DEBUG("retrieve_ait_message - WARN: message_length (%d) != msg_bytes (%lu)\n", message_length, msg_bytes);
+        if (msg_bytes < message_length) message_length = msg_bytes;
+    }
+
     if (!buf->frame) {
         ECP_DEBUG("retrieve_ait_message - allocating return buffer (%d)\n", message_length);
-        buf->frame = malloc(message_length);
-        if (!buf->frame) { perror("malloc"); return -1; }
+        buf->frame = msg; // potential leak : client responsiblity
         buf->len = message_length;
     }
-
-    if (buf->len < message_length) {
+    else if (buf->len < message_length) {
         ECP_DEBUG("retrieve_ait_message - return buffer too small (%d), reallocated (%d)\n", buf->len, message_length);
-        buf->frame = malloc(message_length);
-        if (!buf->frame) { perror("malloc"); return -1; }
+        buf->frame = msg; // definite leak : FIXME ??
         buf->len = message_length;
     }
-
-    nla_memcpy(buf->frame, cbi.tb[NL_ECNL_ATTR_MESSAGE], buf->len); // nla_get_unspec
+    else {
+        memcpy(buf->frame, msg, (size_t) message_length);
+        buf->len = message_length;
+        free(cbi.msg); // cbi.msg_bytes
+    }
 
     ECP_DEBUG("retr buffer: ");
-    dump_block(buf->frame, buf->len); // ugh: cbi.tb[NL_ECNL_ATTR_MESSAGE], message_length
-
+    dump_block(buf->frame, buf->len);
 }
 WAIT_ACK;
     return 0;
@@ -604,10 +625,8 @@ extern int write_alo_register(struct nl_sock *sock, struct nl_msg *msg, uint32_t
 
 {
     ANALYZE_REPLY("write_alo_register");
-    uint32_t module_id = nla_get_u32(cbi.tb[NL_ECNL_ATTR_MODULE_ID]);
-    uint32_t port_id = nla_get_u32(cbi.tb[NL_ECNL_ATTR_PORT_ID]);
-    *mp = module_id;
-    *pp = port_id;
+    *mp = cbi.module_id;
+    *pp = cbi.port_id;
 }
 WAIT_ACK;
     return 0;
@@ -629,10 +648,8 @@ extern int send_ait_message(struct nl_sock *sock, struct nl_msg *msg, uint32_t m
 
 {
     ANALYZE_REPLY("send_ait_message");
-    uint32_t module_id = nla_get_u32(cbi.tb[NL_ECNL_ATTR_MODULE_ID]);
-    uint32_t port_id = nla_get_u32(cbi.tb[NL_ECNL_ATTR_PORT_ID]);
-    *mp = module_id;
-    *pp = port_id;
+    *mp = cbi.module_id;
+    *pp = cbi.port_id;
 }
 WAIT_ACK;
     return 0;
@@ -644,9 +661,8 @@ WAIT_ACK;
 extern int event_receive_dsc(struct nlattr **tb, uint32_t *mp, uint32_t *pp, uint8_t *dp) {
     uint32_t module_id = nla_get_u32(tb[NL_ECNL_ATTR_MODULE_ID]);
     uint32_t port_id = nla_get_u32(tb[NL_ECNL_ATTR_PORT_ID]);
-int len = 0; // FIXME
     int nbytes = nla_len(tb[NL_ECNL_ATTR_DISCOVERING_MSG]);
-    uint8_t p[4096]; memset(p, 0, sizeof(p)); nla_memcpy(p, tb[NL_ECNL_ATTR_DISCOVERING_MSG], len); // nla_get_unspec
+    uint8_t p[4096]; memset(p, 0, sizeof(p)); nla_memcpy(p, tb[NL_ECNL_ATTR_DISCOVERING_MSG], nbytes); // nla_get_unspec
     *mp = module_id;
     *pp = port_id;
 #if 0
@@ -659,7 +675,7 @@ int len = 0; // FIXME
 extern int event_link_status_update(struct nlattr **tb, uint32_t *mp, uint32_t *pp, link_state_t *lp) {
     uint32_t module_id = nla_get_u32(tb[NL_ECNL_ATTR_MODULE_ID]);
     uint32_t port_id = nla_get_u32(tb[NL_ECNL_ATTR_PORT_ID]);
-    link_state_t ls; memset(&ls, 0, sizeof(link_state_t)); get_link_state(tb, &ls); // FIXME: trash
+    link_state_t ls; memset(&ls, 0, sizeof(link_state_t)); // get_link_state(&cbi, &ls);
     *mp = module_id;
     *pp = port_id;
 #if 0
@@ -673,7 +689,7 @@ extern int event_forward_ait_message(struct nlattr **tb, uint32_t *mp, uint32_t 
     uint32_t module_id = nla_get_u32(tb[NL_ECNL_ATTR_MODULE_ID]);
     uint32_t port_id = nla_get_u32(tb[NL_ECNL_ATTR_PORT_ID]);
     uint32_t message_length = nla_get_u32(tb[NL_ECNL_ATTR_MESSAGE_LENGTH]);
-    int nbytes = nla_len(tb[NL_ECNL_ATTR_MESSAGE]);
+    // int nbytes = nla_len(tb[NL_ECNL_ATTR_MESSAGE]);
     uint8_t p[4096]; memset(p, 0, sizeof(p)); nla_memcpy(p, tb[NL_ECNL_ATTR_MESSAGE], message_length); // nla_get_unspec
     *mp = module_id;
     *pp = port_id;
@@ -701,13 +717,12 @@ extern int event_got_ait_massage(struct nlattr **tb, uint32_t *mp, uint32_t *pp,
 extern int event_got_alo_update(struct nlattr **tb, uint32_t *mp, uint32_t *pp, uint64_t *vp, uint32_t *fp) {
     uint32_t module_id = nla_get_u32(tb[NL_ECNL_ATTR_MODULE_ID]);
     uint32_t port_id = nla_get_u32(tb[NL_ECNL_ATTR_PORT_ID]);
-    int nbytes = nla_len(tb[NL_ECNL_ATTR_ALO_REG_VALUES]);
-    uint8_t p[4096]; memset(p, 0, sizeof(p)); nla_memcpy(p, tb[NL_ECNL_ATTR_ALO_REG_VALUES], sizeof(uint64_t) * 32); // nla_get_unspec
+    uint64_t regblk[32]; memset(regblk, 0, ALO_REGBLK_SIZE); nla_memcpy(regblk, tb[NL_ECNL_ATTR_ALO_REG_VALUES], ALO_REGBLK_SIZE); // nla_get_unspec
     uint32_t alo_flag = nla_get_u32(tb[NL_ECNL_ATTR_ALO_FLAG]);
     *mp = module_id;
     *pp = port_id;
 #if 0
-    *vp = p; // FIXME
+    *vp = regblk;
     *fp = alo_flag;
 #endif
     return 0;
@@ -748,10 +763,8 @@ extern int signal_ait_message(struct nl_sock *sock, struct nl_msg *msg, uint32_t
 
 {
     ANALYZE_REPLY("signal_ait_message");
-    uint32_t module_id = nla_get_u32(cbi.tb[NL_ECNL_ATTR_MODULE_ID]);
-    uint32_t port_id = nla_get_u32(cbi.tb[NL_ECNL_ATTR_PORT_ID]);
-    *mp = module_id;
-    *pp = port_id;
+    *mp = cbi.module_id;
+    *pp = cbi.port_id;
 }
 WAIT_ACK;
     return 0;
