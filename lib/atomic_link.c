@@ -32,15 +32,34 @@ static int my_func(struct nl_msg *msg, void *arg) {
     return 0;
 }
 
+// #define NL_ECNL_MULTICAST_GOUP_LINKSTATUS "status"
+// #define NL_ECNL_MULTICAST_GOUP_AIT "ait"
+// #define NL_ECNL_MULTICAST_GOUP_ALO "alo"
+// #define NL_ECNL_MULTICAST_GOUP_DISCOVERY "discovery"
+// #define NL_ECNL_MULTICAST_GOUP_TEST "test"
+
+char *GROUPS[] = { NL_ECNL_MULTICAST_GOUP_LINKSTATUS, NL_ECNL_MULTICAST_GOUP_AIT};
+
+/* register with multicast group*/
+static int do_listen(struct nl_sock *sk, char *family, char *group_name) {
+    int group = genl_ctrl_resolve_grp(sk, family, group_name);
+    if (group < 0) { SYSLOG(ECNL_GENL_NAME " - genl_ctrl_resolve_grp (%s) failed: %s", group_name, nl_geterror(group)); return group; }
+    SYSLOG(ECNL_GENL_NAME " - group %s (%d)", group_name, group);
+    int error = nl_socket_add_memberships(sk, group, 0);
+    if (error) { SYSLOG(ECNL_GENL_NAME " - nl_socket_add_memberships failed: %d", error); return error; }
+    return error;
+}
+
 void forever(void) {
     struct nl_sock *sk = init_sock_route();
     nl_socket_modify_cb(sk, NL_CB_VALID, NL_CB_CUSTOM, my_func, NULL);
     int rc = genl_ctrl_resolve(sk, ECNL_GENL_NAME);
     if (rc < 0) { perror("genl_ctrl_resolve"); return; }
-#if 1
-    rc = nl_socket_add_memberships(sk, NL_ECNL_MCGRP_LINKSTATUS, NL_ECNL_MCGRP_AIT, NL_ECNL_MCGRP_ALO, NL_ECNL_MCGRP_DISCOVERY, NL_ECNL_MCGRP_TEST, 0);
-    if (rc < 0) { perror("nl_socket_add_memberships"); return; }
-#endif
+
+    for (int i = 0; i < ARRAY_SIZE(GROUPS); i++) {
+        char *group_name = GROUPS[i];
+        do_listen(sk, ECNL_GENL_NAME, group_name);
+    }
 
     SYSLOG(ECNL_GENL_NAME " - listening ...");
     while (1) {
