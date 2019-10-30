@@ -4,10 +4,6 @@
 #include <netlink/genl/genl.h>
 #include <netlink/genl/ctrl.h>
 
-/**
- * Attributes and commands have to be the same as in kernelspace.
- * you might want to move these enums to a .h and just #include that from both files.
- */
 enum attributes {
     ATTR_DUMMY,
     ATTR_HELLO,
@@ -32,40 +28,35 @@ static int nl_fail(int error, char *func_name) {
     return fail(error, func_name);
 }
 
-/*
- * This function will be called for each valid netlink message received in nl_recvmsgs_default()
- */
 static int cb(struct nl_msg *msg, void *arg) {
-    printf("The kernel module sent a message.\n");
-
     struct nlmsghdr *nl_hdr = nlmsg_hdr(msg);
     struct genlmsghdr *genl_hdr = genlmsg_hdr(nl_hdr);
-    if (genl_hdr->cmd != COMMAND_HELLO) { printf("Oops? The message type is not Hello; ignoring.\n"); return 0; }
+    if (genl_hdr->cmd != COMMAND_HELLO) { printf("bad message type: %d\n", genl_hdr->cmd); return 0; }
 
     struct nlattr *attrs[__ATTR_MAX];
     int error = genlmsg_parse(nl_hdr, 0, attrs, __ATTR_MAX - 1, NULL);
     if (error) return nl_fail(error, "genlmsg_parse");
 
-    /* Remember: attrs[0] is a throwaway. */
-    if (attrs[1])
-        printf("ATTR_HELLO: len:%u type:%u data:%s\n",
-            attrs[1]->nla_len,
-            attrs[1]->nla_type,
-            (char *)nla_data(attrs[1])
-        );
-    else
-        printf("ATTR_HELLO: null\n");
-
-    if (attrs[2])
-        printf("ATTR_FOO: len:%u type:%u data:%u\n",
-            attrs[2]->nla_len,
-            attrs[2]->nla_type,
-            *((__u32 *)nla_data(attrs[2]))
-        );
-    else
-        printf("ATTR_FOO: null\n");
+    struct nlattr ap;
+    ap = attrs[ATTR_HELLO];
+    if (ap) printf("ATTR_HELLO: len:%u type:%u data:%s\n", ap->nla_len, ap->nla_type, (char *)nla_data(ap));
+    ap = attrs[ATTR_FOO];
+    if (ap) printf("ATTR_FOO: len:%u type:%u data:%u\n", ap->nla_len, ap->nla_type, *((__u32 *)nla_data(ap)));
     return 0;
 }
+
+/* register with multicast group*/
+static int do_listen(struct nl_sock *sk, char *family, char *group) {
+    int group = genl_ctrl_resolve_grp(sk, family, group);
+    if (group < 0) return nl_fail(group, "genl_ctrl_resolve_grp");
+    printf("group %u\n", group);
+    error = nl_socket_add_memberships(sk, group, 0);
+    if (error) { printf("nl_socket_add_memberships() failed: %d\n", error); return error; }
+    return error;
+}
+
+#define FAMILY_NAME "PotatoFamily
+#define GROUP_NAME "PotatoGroup"
 
 static struct nl_sock *sk = NULL;
 
@@ -77,12 +68,10 @@ static int do_things(void) {
     if (error) return nl_fail(error, "nl_socket_modify_cb");
     error = genl_connect(sk);
     if (error) return nl_fail(error, "genl_connect");
-    /* Find the multicast group identifier and register ourselves to it. */
-    int group = genl_ctrl_resolve_grp(sk, "PotatoFamily", "PotatoGroup");
-    if (group < 0) return nl_fail(group, "genl_ctrl_resolve_grp");
-    printf("The group is %u.\n", group);
-    error = nl_socket_add_memberships(sk, group, 0);
-    if (error) { printf("nl_socket_add_memberships() failed: %d\n", error); return error; }
+
+    error = do_listen(sk, FAMILY_NAME, GROUP_NAME);
+    if (error) { printf("do_listen() failed: %d\n", error); return error; }
+
     nl_recvmsgs_default(sk);
     return 0;
 }

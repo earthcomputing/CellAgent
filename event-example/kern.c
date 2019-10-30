@@ -1,29 +1,22 @@
 #include <linux/kernel.h>
 #include <linux/module.h>
 #include <net/genetlink.h>
-// #include <linux/timer.h>
 
 static struct timer_list timer;
 
 /**
- * This callback runs whenever the socket receives messages.
- * We don't use it now, but Linux complains if we don't define it.
+ * runs whenever the socket receives messages.
+ * unused, but Linux complains if we don't define it.
  */
 static int hello(struct sk_buff *skb, struct genl_info *info) {
     pr_info("Received a message in kernelspace.\n");
     return 0;
 }
 
-/**
- * Attributes are fields of data your messages will contain.
- * The designers of Netlink really want you to use these instead of just dumping
- * data to the packet payload... and I have really mixed feelings about it.
- */
 enum attributes {
     /*
-     * The first one has to be a throwaway empty attribute; I don't know why.
-     * If you remove it, ATTR_HELLO (the first one) stops working, because
-     * it then becomes the throwaway.
+     * first is a throwaway empty attribute; I don't know why.
+     * without it, ATTR_HELLO (the first one) stops working.
      */
     ATTR_DUMMY,
     ATTR_HELLO,
@@ -32,28 +25,17 @@ enum attributes {
     __ATTR_MAX,
 };
 
-/**
- * Here you can define some constraints for the attributes so Linux will
- * validate them for you.
- */
 static struct nla_policy policies[] = {
     [ATTR_HELLO] = { .type = NLA_STRING, },
     [ATTR_FOO] = { .type = NLA_U32, },
 };
 
-/**
- * Message type codes.
- * All you need is a hello sorta function, so that's what I'm defining.
- */
 enum commands {
     COMMAND_HELLO,
     /* This must be last! */
     __COMMAND_MAX,
 };
 
-/**
- * Actual message type definition.
- */
 struct genl_ops ops[] = {
     {
         .cmd = COMMAND_HELLO,
@@ -64,20 +46,13 @@ struct genl_ops ops[] = {
     },
 };
 
-/**
- * And more specifically, anyone who wants to hear messages you throw at
- * specific multicast groups need to register themselves to the same multicast
- * group, too.
- */
 struct genl_multicast_group groups[] = {
     { .name = "PotatoGroup" },
 };
 
 /**
- * A Generic Netlink family is a group of listeners who can and want to speak
- * your language.
- * Anyone who wants to hear your messages needs to register to the same family
- * as you.
+ * A Generic Netlink family is a group of listeners who can and want to speak your language.
+ * Anyone who wants to hear your messages needs to register to the same family as you.
  */
 struct genl_family family = {
     .name = "PotatoFamily",
@@ -91,64 +66,38 @@ struct genl_family family = {
     .n_mcgrps = ARRAY_SIZE(groups),
 };
 
+static unsigned char *msg = "TEST";
+static u32 foo = 12345
+
+/*
+ * The family has only one group, so the group ID is just the family's group offset.
+ * mcgrp_offset is supposed to be private, so use this value for debug purposes only.
+ */
 void send_multicast(struct timer_list *arg) {
-    pr_info("----- Running timer -----\n");
-    pr_info("Newing message.\n");
+    // pr_info("The group ID is %u.\n", family.mcgrp_offset);
     struct sk_buff *skb = genlmsg_new(NLMSG_GOODSIZE, GFP_KERNEL);
     if (!skb) { pr_err("genlmsg_new() failed.\n"); goto end; }
-
-    pr_info("Putting message.\n");
     void *msg_head = genlmsg_put(skb, 0, 0, &family, 0, COMMAND_HELLO);
     if (!msg_head) { pr_err("genlmsg_put() failed.\n"); kfree_skb(skb); goto end; }
-
-    pr_info("Nla_putting string.\n");
-    unsigned char *msg = "TEST";
     int error = nla_put_string(skb, ATTR_HELLO, msg);
     if (error) { pr_err("nla_put_string() failed: %d\n", error); kfree_skb(skb); goto end; }
-
-    pr_info("Nla_putting integer.\n");
-    error = nla_put_u32(skb, ATTR_FOO, 12345);
+    error = nla_put_u32(skb, ATTR_FOO, foo);
     if (error) { pr_err("nla_put_u32() failed: %d\n", error); kfree_skb(skb); goto end; }
-
-    pr_info("Ending message.\n");
     genlmsg_end(skb, msg_head);
-
-    pr_info("Multicasting message.\n");
-    /*
-     * The family has only one group, so the group ID is just the family's group offset.
-     * mcgrp_offset is supposed to be private, so use this value for debug purposes only.
-     */
-    pr_info("The group ID is %u.\n", family.mcgrp_offset);
     error = genlmsg_multicast_allns(&family, skb, 0, 0, GFP_KERNEL);
-    if (error) {
-        pr_err("genlmsg_multicast_allns() failed: %d\n", error);
-        pr_err("(This can happen if nobody is listening. Because it's not that unexpected, you might want to just ignore this error.)\n");
-        goto end;
-    }
-
-    pr_info("Success.\n");
+    if (error) { pr_err("genlmsg_multicast_allns() failed: %d\n", error); goto end; } // can happen when nobody is listening
+    // should skb be freed ??
 end:
     mod_timer(&timer, jiffies + msecs_to_jiffies(2000));
 }
 
 static void initialize_timer(void) {
-    pr_info("Starting timer.\n");
-
     timer_setup(&timer, send_multicast, 0);
-    // struct timer_list *timer, void (*callback)(struct timer_list *), unsigned int flags);
-#if 0
-    init_timer(&timer);
-    timer.function = send_multicast;
-    timer.expires = 0;
-    timer.data = 0;
-#endif
     mod_timer(&timer, jiffies + msecs_to_jiffies(2000));
 }
 
 static int init_socket(void) {
-    pr_info("Registering family.\n");
     int error = genl_register_family(&family);
-    // genl_register_family_with_ops_groups(&family, ops, groups);
     if (error) pr_err("Family registration failed: %d\n", error);
     return error;
 }
@@ -157,7 +106,7 @@ static int __init hello_init(void) {
     int error = init_socket();
     if (error) return error;
     initialize_timer();
-    pr_info("Hello module registered.\n");
+    pr_info("Hello registered.\n");
     return 0;
 }
 
