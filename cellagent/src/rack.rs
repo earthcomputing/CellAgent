@@ -39,9 +39,11 @@ impl Rack {
                 let cell_no = border_cell.get_cell_no();
                 let border_ports = border_cell.get_border_ports();
                 let (nal_cell, _join_handle) = NalCell::new(&border_cell.get_name(),
-                                            Some(border_cell.get_num_phys_ports()),
-                                            &HashSet::from_iter(border_ports.clone()),
-                                            CellConfig::Large)?;
+                                                            border_cell.get_num_phys_ports(),
+                                                            &HashSet::from_iter(border_ports.clone()),
+                                                            CellConfig::Large,
+                                                            None,
+                )?;
                 {
                     if CONFIG.trace_options.all || CONFIG.trace_options.dc {
                         let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "border_cell_start" };
@@ -63,8 +65,12 @@ impl Rack {
             .iter()
             .map(|interior_cell| -> Result<(CellNo, NalCell), Error> {
                 let cell_no = interior_cell.get_cell_no();
-                let (nal_cell, _join_handle) = NalCell::new(&interior_cell.get_name(), Some(interior_cell.get_num_phys_ports()),
-                                            &HashSet::new(), CellConfig::Large)?;
+                let (nal_cell, _join_handle) = NalCell::new(&interior_cell.get_name(),
+                                                            interior_cell.get_num_phys_ports(),
+                                                            &HashSet::new(),
+                                                            CellConfig::Large,
+                                                            None,
+                )?;
                 {
                     if CONFIG.trace_options.all || CONFIG.trace_options.dc {
                         let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "interior_cell_start" };

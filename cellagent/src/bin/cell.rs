@@ -5,11 +5,14 @@ use std::{collections::{HashSet},
           fs::{File, OpenOptions},
 	  iter::FromIterator,
           process::{Command, Stdio},
+          rc::Rc,
 };
 
-use ec_fabrix::config::{CONFIG};
+use ec_fabrix::config::{CONFIG, PortQty};
+use ec_fabrix::ecnl::{ECNL_Session};
 use ec_fabrix::nalcell::{NalCell};
 use ec_fabrix::utility::{CellConfig, PortNo};
+
 
 fn main() -> Result<(), Error> {
     let _f = "main";
@@ -45,16 +48,22 @@ fn main() -> Result<(), Error> {
                 .expect("wc failed in identifying ethernet ports");
             wc_cmd_outer = wc_cmd;
         }
-//        println!(get_status(wc_cmd_outer));
         String::from_utf8_lossy(&wc_cmd_outer.stdout)
     };
     println!("num_phys_ports: {}", num_phys_ports_str);
-    let num_phys_ports : u8 = num_phys_ports_str.trim().parse().unwrap();
-    let border_port_list : Vec<PortNo> = vec![2u8]
-        .iter()
-        .map(|i| PortNo(*i as u8))
+    let num_phys_ports : PortQty = PortQty(num_phys_ports_str.trim().parse().unwrap());
+    let ecnl = Rc::new(ECNL_Session::new());
+    let num_ecnl_ports = ecnl.clone().get_num_ecnl_ports();
+    println!("Num ecnl ports: {:?} ", num_ecnl_ports);
+    let border_port_list : Vec<PortNo> = (*num_ecnl_ports+1..*num_phys_ports+1)
+        .map(|i| PortNo(i as u8))
 	.collect();
-    let (_nal_cell, ca_join_handle) = NalCell::new(cell_name, None, &HashSet::from_iter(border_port_list.clone()), CellConfig::Large)?;
+    let (_nal_cell, ca_join_handle) = NalCell::new(cell_name,
+                                                   num_phys_ports,
+                                                   &HashSet::from_iter(border_port_list),
+                                                   CellConfig::Large,
+                                                   Some(ecnl),
+    )?;
     match ca_join_handle.join() {
         Ok(()) => Ok(()),
         Err(e) => Err(MainError::Chain { func_name: _f, comment: format!("{:?}", e) }.into())
