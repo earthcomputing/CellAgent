@@ -37,39 +37,9 @@ pub struct NalCell {
 }
 
 impl NalCell {
-    pub fn new(name: &str, simulated_options: Option<PortQty>, border_port_nos: &HashSet<PortNo>, config: CellConfig)
+    pub fn new(name: &str, num_phys_ports: PortQty, border_port_nos: &HashSet<PortNo>, config: CellConfig, ecnl: Option<Rc<ECNL_Session>>)
             -> Result<(NalCell, JoinHandle<()>), Error> {
         let _f = "new";
-        let ecnl =
-            match simulated_options {
-                Some(_) => None,
-                None => {
-                    #[cfg(feature = "cell")]
-                        {
-                            Some(Rc::new(ECNL_Session::new()))
-                        }
-                    #[cfg(feature = "simulator")]
-                        {
-                            None
-                        }
-                },
-            };
-        let num_phys_ports =
-            match simulated_options {
-                Some(num_phys_ports) => num_phys_ports,
-                None => {
-                    #[cfg(feature = "cell")]
-                    {
-                        let num_ecnl_ports = ecnl.clone().unwrap().get_num_ecnl_ports();
-                        println!("Num ecnl ports: {:?} ", num_ecnl_ports);
-                        num_ecnl_ports
-                    }
-                    #[cfg(feature = "simulator")]
-                    {
-                        PortQty(0)
-                    }
-                }
-            };
         if *num_phys_ports > *CONFIG.max_num_phys_ports_per_cell {
             return Err(NalcellError::NumberPorts { num_phys_ports, func_name: "new", max_num_phys_ports: CONFIG.max_num_phys_ports_per_cell }.into())
         }
