@@ -70,19 +70,33 @@ impl NalCell {
         }
         let cell_type = if border_port_nos.is_empty() { CellType::Interior } else { CellType::Border };
         for i in 0..=*num_phys_ports {
+            let ecnl_clone = ecnl.clone();
             let is_border_port = border_port_nos.contains(&PortNo(i));
+            let is_connected;
             let port_to_pe_or_ca = if is_border_port {
+                is_connected = false;
                 let (ca_to_port, port_from_ca): (CaToPort, PortFromCa) = channel();
                 ca_to_ports.insert(PortNo(i), ca_to_port);
                 ports_from_ca.insert(PortNo(i), port_from_ca);
                 Either::Right(port_to_ca.clone())
             } else {
+                if (i == 0) { //But i==0 for cellagent port - this should be above??
+                    is_connected = true;
+                } else {
+                    match ecnl_clone {
+                        Some(ecnl_session) => {
+                            is_connected = ecnl_session.port_is_connected(i-1)
+                        }
+                        None => {
+                            is_connected = false;
+                        }
+                    }
+                }
                 let (pe_to_port, port_from_pe): (PeToPort, PortFromPe) = channel();
                 pe_to_ports.insert(PortNo(i), pe_to_port);
                 ports_from_pe.insert(PortNo(i), port_from_pe);
                 Either::Left(port_to_pe.clone())
             };
-            let is_connected = i == 0;
             let port_number = PortNo(i).make_port_number(num_phys_ports).context(NalcellError::Chain { func_name: "new", comment: S("port number") })?;
             let port = Port::new(cell_id, port_number, is_border_port, is_connected, port_to_pe_or_ca).context(NalcellError::Chain { func_name: "new", comment: S("port") })?;
             ports.push(port);
