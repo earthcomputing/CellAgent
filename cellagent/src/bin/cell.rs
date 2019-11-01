@@ -53,7 +53,7 @@ fn main() -> Result<(), Error> {
     println!("num_phys_ports: {}", num_phys_ports_str);
     let num_phys_ports : PortQty = PortQty(num_phys_ports_str.trim().parse().unwrap());
     let ecnl = Rc::new(ECNL_Session::new());
-    let num_ecnl_ports = ecnl.clone().get_num_ecnl_ports();
+    let num_ecnl_ports = ecnl.clone().num_ecnl_ports();
     println!("Num ecnl ports: {:?} ", num_ecnl_ports);
     let border_port_list : Vec<PortNo> = (*num_ecnl_ports+1..*num_phys_ports+1)
         .map(|i| PortNo(i as u8))
