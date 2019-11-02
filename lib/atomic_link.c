@@ -38,7 +38,7 @@ static int my_func(struct nl_msg *msg, void *arg) {
 // #define NL_ECNL_MULTICAST_GOUP_DISCOVERY "discovery"
 // #define NL_ECNL_MULTICAST_GOUP_TEST "test"
 
-char *GROUPS[] = { NL_ECNL_MULTICAST_GOUP_LINKSTATUS, NL_ECNL_MULTICAST_GOUP_AIT};
+char *GROUPS[] = { NL_ECNL_MULTICAST_GOUP_LINKSTATUS, NL_ECNL_MULTICAST_GOUP_AIT };
 
 /* register with multicast group*/
 static int do_listen(struct nl_sock *sk, char *family, char *group_name) {
