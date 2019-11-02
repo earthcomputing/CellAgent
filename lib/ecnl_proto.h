@@ -78,6 +78,7 @@ typedef struct {
 #define ALO_REGBLK_SIZE sizeof(uint64_t) * 32
 
 extern struct nl_sock *init_sock();
+extern struct nl_sock *init_sock_events();
 
 extern int get_module_info(struct nl_sock *sock, struct nl_msg *msg, uint32_t module_id, module_info_t *mip);
 extern int get_port_state(struct nl_sock *sock, struct nl_msg *msg, uint32_t module_id, uint32_t port_id, uint32_t *mp, uint32_t *pp, link_state_t *lp);
@@ -101,6 +102,10 @@ extern int event_got_ait_massage(struct nlattr **tb, uint32_t *mp, uint32_t *pp,
 extern int event_got_alo_update(struct nlattr **tb, uint32_t *mp, uint32_t *pp, uint64_t *vp, uint32_t *fp);
 extern int send_discover_message(struct nl_sock *sock, struct nl_msg *msg, uint32_t module_id, uint32_t port_id, buf_desc_t buf);
 extern int signal_ait_message(struct nl_sock *sock, struct nl_msg *msg, uint32_t module_id, uint32_t port_id, buf_desc_t buf, uint32_t *mp, uint32_t *pp);
+
+// --
+
+extern void read_event(struct nl_sock *sock);
 
 // --
 

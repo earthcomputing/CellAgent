@@ -2,6 +2,7 @@
 
 int ecp_verbose = 1;
 #define ECP_DEBUG(fmt, args...) if (ecp_verbose) { printf(fmt, ## args); } else { }
+#define FAM_DEBUG(fmt, args...) if (ecp_verbose) { printf(ECNL_GENL_NAME ": " fmt, ## args); } else { }
 
 #define __ADD(id, name) { .i = id, .a = #name }
 
@@ -770,18 +771,11 @@ WAIT_ACK;
     return 0;
 }
 
-static int registered = 1;
-
 extern struct nl_sock *init_sock() {
     int err;
 
     struct nl_sock *sock = nl_socket_alloc();
     nl_connect(sock, NETLINK_GENERIC);
-    // nl_socket_disable_seq_check(sock); // FIXME: resp seqno = req seqno
-
-if (!registered) {
-    registered++;
-}
 
     // ref: lib/genl/mngt.c
     if ((err = genl_register_family(&ops)) < 0) {
@@ -797,4 +791,47 @@ if (!registered) {
     ECP_DEBUG("genl_ops_resolve: \"%s\" => %d\n", ops.o_name, ops.o_id);
     ECP_DEBUG("\n");
     return sock;
+}
+
+// event listenter socket
+
+char *GROUPS[] = { NL_ECNL_MULTICAST_GOUP_LINKSTATUS, NL_ECNL_MULTICAST_GOUP_AIT };
+
+/* register with multicast group */
+static int do_listen(struct nl_sock *sock, char *family, char *group_name) {
+    int group = genl_ctrl_resolve_grp(sock, family, group_name);
+    if (group < 0) { FAM_DEBUG("genl_ctrl_resolve_grp (%s) failed: %s", group_name, nl_geterror(group)); return group; }
+    FAM_DEBUG("do_listen: group %s (%d)", group_name, group);
+    int error = nl_socket_add_memberships(sock, group, 0);
+    if (error < 0) { FAM_DEBUG("nl_socket_add_memberships failed: %d", error); return error; }
+    return 0;
+}
+
+// this may be more 'proper' than init_sock() above
+extern struct nl_sock *init_sock_events() {
+    struct nl_sock *sock = nl_socket_alloc();
+    nl_connect(sock, NETLINK_GENERIC);
+    int rc = genl_ctrl_resolve(sock, ECNL_GENL_NAME);
+    if (rc < 0) { FAM_DEBUG("genl_ctrl_resolve failed: %d", rc); return NULL; }
+
+    for (int i = 0; i < ARRAY_SIZE(GROUPS); i++) {
+        char *group_name = GROUPS[i];
+        int rc = do_listen(sock, ECNL_GENL_NAME, group_name);
+        if (rc < 0) { FAM_DEBUG("do_listen failed: %d", rc); return NULL; }
+    }
+
+    nl_socket_disable_seq_check(sock);
+    return sock;
+}
+
+// int parse_generic(struct nl_cache_ops *unused, struct genl_cmd *cmd, struct genl_info *info, void *arg);
+// int parse_cb(struct nl_msg *msg, void *arg);
+// ANALYZE_REPLY("get_module_info(\"%s\", %d) : ", ops.o_name, ops.o_id);
+
+extern void read_event(struct nl_sock *sock) {
+    int err;
+    callback_index_t cbi = { .magic = 0x5a5a };
+    if ((err = nl_socket_modify_cb(sock, NL_CB_VALID, NL_CB_CUSTOM, parse_cb, &cbi)) < 0) { fatal_error(err, "nl_socket_modify_cb"); }
+    if ((err = nl_recvmsgs_default(sock)) < 0) { fatal_error(err, "nl_recvmsgs_default"); }
+    // cbi.xx;
 }
