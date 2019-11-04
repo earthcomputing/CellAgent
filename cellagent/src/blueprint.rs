@@ -193,7 +193,7 @@ pub enum BlueprintError {
     #[fail(display = "BlueprintError::EdgeEndpoint {}: Cell reference {} in edges should be less than total number of cells {}", func_name, num_cells, invalid_endpoint)]
     EdgeEndpoint { func_name: &'static str, num_cells: usize, invalid_endpoint: usize},
     #[fail(display = "BlueprintError::DefaultNumPhysPortsPerCell {}:  Default number of physical ports per cell {} is greater than the maximum allowed {}", func_name, default_num_phys_ports_per_cell, max_num_phys_ports_per_cell)]
-    DefaultNumPhysPortsPerCell { func_name: &'static str, default_num_phys_ports_per_cell: u8, max_num_phys_ports_per_cell: u8},
+    DefaultNumPhysPortsPerCell { func_name: &'static str, default_num_phys_ports_per_cell: u8, max_num_phys_ports_per_cell: u8 },
     #[fail(display = "BlueprintError::CellPortsExceptionsCell {}:  Can't create ports exception for invalid cell {}; number of cells is {}", func_name, cell_no, num_cells)]
     CellPortsExceptionsCell { func_name: &'static str, cell_no: usize, num_cells: usize},
     #[fail(display = "BlueprintError::CellPortsExceptionsPorts {}:  Ports exception {} is greater than maximum number allowed {} for cell {}", func_name, num_phys_ports, max_num_phys_ports_per_cell, cell_no)]
@@ -201,7 +201,7 @@ pub enum BlueprintError {
     #[fail(display = "BlueprintError::BorderCellPortsCell {}:  Border ports requested for cell {}; number of cells is {}", func_name, cell_no, num_cells)]
     BorderCellPortsCell { func_name: &'static str, cell_no: usize, num_cells: usize},
     #[fail(display = "BlueprintError::BorderCellPortsPort {}:  Border port {} requested for cell {}; number of ports is {}", func_name, port_no, cell_no, num_phys_ports)]
-    BorderCellPortsPort { func_name: &'static str, port_no: u8, cell_no: usize, num_phys_ports: u8},
+    BorderCellPortsPort { func_name: &'static str, port_no: u8, cell_no: usize, num_phys_ports: u8 },
     #[fail(display = "BlueprintError::BorderCellCount {}: Must have {} border cells but only {} supplied", func_name, num_reqd, num_border)]
     BorderCellCount { func_name: &'static str, num_border: usize, num_reqd: usize},
 }

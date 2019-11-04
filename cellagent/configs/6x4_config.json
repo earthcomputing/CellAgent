@@ -33,7 +33,7 @@
         "cm_to_pe":false,
         "deploy":false,
         "discover":false,
-        "discoverd":true,
+        "discoverd":false,
         "flow_control":false,
         "manifest":false,
         "pe_pkt_recv":false,

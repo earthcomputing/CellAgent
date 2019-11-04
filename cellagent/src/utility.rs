@@ -12,11 +12,11 @@ use lazy_static::lazy_static;
 use time;
 
 use crate::config::{CONFIG, PAYLOAD_DEFAULT_ELEMENT, REPO,
-                    CellQty, MaskValue, PortQty};
+                    CellQty, MASK_MAX, MaskValue, PortQty};
 use crate::uuid_ec::Uuid;
 
-pub const BASE_TENANT_MASK: Mask = Mask { mask: MaskValue(255) };   // All ports
-pub const DEFAULT_USER_MASK: Mask = Mask { mask: MaskValue(254) };  // All ports except port 0
+pub const BASE_TENANT_MASK: Mask = Mask { mask: MaskValue(MASK_MAX) };     // All ports
+pub const DEFAULT_USER_MASK: Mask = Mask { mask: MaskValue(MASK_MAX-1) };  // All ports except port 0
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Hash, Serialize, Deserialize)]
 pub struct Mask { mask: MaskValue }
 impl Mask {
@@ -51,7 +51,7 @@ impl Mask {
                 mask.or(Mask::new(*port_number)) )
     }
     pub fn get_port_nos(self) -> Vec<PortNo> {
-        (0..*CONFIG.max_num_phys_ports_per_cell)
+        (0..=*CONFIG.max_num_phys_ports_per_cell)
             .map(|i| PortNo(i).make_port_number(CONFIG.max_num_phys_ports_per_cell)
                 .expect("Mask make_port_number cannont generate an error"))
             .map(|port_number| Mask::new(port_number))

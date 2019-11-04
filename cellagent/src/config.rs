@@ -10,6 +10,8 @@ use lazy_static::lazy_static;
 
 use crate::utility::{CellConfig, CellNo, Edge, PortNo, Quench, S};
 
+pub type MaskType = u16;
+pub const MASK_MAX: u16 = MaskType::max_value();
 // System parameters
 pub const SCHEMA_VERSION: &str = "0.1";
 pub const REPO: &str = "CellAgent";
@@ -125,8 +127,8 @@ impl Deref for DatacenterNo { type Target = u16; fn deref(&self) -> &Self::Targe
 pub struct LinkQty(pub usize);
 impl Deref for LinkQty { type Target = usize; fn deref(&self) -> &Self::Target { &self.0 } }
 #[derive(Debug, Copy, Clone, Default, Eq, PartialEq, Hash, Serialize, Deserialize)]
-pub struct MaskValue(pub u16);
-impl Deref for MaskValue { type Target = u16; fn deref(&self) -> &Self::Target { &self.0 } }
+pub struct MaskValue(pub MaskType);
+impl Deref for MaskValue { type Target = MaskType; fn deref(&self) -> &Self::Target { &self.0 } }
 #[derive(Debug, Copy, Clone, Default, Serialize)]
 pub struct PacketNo(pub u16);
 impl Deref for PacketNo { type Target = u16; fn deref(&self) -> &Self::Target { &self.0 } }
