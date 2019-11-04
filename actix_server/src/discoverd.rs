@@ -26,7 +26,7 @@ fn process_discoverd(appcells: web::Data<AppCells>, record: web::Json<Value>)
 }
 pub fn process_discoverd_body(appcells: web::Data<AppCells>, body: Body)
         -> Result<impl Responder, Error> {
-    if body.msg.payload.discover_type == "First" {
+    if body.msg.payload.discover_type == "Parent" {
         let this_cell_name = body.cell_id.name;
         let recv_port = body.port_no;
         let tree_name = body.msg.payload.port_tree_id.name;

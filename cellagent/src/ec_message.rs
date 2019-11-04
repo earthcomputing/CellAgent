@@ -341,14 +341,14 @@ impl fmt::Display for DiscoverDPayload {
 }
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Serialize, Deserialize)]
 pub enum DiscoverDType {
-    First,
-    Subsequent
+    Parent,
+    NonParent
 }
 impl fmt::Display for DiscoverDType {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            DiscoverDType::First      => write!(f, "First"),
-            DiscoverDType::Subsequent => write!(f, "Subsequent")
+            DiscoverDType::Parent => write!(f, "First"),
+            DiscoverDType::NonParent => write!(f, "Subsequent")
         }
     }
 }
