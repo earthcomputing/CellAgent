@@ -145,9 +145,17 @@ static void grab_attr(callback_index_t *cbi, uint64_t attr) {
 static int parse_generic(struct nl_cache_ops *unused, struct genl_cmd *cmd, struct genl_info *info, void *arg) {
     callback_index_t *cbi = (callback_index_t *) arg;
     if (cbi->magic != 0x5a5a) fatal_error(-1, "garbled callback arg");
-    struct nlmsghdr *nlh = info->nlh;
 
-    ECP_DEBUG("parse_generic:\n");
+    struct sockaddr_nl *who = info->who;
+    struct nlmsghdr *nlh = info->nlh;
+    struct genlmsghdr *ghdr = info->genlhdr;
+    // info->userhdr; // genlmsg_user_hdr(ghdr);
+    int cmd_id = ghdr->cmd;
+    // struct genl_cmd *cmd = lookup_cmd(ops, cmd_id);
+
+
+    ECP_DEBUG("parse_generic: cmd %s (%d)\n", (cmd) ? cmd->c_name : "??", cmd_id);
+    cbi->cmd_id = cmd_id;
 
     if (nlh->nlmsg_type == NLMSG_ERROR) { ECP_DEBUG("NLMSG_ERROR\n"); return -1; } // FIXME: should this be NL_OK ??
 
@@ -246,6 +254,14 @@ static struct genl_ops ops = {
     // .o_cache_ops = NULL,
     // .o_list = NULL,
 };
+
+static struct genl_cmd *lookup_cmd(struct genl_ops *ops, int cmd_id) {
+    for (int i = 0; i < ops->o_ncmds; i++) {
+        struct genl_cmd *cmd = &ops->o_cmds[i];
+        if (cmd->c_id == cmd_id) return cmd;
+    }
+    return NULL;
+}
 
 #define WAIT_ACK { int err = nl_wait_for_ack(sock); if (err < 0) fatal_error(err, "no ack?"); }
 
@@ -833,5 +849,6 @@ extern void read_event(struct nl_sock *sock) {
     callback_index_t cbi = { .magic = 0x5a5a };
     if ((err = nl_socket_modify_cb(sock, NL_CB_VALID, NL_CB_CUSTOM, parse_cb, &cbi)) < 0) { fatal_error(err, "nl_socket_modify_cb"); }
     if ((err = nl_recvmsgs_default(sock)) < 0) { fatal_error(err, "nl_recvmsgs_default"); }
+// FIXME:
     // cbi.xx;
 }

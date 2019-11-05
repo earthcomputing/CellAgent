@@ -46,6 +46,9 @@ typedef struct {
     uint32_t magic;
     struct nlattr *tb[NL_ECNL_ATTR_MAX+1];
 
+    // cmd:
+    int cmd_id;
+
     // "simple" attributes:
     uint32_t alo_flag;
     uint32_t message_length;
