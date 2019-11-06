@@ -844,13 +844,7 @@ extern struct nl_sock *init_sock_events() {
 // int parse_cb(struct nl_msg *msg, void *arg);
 // ANALYZE_REPLY("get_module_info(\"%s\", %d) : ", ops.o_name, ops.o_id);
 
-extern void read_event(struct nl_sock *sock
-// int *cp,
-// uint32_t *mp,
-// uint32_t *pp,
-// uint32_t *np, // num_ait_messages,
-// link_state_t *lp
-) {
+extern void read_event(struct nl_sock *sock, uint32_t *mp, uint32_t *pp, int *cp, uint32_t *np, link_state_t *lp) {
     int err;
     callback_index_t cbi = { .magic = 0x5a5a };
     if ((err = nl_socket_modify_cb(sock, NL_CB_VALID, NL_CB_CUSTOM, parse_cb, &cbi)) < 0) { fatal_error(err, "nl_socket_modify_cb"); }
@@ -861,9 +855,9 @@ extern void read_event(struct nl_sock *sock
     uint32_t port_id = cbi.port_id;
     FAM_DEBUG("module %d port %d cmd %d", module_id, port_id, cmd_id);
 
-    // *cp = cbi.cmd_id;
-    // *mp = cbi.module_id;
-    // *pp = cbi.port_id;
+    *mp = cbi.module_id;
+    *pp = cbi.port_id;
+    *cp = cbi.cmd_id;
 
     switch (cmd_id) {
     // ecnl_got_ait_message - module_id, port_id, num_message
@@ -871,17 +865,16 @@ extern void read_event(struct nl_sock *sock
         struct genl_cmd *cmd = lookup_cmd(&ops, cmd_id);
         uint32_t num_ait_messages = cbi.num_ait_messages;
         FAM_DEBUG("%s - num_ait_messages %d", cmd->c_name, num_ait_messages);
-        // *np = cbi.num_ait_messages;
+        *np = cbi.num_ait_messages;
         break;
     }
     // ecnl_link_status_update - module_id, port_id, &state
     case NL_ECNL_CMD_GET_PORT_STATE: {
         struct genl_cmd *cmd = lookup_cmd(&ops, cmd_id);
-        // uint32_t num_ait_messages = cbi.num_ait_messages;
         uint32_t link_state = cbi.port_link_state;
         char *link = (link_state) ? "UP" : "DOWN";
         FAM_DEBUG("%s - port_link_state %s (%d)", cmd->c_name, link, link_state);
-        // get_link_state(&cbi, lp);
+        get_link_state(&cbi, lp);
         break;
     }
     default: {

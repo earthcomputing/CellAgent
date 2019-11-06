@@ -108,7 +108,7 @@ extern int signal_ait_message(struct nl_sock *sock, struct nl_msg *msg, uint32_t
 
 // --
 
-extern void read_event(struct nl_sock *sock);
+extern void read_event(struct nl_sock *sock, uint32_t *mp, uint32_t *pp, int *cp, uint32_t *np, link_state_t *lp);
 
 // --
 
