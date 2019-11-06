@@ -866,27 +866,27 @@ extern void read_event(struct nl_sock *sock
     // *pp = cbi.port_id;
 
     switch (cmd_id) {
+    // ecnl_got_ait_message - module_id, port_id, num_message
     case NL_ECNL_CMD_SIGNAL_AIT_MESSAGE: {
-        // ecnl_got_ait_message - module_id, port_id, num_message
         struct genl_cmd *cmd = lookup_cmd(&ops, cmd_id);
         uint32_t num_ait_messages = cbi.num_ait_messages;
-        FAM_DEBUG("%s num_ait_messages %d", cmd->c_name, num_ait_messages);
+        FAM_DEBUG("%s - num_ait_messages %d", cmd->c_name, num_ait_messages);
         // *np = cbi.num_ait_messages;
         break;
     }
-#if 0
-    case xx: {
-        // ecnl_link_status_update - module_id, port_id, &state
+    // ecnl_link_status_update - module_id, port_id, &state
+    case NL_ECNL_CMD_GET_PORT_STATE: {
         struct genl_cmd *cmd = lookup_cmd(&ops, cmd_id);
         // uint32_t num_ait_messages = cbi.num_ait_messages;
-        xx xx = cbi->port_link_state;
-        FAM_DEBUG("%s port_link_state %d", cmd->c_name, xx);
+        uint32_t link_state = cbi.port_link_state;
+        char *link = (link_state) ? "UP" : "DOWN";
+        FAM_DEBUG("%s - port_link_state %s (%d)", cmd->c_name, link, link_state);
         // get_link_state(&cbi, lp);
         break;
     }
-#endif
     default: {
-        FAM_DEBUG("unknown cmd: %d", cmd_id);
+        struct genl_cmd *cmd = lookup_cmd(&ops, cmd_id);
+        FAM_DEBUG("unknown cmd %s (%d)\n", (cmd) ? cmd->c_name : "??", cmd_id);
     }
     }
 }
