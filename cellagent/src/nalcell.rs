@@ -4,9 +4,9 @@ extern crate libc;
 use std::{
     fmt, fmt::Write,
     collections::{HashMap, HashSet},
-    thread::JoinHandle,
+    thread, thread::JoinHandle,
     iter::FromIterator,
-    rc::Rc,
+    sync::Arc,
 };
 use crossbeam::crossbeam_channel::unbounded as channel;
 
@@ -20,7 +20,7 @@ use crate::ec_message_formats::{PortToPe, PeFromPort, PeToPort, PortFromPe,
 use crate::ecnl::{ECNL_Session};
 use crate::name::{CellID};
 use crate::port::{Port};
-use crate::utility::{CellConfig, CellType, PortNo, S, TraceHeaderParams, TraceType};
+use crate::utility::{CellConfig, CellType, PortNo, S, TraceHeader, TraceHeaderParams, TraceType};
 use crate::vm::VirtualMachine;
 
 #[derive(Debug)]
@@ -33,11 +33,11 @@ pub struct NalCell {
     vms: Vec<VirtualMachine>,
     ports_from_pe: HashMap<PortNo, PortFromPe>,
     ports_from_ca: HashMap<PortNo, PortFromCa>,
-    ecnl: Option<Rc<ECNL_Session>>,
+    ecnl: Option<Arc<ECNL_Session>>,
 }
 
 impl NalCell {
-    pub fn new(name: &str, num_phys_ports: PortQty, border_port_nos: &HashSet<PortNo>, config: CellConfig, ecnl: Option<Rc<ECNL_Session>>)
+    pub fn new(name: &str, num_phys_ports: PortQty, border_port_nos: &HashSet<PortNo>, config: CellConfig, ecnl: Option<Arc<ECNL_Session>>)
             -> Result<(NalCell, JoinHandle<()>), Error> {
         let _f = "new";
         if *num_phys_ports > *CONFIG.max_num_phys_ports_per_cell {
@@ -80,7 +80,7 @@ impl NalCell {
                 ports_from_ca.insert(PortNo(i), port_from_ca);
                 Either::Right(port_to_ca.clone())
             } else {
-                if (i == 0) { //But i==0 for cellagent port - this should be above??
+                if (i == 0) {
                     is_connected = true;
                 } else {
                     match ecnl_clone {
@@ -161,6 +161,22 @@ impl NalCell {
         let recvr = self.ports_from_ca.remove(&port.get_port_no())
             .ok_or::<Error>(NalcellError::Channel { port_no: port.get_port_no(), func_name: _f }.into())?;
         Ok((port, recvr))
+    }
+    #[cfg(feature = "cell")]
+    pub fn link_ecnl_channels(&mut self, ecnl: Arc<ECNL_Session>) -> Result<&mut Self, Error> {
+        let _f = "link_ecnl_channels";
+        {
+            if CONFIG.trace_options.all || CONFIG.trace_options.ca {
+                let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "worker" };
+                let trace = json!({ "thread_name": thread::current().name(), "thread_id": TraceHeader::parse(thread::current().id()) });
+                let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
+            }
+        }
+        for i in 0..=*(ecnl.num_ecnl_ports()) {
+            (*self.ports)[i as usize].link_channel(Either::Right(ecnl.clone()), (self.ports_from_pe[&PortNo(i as u8)]).clone());
+        }
+        println!("Linked ecnl channels");
+        Ok(self)
     }
 }
 impl fmt::Display for NalCell {

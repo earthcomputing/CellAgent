@@ -1,3 +1,5 @@
+use either::Either;
+use failure::{Error, ResultExt, Fail};
 #[cfg(feature = "cell")]
 use libc::{free};
 #[cfg(feature = "cell")]
@@ -6,11 +8,16 @@ use std::{
 };
 
 use std::{
+    collections::{HashMap},
     os::raw::{c_char, c_int, c_uchar, c_uint, c_ulong, c_void},
     ptr::{null, null_mut},
 };
 
-use crate::config::{PortQty};
+use crate::config::{CONFIG, PortQty};
+use crate::dal::{add_to_trace};
+use crate::ec_message_formats::{PortFromPe};
+use crate::name::{CellID};
+use crate::port::{Port};
 
 #[derive(Debug)]
 #[repr(C)]
@@ -101,13 +108,21 @@ impl ECNL_Session {
 }
 
 unsafe impl Send for ECNL_Session {}
+unsafe impl Sync for ECNL_Session {}
 
 impl Drop for ECNL_Session {
     fn drop(&mut self) {
         #[cfg(feature = "cell")]
         unsafe {
+            println!("CLOSING ECNL!!!");
             free_nl_session((*self).clone().nl_session);
             free(self.module_info_ptr as *mut libc::c_void);
         }
     }
+}
+
+#[derive(Debug, Fail)]
+pub enum EcnlError {
+    #[fail(display = "EcnlError::Chain {} {}", func_name, comment)]
+    Chain { func_name: &'static str, comment: String },
 }

@@ -159,7 +159,7 @@ impl Port {
     }
 
     // SPAWN THREAD (listen_link, listen_pe)
-    pub fn link_channel(&self, port_link_channel_or_ecnl: Either<(PortToLink, PortFromLink), ECNL_Session>,
+    pub fn link_channel(&self, port_link_channel_or_ecnl: Either<(PortToLink, PortFromLink), Arc<ECNL_Session>>,
                         port_from_pe: PortFromPe) {
         let _f = "link_channel";
         let mut port = self.clone();
@@ -177,7 +177,7 @@ impl Port {
         };
         thread::Builder::new().name(thread_name).spawn( move || {
             update_trace_header(child_trace_header);
-            let _ = port.listen_link_loop(port_link_channel_clone_or_ecnl.clone()).map_err(|e| write_err("port", &e));
+            let _ = port.listen_link_loop(port_link_channel_clone_or_ecnl).map_err(|e| write_err("port", &e));
             if CONFIG.continue_on_error { }
         }).expect("thread failed");
         let port = self.clone();
@@ -191,7 +191,7 @@ impl Port {
                 Either::Left(port_to_link)
             };
             #[cfg(feature = "cell")]
-            let port_to_link_or_ecnl = {
+            let port_to_link_or_ecnl: Either<PortToLink, Arc<ECNL_Session>> = {
                 Either::Right(port_link_channel_or_ecnl.clone().right().unwrap())
             };
             let _ = port.listen_pe_loop(&port_to_link_or_ecnl, &port_from_pe).map_err(|e| write_err("port", &e));
@@ -200,7 +200,7 @@ impl Port {
     }
 
     // WORKER (PortFromLink)
-    fn listen_link_loop(&mut self, port_link_channel_or_ecnl: Either<(PortToLink, PortFromLink), ECNL_Session>) -> Result<(), Error> {
+    fn listen_link_loop(&mut self, port_link_channel_or_ecnl: Either<(PortToLink, PortFromLink), Arc<ECNL_Session>>) -> Result<(), Error> {
         let _f = "listen_link_loop";
         {
             if CONFIG.trace_options.all || CONFIG.trace_options.port {
@@ -303,14 +303,10 @@ impl Port {
             }
         }
         #[cfg(feature = "cell")]
-        loop {
-            let ecnl = port_link_channel_or_ecnl.clone().right();
-            let packet = Packet::new(UniqueMsgId(0), &Uuid::new(), PacketNo(1500), true, Vec::new());
-            port_to_pe.send(PortToPePacket::Packet((self.port_number.get_port_no(), packet)))?;
-        }
+        Ok(())
     }
     // WORKER (PortFromPe)
-    fn listen_pe_loop(&self, port_to_link_or_ecnl: &Either<PortToLink, ECNL_Session>, port_from_pe: &PortFromPe) -> Result<(), Error> {
+    fn listen_pe_loop(&self, port_to_link_or_ecnl: &Either<PortToLink, Arc<ECNL_Session>>, port_from_pe: &PortFromPe) -> Result<(), Error> {
         let _f = "listen_pe_loop";
         {
             if CONFIG.trace_options.all || CONFIG.trace_options.port {
@@ -353,11 +349,11 @@ impl Port {
                         let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
                     }
                 }
-                port_to_link_or_ecnl.clone().left().expect("ecnl in simulator").send(packet)?;
+                port_to_link_or_ecnl.clone().left().expect("ecnl port in simulator").send(packet)?;
             }
             #[cfg(feature = "cell")]
             {
-                let ecnl = port_to_link_or_ecnl.clone().right();
+                let ecnl = port_to_link_or_ecnl.clone().right().expect("simulated port in cell");
             }
         }
     }
