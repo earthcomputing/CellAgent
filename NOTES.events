@@ -1,0 +1,15 @@
+
+--
+
+bjackson-e1000e/src/entl_device.c - entl_watchdog_task => notify_manager => *emf_event()
+bjackson-ecnl/src/ecnl_device.c - mgr->emf_event => adapt_event =>
+ 
+    SIGUSR1 : ecnl_link_status_update => genlmsg_multicast_allns(... NL_ECNL_MCGRP_LINKSTATUS ...) / NL_ECNL_CMD_GET_PORT_STATE (3)
+    SIGUSR2 : ecnl_got_ait_message => genlmsg_multicast_allns(... NL_ECNL_MCGRP_AIT ...) / NL_ECNL_CMD_SIGNAL_AIT_MESSAGE (13)
+
+bjackson-rust-ffi/libept/src/ecnl_endpoint.rs - event_listener (spawn thread) => event_loop => ept_get_event
+bjackson-rust-ffi/libept/src/ecnl_endpoint.c - ept_get_event => read_event
+bjackson-ecnl/lib/ecnl_proto.c - read_event
+
+--
+
