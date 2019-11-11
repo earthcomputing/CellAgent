@@ -5,8 +5,8 @@
     "race_sleep":0, "//": "Seconds to sleep if discover_quiesce_factor doesn't work",
     "kafka_server":"172.16.1.2",
     "kafka_topic":"CellAgent",
-    "output_dir_name":"/tmp/multicell/",
-    "output_file_name":"/tmp/multicell/trace.json",
+    "output_dir_name":"/Users/alan/Documents/Eclipse/multicell/trace",
+    "output_file_name":"/Users/alan/Documents/Eclipse/multicell/trace/trace.json",
     "quench":"RootPort", "//": "Either Simple or RootPort",
     "trace_options":{
         "all":false,
