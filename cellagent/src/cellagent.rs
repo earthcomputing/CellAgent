@@ -942,25 +942,27 @@ impl CellAgent {
         let new_tree_id = new_port_tree_id.to_tree_id();
         self.tree_id_map.insert(new_port_tree_id.get_uuid(), new_port_tree_id);
         let tree_seen = self.quench_simple(new_tree_id);
-        self.tree_unseen_on_ports
+        let tree_unseen_on_ports = self.tree_unseen_on_ports
             .entry(new_tree_id)
             .or_insert(self.neighbors
                 .keys()
                 .cloned()
-                .collect())
-            .remove(&port_no);
+                .collect());
         {
-            if CONFIG.debug_options.all || CONFIG.debug_options.discoverd {
+            if CONFIG.debug_options.all || CONFIG.debug_options.discover {
+                let neighbors: Vec<_> = self.neighbors.keys().collect();
                 let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "ca_process_discover_msg_dbg" };
                 let trace = json!({ "cell_id": &self.cell_id, "port_tree_id": new_port_tree_id,
-                "port_no": port_no, "tree_seen": tree_seen,
-                "tree_unseen_on_ports": self.tree_unseen_on_ports.get(&new_tree_id), "msg": msg.value() });
+                "port_no": port_no, "tree_seen": tree_seen, "neighbors": neighbors,
+                "tree_unseen_on_ports": tree_unseen_on_ports, "msg": msg.value() });
                 let _ = add_to_trace(TraceType::Debug, trace_params, &trace, _f);
             }
         }
         let sender_id = SenderID::new(self.cell_id, "CellAgent")?;
         let in_reply_to = msg.get_sender_msg_seq_no();
         if !tree_seen {
+            // Needed since I won't get a NonParent StackTreeDMsg on this port
+            if **hops == 1 { tree_unseen_on_ports.remove(&port_no); }
             let discoverd_msg = DiscoverDMsg::new(in_reply_to, sender_id,
                        self.cell_id, new_port_tree_id, path,
                                      DiscoverDType::Parent);
@@ -989,7 +991,7 @@ impl CellAgent {
         let gvm_equation = GvmEquation::new(&eqns, &Vec::new());
         {
             if CONFIG.debug_options.all || CONFIG.debug_options.discover {
-                let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "ca_process_discover_msg" };
+                let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "ca_process_discover_msg_quench_dbg" };
                 let trace = json!({ "cell_id": &self.cell_id, "quench": quench, "new_port_tree_id": new_tree_id, "port_no": port_no, "msg": msg.value() });
                 let _ = add_to_trace(TraceType::Debug, trace_params, &trace, _f);
             }
@@ -1023,7 +1025,7 @@ impl CellAgent {
             if CONFIG.trace_options.all || CONFIG.trace_options.ca {
                 let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "ca_process_discoverd_msg" };
                 let trace = json!({ "cell_id": &self.cell_id, "port_no": port_no, "msg": msg.value() });
-                let _ = add_to_trace(TraceType::Debug, trace_params, &trace, _f);
+                let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
             }
         }
         let port_tree_id = msg.get_port_tree_id();
@@ -1034,10 +1036,12 @@ impl CellAgent {
             .remove(&port_no);
         {
             if CONFIG.debug_options.all || CONFIG.debug_options.discoverd {
+                let neighbors: Vec<_> = self.neighbors.keys().collect();
+                let unseen_ports = self.tree_unseen_on_ports.get(&tree_id);
                 let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "ca_process_discoverd_msg_dbg" };
                 let trace = json!({ "cell_id": &self.cell_id, "port_tree_id": port_tree_id,
-                "port_no": port_no, "is_discover_done": self.is_discover_done(&tree_id),
-                "tree_unseen_on_ports": self.tree_unseen_on_ports.get(&tree_id), "msg": msg.value() });
+                            "unseen ports": unseen_ports, "is_discover_done": self.is_discover_done(&tree_id),
+                            "neighbors": neighbors, "port_no": port_no, "msg": msg.value() });
                 let _ = add_to_trace(TraceType::Debug, trace_params, &trace, _f);
             }
         }
@@ -1069,17 +1073,6 @@ impl CellAgent {
                 eqns.insert(GvmEqn::Xtnd("false"));
                 eqns.insert(GvmEqn::Save("false"));
                 let gvm_eqn = GvmEquation::new(&eqns, &Vec::new());
-                {
-                    if CONFIG.debug_options.all || CONFIG.debug_options.discoverd {
-                        let unseen_ports = self.tree_unseen_on_ports
-                            .get(&tree_id);
-                        let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "ca_process_discoverd_msg_dbg" };
-                        let trace = json!({ "cell_id": &self.cell_id, "port_tree_id": port_tree_id,
-                            "unseen ports": unseen_ports,
-                            "# neighbors": self.get_no_neighbors(), "port_no": port_no, "msg": msg.value() });
-                        let _ = add_to_trace(TraceType::Debug, trace_params, &trace, _f);
-                    }
-                }
                 // Setting hops to 0 is a hack so I can use update_traph()
                 let _ = self.update_traph(port_tree_id, port_number, port_state, &gvm_eqn,
                                           children, PathLength(CellQty(0)), path)?;
@@ -1222,18 +1215,23 @@ impl CellAgent {
             if CONFIG.trace_options.all || CONFIG.trace_options.ca {
                 let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "ca_process_hello_msg" };
                 let trace = json!({ "cell_id": &self.cell_id, "port_no": port_no, "msg": msg.value() });
-                let _ = add_to_trace(TraceType::Debug, trace_params, &trace, _f);
+                let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
             }
         }
-        self.tree_unseen_on_ports
-            .entry(self.my_tree_id)
-            .or_insert(HashSet::new())
-            .insert(port_no);
         let payload = msg.get_payload();
         let neighbor_cell_id = payload.get_cell_id();
         let neigbor_port_no = payload.get_port_no();
         let port_number = port_no.make_port_number(self.no_ports)?;
         self.neighbors.insert(port_no, (neighbor_cell_id, *neigbor_port_no));
+        {
+            if CONFIG.debug_options.all || CONFIG.debug_options.hello {   // Debug
+                let neighbors: Vec<_> = self.neighbors.keys().collect();
+                let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "ca_process_hello_msg_dbg" };
+                let trace = json!({ "cell_id": &self.cell_id, "recv_port_no": port_no,
+                    "neighbors": neighbors, "msg": msg.value() });
+                let _ = add_to_trace(TraceType::Debug, trace_params, &trace, _f);
+            }
+        }
         let sender_id = SenderID::new(self.cell_id, "CellAgent")?;
         let user_mask = Mask::new(port_number);
         let path = Path::new(port_no, self.no_ports)?;
@@ -1244,13 +1242,6 @@ impl CellAgent {
                                             self.cell_id, hops, path);
         self.send_msg(self.connected_tree_id, &discover_msg, user_mask).context(CellagentError::Chain { func_name: _f, comment: S(self.cell_id) })?;
         self.forward_discover(user_mask).context(CellagentError::Chain { func_name: _f, comment: S(self.cell_id) })?;
-        {
-            if CONFIG.debug_options.all || CONFIG.debug_options.process_msg {   // Debug
-                let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "ca_process_hello_msg_dbg" };
-                let trace = json!({ "cell_id": &self.cell_id, "recv_port_no": port_no, "msg": msg.value() });
-                let _ = add_to_trace(TraceType::Debug, trace_params, &trace, _f);
-            }
-        }
         Ok(())
     }
     pub fn process_manifest_msg(&mut self, msg: &ManifestMsg, port_no: PortNo, msg_port_tree_id: PortTreeID)
