@@ -331,6 +331,27 @@ static int entl_do_ioctl(struct net_device *netdev, struct ifreq *ifr, int cmd) 
     entl_state_machine_t *stm = &dev->edev_stm;
 
     switch (cmd) {
+#if 0
+// could combine these into:
+    case SIOCDEVPRIVATE_ENTL_RD_CURRENT:
+    case SIOCDEVPRIVATE_ENTL_RD_ERROR: {
+        struct e1000_hw *hw = &adapter->hw;
+        uint32_t link = !hw->mac.get_link_status;
+        struct entl_ioctl_data entl_data;
+        entl_data.link_state = link;
+
+        if (cmd == SIOCDEVPRIVATE_ENTL_RD_CURRENT) {
+            entl_read_current_state(stm, &entl_data.state, &entl_data.error_state);
+        }
+        else {
+            // FIXME: CLEARS error_state!!
+            entl_read_error_state(stm, &entl_data.state, &entl_data.error_state);
+        }
+        entl_data.num_queued = entl_num_queued(stm);
+        copy_to_user(ifr->ifr_data, &entl_data, sizeof(struct entl_ioctl_data));
+    }
+    break;
+#endif
     case SIOCDEVPRIVATE_ENTL_RD_CURRENT: {
         // FIXME: switch to public API ?
         // e1000e_has_link(struct e1000_adapter *adapter)
@@ -340,7 +361,6 @@ static int entl_do_ioctl(struct net_device *netdev, struct ifreq *ifr, int cmd) 
         struct entl_ioctl_data entl_data;
         entl_data.link_state = link;
 
-        // FIXME: CLEARS error_state!!
         entl_read_current_state(stm, &entl_data.state, &entl_data.error_state);
         entl_data.num_queued = entl_num_queued(stm);
         copy_to_user(ifr->ifr_data, &entl_data, sizeof(struct entl_ioctl_data));
@@ -352,6 +372,7 @@ static int entl_do_ioctl(struct net_device *netdev, struct ifreq *ifr, int cmd) 
         uint32_t link = !hw->mac.get_link_status;
         struct entl_ioctl_data entl_data;
         entl_data.link_state = link;
+        // FIXME: CLEARS error_state!!
         entl_read_error_state(stm, &entl_data.state, &entl_data.error_state);
         entl_data.num_queued = entl_num_queued(stm);
         copy_to_user(ifr->ifr_data, &entl_data, sizeof(struct entl_ioctl_data));

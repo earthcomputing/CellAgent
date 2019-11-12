@@ -762,7 +762,7 @@ void entl_read_error_state(entl_state_machine_t *mcn, entl_state_t *st, entl_sta
     STM_LOCK;
         memcpy(st, &mcn->current_state, sizeof(entl_state_t));
         memcpy(err, &mcn->error_state, sizeof(entl_state_t));
-        memset(&mcn->error_state, 0, sizeof(entl_state_t));
+        memset(&mcn->error_state, 0, sizeof(entl_state_t)); // clears error state!
     STM_UNLOCK;
     uint32_t was_state = st->current_state;
     uint32_t count = err->error_count;
