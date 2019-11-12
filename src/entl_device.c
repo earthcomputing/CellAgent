@@ -254,7 +254,9 @@ static bool entl_device_process_rx_packet(entl_device_t *dev, struct sk_buff *sk
         }
     }
 
+    // FIXME: rather than a 'level', should have an event obj queue, that includes 'seqno'
     if (recv_action & ENTL_ACTION_SIG_AIT) {
+        ENTL_DEBUG_NAME(stm->name, "process_tx - signal seqno %d", seqno);
         dev->edev_flag |= ENTL_DEVICE_FLAG_SIGNAL2;
     }
 
@@ -309,7 +311,9 @@ static void entl_device_process_tx_packet(entl_device_t *dev, struct sk_buff *sk
         int send_action = entl_next_send_tx(stm, &emsg_raw, &seqno);
         encode_dest(eth->h_dest, emsg_raw, seqno);
 
+        // FIXME: rather than a 'level', should have an event obj queue, that includes 'seqno'
         if (send_action & ENTL_ACTION_SIG_AIT) {
+            ENTL_DEBUG_NAME(stm->name, "process_tx - signal seqno %d", seqno);
             dev->edev_flag |= ENTL_DEVICE_FLAG_SIGNAL2; // AIT send completion signal
         }
 
