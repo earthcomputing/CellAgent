@@ -34,7 +34,6 @@ pub struct Config {
     pub quench: Quench,
     pub continue_on_error: bool,
     pub auto_break: Option<Edge>,
-    pub discover_quiescence_factor: usize,
     pub output_dir_name: String,
     pub output_file_name: String,
     pub kafka_server: String,
