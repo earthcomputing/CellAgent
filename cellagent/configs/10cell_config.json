@@ -1,8 +1,7 @@
 {
     "//": "Common Parameters",
     "continue_on_error":false, "//": "true in production, false when debugging",
-    "discover_quiescence_factor":6, "//": "Discover quiesced when #DiscoverD*factor > #HelloMsg",
-    "race_sleep":0, "//": "Seconds to sleep if discover_quiesce_factor doesn't work",
+    "race_sleep":1, "//": "Seconds to sleep before sending HelloMsg",
     "kafka_server":"172.16.1.2",
     "kafka_topic":"CellAgent",
     "output_dir_name":"/Users/alan/Documents/Eclipse/multicell/trace",
