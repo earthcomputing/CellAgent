@@ -143,6 +143,7 @@ impl Rack {
             .ok_or::<Error>(RackError::Boundary { func_name: _f }.into())?;
         let (port, port_from_ca) = cell.get_free_boundary_port_mut()?;
         port.noc_channel(port_to_noc, port_from_noc, port_from_ca)?;
+        println!("Connecting NOC to cell {}", cell.get_id());
         Ok(())
     }
 }
