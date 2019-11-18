@@ -1242,8 +1242,6 @@ impl CellAgent {
                 let _ = add_to_trace(TraceType::Debug, trace_params, &trace, _f);
             }
         }
-        // A perhaps vain attempt to make the simulator more like the physical system
-        std::thread::yield_now();
         let sender_id = SenderID::new(self.cell_id, "CellAgent")?;
         let user_mask = Mask::new(port_number);
         let path = Path::new(port_no, self.no_ports)?;
@@ -1706,11 +1704,16 @@ impl CellAgent {
             let user_mask = Mask::new(port_number);
             self.connected_tree_entry.add_child(port_number); // Add to connected ports
             self.update_entry(&self.connected_tree_entry)?;
-            let hello_msg = HelloMsg::new(sender_id, self.cell_id, port_no);
-            self.send_msg(self.connected_tree_id, &hello_msg, user_mask)?;
             let my_port_tree_id = self.my_tree_id.to_port_tree_id(port_number);
             self.update_base_tree_map(my_port_tree_id, self.my_tree_id);
             // I was sending DiscoverMsg here, but now I send it when processing HelloMsg
+            let ca = self.clone();
+            let thread_name = format!("CellAgent {} send hello", self.cell_id);
+            thread::Builder::new().name(thread_name).spawn( move || {
+                crate::utility::sleep(CONFIG.race_sleep);
+                let hello_msg = HelloMsg::new(sender_id, ca.cell_id, port_no);
+                let _ = ca.send_msg(ca.connected_tree_id, &hello_msg, user_mask);
+            }).expect("cellagent send hello thread failed");
             Ok(())
         }
     }
