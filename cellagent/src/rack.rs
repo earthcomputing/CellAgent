@@ -24,66 +24,49 @@ pub struct Rack {
     links: HashMap<Edge, Link>,
 }
 impl Rack {
-    pub fn new() -> Rack { Rack { cells: HashMap::new(), links: HashMap::new() } }
+    pub fn new() -> Rack { Rack { cells: Default::default(), links: Default::default() } }
     pub fn initialize(&mut self, blueprint: &Blueprint)  -> Result<Vec<JoinHandle<()>>, Error> {
         let _f = "initialize";
         let num_cells = blueprint.get_ncells();
         let edge_list = blueprint.get_edge_list();
         if *num_cells < 1  { return Err(RackError::Cells{ num_cells, func_name: _f }.into()); }
         if edge_list.len() < *num_cells - 1 { return Err(RackError::Edges { nlinks: LinkQty(edge_list.len()), func_name: _f }.into() ); }
-        let labeled_border_nal_cells  =
-            blueprint
-            .get_border_cells()
-            .iter()
-            .map(|border_cell| -> Result<(CellNo, NalCell), Error> {
-                let cell_no = border_cell.get_cell_no();
-                let border_ports = border_cell.get_border_ports();
-                let (nal_cell, _join_handle) = NalCell::new(&border_cell.get_name(),
-                                                            border_cell.get_num_phys_ports(),
-                                                            &HashSet::from_iter(border_ports.clone()),
-                                                            CellConfig::Large,
-                                                            None,
-                )?;
-                {
-                    if CONFIG.trace_options.all || CONFIG.trace_options.dc {
-                        let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "border_cell_start" };
-                        let cell_id = nal_cell.get_id();
-                        let trace = json!({ "cell_id": cell_id, "cell_number": cell_no,
+        for border_cell in blueprint.get_border_cells() {
+            let cell_no = border_cell.get_cell_no();
+            let border_ports = border_cell.get_border_ports();
+            let (nal_cell, _join_handle) = NalCell::new(&border_cell.get_name(),
+                                                        border_cell.get_num_phys_ports(),
+                                                        &HashSet::from_iter(border_ports.clone()),
+                                                        CellConfig::Large,
+                                                        None,
+                                                        )?;
+            {
+                if CONFIG.trace_options.all || CONFIG.trace_options.dc {
+                    let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "border_cell_start" };
+                    let cell_id = nal_cell.get_id();
+                    let trace = json!({ "cell_id": cell_id, "cell_number": cell_no,
                             "border_ports": border_ports, "location":  CONFIG.geometry.get(*cell_no)});
-                        let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
-                    }
+                    let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
                 }
-                Ok((cell_no, nal_cell))
-            })
-            .collect::<Result<Vec<(CellNo, NalCell)>, Error>>().context(RackError::Chain { func_name: "initialize", comment: S("border")})?;
-        for (cell_no, border_nal_cell) in labeled_border_nal_cells {
-            self.cells.insert(cell_no, border_nal_cell);
+            }
+            self.cells.insert(cell_no, nal_cell);
         }
-        let labeled_interior_nal_cells =
-            blueprint
-            .get_interior_cells()
-            .iter()
-            .map(|interior_cell| -> Result<(CellNo, NalCell), Error> {
-                let cell_no = interior_cell.get_cell_no();
-                let (nal_cell, _join_handle) = NalCell::new(&interior_cell.get_name(),
-                                                            interior_cell.get_num_phys_ports(),
-                                                            &HashSet::new(),
-                                                            CellConfig::Large,
-                                                            None,
-                )?;
-                {
-                    if CONFIG.trace_options.all || CONFIG.trace_options.dc {
-                        let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "interior_cell_start" };
-                        let cell_id = nal_cell.get_id();
-                        let trace = json!({ "cell_id": cell_id, "cell_number": cell_no, "location": CONFIG.geometry.get(*cell_no as usize) });
-                        let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
-                    }
+        for interior_cell in blueprint.get_interior_cells() {
+            let cell_no = interior_cell.get_cell_no();
+            let (nal_cell, _join_handle) = NalCell::new(&interior_cell.get_name(),
+                                                        interior_cell.get_num_phys_ports(),
+                                                        &HashSet::new(),
+                                                        CellConfig::Large,
+                                                         None)?;
+            {
+                if CONFIG.trace_options.all || CONFIG.trace_options.dc {
+                    let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "interior_cell_start" };
+                    let cell_id = nal_cell.get_id();
+                    let trace = json!({ "cell_id": cell_id, "cell_number": cell_no, "location": CONFIG.geometry.get(*cell_no as usize) });
+                    let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
                 }
-                Ok((cell_no, nal_cell))
-            })
-            .collect::<Result<Vec<(CellNo, NalCell)>, Error>>().context(RackError::Chain { func_name: "initialize", comment: S("interior")})?;
-        for (cell_no, interior_nal_cell) in labeled_interior_nal_cells {
-            self.cells.insert(cell_no, interior_nal_cell);
+            }
+            self.cells.insert(cell_no, nal_cell);
         }
         let mut link_handles = Vec::new();
         for edge in edge_list {
