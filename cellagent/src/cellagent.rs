@@ -974,7 +974,7 @@ impl CellAgent {
             let discoverd_msg = DiscoverDMsg::new(in_reply_to, sender_id,
                                                   self.cell_id, new_port_tree_id, path,
                                                   DiscoverDType::NonParent);
-            let mask = DEFAULT_USER_MASK.all_but_port(port_number);;
+            let mask = DEFAULT_USER_MASK.all_but_port(port_number);
             self.send_msg(self.connected_tree_id, &discoverd_msg, mask)?;
         } else if new_tree_id != self.my_tree_id {
             if let Some((parent_port, _)) = self.discoverd_parent_msg.get(&new_tree_id) {
