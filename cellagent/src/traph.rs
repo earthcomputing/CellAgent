@@ -76,7 +76,7 @@ impl Traph {
         }
         
     }
-    pub fn _get_port_tree(&self, port_tree_id: PortTreeID) -> Result<&PortTree, Error> {
+    pub fn get_port_tree(&self, port_tree_id: PortTreeID) -> Result<&PortTree, Error> {
         let _f = "get_port_tree";
         let port_no = port_tree_id.get_port_no();
         self.port_trees
@@ -94,7 +94,7 @@ impl Traph {
         self.port_trees.insert(port_tree.get_port_tree_id().clone(), port_tree.clone()); // Duplicate inserts do no harm
         self.port_tree_id.clone().unwrap() // Unwrap is guaranteed to be safe by first line
     }
-    pub fn _get_elements(&self) -> Iter<'_, TraphElement> { self.elements.iter() }
+    pub fn get_elements(&self) -> &Vec<TraphElement> { &self.elements }
     pub fn _set_element(&mut self, traph_element: TraphElement) {
         self.elements[*traph_element.get_port_no() as usize] = traph_element;
     }
