@@ -6,7 +6,7 @@
     "kafka_topic":"CellAgent",
     "output_dir_name":"/Users/alan/Documents/Eclipse/multicell/trace",
     "output_file_name":"/Users/alan/Documents/Eclipse/multicell/trace/trace.json",
-    "quench":"RootPort", "//": "Either Simple or RootPort",
+    "quench":"RootPort", "//": "Either Simple or RootPort or MyPort",
     "trace_options":{
         "all":true,
         "ca":true,

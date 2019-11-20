@@ -389,19 +389,22 @@ impl CellAgent {
         self.traphs.contains_key(&tree_id.get_uuid())
     }
     // Quench if this cell has seen a DiscoverMsg for each root port of this tree
-    fn quench_root_port(&self, tree_id: TreeID, path: Path) -> bool {
+    fn quench_root_port(&self, port_tree_id: PortTreeID) -> bool {
         let _f = "quench_root_port";
         self.traphs
-            .get(&tree_id.get_uuid())
+            .get(&port_tree_id.to_tree_id().get_uuid())
             .map_or(false, |traph| {
-                let port_no = path.get_port_no();
-                traph.get_port_trees()
-                    .iter()
-                    .map(|(_, port_tree)| -> bool {
-                        port_tree.get_root_port_no() == port_no
-                    })
-                    .any(|b| b)
-                })
+                traph.get_port_trees().contains_key(&port_tree_id)
+            })
+    }
+    // Quench if this cell has seen a DiscoverMsg for this tree on each of its ports
+    fn quench_my_port(&self, tree_id: TreeID, port_no: PortNo) -> bool {
+        let _f = "quench_my_port";
+        self.traphs
+            .get(&tree_id.get_uuid())
+            .map_or(false, |traph| -> bool {
+                traph.get_element(port_no).is_ok()
+            })
     }
     fn update_traph(&mut self, base_port_tree_id: PortTreeID, port_number: PortNumber, port_state: PortState,
                     gvm_eqn: &GvmEquation, mut children: HashSet<PortNumber>,
@@ -949,6 +952,8 @@ impl CellAgent {
         let new_tree_id = new_port_tree_id.to_tree_id();
         self.tree_id_map.insert(new_port_tree_id.get_uuid(), new_port_tree_id);
         let tree_seen = self.quench_simple(new_tree_id);
+        let port_tree_seen = self.quench_root_port(new_port_tree_id);
+        let my_port_seen = self.quench_my_port(new_tree_id, port_no);
         let ports_seen_on_tree = self.ports_seen_on_tree
             .entry(new_tree_id)
             .or_insert(Default::default());
@@ -987,10 +992,10 @@ impl CellAgent {
                 }
             }
         }
-        let port_tree_seen = self.quench_root_port(new_tree_id, path);
         let quench = match CONFIG.quench {
-            Quench::Simple => tree_seen,       // Must see this tree once
-            Quench::RootPort => port_tree_seen // Must see every root port for this tree once
+            Quench::Simple   => tree_seen,      // Must see this tree once
+            Quench::RootPort => port_tree_seen, // Must see every root port for this tree once
+            Quench::MyPort   => my_port_seen,   // Must see every tree on every connected port
         };
         let mut eqns = HashSet::new();
         eqns.insert(GvmEqn::Recv("true"));

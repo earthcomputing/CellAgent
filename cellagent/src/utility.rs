@@ -315,12 +315,13 @@ impl fmt::Display for ByteArray {
     }
 }
 #[derive(Debug, Copy, Clone, Serialize, Deserialize, EnumIter)]
-pub enum Quench { Simple, RootPort }
+pub enum Quench { Simple, RootPort, MyPort }
 impl fmt::Display for Quench {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Quench::Simple   => write!(f, "Simple"),
-            Quench::RootPort => write!(f, "RootPort")
+            Quench::RootPort => write!(f, "RootPort"),
+            Quench::MyPort   => write!(f, "MyPort")
         }
     }
 }
