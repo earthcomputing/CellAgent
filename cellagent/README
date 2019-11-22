@@ -21,8 +21,10 @@ $ cd ..
 
 There are three executables in multicell/cellagent.
 $ cargo run --bin simulator --features="simulator" -- config_file_name
-$ cargo run --bin cell --features="cell"
 $ cargo run --bin external_echoDemo --features="noc"
+
+$ cargo build --release --bin cell --features="cell"
+$ sudo target/release/cell
 
 There are currently 3 configuration files in multicell/cellagent/configs.
 
