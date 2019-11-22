@@ -15,7 +15,7 @@ use std::{
 
 use crate::config::{CONFIG, PortQty};
 use crate::dal::{add_to_trace};
-use crate::ec_message_formats::{PortFromPe};
+use crate::ec_message_formats::{LinkToPortPacket};
 use crate::ecnl_port::{ECNL_Port};
 use crate::name::{CellID};
 use crate::port::{Port};
@@ -51,6 +51,14 @@ pub struct ECNL_Session {
     module_info_ptr: *const ModuleInfo,
     ecnl_port_ptr_vector: Vec<ECNL_Port>,
 }
+
+#[derive(Debug)]
+#[repr(C)]
+pub struct BuffDesc {
+    len: c_uint,
+    frame: *const c_uchar,
+}
+
 
 #[cfg(feature = "cell")]
 #[allow(improper_ctypes)]
