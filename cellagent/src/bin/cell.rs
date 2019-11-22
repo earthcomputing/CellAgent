@@ -22,7 +22,7 @@ fn main() -> Result<(), Error> {
         .write(true)
         .truncate(true)
 	.open(&CONFIG.output_file_name);
-    let cell_name = "Alice"; /* if needed, can read cell name from config file */
+    let cell_name = "Carol"; /* if needed, can read cell name from config file */
     let mut wc_cmd_outer;
     let num_phys_ports_str = {
         let lspci_cmd = Command::new("lspci")
