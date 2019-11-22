@@ -1054,6 +1054,7 @@ impl CellAgent {
                 let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "ca_process_discoverd_msg_dbg" };
                 let trace = json!({ "cell_id": &self.cell_id, "port_tree_id": port_tree_id,
                             "seen ports": seen_ports, "is_discover_done": self.is_discover_done(&tree_id),
+                            "seen trees": self.traphs.len(),
                             "neighbor count": self.neighbor_count, "port_no": port_no, "msg": msg.value() });
                 let _ = add_to_trace(TraceType::Debug, trace_params, &trace, _f);
             }
