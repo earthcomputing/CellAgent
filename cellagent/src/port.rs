@@ -211,96 +211,97 @@ impl Port {
             }
         }
         let port_to_pe = self.port_to_pe_or_ca.clone().left().expect("Port: Sender to Pe must be set");
-        #[cfg(any(feature = "noc", feature = "simulator"))]
-        loop {
-            let (port_to_link, port_from_link) = port_link_channel_or_ecnl_port.clone().left().expect("ecnl in simulator");
-            let msg = port_from_link.recv().context(PortError::Chain { func_name: _f, comment: S(self.id.get_name()) + " recv from link"})?;
-            {
-                if CONFIG.trace_options.all || CONFIG.trace_options.port {
-                    match &msg {
-                        LinkToPortPacket::Packet(packet) => {
-                            let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "port_from_link_packet" };
-                            let trace = json!({ "id": self.get_id().get_name(), "packet":packet.to_string()? });
-                            let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
-                        },
-                        LinkToPortPacket::Status(status) => {
-                            let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "port_from_link_status" };
-                            let trace = json!({ "id": self.get_id().get_name(), "status": status, "msg": msg});
-                            let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
-                        }
-                        
+        let mut msg: LinkToPortPacket;
+        #[cfg(any(feature = "noc", feature = "simulator"))] {
+            loop {
+                let (port_to_link, port_from_link) = port_link_channel_or_ecnl_port.clone().left().expect("ecnl in simulator");
+                msg = port_from_link.recv().context(PortError::Chain { func_name: _f, comment: S(self.id.get_name()) + " recv from link"})?;
+		{
+                    if CONFIG.trace_options.all || CONFIG.trace_options.port {
+                        match &msg {
+                            LinkToPortPacket::Packet(packet) => {
+                                let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "port_from_link_packet" };
+                                let trace = json!({ "id": self.get_id().get_name(), "packet":packet.to_string()? });
+                                let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
+                            },
+                            LinkToPortPacket::Status(status) => {
+                                let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "port_from_link_status" };
+                                let trace = json!({ "id": self.get_id().get_name(), "status": status, "msg": msg});
+                                let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
+                            },
+			}
                     }
-                }
-            }
-            match msg {
-                LinkToPortPacket::Status(status) => {
-                    match status {
-                        PortStatus::Connected => self.set_connected(),
-                        PortStatus::Disconnected => self.set_disconnected()
-                    };
-                    {
-                        if CONFIG.trace_options.all || CONFIG.trace_options.port {
-                            let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "port_to_pe_status" };
-                            let trace = json!({ "id": self.get_id().get_name(), "status": status });
-                            let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
-                        }
+		}
+		match msg {
+                    LinkToPortPacket::Status(status) => {
+			match status {
+                            PortStatus::Connected => self.set_connected(),
+                            PortStatus::Disconnected => self.set_disconnected()
+			};
+			{
+                            if CONFIG.trace_options.all || CONFIG.trace_options.port {
+				let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "port_to_pe_status" };
+				let trace = json!({ "id": self.get_id().get_name(), "status": status });
+				let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
+                            }
+			}
+			port_to_pe.send(PortToPePacket::Status((self.port_number.get_port_no(), self.is_border, status))).context(PortError::Chain { func_name: _f, comment: S(self.id.get_name()) + " send status to pe"})?;
                     }
-                    port_to_pe.send(PortToPePacket::Status((self.port_number.get_port_no(), self.is_border, status))).context(PortError::Chain { func_name: _f, comment: S(self.id.get_name()) + " send status to pe"})?;
-                }
-                LinkToPortPacket::Packet(mut packet) => {
-                    let ait_state = packet.get_ait_state();
-                    match ait_state {
-                        AitState::AitD |
-                        AitState::Ait => return Err(PortError::Ait { func_name: _f, ait_state }.into()),
-                        
-                        AitState::Tick => (), // TODO: Send AitD to packet engine
-                        AitState::Entl |
-                        AitState::Normal => {
-                            {
-                                if CONFIG.trace_options.all || CONFIG.trace_options.port {
-                                    let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "port_to_pe_packet" };
-                                    let trace = json!({ "id": self.get_id().get_name(), "packet":packet.to_string()? });
-                                    let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
+                    LinkToPortPacket::Packet(mut packet) => {
+			let ait_state = packet.get_ait_state();
+			match ait_state {
+                            AitState::AitD |
+                            AitState::Ait => return Err(PortError::Ait { func_name: _f, ait_state }.into()),
+
+                            AitState::Tick => (), // TODO: Send AitD to packet engine
+                            AitState::Entl |
+                            AitState::Normal => {
+                                {
+                                    if CONFIG.trace_options.all || CONFIG.trace_options.port {
+                                        let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "port_to_pe_packet" };
+                                        let trace = json!({ "id": self.get_id().get_name(), "packet":packet.to_string()? });
+                                        let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
+                                    }
                                 }
-                            }
-                            port_to_pe.send(PortToPePacket::Packet((self.port_number.get_port_no(), packet)))?;
-                        },
-                        AitState::Teck |
-                        AitState::Tack => {
-                            packet.next_ait_state()?;
-                            {
-                                if CONFIG.trace_options.all | CONFIG.trace_options.port {
-                                    let ait_state = packet.get_ait_state();
-                                    let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "port_to_link" };
-                                    let trace = json!({ "id": self.get_id().get_name(), "ait_state": ait_state, "packet":packet.to_string()? });
-                                    let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
+                                port_to_pe.send(PortToPePacket::Packet((self.port_number.get_port_no(), packet)))?;
+                            },
+                            AitState::Teck |
+                            AitState::Tack => {
+                                packet.next_ait_state()?;
+                                {
+                                    if CONFIG.trace_options.all | CONFIG.trace_options.port {
+                                        let ait_state = packet.get_ait_state();
+                                        let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "port_to_link" };
+                                        let trace = json!({ "id": self.get_id().get_name(), "ait_state": ait_state, "packet":packet.to_string()? });
+                                        let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
+                                    }
                                 }
+                                port_to_link.send(packet)?;
                             }
-                            port_to_link.send(packet)?;
-                        }
-                        AitState::Tock => {
-                            packet.next_ait_state()?;
-                            {
-                                if CONFIG.trace_options.all | CONFIG.trace_options.port {
-                                    let ait_state = packet.get_ait_state();
-                                    let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "port_to_link" };
-                                    let trace = json!({ "id": self.get_id().get_name(), "ait_state": ait_state, "packet":packet.to_string()? });
-                                    let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
+                            AitState::Tock => {
+                                packet.next_ait_state()?;
+                                {
+                                    if CONFIG.trace_options.all | CONFIG.trace_options.port {
+                                        let ait_state = packet.get_ait_state();
+                                        let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "port_to_link" };
+                                        let trace = json!({ "id": self.get_id().get_name(), "ait_state": ait_state, "packet":packet.to_string()? });
+                                        let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
+                                    }
                                 }
-                            }
-                            port_to_link.send(packet.clone())?;
-                            packet.make_ait_send();
-                            {
-                                if CONFIG.trace_options.all || CONFIG.trace_options.port {
-                                    let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "port_to_pe_packet" };
-                                    let trace = json!({ "id": self.get_id().get_name(), "packet":packet.to_string()? });
-                                    let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
+                                port_to_link.send(packet.clone())?;
+                                packet.make_ait_send();
+                                {
+                                    if CONFIG.trace_options.all || CONFIG.trace_options.port {
+                                        let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "port_to_pe_packet" };
+                                        let trace = json!({ "id": self.get_id().get_name(), "packet":packet.to_string()? });
+                                        let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
+                                    }
                                 }
-                            }
-                            port_to_pe.send(PortToPePacket::Packet((self.port_number.get_port_no(), packet)))?;
-                        },
+                                port_to_pe.send(PortToPePacket::Packet((self.port_number.get_port_no(), packet)))?;
+                            },
+			}
                     }
-                }
+		}
             }
         }
         #[cfg(feature = "cell")] {
@@ -358,7 +359,7 @@ impl Port {
             }
             #[cfg(feature = "cell")]
             {
-                let ecnl = port_to_link_or_ecnl_port.clone().right().expect("simulated port in cell");
+                port_to_link_or_ecnl_port.clone().right().expect("simulated port in cell").send(&packet)?;
             }
         }
     }
