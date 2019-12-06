@@ -134,7 +134,7 @@ pub trait Message {
             where Self:std::marker::Sized + serde::Serialize {
         let _f = "to_packets";
         let bytes = Serializer::serialize(self).context(MessageError::Chain { func_name: _f, comment: S("")})?;
-        let packets = Packetizer::packetize(&tree_id.get_uuid(), &ByteArray::new(&bytes));
+        let packets = Packetizer::packetize(&tree_id.get_uuid(), &ByteArray::new(&bytes))?;
         Ok(packets)
     }
     fn process_ca(&mut self, _cell_agent: &mut CellAgent, _port_no: PortNo,

@@ -1,4 +1,5 @@
 use std::{fmt, fmt::Write,
+          convert::TryFrom,
           collections::{HashMap, HashSet},
           iter::FromIterator,
 };

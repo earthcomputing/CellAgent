@@ -56,7 +56,7 @@ fn main() -> Result<(), Error> {
     let num_ecnl_ports = ecnl.clone().num_ecnl_ports();
     println!("Num ecnl ports: {:?} ", num_ecnl_ports);
     let border_port_list : Vec<PortNo> = (*num_ecnl_ports+1..*num_phys_ports+1)
-        .map(|i| PortNo(i as u8))
+        .map(|i| PortNo(*i))
 	.collect();
     let (mut nal_cell, ca_join_handle) = NalCell::new(cell_name,
                                                       num_phys_ports,

@@ -118,10 +118,6 @@ impl Noc {
         if self.allowed_trees.get(tree_name).is_some() { return Ok(()); }
         self.allowed_trees.insert(tree_name.clone());
         if self.base_tree.is_none() {
-            if CONFIG.race_sleep > 0 {
-                println!("Noc: Sleeping {} seconds to wait for discover to quiesce", CONFIG.race_sleep);
-                sleep(CONFIG.race_sleep);
-            }
             self.base_tree = Some(tree_name.clone());
             self.stack_trees(tree_name, &noc_to_port).context(NocError::Chain { func_name: "listen_port", comment: S("") })?;
         }

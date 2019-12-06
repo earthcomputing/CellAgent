@@ -195,7 +195,7 @@ impl Cmodel {
                 let mut uuid = tree_id.get_uuid();
                 if is_ait { uuid.make_ait_send(); }
             
-                let packets = Packetizer::packetize(&uuid, &bytes);
+                let packets = Packetizer::packetize(&uuid, &bytes).context(CmodelError::Chain { func_name: _f, comment: S("") })?;
                 let first = packets.get(0).expect("No packets from packetizer");
                 let dpi_is_ait = first.is_ait();
                 let sender_msg_seq_no = first.get_unique_msg_id();
