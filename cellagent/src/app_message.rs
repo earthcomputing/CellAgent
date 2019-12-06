@@ -1,6 +1,6 @@
 use std::{fmt,
           ops::{Deref},
-          sync::atomic::{AtomicUsize, Ordering},
+          sync::atomic::{AtomicU64, Ordering},
 };
 
 use serde_json;
@@ -16,8 +16,8 @@ use crate::utility::{ByteArray, S};
 #[derive(Debug, Copy, Clone, Hash, Eq, PartialEq, Serialize, Deserialize)]
 pub struct SenderMsgSeqNo(pub u64);
 impl Deref for SenderMsgSeqNo { type Target = u64; fn deref(&self) -> &Self::Target { &self.0 } }
-static MESSAGE_COUNT: AtomicUsize = AtomicUsize::new(0);
-pub fn get_next_count() -> SenderMsgSeqNo { SenderMsgSeqNo(MESSAGE_COUNT.fetch_add(1, Ordering::SeqCst) as u64) }
+static MESSAGE_COUNT: AtomicU64 = AtomicU64::new(0);
+pub fn get_next_count() -> SenderMsgSeqNo { SenderMsgSeqNo(MESSAGE_COUNT.fetch_add(1, Ordering::SeqCst)) }
 
 #[derive(Debug, Copy, Clone, Hash, Eq, PartialEq, Serialize, Deserialize)]
 pub enum AppMsgType { // Make sure these match the struct names

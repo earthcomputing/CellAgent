@@ -2,6 +2,7 @@
     "//": "Common Parameters",
     "continue_on_error":false, "//": "true in production, false when debugging",
     "race_sleep":1, "//": "Seconds to sleep before sending HelloMsg",
+    "min_discover": 1, "//": "Minimum number of discover messages received before sending one",
     "kafka_server":"172.16.1.2",
     "kafka_topic":"CellAgent",
     "output_dir_name":"/Users/alan/Documents/Eclipse/multicell/trace",

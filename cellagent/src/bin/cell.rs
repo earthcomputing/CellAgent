@@ -6,7 +6,8 @@ use std::{collections::{HashSet},
 
 use ec_fabrix::config::{CONFIG};
 use ec_fabrix::nalcell::{NalCell};
-use ec_fabrix::utility::{CellConfig, PortNo};
+use ec_fabrix::utility::{CellConfig, PortNo}
+use ec_fabrix::config::PortQty;
 
 fn main() -> Result<(), Error> {
     let _f = "main";
@@ -19,9 +20,10 @@ fn main() -> Result<(), Error> {
     let cell_name = "Alice"; /* if needed, can read cell name from config file */
     let border_port_list : Vec<PortNo> = vec![2u8]
         .iter()
-        .map(|i| PortNo(*i as u8))
+        .map(|i| PortNo(*i))
 	.collect();
-    let (_nal_cell, ca_join_handle) = NalCell::new(cell_name, None, &HashSet::from_iter(border_port_list.clone()), CellConfig::Large)?;
+    let (_nal_cell, ca_join_handle) = NalCell::new(cell_name, CONFIG.mmax_num_phys_ports_per_cell,
+                                                   &HashSet::from_iter(border_port_list.clone()), CellConfig::Large, None)?;
     match ca_join_handle.join() {
         Ok(()) => Ok(()),
         Err(e) => Err(MainError::Chain { func_name: _f, comment: format!("{:?}", e) }.into())

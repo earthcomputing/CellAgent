@@ -1,5 +1,6 @@
 use std::{fmt,
           collections::HashMap,
+          convert::TryFrom,
           cmp::min,
           ops::Deref,
           sync::atomic::{AtomicUsize, Ordering},
@@ -214,7 +215,7 @@ impl Serializer {
 pub struct Packetizer {}
 impl Packetizer {
     pub fn packetize(uuid: &Uuid, msg: &ByteArray)
-            -> Vec<Packet> {
+            -> Result<Vec<Packet>, Error> {
         let msg_bytes = msg.get_bytes();
         let mtu = Packetizer::packet_payload_size(msg_bytes.len());
         let num_packets = (msg_bytes.len() + mtu - 1)/ mtu; // Poor man's ceiling
@@ -233,12 +234,12 @@ impl Packetizer {
                 if i*mtu + j == msg_bytes.len() { break; }
                 packet_bytes[j] = msg_bytes[i*mtu + j];
             }
-            let packet = Packet::new(unique_msg_id, uuid, PacketNo(size as u16),
+            let packet = Packet::new(unique_msg_id, uuid, PacketNo(u16::try_from(size)?),
                                      is_last_packet, packet_bytes);
             //println!("Packet: packet {} for msg {}", packet.get_packet_count(), msg.get_count());
             packets.push(packet);
         }
-        packets
+        Ok(packets)
     }
     pub fn unpacketize(packets: &Vec<Packet>) -> Result<ByteArray, Error> {
         let mut msg = Vec::new();
