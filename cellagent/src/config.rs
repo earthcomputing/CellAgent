@@ -38,6 +38,7 @@ pub struct Config {
     pub output_file_name: String,
     pub kafka_server: String,
     pub kafka_topic: String,
+    pub min_discover: usize, // Minimum number of discover messages received before sending one
     pub num_cells: CellQty,
     pub num_ports_per_cell: PortQty,
     pub cell_port_exceptions: HashMap<CellNo, PortQty>,

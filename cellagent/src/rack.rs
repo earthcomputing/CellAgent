@@ -57,7 +57,8 @@ impl Rack {
                                                         interior_cell.get_num_phys_ports(),
                                                         &HashSet::new(),
                                                         CellConfig::Large,
-                                                         None)?;
+                                                        None,
+                                                        )?;
             {
                 if CONFIG.trace_options.all || CONFIG.trace_options.dc {
                     let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "interior_cell_start" };
