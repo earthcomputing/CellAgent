@@ -41,7 +41,7 @@ impl Rack {
                                                         None,
             )?;
             {
-                if CONFIG.trace_options.all || CONFIG.trace_options.dc {
+                if CONFIG.trace_options.all || CONFIG.trace_options.dc { // Needed for visualization
                     let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "border_cell_start" };
                     let cell_id = nal_cell.get_id();
                     let trace = json!({ "cell_id": cell_id, "cell_number": cell_no,
@@ -60,7 +60,7 @@ impl Rack {
                                                         None,
             )?;
             {
-                if CONFIG.trace_options.all || CONFIG.trace_options.dc {
+                if CONFIG.trace_options.all || CONFIG.trace_options.dc { // Needed for visualization
                     let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "interior_cell_start" };
                     let cell_id = nal_cell.get_id();
                     let trace = json!({ "cell_id": cell_id, "cell_number": cell_no, "location": CONFIG.geometry.get(*cell_no as usize) });
