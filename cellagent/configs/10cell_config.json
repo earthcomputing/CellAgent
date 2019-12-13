@@ -10,6 +10,7 @@
     "output_dir_name":"/Users/alan/Documents/Eclipse/multicell/trace",
     "output_file_name":"/Users/alan/Documents/Eclipse/multicell/trace/trace.json",
     "quench":"Simple", "//": "Either Simple or RootPort or MyPort",
+    "visualize": ["dc", "ca"],
     "trace_options":{
         "all":false,
         "ca":true,

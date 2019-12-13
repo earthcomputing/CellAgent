@@ -48,6 +48,7 @@ pub struct Config {
     pub edge_list: Vec<Edge>,
     pub geometry: Vec<(usize, usize)>,
     pub race_sleep: u64,
+    pub visualize: Vec<String>,
     pub trace_options: TraceOptions,
     pub debug_options: DebugOptions
 }
@@ -62,8 +63,20 @@ impl Config {
         let config_file = OpenOptions::new().read(true).open(config_file_name)?;//.context(ConfigError::File { func_name: _f, file_name: config_file_name})?;
         let mut config: Config = serde_json::from_reader(config_file)?;//.context(ConfigError::Chain { func_name: _f, comment: S("") })?;
         // The following must be true for the Trace Visualizer
-        config.trace_options.dc = true;
-        config.trace_options.ca = true;
+        for viz in &config.visualize {
+            match viz.as_str() {
+                "dc"  => config.trace_options.dc  = true,
+                "ca"  => config.trace_options.ca  = true,
+                "ca"  => config.trace_options.ca  = true,
+                "nal" => config.trace_options.nal = true,
+                "noc" => config.trace_options.noc = true,
+                "svc" => config.trace_options.svc = true,
+                "vm"  => config.trace_options.vm  = true,
+                "cm"  => config.trace_options.cm  = true,
+                "pe"  => config.trace_options.pe  = true,
+                _    => eprintln!("---> {} is not a valid visualization designator", viz)
+            }
+        }
         if Path::new(&config.output_dir_name).exists() {
             remove_dir_all(&config.output_dir_name)?;
         }
@@ -72,7 +85,6 @@ impl Config {
         Ok(config)
     }
 }
-
 // TODO: Use log crate for this
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TraceOptions {
