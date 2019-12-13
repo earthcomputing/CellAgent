@@ -1808,22 +1808,18 @@ impl CellAgent {
         where T: Message + ::std::marker::Sized + serde::Serialize + fmt::Display
     {
         let _f = "send_msg";
+        let bytes = msg.to_bytes()?;
         {
             let mask = self.get_mask(tree_id.to_port_tree_id_0())?;
             let port_mask = user_mask.and(mask);
             let ports = Mask::get_port_nos(port_mask);
             let msg_type = msg.get_msg_type();
             if CONFIG.debug_options.all || CONFIG.debug_options.ca_msg_send {
-                match msg_type {
-                    MsgType::Discover  |
-                    MsgType::DiscoverD => println!("Cellagent {}: {} send on ports {:?} msg {}", self.cell_id, _f, ports, msg),
-                    _ => {
-                        println!("Cellagent {}: {} send on ports {:?} msg {}", self.cell_id, _f, ports, msg)
-                    }
-                }
+                let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "ca_send_msg" };
+                let trace = json!({ "cell_id": &self.cell_id, "tree_id": &tree_id, "ports": ports, "length": bytes.len(), "msg": msg });
+                let _ = add_to_trace(TraceType::Debug, trace_params, &trace, _f);
             }
         }
-        let bytes = msg.to_bytes()?;
         self.send_bytes(tree_id, msg.is_ait(), user_mask, bytes)?;
         Ok(())
     }
