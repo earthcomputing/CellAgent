@@ -61,7 +61,9 @@ impl Packet {
     // Used for trace records
     pub fn to_string(&self) -> Result<String, Error> {
         let bytes = self.get_bytes();
-        let string = std::str::from_utf8(&bytes)?.to_owned();
+        let is_last = self.payload.is_last;
+        let len = bytes.len();
+        let string = format!("is last {}, length {} {}", is_last, len, std::str::from_utf8(&bytes)?.to_owned());
         let default_as_char = PAYLOAD_DEFAULT_ELEMENT as char;
         Ok(string.replace(default_as_char, ""))
     }

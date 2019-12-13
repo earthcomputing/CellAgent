@@ -302,6 +302,7 @@ impl ByteArray {
         ByteArray { bytes: bytes.clone() }
     }
     pub fn get_bytes(&self) -> &Vec<u8> { &self.bytes }
+    pub fn len(&self) -> usize { self.bytes.len() }
     pub fn to_string(&self) -> Result<String, Error> {
         let string = std::str::from_utf8(&self.bytes)?;
         let default_as_char = PAYLOAD_DEFAULT_ELEMENT as char;

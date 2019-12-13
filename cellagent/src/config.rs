@@ -60,7 +60,10 @@ impl Config {
             .unwrap_or(S("configs/10cell_config.json"));
         println!("\nReading configuratation from {}", config_file_name);
         let config_file = OpenOptions::new().read(true).open(config_file_name)?;//.context(ConfigError::File { func_name: _f, file_name: config_file_name})?;
-        let config: Config = serde_json::from_reader(config_file)?;//.context(ConfigError::Chain { func_name: _f, comment: S("") })?;
+        let mut config: Config = serde_json::from_reader(config_file)?;//.context(ConfigError::Chain { func_name: _f, comment: S("") })?;
+        // The following must be true for the Trace Visualizer
+        config.trace_options.dc = true;
+        config.trace_options.ca = true;
         if Path::new(&config.output_dir_name).exists() {
             remove_dir_all(&config.output_dir_name)?;
         }
