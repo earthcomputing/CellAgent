@@ -99,7 +99,7 @@ impl Cmodel {
                 match &msg {
                     CaToCmBytes::Bytes((_, _, _, bytes)) => {
                         let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "cm_from_ca_bytes" };
-                        let trace = json!({"cell_id": &self.cell_id, "bytes": bytes.to_string()? });
+                        let trace = json!({"cell_id": &self.cell_id, "msg_len": bytes.len(), "bytes": bytes.to_string()? });
                         let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
                     },
                     CaToCmBytes::Delete(uuid) => {
