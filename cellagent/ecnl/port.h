@@ -16,12 +16,13 @@ typedef struct {
     void *port_sock; // struct nl_sock *
     void *port_esock; // struct nl_sock *
     char *port_name;
-    uint32_t port_id;
+    uint8_t port_id;
     int port_up_down;
 } ecnl_port_t;
 
 extern int ecnl_init(bool debug);
-extern ecnl_port_t *port_create(uint32_t port_id);
+// Returning struct because Rust doesn't want to store the pointers :-(.
+extern ecnl_port_t port_create(uint8_t port_id);
 extern void port_destroy(ecnl_port_t *port);
 
 extern void port_do_read_async(ecnl_port_t *port, port_buf_desc_t *actual_buf);
@@ -31,7 +32,7 @@ extern void port_update(ecnl_port_t *port);
 
 typedef struct {
     uint32_t event_module_id;
-    uint32_t event_port_id;
+    uint8_t event_port_id;
     int event_cmd_id;
     uint32_t event_n_msgs;
     int event_up_down;

@@ -16,6 +16,7 @@ use std::{
 use crate::config::{CONFIG, PortQty};
 use crate::dal::{add_to_trace};
 use crate::ec_message_formats::{PortFromPe};
+use crate::ecnl_port::{ECNL_Port};
 use crate::name::{CellID};
 use crate::port::{Port};
 
@@ -48,7 +49,7 @@ pub struct ECNL_Session {
     #[allow(dead_code)]
     nl_session: *mut c_void,
     module_info_ptr: *const ModuleInfo,
-    port_state_ptr_vector: Vec<*const PortState>,
+    ecnl_port_ptr_vector: Vec<ECNL_Port>,
 }
 
 #[cfg(feature = "cell")]
@@ -60,7 +61,6 @@ pub struct ECNL_Session {
 extern {
     pub fn alloc_nl_session(nl_session_ptr: *const *mut c_void) -> c_int;
     pub fn ecnl_get_module_info(nl_session: *mut c_void, mipp: *const *const ModuleInfo) -> c_int;
-    pub fn ecnl_get_port_state(nl_session: *mut c_void, port_id: c_uint, pspp: *const *const PortState) -> c_int;
     pub fn free_nl_session(nl_session: *mut c_void) -> c_int;
 }
 
@@ -68,7 +68,7 @@ impl ECNL_Session {
     pub fn new() -> ECNL_Session {
         let nsp: *mut c_void = null_mut();
         let mip: *const ModuleInfo = null();
-        let mut pspv: Vec<*const PortState>;
+        let mut eppv: Vec<ECNL_Port>;
         #[cfg(feature = "cell")]
         unsafe {
             alloc_nl_session(&nsp);
@@ -79,31 +79,28 @@ impl ECNL_Session {
             println!("Module name: {:?} ", module_name);
             let num_ports = ((*mip).num_ports as u8);
             println!("Num ecnl ports: {} ", num_ports);
-            pspv = Vec::with_capacity(num_ports as usize);
-            let psp: *const PortState = null();
-            for i in 0..=num_ports-1 {
-                pspv.push(psp);
-                ecnl_get_port_state(nsp, i as u32, &(pspv[i as usize]));
+            eppv = Vec::with_capacity(num_ports as usize);
+            for port_id in 0..=num_ports-1 {
+                eppv.push(ECNL_Port::new(port_id as u8));
+		println!("Created ECNL port {} as {}", port_id, eppv[port_id as usize].port_id);
             }
         }
         #[cfg(feature = "simulator")] {
-            pspv = Vec::new();
+            eppv = Vec::new();
         }
-        ECNL_Session {
+        return ECNL_Session {
             nl_session: nsp,
             module_info_ptr: mip,
-            port_state_ptr_vector: pspv,
-        }
+            ecnl_port_ptr_vector: eppv,
+        };
     }
     pub fn num_ecnl_ports(&self) -> PortQty {
         unsafe {
-            PortQty((*(self.module_info_ptr)).num_ports as u8)
+            return PortQty((*(self.module_info_ptr)).num_ports as u8)
         }
     }
-    pub fn port_is_connected(&self, port_id: u8) -> bool {
-        unsafe {
-            (*(*(self.port_state_ptr_vector))[port_id as usize]).port_link_state > 0
-        }
+    pub fn get_port(&self, port_id: u8) -> ECNL_Port {
+	return self.ecnl_port_ptr_vector[port_id as usize];
     }
 }
 

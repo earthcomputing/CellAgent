@@ -27,6 +27,7 @@ pub mod gvm_equation;
 pub mod link;
 pub mod ec_message;
 pub mod ec_message_formats;
+pub mod ecnl_port;
 #[cfg(any(feature = "simulator", feature = "cell"))]
 pub mod nalcell;
 pub mod name;

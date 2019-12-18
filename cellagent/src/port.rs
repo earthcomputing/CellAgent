@@ -11,6 +11,7 @@ use crate::dal::{add_to_trace, fork_trace_header, update_trace_header};
 use crate::ec_message_formats::{PortToLink, PortFromLink, PortToPe, PortFromPe, LinkToPortPacket,
                                 PortToPePacket};
 use crate::ecnl::{ECNL_Session};
+use crate::ecnl_port::{ECNL_Port};
 use crate::name::{Name, PortID, CellID};
 #[cfg(feature = "cell")]
 use crate::packet::{Packet, UniqueMsgId};
@@ -159,25 +160,25 @@ impl Port {
     }
 
     // SPAWN THREAD (listen_link, listen_pe)
-    pub fn link_channel(&self, port_link_channel_or_ecnl: Either<(PortToLink, PortFromLink), Arc<ECNL_Session>>,
+    pub fn link_channel(&self, port_link_channel_or_ecnl_port: Either<(PortToLink, PortFromLink), Arc<ECNL_Port>>,
                         port_from_pe: PortFromPe) {
         let _f = "link_channel";
         let mut port = self.clone();
         let child_trace_header = fork_trace_header();
         let thread_name = format!("Port {} listen_link", self.get_id().get_name());
         #[cfg(feature = "simulator")]
-        let port_link_channel_clone_or_ecnl = {
-            let (port_to_link, port_from_link) = port_link_channel_or_ecnl.clone().left().expect("ecnl in simulator");
+        let port_link_channel_clone_or_ecnl_port = {
+            let (port_to_link, port_from_link) = port_link_channel_or_ecnl_port.clone().left().expect("ecnl in simulator");
             let port_to_link_clone = port_to_link.clone();
             Either::Left((port_to_link_clone, port_from_link))
         };
         #[cfg(feature = "cell")]
-        let port_link_channel_clone_or_ecnl = {
-            Either::Right(port_link_channel_or_ecnl.clone().right().unwrap())
+        let port_link_channel_clone_or_ecnl_port = {
+            Either::Right(port_link_channel_or_ecnl_port.clone().right().unwrap())
         };
         thread::Builder::new().name(thread_name).spawn( move || {
             update_trace_header(child_trace_header);
-            let _ = port.listen_link_loop(port_link_channel_clone_or_ecnl).map_err(|e| write_err("port", &e));
+            let _ = port.listen_link_loop(port_link_channel_clone_or_ecnl_port).map_err(|e| write_err("port", &e));
             if CONFIG.continue_on_error { }
         }).expect("thread failed");
         let port = self.clone();
@@ -186,21 +187,21 @@ impl Port {
         thread::Builder::new().name(thread_name).spawn( move || {
             update_trace_header(child_trace_header);
             #[cfg(feature = "simulator")]
-            let port_to_link_or_ecnl = {
-                let (port_to_link, port_from_link) = port_link_channel_or_ecnl.left().expect("ecnl in simulator");
+            let port_to_link_or_ecnl_port = {
+                let (port_to_link, port_from_link) = port_link_channel_or_ecnl_port.left().expect("ecnl in simulator");
                 Either::Left(port_to_link)
             };
             #[cfg(feature = "cell")]
-            let port_to_link_or_ecnl: Either<PortToLink, Arc<ECNL_Session>> = {
-                Either::Right(port_link_channel_or_ecnl.clone().right().unwrap())
+            let port_to_link_or_ecnl_port: Either<PortToLink, Arc<ECNL_Port>> = {
+                Either::Right(port_link_channel_or_ecnl_port.clone().right().unwrap())
             };
-            let _ = port.listen_pe_loop(&port_to_link_or_ecnl, &port_from_pe).map_err(|e| write_err("port", &e));
+            let _ = port.listen_pe_loop(&port_to_link_or_ecnl_port, &port_from_pe).map_err(|e| write_err("port", &e));
             if CONFIG.continue_on_error { }
         }).expect("thread failed");
     }
 
     // WORKER (PortFromLink)
-    fn listen_link_loop(&mut self, port_link_channel_or_ecnl: Either<(PortToLink, PortFromLink), Arc<ECNL_Session>>) -> Result<(), Error> {
+    fn listen_link_loop(&mut self, port_link_channel_or_ecnl_port: Either<(PortToLink, PortFromLink), Arc<ECNL_Port>>) -> Result<(), Error> {
         let _f = "listen_link_loop";
         {
             if CONFIG.trace_options.all || CONFIG.trace_options.port {
@@ -212,7 +213,7 @@ impl Port {
         let port_to_pe = self.port_to_pe_or_ca.clone().left().expect("Port: Sender to Pe must be set");
         #[cfg(feature = "simulator")]
         loop {
-            let (port_to_link, port_from_link) = port_link_channel_or_ecnl.clone().left().expect("ecnl in simulator");
+            let (port_to_link, port_from_link) = port_link_channel_or_ecnl_port.clone().left().expect("ecnl in simulator");
             let msg = port_from_link.recv().context(PortError::Chain { func_name: _f, comment: S(self.id.get_name()) + " recv from link"})?;
             {
                 if CONFIG.trace_options.all || CONFIG.trace_options.port {
@@ -302,11 +303,13 @@ impl Port {
                 }
             }
         }
-        #[cfg(feature = "cell")]
-        Ok(())
+        #[cfg(feature = "cell")] {
+            let ecnl_port = port_link_channel_or_ecnl_port.clone().right().expect("port_link_channel in cell");
+	    return ecnl_port.listen(self, port_to_pe);
+	}
     }
     // WORKER (PortFromPe)
-    fn listen_pe_loop(&self, port_to_link_or_ecnl: &Either<PortToLink, Arc<ECNL_Session>>, port_from_pe: &PortFromPe) -> Result<(), Error> {
+    fn listen_pe_loop(&self, port_to_link_or_ecnl_port: &Either<PortToLink, Arc<ECNL_Port>>, port_from_pe: &PortFromPe) -> Result<(), Error> {
         let _f = "listen_pe_loop";
         {
             if CONFIG.trace_options.all || CONFIG.trace_options.port {
@@ -349,11 +352,11 @@ impl Port {
                         let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
                     }
                 }
-                port_to_link_or_ecnl.clone().left().expect("ecnl port in simulator").send(packet)?;
+                port_to_link_or_ecnl_port.clone().left().expect("ecnl port in simulator").send(packet)?;
             }
             #[cfg(feature = "cell")]
             {
-                let ecnl = port_to_link_or_ecnl.clone().right().expect("simulated port in cell");
+                let ecnl = port_to_link_or_ecnl_port.clone().right().expect("simulated port in cell");
             }
         }
     }

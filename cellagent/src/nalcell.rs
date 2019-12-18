@@ -85,7 +85,16 @@ impl NalCell {
                 } else {
                     match ecnl_clone {
                         Some(ecnl_session) => {
-                            is_connected = ecnl_session.port_is_connected(i-1)
+			    #[cfg(feature = "cell")] {
+                                is_connected = ecnl_session.get_port(i-1).is_connected()
+			    }
+			    // To keep compiler happy
+			    #[cfg(feature = "simulator")] {
+			        is_connected = false;
+			    }
+			    #[cfg(feature = "noc")] {
+			        is_connected = false;
+			    }
                         }
                         None => {
                             is_connected = false;
@@ -172,8 +181,8 @@ impl NalCell {
                 let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
             }
         }
-        for i in 0..=*(ecnl.num_ecnl_ports()) {
-            (*self.ports)[i as usize].link_channel(Either::Right(ecnl.clone()), (self.ports_from_pe[&PortNo(i as u8)]).clone());
+        for i in 0..=*(ecnl.num_ecnl_ports())-1 {
+            (*self.ports)[i as usize].link_channel(Either::Right(Arc::new(ecnl.get_port(i as u8))), (self.ports_from_pe[&PortNo(i as u8)]).clone());
         }
         println!("Linked ecnl channels");
         Ok(self)
