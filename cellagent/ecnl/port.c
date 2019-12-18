@@ -125,7 +125,7 @@ extern void port_get_event(ecnl_port_t *port, ecnl_event_t *ep) {
     uint32_t actual_port_id = 0;
     int cmd_id;
     uint32_t num_ait_messages;
-    link_state_t link_state; 
+    link_state_t link_state;
     read_event((struct nl_sock *) (port->port_esock), &actual_module_id, &actual_port_id, &cmd_id, &num_ait_messages, &link_state);
     PORT_DEBUG("event: module_id %d port_id %d", actual_module_id, actual_port_id);
 
@@ -156,19 +156,20 @@ extern int ecnl_init(bool debug) {
 }
 
 // per-port sock
-extern ecnl_port_t *port_create(uint32_t port_id) {
+extern ecnl_port_t port_create(uint8_t port_id) {
     struct nl_sock *sock = init_sock();
     struct nl_sock *esock = init_sock_events();
-    ecnl_port_t *port = malloc(sizeof(ecnl_port_t)); memset(port, 0, sizeof(ecnl_port_t));
-    port->port_sock = sock;
-    port->port_esock = esock;
-    port->port_module_id = 0; // hardwired
-    port->port_id = port_id;
+    ecnl_port_t port;
+    port.port_sock = sock;
+    port.port_esock = esock;
+    port.port_module_id = 0; // hardwired
+    port.port_id = port_id;
 
     link_state_t link_state; 
-    get_link_state(port, &link_state);
-    port->port_up_down = link_state.port_link_state;
-    port->port_name = link_state.port_name; // fill in name
+    get_link_state(&port, &link_state);
+    port.port_up_down = link_state.port_link_state;
+    port.port_name = link_state.port_name; // fill in name
+    return port;
 }
 
 extern void port_destroy(ecnl_port_t *port) {

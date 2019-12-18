@@ -22,6 +22,7 @@ LDLIBS += -l$(ENTL_ECNL_LIB)
 
 all:
 	gcc -c -fPIC -o ecnl_sdk.o $(CFLAGS) ecnl_sdk.c
+	gcc -c -fPIC -o port.o $(CFLAGS) port.c
 #       This seems nicer, but can't reference it from rust
 #	ar -rc ecnl_sdk.a ecnl_sdk.o /lib/x86_64-linux-gnu/libnl-genl-3.so /lib/x86_64-linux-gnu/libnl-3.so
 
