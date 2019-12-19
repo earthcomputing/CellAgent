@@ -11,7 +11,7 @@ fn main() {
     println!("Server at {}", server_url);
     let html_file_name = env::var("HTML").expect("Environment variable HTML not found");
     println!("html_file_name {}", html_file_name);
-    let index_data = web::Data::new(html_file_name);
+    let index_data = web::Data::new(html_file_name); // Location of index.html
     let geo_data = geometry::data();
     let hello_data = hello::data();
     HttpServer::new(move || {

@@ -195,22 +195,24 @@ function cell_click(evt) {
         evt.target.setAttribute("class", "noderootborder");
     }
     let my_id = evt.target.getAttribute("id");
-    draw_black_tree(my_id, "Tree:" + my_id);
+    draw_black_tree("Tree:" + my_id);
 }
-function draw_black_tree(my_id, tree_id) {
-    let cell = cells[my_id];
-    let trees = cell.black_trees;
-    let tree = trees[tree_id].tree;
-    let neighbors = cell.neighbors;
-    for (my_port in tree) {
-        let neighbor_cell_id = neighbors[my_port].cell_name;
-        if ( tree[my_port] == "Parent") {
-            let neighbor_port = neighbors[my_port].port;
-            let link_id = make_link_id(my_id, my_port, neighbor_cell_id, neighbor_port);
-            document.getElementById(link_id).setAttribute("class", "linktree");
-        }
-        if ( tree[my_port] == "Child" ) {
-            draw_black_tree(neighbor_cell_id, tree_id);
+function draw_black_tree(tree_id) {
+    let count = 0;
+    for (cell_id in cells) {
+        let cell = cells[cell_id];
+        let neighbors = cell.neighbors;
+        if (cell.black_trees[tree_id]) {
+            let tree = cell.black_trees[tree_id].tree;
+            for (port in tree) {
+                if (tree[port] == "Parent") {
+                    let neighbor = neighbors[port];
+                    let neighbor_name = neighbor.cell_name;
+                    let neighbor_port = neighbor.port;
+                    let link_id = make_link_id(cell_id, port, neighbor_name, neighbor_port);
+                    document.getElementById(link_id).setAttribute("class", "linktree");
+                }
+            }
         }
     }
 }
