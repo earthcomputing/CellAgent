@@ -40,6 +40,7 @@ pub struct Config {
     pub kafka_topic: String,
     pub min_discover: usize, // Minimum number of Discover messages received before sending mine
     pub min_hello: usize, // Minimum number of Hello messages before sending my discover
+    pub discover_depth: usize, // Number of hops of breadth first search
     pub num_cells: CellQty,
     pub num_ports_per_cell: PortQty,
     pub cell_port_exceptions: HashMap<CellNo, PortQty>,
