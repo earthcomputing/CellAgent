@@ -191,6 +191,13 @@ impl Traph {
     pub fn get_port_status(&self, port_number: PortNumber) -> PortState {
         self.elements[*port_number.get_port_no() as usize].get_state()
     }
+    pub fn get_child_elements(&self) -> Vec<PortNo> {
+        self.elements
+            .iter()
+            .filter(|&element| element.get_state() == PortState::Child)
+            .map(|element| element.get_port_no())
+            .collect()
+    }
     pub fn get_parent_port(&self) -> Result<PortNo, Error> {
         self.get_parent_element()
             .map(|element| element.get_port_no())
