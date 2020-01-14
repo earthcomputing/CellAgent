@@ -91,7 +91,7 @@ pub struct CellAgent {
     recv_discover_count: usize,
     sent_to_noc: bool,
     my_discover_sent: bool,
-    my_discoverd_sent: bool,
+    my_discoverd_sent: HashSet<(PortNo, TreeID)>,
     is_border_port_connected: bool,
     ports_seen_on_tree: HashMap<TreeID, HashSet<PortNo>>,
     parents_seen_on_tree: HashMap<TreeID, usize>,
@@ -138,7 +138,7 @@ impl CellAgent {
             tenant_masks, up_tree_senders: HashMap::new(), cell_info: CellInfo::new(),
             up_traphs_clist: HashMap::new(), ca_to_cm, ca_to_ports,
             failover_reply_ports: HashMap::new(), recv_discover_count: 0,
-            my_discover_sent: false, my_discoverd_sent: false,
+            my_discover_sent: false, my_discoverd_sent: Default::default(),
             no_packets, ports_seen_on_tree: HashMap::new(), parents_seen_on_tree: HashMap::new(),
             child_ports: HashMap::new()
         }, cm_join_handle))
@@ -282,7 +282,7 @@ impl CellAgent {
         let _f = "send_my_discover";
         if !self.my_discover_sent &&
             (self.recv_discover_count >= CONFIG.min_discover || // == test might fail if get two discovers before reaching here
-           self.neighbors.len() >= CONFIG.min_hello) {
+            self.neighbors.len() >= CONFIG.min_hello) {
             self.my_discover_sent = true;
             for index in 1..=*self.no_ports {
                 let port_no = PortNo(index);
@@ -1021,34 +1021,30 @@ impl CellAgent {
             self.update_traph(new_port_tree_id, port_number, port_state, &gvm_equation,
                               HashSet::new(), hops, path).context(CellagentError::Chain { func_name: _f, comment: S("DiscoverMsg") })?;
         }
-        if !tree_seen {
+        if !self.my_discoverd_sent.contains(&(port_no, new_tree_id)) {
+            self.my_discoverd_sent.insert((port_no, new_tree_id));
             let sender_id = SenderID::new(self.cell_id, "CellAgent")?;
             let in_reply_to = msg.get_sender_msg_seq_no();
-            let discoverd_msg = DiscoverDMsg::new(in_reply_to, sender_id,
-                                                  self.cell_id, new_port_tree_id, path,
-                                                  DiscoverDType::Parent);
-            self.discoverd_parent_msg.insert(new_tree_id, (port_number, discoverd_msg));
-            let discoverd_msg = DiscoverDMsg::new(in_reply_to, sender_id,
-                                                  self.cell_id, new_port_tree_id, path,
-                                                  DiscoverDType::NonParent);
-            self.send_msg(line!(), self.connected_tree_id, &discoverd_msg, DEFAULT_USER_MASK)?;
-        } else if new_tree_id != self.my_tree_id && self.discover_done(&new_tree_id) {
-                if let Some((port_number, discoverd_msg)) = self.discoverd_parent_msg.remove(&new_tree_id) {
-                    self.send_msg(line!(), self.connected_tree_id, &discoverd_msg, Mask::new(port_number))?;
-                }
+            let discoverd_type = if tree_seen || self.my_tree_id == new_tree_id {
+                DiscoverDType::NonParent
+            } else {
+                DiscoverDType::Parent
+            };
+            let discoverd_msg = DiscoverDMsg::new(in_reply_to, sender_id, self.cell_id, new_port_tree_id, path,
+                              discoverd_type);
+            self.send_msg(line!(), self.connected_tree_id, &discoverd_msg, Mask::new(port_number))?;
         }
         let updated_msg = msg.update(self.cell_id);
         if **hops <= CONFIG.discover_depth { // quench is false for a discover_depth-hop DiscoverMsg
             self.discover_n_hop_msg.insert((port_no, new_tree_id), updated_msg);
         } else {
-            self.send_my_discover(line!())?;
             if !quench {
-                let user_mask = DEFAULT_USER_MASK.all_but_port(port_no.make_port_number(self.no_ports)?);
-                self.send_msg(line!(), self.get_connected_tree_id(),
-                              &updated_msg, user_mask).context(CellagentError::Chain { func_name: _f, comment: S("DiscoverMsg") })?;
+                let user_mask = DEFAULT_USER_MASK.all_but_port(port_number);
+                self.send_msg(line!(), self.get_connected_tree_id(), &updated_msg, user_mask).context(CellagentError::Chain { func_name: _f, comment: S("DiscoverMsg") })?;
                 self.add_saved_discover(&updated_msg); // Discover message are always saved for late port connect
             }
         }
+        self.send_my_discover(line!())?;
         Ok(())
     }
     pub fn process_discover_d_msg(&mut self, msg: &DiscoverDMsg, port_no: PortNo)
@@ -1080,22 +1076,6 @@ impl CellAgent {
                 let _ = add_to_trace(TraceType::Debug, trace_params, &trace, _f);
             }
         }
-        if self.discover_done(&tree_id) {
-            if  tree_id != self.my_tree_id {
-                if let Some((port_number, discoverd_msg)) = self.discoverd_parent_msg.remove(&tree_id) {
-                    self.send_msg(line!(), self.connected_tree_id, &discoverd_msg, Mask::new(port_number))?;
-                }
-            } else if !self.my_discoverd_sent {
-                self.my_discoverd_sent = true;
-                let sender_id = SenderID::new(self.cell_id, "CellAgent")?;
-                let in_reply_to = msg.get_sender_msg_seq_no();
-                let path = msg.get_path();
-                let discoverd_msg = DiscoverDMsg::new(in_reply_to, sender_id,
-                                                      self.cell_id, port_tree_id, path,
-                                                      DiscoverDType::NonParent);
-                self.send_msg(line!(), self.connected_tree_id, &discoverd_msg, DEFAULT_USER_MASK)?;
-            }
-        }
         match msg.get_discoverd_type() {
             DiscoverDType::NonParent => {
                 // Traph may not have been created yet for this port tree since I send DiscoverD early
@@ -1107,14 +1087,10 @@ impl CellAgent {
                     }
                 }
                 let is_discover_done = self.discover_done(&tree_id);
-                self.discover_n_hop_msg.remove(&(port_no, tree_id))
+                self.discover_n_hop_msg.remove(&(port_no, tree_id)) // Remove it to avoid borrow problem
                     .map(|discover_msg| -> Result<(), Error> {
-                        if **discover_msg.get_payload().get_hops() >= CONFIG.discover_depth || is_discover_done {
-                            let user_mask = DEFAULT_USER_MASK.all_but_port(PortNumber::new(port_no, self.no_ports)?);
-                            self.send_msg(line!(), self.connected_tree_id, &discover_msg, user_mask)?;
-                        } else {
-                            self.discover_n_hop_msg.insert((port_no, tree_id), discover_msg);
-                        }
+                        let user_mask = DEFAULT_USER_MASK.all_but_port(port_number);
+                        self.send_msg(line!(), self.connected_tree_id, &discover_msg, user_mask)?;
                         Ok(())
                     });
             },
@@ -1143,6 +1119,16 @@ impl CellAgent {
                     *count += 1;
                     *count
                 };
+                if self.discover_done(&tree_id) {
+                    let sender_id = SenderID::new(self.cell_id, "CellAgent")?;
+                    let in_reply_to = msg.get_sender_msg_seq_no();
+                    let discoverd_msg = DiscoverDMsg::new(in_reply_to, sender_id, self.cell_id, port_tree_id, path,
+                                                          DiscoverDType::NonParent);
+                    let traph = self.get_traph(port_tree_id)?;
+                    let parent_port_no = traph.get_parent_port()?;
+                    let parent_port_number =  PortNumber::new(parent_port_no, self.no_ports)?;
+                    self.send_msg(line!(), self.connected_tree_id, &discoverd_msg, DEFAULT_USER_MASK.all_but_port(parent_port_number))?;
+                }
                 {
                     if CONFIG.debug_options.all || CONFIG.debug_options.discoverd {
                         let seen_ports = self.ports_seen_on_tree.get(&tree_id);
