@@ -214,7 +214,7 @@ impl Noc {
         self.noc_agent_deploy_tree(&noc_agent_deploy, base_tree_name, noc_to_port).context(NocError::Chain { func_name: "create_noc", comment: S("noc agent tree")})?;
         self.noc_master_deploy_tree(&noc_master_deploy, base_tree_name, noc_to_port).context(NocError::Chain { func_name: "create_noc", comment: S("noc master tree")})?;
         self.small_tree(&small_tree_name, base_tree_name, noc_to_port).context(NocError::Chain { func_name: "create_noc", comment: S("noc master tree")})?;
-        Ok(4)
+        Ok(5)
     }
     fn small_tree(&mut self, new_tree_name: &AllowedTree, parent_tree_name: &AllowedTree,
                   noc_to_port: &NocToPort) -> Result<(), Error> {
