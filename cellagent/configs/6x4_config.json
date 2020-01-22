@@ -19,7 +19,7 @@
         "dc":     false,
         "link":   false,
         "nal":    false,
-        "noc":    false,
+        "noc":    true,
         "pe":     false,
         "pe_cm":  false,
         "pe_port":false,
