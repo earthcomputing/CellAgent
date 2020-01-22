@@ -91,7 +91,7 @@ pub struct CellAgent {
     recv_discover_count: usize,
     sent_to_noc: bool,
     my_discover_sent: bool,
-    my_discoverd_sent: HashSet<(PortNo, TreeID)>,
+    my_discoverd_sent: bool,
     is_border_port_connected: bool,
     ports_seen_on_tree: HashMap<TreeID, HashSet<PortNo>>,
     parents_seen_on_tree: HashMap<TreeID, usize>,
@@ -1021,24 +1021,23 @@ impl CellAgent {
             self.update_traph(new_port_tree_id, port_number, port_state, &gvm_equation,
                               HashSet::new(), hops, path).context(CellagentError::Chain { func_name: _f, comment: S("DiscoverMsg") })?;
         }
-        if !tree_seen {
-            //self.my_discoverd_sent.insert((port_no, new_tree_id));
-            let sender_id = SenderID::new(self.cell_id, "CellAgent")?;
-            let in_reply_to = msg.get_sender_msg_seq_no();
-            if !tree_seen || self.my_tree_id != new_tree_id {
+        if self.my_tree_id != new_tree_id {
+            if !tree_seen {
+                let sender_id = SenderID::new(self.cell_id, "CellAgent")?;
+                let in_reply_to = msg.get_sender_msg_seq_no();
                 let discoverd_msg = DiscoverDMsg::new(in_reply_to, sender_id, self.cell_id, new_port_tree_id, path,
-                                  DiscoverDType::Parent);
+                                                      DiscoverDType::Parent);
                 self.discoverd_parent_msg.insert(new_tree_id, (port_number, discoverd_msg));
                 let discoverd_msg = DiscoverDMsg::new(in_reply_to, sender_id, self.cell_id, new_port_tree_id, path,
                                                       DiscoverDType::NonParent);
-                let user_mask = if **hops > 1 {
+                let user_mask = if **hops > CONFIG.discover_depth {
                     DEFAULT_USER_MASK.all_but_port(port_number)
                 } else {
                     DEFAULT_USER_MASK
                 };
                 self.send_msg(line!(), self.connected_tree_id, &discoverd_msg, user_mask)?;
             }
-        } else if new_tree_id != self.my_tree_id && self.discover_done(&new_tree_id) {
+        } else if self.discover_done(&new_tree_id) {
             if let Some((port_number, discoverd_msg)) = self.discoverd_parent_msg.remove(&new_tree_id) {
                 self.send_msg(line!(), self.connected_tree_id, &discoverd_msg, Mask::new(port_number))?;
             }
@@ -1090,7 +1089,8 @@ impl CellAgent {
                 if let Some((port_number, discoverd_msg)) = self.discoverd_parent_msg.remove(&tree_id) {
                     self.send_msg(line!(), self.connected_tree_id, &discoverd_msg, Mask::new(port_number))?;
                 }
-            } else {
+            } else if !self.my_discoverd_sent {
+                self.my_discoverd_sent = true;
                 let sender_id = SenderID::new(self.cell_id, "CellAgent")?;
                 let in_reply_to = msg.get_sender_msg_seq_no();
                 let path = msg.get_path();
@@ -1110,8 +1110,7 @@ impl CellAgent {
                         element.mark_pruned();
                     }
                 }
-                let is_discover_done = self.discover_done(&tree_id);
-                self.discover_n_hop_msg.remove(&(port_no, tree_id)) // Remove it to avoid borrow problem
+                self.discover_n_hop_msg.remove(&(port_no, tree_id)) // Remove so it's only sent once
                     .map(|discover_msg| -> Result<(), Error> {
                         let user_mask = DEFAULT_USER_MASK.all_but_port(port_number);
                         self.send_msg(line!(), self.connected_tree_id, &discover_msg, user_mask)?;
@@ -1395,8 +1394,8 @@ impl CellAgent {
             // TODO: Make work for VMs as well as from outside
             if self.is_border_port(&port_number) {
                 let tree_id = msg.get_payload().get_new_port_tree_id().to_tree_id();
-                let new_tree_name = self.name_from_tree(sender_id, tree_id)?;
-                let parent_tree_name = self.name_from_tree(sender_id, parent_port_tree_id.to_tree_id())?;
+                let new_tree_name = self.name_from_tree(sender_id, tree_id).context(CellagentError::Chain { func_name: _f, comment: S("") })?;
+                let parent_tree_name = self.name_from_tree(sender_id, parent_port_tree_id.to_tree_id()).context(CellagentError::Chain { func_name: _f, comment: S("") })?;
                 let app_msg = AppStackTreeMsg::new(&sender_id.get_name(), &new_tree_name,
                                 &parent_tree_name, AppMsgDirection::Rootward, gvm_eqn);
                 {
@@ -1475,7 +1474,7 @@ impl CellAgent {
             if parent_port == PortNo(0) {
                 // I am the root of the tree.  I need to tell the sender.
                 let allowed_tree_id = port_tree_id.to_tree_id();
-                let allowed_tree = self.name_from_tree(sender_id, allowed_tree_id)?;
+                let allowed_tree = self.name_from_tree(sender_id, allowed_tree_id).context(CellagentError::Chain { func_name: _f, comment: S("") })?;
                 let sender_id = msg.get_header().get_sender_id();
                 self.add_tree_name_map_item(sender_id, &allowed_tree, allowed_tree_id);
                 let tree_name_msg = AppTreeNameMsg::new("noc",
@@ -1568,10 +1567,11 @@ impl CellAgent {
     }
     fn make_tree_map(&self, sender_id: SenderID, allowed_trees: &Vec<AllowedTree>)
             -> Result<MsgTreeMap, Error> {
+        let _f = "make_tree_map";
         // Make sure sender has permission to use all tree names included in message
         let mut tree_map = HashMap::new();
         for allowed_tree in allowed_trees {
-            let tree_id = self.tree_from_name(sender_id, allowed_tree)?;
+            let tree_id = self.tree_from_name(sender_id, allowed_tree).context(CellagentError::Chain { func_name: _f, comment: S("") })?;
             tree_map.insert(S(allowed_tree.get_name()), tree_id);
         }
         Ok(tree_map)
@@ -1583,7 +1583,7 @@ impl CellAgent {
         let allowed_trees = app_msg.get_allowed_trees();
         let tree_map = self.make_tree_map(sender_id, allowed_trees)?;
         let direction = app_msg.get_direction().into();
-        let tree_id = self.tree_from_name(sender_id, target_tree_name)?;
+        let tree_id = self.tree_from_name(sender_id, target_tree_name).context(CellagentError::Chain { func_name: _f, comment: S("") })?;
         let port_tree_id = tree_id.to_port_tree_id_0();
         if !self.may_send(port_tree_id).context(CellagentError::Chain { func_name: _f, comment: S("") })? {
             return Err(CellagentError::MayNotSend { func_name: _f, cell_id: self.cell_id, tree_id }.into());
@@ -1603,7 +1603,7 @@ impl CellAgent {
     pub fn app_delete_tree(&mut self, app_msg: &AppDeleteTreeMsg, sender_id: SenderID) -> Result<(), Error> {
         let _f = "app_delete_tree";
         let delete_tree_name = app_msg.get_delete_tree_name();
-        let delete_tree_id = self.tree_from_name(sender_id, delete_tree_name)?;
+        let delete_tree_id = self.tree_from_name(sender_id, delete_tree_name).context(CellagentError::Chain { func_name: _f, comment: S("") })?;
         println!("Cellagent {}: {} deleting tree {}", self.cell_id, _f, delete_tree_id);
         let delete_port_tree_id = delete_tree_id.to_port_tree_id_0();
         if delete_tree_name.get_name() != BASE_TREE_NAME {  // Can't delete base tree
@@ -1635,7 +1635,7 @@ impl CellAgent {
         let allowed_trees = app_msg.get_allowed_trees();
         let mut tree_map = self.make_tree_map(sender_id, allowed_trees)?;
         let deploy_tree_name = app_msg.get_deploy_tree_name();
-        let deploy_tree_id = self.tree_from_name(sender_id, deploy_tree_name)?;
+        let deploy_tree_id = self.tree_from_name(sender_id, deploy_tree_name).context(CellagentError::Chain { func_name: _f, comment: S("") })?;
         tree_map.insert(S(deploy_tree_name.get_name()), deploy_tree_id);
         let deploy_port_tree_id = deploy_tree_id.to_port_tree_id_0();
         if !self.may_send(deploy_port_tree_id).context(CellagentError::Chain { func_name: _f, comment: S("") })? {
@@ -1670,7 +1670,7 @@ impl CellAgent {
         let direction = app_msg_direction.into();
         let new_tree_id = self.my_tree_id.add_component(&new_tree_name.get_name()).context(CellagentError::Chain { func_name: _f, comment: S(self.cell_id) + " new_tree_id" })?;
         self.add_tree_name_map_item(sender_id, new_tree_name, new_tree_id);
-        let parent_tree_id = self.tree_from_name(sender_id, parent_tree_name)?;
+        let parent_tree_id = self.tree_from_name(sender_id, parent_tree_name).context(CellagentError::Chain { func_name: _f, comment: S("") })?;
         let parent_entry = self.get_tree_entry(parent_tree_id.to_port_tree_id_0()).context(CellagentError::Chain { func_name: _f, comment: S("") })?;
         let parent_mask = parent_entry.get_mask().all_but_port(PortNumber::new0());
         let child_ports = new_hashset(&parent_mask.get_port_nos());

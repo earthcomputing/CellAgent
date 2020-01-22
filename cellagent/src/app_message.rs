@@ -145,7 +145,8 @@ impl AppMessage for AppInterapplicationMsg {
         serde_json::to_value(self).expect("I don't know how to handle errors in msg.value()")
     }
     fn process_ca(&self, cell_agent: &mut CellAgent, sender_id: SenderID) -> Result<(), Error> {
-        cell_agent.app_interapplication(self, sender_id)?;
+        let _f = "process_ca";
+        cell_agent.app_interapplication(self, sender_id).context(AppMessageError::Chain { func_name: _f, comment: S("") })?;
         Ok(())
     }
     fn process_noc(&self, noc: &mut Noc, noc_to_port: &NocToPort) -> Result<(), Error> {
@@ -474,7 +475,7 @@ impl fmt::Display for AppTreeNameMsgPayload {
 }
 
 // Errors
-use failure::{Error};
+use failure::{Error, ResultExt};
 use crate::app_message_formats::NocToPort;
 
 #[derive(Debug, Fail)]
