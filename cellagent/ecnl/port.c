@@ -126,21 +126,24 @@ extern void port_get_event(ecnl_port_t *port, ecnl_event_t *ep) {
     int cmd_id;
     uint32_t num_ait_messages;
     link_state_t link_state;
-    read_event((struct nl_sock *) (port->port_esock), &actual_module_id, &actual_port_id, &cmd_id, &num_ait_messages, &link_state);
-    PORT_DEBUG("event: module_id %d port_id %d", actual_module_id, actual_port_id);
 
+    while (true) {
+      read_event((struct nl_sock *) (port->port_esock), &actual_module_id, &actual_port_id, &cmd_id, &num_ait_messages, &link_state);
 
-    // meant for this port?
-    if (actual_port_id == port->port_id) {
+      // meant for this port?
+      if (actual_port_id == port->port_id) {
+        PORT_DEBUG("event: module_id %d port_id %d", actual_module_id, actual_port_id);
         char *up_down = (link_state.port_link_state) ? "UP" : "DOWN";
         PORT_DEBUG("event: cmd_id %d n_msg %d link %s", cmd_id, num_ait_messages, up_down);
-    }
 
-    ep->event_module_id = actual_module_id;
-    ep->event_port_id = actual_port_id;
-    ep->event_cmd_id = cmd_id;
-    ep->event_n_msgs = num_ait_messages;
-    ep->event_up_down = link_state.port_link_state;
+	ep->event_module_id = actual_module_id;
+	ep->event_port_id = actual_port_id;
+	ep->event_cmd_id = cmd_id;
+	ep->event_n_msgs = num_ait_messages;
+	ep->event_up_down = link_state.port_link_state;
+	break;
+      }
+    }
 }
 
 extern int ecnl_init(bool debug) {
