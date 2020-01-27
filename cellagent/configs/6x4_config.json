@@ -3,7 +3,7 @@
     "continue_on_error":false, "//": "true in production, false when debugging",
     "race_sleep":0, "//": "Seconds to sleep before sending DiscoverD",
     "//": "Send my Discover messages based on which of the two following conditions occurs first",
-    "min_discover": 3, "//": "Minimum number of Discover messages received before sending mine",
+    "min_discover": 30, "//": "Minimum number of Discover messages received before sending mine",
     "min_hello": 8, "//": "Wait for this many Hello messages before sending my Discover",
     "discover_depth": 1, "//": "Breadth first discover to this many hops",
     "kafka_server":"172.16.1.2",

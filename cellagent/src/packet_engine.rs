@@ -382,7 +382,7 @@ impl PacketEngine {
         {
             if CONFIG.trace_options.all || CONFIG.trace_options.pe_port {
                 let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "pe_to_port_packet" };
-                let trace = json!({ "cell_id": self.cell_id, "reroute_port_no": reroute_port_no, "packet": packet.to_string()? });
+                let trace = json!({ "cell_id": self.cell_id, "port_no": port_no, "reroute_port_no": reroute_port_no, "packet": packet.to_string()? });
                 let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
             }
         }
