@@ -1,6 +1,7 @@
 //use std::sync::mpsc;
 use crossbeam::crossbeam_channel as mpsc;
 
+use crate::app_message::{SenderMsgSeqNo};
 use crate::app_message_formats::{ISAIT};
 use crate::name::{SenderID, TreeID};
 use crate::packet::{Packet};
@@ -10,7 +11,7 @@ use crate::routing_table_entry::{RoutingTableEntry};
 use crate::utility::{ByteArray, Mask, PortNo};
 use crate::uuid_ec::Uuid;
 
-type CATOCM = (TreeID, ISAIT, Mask, ByteArray);
+type CATOCM = (TreeID, ISAIT, Mask, SenderMsgSeqNo, ByteArray);
 type REROUTE = (PortNo, PortNo, NumberOfPackets);
 type STATUS = (PortNo, bool, NumberOfPackets, PortStatus);
 type TUNNELPORT = (PortNo, ByteArray);
@@ -56,7 +57,7 @@ pub type LinkFromPort = mpsc::Receiver<PortToLinkPacket>;
 #[derive(Debug, Clone, Serialize)]
 pub enum LinkToPortPacket {
     Status(PortStatus),
-    Packet((PACKET)),
+    Packet(PACKET),
 }
 pub type LinkToPort = mpsc::Sender<LinkToPortPacket>;
 pub type PortFromLink = mpsc::Receiver<LinkToPortPacket>;

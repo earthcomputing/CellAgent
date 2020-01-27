@@ -97,9 +97,9 @@ impl Cmodel {
          {
             if CONFIG.trace_options.all || CONFIG.trace_options.cm {
                 match &msg {
-                    CaToCmBytes::Bytes((_, _, _, bytes)) => {
+                    CaToCmBytes::Bytes((_, _, _, seq_no, bytes)) => {
                         let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "cm_from_ca_bytes" };
-                        let trace = json!({"cell_id": &self.cell_id, "msg_len": bytes.len(), "bytes": bytes.to_string()? });
+                        let trace = json!({"cell_id": &self.cell_id, "msg_len": bytes.len(), "msg_no": seq_no });
                         let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
                     },
                     CaToCmBytes::Delete(uuid) => {
@@ -178,7 +178,7 @@ impl Cmodel {
             }
         
             // packetize
-            CaToCmBytes::Bytes((tree_id, is_ait, user_mask, bytes)) => {
+            CaToCmBytes::Bytes((tree_id, is_ait, user_mask, seq_no, bytes)) => {
                 {
                     if CONFIG.debug_options.all || CONFIG.debug_options.cm_from_ca {
                         let dpi_msg = MsgType::msg_from_bytes(&bytes)?;
@@ -195,7 +195,7 @@ impl Cmodel {
                 let mut uuid = tree_id.get_uuid();
                 if is_ait { uuid.make_ait_send(); }
             
-                let packets = Packetizer::packetize(&uuid, &bytes).context(CmodelError::Chain { func_name: _f, comment: S("") })?;
+                let packets = Packetizer::packetize(&uuid, seq_no, &bytes).context(CmodelError::Chain { func_name: _f, comment: S("") })?;
                 let first = packets.get(0).expect("No packets from packetizer");
                 let dpi_is_ait = first.is_ait();
                 let sender_msg_seq_no = first.get_unique_msg_id();

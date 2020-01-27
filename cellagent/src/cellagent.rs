@@ -11,7 +11,8 @@ use serde_json;
 
 use crate::app_message::{AppMsgDirection, AppMessage, AppMsgType,
                          AppDeleteTreeMsg, AppInterapplicationMsg, AppManifestMsg,
-                         AppQueryMsg, AppStackTreeMsg, AppTreeNameMsg};
+                         AppQueryMsg, AppStackTreeMsg, AppTreeNameMsg,
+                         SenderMsgSeqNo};
 use crate::app_message_formats::{CaToPort, PortToCaMsg,
                                  CaToVm, VmFromCa, VmToCa, CaFromVm};
 use crate::cmodel::{Cmodel};
@@ -91,7 +92,7 @@ pub struct CellAgent {
     recv_discover_count: usize,
     sent_to_noc: bool,
     my_discover_sent: bool,
-    my_discoverd_sent: bool,
+    discoverd_sent: HashSet<TreeID>,
     is_border_port_connected: bool,
     ports_seen_on_tree: HashMap<TreeID, HashSet<PortNo>>,
     parents_seen_on_tree: HashMap<TreeID, usize>,
@@ -138,7 +139,7 @@ impl CellAgent {
             tenant_masks, up_tree_senders: HashMap::new(), cell_info: CellInfo::new(),
             up_traphs_clist: HashMap::new(), ca_to_cm, ca_to_ports,
             failover_reply_ports: HashMap::new(), recv_discover_count: 0,
-            my_discover_sent: false, my_discoverd_sent: Default::default(),
+            my_discover_sent: false, discoverd_sent: Default::default(),
             no_packets, ports_seen_on_tree: HashMap::new(), parents_seen_on_tree: HashMap::new(),
             child_ports: HashMap::new()
         }, cm_join_handle))
@@ -263,7 +264,7 @@ impl CellAgent {
     }
     fn discover_done(&mut self, tree_id: &TreeID) -> bool {
         let _f = "is_discover_done";
-        self.neighbors.len() == self.ports_seen_on_tree
+        self.neighbors.len() <= self.ports_seen_on_tree // <= to handle late port connects
             .entry(tree_id.clone())
             .or_insert(Default::default())
             .len()
@@ -1035,6 +1036,7 @@ impl CellAgent {
                 } else {
                     DEFAULT_USER_MASK
                 };
+                self.discoverd_sent.insert(new_tree_id);
                 self.send_msg(line!(), self.connected_tree_id, &discoverd_msg, user_mask)?;
             }
         } else if self.discover_done(&new_tree_id) {
@@ -1089,8 +1091,7 @@ impl CellAgent {
                 if let Some((port_number, discoverd_msg)) = self.discoverd_parent_msg.remove(&tree_id) {
                     self.send_msg(line!(), self.connected_tree_id, &discoverd_msg, Mask::new(port_number))?;
                 }
-            } else if !self.my_discoverd_sent {
-                self.my_discoverd_sent = true;
+            } else if self.discoverd_sent.insert(tree_id) {
                 let sender_id = SenderID::new(self.cell_id, "CellAgent")?;
                 let in_reply_to = msg.get_sender_msg_seq_no();
                 let path = msg.get_path();
@@ -1285,16 +1286,37 @@ impl CellAgent {
         (*self.traphs_mutex.lock().unwrap()) = self.traphs.clone();
         Ok(())
     }
-    pub fn process_hello_msg(&mut self, msg: &HelloMsg, port_no: PortNo)
-            -> Result<(), Error> {
+    pub fn process_hello_msg(&mut self, msg: &HelloMsg, port_no: PortNo) -> Result<(), Error> {
         let _f = "process_hello_msg";
         {
             if CONFIG.trace_options.all || CONFIG.trace_options.ca { // Needed for visualization
                 let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "ca_process_hello_msg" };
-                let trace = json!({ "cell_id": &self.cell_id, "port_no": port_no, "msg": msg.value() });
+                let trace = json!({ "cell_id": &self.cell_id, "port_no": port_no, "#neighbors": self.neighbors.len(), "msg": msg.value() });
                 let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
             }
         }
+        let port_number= PortNumber::new(port_no, self.no_ports)?;
+        let tree_ids = self.discoverd_sent.clone();
+        let user_mask = Mask::new(port_number);
+        for tree_id in tree_ids.iter() { // Hueristic failed; got late port connect
+            println!("Cellagent {}: {} late port connect on tree {} {} neighbors {}", self.cell_id, _f, tree_id, port_no, self.neighbors.len());
+            let sender_id = SenderID::new(self.cell_id, "CellAgent")?;
+            let path = Path::new(port_number.get_port_no(), self.no_ports)?;
+            let hops = PathLength(CellQty(1));
+            let my_port_tree_id = self.my_tree_id.to_port_tree_id(port_number);
+            self.update_base_tree_map(my_port_tree_id, self.my_tree_id);
+            let discover_msg = DiscoverMsg::new(sender_id.clone(), my_port_tree_id,
+                                                self.cell_id, hops, path);
+            self.send_msg(line!(), self.connected_tree_id, &discover_msg, user_mask)?;
+            let in_reply_to = msg.get_sender_msg_seq_no();
+            let discoverd_msg = DiscoverDMsg::new(in_reply_to, sender_id,
+                                                  self.cell_id, tree_id.to_port_tree_id_0(), path,
+                                                  DiscoverDType::NonParent);
+            self.send_msg(line!(), self.connected_tree_id, &discoverd_msg, user_mask)?;
+        }
+        for discover_msg in self.get_saved_discover().iter() {
+            self.send_msg(line!(), self.connected_tree_id, discover_msg, user_mask)?;
+        };
         let payload = msg.get_payload();
         let neighbor_cell_id = payload.get_cell_id();
         let neigbor_port_no = payload.get_port_no();
@@ -1847,6 +1869,7 @@ impl CellAgent {
         where T: Message + ::std::marker::Sized + serde::Serialize + fmt::Display
     {
         let _f = "send_msg";
+        let seq_no = msg.get_sender_msg_seq_no();
         let bytes = msg.to_bytes()?;
         {
             let mask = self.get_mask(tree_id.to_port_tree_id_0())?;
@@ -1859,11 +1882,11 @@ impl CellAgent {
                 let _ = add_to_trace(TraceType::Debug, trace_params, &trace, _f);
             }
         }
-        self.send_bytes(line_no, tree_id, msg.is_ait(), user_mask, bytes)?;
+        self.send_bytes(line_no, tree_id, msg.is_ait(), user_mask, seq_no, bytes)?;
         Ok(())
     }
     fn send_bytes(&self, line_no: u32, tree_id: TreeID, is_ait: bool, user_mask: Mask,
-                  bytes: ByteArray) -> Result<(), Error> {
+                  seq_no: SenderMsgSeqNo, bytes: ByteArray) -> Result<(), Error> {
         let _f = "send_bytes";
         let tree_uuid = tree_id.get_uuid();
         // Make sure tree_id is legit
@@ -1880,7 +1903,7 @@ impl CellAgent {
                 let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
             }
         }
-        let msg = CaToCmBytes::Bytes((tree_id, is_ait, user_mask, bytes));
+        let msg = CaToCmBytes::Bytes((tree_id, is_ait, user_mask, seq_no, bytes));
         self.ca_to_cm.send(msg)?;
         Ok(())
     }

@@ -10,6 +10,7 @@ use rand;
 use serde;
 use serde_json;
 
+use crate::app_message::SenderMsgSeqNo;
 use crate::config::{PACKET_MIN, PACKET_MAX, PAYLOAD_DEFAULT_ELEMENT, PacketNo};
 use crate::ec_message::{Message, MsgType};
 use crate::name::{PortTreeID, Name};
@@ -33,23 +34,21 @@ static PACKET_COUNT: AtomicUsize = AtomicUsize::new(0);
 pub struct Packet {
     header: PacketHeader,
     payload: Payload,
-    packet_count: usize
+    packet_count: usize,
+    sender_msg_seq_no: SenderMsgSeqNo
 }
 impl Packet {
     pub fn new(unique_msg_id: UniqueMsgId, uuid: &Uuid, size: PacketNo,
-           is_last_packet: bool, data_bytes: Vec<u8>) -> Packet {
+           is_last_packet: bool, seq_no: SenderMsgSeqNo, data_bytes: Vec<u8>) -> Packet {
         let header = PacketHeader::new(uuid);
         let payload = Payload::new(unique_msg_id, size, is_last_packet, data_bytes);
-        Packet { header, payload, packet_count: Packet::get_next_count() }
-    }
-    pub fn _make(header: PacketHeader, payload: Payload, packet_count: usize) -> Packet {
-        Packet { header, payload, packet_count }
+        Packet { header, payload, packet_count: Packet::get_next_count(), sender_msg_seq_no: seq_no }
     }
     pub fn make_entl_packet() -> Packet {
         let mut uuid = Uuid::new();
         uuid.make_entl();
         Packet::new(UniqueMsgId::new(), &uuid, PacketNo(1),
-                    false, vec![])
+                    false, SenderMsgSeqNo(0), vec![])
     }
     
     pub fn get_next_count() -> usize { PACKET_COUNT.fetch_add(1, Ordering::SeqCst) }
@@ -63,7 +62,7 @@ impl Packet {
         let bytes = self.get_bytes();
         let is_last = self.payload.is_last;
         let len = bytes.len();
-        let string = format!("is last {}, length {} {}", is_last, len, std::str::from_utf8(&bytes)?.to_owned());
+        let string = format!("is last {}, length {} msg_no {}", is_last, len, self.sender_msg_seq_no.0);
         let default_as_char = PAYLOAD_DEFAULT_ELEMENT as char;
         Ok(string.replace(default_as_char, ""))
     }
@@ -216,7 +215,7 @@ impl Serializer {
 }
 pub struct Packetizer {}
 impl Packetizer {
-    pub fn packetize(uuid: &Uuid, msg: &ByteArray)
+    pub fn packetize(uuid: &Uuid, seq_no: SenderMsgSeqNo, msg: &ByteArray)
             -> Result<Vec<Packet>, Error> {
         let msg_bytes = msg.get_bytes();
         let mtu = Packetizer::packet_payload_size(msg_bytes.len());
@@ -237,7 +236,7 @@ impl Packetizer {
                 packet_bytes[j] = msg_bytes[i*mtu + j];
             }
             let packet = Packet::new(unique_msg_id, uuid, PacketNo(u16::try_from(size)?),
-                                     is_last_packet, packet_bytes);
+                                     is_last_packet, seq_no, packet_bytes);
             //println!("Packet: packet {} for msg {}", packet.get_packet_count(), msg.get_count());
             packets.push(packet);
         }
