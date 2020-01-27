@@ -68,7 +68,6 @@ impl Config {
             match viz.as_str() {
                 "dc"  => config.trace_options.dc  = true,
                 "ca"  => config.trace_options.ca  = true,
-                "ca"  => config.trace_options.ca  = true,
                 "nal" => config.trace_options.nal = true,
                 "noc" => config.trace_options.noc = true,
                 "svc" => config.trace_options.svc = true,

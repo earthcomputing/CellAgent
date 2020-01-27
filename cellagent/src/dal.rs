@@ -77,8 +77,8 @@ pub fn add_to_trace(trace_type: TraceType, trace_params: &TraceHeaderParams,
     } else {
         format!("{:?}", &trace_record)
     };
-    cell_id_handle.write(&(line.clone() + ",\n").into_bytes()).context(DalError::Chain { func_name: "add_to_trace", comment: S("Write cell record") })?;
-    file_handle.write(   &(line.clone() + ",\n").into_bytes()).context(DalError::Chain { func_name: "add_to_trace", comment: S("Write record") })?;
+    cell_id_handle.write(&(line.clone() + ",\n").into_bytes()).context(DalError::Chain { func_name: _f, comment: S("Write cell record") })?;
+    file_handle.write(   &(line.clone() + ",\n").into_bytes()).context(DalError::Chain { func_name: _f, comment: S("Write record") })?;
     let _ = PRODUCER_RD.send(FutureRecord::to(&CONFIG.kafka_topic)
                                  .payload(&line)
                                  .key(&format!("{:?}", trace_header.get_event_id())),
