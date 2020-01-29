@@ -1298,17 +1298,24 @@ impl CellAgent {
         let port_number= PortNumber::new(port_no, self.no_ports)?;
         let tree_ids = self.discoverd_sent.clone();
         let user_mask = Mask::new(port_number);
+        let sender_id = SenderID::new(self.cell_id, "CellAgent")?;
+        let path = Path::new(port_number.get_port_no(), self.no_ports)?;
+        let in_reply_to = msg.get_sender_msg_seq_no();
+        if CONFIG.discover_depth == 0 {
+            let discoverd_msg = DiscoverDMsg::new(in_reply_to, sender_id, self.cell_id,
+                      self.my_tree_id.to_port_tree_id_0(), path, DiscoverDType::NonParent);
+            self.send_msg(line!(), self.connected_tree_id, &discoverd_msg, user_mask)?;
+        }
         for tree_id in tree_ids.iter() { // Hueristic failed; got late port connect
-            println!("Cellagent {}: {} late port connect on tree {} {} neighbors {}", self.cell_id, _f, tree_id, port_no, self.neighbors.len());
-            let sender_id = SenderID::new(self.cell_id, "CellAgent")?;
-            let path = Path::new(port_number.get_port_no(), self.no_ports)?;
+            if CONFIG.discover_depth > 0 {
+                println!("Cellagent {}: {} late port connect on tree {} {} neighbors {}", self.cell_id, _f, tree_id, port_no, self.neighbors.len());
+            }
             let hops = PathLength(CellQty(1));
             let my_port_tree_id = self.my_tree_id.to_port_tree_id(port_number);
             self.update_base_tree_map(my_port_tree_id, self.my_tree_id);
             let discover_msg = DiscoverMsg::new(sender_id.clone(), my_port_tree_id,
                                                 self.cell_id, hops, path);
             self.send_msg(line!(), self.connected_tree_id, &discover_msg, user_mask)?;
-            let in_reply_to = msg.get_sender_msg_seq_no();
             let discoverd_msg = DiscoverDMsg::new(in_reply_to, sender_id,
                                                   self.cell_id, tree_id.to_port_tree_id_0(), path,
                                                   DiscoverDType::NonParent);
@@ -1713,7 +1720,6 @@ impl CellAgent {
         let parent_mask = parent_entry.get_mask();
         let stack_tree_msg = StackTreeMsg::new(sender_id, new_tree_name, new_tree_id, parent_tree_id, direction, gvm_eqn);
         self.send_msg(line!(), self.control_tree_id, &stack_tree_msg, Mask::port0())?;
-        self.send_msg(line!(), self.connected_tree_id, &stack_tree_msg, parent_mask)?;
         Ok(())
     }
     pub fn app_tree_name(&self, _msg: &AppTreeNameMsg, _sender_id: SenderID) -> Result<(), Error> {
