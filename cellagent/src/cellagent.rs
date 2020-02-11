@@ -1031,7 +1031,7 @@ impl CellAgent {
                 self.discoverd_parent_msg.insert(new_tree_id, (port_number, discoverd_msg));
                 let discoverd_msg = DiscoverDMsg::new(in_reply_to, sender_id, self.cell_id, new_port_tree_id, path,
                                                       DiscoverDType::NonParent);
-                let user_mask = if **hops > CONFIG.discover_depth {
+                let user_mask = if !CONFIG.breadth_first_1hop || **hops > 1 {
                     DEFAULT_USER_MASK.all_but_port(port_number)
                 } else {
                     DEFAULT_USER_MASK
@@ -1045,7 +1045,7 @@ impl CellAgent {
             }
         }
         let updated_msg = msg.update(self.cell_id);
-        if **hops <= CONFIG.discover_depth { // quench is false for a discover_depth-hop DiscoverMsg
+        if CONFIG.breadth_first_1hop && **hops <= 1 { // quench is false for a discover_depth-hop DiscoverMsg
             self.discover_n_hop_msg.insert((port_no, new_tree_id), updated_msg);
         } else {
             if !quench {
@@ -1301,13 +1301,13 @@ impl CellAgent {
         let sender_id = SenderID::new(self.cell_id, "CellAgent")?;
         let path = Path::new(port_number.get_port_no(), self.no_ports)?;
         let in_reply_to = msg.get_sender_msg_seq_no();
-        if CONFIG.discover_depth == 0 {
+        if !CONFIG.breadth_first_1hop {
             let discoverd_msg = DiscoverDMsg::new(in_reply_to, sender_id, self.cell_id,
                       self.my_tree_id.to_port_tree_id_0(), path, DiscoverDType::NonParent);
             self.send_msg(line!(), self.connected_tree_id, &discoverd_msg, user_mask)?;
         }
         for tree_id in tree_ids.iter() { // Hueristic failed; got late port connect
-            if CONFIG.discover_depth > 0 {
+            if CONFIG.breadth_first_1hop {
                 println!("Cellagent {}: {} late port connect on tree {} {} neighbors {}", self.cell_id, _f, tree_id, port_no, self.neighbors.len());
             }
             let hops = PathLength(CellQty(1));
