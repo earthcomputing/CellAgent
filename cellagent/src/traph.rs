@@ -1,6 +1,5 @@
 use std::{fmt, fmt::Write,
           collections::{HashMap, HashSet},
-          slice::Iter,
           sync::{Arc, Mutex}};
 
 use serde_json;
