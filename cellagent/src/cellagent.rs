@@ -484,20 +484,20 @@ impl CellAgent {
             // it will be the smallest, anyway.
             PortState::Parent | PortState::Unknown => hops,
         };
-        let traph_status = traph.get_port_status(port_number);
-        let entry_port_status = match traph_status {
+        let traph_state = traph.get_port_status(port_number);
+        let entry_port_state = match traph_state {
             PortState::Pruned | PortState::Unknown => port_state,
-            _ => traph_status  // Don't replace if Parent or Child
+            _ => traph_state  // Don't replace if Parent or Child
         };
         if gvm_recv { children.insert(PortNumber::new0()); }
         let mut entry = traph.update_element(base_tree_id, port_number,
-                                             entry_port_status, &children, updated_hops, path).context(CellagentError::Chain { func_name: "update_traph", comment: S("") })?;
+                                             entry_port_state, &children, updated_hops, path).context(CellagentError::Chain { func_name: "update_traph", comment: S("") })?;
         if gvm_send { entry.enable_send() } else { entry.disable_send() }
         {
             if CONFIG.debug_options.all || CONFIG.debug_options.traph_entry {
                 let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "ca_updated_traph_entry" };
                 let trace = json!({ "cell_id": &self.cell_id, "base_tree_id": base_tree_id,
-                    "port_number": port_number, "traph_status": traph_status, "hops":hops, "entry": &entry });
+                    "port_number": port_number, "traph_state": traph_state, "hops":hops, "entry": &entry });
                 let _ = add_to_trace(TraceType::Debug, trace_params, &trace, _f);
             }
         }
@@ -1013,7 +1013,7 @@ impl CellAgent {
         self.update_base_tree_map(new_port_tree_id, new_tree_id);
         // The following is needed until I get port trees and trees straighened out.
         self.update_base_tree_map(new_tree_id.to_port_tree_id_0(), new_tree_id);
-        if !port_tree_seen {
+        if !(new_tree_id == self.my_tree_id) && !port_tree_seen {
             let port_state = if tree_seen {
                 PortState::Pruned
             } else {
