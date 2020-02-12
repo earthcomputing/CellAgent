@@ -497,7 +497,7 @@ impl CellAgent {
             if CONFIG.debug_options.all || CONFIG.debug_options.traph_entry {
                 let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "ca_updated_traph_entry" };
                 let trace = json!({ "cell_id": &self.cell_id, "base_tree_id": base_tree_id,
-                    "port_number": port_number, "traph_state": traph_state, "hops":hops, "entry": &entry });
+                    "port_number": port_number, "traph_state": traph_state, "hops": hops, "updated hops": updated_hops, "entry": &entry });
                 let _ = add_to_trace(TraceType::Debug, trace_params, &trace, _f);
             }
         }
@@ -505,7 +505,7 @@ impl CellAgent {
         self.update_entry(&entry).context(CellagentError::Chain { func_name: _f, comment: S("base_tree_id") })?;
         let mut port_tree = traph
             .own_port_tree(base_port_tree_id)
-            .unwrap_or(PortTree::new(base_port_tree_id, port_number.get_port_no(), updated_hops));
+            .unwrap_or(PortTree::new(base_port_tree_id, port_number.get_port_no(), hops));
         if base_tree_id != self.my_tree_id {  // Not my tree
             // The first port_tree entry is the one that denotes this branch
             let first_port_tree_id = traph.add_port_tree(&port_tree);
