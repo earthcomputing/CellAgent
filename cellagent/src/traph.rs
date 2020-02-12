@@ -80,7 +80,7 @@ impl Traph {
         let port_no = port_tree_id.get_port_no();
         self.port_trees
             .get(&port_tree_id)
-            .ok_or(TraphError::PortTree { cell_id: self.cell_id.clone(), func_name: _f, port_no: *port_no }.into())
+            .ok_or(TraphError::PortTree { cell_id: self.cell_id, func_name: _f, port_no: *port_no }.into())
     }
     pub fn get_base_tree_id(&self) -> TreeID { self.base_tree_id }
     fn get_hops(&self) -> Result<PathLength, Error> {
@@ -89,9 +89,9 @@ impl Traph {
     }
     pub fn add_port_tree(&mut self, port_tree: &PortTree) -> PortTreeID {
         let _f = "add_port_tree";
-        if self.port_tree_id.is_none() { self.port_tree_id = Some(port_tree.get_port_tree_id().clone()); }
-        self.port_trees.insert(port_tree.get_port_tree_id().clone(), port_tree.clone()); // Duplicate inserts do no harm
-        self.port_tree_id.clone().unwrap() // Unwrap is guaranteed to be safe by first line
+        if self.port_tree_id.is_none() { self.port_tree_id = Some(port_tree.get_port_tree_id()); }
+        self.port_trees.insert(port_tree.get_port_tree_id(), port_tree.clone()); // Duplicate inserts do no harm
+        self.port_tree_id.unwrap() // Unwrap is guaranteed to be safe by first line
     }
     pub fn get_elements(&self) -> &Vec<TraphElement> { &self.elements }
     pub fn _set_element(&mut self, traph_element: TraphElement) {
