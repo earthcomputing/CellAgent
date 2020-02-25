@@ -89,7 +89,7 @@ pub struct CellAgent {
     up_traphs_clist: HashMap<TreeID, TreeID>,
     neighbors: HashMap<PortNo, (CellID, PortNo)>,
     neighbor_count: usize,
-    recv_discover_count: usize,
+    tree_count: usize,
     sent_to_noc: bool,
     my_discover_sent: bool,
     discoverd_sent: HashSet<TreeID>,
@@ -138,7 +138,7 @@ impl CellAgent {
             sent_to_noc: false, is_border_port_connected: false,
             tenant_masks, up_tree_senders: HashMap::new(), cell_info: CellInfo::new(),
             up_traphs_clist: HashMap::new(), ca_to_cm, ca_to_ports,
-            failover_reply_ports: HashMap::new(), recv_discover_count: 0,
+            failover_reply_ports: HashMap::new(), tree_count: 0,
             my_discover_sent: false, discoverd_sent: Default::default(),
             no_packets, ports_seen_on_tree: HashMap::new(), parents_seen_on_tree: HashMap::new(),
             child_ports: HashMap::new()
@@ -282,7 +282,7 @@ impl CellAgent {
     fn send_my_discover(&mut self, line_no: u32) -> Result<(), Error<>> {
         let _f = "send_my_discover";
         if !self.my_discover_sent &&
-            (self.recv_discover_count >= CONFIG.min_discover || // == test might fail if get two discovers before reaching here
+            (self.tree_count >= CONFIG.min_trees || // == test might fail if get two discovers before reaching here
             self.neighbors.len() >= CONFIG.min_hello) {
             self.my_discover_sent = true;
             for index in 1..=*self.no_ports {
@@ -971,7 +971,6 @@ impl CellAgent {
     pub fn process_discover_msg(&mut self, msg: &DiscoverMsg, port_no: PortNo)
             -> Result<(), Error> {
         let _f = "process_discover_msg";
-        self.recv_discover_count = self.recv_discover_count + 1;
         let payload = msg.get_payload();
         let port_number = port_no.make_port_number(self.no_ports)?;
         let hops = payload.get_hops();
@@ -980,6 +979,7 @@ impl CellAgent {
         let new_tree_id = new_port_tree_id.to_tree_id();
         self.tree_id_map.insert(new_port_tree_id.get_uuid(), new_port_tree_id);
         let tree_seen = self.quench_simple(new_tree_id);
+        if !tree_seen { self.tree_count = self.tree_count + 1; }
         let port_tree_seen = self.quench_root_port(new_port_tree_id);
         let my_port_seen = self.quench_my_port(new_tree_id, port_no);
         {
@@ -1301,13 +1301,13 @@ impl CellAgent {
         let sender_id = SenderID::new(self.cell_id, "CellAgent")?;
         let path = Path::new(port_number.get_port_no(), self.no_ports)?;
         let in_reply_to = msg.get_sender_msg_seq_no();
-        if !CONFIG.breadth_first_1hop {
+        if !CONFIG.breadth_first_1hop  {
             let discoverd_msg = DiscoverDMsg::new(in_reply_to, sender_id, self.cell_id,
                       self.my_tree_id.to_port_tree_id_0(), path, DiscoverDType::NonParent);
             self.send_msg(line!(), self.connected_tree_id, &discoverd_msg, user_mask)?;
         }
         for tree_id in tree_ids.iter() { // Hueristic failed; got late port connect
-            if CONFIG.breadth_first_1hop {
+            if self.my_discover_sent {
                 println!("Cellagent {}: {} late port connect on tree {} {} neighbors {}", self.cell_id, _f, tree_id, port_no, self.neighbors.len());
             }
             let hops = PathLength(CellQty(1));
