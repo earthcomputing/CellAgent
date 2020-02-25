@@ -50,6 +50,7 @@ futures = "0.1.23" # used in dal.rs
 #im = "13.0.0" # Fast cloneable collections
 #indexmap = "1.0.1" # HashMap and HashSet that preserve order
 #internment = "0.3.6"
+itertools = "0.8.2"
 lazy_static = "1.1.0"
 #[cfg(feature = "cell")]
 libc = "0.2.57"
