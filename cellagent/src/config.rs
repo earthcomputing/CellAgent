@@ -39,7 +39,7 @@ pub struct Config {
     pub output_file_name: String,
     pub kafka_server: String,
     pub kafka_topic: String,
-    pub min_discover: usize, // Minimum number of Discover messages received before sending mine
+    pub min_trees: usize, // Minimum number of trees seen before sending mine
     pub min_hello: usize, // Minimum number of Hello messages before sending my discover
     pub breadth_first_1hop: bool, // Number of hops of breadth first search
     pub num_cells: CellQty,
