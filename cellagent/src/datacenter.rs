@@ -28,7 +28,7 @@ impl Datacenter {
         let (mut rack, _join_handles) = Rack::construct(&blueprint).context(DatacenterError::Chain { func_name: "initialize", comment: S("")})?;
         let (application_to_noc, noc_from_application): (ApplicationToNoc, NocFromApplication) = channel();
         let (noc_to_application, application_from_noc): (NocToApplication, ApplicationFromNoc) = channel();
-        let mut noc = Noc::new(noc_to_application)?;
+        let mut noc = Noc::new(noc_to_application).context(DatacenterError::Chain { func_name: "initialize", comment: S("")})?;
         let (port_to_noc, port_from_noc) = noc.initialize(&blueprint, noc_from_application).context(DatacenterError::Chain { func_name: "initialize", comment: S("")})?;
         rack.connect_to_noc(port_to_noc, port_from_noc).context(DatacenterError::Chain { func_name: "initialize", comment: S("")})?;
         return Ok(Datacenter { rack, application_to_noc, application_from_noc});

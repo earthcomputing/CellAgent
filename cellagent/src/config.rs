@@ -6,6 +6,7 @@ use std::{fmt,
           path::Path,
           ops::{Deref}};
 
+use itertools::Itertools;
 use lazy_static::lazy_static;
 
 use crate::utility::{CellConfig, CellNo, Edge, PortNo, Quench, S};
@@ -46,6 +47,8 @@ pub struct Config {
     pub cell_port_exceptions: HashMap<CellNo, PortQty>,
     pub border_cell_ports: HashMap<CellNo, Vec<PortNo>>,
     pub cell_config: HashMap<CellNo, CellConfig>,
+    nrows: usize,
+    ncols: usize,
     pub edge_list: Vec<Edge>,
     pub geometry: Vec<(usize, usize)>,
     pub race_sleep: u64,
@@ -63,6 +66,16 @@ impl Config {
         println!("\nReading configuratation from {}", config_file_name);
         let config_file = OpenOptions::new().read(true).open(config_file_name)?;//.context(ConfigError::File { func_name: _f, file_name: config_file_name})?;
         let mut config: Config = serde_json::from_reader(config_file)?;//.context(ConfigError::Chain { func_name: _f, comment: S("") })?;
+        if *config.num_cells == 0 {
+            let (nr, nc) = (config.nrows, config.ncols);
+            config.num_cells = CellQty(nr*nc);
+            config.geometry = (0..nr).cartesian_product(0..nc).collect();
+            config.edge_list = Config::make_edges(nr, nc);
+            // TODO: Kludge for defining border cells that don't have max_num_phys_ports_per_cell edges in the edge list
+            config.border_cell_ports = Default::default();
+            config.border_cell_ports.insert(CellNo(1), vec![PortNo(1)]);
+            config.border_cell_ports.insert(CellNo(*config.num_cells-2), vec![PortNo(2)]);
+        }
         // The following must be true for the Trace Visualizer
         for viz in &config.visualize {
             match viz.as_str() {
@@ -83,6 +96,29 @@ impl Config {
         let _ = OpenOptions::new().write(true).truncate(true).open(&config.output_file_name);
         create_dir(&config.output_dir_name)?;
         Ok(config)
+    }
+    fn make_edges(nr: usize, nc: usize) -> Vec<Edge> {
+        (0..nr).fold(vec![], |mut edges, r| {
+            let along_row = ((r*nc)..((r+1)* nc-1))
+                .zip((r*nc+1)..((r+1)*nc))
+                .map(|(r, c)| { Edge(CellNo(r), CellNo(c)) });
+            edges.extend_from_slice(&along_row.collect::<Vec<Edge>>());
+            if r < (nr-1) {
+                let along_col = ((r * nc)..((r + 1) * nc))
+                    .zip(((r + 1) * nc)..((r + 2) * nc))
+                    .map(|(r, c)| { Edge(CellNo(r), CellNo(c)) });
+                edges.extend_from_slice(&along_col.collect::<Vec<Edge>>());
+                let diag_rite = ((r * nc)..((r + 1) * nc - 1))
+                    .zip(((r + 1) * nc + 1)..((r + 2) * nc))
+                    .map(|(r, c)| { Edge(CellNo(r), CellNo(c)) });
+                edges.extend_from_slice(&diag_rite.collect::<Vec<Edge>>());
+                let diag_left = ((r * nc + 1)..((r + 1) * nc))
+                    .zip(((r + 1) * nc)..((r + 2) * nc - 1))
+                    .map(|(r, c)| { Edge(CellNo(r), CellNo(c)) });
+                edges.extend_from_slice(&diag_left.collect::<Vec<Edge>>());
+            }
+            edges
+        })
     }
 }
 // TODO: Use log crate for this
