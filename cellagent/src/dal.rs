@@ -16,7 +16,7 @@ use {
 
 use futures::Future;
 use lazy_static::lazy_static;
-use rdkafka::{config::ClientConfig, producer::{FutureProducer, FutureRecord}};
+//use rdkafka::{config::ClientConfig, producer::{FutureProducer, FutureRecord}};
 use serde_json;
 use serde_json::{Value};
 
@@ -31,14 +31,18 @@ const FOR_EVAL: bool = true;
 lazy_static! {
     static ref SERVER_URL: String = ::std::env::var("SERVER_URL").expect("Environment variable SERVER_URL not set");
 }
+
 lazy_static! {
     static ref SERVER_ERROR: AtomicBool = AtomicBool::new(false);
+/*
     static ref PRODUCER_RD: FutureProducer = ClientConfig::new()
                         .set("bootstrap.servers", &CONFIG.kafka_server)
                         .set("message.timeout.ms", "5000")
                         .create()
                         .expect("Dal: Problem setting up Kafka");
+*/
 }
+
 #[cfg(feature="webserver")]
 thread_local!{ static SYSTEM: RefCell<SystemRunner> = RefCell::new(System::new("Tracer")); }
 thread_local!{ static SKIP: RefCell<HashSet<String>> = RefCell::new(HashSet::new()); }
@@ -79,6 +83,7 @@ pub fn add_to_trace(trace_type: TraceType, trace_params: &TraceHeaderParams,
     };
     cell_id_handle.write(&(line.clone() + ",\n").into_bytes()).context(DalError::Chain { func_name: _f, comment: S("Write cell record") })?;
     file_handle.write(   &(line.clone() + ",\n").into_bytes()).context(DalError::Chain { func_name: _f, comment: S("Write record") })?;
+/*
     let _ = PRODUCER_RD.send(FutureRecord::to(&CONFIG.kafka_topic)
                                  .payload(&line)
                                  .key(&format!("{:?}", trace_header.get_event_id())),
@@ -90,6 +95,7 @@ pub fn add_to_trace(trace_type: TraceType, trace_params: &TraceHeaderParams,
                 Err(e) => Err(DalError::Kafka { func_name: _f, kafka_error: S(e) }.into())
             }
         });
+*/
     Ok(())
 }
 #[cfg(feature="webserver")]

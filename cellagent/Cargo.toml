@@ -57,7 +57,7 @@ libc = "0.2.57"
 #log = {version = "0.4.6", features = ["std", "serde"]} # Should use instead of my trace approach
 multi_mut = "0.1"
 rand = "0.5.4"
-rdkafka = "0.17.0"
+#rdkafka = "0.17.0"
 reqwest = "0.9.11"
 #rusoto_s3 = "0.36.0" # Library for AWS S3
 #schema = { path = "/Users/alan/Documents/Eclipse/schema" }  # JSON schema
