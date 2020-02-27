@@ -17,8 +17,9 @@ use ec_fabrix::utility::{CellConfig, CellNo, Edge, S, print_hash_map, sleep};
 fn main() -> Result<(), Error> {
     let _f = "main";
     println!("\nMulticell trace and debug output to file {}", CONFIG.output_file_name);
-    println!("{:?} Quenching of Discover messages", CONFIG.quench);
+    println!("{} Quenching of Discover messages", CONFIG.quench);
     println!("Delaying HelloMsg {} seconds", CONFIG.race_sleep);
+    println!("Wait until {} trees seen or {} hello messages before sending discover message", CONFIG.min_hello, CONFIG.min_trees);
     println!("\nMain: {} ports for each of {} cells", CONFIG.num_ports_per_cell , CONFIG.num_cells);
     let mut dc =
         match Datacenter::construct(Blueprint::new(CONFIG.num_cells,
