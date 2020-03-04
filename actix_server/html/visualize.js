@@ -6,11 +6,9 @@ let all_stacked_trees = [];
 let canvas;
 window.onload = function() {
     canvas = document.getElementById("viz-canvas");
-    document.getElementById("displayButton").disabled = false;
     visualize();
 }
 function clear_dispay() {
-    document.getElementById("displayButton").disabled = true;
     let buttons = document.querySelectorAll(".stackedtreebutton");
     if (buttons.length > 0 ) {
         for (button of buttons) {
@@ -25,7 +23,7 @@ function visualize() {
     canvas.innerHTML = "";
     const Http = new XMLHttpRequest();
     clear_dispay();
-    document.getElementById("displayButton").disabled = false;    const url = 'http://127.0.0.1:8088/';
+    const url = 'http://127.0.0.1:8088/';
     Http.open("GET", url + "geometry");
     Http.send();
     Http.onreadystatechange = (e) => {
@@ -210,7 +208,12 @@ function draw_black_tree(tree_id) {
                     let neighbor_name = neighbor.cell_name;
                     let neighbor_port = neighbor.port;
                     let link_id = make_link_id(cell_id, port, neighbor_name, neighbor_port);
-                    document.getElementById(link_id).setAttribute("class", "linktree");
+                    let element = document.getElementById(link_id);
+                    if (element) {
+                        element.setAttribute("class", "linktree");
+                    } else {
+                        console.log("No element for ", link_id);
+                    }
                 }
             }
         }

@@ -14,7 +14,7 @@ use {
     std::sync::atomic::Ordering
 };
 
-use futures::Future;
+use futures::Future; // Needed for rdkafka
 use lazy_static::lazy_static;
 //use rdkafka::{config::ClientConfig, producer::{FutureProducer, FutureRecord}};
 use serde_json;
@@ -119,7 +119,7 @@ fn trace_it(trace_record: &TraceRecord<'_>) -> Result<(), Error> {
                         .header("User-Agent", "Actix-web")
                         .send_json(&value)
                         .map_err(|e| {
-                            println!("\nError from server {:?}\n", e);
+                            println!("\nError from server: url {} {:?}\n", server_url_clone, e);
                             SERVER_ERROR.swap(true, Ordering::SeqCst);
                         })
                         .and_then(|response| {

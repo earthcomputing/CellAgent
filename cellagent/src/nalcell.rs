@@ -80,7 +80,7 @@ impl NalCell {
                 ports_from_ca.insert(PortNo(i), port_from_ca);
                 Either::Right(port_to_ca.clone())
             } else {
-                if (i == 0) {
+                if i == 0 {
                     is_connected = true;
                 } else {
                     match ecnl_clone {
