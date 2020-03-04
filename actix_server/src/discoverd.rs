@@ -33,10 +33,10 @@ pub fn process_discoverd_body(appcells: web::Data<AppCells>, body: Body)
         let mut cells = appcells
             .get_ref()
             .appcells.lock().unwrap();
-        let other_cell = {
+        let other_cell =
             update_tree(&mut cells, &this_cell_name, &tree_name, recv_port, LinkType::Child)
                 .get(&recv_port).expect("DiscoverDMsg: missing neighbor")
-        }.clone(); // Avoid borrow error on next update_tree call
+                .clone(); // Avoid borrow error on next update_tree call
         let other_cell_name = other_cell.cell_name();
         let other_cell_port = other_cell.port;
         update_tree(&mut cells, other_cell_name, &tree_name, other_cell_port, LinkType::Parent);

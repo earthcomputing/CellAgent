@@ -19,13 +19,17 @@ fn replay_from_file(appcells: web::Data<AppCells>, appgeometry: web::Data<AppGeo
                     form_data: web::Form<FileNameParams>)
                     -> Result<impl Responder, Error> {
     reset(appcells.clone(), appgeometry.clone());
-    let filename = &form_data.filename;
+    let filename = if form_data.filename == "" {
+        "../trace/trace.json"
+    } else {
+        &form_data.filename
+    };
     let replay_file = File::open(filename)?;
     let reader = BufReader::new(replay_file);
     for line in reader.lines() {
-        let mut foo = line?;
-        foo.pop();
-        let trace_record: TraceRecord = serde_json::from_str(&foo)?;
+        let mut trace_line = line?;
+        trace_line.pop(); // Remove LF
+        let trace_record: TraceRecord = serde_json::from_str(&trace_line)?;
         let header = trace_record.header();
         let body = trace_record.body().clone();
         match header.format() {
