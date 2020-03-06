@@ -71,10 +71,14 @@ impl Config {
             config.num_cells = CellQty(nr*nc);
             config.geometry = (0..nr).cartesian_product(0..nc).collect();
             config.edge_list = Config::make_edges(nr, nc);
-            // TODO: Kludge for defining border cells that don't have max_num_phys_ports_per_cell edges in the edge list
+            // Select border cells
             config.border_cell_ports = Default::default();
-            config.border_cell_ports.insert(CellNo(1), vec![PortNo(1)]);
-            config.border_cell_ports.insert(CellNo(*config.num_cells-2), vec![PortNo(2)]);
+            for cell_no in 1..nc {
+                if 0 == cell_no%2 {
+                    config.border_cell_ports.insert(CellNo(cell_no), vec![PortNo(2)]);
+                    config.border_cell_ports.insert(CellNo(cell_no + nc*(nr-1)), vec![PortNo(1)]);
+                }
+            }
         }
         // The following must be true for the Trace Visualizer
         for viz in &config.visualize {
