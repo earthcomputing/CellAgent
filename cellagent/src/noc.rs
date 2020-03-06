@@ -208,7 +208,7 @@ impl Noc {
         let noc_agent_master = AllowedTree::new(NOC_LISTEN_TREE_NAME);
         let noc_master_deploy= AllowedTree::new(NOC_MASTER_DEPLOY_TREE_NAME);
         let noc_agent_deploy = AllowedTree::new(NOC_AGENT_DEPLOY_TREE_NAME);
-        let small_tree_name = AllowedTree::new("2hop");
+        let small_tree_name = AllowedTree::new("3hop");
         self.noc_master_agent_tree(&noc_master_agent, base_tree_name, noc_to_port).context(NocError::Chain { func_name: "create_noc", comment: S("noc master tree")})?;
         self.noc_agent_master_tree(&noc_agent_master, base_tree_name, noc_to_port).context(NocError::Chain { func_name: "create_noc", comment: S("noc agent tree")})?;
         self.noc_agent_deploy_tree(&noc_agent_deploy, base_tree_name, noc_to_port).context(NocError::Chain { func_name: "create_noc", comment: S("noc agent tree")})?;
@@ -221,9 +221,9 @@ impl Noc {
         let _f = "small_tree";
         // 2-hop tree
         let mut eqns = HashSet::new();
-        eqns.insert(GvmEqn::Send("hops < 3"));
-        eqns.insert(GvmEqn::Recv("hops < 3"));
-        eqns.insert(GvmEqn::Xtnd("hops < 3"));
+        eqns.insert(GvmEqn::Send("hops < 4"));
+        eqns.insert(GvmEqn::Recv("hops < 4"));
+        eqns.insert(GvmEqn::Xtnd("hops < 4"));
         eqns.insert(GvmEqn::Save("true"));
         let gvm_eqn = GvmEquation::new(&eqns, &[GvmVariable::new(GvmVariableType::PathLength, "hops")]);
         let stack_tree_msg = AppStackTreeMsg::new("Noc",
@@ -231,12 +231,12 @@ impl Noc {
                                                   AppMsgDirection::Leafward, &gvm_eqn);
         {
             if CONFIG.trace_options.all || CONFIG.trace_options.svc {
-                let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "2hop_to_vm" };
+                let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "3hop_to_vm" };
                 let trace = json!({ "NocMaster": self.get_name(), "app_msg": stack_tree_msg });
                 let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
             }
         }
-        println!("Noc: stack {} on tree {}", "2hop", parent_tree_name);
+        println!("Noc: stack {} on tree {}", "3hop", parent_tree_name);
         self.send_msg(&stack_tree_msg, noc_to_port)?;
         Ok(())
     }
