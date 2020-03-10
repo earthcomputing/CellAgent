@@ -125,7 +125,11 @@ impl Noc {
             self.deploy_agent(&AllowedTree::new(NOC_AGENT_DEPLOY_TREE_NAME), noc_to_port)?;
             self.deploy_master(&AllowedTree::new(NOC_MASTER_DEPLOY_TREE_NAME), noc_to_port)?;
         }
-        if self.allowed_trees.len() == 5 {
+        if *tree_name == AllowedTree::new("Base") {
+            let tree_name_3hop = AllowedTree::new("3hop");
+            self.small_tree(&tree_name_3hop, &tree_name, 3, noc_to_port).context(NocError::Chain { func_name: "create_noc", comment: S("noc master tree") })?;
+        }
+        if *tree_name == AllowedTree::new("3hop") {
             let tree_name_2hop = AllowedTree::new("2hop");
             self.small_tree(&tree_name_2hop, &tree_name, 2, noc_to_port).context(NocError::Chain { func_name: "create_noc", comment: S("noc master tree")})?;
         }
@@ -216,8 +220,6 @@ impl Noc {
         self.noc_agent_master_tree(&noc_agent_master, base_tree_name, noc_to_port).context(NocError::Chain { func_name: "create_noc", comment: S("noc agent tree")})?;
         self.noc_agent_deploy_tree(&noc_agent_deploy, base_tree_name, noc_to_port).context(NocError::Chain { func_name: "create_noc", comment: S("noc agent tree")})?;
         self.noc_master_deploy_tree(&noc_master_deploy, base_tree_name, noc_to_port).context(NocError::Chain { func_name: "create_noc", comment: S("noc master tree")})?;
-        let tree_name_3hop = AllowedTree::new("3hop");
-        self.small_tree(&tree_name_3hop, base_tree_name, 3, noc_to_port).context(NocError::Chain { func_name: "create_noc", comment: S("noc master tree")})?;
         Ok(5)
     }
     fn small_tree(&mut self, new_tree_name: &AllowedTree, parent_tree_name: &AllowedTree,
@@ -241,7 +243,7 @@ impl Noc {
                 let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
             }
         }
-        println!("Noc: stack {} on tree {}", "3hop", parent_tree_name);
+        println!("Noc: stack {} on tree {}", new_tree_name, parent_tree_name);
         self.send_msg(&stack_tree_msg, noc_to_port)?;
         Ok(())
     }
