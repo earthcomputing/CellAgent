@@ -73,9 +73,11 @@ impl Config {
             config.edge_list = Config::make_edges(nr, nc);
             // Select border cells
             config.border_cell_ports = Default::default();
-            for cell_no in 1..nc {
-                if 0 == cell_no%2 {
+            for cell_no in 0..nc {
+                if 1 == cell_no%2 {
                     config.border_cell_ports.insert(CellNo(cell_no), vec![PortNo(2)]);
+                }
+                if 0 == cell_no%2 {
                     config.border_cell_ports.insert(CellNo(cell_no + nc*(nr-1)), vec![PortNo(1)]);
                 }
             }

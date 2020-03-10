@@ -290,7 +290,7 @@ impl CellAgent {
                 let port_number = PortNumber::new(port_no, self.no_ports)?;
                 let discover_msg = self.make_my_discover_msg(port_number)?;
                 let user_mask = Mask::new(port_number);
-                self.send_msg(line_no, self.connected_tree_id, &discover_msg, user_mask)?;
+                self.send_msg(line_no, self.connected_tree_id, discover_msg, user_mask)?;
             }
         }
         Ok(())
@@ -1037,11 +1037,11 @@ impl CellAgent {
                     DEFAULT_USER_MASK
                 };
                 self.discoverd_sent.insert(new_tree_id);
-                self.send_msg(line!(), self.connected_tree_id, &discoverd_msg, user_mask)?;
+                self.send_msg(line!(), self.connected_tree_id, discoverd_msg, user_mask)?;
             }
         } else if self.discover_done(&new_tree_id) {
             if let Some((port_number, discoverd_msg)) = self.discoverd_parent_msg.remove(&new_tree_id) {
-                self.send_msg(line!(), self.connected_tree_id, &discoverd_msg, Mask::new(port_number))?;
+                self.send_msg(line!(), self.connected_tree_id, discoverd_msg, Mask::new(port_number))?;
             }
         }
         let updated_msg = msg.update(self.cell_id);
@@ -1049,9 +1049,9 @@ impl CellAgent {
             self.discover_n_hop_msg.insert((port_no, new_tree_id), updated_msg);
         } else {
             if !quench {
-                let user_mask = DEFAULT_USER_MASK.all_but_port(port_number);
-                self.send_msg(line!(), self.get_connected_tree_id(), &updated_msg, user_mask).context(CellagentError::Chain { func_name: _f, comment: S("DiscoverMsg") })?;
                 self.add_saved_discover(&updated_msg); // Discover message are always saved for late port connect
+                let user_mask = DEFAULT_USER_MASK.all_but_port(port_number);
+                self.send_msg(line!(), self.get_connected_tree_id(), updated_msg, user_mask).context(CellagentError::Chain { func_name: _f, comment: S("DiscoverMsg") })?;
             }
         }
         self.send_my_discover(line!())?;
@@ -1089,7 +1089,7 @@ impl CellAgent {
         if self.discover_done(&tree_id) {
             if  tree_id != self.my_tree_id {
                 if let Some((port_number, discoverd_msg)) = self.discoverd_parent_msg.remove(&tree_id) {
-                    self.send_msg(line!(), self.connected_tree_id, &discoverd_msg, Mask::new(port_number))?;
+                    self.send_msg(line!(), self.connected_tree_id, discoverd_msg, Mask::new(port_number))?;
                 }
             } else if self.discoverd_sent.insert(tree_id) {
                 let sender_id = SenderID::new(self.cell_id, "CellAgent")?;
@@ -1098,7 +1098,7 @@ impl CellAgent {
                 let discoverd_msg = DiscoverDMsg::new(in_reply_to, sender_id,
                                                       self.cell_id, port_tree_id, path,
                                                       DiscoverDType::NonParent);
-                self.send_msg(line!(), self.connected_tree_id, &discoverd_msg, DEFAULT_USER_MASK)?;
+                self.send_msg(line!(), self.connected_tree_id, discoverd_msg, DEFAULT_USER_MASK)?;
             }
         }
         match msg.get_discoverd_type() {
@@ -1114,7 +1114,7 @@ impl CellAgent {
                 self.discover_n_hop_msg.remove(&(port_no, tree_id)) // Remove so it's only sent once
                     .map(|discover_msg| -> Result<(), Error> {
                         let user_mask = DEFAULT_USER_MASK.all_but_port(port_number);
-                        self.send_msg(line!(), self.connected_tree_id, &discover_msg, user_mask)?;
+                        self.send_msg(line!(), self.connected_tree_id, discover_msg, user_mask)?;
                         Ok(())
                     });
             },
@@ -1198,7 +1198,7 @@ impl CellAgent {
             let failover_d_msg = FailoverDMsg::new(in_reply_to, sender_id,
                                                    FailoverResponse::Success,
                                                    no_packets, payload);
-            self.send_msg(line!(), self.connected_tree_id, &failover_d_msg, mask)?;
+            self.send_msg(line!(), self.connected_tree_id, failover_d_msg, mask)?;
         } else {
             self.failover_reply_ports.insert(rw_port_tree_id, port_no);
             self.find_new_parent(header, payload, port_no).context(CellagentError::Chain { func_name: _f, comment: S("find_new_parent") })?;
@@ -1272,7 +1272,7 @@ impl CellAgent {
                                                                    FailoverResponse::Success,
                                                                    self.no_packets[broken_port_number],
                                                                    payload.get_failover_payload());
-                            self.send_msg(line!(), self.connected_tree_id, &failover_d_msg, mask)
+                            self.send_msg(line!(), self.connected_tree_id, failover_d_msg, mask)
                         })
                         .ok_or(CellagentError::FailoverPort { func_name: _f, cell_id: self.cell_id, port_tree_id: rw_port_tree_id })??;
                     self.failover_reply_ports.remove(&rw_port_tree_id);
@@ -1304,7 +1304,7 @@ impl CellAgent {
         if !CONFIG.breadth_first_1hop  {
             let discoverd_msg = DiscoverDMsg::new(in_reply_to, sender_id, self.cell_id,
                       self.my_tree_id.to_port_tree_id_0(), path, DiscoverDType::NonParent);
-            self.send_msg(line!(), self.connected_tree_id, &discoverd_msg, user_mask)?;
+            self.send_msg(line!(), self.connected_tree_id, discoverd_msg, user_mask)?;
         }
         for tree_id in tree_ids.iter() { // Hueristic failed; got late port connect
             if self.my_discover_sent {
@@ -1315,13 +1315,13 @@ impl CellAgent {
             self.update_base_tree_map(my_port_tree_id, self.my_tree_id);
             let discover_msg = DiscoverMsg::new(sender_id.clone(), my_port_tree_id,
                                                 self.cell_id, hops, path);
-            self.send_msg(line!(), self.connected_tree_id, &discover_msg, user_mask)?;
+            self.send_msg(line!(), self.connected_tree_id, discover_msg, user_mask)?;
             let discoverd_msg = DiscoverDMsg::new(in_reply_to, sender_id,
                                                   self.cell_id, tree_id.to_port_tree_id_0(), path,
                                                   DiscoverDType::NonParent);
-            self.send_msg(line!(), self.connected_tree_id, &discoverd_msg, user_mask)?;
+            self.send_msg(line!(), self.connected_tree_id, discoverd_msg, user_mask)?;
         }
-        for discover_msg in self.get_saved_discover().iter() {
+        for discover_msg in self.get_saved_discover().iter().cloned() { // cloned because I may need it later
             self.send_msg(line!(), self.connected_tree_id, discover_msg, user_mask)?;
         };
         let payload = msg.get_payload();
@@ -1442,10 +1442,10 @@ impl CellAgent {
             } else {
                 let new_msg = StackTreeDMsg::new(in_reply_to, sender_id, new_port_tree_id,
                                                  parent_port_tree_id, join_tree);
-                self.send_msg(line!(), self.get_connected_tree_id(), &new_msg, user_mask)?;
+                self.send_msg(line!(), self.get_connected_tree_id(), new_msg, user_mask)?;
             }
         } else {
-            self.send_msg(line!(), self.connected_tree_id, msg, parent_mask)?; // Send to children of parent tree
+            self.send_msg(line!(), self.connected_tree_id, msg.clone(), parent_mask)?; // Send to children of parent tree
         }
         self.child_ports.insert(new_port_tree_id.to_tree_id(), child_ports);
         let parent_port_tree_id = payload.get_parent_port_tree_id();
@@ -1528,7 +1528,7 @@ impl CellAgent {
                 let parent_port_tree_id = msg.get_parent_port_tree_id();
                 let new_msg = StackTreeDMsg::new(in_reply_to, sender_id, port_tree_id,
                                                  parent_port_tree_id, true);
-                self.send_msg(line!(), self.get_connected_tree_id(), &new_msg, mask)?;
+                self.send_msg(line!(), self.get_connected_tree_id(), new_msg, mask)?;
             }
         }
         (*self.traphs_mutex.lock().unwrap()) = self.traphs.clone();
@@ -1566,13 +1566,13 @@ impl CellAgent {
                 let failover_d_msg = FailoverDMsg::new(in_reply_to, sender_id,
                                                        FailoverResponse::Failure,
                                                        no_packets, payload);
-                self.send_msg(line!(), self.connected_tree_id, &failover_d_msg, mask)?;
+                self.send_msg(line!(), self.connected_tree_id, failover_d_msg, mask)?;
             },
             Some(trial_port_no) => {
                 let failover_msg = FailoverMsg::new(sender_id, rw_port_tree_id, lw_port_tree_id,
                                                     broken_path, &broken_tree_ids);
                 let mask = Mask::new(trial_port_no.make_port_number(self.no_ports)?);
-                self.send_msg(line!(), self.connected_tree_id, &failover_msg, mask)?;
+                self.send_msg(line!(), self.connected_tree_id, failover_msg, mask)?;
             }
         }
         (*self.traphs_mutex.lock().unwrap()) = self.traphs.clone();
@@ -1626,7 +1626,7 @@ impl CellAgent {
                 let _ = add_to_trace(TraceType::Debug, trace_params, &trace, _f);
             }
         }
-        self.send_msg(line!(), tree_id, &msg, DEFAULT_USER_MASK)?;
+        self.send_msg(line!(), tree_id, msg, DEFAULT_USER_MASK)?;
         Ok(())
     }
     pub fn app_delete_tree(&mut self, app_msg: &AppDeleteTreeMsg, sender_id: SenderID) -> Result<(), Error> {
@@ -1649,7 +1649,7 @@ impl CellAgent {
                                 let _ = add_to_trace(TraceType::Debug, trace_params, &trace, _f);
                            }
                         }
-                        self.send_msg(line!(), parent_tree_id, &msg, DEFAULT_USER_MASK)?;
+                        self.send_msg(line!(), parent_tree_id, msg, DEFAULT_USER_MASK)?;
                         self.delete_tree(&delete_tree_id)?;
                     }
                 }
@@ -1682,7 +1682,7 @@ impl CellAgent {
                 let _ = add_to_trace(TraceType::Debug, trace_params, &trace, _f);
             }
         }
-         self.send_msg(line!(), deploy_tree_id, &msg, mask.or(Mask::port0())).context(CellagentError::Chain { func_name: _f, comment: S(self.cell_id) + " send manifest" })?;
+         self.send_msg(line!(), deploy_tree_id, msg, mask.or(Mask::port0())).context(CellagentError::Chain { func_name: _f, comment: S(self.cell_id) + " send manifest" })?;
         Ok(())
     }
     pub fn app_query(&self, _msg: &AppQueryMsg, _sender_id: SenderID) -> Result<MsgTreeMap, Error> {
@@ -1719,7 +1719,7 @@ impl CellAgent {
         let parent_entry = self.get_tree_entry(parent_port_tree_id).context(CellagentError::Chain { func_name: _f, comment: S("get parent_entry") })?;
         let parent_mask = parent_entry.get_mask();
         let stack_tree_msg = StackTreeMsg::new(sender_id, new_tree_name, new_tree_id, parent_tree_id, direction, gvm_eqn);
-        self.send_msg(line!(), self.control_tree_id, &stack_tree_msg, Mask::port0())?;
+        self.send_msg(line!(), self.control_tree_id, stack_tree_msg, Mask::port0())?;
         Ok(())
     }
     pub fn app_tree_name(&self, _msg: &AppTreeNameMsg, _sender_id: SenderID) -> Result<(), Error> {
@@ -1796,7 +1796,7 @@ impl CellAgent {
             self.update_base_tree_map(my_port_tree_id, self.my_tree_id);
             // I was sending DiscoverMsg here, but now I send it when processing HelloMsg
             let hello_msg = HelloMsg::new(sender_id, self.cell_id, port_no);
-            let _ = self.send_msg(line!(), self.connected_tree_id, &hello_msg, user_mask);
+            let _ = self.send_msg(line!(), self.connected_tree_id, hello_msg, user_mask);
             Ok(())
         }
     }
@@ -1846,7 +1846,7 @@ impl CellAgent {
             let failover_msg = FailoverMsg::new(sender_id, rw_port_tree_id, lw_port_tree_id,
                                                 broken_path, &broken_port_tree_ids);
             println!("Cellagent {}: {} candidate parent for tree {} is port {}", self.cell_id, _f, rw_traph.get_base_tree_id(), *trial_parent_port);
-            self.send_msg(line!(), self.connected_tree_id, &failover_msg, mask).context(CellagentError::Chain { func_name: _f, comment: S(self.cell_id) })?;
+            self.send_msg(line!(), self.connected_tree_id, failover_msg, mask).context(CellagentError::Chain { func_name: _f, comment: S(self.cell_id) })?;
         } else {
             println!("Cellagent {}: {} no candidate parent found for tree {}", self.cell_id, _f, rw_traph.get_base_tree_id())
         }
@@ -1855,7 +1855,7 @@ impl CellAgent {
     }
     fn forward_discover(&self, mask: Mask) -> Result<(), Error> {
         let _f = "forward_discover";
-        for msg in self.get_saved_discover().iter() {
+        for msg in self.get_saved_discover().iter().cloned() { // cloned because may need it later
             {
                 if CONFIG.debug_options.all || CONFIG.debug_options.discover {
                     let n_forward = self.get_saved_discover().len();
@@ -1871,8 +1871,8 @@ impl CellAgent {
         Ok(())
     }
     // Added line_no parameter for debugging purposes
-    fn send_msg<T: Message>(&self, line_no: u32, tree_id: TreeID, msg: &T, user_mask: Mask) -> Result<(), Error>
-        where T: Message + ::std::marker::Sized + serde::Serialize + fmt::Display
+    fn send_msg<T: Message>(&self, line_no: u32, tree_id: TreeID, msg: T, user_mask: Mask) -> Result<(), Error>
+        where T: Message + Sized + serde::Serialize + fmt::Display
     {
         let _f = "send_msg";
         let seq_no = msg.get_sender_msg_seq_no();
