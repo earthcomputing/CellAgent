@@ -630,7 +630,7 @@ impl Message for StackTreeMsg {
     }
     fn process_ca(&mut self, cell_agent: &mut CellAgent, port_no: PortNo,
                   msg_port_tree_id: PortTreeID, _is_ait: bool) -> Result<(), Error> {
-        cell_agent.process_stack_tree_msg(&self, port_no, msg_port_tree_id)
+        cell_agent.process_stack_tree_msg(self, port_no, msg_port_tree_id)
     }
 }
 impl fmt::Display for StackTreeMsg {
