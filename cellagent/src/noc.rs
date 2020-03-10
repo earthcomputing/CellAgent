@@ -125,6 +125,10 @@ impl Noc {
             self.deploy_agent(&AllowedTree::new(NOC_AGENT_DEPLOY_TREE_NAME), noc_to_port)?;
             self.deploy_master(&AllowedTree::new(NOC_MASTER_DEPLOY_TREE_NAME), noc_to_port)?;
         }
+        if self.allowed_trees.len() == 5 {
+            let tree_name_2hop = AllowedTree::new("2hop");
+            self.small_tree(&tree_name_2hop, &tree_name, 2, noc_to_port).context(NocError::Chain { func_name: "create_noc", comment: S("noc master tree")})?;
+        }
         Ok(())
     }
     // SPAWN THREAD (listen_application_loop)
@@ -208,22 +212,23 @@ impl Noc {
         let noc_agent_master = AllowedTree::new(NOC_LISTEN_TREE_NAME);
         let noc_master_deploy= AllowedTree::new(NOC_MASTER_DEPLOY_TREE_NAME);
         let noc_agent_deploy = AllowedTree::new(NOC_AGENT_DEPLOY_TREE_NAME);
-        let small_tree_name = AllowedTree::new("3hop");
         self.noc_master_agent_tree(&noc_master_agent, base_tree_name, noc_to_port).context(NocError::Chain { func_name: "create_noc", comment: S("noc master tree")})?;
         self.noc_agent_master_tree(&noc_agent_master, base_tree_name, noc_to_port).context(NocError::Chain { func_name: "create_noc", comment: S("noc agent tree")})?;
         self.noc_agent_deploy_tree(&noc_agent_deploy, base_tree_name, noc_to_port).context(NocError::Chain { func_name: "create_noc", comment: S("noc agent tree")})?;
         self.noc_master_deploy_tree(&noc_master_deploy, base_tree_name, noc_to_port).context(NocError::Chain { func_name: "create_noc", comment: S("noc master tree")})?;
-        self.small_tree(&small_tree_name, base_tree_name, noc_to_port).context(NocError::Chain { func_name: "create_noc", comment: S("noc master tree")})?;
+        let tree_name_3hop = AllowedTree::new("3hop");
+        self.small_tree(&tree_name_3hop, base_tree_name, 3, noc_to_port).context(NocError::Chain { func_name: "create_noc", comment: S("noc master tree")})?;
         Ok(5)
     }
     fn small_tree(&mut self, new_tree_name: &AllowedTree, parent_tree_name: &AllowedTree,
-                  noc_to_port: &NocToPort) -> Result<(), Error> {
+                  hops: usize, noc_to_port: &NocToPort) -> Result<(), Error> {
         let _f = "small_tree";
-        // 2-hop tree
+        // n-hop tree
+        let hops_term = &format!("hops < {}", hops + 1);
         let mut eqns = HashSet::new();
-        eqns.insert(GvmEqn::Send("hops < 4"));
-        eqns.insert(GvmEqn::Recv("hops < 4"));
-        eqns.insert(GvmEqn::Xtnd("hops < 4"));
+        eqns.insert(GvmEqn::Send(hops_term));
+        eqns.insert(GvmEqn::Recv(hops_term));
+        eqns.insert(GvmEqn::Xtnd(hops_term));
         eqns.insert(GvmEqn::Save("true"));
         let gvm_eqn = GvmEquation::new(&eqns, &[GvmVariable::new(GvmVariableType::PathLength, "hops")]);
         let stack_tree_msg = AppStackTreeMsg::new("Noc",
