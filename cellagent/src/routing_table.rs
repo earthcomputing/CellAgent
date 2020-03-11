@@ -6,8 +6,9 @@ use failure::{Error};
 use crate::name::{CellID};
 use crate::routing_table_entry::{RoutingTableEntry};
 use crate::uuid_ec::Uuid;
+use crate::blueprint::BlueprintError::DefaultNumPhysPortsPerCell;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct RoutingTable {
     id: CellID,
     entries: HashMap<Uuid, RoutingTableEntry>,
@@ -16,7 +17,9 @@ pub struct RoutingTable {
 }
 impl RoutingTable {
     pub fn new(id: CellID) -> RoutingTable {
-        RoutingTable { id, entries: HashMap::new(), connected_ports: Vec::new(), order: Vec::new() }
+        let mut routing_table: RoutingTable = Default::default();
+        routing_table.id = id;
+        routing_table
     }
     pub fn get_entry(&self, uuid: Uuid) -> Result<RoutingTableEntry, Error> {
         let _f = "get_entry";
