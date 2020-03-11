@@ -39,7 +39,7 @@ pub trait Name: Sized {
     }
     fn is_name(&self, name: &str) -> bool { self.get_name() == name }
 }
-#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, Serialize, Deserialize, Default)]
 pub struct CellID {
     name: NameType,
     uuid: Uuid
