@@ -87,6 +87,9 @@ pub enum CellType {
     Border,
     Interior
 }
+impl Default for CellType {
+    fn default() -> CellType { CellType::Interior }
+}
 impl fmt::Display for CellType {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let s = match *self {
@@ -265,6 +268,9 @@ impl fmt::Display for TraceType {
 }
 #[derive(Debug, Copy, Clone, Hash, Serialize, Deserialize)]
 pub enum CellConfig { Small, Medium, Large }
+impl Default for CellConfig {
+    fn default() -> CellConfig { CellConfig::Large }
+}
 impl fmt::Display for CellConfig {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let s = match *self {
@@ -275,13 +281,13 @@ impl fmt::Display for CellConfig {
         write!(f, "{}", s)
     }
 }
-#[derive(Debug, Copy, Clone, Serialize, Deserialize)]
+#[derive(Debug, Copy, Clone, Serialize, Deserialize, Default)]
 pub struct CellInfo {   // Any data the cell agent wants to expose to applications
-external_id: Uuid   // An externally visible identifier so applications can talk about individual cells
+    external_id: Uuid   // An externally visible identifier so applications can talk about individual cells
 }
 impl CellInfo {
     pub fn new() -> CellInfo {
-        CellInfo { external_id: Uuid::new() }
+        Default::default()
     }
     pub fn get_external_id(&self) -> Uuid {
         return self.external_id;
