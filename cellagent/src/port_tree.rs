@@ -20,8 +20,7 @@ impl PortTree {
         let mut entry = RoutingTableEntry::default();
         entry.set_tree_id(port_tree_id);
         entry.add_child(PortNumber::new0());
-        PortTree { port_tree_id: port_tree_id.clone(), root_port_no,
-                   in_port_no, hops, entry }
+        PortTree { port_tree_id, root_port_no, in_port_no, hops, entry }
     }
     pub fn get_port_tree_id(&self) -> PortTreeID { self.port_tree_id }
     pub fn get_root_port_no(&self) -> PortNo { self.root_port_no }

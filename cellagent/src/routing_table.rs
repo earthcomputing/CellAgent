@@ -17,9 +17,7 @@ pub struct RoutingTable {
 }
 impl RoutingTable {
     pub fn new(id: CellID) -> RoutingTable {
-        let mut routing_table: RoutingTable = Default::default();
-        routing_table.id = id;
-        routing_table
+        RoutingTable { id, ..Default::default() }
     }
     pub fn get_entry(&self, uuid: Uuid) -> Result<RoutingTableEntry, Error> {
         let _f = "get_entry";

@@ -151,7 +151,7 @@ impl Port {
             {
                 if CONFIG.trace_options.all || CONFIG.trace_options.port {
                     let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "port_from_ca" };
-                    let trace = json!({ "id": self.get_id().get_name(), "bytes": bytes });
+                    let trace = json!({ "id": self.get_id().get_name(), "bytes": bytes.to_string()? });
                     let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
                 }
             }
@@ -365,7 +365,7 @@ impl Port {
         {
             if CONFIG.trace_options.all | CONFIG.trace_options.port {
                 let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "port_to_noc" };
-                let trace = json!({ "id": self.get_id().get_name(), "bytes": bytes });
+                let trace = json!({ "id": self.get_id().get_name(), "bytes": bytes.to_string()? });
                 let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
             }
         }
