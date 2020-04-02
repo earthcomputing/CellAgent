@@ -18,7 +18,7 @@ use crate::uuid_ec::Uuid;
 
 type StackedTrees = HashMap<Uuid, Tree>;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct Traph {
     cell_id: CellID, // For debugging
     base_tree_id: TreeID,
@@ -29,28 +29,25 @@ pub struct Traph {
     tried_ports: HashMap<PortTreeID,HashSet<PortNo>>
 }
 impl Traph {
-    pub fn new(cell_id: &CellID, no_ports: PortQty, black_tree_id: TreeID, gvm_eqn: &GvmEquation)
+    pub fn new(cell_id: CellID, no_ports: PortQty, black_tree_id: TreeID, gvm_eqn: &GvmEquation)
             -> Result<Traph, Error> {
-        let mut elements = Vec::new();
+        let mut traph: Traph = Default::default();
+        traph.cell_id = cell_id;
+        traph.base_tree_id = black_tree_id;
         for i in 0..=*no_ports {
             let port_number = PortNo(i as u8).make_port_number(no_ports).context(TraphError::Chain { func_name: "new", comment: S("")})?;
-            elements.push(TraphElement::default_for_port(port_number));
+            traph.elements.push(TraphElement::default_for_port(port_number));
         }
-        let mut entry = RoutingTableEntry::default();
-        entry.add_child(PortNumber::new0());
-        let black_port_tree_id = black_tree_id.to_port_tree_id_0();
-        let black_tree = Tree::new(black_port_tree_id, black_tree_id,
-                                   black_port_tree_id, gvm_eqn, entry);
-        let stacked_trees = Arc::new(Mutex::new(HashMap::new()));
-        {
-            let mut locked = stacked_trees.lock().unwrap();
+        { // Need this block to make locked go out of scope before return
+            let mut entry = RoutingTableEntry::default();
+            entry.add_child(PortNumber::new0());
+            let black_port_tree_id = black_tree_id.to_port_tree_id_0();
+            let black_tree = Tree::new(black_port_tree_id, black_tree_id,
+                                       black_port_tree_id, gvm_eqn, entry);
+            let mut locked = traph.stacked_trees.lock().unwrap();
             locked.insert(black_tree_id.get_uuid(), black_tree);
         }
-        let cloth = Traph { cell_id: cell_id.clone(), base_tree_id: black_tree_id.clone(), port_tree_id: None,
-                   port_trees: HashMap::new(), stacked_trees, elements, tried_ports: HashMap::new() };
-        // println!("new - {}", cloth);
-        // dumpstack();
-        Ok(cloth)
+        Ok(traph)
     }
     pub fn _get_cell_id(&self) -> &CellID { &self.cell_id }
     pub fn get_tree(&self, tree_uuid: &Uuid) -> Result<Tree, Error> {

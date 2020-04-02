@@ -64,8 +64,8 @@ impl RoutingTableEntry {
     fn or_with_mask(&mut self, mask: Mask) { self.mask = self.mask.or(mask); }
     fn and_with_mask(&mut self, mask: Mask) { self.mask = self.mask.and(mask); }
 }
-impl Default for RoutingTableEntry {
-    fn default() -> Self {
+impl Default for RoutingTableEntry { // Need may_sent = true
+    fn default() -> Self { // Can't use ..Default::default() without overflowing stack
         RoutingTableEntry::new(PortTreeID::default(), false,
                                PortNumber::default(), Mask::default(), true)
     }
