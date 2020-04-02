@@ -397,9 +397,13 @@ impl PacketEngine {
                 reroute_outbuf.append(broken_outbuf);
             }
         }
-        self.pe_to_ports.get(&reroute_port_no)
-            .ok_or::<Error>(PacketEngineError::Sender { cell_id: self.cell_id, func_name: _f, port_no: *reroute_port_no }.into())?
-            .send(packet.clone())?;
+        if port_no == PortNo(0) {
+            self.pe_to_cm.send(PeToCmPacket::Packet((port_no, packet.clone())))?;
+        } else {
+            self.pe_to_ports.get(&reroute_port_no)
+                .ok_or::<Error>(PacketEngineError::Sender { cell_id: self.cell_id, func_name: _f, port_no: *reroute_port_no }.into())?
+                .send(packet.clone())?;
+        }
         Ok(())
     }
     fn send_packet_flow_control(&mut self, port_no: PortNo) -> Result<(), Error> {

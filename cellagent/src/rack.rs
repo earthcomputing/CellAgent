@@ -18,13 +18,13 @@ use crate::name::{CellID, LinkID};
 use crate::port::{Port};
 use crate::utility::{CellNo, CellConfig, Edge, S, TraceHeaderParams, TraceType};
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct Rack {
     cells: HashMap<CellNo, NalCell>,
     links: HashMap<Edge, Link>,
 }
 impl Rack {
-    pub fn new() -> Rack { Rack { cells: Default::default(), links: Default::default() } }
+    pub fn new() -> Rack { Default::default() }
     pub fn initialize(&mut self, blueprint: &Blueprint)  -> Result<Vec<JoinHandle<()>>, Error> {
         let _f = "initialize";
         let num_cells = blueprint.get_ncells();

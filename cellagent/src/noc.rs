@@ -25,12 +25,12 @@ pub const NOC_LISTEN_TREE_NAME:    &str = "NocAgentMaster";
 pub struct Noc {
     base_tree: Option<AllowedTree>,
     allowed_trees: HashSet<AllowedTree>,
+    deploy_done: bool,
     noc_to_application: NocToApplication,
 }
 impl Noc {
-    pub fn get_name(&self) -> &str { "NOC" }
     pub fn new(noc_to_application: NocToApplication) -> Result<Noc, Error> {
-        Ok(Noc { base_tree: None, allowed_trees: HashSet::new(), noc_to_application })
+        Ok(Noc { base_tree: None, allowed_trees: HashSet::new(), deploy_done: false, noc_to_application })
     }
     pub fn initialize(&mut self, blueprint: &Blueprint, noc_from_application: NocFromApplication)
             -> Result<(PortToNoc, PortFromNoc), Error> {
@@ -55,6 +55,7 @@ impl Noc {
 //			_ => panic!("Noc doesn't recognize message type {}", msg_type)
 //		})
 //	}
+    pub fn get_name(&self) -> &str { "NOC" }
 
     // SPAWN THREAD (listen_port_loop)
     fn listen_port(&mut self, noc_to_port: NocToPort, noc_from_port: NocFromPort)
@@ -116,24 +117,38 @@ impl Noc {
         let tree_name = msg.get_tree_name();
         // Handle duplicate notifications
         if self.allowed_trees.get(tree_name).is_some() { return Ok(()); }
+        let master_agent = AllowedTree::new(NOC_CONTROL_TREE_NAME);
+        let agent_master = AllowedTree::new(NOC_LISTEN_TREE_NAME);
+        let master_deploy = AllowedTree::new(NOC_MASTER_DEPLOY_TREE_NAME);
+        let agent_deploy = AllowedTree::new(NOC_AGENT_DEPLOY_TREE_NAME);
+        let deploy_trees = [&master_agent, &agent_master, &master_deploy, &agent_deploy];
+        let three_hop = AllowedTree::new("3hop");
+        let two_hop = AllowedTree::new("2hop");
         self.allowed_trees.insert(tree_name.clone());
-        if self.base_tree.is_none() {
-            self.base_tree = Some(tree_name.clone());
-            self.stack_trees(tree_name, &noc_to_port).context(NocError::Chain { func_name: "listen_port", comment: S("") })?;
-        }
-        if self.allowed_trees.len() == 4 {
-            self.deploy_agent(&AllowedTree::new(NOC_AGENT_DEPLOY_TREE_NAME), noc_to_port)?;
-            self.deploy_master(&AllowedTree::new(NOC_MASTER_DEPLOY_TREE_NAME), noc_to_port)?;
-        }
-        if *tree_name == AllowedTree::new("Base") {
-            let tree_name_3hop = AllowedTree::new("3hop");
-            self.small_tree(&tree_name_3hop, &tree_name, 3, noc_to_port).context(NocError::Chain { func_name: "create_noc", comment: S("noc master tree") })?;
-        }
-        if *tree_name == AllowedTree::new("3hop") {
-            let tree_name_2hop = AllowedTree::new("2hop");
-            self.small_tree(&tree_name_2hop, &tree_name, 2, noc_to_port).context(NocError::Chain { func_name: "create_noc", comment: S("noc master tree")})?;
+        match &self.base_tree.clone() {
+            None => { // First tree name received is assumed to be the base tree
+                self.base_tree = Some(tree_name.to_owned());
+                self.noc_master_agent_tree(&master_agent, tree_name, noc_to_port).context(NocError::Chain { func_name: "create_noc", comment: S("noc master tree") })?;
+                self.noc_agent_master_tree(&agent_master, tree_name, noc_to_port).context(NocError::Chain { func_name: "create_noc", comment: S("noc agent tree") })?;
+                self.noc_master_deploy_tree(&master_deploy, tree_name, noc_to_port)?;
+                self.noc_agent_deploy_tree(&agent_deploy, tree_name, noc_to_port)?;
+                self.small_tree(&three_hop, &tree_name, 3, noc_to_port).context(NocError::Chain { func_name: "create_noc", comment: S("noc master tree") })?;
+            },
+            Some(base) => {
+                if self.allowed_trees.contains(&three_hop) && *tree_name == three_hop {
+                    self.small_tree(&two_hop, &three_hop, 2, noc_to_port).context(NocError::Chain { func_name: "create_noc", comment: S("noc master tree") })?;
+                }
+                if self.has_allowed_trees(&deploy_trees) && !self.deploy_done {
+                    self.deploy_done = true;
+                    self.deploy_master(&master_deploy, noc_to_port)?;
+                    self.deploy_agent(tree_name, noc_to_port)?;
+                }
+            }
         }
         Ok(())
+    }
+    fn has_allowed_trees(&self, allowed_trees: &[&AllowedTree]) -> bool {
+        allowed_trees.iter().all(|&tree| self.allowed_trees.contains(tree))
     }
     // SPAWN THREAD (listen_application_loop)
     fn listen_application(&mut self, noc_from_application: NocFromApplication, noc_to_port: NocToPort)
@@ -214,12 +229,8 @@ impl Noc {
     fn stack_trees(&mut self, base_tree_name: &AllowedTree, noc_to_port: &NocToPort) -> Result<usize, Error> {
         let noc_master_agent = AllowedTree::new(NOC_CONTROL_TREE_NAME);
         let noc_agent_master = AllowedTree::new(NOC_LISTEN_TREE_NAME);
-        let noc_master_deploy= AllowedTree::new(NOC_MASTER_DEPLOY_TREE_NAME);
-        let noc_agent_deploy = AllowedTree::new(NOC_AGENT_DEPLOY_TREE_NAME);
         self.noc_master_agent_tree(&noc_master_agent, base_tree_name, noc_to_port).context(NocError::Chain { func_name: "create_noc", comment: S("noc master tree")})?;
         self.noc_agent_master_tree(&noc_agent_master, base_tree_name, noc_to_port).context(NocError::Chain { func_name: "create_noc", comment: S("noc agent tree")})?;
-        self.noc_agent_deploy_tree(&noc_agent_deploy, base_tree_name, noc_to_port).context(NocError::Chain { func_name: "create_noc", comment: S("noc agent tree")})?;
-        self.noc_master_deploy_tree(&noc_master_deploy, base_tree_name, noc_to_port).context(NocError::Chain { func_name: "create_noc", comment: S("noc master tree")})?;
         Ok(5)
     }
     fn small_tree(&mut self, new_tree_name: &AllowedTree, parent_tree_name: &AllowedTree,
