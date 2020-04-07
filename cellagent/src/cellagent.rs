@@ -1014,7 +1014,7 @@ impl CellAgent {
                 self.discoverd_parent_msg.insert(new_tree_id, (port_number, discoverd_msg));
                 let discoverd_msg = DiscoverDMsg::new(in_reply_to, sender_id, self.cell_id, new_port_tree_id, path,
                                                       DiscoverDType::NonParent);
-                let user_mask = if !CONFIG.breadth_first_1hop || **hops > 1 {
+                let user_mask = if !CONFIG.breadth_first_hops <= **hops || **hops > 1 {
                     DEFAULT_USER_MASK.all_but_port(port_number)
                 } else {
                     DEFAULT_USER_MASK
@@ -1028,7 +1028,7 @@ impl CellAgent {
             }
         }
         let updated_msg = msg.update(self.cell_id);
-        if CONFIG.breadth_first_1hop && **hops <= 1 { // quench is false for a discover_depth-hop DiscoverMsg
+        if CONFIG.breadth_first_hops <= **hops && **hops <= 1 { // quench is false for a discover_depth-hop DiscoverMsg
             self.discover_n_hop_msg.insert((port_no, new_tree_id), updated_msg);
         } else {
             if !quench {
@@ -1284,7 +1284,7 @@ impl CellAgent {
         let sender_id = SenderID::new(self.cell_id, "CellAgent")?;
         let path = Path::new(port_number.get_port_no(), self.no_ports)?;
         let in_reply_to = msg.get_sender_msg_seq_no();
-        if !CONFIG.breadth_first_1hop  {
+        if !CONFIG.breadth_first_hops > 0  {
             let discoverd_msg = DiscoverDMsg::new(in_reply_to, sender_id, self.cell_id,
                       self.my_tree_id.to_port_tree_id_0(), path, DiscoverDType::NonParent);
             self.send_msg(line!(), self.connected_tree_id, discoverd_msg, user_mask)?;
@@ -1460,7 +1460,7 @@ impl CellAgent {
         }
         let old_len = child_ports.len();
         child_ports.remove(&port_no); // Can't move to after if-block due to borrow checker
-        if old_len == 1 || (old_len == 0 && parent_port == PortNo(0)){ // I'm not a leaf, and I just heard from my last child, so tell my parent
+        if old_len == 1 || (old_len == 0 && parent_port == PortNo(0)) { // I'm not a leaf, and I just heard from my last child, so tell my parent
             let port_number = parent_port.make_port_number(self.no_ports)?;
             if parent_port == PortNo(0) {
                 // I am the root of the tree.  I need to tell the sender.
