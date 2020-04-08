@@ -28,6 +28,8 @@ pub enum MsgType {
     Hello,
     Interapplication,
     Manifest,
+    Prepare,
+    PrepareD,
     StackTree,
     StackTreeD,
     TreeName
@@ -62,6 +64,8 @@ impl MsgType {
         else if MsgType::is_type(packet, MsgType::FailoverD)   { MsgType::FailoverD }
         else if MsgType::is_type(packet, MsgType::Hello)       { MsgType::Hello }
         else if MsgType::is_type(packet, MsgType::Manifest)    { MsgType::Manifest }
+        else if MsgType::is_type(packet, MsgType::Prepare)     { MsgType::Prepare }
+        else if MsgType::is_type(packet, MsgType::PrepareD)    { MsgType::PrepareD }
         else if MsgType::is_type(packet, MsgType::StackTree)   { MsgType::StackTree }
         else if MsgType::is_type(packet, MsgType::StackTreeD)  { MsgType::StackTreeD }
         else if MsgType::is_type(packet, MsgType::TreeName)    { MsgType::TreeName }
@@ -80,6 +84,8 @@ impl fmt::Display for MsgType {
             MsgType::Hello             => "Hello",
             MsgType::Interapplication  => "Interapplication",
             MsgType::Manifest          => "Manifest",
+            MsgType::Prepare           => "Prepare",
+            MsgType::PrepareD          => "PrepareD",
             MsgType::StackTree         => "StackTree",
             MsgType::StackTreeD        => "StackTreeD",
             MsgType::TreeName          => "TreeName",
@@ -350,6 +356,141 @@ impl fmt::Display for DiscoverDType {
         match self {
             DiscoverDType::Parent => write!(f, "First"),
             DiscoverDType::NonParent => write!(f, "Subsequent")
+        }
+    }
+}
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PrepareMsg {
+    header: MsgHeader,
+    payload: PreparePayload
+}
+impl PrepareMsg {
+    pub fn new(in_reply_to: SenderMsgSeqNo, sender_id: SenderID, sending_cell_id: CellID,
+               tree_id: PortTreeID) -> PrepareMsg {
+        // Note that direction is leafward so we can use the connected ports tree
+        // If we send rootward, then the first recipient forwards the Prepare
+        let header = MsgHeader::new(sender_id, true, &HashMap::new(),
+                                    MsgType::Prepare, MsgDirection::Leafward);
+        let payload = PreparePayload::new(in_reply_to, sending_cell_id,
+                                            tree_id);
+        PrepareMsg { header, payload }
+    }
+    pub fn get_payload(&self) -> &PreparePayload { &self.payload }
+    pub fn get_in_reply_to(&self) -> SenderMsgSeqNo { self.payload.get_in_reply_to() }
+    pub fn get_port_tree_id(&self) -> PortTreeID { self.payload.get_port_tree_id() }
+}
+#[typetag::serde]
+impl Message for PrepareMsg {
+    fn get_header(&self) -> &MsgHeader { &self.header }
+    fn get_payload(&self) -> &dyn MsgPayload { &self.payload }
+    fn get_msg_type(&self) -> MsgType { self.get_header().msg_type }
+    fn value(&self) -> serde_json::Value {
+        serde_json::to_value(self).expect("I don't know how to handle errors in msg.value()")
+    }
+    fn process_ca(&mut self, cell_agent: &mut CellAgent, port_no: PortNo,
+                  _msg_tree_id: PortTreeID, _is_ait: bool,) -> Result<(), Error> {
+        let _f = "process_ca";
+        cell_agent.process_prepare_msg(&self, port_no)
+    }
+}
+impl fmt::Display for PrepareMsg {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let s = format!("{}: {}", self.get_header(), self.get_payload());
+        write!(f, "{}", s)
+    }
+}
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PreparePayload {
+    in_reply_to: SenderMsgSeqNo,
+    sending_cell_id: CellID,
+    port_tree_id: PortTreeID,
+}
+impl PreparePayload {
+    fn new(in_reply_to: SenderMsgSeqNo, sending_cell_id: CellID, port_tree_id: PortTreeID,) -> PreparePayload {
+        let root_port_no = port_tree_id.get_port_no();
+        PreparePayload { in_reply_to, sending_cell_id: sending_cell_id.clone(), port_tree_id: port_tree_id.clone() }
+    }
+    fn get_in_reply_to(&self) -> SenderMsgSeqNo { self.in_reply_to }
+    fn get_port_tree_id(&self) -> PortTreeID { self.port_tree_id }
+}
+#[typetag::serde]
+impl MsgPayload for PreparePayload {}
+impl fmt::Display for PreparePayload {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "Tree {}", self.port_tree_id)
+    }
+}
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PrepareDMsg {
+    header: MsgHeader,
+    payload: PrepareDPayload
+}
+impl PrepareDMsg {
+    pub fn new(in_reply_to: SenderMsgSeqNo, sender_id: SenderID, sending_cell_id: CellID,
+               tree_id: PortTreeID) -> PrepareDMsg {
+        // Note that direction is leafward so we can use the connected ports tree
+        // If we send rootward, then the first recipient forwards the PrepareD
+        let header = MsgHeader::new(sender_id, true, &HashMap::new(),
+                                    MsgType::DiscoverD, MsgDirection::Leafward);
+        let payload = PrepareDPayload::new(in_reply_to, sending_cell_id,
+                                            tree_id);
+        PrepareDMsg { header, payload }
+    }
+    pub fn get_payload(&self) -> &PrepareDPayload { &self.payload }
+    pub fn get_in_reply_to(&self) -> SenderMsgSeqNo { self.payload.get_in_reply_to() }
+    pub fn get_port_tree_id(&self) -> PortTreeID { self.payload.get_port_tree_id() }
+}
+#[typetag::serde]
+impl Message for PrepareDMsg {
+    fn get_header(&self) -> &MsgHeader { &self.header }
+    fn get_payload(&self) -> &dyn MsgPayload { &self.payload }
+    fn get_msg_type(&self) -> MsgType { self.get_header().msg_type }
+    fn value(&self) -> serde_json::Value {
+        serde_json::to_value(self).expect("I don't know how to handle errors in msg.value()")
+    }
+    fn process_ca(&mut self, cell_agent: &mut CellAgent, port_no: PortNo,
+                  _msg_tree_id: PortTreeID, _is_ait: bool) -> Result<(), Error> {
+        let _f = "process_ca";
+        cell_agent.process_prepare_d_msg(&self, port_no)
+    }
+}
+impl fmt::Display for PrepareDMsg {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let s = format!("{}: {}", self.get_header(), self.get_payload());
+        write!(f, "{}", s)
+    }
+}
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PrepareDPayload {
+    in_reply_to: SenderMsgSeqNo,
+    sending_cell_id: CellID,
+    port_tree_id: PortTreeID,
+}
+impl PrepareDPayload {
+    fn new(in_reply_to: SenderMsgSeqNo, sending_cell_id: CellID, port_tree_id: PortTreeID) -> PrepareDPayload {
+        let root_port_no = port_tree_id.get_port_no();
+        PrepareDPayload { in_reply_to, sending_cell_id, port_tree_id }
+    }
+    fn get_in_reply_to(&self) -> SenderMsgSeqNo { self.in_reply_to }
+    fn get_port_tree_id(&self) -> PortTreeID { self.port_tree_id }
+}
+#[typetag::serde]
+impl MsgPayload for PrepareDPayload {}
+impl fmt::Display for PrepareDPayload {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "Tree {}", self.port_tree_id)
+    }
+}
+#[derive(Debug, Copy, Clone, Eq, PartialEq, Serialize, Deserialize)]
+pub enum PrepareDType {
+    Parent,
+    NonParent
+}
+impl fmt::Display for PrepareDType {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            PrepareDType::Parent => write!(f, "First"),
+            PrepareDType::NonParent => write!(f, "Subsequent")
         }
     }
 }
