@@ -267,8 +267,9 @@ impl CellAgent {
     fn send_my_discover(&mut self, line_no: u32) -> Result<(), Error<>> {
         let _f = "send_my_discover";
         if !self.my_discover_sent &&
+            (CONFIG.breadth_first_hops == 0 ||
             (self.tree_count >= CONFIG.min_trees || // == test might fail if get two discovers before reaching here
-                self.neighbors.len() >= CONFIG.min_hello) {
+                self.neighbors.len() >= CONFIG.min_hello)) {
             self.my_discover_sent = true;
             for index in 1..=*self.no_ports {
                 let port_no = PortNo(index);
