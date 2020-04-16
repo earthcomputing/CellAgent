@@ -27,7 +27,8 @@ use crate::ec_message::{Message, MsgHeader, MsgTreeMap, MsgType,
               HelloMsg,
               ManifestMsg,
               PrepareMsg, PrepareDMsg,
-              StackTreeMsg, StackTreeDMsg};
+              StackTreeMsg, StackTreeDMsg,
+              TreeNameMsg};
 use crate::ec_message_formats::{CaToCm, CaFromCm, CmToCa, CmFromCa, PeToCm, CmFromPe, CaToCmBytes, CmToCaBytes, PeToPort, PeFromPort };
 use crate::gvm_equation::{GvmEquation, GvmEqn};
 use crate::name::{Name, CellID, SenderID, PortTreeID, TreeID, UptreeID, VmID};
@@ -261,7 +262,7 @@ impl CellAgent {
         let my_port_tree_id = self.my_tree_id.to_port_tree_id(port_number);
         self.update_base_tree_map(my_port_tree_id, self.my_tree_id);
         let discover_msg = DiscoverMsg::new(sender_id.clone(), my_port_tree_id.clone(),
-                                            self.cell_id, hops, path);
+                                            hops, path);
         Ok(discover_msg)
     }
     fn send_my_discover(&mut self, line_no: u32) -> Result<(), Error<>> {
@@ -288,9 +289,8 @@ impl CellAgent {
         {
             if CONFIG.debug_options.all || CONFIG.debug_options.saved_discover {
                 let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "ca_save_discover_msg" };
-                let trace = json!({ "cell_id": &self.cell_id, "tree_id": port_tree_id, "msg": &discover_msg });
+                let trace = json!({ "cell_id": &self.cell_id, "tree_id": port_tree_id, "msg": discover_msg });
                 let _ = add_to_trace(TraceType::Debug, trace_params, &trace, _f);
-                println!("Cell {}: save discover {}", self.cell_id, discover_msg);
             }
         }
         self.saved_discover.push(discover_msg.clone());
@@ -1010,10 +1010,10 @@ impl CellAgent {
             if !tree_seen {
                 let sender_id = SenderID::new(self.cell_id, "CellAgent")?;
                 let in_reply_to = msg.get_sender_msg_seq_no();
-                let discoverd_msg = DiscoverDMsg::new(in_reply_to, sender_id, self.cell_id, new_port_tree_id, path,
+                let discoverd_msg = DiscoverDMsg::new(in_reply_to, sender_id, new_port_tree_id, path,
                                                       DiscoverDType::Parent);
                 self.discoverd_parent_msg.insert(new_tree_id, (port_number, discoverd_msg));
-                let discoverd_msg = DiscoverDMsg::new(in_reply_to, sender_id, self.cell_id, new_port_tree_id, path,
+                let discoverd_msg = DiscoverDMsg::new(in_reply_to, sender_id, new_port_tree_id, path,
                                                       DiscoverDType::NonParent);
                 let user_mask = if !CONFIG.breadth_first_hops <= **hops || **hops > 1 {
                     DEFAULT_USER_MASK.all_but_port(port_number)
@@ -1080,7 +1080,7 @@ impl CellAgent {
                 let in_reply_to = msg.get_sender_msg_seq_no();
                 let path = msg.get_path();
                 let discoverd_msg = DiscoverDMsg::new(in_reply_to, sender_id,
-                                                      self.cell_id, port_tree_id, path,
+                                                      port_tree_id, path,
                                                       DiscoverDType::NonParent);
                 self.send_msg(line!(), self.connected_tree_id, discoverd_msg, DEFAULT_USER_MASK)?;
             }
@@ -1285,7 +1285,7 @@ impl CellAgent {
         let path = Path::new(port_number.get_port_no(), self.no_ports)?;
         let in_reply_to = msg.get_sender_msg_seq_no();
         if !CONFIG.breadth_first_hops > 0 {
-            let discoverd_msg = DiscoverDMsg::new(in_reply_to, sender_id, self.cell_id,
+            let discoverd_msg = DiscoverDMsg::new(in_reply_to, sender_id,
                       self.my_tree_id.to_port_tree_id_0(), path, DiscoverDType::NonParent);
             self.send_msg(line!(), self.connected_tree_id, discoverd_msg, user_mask)?;
         }
@@ -1297,10 +1297,10 @@ impl CellAgent {
             let my_port_tree_id = self.my_tree_id.to_port_tree_id(port_number);
             self.update_base_tree_map(my_port_tree_id, self.my_tree_id);
             let discover_msg = DiscoverMsg::new(sender_id.clone(), my_port_tree_id,
-                                                self.cell_id, hops, path);
+                                                hops, path);
             self.send_msg(line!(), self.connected_tree_id, discover_msg, user_mask)?;
             let discoverd_msg = DiscoverDMsg::new(in_reply_to, sender_id,
-                                                  self.cell_id, tree_id.to_port_tree_id_0(), path,
+                                                  tree_id.to_port_tree_id_0(), path,
                                                   DiscoverDType::NonParent);
             self.send_msg(line!(), self.connected_tree_id, discoverd_msg, user_mask)?;
         }
@@ -1358,7 +1358,7 @@ impl CellAgent {
         let _f = "_process_reroute_msg";
         unimplemented!("Should never get here")
     }
-    pub fn process_prepare_msg(&mut self, msg: &PrepareMsg, portno: PortNo) -> Result<(), Error> {
+    pub fn process_prepare_msg(&mut self, msg: &PrepareMsg, port_no: PortNo) -> Result<(), Error> {
         let _f = "process_prepare_msg";
         unimplemented!("Should never get here")
     }
@@ -1504,6 +1504,9 @@ impl CellAgent {
         }
         (*self.traphs_mutex.lock().unwrap()) = self.traphs.clone();
         Ok(())
+    }
+    pub fn process_tree_name_msg(&mut self, msg: &TreeNameMsg, port_no: PortNo) -> Result<(), Error> {
+        unimplemented!()
     }
     fn send_base_tree_to_noc(&mut self) -> Result<(), Error> {
         let _f = "send_base_tree_to_noc";
@@ -1843,7 +1846,7 @@ impl CellAgent {
     }
     // Added line_no parameter for debugging purposes
     fn send_msg<T: Message>(&self, line_no: u32, tree_id: TreeID, msg: T, user_mask: Mask) -> Result<(), Error>
-        where T: Message + Sized + serde::Serialize + fmt::Display
+        where T: Message + Sized + serde::Serialize
     {
         let _f = "send_msg";
         let seq_no = msg.get_sender_msg_seq_no();
