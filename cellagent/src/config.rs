@@ -41,7 +41,7 @@ pub struct Config {
     pub kafka_topic: String,
     pub min_trees: usize, // Minimum number of trees seen before sending mine
     pub min_hello: usize, // Minimum number of Hello messages before sending my discover
-    pub breadth_first_hops: usize, // Number of hops of breadth first search
+    pub breadth_first: bool, // Breadth first or stochastic discover
     pub num_cells: CellQty,
     pub num_ports_per_cell: PortQty,
     pub cell_port_exceptions: HashMap<CellNo, PortQty>,

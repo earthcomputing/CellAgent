@@ -19,7 +19,11 @@ fn main() -> Result<(), Error> {
     println!("\nMulticell trace and debug output to file {}", CONFIG.output_file_name);
     println!("{} Quenching of Discover messages", CONFIG.quench);
     println!("Delaying HelloMsg {} seconds", CONFIG.race_sleep);
-    println!("Breadth first Discover for {} hops", CONFIG.breadth_first_hops);
+    if CONFIG.breadth_first {
+        println!("Breadth first Discover");
+    } else {
+        println!("Stochastic Discover");
+    }
     println!("Wait until {} trees seen or {} hello messages before sending discover message", CONFIG.min_hello, CONFIG.min_trees);
     println!("\nMain: {} ports for each of {} cells", CONFIG.num_ports_per_cell , CONFIG.num_cells);
     let mut dc =
