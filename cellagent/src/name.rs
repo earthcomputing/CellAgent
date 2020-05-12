@@ -223,22 +223,22 @@ impl Name for VmID {
 }
 impl fmt::Display for VmID { fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result { str_from_chars(self.name).fmt(f) } }
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
-pub struct SenderID {
+pub struct OriginatorID { // Originator of a message that may be passed through many cells
     name: NameType,
     uuid: Uuid
 }
-impl SenderID {
-    pub fn new(cell_id: CellID, name: &str) -> Result<SenderID, Error> {
-        let name = str_to_chars(&format!("Sender:{}+{}", cell_id, name));
-        Ok(SenderID { name, uuid: Uuid::new() })
+impl OriginatorID {
+    pub fn new(cell_id: CellID, name: &str) -> Result<OriginatorID, Error> {
+        let name = str_to_chars(&format!("Originator:{}+{}", cell_id, name));
+        Ok(OriginatorID { name, uuid: Uuid::new() })
     }
 }
-impl Name for SenderID {
+impl Name for OriginatorID {
     fn get_name(&self) -> String { str_from_chars(self.name) }
     fn get_uuid(&self) -> Uuid { self.uuid }
-    fn create_from_string(&self, name: &str) -> SenderID { SenderID { name: str_to_chars(name), uuid: Uuid::new() } }
+    fn create_from_string(&self, name: &str) -> OriginatorID { OriginatorID { name: str_to_chars(name), uuid: Uuid::new() } }
 }
-impl fmt::Display for SenderID { fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result { str_from_chars(self.name).fmt(f) } }
+impl fmt::Display for OriginatorID { fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result { str_from_chars(self.name).fmt(f) } }
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct ContainerID {
     name: NameType,

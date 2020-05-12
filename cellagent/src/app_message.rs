@@ -7,7 +7,7 @@ use serde_json;
 
 use crate::cellagent::CellAgent;
 use crate::gvm_equation::{GvmEquation};
-use crate::name::{SenderID};
+use crate::name::{OriginatorID};
 use crate::noc::Noc;
 use crate::uptree_spec::{AllowedTree, Manifest};
 use crate::utility::{ByteArray, S};
@@ -82,7 +82,7 @@ pub trait AppMessage: fmt::Display {
     fn get_sender_name(&self) -> &str { &self.get_header().get_sender_name() }
     fn get_direction(&self) -> AppMsgDirection { self.get_header().get_direction() }
     fn get_allowed_trees(&self) -> &Vec<AllowedTree> { &self.get_header().get_allowed_trees() }
-    fn process_ca(&self, cell_agent: &mut CellAgent, sender_id: SenderID) -> Result<(), Error>;
+    fn process_ca(&self, cell_agent: &mut CellAgent, sender_id: OriginatorID) -> Result<(), Error>;
     fn process_noc(&self, noc: &mut Noc, noc_to_port: &NocToPort) -> Result<(), Error>;
 }
 #[typetag::serde(tag = "app_msg_payload_type")]
@@ -144,7 +144,7 @@ impl AppMessage for AppInterapplicationMsg {
     fn value(&self) -> serde_json::Value {
         serde_json::to_value(self).expect("I don't know how to handle errors in msg.value()")
     }
-    fn process_ca(&self, cell_agent: &mut CellAgent, sender_id: SenderID) -> Result<(), Error> {
+    fn process_ca(&self, cell_agent: &mut CellAgent, sender_id: OriginatorID) -> Result<(), Error> {
         let _f = "process_ca";
         cell_agent.app_interapplication(self, sender_id).context(AppMessageError::Chain { func_name: _f, comment: S("") })?;
         Ok(())
@@ -203,7 +203,7 @@ impl AppMessage for AppDeleteTreeMsg {
     fn value(&self) -> serde_json::Value {
         serde_json::to_value(self).expect("I don't know how to handle errors in msg.value()")
     }
-    fn process_ca(&self, cell_agent: &mut CellAgent, sender_id: SenderID) -> Result<(), Error> {
+    fn process_ca(&self, cell_agent: &mut CellAgent, sender_id: OriginatorID) -> Result<(), Error> {
         cell_agent.app_delete_tree(self, sender_id)?;
         Ok(())
     }
@@ -259,7 +259,7 @@ impl AppMessage for AppManifestMsg {
     fn value(&self) -> serde_json::Value {
         serde_json::to_value(self).expect("I don't know how to handle errors in msg.value()")
     }
-    fn process_ca(&self, cell_agent: &mut CellAgent, sender_id: SenderID) -> Result<(), Error> {
+    fn process_ca(&self, cell_agent: &mut CellAgent, sender_id: OriginatorID) -> Result<(), Error> {
         cell_agent.app_manifest(self, sender_id)?;
         Ok(())
     }
@@ -318,7 +318,7 @@ impl AppMessage for AppQueryMsg {
     fn value(&self) -> serde_json::Value {
         serde_json::to_value(self).expect("I don't know how to handle errors in msg.value()")
     }
-    fn process_ca(&self, cell_agent: &mut CellAgent, sender_id: SenderID) -> Result<(), Error> {
+    fn process_ca(&self, cell_agent: &mut CellAgent, sender_id: OriginatorID) -> Result<(), Error> {
         cell_agent.app_query(self, sender_id)?;
         Ok(())
     }
@@ -378,7 +378,7 @@ impl AppMessage for AppStackTreeMsg {
     fn value(&self) -> serde_json::Value {
         serde_json::to_value(self).expect("I don't know how to handle errors in msg.value()")
     }
-    fn process_ca(&self, cell_agent: &mut CellAgent, sender_id: SenderID) -> Result<(), Error> {
+    fn process_ca(&self, cell_agent: &mut CellAgent, sender_id: OriginatorID) -> Result<(), Error> {
         cell_agent.app_stack_tree(self, sender_id)?;
         Ok(())
     }
@@ -440,7 +440,7 @@ impl AppMessage for AppTreeNameMsg {
     fn value(&self) -> serde_json::Value {
         serde_json::to_value(self).expect("I don't know how to handle errors in msg.value()")
     }
-    fn process_ca(&self, cell_agent: &mut CellAgent, sender_id: SenderID) -> Result<(), Error> {
+    fn process_ca(&self, cell_agent: &mut CellAgent, sender_id: OriginatorID) -> Result<(), Error> {
         cell_agent.app_tree_name(self, sender_id)?;
         Ok(())
     }
