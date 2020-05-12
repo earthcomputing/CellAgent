@@ -3,7 +3,7 @@ use crossbeam::crossbeam_channel as mpsc;
 
 use crate::app_message::{SenderMsgSeqNo};
 use crate::app_message_formats::{ISAIT};
-use crate::name::{SenderID, TreeID};
+use crate::name::{OriginatorID, TreeID};
 use crate::packet::{Packet};
 use crate::packet_engine::NumberOfPackets;
 use crate::port::{PortStatus};
@@ -15,7 +15,7 @@ type CATOCM = (TreeID, ISAIT, Mask, SenderMsgSeqNo, ByteArray);
 type REROUTE = (PortNo, PortNo, NumberOfPackets);
 type STATUS = (PortNo, bool, NumberOfPackets, PortStatus);
 type TUNNELPORT = (PortNo, ByteArray);
-type TUNNELUP = (SenderID, ByteArray);
+type TUNNELUP = (OriginatorID, ByteArray);
 pub type PACKET = Packet;
 //pub type PePeError = mpsc::SendError<PeToPePacket>;
 // CellAgent to Cmodel (index, tree_uuid, user_mask, direction, bytes)
