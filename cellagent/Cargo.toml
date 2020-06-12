@@ -28,6 +28,14 @@ name = "test"
 test = true
 path = "src/test.rs"
 
+[profile.dev.package."*"]
+# Set the default for dependencies in Development mode
+opt-level = 3
+
+[profile.dev]
+# Turn off optimization in Development mode
+opt-level = 0
+
 [dependencies]
 actix-web = "1.0.5"
 actix-rt = "0.2.4"
