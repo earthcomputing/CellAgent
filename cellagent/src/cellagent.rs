@@ -1246,7 +1246,7 @@ impl CellAgent {
         let my_port_tree_id = self.my_tree_id.to_port_tree_id(port_number);
         let user_mask = Mask::new(port_number);
         let originator_id = OriginatorID::new(self.cell_id, "CellAgent")?;
-        let path = Path::new(port_number.get_port_no(), self.no_ports)?;
+        let path = Path::new(port_number);
         let in_reply_to = msg.get_sender_msg_seq_no();
         let payload = msg.get_payload();
         let neighbor_cell_id = msg.get_cell_id();
@@ -1264,7 +1264,7 @@ impl CellAgent {
         }
         let discover_msg = DiscoverMsg::new(self.cell_id, originator_id,
                                             my_port_tree_id, PathLength(CellQty(1)),
-                                            Path::new(port_no, self.no_ports)?);
+                                            Path::new(port_number));
         self.send_msg(line!(), self.connected_tree_id, discover_msg, user_mask)?;
         let discoverd_msg = DiscoverDMsg::new(in_reply_to, self.cell_id,
                          originator_id, my_port_tree_id, path, DiscoverDType::NonParent);
@@ -1320,7 +1320,7 @@ impl CellAgent {
             let in_reply_to = msg.get_sender_msg_seq_no();
             let originator_id = msg.get_originator_id();
             let port_number = PortNumber::new(port_no, self.no_ports)?;
-            let path = Path::new(port_no, self.no_ports)?;
+            let path = Path::new(port_number);
             for discover_msg in &self.saved_discover {
                 if tree_id == discover_msg.get_port_tree_id().to_tree_id() {
                     self.send_msg(line!(), self.connected_tree_id, discover_msg.clone(), DEFAULT_USER_MASK)?;
