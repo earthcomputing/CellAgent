@@ -35,7 +35,7 @@ impl Traph {
         traph.cell_id = cell_id;
         traph.base_tree_id = black_tree_id;
         for i in 0..=*no_ports {
-            let port_number = PortNo(i as u8).make_port_number(no_ports).context(TraphError::Chain { func_name: "new", comment: S("")})?;
+            let port_number = PortNo(i as u8).make_port_number(no_ports).context(TraphError::Chain { func_name: "new", comment: S("") })?;
             traph.elements.push(TraphElement::default_for_port(port_number));
         }
         { // Need this block to make locked go out of scope before return
@@ -170,14 +170,17 @@ impl Traph {
         // Cannont set port status to pruned here because I subsequently use port status to find broken parent links
         self.elements[*port_number.get_port_no() as usize].set_broken();
     }
-    pub fn _mark_parent(&mut self, port_number: PortNumber) {
+    pub fn mark_parent(&mut self, port_number: PortNumber) {
         self.elements[*port_number.get_port_no() as usize].mark_parent();
     }
-    pub fn _mark_child(&mut self, port_number: PortNumber) {
+    pub fn mark_child(&mut self, port_number: PortNumber) {
         self.elements[*port_number.get_port_no() as usize]._mark_child();
     }
-    pub fn _mark_pruned(&mut self, port_number: PortNumber) {
+    pub fn mark_pruned(&mut self, port_number: PortNumber) {
         self.elements[*port_number.get_port_no() as usize].mark_pruned();
+    }
+    pub fn mark_unknown(&mut self, port_number: PortNumber) {
+        self.elements[*port_number.get_port_no() as usize].mark_unknown();
     }
     pub fn mark_broken(&mut self, port_number: PortNumber) {
         let index = *port_number.get_port_no() as usize;
