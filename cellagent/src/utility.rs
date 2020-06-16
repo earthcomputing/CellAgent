@@ -119,10 +119,8 @@ impl fmt::Display for PortNumber {
 #[derive(Debug, Copy, Clone, Default, Eq, PartialEq, Hash, Serialize, Deserialize)]
 pub struct Path { port_number: PortNumber }
 impl Path {
-    // TODO: new() should take PortNumber instead of PortNo
-    pub fn new(port_no: PortNo, no_ports: PortQty) -> Result<Path, Error> {
-        let port_number = port_no.make_port_number(no_ports).context(UtilityError::Chain { func_name: "Path::new", comment: S("")})?;
-        Ok(Path { port_number })
+    pub fn new(port_number: PortNumber) -> Path {
+        Path { port_number }
     }
     pub fn new0() -> Path { Path { port_number: PortNumber::new0() } }
     pub fn get_port_number(self) -> PortNumber { self.port_number }
