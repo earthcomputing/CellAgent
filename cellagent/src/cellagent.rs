@@ -331,6 +331,13 @@ impl CellAgent {
             .ok_or::<Error>(CellagentError::NameMap { cell_id: self.cell_id, func_name: _f, tree_name: tree_name.clone(), originator_id }.into())?;
         Ok(tree_id.clone())
     }
+    fn neighbor_names_from_port_nos(&self, port_nos: &[PortNo]) -> Vec<String> {
+        port_nos.iter()
+            .map(|port_no| self.neighbors.get(&port_no))
+            .filter(|neighbor| neighbor.is_some() )
+            .map(|neighbor| neighbor.unwrap().0.get_name())
+            .collect::<Vec<_>>()
+    }
     fn update_base_tree_map(&mut self, stacked_tree_id: PortTreeID, base_tree_id: TreeID) {
         let _f = "update_base_tree_map";
         {
@@ -1851,11 +1858,13 @@ impl CellAgent {
         {
             let mask = self.get_mask(tree_id.to_port_tree_id_0())?;
             let port_mask = user_mask.and(mask);
-            let ports = Mask::get_port_nos(port_mask);
+            let port_nos = Mask::get_port_nos(port_mask);
             let msg_type = msg.get_msg_type();
             if CONFIG.debug_options.all || CONFIG.debug_options.ca_msg_send {
+                let neighbors = self.neighbor_names_from_port_nos(&port_nos);
                 let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "ca_send_msg" };
-                let trace = json!({ "cell_id": &self.cell_id, "tree_id": &tree_id, "ports": ports, "length": bytes.len(), "msg": msg });
+                let trace = json!({ "cell_id": &self.cell_id, "tree_id": &tree_id,
+                    "neighbors": neighbors, "length": bytes.len(), "msg": msg });
                 let _ = add_to_trace(TraceType::Debug, trace_params, &trace, _f);
             }
         }
