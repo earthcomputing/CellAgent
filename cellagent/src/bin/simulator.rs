@@ -24,7 +24,7 @@ fn main() -> Result<(), Error> {
     } else {
         println!("Stochastic Discover");
     }
-    println!("Wait until {} trees seen or {} hello messages before sending discover message", CONFIG.min_hello, CONFIG.min_trees);
+    println!("Wait until {} trees seen or {} hello messages before sending discover message", CONFIG.min_trees, CONFIG.min_hello);
     println!("\nMain: {} ports for each of {} cells", CONFIG.num_ports_per_cell , CONFIG.num_cells);
     let mut dc =
         match Datacenter::construct(Blueprint::new(CONFIG.num_cells,
