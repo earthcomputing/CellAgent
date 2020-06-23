@@ -974,7 +974,6 @@ impl CellAgent {
         let new_tree_id = new_port_tree_id.to_tree_id();
         self.tree_id_map.insert(new_port_tree_id.get_uuid(), new_port_tree_id);
         let tree_seen = self.tree_seen(new_tree_id);
-        if !tree_seen { self.tree_count = self.tree_count + 1; }
         let port_tree_seen = self.quench_root_port(new_port_tree_id);
         let my_port_seen = self.quench_my_port(new_tree_id, port_no);
         {
@@ -1015,6 +1014,7 @@ impl CellAgent {
         let originator_id = OriginatorID::new(self.cell_id, "CellAgent")?;
         let in_reply_to = msg.get_sender_msg_seq_no();
         if new_tree_id != self.my_tree_id && !tree_seen {
+            self.tree_count = self.tree_count + 1;
             let discoverd_parent_msg = DiscoverDMsg::new(in_reply_to, self.cell_id,
                                                          originator_id, new_port_tree_id, path,
                                                          DiscoverDType::Parent);
@@ -1026,17 +1026,24 @@ impl CellAgent {
                           DEFAULT_USER_MASK.all_but_port(port_number))?;
             self.update_traph(new_port_tree_id, port_number, PortState::Parent,
                               &gvm_equation, HashSet::new(), hops, path).context(CellagentError::Chain { func_name: _f, comment: S("DiscoverMsg") })?;
+            if self.discoverd_done(new_tree_id) {
+                if new_tree_id != self.my_tree_id {
+                    if let Some((port_number, discoverd_msg)) = self.discoverd_parent_msg.remove(&new_tree_id) {
+                        self.send_msg(line!(), self.connected_tree_id, discoverd_msg, Mask::new(port_number))?;
+                    }
+                }
+                if self.tree_count >= CONFIG.min_trees {
+                    for tree_id in self.discoverd_parent_msg.keys() {
+                        let (port_number, discoverd_msg) = self.discoverd_parent_msg.get(&tree_id).unwrap();
+                        self.send_msg(line!(), self.connected_tree_id, discoverd_msg.clone(), Mask::new(*port_number))?;
+                    }
+                    self.discoverd_parent_msg.clear();
+                }
+            }
         }
         let prepared_msg = PrepareDMsg::new(in_reply_to, self.cell_id,
                                             originator_id, new_port_tree_id);
         self.send_msg(line!(), self.connected_tree_id, prepared_msg, Mask::new(port_number))?;
-        if self.discoverd_done(new_tree_id) {
-            if new_tree_id != self.my_tree_id {
-                if let Some((port_number, discoverd_msg)) = self.discoverd_parent_msg.remove(&new_tree_id) {
-                    self.send_msg(line!(), self.connected_tree_id, discoverd_msg, Mask::new(port_number))?;
-                }
-            }
-        }
         if !quench {
             let updated_msg = msg.update(self.cell_id);
             self.add_saved_discover(&updated_msg); // Discover message are always saved for late port connect
@@ -1081,6 +1088,13 @@ impl CellAgent {
                 if let Some((port_number, discoverd_msg)) = self.discoverd_parent_msg.remove(&tree_id) {
                     self.send_msg(line!(), self.connected_tree_id, discoverd_msg, Mask::new(port_number))?;
                 }
+            }
+            if self.tree_count >= CONFIG.min_trees {
+                for tree_id in self.discoverd_parent_msg.keys() {
+                    let (port_number, discoverd_msg) = self.discoverd_parent_msg.get(&tree_id).unwrap();
+                    self.send_msg(line!(), self.connected_tree_id, discoverd_msg.clone(), Mask::new(*port_number))?;
+                }
+                self.discoverd_parent_msg.clear();
             }
         }
         match msg.get_discoverd_type() {
