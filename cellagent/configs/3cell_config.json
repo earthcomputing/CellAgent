@@ -38,6 +38,7 @@
         "deploy":false,
         "discover":false,
         "discoverd":false,
+        "discover_done": false,
         "flow_control":false,
         "hello":false,
         "manifest":false,
