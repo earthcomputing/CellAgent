@@ -159,6 +159,7 @@ pub struct DebugOptions {
     pub deploy:         bool,
     pub discover:       bool,
     pub discoverd:      bool,
+    pub discover_done:  bool,
     pub hello:          bool,
     pub manifest:       bool,
     pub pe_pkt_recv:    bool,
