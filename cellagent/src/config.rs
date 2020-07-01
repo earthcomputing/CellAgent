@@ -160,6 +160,7 @@ pub struct DebugOptions {
     pub discover:       bool,
     pub discoverd:      bool,
     pub discover_done:  bool,
+    pub enough_ports:   bool,
     pub hello:          bool,
     pub manifest:       bool,
     pub pe_pkt_recv:    bool,
@@ -167,8 +168,7 @@ pub struct DebugOptions {
     pub process_msg:    bool,
     pub pe_process_pkt: bool,
     pub port:           bool,
-    pub saved_discover: bool,
-    pub saved_stack:    bool,
+    pub saved_msgs:     bool,
     pub stack_tree:     bool,
     pub traph_entry:    bool,
 }

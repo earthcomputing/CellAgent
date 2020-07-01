@@ -39,6 +39,7 @@
         "discover":false,
         "discoverd":false,
         "discover_done": false,
+        "enough_ports":  false,
         "flow_control":false,
         "hello":false,
         "manifest":false,
@@ -47,8 +48,7 @@
         "pe_process_pkt":false,
         "port":false,
         "process_msg":false,
-        "saved_discover":false,
-        "saved_stack":false,
+        "saved_msgs":false,
         "stack_tree":false,
         "traph_entry":false},
 

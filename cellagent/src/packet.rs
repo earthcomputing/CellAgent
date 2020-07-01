@@ -62,7 +62,7 @@ impl Packet {
         let bytes = self.get_bytes();
         let is_last = self.payload.is_last;
         let len = bytes.len();
-        let string = format!("is last {}, length {} msg_no {}", is_last, len, self.sender_msg_seq_no.0);
+        let string = format!("is last {}, length {} msg_no {} msg {}", is_last, len, self.sender_msg_seq_no.0, ByteArray::new_from_bytes(&bytes).to_string()?);
         let default_as_char = PAYLOAD_DEFAULT_ELEMENT as char;
         Ok(string.replace(default_as_char, ""))
     }
