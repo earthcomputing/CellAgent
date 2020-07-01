@@ -177,6 +177,8 @@ pub struct TraceHeader {
 impl TraceHeader {
     pub fn new() -> TraceHeader {
         let thread_id = TraceHeader::parse(thread::current().id());
+        // TODO: Setting the timestamp here results in messages received with an earlier timestamp than when sent.
+        // TODO: The epoch should be one of the TraceHeaderParams
         let epoch = timestamp();
         TraceHeader { starting_epoch: *STARTING_EPOCH, epoch,
             thread_id, spawning_thread_id: thread_id,
