@@ -63,7 +63,8 @@ pub fn add_to_trace(trace_type: TraceType, trace_params: &TraceHeaderParams,
         .unwrap()
         .as_str()
         .unwrap();
-    let cell_file_name = format!("{}{}-{}", CONFIG.output_dir_name, CONFIG.output_file_name, cell_id);
+    // Mac Finder replaces ":" with "/" which is obviously bad for filenames in the shell
+    let cell_file_name = format!("{}{}-{}", CONFIG.output_dir_name, CONFIG.output_file_name, str::replace(cell_id, ":", "-"));
     let mut cell_id_handle = OpenOptions::new().append(true).open(cell_file_name.clone())
         .or_else(|_| { File::create(cell_file_name) })?;
     let mut file_handle = OpenOptions::new().append(true).open(output_file_name.clone())
