@@ -574,25 +574,25 @@ impl fmt::Display for HelloMsgPayload {
     }
 }
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct PrepareMsg {
+pub struct DiscoverAckDMsg {
     header: MsgHeader,
-    payload: PreparePayload
+    payload: DiscoverAckDPayload
 }
-impl PrepareMsg {
-    pub fn new(in_reply_to: SenderMsgSeqNo, sending_cell_id: CellID, originator_id: OriginatorID, port_tree_id: PortTreeID) -> PrepareMsg {
+impl DiscoverAckDMsg {
+    pub fn new(in_reply_to: SenderMsgSeqNo, sending_cell_id: CellID, originator_id: OriginatorID, port_tree_id: PortTreeID) -> DiscoverAckDMsg {
         // Note that direction is leafward so we can use the connected ports tree
         // If we send rootward, then the first recipient forwards the Prepare
         let header = MsgHeader::new(sending_cell_id, originator_id,
                                     true, HashMap::new(),
                                     MsgType::Prepare, MsgDirection::Leafward);
-        let payload = PreparePayload::new(in_reply_to, port_tree_id);
-        PrepareMsg { header, payload }
+        let payload = DiscoverAckDPayload::new(in_reply_to, port_tree_id);
+        DiscoverAckDMsg { header, payload }
     }
-    pub fn get_payload(&self) -> &PreparePayload { &self.payload }
+    pub fn get_payload(&self) -> &DiscoverAckDPayload { &self.payload }
     pub fn get_port_tree_id(&self) -> PortTreeID { self.payload.get_port_tree_id() }
 }
 #[typetag::serde]
-impl Message for PrepareMsg {
+impl Message for DiscoverAckDMsg {
     fn get_header(&self) -> &MsgHeader { &self.header }
     fn get_payload(&self) -> &dyn MsgPayload { &self.payload }
     fn get_msg_type(&self) -> MsgType { self.get_header().msg_type }
@@ -602,47 +602,47 @@ impl Message for PrepareMsg {
     fn process_ca(&mut self, cell_agent: &mut CellAgent, port_no: PortNo,
                   _msg_tree_id: PortTreeID, _is_ait: bool,) -> Result<(), Error> {
         let _f = "process_ca";
-        cell_agent.process_prepare_msg(&self, port_no)
+        cell_agent.process_discover_ack_d_msg(&self, port_no)
     }
 }
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct PreparePayload {
+pub struct DiscoverAckDPayload {
     in_reply_to: SenderMsgSeqNo,
     port_tree_id: PortTreeID,
 }
-impl PreparePayload {
-    fn new(in_reply_to: SenderMsgSeqNo, port_tree_id: PortTreeID) -> PreparePayload {
-        PreparePayload { in_reply_to, port_tree_id }
+impl DiscoverAckDPayload {
+    fn new(in_reply_to: SenderMsgSeqNo, port_tree_id: PortTreeID) -> DiscoverAckDPayload {
+        DiscoverAckDPayload { in_reply_to, port_tree_id }
     }
     fn get_port_tree_id(&self) -> PortTreeID { self.port_tree_id }
 }
 #[typetag::serde]
-impl MsgPayload for PreparePayload {}
-impl fmt::Display for PreparePayload {
+impl MsgPayload for DiscoverAckDPayload {}
+impl fmt::Display for DiscoverAckDPayload {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "Port Tree ID {} ", self.port_tree_id)
     }
 }
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct PrepareDMsg {
+pub struct DiscoverAckMsg {
     header: MsgHeader,
-    payload: PrepareDPayload
+    payload: DiscoverAckPayload
 }
-impl PrepareDMsg {
-    pub fn new(in_reply_to: SenderMsgSeqNo, sending_cell_id: CellID, originator_id: OriginatorID, port_tree_id: PortTreeID) -> PrepareDMsg {
+impl DiscoverAckMsg {
+    pub fn new(in_reply_to: SenderMsgSeqNo, sending_cell_id: CellID, originator_id: OriginatorID, port_tree_id: PortTreeID) -> DiscoverAckMsg {
         // Note that direction is leafward so we can use the connected ports tree
         // If we send rootward, then the first recipient forwards the PrepareD
         let header = MsgHeader::new(sending_cell_id, originator_id,
                                     true, HashMap::new(),
                                     MsgType::PrepareD, MsgDirection::Leafward);
-        let payload = PrepareDPayload::new(in_reply_to, port_tree_id);
-        PrepareDMsg { header, payload }
+        let payload = DiscoverAckPayload::new(in_reply_to, port_tree_id);
+        DiscoverAckMsg { header, payload }
     }
-    pub fn get_payload(&self) -> &PrepareDPayload { &self.payload }
+    pub fn get_payload(&self) -> &DiscoverAckPayload { &self.payload }
     pub fn get_port_tree_id(&self) -> PortTreeID { self.payload.get_port_tree_id() }
 }
 #[typetag::serde]
-impl Message for PrepareDMsg {
+impl Message for DiscoverAckMsg {
     fn get_header(&self) -> &MsgHeader { &self.header }
     fn get_payload(&self) -> &dyn MsgPayload { &self.payload }
     fn get_msg_type(&self) -> MsgType { self.get_header().msg_type }
@@ -652,23 +652,23 @@ impl Message for PrepareDMsg {
     fn process_ca(&mut self, cell_agent: &mut CellAgent, port_no: PortNo,
                   _msg_tree_id: PortTreeID, _is_ait: bool) -> Result<(), Error> {
         let _f = "process_ca";
-        cell_agent.process_prepare_d_msg(&self, port_no)
+        cell_agent.process_discover_ack_msg(&self, port_no)
     }
 }
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct PrepareDPayload {
+pub struct DiscoverAckPayload {
     in_reply_to: SenderMsgSeqNo,
     port_tree_id: PortTreeID,
 }
-impl PrepareDPayload {
-    fn new(in_reply_to: SenderMsgSeqNo, port_tree_id: PortTreeID) -> PrepareDPayload {
-        PrepareDPayload { in_reply_to, port_tree_id }
+impl DiscoverAckPayload {
+    fn new(in_reply_to: SenderMsgSeqNo, port_tree_id: PortTreeID) -> DiscoverAckPayload {
+        DiscoverAckPayload { in_reply_to, port_tree_id }
     }
     fn get_port_tree_id(&self) -> PortTreeID { self.port_tree_id }
 }
 #[typetag::serde]
-impl MsgPayload for PrepareDPayload {}
-impl fmt::Display for PrepareDPayload {
+impl MsgPayload for DiscoverAckPayload {}
+impl fmt::Display for DiscoverAckPayload {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "Port Tree {}", self.port_tree_id)
     }
