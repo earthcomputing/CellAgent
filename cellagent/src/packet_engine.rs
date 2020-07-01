@@ -524,10 +524,6 @@ impl PacketEngine {
                             let trace = json!({ "cell_id": self.cell_id, "port_tree_id": port_tree_id, "ait_state": ait_state,
                             "msg_type": &msg_type, "port_no": &port_no, "entry": &entry });
                             let _ = add_to_trace(TraceType::Debug, trace_params, &trace, _f);
-                            match msg_type {
-                                MsgType::Discover => (),
-                                _ => { println!("PacketEngine {}: got from {} {} {} {}", self.cell_id, *port_no, msg_type, port_tree_id, entry); },
-                            }
                         }
                     }
                 }
@@ -565,7 +561,9 @@ impl PacketEngine {
             {
                 if CONFIG.trace_options.all | CONFIG.trace_options.pe {
                     let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "pe_forward_connected_tree" };
-                    let trace = json!({ "cell_id": &self.cell_id, "port": recv_port_no, "user_mask": user_mask, "entry_mask": entry.get_mask(), "port_nos": port_nos, "packet": packet.to_string()? });
+                    let trace = json!({ "cell_id": &self.cell_id, "port": recv_port_no,
+                        "user_mask": user_mask, "entry_mask": entry.get_mask(), "port_nos": port_nos,
+                        "packet": packet.to_string()? });
                     let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
                 }
             }

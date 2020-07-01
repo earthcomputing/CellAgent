@@ -690,6 +690,11 @@ impl StackTreeMsg {
     }
     pub fn get_payload(&self) -> &StackTreeMsgPayload { &self.payload }
     fn _get_port_tree_id(&self) -> PortTreeID { self.payload._get_port_tree_id() }
+    pub fn update_sender(&self, sending_cell_id: CellID) -> StackTreeMsg {
+        let mut msg = self.clone();
+        msg.header.sending_cell_id = sending_cell_id;
+        msg
+    }
 }
 #[typetag::serde]
 impl Message for StackTreeMsg {
