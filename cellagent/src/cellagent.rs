@@ -1485,7 +1485,7 @@ impl CellAgent {
                 self.send_msg(line!(), self.connected_tree_id, discover_msg.clone(), DEFAULT_USER_MASK)?;
                 self.discover_sent.insert(tree_id);
             } else {
-                println!("Cellagent {}: {} DiscoverMsg must be set for {}", self.cell_id, _f, tree_id.get_name());
+                println!("Cellagent {}: {} DiscoverMsg not set for {}", self.cell_id, _f, tree_id.get_name());
             }
         }
         Ok(())
