@@ -2,5 +2,5 @@ FROM ec/baseline
 
 COPY Cargo.toml Cargo.toml
 COPY src src
-RUN cargo build --release --bin cell
+RUN cargo build --release --bin cell --features="cell"
 CMD ["target/release/cell"]
