@@ -1360,13 +1360,18 @@ impl CellAgent {
             }
         }
         // Send my DiscoverMsg and DiscoverDMsg
-        let discover_msg = DiscoverMsg::new(self.cell_id, originator_id,
-                                            my_port_tree_id, PathLength(CellQty(1)),
-                                            Path::new(port_number));
-        self.send_msg(line!(), self.connected_tree_id, discover_msg, user_mask)?;
-        let discoverd_msg = DiscoverDMsg::new(in_reply_to, self.cell_id,
-                         originator_id, my_port_tree_id, path, DiscoverDType::NonParent);
-        self.send_msg(line!(), self.connected_tree_id, discoverd_msg, user_mask)?;
+        let clone = self.clone();
+        thread::spawn(move || -> Result<(), Error> {
+            crate::utility::sleep(CONFIG.race_sleep);
+            let discover_msg = DiscoverMsg::new(clone.cell_id, originator_id,
+                                                my_port_tree_id, PathLength(CellQty(1)),
+                                                Path::new(port_number));
+            clone.send_msg(line!(), clone.connected_tree_id, discover_msg, user_mask)?;
+            let discoverd_msg = DiscoverDMsg::new(in_reply_to, clone.cell_id,
+                                                  originator_id, my_port_tree_id, path, DiscoverDType::NonParent);
+            clone.send_msg(line!(), clone.connected_tree_id, discoverd_msg, user_mask)?;
+            Ok(())
+        });
         for (tree_id, discoverd_msg) in &self.saved_discoverd {
             {
                 if CONFIG.debug_options.all || CONFIG.debug_options.hello {
