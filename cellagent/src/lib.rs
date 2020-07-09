@@ -38,6 +38,7 @@ pub mod port;
 pub mod port_tree;
 #[cfg(any(feature = "simulator"))]
 pub mod rack;
+pub mod replay;
 pub mod routing_table;
 pub mod routing_table_entry;
 pub mod service;
