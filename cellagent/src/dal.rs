@@ -3,7 +3,7 @@
 use std::{cell::RefCell,
           collections::{HashSet},
           fs::{File, OpenOptions},
-          io::Write,
+          io::{BufReader, Lines, Write},
           sync::atomic::{AtomicBool}
 };
 #[cfg(feature="webserver")]
@@ -54,7 +54,6 @@ pub fn update_trace_header(child_trace_header: TraceHeader) { TRACE_HEADER.with(
 pub fn add_to_trace(trace_type: TraceType, trace_params: &TraceHeaderParams,
                     trace_body: &Value, caller: &str) -> Result<(), Error> {
     let _f = "add_to_trace";
-    let output_file_name = format!("{}", CONFIG.output_file_name);
     let other = json!({"name": "Other"});
     let cell_id = trace_body
         .get("cell_id")
@@ -64,11 +63,12 @@ pub fn add_to_trace(trace_type: TraceType, trace_params: &TraceHeaderParams,
         .as_str()
         .unwrap();
     // Mac Finder replaces ":" with "/" which is obviously bad for filenames in the shell
-    let cell_file_name = format!("{}{}-{}", CONFIG.output_dir_name, CONFIG.output_file_name, str::replace(cell_id, ":", "-"));
-    let mut cell_id_handle = OpenOptions::new().append(true).open(cell_file_name.clone())
+    let cell_file_name = format!("{}{}-{}.json", CONFIG.output_dir_name, CONFIG.output_file_name, str::replace(cell_id, ":", "-"));
+    let mut cell_file_handle = OpenOptions::new().append(true).open(cell_file_name.clone())
         .or_else(|_| { File::create(cell_file_name) })?;
+    let output_file_name = format!("{}/{}.json", CONFIG.output_dir_name, CONFIG.output_file_name);
     let mut file_handle = OpenOptions::new().append(true).open(output_file_name.clone())
-        .or_else(|_| { File::create(output_file_name.clone()) })?;
+        .or_else(|_| { File::create(output_file_name) })?;
     TRACE_HEADER.with(|t| {
         t.borrow_mut().next(trace_type);
         t.borrow_mut().update(trace_params);
@@ -82,7 +82,7 @@ pub fn add_to_trace(trace_type: TraceType, trace_params: &TraceHeaderParams,
     } else {
         format!("{:?}", &trace_record)
     };
-    cell_id_handle.write(&(line.clone() + ",\n").into_bytes()).context(DalError::Chain { func_name: _f, comment: S("Write cell record") })?;
+    cell_file_handle.write(&(line.clone() + ",\n").into_bytes()).context(DalError::Chain { func_name: _f, comment: S("Write cell record") })?;
     file_handle.write(   &(line.clone() + ",\n").into_bytes()).context(DalError::Chain { func_name: _f, comment: S("Write record") })?;
 /*
     let _ = PRODUCER_RD.send(FutureRecord::to(&CONFIG.kafka_topic)
@@ -98,6 +98,19 @@ pub fn add_to_trace(trace_type: TraceType, trace_params: &TraceHeaderParams,
         });
 */
     Ok(())
+}
+pub fn get_cell_replay_lines(cell_name: &str) -> Result<Option<Lines<BufReader<File>>>, Error> {
+    let _f = "get_cell_replay_lines";
+    if CONFIG.replay {
+        let dir_name = format!("{}-replay", CONFIG.output_dir_name);
+        let file_name = format!("{}/{}-{}.json", dir_name, CONFIG.output_file_name, cell_name);
+        let cell_file_name = str::replace(&file_name, ":", "-");
+        let mut cell_file_handle = OpenOptions::new().read(true).open(cell_file_name.clone()).context(DalError::Replay { func_name: _f, file_name: cell_file_name, cell_name: S(cell_name)})?;
+        let reader = BufReader::new(cell_file_handle);
+        Ok(Some(reader.lines()))
+    } else {
+        Ok(None)
+    }
 }
 #[cfg(feature="webserver")]
 fn trace_it(trace_record: &TraceRecord<'_>) -> Result<(), Error> {
@@ -145,11 +158,14 @@ struct TraceRecord<'a> {
 }
 // Errors
 use failure::{Error, ResultExt};
+use std::io::BufRead;
 
 #[derive(Debug, Fail)]
 pub enum DalError {
-    #[fail(display = "DalError::Chain {} {}", func_name, comment)]
+    #[fail(display = "DalError::Chain {}: {}", func_name, comment)]
     Chain { func_name: &'static str, comment: String },
     #[fail(display = "DalError::Kafka {}: Error {} producing trace record", func_name, kafka_error)]
-    Kafka { func_name: &'static str, kafka_error: String }
+    Kafka { func_name: &'static str, kafka_error: String },
+    #[fail(display = "DalError::Replay {}: Error opening replay file {} on cell {}", func_name, file_name, cell_name)]
+    Replay { func_name: &'static str, file_name: String, cell_name: String}
 }

@@ -2,7 +2,7 @@ use std;
 use std::{fmt,
           collections::HashMap,
           env::args,
-          fs::{OpenOptions, create_dir, remove_dir_all},
+          fs::{OpenOptions, create_dir, remove_dir_all, rename},
           path::Path,
           ops::{Deref}};
 
@@ -54,7 +54,8 @@ pub struct Config {
     pub race_sleep: u64,
     pub visualize: Vec<String>,
     pub trace_options: TraceOptions,
-    pub debug_options: DebugOptions
+    pub debug_options: DebugOptions,
+    pub replay: bool,
 }
 impl Config {
     pub fn new() -> Result<Config, Error> {
@@ -99,7 +100,8 @@ impl Config {
         if Path::new(&config.output_dir_name).exists() {
             remove_dir_all(&config.output_dir_name)?;
         }
-        let _ = OpenOptions::new().write(true).truncate(true).open(&config.output_file_name);
+        //let output_file_name = format!("{}/trace.json", config.output_dir_name);
+        //let _ = OpenOptions::new().write(true).truncate(true).open(&output_file_name);
         create_dir(&config.output_dir_name)?;
         Ok(config)
     }
