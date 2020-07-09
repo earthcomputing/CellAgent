@@ -107,17 +107,32 @@ pub struct CellAgent {
     child_ports: HashMap<TreeID, HashSet<PortNo>>,
 }
 impl CellAgent {
-    pub fn new(cell_id: CellID, cell_type: CellType, config: CellConfig, no_ports: PortQty,
+    pub fn new(cell_id: CellID, tree_ids: Option<(TreeID, TreeID, TreeID)>, cell_type: CellType,
+               config: CellConfig, no_ports: PortQty,
                ca_to_ports: HashMap<PortNo, CaToPort>, cm_to_ca: CmToCa, pe_from_ports: PeFromPort, pe_to_ports: HashMap<PortNo, PeToPort>,
                border_port_nos: &HashSet<PortNo>)
                -> Result<(CellAgent, JoinHandle<()>), Error> {
         let _f = "new";
         let tenant_masks = vec![BASE_TENANT_MASK];
-        let my_tree_id = TreeID::new(&cell_id.get_name()).context(CellagentError::Chain { func_name: _f, comment: S("my_tree_id") })?;
-        let control_tree_id = TreeID::new(&cell_id.get_name())?.
-            add_component(CONTROL_TREE_NAME)?;
-        let connected_tree_id = TreeID::new(&cell_id.get_name())?
-            .add_component(CONNECTED_PORTS_TREE_NAME)?;
+        let (my_tree_id, control_tree_id, connected_tree_id) = match tree_ids {
+            Some(tree_ids) => tree_ids,
+            None => {
+                let my_tree_id = TreeID::new(&cell_id.get_name()).context(CellagentError::Chain { func_name: _f, comment: S("my_tree_id") })?;
+                let control_tree_id = TreeID::new(&cell_id.get_name())?.
+                    add_component(CONTROL_TREE_NAME)?;
+                let connected_tree_id = TreeID::new(&cell_id.get_name())?
+                    .add_component(CONNECTED_PORTS_TREE_NAME)?;
+                (my_tree_id, control_tree_id, connected_tree_id)
+            }
+        };
+        {
+            if CONFIG.trace_options.all || CONFIG.trace_options.ca {
+                let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "ca_new" };
+                let trace = json!({ "cell_id": cell_id, "my_tree_id": my_tree_id,
+                     "control_tree_id": control_tree_id, "connected_tree_id": connected_tree_id});
+                let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
+            }
+        }
         let mut base_tree_map = HashMap::new();
         base_tree_map.insert(my_tree_id.to_port_tree_id_0(), my_tree_id);
         let mut no_packets = Vec::new();

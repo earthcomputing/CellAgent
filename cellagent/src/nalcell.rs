@@ -12,15 +12,18 @@ use crossbeam::crossbeam_channel::unbounded as channel;
 
 use either::Either;
 
+use serde_json::{Value};
+
 use crate::cellagent::{CellAgent};
 use crate::config::{CONFIG, PortQty};
-use crate::dal::{add_to_trace};
+use crate::dal::{add_to_trace, get_cell_replay_lines};
 use crate::ec_message_formats::{PortToPe, PeFromPort, PeToPort, PortFromPe,
                                 CmToCa, CaFromCm };
 use crate::ecnl::{ECNL_Session};
 use crate::name::{CellID};
 use crate::port::{Port};
-use crate::utility::{CellConfig, CellType, PortNo, S, TraceHeader, TraceHeaderParams, TraceType};
+use crate::utility::{CellConfig, CellType, PortNo, S,
+                     TraceHeaderParams, TraceType};
 use crate::vm::VirtualMachine;
 
 #[derive(Debug)]
@@ -43,7 +46,18 @@ impl NalCell {
         if *num_phys_ports > *CONFIG.max_num_phys_ports_per_cell {
             return Err(NalcellError::NumberPorts { num_phys_ports, func_name: "new", max_num_phys_ports: CONFIG.max_num_phys_ports_per_cell }.into())
         }
-        let cell_id = CellID::new(name).context(NalcellError::Chain { func_name: "new", comment: S("cell_id") })?;
+        let trace_lines = get_cell_replay_lines(name).context(NalcellError::Chain { func_name: _f, comment: S(name) })?;
+        let (cell_id, tree_ids) = match trace_lines {
+            Some(mut line) => {
+                let mut record = line.next().transpose()?.expect(&format!("First record for cell {} must be there", name));
+                record.pop(); // Get rid of trailing comma
+                let trace_record = serde_json::from_str::<TraceRecordCaNew>(&record)?;
+                let body = trace_record.body;
+                (body.cell_id, Some((body.my_tree_id, body.control_tree_id, body.connected_tree_id)))
+            },
+            None => (CellID::new(name).context(NalcellError::Chain { func_name: "new", comment: S("cell_id") })?,
+                     None)
+        };
         let (cm_to_ca, ca_from_cm): (CmToCa, CaFromCm) = channel();
         let (port_to_pe, pe_from_ports): (PortToPe, PeFromPort) = channel();
         let (port_to_ca, ca_from_ports): (PortToCa, CaFromPort) = channel();
@@ -111,7 +125,10 @@ impl NalCell {
             ports.push(port);
         }
         let boxed_ports: Box<[Port]> = ports.into_boxed_slice();
-        let (cell_agent, _cm_join_handle) = CellAgent::new(cell_id, cell_type, config, num_phys_ports, ca_to_ports, cm_to_ca, pe_from_ports, pe_to_ports, border_port_nos).context(NalcellError::Chain { func_name: "new", comment: S("cell agent create") })?;
+        let (cell_agent, _cm_join_handle) = CellAgent::new(cell_id, tree_ids, cell_type, config,
+                                                           num_phys_ports, ca_to_ports, cm_to_ca,
+                                                           pe_from_ports, pe_to_ports,
+                                                           border_port_nos).context(NalcellError::Chain { func_name: "new", comment: S("cell agent create") })?;
         let ca_join_handle = cell_agent.start(ca_from_cm, ca_from_ports);
         Ok((NalCell {
             id: cell_id,
@@ -211,7 +228,34 @@ impl Drop for NalCell {
         }
     }
 }
-
+// Structs to parse trace records
+use crate::name::TreeID;
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TraceHeader {
+    starting_epoch: u64,
+    epoch: u64,
+    spawning_thread_id: u64,
+    thread_id: u64,
+    event_id: Vec<u64>,
+    trace_type: TraceType,
+    module: String,
+    line_no: u32,
+    function: String,
+    format: String,
+    repo: String,
+}
+#[derive(Debug, Clone, Serialize, Deserialize)]
+struct TraceRecordCaNew {
+    header: TraceHeader,
+    body: CaNew
+}
+#[derive(Debug, Clone, Serialize, Deserialize)]
+struct CaNew { // trace format ca_new
+    cell_id: CellID,
+    connected_tree_id: TreeID,
+    control_tree_id: TreeID,
+    my_tree_id: TreeID
+}
 
 // Errors
 use failure::{Error, ResultExt};
@@ -226,5 +270,7 @@ pub enum NalcellError {
     #[fail(display = "NalcellError::NoFreePorts {}: All ports have been assigned for cell {}", func_name, cell_id)]
     NoFreePorts { func_name: &'static str, cell_id: CellID },
     #[fail(display = "NalcellError::NumberPorts {}: You asked for {:?} ports, but only {:?} are allowed", func_name, num_phys_ports, max_num_phys_ports)]
-    NumberPorts { func_name: &'static str, num_phys_ports: PortQty, max_num_phys_ports: PortQty }
+    NumberPorts { func_name: &'static str, num_phys_ports: PortQty, max_num_phys_ports: PortQty },
+    #[fail(display = "NalCellError::Replay {}: Error opening replay file {}", func_name, cell_name)]
+    Replay { func_name: &'static str, cell_name: String }
 }

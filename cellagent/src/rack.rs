@@ -39,7 +39,7 @@ impl Rack {
                                                         &HashSet::from_iter(border_ports.clone()),
                                                         CellConfig::Large,
                                                         None,
-                                                        )?;
+                                                        ).context(RackError::Chain { func_name: _f, comment: S("border") })?;
             {
                 if CONFIG.trace_options.all || CONFIG.trace_options.dc { // Needed for visualization
                     let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "border_cell_start" };
@@ -58,7 +58,7 @@ impl Rack {
                                                         &HashSet::new(),
                                                         CellConfig::Large,
                                                         None,
-                                                        )?;
+                                                        ).context(RackError::Chain { func_name: _f, comment: S("interior") })?;
             {
                 if CONFIG.trace_options.all || CONFIG.trace_options.dc { // Needed for visualization
                     let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "interior_cell_start" };
@@ -109,8 +109,9 @@ impl Rack {
         Ok(link_handles)
     }
     pub fn construct(blueprint: &Blueprint) -> Result<(Rack, Vec<JoinHandle<()>>), Error> {
+        let _f = "construct";
         let mut rack = Rack::new();
-        let join_handles = rack.initialize(blueprint).context(RackError::Chain { func_name: "build_rack", comment: S("")})?;
+        let join_handles = rack.initialize(blueprint).context(RackError::Chain { func_name: _f, comment: S("initialize")})?;
         Ok((rack, join_handles))
     }
     pub fn get_cells(&self) -> &HashMap<CellNo, NalCell> { &self.cells }
