@@ -29,7 +29,8 @@ use crate::ec_message::{Message, MsgHeader, MsgTreeMap, MsgType,
                         DiscoverAckDMsg, DiscoverAckMsg,
                         StackTreeMsg, StackTreeDMsg,
                         TreeNameMsg};
-use crate::ec_message_formats::{CaToCm, CaFromCm, CmToCa, CmFromCa, PeToCm, CmFromPe, CaToCmBytes, CmToCaBytes, PeToPort, PeFromPort };
+use crate::ec_message_formats::{CaToCm, CaFromCm, CmToCa, CmFromCa, PeToCm, CmFromPe,
+                                CaToCmBytes, CmToCaBytes, PeToPort, PeFromPort };
 use crate::gvm_equation::{GvmEquation, GvmEqn};
 use crate::name::{Name, CellID, OriginatorID, PortTreeID, TreeID, UptreeID, VmID};
 use crate::packet_engine::NumberOfPackets;
@@ -818,7 +819,6 @@ impl CellAgent {
         let _f = "update_entry";
         if CONFIG.trace_options.all || CONFIG.trace_options.ca {
             let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "ca_to_cm_entry" };
-            //println!("Cellagent {}: {} msg {}", self.cell_id, _f, msg); // Should be msg.value()
             let trace = json!({ "cell_id": &self.cell_id, "entry": entry });
             let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
         }

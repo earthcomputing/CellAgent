@@ -20,8 +20,9 @@ use crate::dal::{add_to_trace, get_cell_replay_lines};
 use crate::ec_message_formats::{PortToPe, PeFromPort, PeToPort, PortFromPe,
                                 CmToCa, CaFromCm };
 use crate::ecnl::{ECNL_Session};
-use crate::name::{CellID};
+use crate::name::{Name, CellID};
 use crate::port::{Port};
+use crate::replay::{TraceFormat, process_trace_record};
 use crate::utility::{CellConfig, CellType, PortNo, S,
                      TraceHeaderParams, TraceType};
 use crate::vm::VirtualMachine;
@@ -46,17 +47,20 @@ impl NalCell {
         if *num_phys_ports > *CONFIG.max_num_phys_ports_per_cell {
             return Err(NalcellError::NumberPorts { num_phys_ports, func_name: "new", max_num_phys_ports: CONFIG.max_num_phys_ports_per_cell }.into())
         }
-        let trace_lines = get_cell_replay_lines(name).context(NalcellError::Chain { func_name: _f, comment: S(name) })?;
-        let (cell_id, tree_ids) = match trace_lines {
-            Some(mut line) => {
-                let mut record = line.next().transpose()?.expect(&format!("First record for cell {} must be there", name));
-                record.pop(); // Get rid of trailing comma
-                let trace_record = serde_json::from_str::<TraceRecordCaNew>(&record)?;
-                let body = trace_record.body;
-                (body.cell_id, Some((body.my_tree_id, body.control_tree_id, body.connected_tree_id)))
-            },
-            None => (CellID::new(name).context(NalcellError::Chain { func_name: "new", comment: S("cell_id") })?,
-                     None)
+        let mut trace_lines = get_cell_replay_lines(name).context(NalcellError::Chain { func_name: _f, comment: S(name) })?;
+        let (cell_id, tree_ids) = if CONFIG.replay {
+            let mut record = trace_lines.next().transpose()?.expect(&format!("First record for cell {} must be there", name));
+            let trace_format = process_trace_record(record)?;
+            match trace_format {
+                TraceFormat::CaNewFormat(cell_id, my_tree_id, control_tree_id, connected_tree_id) =>
+                    (cell_id, Some((my_tree_id, control_tree_id, connected_tree_id))),
+                _ => {
+                    unimplemented!()
+                }
+            }
+        } else {
+            (CellID::new(name).context(NalcellError::Chain { func_name: "new", comment: S("cell_id") })?,
+             None)
         };
         let (cm_to_ca, ca_from_cm): (CmToCa, CaFromCm) = channel();
         let (port_to_pe, pe_from_ports): (PortToPe, PeFromPort) = channel();
@@ -99,16 +103,16 @@ impl NalCell {
                 } else {
                     match ecnl_clone {
                         Some(ecnl_session) => {
-			    #[cfg(feature = "cell")] {
-                                is_connected = ecnl_session.get_port(i-1).is_connected()
-			    }
-			    // To keep compiler happy
-			    #[cfg(feature = "simulator")] {
-			        is_connected = false;
-			    }
-			    #[cfg(feature = "noc")] {
-			        is_connected = false;
-			    }
+                            #[cfg(feature = "cell")] {
+                                is_connected = ecnl_session.get_port(i - 1).is_connected()
+                            }
+                            // To keep compiler happy
+                            #[cfg(feature = "simulator")] {
+                                is_connected = false;
+                            }
+                            #[cfg(feature = "noc")] {
+                                is_connected = false;
+                            }
                         }
                         None => {
                             is_connected = false;
@@ -130,6 +134,18 @@ impl NalCell {
                                                            pe_from_ports, pe_to_ports,
                                                            border_port_nos).context(NalcellError::Chain { func_name: "new", comment: S("cell agent create") })?;
         let ca_join_handle = cell_agent.start(ca_from_cm, ca_from_ports);
+        thread::spawn(move || -> Result<(), Error> {
+            loop {
+                let mut record = trace_lines.next().transpose()?.expect(&format!("First record for cell {} must be there", cell_id));
+                let trace_format = process_trace_record(record.clone())?;
+                let _ = match trace_format {
+                    TraceFormat::EmptyFormat => println!("Nalcell {}: {} no match for {}", cell_id, _f, record),
+                    TraceFormat::CaNewFormat(_, _, _, _) => println!("nalcell {}: {} ca_new out of order", cell_id, _f),
+                    TraceFormat::CaToCmEntryFormat(entry) => println!("NalCell {}: {} entry {}", cell_id, _f, entry),
+                };
+            }
+            Ok(())
+        });
         Ok((NalCell {
             id: cell_id,
             cell_type,
@@ -227,34 +243,6 @@ impl Drop for NalCell {
             },
         }
     }
-}
-// Structs to parse trace records
-use crate::name::TreeID;
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct TraceHeader {
-    starting_epoch: u64,
-    epoch: u64,
-    spawning_thread_id: u64,
-    thread_id: u64,
-    event_id: Vec<u64>,
-    trace_type: TraceType,
-    module: String,
-    line_no: u32,
-    function: String,
-    format: String,
-    repo: String,
-}
-#[derive(Debug, Clone, Serialize, Deserialize)]
-struct TraceRecordCaNew {
-    header: TraceHeader,
-    body: CaNew
-}
-#[derive(Debug, Clone, Serialize, Deserialize)]
-struct CaNew { // trace format ca_new
-    cell_id: CellID,
-    connected_tree_id: TreeID,
-    control_tree_id: TreeID,
-    my_tree_id: TreeID
 }
 
 // Errors
