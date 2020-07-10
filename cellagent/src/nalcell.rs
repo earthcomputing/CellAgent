@@ -136,13 +136,17 @@ impl NalCell {
         let ca_join_handle = cell_agent.start(ca_from_cm, ca_from_ports);
         thread::spawn(move || -> Result<(), Error> {
             loop {
-                let mut record = trace_lines.next().transpose()?.expect(&format!("First record for cell {} must be there", cell_id));
-                let trace_format = process_trace_record(record.clone())?;
-                let _ = match trace_format {
-                    TraceFormat::EmptyFormat => println!("Nalcell {}: {} no match for {}", cell_id, _f, record),
-                    TraceFormat::CaNewFormat(_, _, _, _) => println!("nalcell {}: {} ca_new out of order", cell_id, _f),
-                    TraceFormat::CaToCmEntryFormat(entry) => println!("NalCell {}: {} entry {}", cell_id, _f, entry),
-                };
+                match trace_lines.next().transpose()? {
+                    None => break,
+                    Some(record) => {
+                        let trace_format = process_trace_record(record.clone())?;
+                        let _ = match trace_format {
+                            TraceFormat::EmptyFormat => (),
+                            TraceFormat::CaNewFormat(_, _, _, _) => println!("nalcell {}: {} ca_new out of order", cell_id, _f),
+                            TraceFormat::CaToCmEntryFormat(entry) => println!("NalCell {}: {} entry {}", cell_id, _f, entry),
+                        };
+                    }
+                }
             }
             Ok(())
         });
