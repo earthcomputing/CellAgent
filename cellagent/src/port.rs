@@ -166,7 +166,7 @@ impl Port {
         let mut port = self.clone();
         let child_trace_header = fork_trace_header();
         let thread_name = format!("Port {} listen_link", self.get_id().get_name());
-        #[cfg(feature = "simulator")]
+        #[cfg(any(feature = "noc", feature = "simulator"))]
         let port_link_channel_clone_or_ecnl_port = {
             let (port_to_link, port_from_link) = port_link_channel_or_ecnl_port.clone().left().expect("ecnl in simulator");
             let port_to_link_clone = port_to_link.clone();
@@ -186,7 +186,7 @@ impl Port {
         let thread_name = format!("Port {} listen_pe", self.get_id().get_name());
         thread::Builder::new().name(thread_name).spawn( move || {
             update_trace_header(child_trace_header);
-            #[cfg(feature = "simulator")]
+            #[cfg(any(feature="noc", feature = "simulator"))]
             let port_to_link_or_ecnl_port = {
                 let (port_to_link, port_from_link) = port_link_channel_or_ecnl_port.left().expect("ecnl in simulator");
                 Either::Left(port_to_link)
@@ -211,7 +211,7 @@ impl Port {
             }
         }
         let port_to_pe = self.port_to_pe_or_ca.clone().left().expect("Port: Sender to Pe must be set");
-        #[cfg(feature = "simulator")]
+        #[cfg(any(feature = "noc", feature = "simulator"))]
         loop {
             let (port_to_link, port_from_link) = port_link_channel_or_ecnl_port.clone().left().expect("ecnl in simulator");
             let msg = port_from_link.recv().context(PortError::Chain { func_name: _f, comment: S(self.id.get_name()) + " recv from link"})?;
@@ -307,6 +307,8 @@ impl Port {
             let ecnl_port = port_link_channel_or_ecnl_port.clone().right().expect("port_link_channel in cell");
 	    return ecnl_port.listen(self, port_to_pe);
 	}
+        #[cfg(feature = "noc")]
+        return Ok(()) // For now, needs to be fleshed out!
     }
     // WORKER (PortFromPe)
     fn listen_pe_loop(&self, port_to_link_or_ecnl_port: &Either<PortToLink, Arc<ECNL_Port>>, port_from_pe: &PortFromPe) -> Result<(), Error> {
@@ -350,7 +352,7 @@ impl Port {
                     let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
                 }
             }
-            #[cfg(feature = "simulator")]
+            #[cfg(any(feature = "noc", feature = "simulator"))]
             {
 		port_to_link_or_ecnl_port.clone().left().expect("ecnl port in simulator").send(packet)?;
             }
