@@ -85,7 +85,7 @@ impl ECNL_Session {
 		println!("Created ECNL port {} as {}", port_id, eppv[port_id as usize].port_id);
             }
         }
-        #[cfg(feature = "simulator")] {
+        #[cfg(any(feature = "noc", feature = "simulator"))] {
             eppv = Vec::new();
         }
         return ECNL_Session {
