@@ -1366,35 +1366,18 @@ impl CellAgent {
             let discover_msg = DiscoverMsg::new(clone.cell_id, originator_id,
                                                 my_port_tree_id, PathLength(CellQty(1)),
                                                 Path::new(port_number));
-            clone.send_msg(line!(), clone.connected_tree_id, discover_msg, user_mask)?;
             let discoverd_msg = DiscoverDMsg::new(in_reply_to, clone.cell_id,
                                                   originator_id, my_port_tree_id, path, DiscoverDType::NonParent);
+            clone.send_msg(line!(), clone.connected_tree_id, discover_msg, user_mask)?;
             clone.send_msg(line!(), clone.connected_tree_id, discoverd_msg, user_mask)?;
             Ok(())
         });
         for (tree_id, discoverd_msg) in &self.saved_discoverd {
-            {
-                if CONFIG.debug_options.all || CONFIG.debug_options.hello {
-                    let neighbors: Vec<_> = self.neighbors.keys().collect();
-                    let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "ca_process_hello_msg_discoverd" };
-                    let trace = json!({ "cell_id": &self.cell_id, "tree_id": tree_id,
-                    "discoverd_msg": discoverd_msg.value() });
-                    let _ = add_to_trace(TraceType::Debug, trace_params, &trace, _f);
-                }
-            }
             self.send_msg(line!(), self.connected_tree_id, discoverd_msg.clone(), user_mask)?;
         }
         for tree_id in &self.discover_sent {
             if let Some(discover_msg) = self.saved_discover.get(&tree_id) {
                 if *tree_id != self.my_tree_id {
-                    {
-                        if CONFIG.debug_options.all || CONFIG.debug_options.hello {
-                            let neighbors: Vec<_> = self.neighbors.keys().collect();
-                            let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "ca_process_hello_msg_discover" };
-                            let trace = json!({ "cell_id": &self.cell_id, "tree_id": tree_id, "discover_msg": discover_msg.value() });
-                            let _ = add_to_trace(TraceType::Debug, trace_params, &trace, _f);
-                        }
-                    }
                     self.send_msg(line!(), self.connected_tree_id, discover_msg.clone(), user_mask)?;
                 } else {
                     println!("Cellagent {}: {} DiscoverMsg not set for {}", self.cell_id, _f, tree_id.get_name());
@@ -1405,14 +1388,6 @@ impl CellAgent {
             for tree_id in &self.discover_ack_d_sent.clone() {
                 if self.discover_ack_d_done(*tree_id) {
                     if let Some(discover_ack_d_msg) = self.saved_discover_ack_d.get(&tree_id) {
-                        {
-                            if CONFIG.debug_options.all || CONFIG.debug_options.hello {
-                                let neighbors: Vec<_> = self.neighbors.keys().collect();
-                                let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "ca_process_hello_msg_discover_ack_d" };
-                                let trace = json!({ "cell_id": &self.cell_id, "tree_id": tree_id, "discover_ack_d_msg": discover_ack_d_msg.value() });
-                                let _ = add_to_trace(TraceType::Debug, trace_params, &trace, _f);
-                            }
-                        }
                         self.send_msg(line!(), self.connected_tree_id, discover_ack_d_msg.clone(), user_mask)?;
                     }
                 } else {
