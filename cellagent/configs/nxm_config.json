@@ -8,9 +8,9 @@
     "breadth_first_1hop": true, "//": "Breadth first discover first hop",
     "kafka_server":"172.16.1.2",
     "kafka_topic":"CellAgent",
-    "output_dir_name":"/Users/alan/Documents/Eclipse/multicell/trace",
-    "output_file_name":"/Users/alan/Documents/Eclipse/multicell/trace/trace.json",
-    "quench":"RootPort", "//": "Either Simple or RootPort or MyPort",
+    "output_dir_name":"trace/",
+    "output_file_name":"trace.json",
+    "quench":"Simple", "//": "Either Simple or RootPort or MyPort",
     "visualize": ["dc", "ca"], "//": "Force these trace options to true for visualization",
     "trace_options":{
         "all":    false,
