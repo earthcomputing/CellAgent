@@ -134,22 +134,24 @@ impl NalCell {
                                                            pe_from_ports, pe_to_ports,
                                                            border_port_nos).context(NalcellError::Chain { func_name: "new", comment: S("cell agent create") })?;
         let ca_join_handle = cell_agent.start(ca_from_cm, ca_from_ports);
-        thread::spawn(move || -> Result<(), Error> {
-            loop {
-                match trace_lines.next().transpose()? {
-                    None => break,
-                    Some(record) => {
-                        let trace_format = process_trace_record(record.clone())?;
-                        let _ = match trace_format {
-                            TraceFormat::EmptyFormat => (),
-                            TraceFormat::CaNewFormat(_, _, _, _) => println!("nalcell {}: {} ca_new out of order", cell_id, _f),
-                            TraceFormat::CaToCmEntryFormat(entry) => println!("NalCell {}: {} entry {}", cell_id, _f, entry),
-                        };
+        if CONFIG.replay {
+            thread::spawn(move || -> Result<(), Error> {
+                loop {
+                    match trace_lines.next().transpose()? {
+                        None => break,
+                        Some(record) => {
+                            let trace_format = process_trace_record(record.clone())?;
+                            let _ = match trace_format {
+                                TraceFormat::EmptyFormat => (),
+                                TraceFormat::CaNewFormat(_, _, _, _) => println!("nalcell {}: {} ca_new out of order", cell_id, _f),
+                                TraceFormat::CaToCmEntryFormat(entry) => println!("NalCell {}: {} entry {}", cell_id, _f, entry),
+                            };
+                        }
                     }
                 }
-            }
-            Ok(())
-        });
+                Ok(())
+            });
+        }
         Ok((NalCell {
             id: cell_id,
             cell_type,

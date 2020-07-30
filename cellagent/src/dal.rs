@@ -101,12 +101,12 @@ pub fn add_to_trace(trace_type: TraceType, trace_params: &TraceHeaderParams,
 }
 pub fn get_cell_replay_lines(cell_name: &str) -> Result<Lines<BufReader<File>>, Error> {
     let _f = "get_cell_replay_lines";
-    let dir_name = if CONFIG.replay {
-        format!("{}-replay", CONFIG.output_dir_name)
+    let dir_name = format!("{}-replay", &CONFIG.output_dir_name[..CONFIG.output_dir_name.len()-1]);
+    let file_name = if CONFIG.replay {
+        format!("{}/{}-{}.json", dir_name, CONFIG.output_file_name, cell_name)
     } else {
-        CONFIG.output_dir_name.clone()
+        S("/dev/null")
     };
-    let file_name = format!("{}/{}-{}.json", dir_name, CONFIG.output_file_name, cell_name);
     let cell_file_name = str::replace(&file_name, ":", "-");
     let mut cell_file_handle = OpenOptions::new().read(true).open(cell_file_name.clone()).context(DalError::Replay { func_name: _f, file_name: cell_file_name, cell_name: S(cell_name) })?;
     let reader = BufReader::new(cell_file_handle);

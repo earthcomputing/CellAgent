@@ -34,12 +34,18 @@ impl Rack {
         for border_cell in blueprint.get_border_cells() {
             let cell_no = border_cell.get_cell_no();
             let border_ports = border_cell.get_border_ports();
-            let (nal_cell, _join_handle) = NalCell::new(&border_cell.get_name(),
+            let (nal_cell, _join_handle) = match NalCell::new(&border_cell.get_name(),
                                                         border_cell.get_num_phys_ports(),
                                                         &HashSet::from_iter(border_ports.clone()),
                                                         CellConfig::Large,
                                                         None,
-                                                        ).context(RackError::Chain { func_name: _f, comment: S("border") })?;
+                                                        ) {
+                Ok(t) => t,
+                Err(e) => {
+                    println!("Rack: {} error from nalcell {}", _f, e);
+                    return Err(RackError::Chain { func_name: _f, comment: S("Border cell") }.into() );
+                }
+            };
             {
                 if CONFIG.trace_options.all || CONFIG.trace_options.dc { // Needed for visualization
                     let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "border_cell_start" };
@@ -53,12 +59,19 @@ impl Rack {
         }
         for interior_cell in blueprint.get_interior_cells() {
             let cell_no = interior_cell.get_cell_no();
-            let (nal_cell, _join_handle) = NalCell::new(&interior_cell.get_name(),
+            let (nal_cell, _join_handle) = match NalCell::new(&interior_cell.get_name(),
                                                         interior_cell.get_num_phys_ports(),
                                                         &HashSet::new(),
                                                         CellConfig::Large,
                                                         None,
-                                                        ).context(RackError::Chain { func_name: _f, comment: S("interior") })?;
+                                                        )
+            {
+                Ok(t) => t,
+                Err(e) => {
+                    println!("Rack: {} error from nalcell {}", _f, e);
+                    return Err(RackError::Chain { func_name: _f, comment: S("Interior cell") }.into());
+                }
+            };
             {
                 if CONFIG.trace_options.all || CONFIG.trace_options.dc { // Needed for visualization
                     let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "interior_cell_start" };

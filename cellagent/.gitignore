@@ -7,3 +7,5 @@ test.json
 node_modules
 .vscode
 bin
+trace
+trace-replay
