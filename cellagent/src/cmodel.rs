@@ -5,7 +5,6 @@ use std::{fmt, fmt::Write,
 };
 
 use failure::{Error, ResultExt};
-use crossbeam::crossbeam_channel::unbounded as channel;
 
 use crate::config::{CONFIG};
 use crate::dal::{add_to_trace, fork_trace_header, update_trace_header};
@@ -29,10 +28,12 @@ impl Cmodel {
     pub fn get_name(&self) -> String { self.cell_id.get_name() }
     pub fn get_cell_id(&self) -> &CellID { &self.cell_id }
     // NEW
-    pub fn new(cell_id: CellID, connected_tree_id: TreeID, pe_to_cm: PeToCm, cm_to_ca: CmToCa, pe_from_ports: PeFromPort, pe_to_ports: HashMap<PortNo, PeToPort>, border_port_nos: &HashSet<PortNo> ) -> (Cmodel, JoinHandle<()>) {
+    pub fn new(cell_id: CellID, connected_tree_id: TreeID, pe_to_cm: PeToCm, cm_to_ca: CmToCa,
+               pe_from_ports: PeFromPort, pe_to_ports: HashMap<PortNo, PeToPort>,
+               border_port_nos: &HashSet<PortNo>,
+               cm_to_pe: CmToPe, pe_from_cm: PeFromCm) -> (Cmodel, JoinHandle<()>) {
         let packet_engine = PacketEngine::new(cell_id, connected_tree_id,
                                               pe_to_cm, pe_to_ports, &border_port_nos);
-        let (cm_to_pe, pe_from_cm): (CmToPe, PeFromCm) = channel();
         let pe_join_handle = packet_engine.start(pe_from_cm, pe_from_ports);
         (Cmodel { cell_id,
                   packet_engine,
