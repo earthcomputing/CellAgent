@@ -18,7 +18,8 @@ use crate::cellagent::{CellAgent};
 use crate::config::{CONFIG, PortQty};
 use crate::dal::{add_to_trace, get_cell_replay_lines};
 use crate::ec_message_formats::{PortToPe, PeFromPort, PeToPort, PortFromPe,
-                                CmToCa, CaFromCm };
+                                CmToCa, CaFromCm, CaToCm, CmFromCa,
+                                PeToCm, CmFromPe, CmToPe, PeFromCm};
 use crate::ecnl::{ECNL_Session};
 use crate::name::{Name, CellID};
 use crate::port::{Port};
@@ -62,7 +63,6 @@ impl NalCell {
             (CellID::new(name).context(NalcellError::Chain { func_name: "new", comment: S("cell_id") })?,
              None)
         };
-        let (cm_to_ca, ca_from_cm): (CmToCa, CaFromCm) = channel();
         let (port_to_pe, pe_from_ports): (PortToPe, PeFromPort) = channel();
         let (port_to_ca, ca_from_ports): (PortToCa, CaFromPort) = channel();
         let port_list: Vec<PortNo> = (0..*num_phys_ports)
@@ -129,10 +129,15 @@ impl NalCell {
             ports.push(port);
         }
         let boxed_ports: Box<[Port]> = ports.into_boxed_slice();
+        let (cm_to_ca, ca_from_cm): (CmToCa, CaFromCm) = channel();
+        let (ca_to_cm, cm_from_ca): (CaToCm, CmFromCa) = channel();
+        let (pe_to_cm, cm_from_pe): (PeToCm, CmFromPe) = channel();
+        let (cm_to_pe, pe_from_cm): (CmToPe, PeFromCm) = channel();
         let (cell_agent, _cm_join_handle) = CellAgent::new(cell_id, tree_ids, cell_type, config,
-                                                           num_phys_ports, ca_to_ports, cm_to_ca,
-                                                           pe_from_ports, pe_to_ports,
-                                                           border_port_nos).context(NalcellError::Chain { func_name: "new", comment: S("cell agent create") })?;
+                 num_phys_ports, ca_to_ports, cm_to_ca,
+                  pe_from_ports, pe_to_ports,
+                  border_port_nos,
+                  ca_to_cm, cm_from_ca, pe_to_cm, cm_from_pe,cm_to_pe, pe_from_cm).context(NalcellError::Chain { func_name: "new", comment: S("cell agent create") })?;
         let ca_join_handle = cell_agent.start(ca_from_cm, ca_from_ports);
         if CONFIG.replay {
             thread::spawn(move || -> Result<(), Error> {
