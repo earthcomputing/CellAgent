@@ -131,7 +131,7 @@ impl CellAgent {
         Ok((CellAgent {
             cell_id, my_tree_id, cell_type, config, no_ports,
             control_tree_id, connected_tree_id,
-            cmodel: vec![cmodel], ca_to_cm: vec![ca_to_cm], ca_to_ports, my_entry, base_tree_map,
+            cmodel: vec![cmodel], ca_to_cm: vec![ca_to_cm], ca_to_ports, my_entry, base_tree_map, no_packets,
             ..Default::default()
         }, cm_join_handle))
     }
