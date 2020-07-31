@@ -826,7 +826,9 @@ impl CellAgent {
             let trace = json!({ "cell_id": &self.cell_id, "entry": entry });
             let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
         }
-        self.ca_to_cm[0].send(CaToCmBytes::Entry(*entry)).context(CellagentError::Chain { func_name: _f, comment: S("") })?;
+        if !CONFIG.replay {
+            self.ca_to_cm[0].send(CaToCmBytes::Entry(*entry)).context(CellagentError::Chain { func_name: _f, comment: S("") })?;
+        }
         Ok(())
     }
 

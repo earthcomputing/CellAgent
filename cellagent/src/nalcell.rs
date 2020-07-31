@@ -18,7 +18,7 @@ use crate::cellagent::{CellAgent};
 use crate::config::{CONFIG, PortQty};
 use crate::dal::{add_to_trace, get_cell_replay_lines};
 use crate::ec_message_formats::{PortToPe, PeFromPort, PeToPort, PortFromPe,
-                                CmToCa, CaFromCm, CaToCm, CmFromCa,
+                                CmToCa, CaFromCm, CaToCm, CmFromCa, CaToCmBytes,
                                 PeToCm, CmFromPe, CmToPe, PeFromCm};
 use crate::ecnl::{ECNL_Session};
 use crate::name::{Name, CellID};
@@ -137,7 +137,8 @@ impl NalCell {
                  num_phys_ports, ca_to_ports, cm_to_ca,
                   pe_from_ports, pe_to_ports,
                   border_port_nos,
-                  ca_to_cm, cm_from_ca, pe_to_cm, cm_from_pe,cm_to_pe, pe_from_cm).context(NalcellError::Chain { func_name: "new", comment: S("cell agent create") })?;
+                  ca_to_cm.clone(), cm_from_ca, pe_to_cm.clone(),
+                            cm_from_pe, cm_to_pe.clone(), pe_from_cm).context(NalcellError::Chain { func_name: "new", comment: S("cell agent create") })?;
         let ca_join_handle = cell_agent.start(ca_from_cm, ca_from_ports);
         if CONFIG.replay {
             thread::spawn(move || -> Result<(), Error> {
@@ -149,7 +150,10 @@ impl NalCell {
                             let _ = match trace_format {
                                 TraceFormat::EmptyFormat => (),
                                 TraceFormat::CaNewFormat(_, _, _, _) => println!("nalcell {}: {} ca_new out of order", cell_id, _f),
-                                TraceFormat::CaToCmEntryFormat(entry) => println!("NalCell {}: {} entry {}", cell_id, _f, entry),
+                                TraceFormat::CaToCmEntryFormat(entry) => {
+                                    //println!("NalCell {}: {} entry {}", cell_id, _f, entry);
+                                    ca_to_cm.send(CaToCmBytes::Entry(entry))?;
+                                },
                             };
                         }
                     }
