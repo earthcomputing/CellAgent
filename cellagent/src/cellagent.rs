@@ -911,10 +911,17 @@ impl CellAgent {
             {
                 if CONFIG.trace_options.all || CONFIG.trace_options.ca {
                     match &msg {
-                        CmToCaBytes::Bytes((port_no, _, _, bytes)) => {
+                        CmToCaBytes::Bytes((port_no, is_ait, uuid, bytes)) => {
+                            let msg_tree_id = {  // Use control tree if uuid not found
+                                self.tree_id_map
+                                    .get(&uuid)
+                                    .unwrap_or(&self.control_tree_id.to_port_tree_id_0())
+                                    .clone()
+                            };
                             let ec_msg: Box<dyn Message> = serde_json::from_str(&bytes.to_string()?)?;
                             let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "ca_from_cm_bytes" };
-                            let trace = json!({ "cell_id": self.cell_id, "port": port_no, "msg": ec_msg });
+                            let trace = json!({ "cell_id": self.cell_id, "port": port_no,
+                                "is_ait": is_ait, "uuid": uuid, "msg": ec_msg, "bytes": bytes });
                             let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
                         },
                         CmToCaBytes::Status((port_no, is_border, number_of_packets, status)) => {
@@ -1995,7 +2002,9 @@ impl CellAgent {
                 let _ = add_to_trace(TraceType::Debug, trace_params, &trace, _f);
             }
         }
-        self.send_bytes(line_no, tree_id, msg.is_ait(), user_mask, seq_no, bytes)?;
+        if !CONFIG.replay {
+            self.send_bytes(line_no, tree_id, msg.is_ait(), user_mask, seq_no, bytes)?;
+        }
         Ok(())
     }
     fn send_bytes(&self, line_no: u32, tree_id: TreeID, is_ait: bool, user_mask: Mask,
@@ -2022,8 +2031,7 @@ impl CellAgent {
             }
         }
         let msg = CaToCmBytes::Bytes((tree_id, is_ait, user_mask, seq_no, bytes));
-        self.ca_to_cm[0].send(msg)?;
-        Ok(())
+        self.ca_to_cm[0].send(msg).map_err(Error::from)
     }
     // For debugging only
     fn _dbg_get_traph_keys(&self) -> Vec<String> {

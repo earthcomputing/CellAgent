@@ -65,7 +65,13 @@ impl Config {
             .next()
             .unwrap_or(S("configs/10cell_config.json"));
         println!("\nReading configuratation from {}", config_file_name);
-        let config_file = OpenOptions::new().read(true).open(config_file_name)?;//.context(ConfigError::File { func_name: _f, file_name: config_file_name})?;
+        let config_file = match OpenOptions::new().read(true).open(config_file_name) {
+            Ok(f) => f,
+            Err(e) => {
+                println!("Config: {} Error {}", _f, e);
+                return Err(e.into())
+            }
+        };
         let mut config: Config = serde_json::from_reader(config_file)?;//.context(ConfigError::Chain { func_name: _f, comment: S("") })?;
         if *config.num_cells == 0 {
             let (nr, nc) = (config.nrows, config.ncols);

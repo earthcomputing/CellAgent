@@ -18,7 +18,7 @@ use crate::cellagent::{CellAgent};
 use crate::config::{CONFIG, PortQty};
 use crate::dal::{add_to_trace, get_cell_replay_lines};
 use crate::ec_message_formats::{PortToPe, PeFromPort, PeToPort, PortFromPe,
-                                CmToCa, CaFromCm, CaToCm, CmFromCa, CaToCmBytes,
+                                CmToCa, CaFromCm, CaToCm, CmFromCa, CaToCmBytes, CmToCaBytes,
                                 PeToCm, CmFromPe, CmToPe, PeFromCm};
 use crate::ecnl::{ECNL_Session};
 use crate::name::{Name, CellID};
@@ -104,7 +104,7 @@ impl NalCell {
                     match ecnl_clone {
                         Some(ecnl_session) => {
                             #[cfg(feature = "cell")] {
-                                is_connected = ecnl_session.get_port(i - 1).is_connected()
+                                is_connected = ecnl_session.get_port(i).is_connected()
                             }
                             // To keep compiler happy
                             #[cfg(feature = "simulator")] {
@@ -134,7 +134,7 @@ impl NalCell {
         let (pe_to_cm, cm_from_pe): (PeToCm, CmFromPe) = channel();
         let (cm_to_pe, pe_from_cm): (CmToPe, PeFromCm) = channel();
         let (cell_agent, _cm_join_handle) = CellAgent::new(cell_id, tree_ids, cell_type, config,
-                 num_phys_ports, ca_to_ports, cm_to_ca,
+                 num_phys_ports, ca_to_ports, cm_to_ca.clone(),
                   pe_from_ports, pe_to_ports,
                   border_port_nos,
                   ca_to_cm.clone(), cm_from_ca, pe_to_cm.clone(),
@@ -147,13 +147,15 @@ impl NalCell {
                         None => break,
                         Some(record) => {
                             let trace_format = process_trace_record(record.clone())?;
-                            let _ = match trace_format {
+                            match trace_format {
                                 TraceFormat::EmptyFormat => (),
                                 TraceFormat::CaNewFormat(_, _, _, _) => println!("nalcell {}: {} ca_new out of order", cell_id, _f),
                                 TraceFormat::CaToCmEntryFormat(entry) => {
-                                    //println!("NalCell {}: {} entry {}", cell_id, _f, entry);
                                     ca_to_cm.send(CaToCmBytes::Entry(entry))?;
                                 },
+                                TraceFormat::CaFromCmBytes(port_no, is_ait, uuid, msg) => {
+                                    cm_to_ca.send(CmToCaBytes::Bytes((port_no, is_ait, uuid, msg)))?;
+                                }
                             };
                         }
                     }

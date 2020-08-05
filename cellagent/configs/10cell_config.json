@@ -1,6 +1,6 @@
 {
     "//": "Common Parameters",
-    "replay": false, "//": "Replay if true",
+    "replay": true, "//": "Replay if true",
     "continue_on_error":false, "//": "true in production, false when debugging",
     "race_sleep":1, "//": "Seconds to sleep before sending HelloMsg",
     "//": "Send my iscover messages based on which of the two following conditions occurs first",

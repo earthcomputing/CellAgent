@@ -79,7 +79,7 @@ impl PacketEngine {
     pub fn start(&self, pe_from_cm: PeFromCm, pe_from_ports: PeFromPort) -> JoinHandle<()> {
         let _f = "start_packet_engine";
         {
-            if CONFIG.trace_options.all || CONFIG.trace_options.nal {
+            if CONFIG.trace_options.all || CONFIG.trace_options.pe {
                 let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "nalcell_start_pe" };
                 let trace = json!({ "cell_id": self.get_cell_id() });
                 let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
