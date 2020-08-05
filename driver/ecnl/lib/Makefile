@@ -15,7 +15,7 @@ EARTH_CUSTOM=3.4.2.1
 CFLAGS += -DBIONIC
 endif
 
-ENTL_E1000E=../../bjackson-e1000e/e1000e-$(EARTH_CUSTOM)/src
+ENTL_E1000E=../../e1000e/e1000e-$(EARTH_CUSTOM)/src
 
 CFLAGS += -I$(ENTL_E1000E)
 CFLAGS += -I../src
