@@ -3,8 +3,11 @@ use serde_json::Value;
 use std::{fmt, fmt::Write};
 
 // Structs to parse trace records
+use crate::app_message::AppMessage;
 use crate::ec_message::{Message, MsgHeader, MsgType};
 use crate::name::{CellID, TreeID};
+use crate::packet_engine::NumberOfPackets;
+use crate::port::PortStatus;
 use crate::routing_table_entry::RoutingTableEntry;
 use crate::utility::{ByteArray, PortNo, TraceType};
 use crate::uuid_ec::Uuid;
@@ -14,7 +17,9 @@ pub enum TraceFormat {
     EmptyFormat,
     CaNewFormat(CellID, TreeID, TreeID, TreeID),
     CaToCmEntryFormat(RoutingTableEntry),
-    CaFromCmBytes(PortNo, bool, Uuid, ByteArray)
+    CaFromCmBytesMsg(PortNo, bool, Uuid, ByteArray),
+    CaFromCmBytesStatus(PortNo, bool, NumberOfPackets, PortStatus),
+    CaToNoc(PortNo, ByteArray),
 }
 
 pub fn process_trace_record(mut record: String) -> Result<TraceFormat, Error> {
@@ -33,14 +38,34 @@ pub fn process_trace_record(mut record: String) -> Result<TraceFormat, Error> {
             TraceFormat::CaToCmEntryFormat(ca_to_cm_entry.entry)
         },
         "ca_from_cm_bytes" => {
-            let m2a: CaFromCmBytes = match serde_json::from_value(trace.body) {
+            let m2a: CaFromCmBytesMsg = match serde_json::from_value(trace.body) {
                 Ok(m) => m,
                 Err(e) => {
                     println!("Replay {} error {}", format, e);
                     return Err(e.into());
                 }
             };
-            TraceFormat::CaFromCmBytes(m2a.port, m2a.is_ait, m2a.uuid, m2a.bytes)
+            TraceFormat::CaFromCmBytesMsg(m2a.port, m2a.is_ait, m2a.uuid, m2a.bytes)
+        }
+        "ca_from_cm_status" => {
+            let m2a: CaFromCmBytesStatus = match serde_json::from_value(trace.body) {
+                Ok(m) => m,
+                Err(e) => {
+                    println!("Replay {} error {}", format, e);
+                    return Err(e.into());
+                }
+            };
+            TraceFormat::CaFromCmBytesStatus(m2a.port, m2a.is_border, m2a.no_packets, m2a.status)
+        }
+        "ca_to_noc_tree_name" => {
+            let a2n: CaToNoc = match serde_json::from_value(trace.body) {
+                Ok(m) => m,
+                Err(e) => {
+                    println!("Replay {} error {}", format, e);
+                    return Err(e.into());
+                }
+            };
+            TraceFormat::CaToNoc(a2n.noc_port, a2n.bytes)
         }
         _ => TraceFormat::EmptyFormat
     };
@@ -88,18 +113,18 @@ struct CaToCmEntry {
     entry: RoutingTableEntry
 }
 #[derive(Debug, Clone, Serialize, Deserialize)]
-struct TraceRecordCaFromCmBytes {
+struct TraceRecordCaFromCmBytesMsg {
     header: TraceHeader,
-    body: CaFromCmBytes
+    body: CaFromCmBytesMsg
 }
 #[derive(Debug, Clone, Serialize, Deserialize)]
-struct CaFromCmBytes {
+struct CaFromCmBytesMsg {
     is_ait: bool,
     port: PortNo,
     uuid: Uuid,
     bytes: ByteArray
 }
-impl fmt::Display for CaFromCmBytes {
+impl fmt::Display for CaFromCmBytesMsg {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let mut s = "CaFromCmBytes".to_string();
         write!(s, "is_ait {} ", self.is_ait)?;
@@ -110,6 +135,28 @@ impl fmt::Display for CaFromCmBytes {
         write!(f, "{}", s)
     
     }
+}
+#[derive(Debug, Clone, Serialize, Deserialize)]
+struct TraceRecordCaFromCmBytesStatus {
+    header: TraceHeader,
+    body: CaFromCmBytesStatus
+}
+#[derive(Debug, Clone, Serialize, Deserialize)]
+struct CaFromCmBytesStatus {
+    port: PortNo,
+    is_border: bool,
+    no_packets: NumberOfPackets,
+    status: PortStatus
+}
+#[derive(Debug, Clone, Serialize, Deserialize)]
+struct TraceRecordCaToNoc {
+    header: TraceHeader,
+    body: CaToNoc
+}
+#[derive(Debug, Clone, Serialize, Deserialize)]
+struct CaToNoc {
+    noc_port: PortNo,
+    bytes: ByteArray
 }
 #[derive(Debug, Fail)]
 pub enum ReplayError {

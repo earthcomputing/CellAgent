@@ -3,7 +3,7 @@
     "replay": true, "//": "Replay if true",
     "continue_on_error":false, "//": "true in production, false when debugging",
     "race_sleep":1, "//": "Seconds to sleep before sending HelloMsg",
-    "//": "Send my iscover messages based on which of the two following conditions occurs first",
+    "//": "Send my Discover messages based on which of the two following conditions occurs first",
     "min_trees": 3, "//": "Minimum number of trees seen before sending mine",
     "min_hello": 3, "//": "Wait for this many Hello messages before sending my Discover",
     "breadth_first": false, "//": "Breadth first discover",

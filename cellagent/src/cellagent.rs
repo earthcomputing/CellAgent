@@ -378,12 +378,12 @@ impl CellAgent {
     fn is_border_port(&self, port_number: &PortNumber) -> bool {
         self.border_port_tree_id_map.contains_key(port_number)
     }
-    fn get_border_port(&self, test_originator_id: &OriginatorID) -> Result<PortNumber, Error> {
+    fn get_border_port(&self, test_originator_id: OriginatorID) -> Result<PortNumber, Error> {
         let _f = "get_border_port";
         let entry = self.border_port_tree_id_map
             .iter()
-            .find(|(_, originator_id)| test_originator_id == *originator_id)
-            .ok_or(CellagentError::Sender { func_name: _f, cell_id: self.cell_id, originator_id: test_originator_id.clone() })?;
+            .find(|(_, &originator_id)| test_originator_id == originator_id)
+            .ok_or(CellagentError::Sender { func_name: _f, cell_id: self.cell_id, originator_id: test_originator_id })?;
         Ok(*entry.0)
     }
     fn add_tree_name_map_item(&mut self, originator_id: OriginatorID, allowed_tree: &AllowedTree, allowed_tree_id: TreeID) {
@@ -398,7 +398,7 @@ impl CellAgent {
     }
     fn get_originator_ids(&self) -> Vec<OriginatorID> {
         let locked = self.tree_name_map.lock().unwrap();
-        locked.keys().cloned().collect::<Vec<OriginatorID>>()
+        locked.keys().cloned().collect()
     }
     fn delete_tree_name_map_item(&mut self, delete_tree_id: &TreeID)
             -> Result<(), Error> {
@@ -1628,18 +1628,23 @@ impl CellAgent {
                 let tree_name_msg = AppTreeNameMsg::new("noc",
                                &AllowedTree::new(&parent_port_tree_id.get_name()),
                                     &allowed_tree);
+                let serialized = serde_json::to_string(&tree_name_msg as &dyn AppMessage).context(CellagentError::Chain { func_name: "port_connected", comment: S(self.cell_id) })?;
+                let bytes = ByteArray::new(&serialized);
+                let noc_port_no = self.get_border_port(originator_id)
+                    .context(CellagentError::Chain { func_name: _f, comment: format!("{:?}", originator_id)})?
+                    .get_port_no();
                 {
                     if CONFIG.trace_options.all || CONFIG.trace_options.ca {
                         let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "ca_to_noc_tree_name" };
-                        let trace = json!({ "cell_id": &self.cell_id, "port": port_no, "app_msg": tree_name_msg });
+                        let trace = json!({ "cell_id": &self.cell_id, "port": port_no,
+                            "noc_port": noc_port_no, "tree_name_msg": tree_name_msg, "bytes":  bytes });
                         let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
                     }
                 }
-                let serialized = serde_json::to_string(&tree_name_msg as &dyn AppMessage).context(CellagentError::Chain { func_name: "port_connected", comment: S(self.cell_id) })?;
-                let bytes = ByteArray::new(&serialized);
-                let port_no = self.get_border_port(&originator_id)?.get_port_no();
-                let ca_to_port = self.ca_to_ports.get(&port_no).expect("cellagent.rs: border port sender must be set");
-                ca_to_port.send(bytes)?;
+                if !CONFIG.replay {
+                    let ca_to_port = self.ca_to_ports.get(&noc_port_no).expect("cellagent.rs: border port sender must be set");
+                    ca_to_port.send(bytes)?;
+                }
             } else {
                 let mask = Mask::new(port_number);
                 let in_reply_to = msg.get_sender_msg_seq_no();
@@ -1906,6 +1911,7 @@ impl CellAgent {
             let _ = self.update_traph(new_tree_id.to_port_tree_id(port_number), port_number, PortState::Parent,
                                       &gvm_eqn, HashSet::new(), PathLength(CellQty(1)), Path::new0(), ).context(CellagentError::Chain { func_name: "port_connected", comment: S(self.cell_id) })?;
             let base_tree_name = AllowedTree::new(BASE_TREE_NAME);
+            // These originator_ids must be unique since uuid = UUID::default()
             let originator_id = OriginatorID::new(self.cell_id, &format!("BorderPort+{}", *port_no))?;
             self.add_tree_name_map_item(originator_id,&base_tree_name, self.my_tree_id);
             self.border_port_tree_id_map.insert(port_number, originator_id);
@@ -1964,7 +1970,7 @@ impl CellAgent {
         rw_traph.add_tried_port(rw_port_tree_id, port_no);  // Don't try port attached to broken link
         if let Some(trial_parent_port) = rw_traph.find_new_parent_port(rw_port_tree_id, broken_path) {
             rw_traph.add_tried_port(rw_port_tree_id, trial_parent_port);
-            let originator_id = OriginatorID::new(self.cell_id, "CellAgent")?;
+            let originator_id = OriginatorID::new(self.cell_id, "CellAgent").context(CellagentError::Chain { func_name: _f, comment: S("") })?;
             let rootward_tree_id = rw_traph.get_base_tree_id();
             let rw_port_number = broken_path.get_port_number();
             let rw_port_tree_id = rootward_tree_id.to_port_tree_id(rw_port_number);

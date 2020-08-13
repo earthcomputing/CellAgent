@@ -21,7 +21,7 @@ fn str_from_chars(chars: NameType) -> String {
 pub trait Name: Sized {
     fn get_name(&self) -> String;
     fn get_uuid(&self) -> Uuid;
-    fn create_from_string(&self, n: &str) -> Self; // Warning is an IntelliJ false positive
+    fn create_from_string(&self, n: &str) -> Self;
     // Default implementations
     fn stringify(&self) -> String { S(self.get_name()) }
     fn name_from_str(&self, s: &str) -> Result<Self, Error> {
@@ -230,7 +230,8 @@ pub struct OriginatorID { // Originator of a message that may be passed through 
 impl OriginatorID {
     pub fn new(cell_id: CellID, name: &str) -> Result<OriginatorID, Error> {
         let name = str_to_chars(&format!("Originator:{}+{}", cell_id, name));
-        Ok(OriginatorID { name, uuid: Uuid::new() })
+        // All OriginatorIDs with the same name have the same UUID
+        Ok(OriginatorID { name, uuid: Uuid::default() })
     }
 }
 impl Name for OriginatorID {
