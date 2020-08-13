@@ -31,7 +31,7 @@ pub fn process_trace_record(mut record: String) -> Result<TraceFormat, Error> {
         "ca_new" => {
             let ca_new: CaNew = serde_json::from_value(trace.body)?;
             TraceFormat::CaNewFormat(ca_new.cell_id, ca_new.my_tree_id,
-                               ca_new.connected_tree_id, ca_new.control_tree_id)
+                                     ca_new.control_tree_id, ca_new.connected_tree_id)
         },
         "ca_to_cm_entry" => {
             let ca_to_cm_entry: CaToCmEntry = serde_json::from_value(trace.body)?;
