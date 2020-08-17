@@ -1,9 +1,5 @@
 Cargo.lock
-manifest.txt
 out
 target
-test.json
 .idea
-node_modules
 .vscode
-bin
