@@ -1,0 +1,1 @@
+This is a subsytem for anything related to Earth Computing link protocols (ECLP).  Models of protocols should be checked directly into driver-master unless specific to particular code in a lower-level branch.
