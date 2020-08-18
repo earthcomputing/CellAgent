@@ -3,8 +3,7 @@ use serde_json::Value;
 use std::{fmt, fmt::Write};
 
 // Structs to parse trace records
-use crate::app_message::AppMessage;
-use crate::ec_message::{Message, MsgHeader, MsgType};
+use crate::ec_message::{MsgType};
 use crate::name::{CellID, TreeID};
 use crate::packet_engine::NumberOfPackets;
 use crate::port::PortStatus;
@@ -21,7 +20,19 @@ pub enum TraceFormat {
     CaFromCmBytesStatus(PortNo, bool, NumberOfPackets, PortStatus),
     CaToNoc(PortNo, ByteArray),
 }
-
+impl fmt::Display for TraceFormat {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let s = match self {
+            TraceFormat::EmptyFormat => "Empty",
+            TraceFormat::CaNewFormat(_, _, _, _) => "CaNew",
+            TraceFormat::CaToCmEntryFormat(_) => "CaToCmEntry",
+            TraceFormat::CaFromCmBytesMsg(_, _, _, _) => "CaFromCmBytesMsg",
+            TraceFormat::CaFromCmBytesStatus(_, _, _, _) => "CaFromCmBytesStatus",
+            TraceFormat::CaToNoc(_, _) => "CaToNoc"
+        };
+        write!(f, "{}", s)
+    }
+}
 pub fn process_trace_record(mut record: String) -> Result<TraceFormat, Error> {
     let _f = "process_trace_record";
     record.pop(); // Remove trailing comma

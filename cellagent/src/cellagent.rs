@@ -735,7 +735,9 @@ impl CellAgent {
                     let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
                 }
             }
-            self.ca_to_cm[0].send(CaToCmBytes::TunnelUp((originator_id, bytes)))?;
+            if !CONFIG.replay {
+                self.ca_to_cm[0].send(CaToCmBytes::TunnelUp((originator_id, bytes)))?;
+            }
         }
     }
     /*
@@ -874,11 +876,15 @@ impl CellAgent {
             }
             match msg {
                 PortToCaMsg::AppMsg(port_no, bytes) => {
-                    self.ca_to_cm[0].send(CaToCmBytes::TunnelPort((port_no, bytes)))?;
+                    if !CONFIG.replay {
+                        self.ca_to_cm[0].send(CaToCmBytes::TunnelPort((port_no, bytes)))?;
+                    }
                 }
                 PortToCaMsg::Status(port_no, port_status) => {
                     let is_border = true;
-                    self.ca_to_cm[0].send(CaToCmBytes::Status((port_no, is_border, NumberOfPackets::new(), port_status)))?;
+                    if !CONFIG.replay {
+                        self.ca_to_cm[0].send(CaToCmBytes::Status((port_no, is_border, NumberOfPackets::new(), port_status)))?;
+                    }
                 }
             }
         }
@@ -1389,7 +1395,7 @@ impl CellAgent {
         }
         // Send my DiscoverMsg and DiscoverDMsg
         let clone = self.clone();
-        thread::spawn(move || -> Result<(), Error> {
+        let delay_discover = move || -> Result<(), Error> {
             crate::utility::sleep(CONFIG.race_sleep);
             let discover_msg = DiscoverMsg::new(clone.cell_id, originator_id,
                                                 my_port_tree_id, PathLength(CellQty(1)),
@@ -1399,7 +1405,14 @@ impl CellAgent {
             clone.send_msg(line!(), clone.connected_tree_id, discover_msg, user_mask)?;
             clone.send_msg(line!(), clone.connected_tree_id, discoverd_msg, user_mask)?;
             Ok(())
-        });
+        };
+        if CONFIG.replay {
+            delay_discover()?;
+        } else {
+            thread::spawn(move || -> Result<(), Error> {
+                delay_discover()
+            });
+        }
         for (tree_id, discoverd_msg) in &self.saved_discoverd {
             self.send_msg(line!(), self.connected_tree_id, discoverd_msg.clone(), user_mask)?;
         }
@@ -2008,10 +2021,7 @@ impl CellAgent {
                 let _ = add_to_trace(TraceType::Debug, trace_params, &trace, _f);
             }
         }
-        if !CONFIG.replay {
-            self.send_bytes(line_no, tree_id, msg.is_ait(), user_mask, seq_no, bytes)?;
-        }
-        Ok(())
+        self.send_bytes(line_no, tree_id, msg.is_ait(), user_mask, seq_no, bytes).map_err(Error::from)
     }
     fn send_bytes(&self, line_no: u32, tree_id: TreeID, is_ait: bool, user_mask: Mask,
                   seq_no: SenderMsgSeqNo, bytes: ByteArray) -> Result<(), Error> {
@@ -2037,8 +2047,11 @@ impl CellAgent {
             }
         }
         let msg = CaToCmBytes::Bytes((tree_id, is_ait, user_mask, seq_no, bytes));
-        self.ca_to_cm[0].send(msg).map_err(Error::from)
-    }
+        if !CONFIG.replay {
+            self.ca_to_cm[0].send(msg)?;
+        }
+        Ok(())
+   }
     // For debugging only
     fn _dbg_get_traph_keys(&self) -> Vec<String> {
         let _f = "get_traph_keys";
