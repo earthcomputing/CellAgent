@@ -1,8 +1,0 @@
-Cargo.lock
-actix_server.iml
-out
-target
-.idea
-.vscode
-bin
-trace
