@@ -578,7 +578,7 @@ extern int retrieve_ait_message(struct nl_sock *sock, struct nl_msg *msg, uint32
     NLAPUT_CHECKED(nla_put_u64(msg, NL_ECNL_ATTR_ALO_REG_DATA, alo_reg.ar_data));
     NLAPUT_CHECKED(nla_put_u32(msg, NL_ECNL_ATTR_ALO_REG_NO, alo_reg.ar_no));
     nl_complete_msg(sock, msg);
-    if ((err = nl_send(sock, msg)) < 0) { fatal_error(err, "Unable to send message: %s", nl_geterror(err)); }
+    if ((err = nl_send(sock, msg)) < 0) { fatal_error(err, "Unable to retrieve message: %s", nl_geterror(err)); }
 
 {
     ANALYZE_REPLY("retrieve_ait_message");
