@@ -571,17 +571,26 @@ WAIT_ACK;
 // RETRIEVE_AIT_MESSAGE(uint32_t module_id, uint32_t port_id, uint64_t alo_reg_data, uint32_t alo_reg_no)
 extern int retrieve_ait_message(struct nl_sock *sock, struct nl_msg *msg, uint32_t module_id, uint32_t port_id, alo_reg_t alo_reg, uint32_t *mp, uint32_t *pp, buf_desc_t *buf) {
     int err;
+    printf("I'm in retrieve_ait_message\n");
     void *user_hdr = genlmsg_put(msg, NL_AUTO_PORT, NL_AUTO_SEQ, ops.o_id, 0, 0, NL_ECNL_CMD_RETRIEVE_AIT_MESSAGE, ECNL_GENL_VERSION);
+    printf("genlmsg_put()\n");
     NLAPUT_CHECKED(nla_put_u32(msg, NL_ECNL_ATTR_MODULE_ID, module_id));
+    printf("nla_put_u32(msg, NL_ECNL_ATTR_MODULE_ID, %d)\n", module_id);
     NLAPUT_CHECKED(nla_put_u32(msg, NL_ECNL_ATTR_PORT_ID, port_id));
+    printf("nla_put_u32(msg, NL_ECNL_ATTR_PORT_ID, %d)\n", port_id);
     // FIXME: suspect ?
     NLAPUT_CHECKED(nla_put_u64(msg, NL_ECNL_ATTR_ALO_REG_DATA, alo_reg.ar_data));
+    printf("nla_put_u32(msg, NL_ECNL_ATTR_ALO_REG_DATA, %lu)\n", alo_reg.ar_data);
     NLAPUT_CHECKED(nla_put_u32(msg, NL_ECNL_ATTR_ALO_REG_NO, alo_reg.ar_no));
+    printf("nla_put_u32(msg, NL_ECNL_ATTR_ALO_REG_NO, %d)\n", alo_reg.ar_no);
     nl_complete_msg(sock, msg);
+    printf("nl_complete_msg(sock, msg)\n");
     if ((err = nl_send(sock, msg)) < 0) { fatal_error(err, "Unable to retrieve message: %s", nl_geterror(err)); }
 
 {
+    printf("about to analyze_reply\n");
     ANALYZE_REPLY("retrieve_ait_message");
+    printf("just did analyze_reply\n");
 
     *mp = cbi.module_id;
     *pp = cbi.port_id;
