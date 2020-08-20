@@ -250,12 +250,14 @@ impl Cmodel {
                         let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
                     }
                 }
-                self.cm_to_ca.send(CmToCaBytes::Status((port_no, is_border, number_of_packets, status)))?
+                if !CONFIG.replay {
+                    self.cm_to_ca.send(CmToCaBytes::Status((port_no, is_border, number_of_packets, status)))?;
+                }
             },
         
             // de-packetize
             PeToCmPacket::Packet((port_no, packet)) => {
-                self.process_packet(port_no, packet)?
+                self.process_packet(port_no, packet)?;
             }
         };
         Ok(())
