@@ -1401,17 +1401,14 @@ impl CellAgent {
         let clone = self.clone();
         if !CONFIG.replay {
             thread::spawn(move || -> Result<(), Error> {
-                let delay_discover = move || -> Result<(), Error> {
-                    crate::utility::sleep(CONFIG.race_sleep);
-                    let discover_msg = DiscoverMsg::new(clone.cell_id, originator_id,
-                                                        my_port_tree_id, PathLength(CellQty(1)),
-                                                        Path::new(port_number));
-                    let discoverd_msg = DiscoverDMsg::new(in_reply_to, clone.cell_id,
-                                                          originator_id, my_port_tree_id, path, DiscoverDType::NonParent);
-                    clone.send_msg(line!(), clone.connected_tree_id, discover_msg, user_mask)?;
-                    clone.send_msg(line!(), clone.connected_tree_id, discoverd_msg, user_mask)?;
-                    Ok(())
-                };
+                crate::utility::sleep(CONFIG.race_sleep);
+                let discover_msg = DiscoverMsg::new(clone.cell_id, originator_id,
+                                                    my_port_tree_id, PathLength(CellQty(1)),
+                                                    Path::new(port_number));
+                let discoverd_msg = DiscoverDMsg::new(in_reply_to, clone.cell_id,
+                                                      originator_id, my_port_tree_id, path, DiscoverDType::NonParent);
+                clone.send_msg(line!(), clone.connected_tree_id, discover_msg, user_mask)?;
+                clone.send_msg(line!(), clone.connected_tree_id, discoverd_msg, user_mask)?;
                 Ok(())
             });
         }
