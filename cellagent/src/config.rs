@@ -52,7 +52,6 @@ pub struct Config {
     pub edge_list: Vec<Edge>,
     pub geometry: Vec<(usize, usize)>,
     pub race_sleep: u64,
-    pub visualize: Vec<String>,
     pub trace_options: TraceOptions,
     pub debug_options: DebugOptions,
     pub replay: bool,
@@ -87,20 +86,6 @@ impl Config {
                 if 0 == cell_no%2 {
                     config.border_cell_ports.insert(CellNo(cell_no + nc*(nr-1)), vec![PortNo(1)]);
                 }
-            }
-        }
-        // The following must be true for the Trace Visualizer
-        for viz in &config.visualize {
-            match viz.as_str() {
-                "dc"  => config.trace_options.dc  = true,
-                "ca"  => config.trace_options.ca  = true,
-                "nal" => config.trace_options.nal = true,
-                "noc" => config.trace_options.noc = true,
-                "svc" => config.trace_options.svc = true,
-                "vm"  => config.trace_options.vm  = true,
-                "cm"  => config.trace_options.cm  = true,
-                "pe"  => config.trace_options.pe  = true,
-                _    => eprintln!("---> {} is not a valid visualization designator", viz)
             }
         }
         if Path::new(&config.output_dir_name).exists() {
@@ -138,19 +123,21 @@ impl Config {
 // TODO: Use log crate for this
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TraceOptions {
-    pub all:      bool,
-    pub dc:       bool,
-    pub nal:      bool,
-    pub noc:      bool,
-    pub svc:      bool,
-    pub vm:       bool,
-    pub ca:       bool,
-    pub cm:       bool,
-    pub pe:       bool,
-    pub pe_cm:    bool,
-    pub pe_port:  bool,
-    pub port:     bool,
-    pub link:     bool
+    pub all:       bool,
+    pub dc:        bool,
+    pub nal:       bool,
+    pub noc:       bool,
+    pub svc:       bool,
+    pub vm:        bool,
+    pub ca:        bool,
+    pub cm:        bool,
+    pub pe:        bool,
+    pub pe_cm:     bool,
+    pub pe_port:   bool,
+    pub port:      bool,
+    pub link:      bool,
+    pub replay:    bool,
+    pub visualize: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

@@ -16,7 +16,7 @@ use ec_fabrix::utility::{CellConfig, CellNo, Edge, S, print_hash_map, sleep};
 
 fn main() -> Result<(), Error> {
     let _f = "main";
-    let output_file_name = format!("{}/{}.json", CONFIG.output_dir_name, CONFIG.output_file_name);
+    let output_file_name = format!("{}{}.json", CONFIG.output_dir_name, CONFIG.output_file_name);
     println!("\nMulticell trace and debug output to file {}", output_file_name);
     println!("{} Quenching of Discover messages", CONFIG.quench);
     println!("Delaying HelloMsg {} seconds", CONFIG.race_sleep);
