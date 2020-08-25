@@ -591,7 +591,6 @@ extern int retrieve_ait_message(struct nl_sock *sock, struct nl_msg *msg, uint32
         return 0;
     }
 
-    uint32_t message_length = cbi.message_length;
     uint8_t *msg = cbi.msg;
     size_t msg_bytes = cbi.msg_bytes;
 
@@ -600,25 +599,20 @@ extern int retrieve_ait_message(struct nl_sock *sock, struct nl_msg *msg, uint32
         return 0;
     }
 
-    // 3 factors: buf->len, message_length, msg_bytes
-    if (message_length != msg_bytes) {
-        ECP_DEBUG("retrieve_ait_message - WARN: message_length (%d) != msg_bytes (%lu)\n", message_length, msg_bytes);
-        if (msg_bytes < message_length) message_length = msg_bytes;
-    }
-
+    // 2 factors: buf->len, msg_bytes
     if (!buf->frame) {
-        ECP_DEBUG("retrieve_ait_message - allocating return buffer (%d)\n", message_length);
+        ECP_DEBUG("retrieve_ait_message - allocating return buffer (%ld)\n", msg_bytes);
         buf->frame = msg; // potential leak : client responsiblity
-        buf->len = message_length;
+        buf->len = msg_bytes;
     }
-    else if (buf->len < message_length) {
-        ECP_DEBUG("retrieve_ait_message - return buffer too small (%d), reallocated (%d)\n", buf->len, message_length);
+    else if (buf->len < msg_bytes) {
+        ECP_DEBUG("retrieve_ait_message - return buffer too small (%d), reallocated (%ld)\n", buf->len, msg_bytes);
         buf->frame = msg; // definite leak : FIXME ??
-        buf->len = message_length;
+        buf->len = msg_bytes;
     }
     else {
-        memcpy(buf->frame, msg, (size_t) message_length);
-        buf->len = message_length;
+        memcpy(buf->frame, msg, (size_t) msg_bytes);
+        buf->len = msg_bytes;
         free(cbi.msg); // cbi.msg_bytes
     }
 
