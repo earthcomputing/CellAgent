@@ -27,7 +27,7 @@ use crate::name::{Name, CellID};
 use crate::port::{Port};
 use crate::replay::{TraceFormat, process_trace_record};
 use crate::utility::{ByteArray, CellConfig, CellType, PortNo, S,
-                     TraceHeaderParams, TraceType};
+                     TraceHeader, TraceHeaderParams, TraceType};
 use crate::vm::VirtualMachine;
 
 #[derive(Debug)]
