@@ -25,12 +25,12 @@ impl Datacenter {
                 let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
             }
         }
-        let (mut rack, _join_handles) = Rack::construct(&blueprint).context(DatacenterError::Chain { func_name: "initialize", comment: S("")})?;
+        let (mut rack, _join_handles) = Rack::construct(&blueprint).context(DatacenterError::Chain { func_name: _f, comment: S("Rack")})?;
         let (application_to_noc, noc_from_application): (ApplicationToNoc, NocFromApplication) = channel();
         let (noc_to_application, application_from_noc): (NocToApplication, ApplicationFromNoc) = channel();
-        let mut noc = Noc::new(noc_to_application).context(DatacenterError::Chain { func_name: "initialize", comment: S("")})?;
+        let mut noc = Noc::new(noc_to_application).context(DatacenterError::Chain { func_name: _f, comment: S("Noc::new")})?;
         let (port_to_noc, port_from_noc) = noc.initialize(&blueprint, noc_from_application).context(DatacenterError::Chain { func_name: "initialize", comment: S("")})?;
-        rack.connect_to_noc(port_to_noc, port_from_noc).context(DatacenterError::Chain { func_name: "initialize", comment: S("")})?;
+        rack.connect_to_noc(port_to_noc, port_from_noc).context(DatacenterError::Chain { func_name: _f, comment: S("Connect to NOC")})?;
         return Ok(Datacenter { rack, application_to_noc, application_from_noc});
     }
     pub fn get_rack(&self) -> &Rack { &self.rack }

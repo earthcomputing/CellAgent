@@ -36,6 +36,9 @@ opt-level = 3
 # Turn off optimization in Development mode
 opt-level = 0
 
+[profile.release]
+lto = true
+
 [dependencies]
 actix-web = "1.0.5"
 actix-rt = "0.2.4"

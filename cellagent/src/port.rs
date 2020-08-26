@@ -20,7 +20,7 @@ use crate::utility::{ByteArray, PortNo, PortNumber, S, TraceHeader, TraceHeaderP
 use crate::uuid_ec::{Uuid, AitState};
 
 // TODO: There is no distinction between a broken link and a disconnected one.  We may want to revisit.
-#[derive(Debug, Copy, Clone, Serialize)]
+#[derive(Debug, Copy, Clone, Serialize, Deserialize)]
 pub enum PortStatus {
     Connected,
     Disconnected,

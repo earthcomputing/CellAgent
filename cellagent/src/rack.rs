@@ -34,14 +34,20 @@ impl Rack {
         for border_cell in blueprint.get_border_cells() {
             let cell_no = border_cell.get_cell_no();
             let border_ports = border_cell.get_border_ports();
-            let (nal_cell, _join_handle) = NalCell::new(&border_cell.get_name(),
+            let (nal_cell, _join_handle) = match NalCell::new(&border_cell.get_name(),
                                                         border_cell.get_num_phys_ports(),
                                                         &HashSet::from_iter(border_ports.clone()),
                                                         CellConfig::Large,
                                                         None,
-                                                        )?;
+                                                        ) {
+                Ok(t) => t,
+                Err(e) => {
+                    println!("Rack: {} error from nalcell {}", _f, e);
+                    return Err(RackError::Chain { func_name: _f, comment: S("Border cell") }.into() );
+                }
+            };
             {
-                if CONFIG.trace_options.all || CONFIG.trace_options.dc { // Needed for visualization
+                if CONFIG.trace_options.all || CONFIG.trace_options.dc || CONFIG.trace_options.visualize { // Needed for visualization
                     let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "border_cell_start" };
                     let cell_id = nal_cell.get_id();
                     let trace = json!({ "cell_id": cell_id, "cell_number": cell_no,
@@ -53,14 +59,21 @@ impl Rack {
         }
         for interior_cell in blueprint.get_interior_cells() {
             let cell_no = interior_cell.get_cell_no();
-            let (nal_cell, _join_handle) = NalCell::new(&interior_cell.get_name(),
+            let (nal_cell, _join_handle) = match NalCell::new(&interior_cell.get_name(),
                                                         interior_cell.get_num_phys_ports(),
                                                         &HashSet::new(),
                                                         CellConfig::Large,
                                                         None,
-                                                        )?;
+                                                        )
             {
-                if CONFIG.trace_options.all || CONFIG.trace_options.dc { // Needed for visualization
+                Ok(t) => t,
+                Err(e) => {
+                    println!("Rack: {} error from nalcell {}", _f, e);
+                    return Err(RackError::Chain { func_name: _f, comment: S("Interior cell") }.into());
+                }
+            };
+            {
+                if CONFIG.trace_options.all || CONFIG.trace_options.dc || CONFIG.trace_options.visualize { // Needed for visualization
                     let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "interior_cell_start" };
                     let cell_id = nal_cell.get_id();
                     let trace = json!({ "cell_id": cell_id, "cell_number": cell_no, "location": CONFIG.geometry.get(*cell_no as usize) });
@@ -109,8 +122,9 @@ impl Rack {
         Ok(link_handles)
     }
     pub fn construct(blueprint: &Blueprint) -> Result<(Rack, Vec<JoinHandle<()>>), Error> {
+        let _f = "construct";
         let mut rack = Rack::new();
-        let join_handles = rack.initialize(blueprint).context(RackError::Chain { func_name: "build_rack", comment: S("")})?;
+        let join_handles = rack.initialize(blueprint).context(RackError::Chain { func_name: _f, comment: S("initialize")})?;
         Ok((rack, join_handles))
     }
     pub fn get_cells(&self) -> &HashMap<CellNo, NalCell> { &self.cells }

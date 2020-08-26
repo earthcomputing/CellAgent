@@ -2,7 +2,7 @@ use std;
 use std::{fmt,
           collections::HashMap,
           env::args,
-          fs::{OpenOptions, create_dir, remove_dir_all},
+          fs::{OpenOptions, create_dir, remove_dir_all, rename},
           path::Path,
           ops::{Deref}};
 
@@ -52,9 +52,9 @@ pub struct Config {
     pub edge_list: Vec<Edge>,
     pub geometry: Vec<(usize, usize)>,
     pub race_sleep: u64,
-    pub visualize: Vec<String>,
     pub trace_options: TraceOptions,
-    pub debug_options: DebugOptions
+    pub debug_options: DebugOptions,
+    pub replay: bool,
 }
 impl Config {
     pub fn new() -> Result<Config, Error> {
@@ -64,7 +64,13 @@ impl Config {
             .next()
             .unwrap_or(S("configs/10cell_config.json"));
         println!("\nReading configuratation from {}", config_file_name);
-        let config_file = OpenOptions::new().read(true).open(config_file_name)?;//.context(ConfigError::File { func_name: _f, file_name: config_file_name})?;
+        let config_file = match OpenOptions::new().read(true).open(config_file_name) {
+            Ok(f) => f,
+            Err(e) => {
+                println!("Config: {} Error {}", _f, e);
+                return Err(e.into())
+            }
+        };
         let mut config: Config = serde_json::from_reader(config_file)?;//.context(ConfigError::Chain { func_name: _f, comment: S("") })?;
         if *config.num_cells == 0 {
             let (nr, nc) = (config.nrows, config.ncols);
@@ -82,24 +88,11 @@ impl Config {
                 }
             }
         }
-        // The following must be true for the Trace Visualizer
-        for viz in &config.visualize {
-            match viz.as_str() {
-                "dc"  => config.trace_options.dc  = true,
-                "ca"  => config.trace_options.ca  = true,
-                "nal" => config.trace_options.nal = true,
-                "noc" => config.trace_options.noc = true,
-                "svc" => config.trace_options.svc = true,
-                "vm"  => config.trace_options.vm  = true,
-                "cm"  => config.trace_options.cm  = true,
-                "pe"  => config.trace_options.pe  = true,
-                _    => eprintln!("---> {} is not a valid visualization designator", viz)
-            }
-        }
         if Path::new(&config.output_dir_name).exists() {
             remove_dir_all(&config.output_dir_name)?;
         }
-        let _ = OpenOptions::new().write(true).truncate(true).open(&config.output_file_name);
+        //let output_file_name = format!("{}/trace.json", config.output_dir_name);
+        //let _ = OpenOptions::new().write(true).truncate(true).open(&output_file_name);
         create_dir(&config.output_dir_name)?;
         Ok(config)
     }
@@ -130,19 +123,21 @@ impl Config {
 // TODO: Use log crate for this
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TraceOptions {
-    pub all:      bool,
-    pub dc:       bool,
-    pub nal:      bool,
-    pub noc:      bool,
-    pub svc:      bool,
-    pub vm:       bool,
-    pub ca:       bool,
-    pub cm:       bool,
-    pub pe:       bool,
-    pub pe_cm:    bool,
-    pub pe_port:  bool,
-    pub port:     bool,
-    pub link:     bool
+    pub all:       bool,
+    pub dc:        bool,
+    pub nal:       bool,
+    pub noc:       bool,
+    pub svc:       bool,
+    pub vm:        bool,
+    pub ca:        bool,
+    pub cm:        bool,
+    pub pe:        bool,
+    pub pe_cm:     bool,
+    pub pe_port:   bool,
+    pub port:      bool,
+    pub link:      bool,
+    pub replay:    bool,
+    pub visualize: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

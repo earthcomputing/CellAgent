@@ -12,15 +12,22 @@ use crossbeam::crossbeam_channel::unbounded as channel;
 
 use either::Either;
 
+use serde_json::{Value};
+
+use crate::app_message::AppMessage;
+use crate::app_message_formats::{CaToPort, PortFromCa, PortToCa, CaFromPort};
 use crate::cellagent::{CellAgent};
 use crate::config::{CONFIG, PortQty};
-use crate::dal::{add_to_trace};
+use crate::dal::{add_to_trace, get_cell_replay_lines};
 use crate::ec_message_formats::{PortToPe, PeFromPort, PeToPort, PortFromPe,
-                                CmToCa, CaFromCm };
+                                CmToCa, CaFromCm, CaToCm, CmFromCa, CaToCmBytes, CmToCaBytes,
+                                PeToCm, CmFromPe, CmToPe, PeFromCm};
 use crate::ecnl::{ECNL_Session};
-use crate::name::{CellID};
+use crate::name::{Name, CellID};
 use crate::port::{Port};
-use crate::utility::{CellConfig, CellType, PortNo, S, TraceHeader, TraceHeaderParams, TraceType};
+use crate::replay::{TraceFormat, process_trace_record};
+use crate::utility::{ByteArray, CellConfig, CellType, PortNo, S,
+                     TraceHeaderParams, TraceType};
 use crate::vm::VirtualMachine;
 
 #[derive(Debug)]
@@ -30,7 +37,6 @@ pub struct NalCell {
     config: CellConfig,
     ports: Box<[Port]>,
     cell_agent: CellAgent,
-    vms: Vec<VirtualMachine>,
     ports_from_pe: HashMap<PortNo, PortFromPe>,
     ports_from_ca: HashMap<PortNo, PortFromCa>,
     ecnl: Option<Arc<ECNL_Session>>,
@@ -43,8 +49,21 @@ impl NalCell {
         if *num_phys_ports > *CONFIG.max_num_phys_ports_per_cell {
             return Err(NalcellError::NumberPorts { num_phys_ports, func_name: "new", max_num_phys_ports: CONFIG.max_num_phys_ports_per_cell }.into())
         }
-        let cell_id = CellID::new(name).context(NalcellError::Chain { func_name: "new", comment: S("cell_id") })?;
-        let (cm_to_ca, ca_from_cm): (CmToCa, CaFromCm) = channel();
+        let mut trace_lines = get_cell_replay_lines(name).context(NalcellError::Chain { func_name: _f, comment: S(name) })?;
+        let (cell_id, tree_ids) = if CONFIG.replay {
+            let mut record = trace_lines.next().transpose()?.expect(&format!("First record for cell {} must be there", name));
+            let trace_format = process_trace_record(record)?;
+            match trace_format {
+                TraceFormat::CaNewFormat(cell_id, my_tree_id, control_tree_id, connected_tree_id) =>
+                    (cell_id, Some((my_tree_id, control_tree_id, connected_tree_id))),
+                _ => {
+                    unimplemented!()
+                }
+            }
+        } else {
+            (CellID::new(name).context(NalcellError::Chain { func_name: "new", comment: S("cell_id") })?,
+             None)
+        };
         let (port_to_pe, pe_from_ports): (PortToPe, PeFromPort) = channel();
         let (port_to_ca, ca_from_ports): (PortToCa, CaFromPort) = channel();
         let port_list: Vec<PortNo> = (0..*num_phys_ports)
@@ -85,16 +104,16 @@ impl NalCell {
                 } else {
                     match ecnl_clone {
                         Some(ecnl_session) => {
-			    #[cfg(feature = "cell")] {
-                                is_connected = ecnl_session.get_port(i-1).is_connected()
-			    }
-			    // To keep compiler happy
-			    #[cfg(feature = "simulator")] {
-			        is_connected = false;
-			    }
-			    #[cfg(feature = "noc")] {
-			        is_connected = false;
-			    }
+                            #[cfg(feature = "cell")] {
+                                is_connected = ecnl_session.get_port(i).is_connected()
+                            }
+                            // To keep compiler happy
+                            #[cfg(feature = "simulator")] {
+                                is_connected = false;
+                            }
+                            #[cfg(feature = "noc")] {
+                                is_connected = false;
+                            }
                         }
                         None => {
                             is_connected = false;
@@ -111,15 +130,54 @@ impl NalCell {
             ports.push(port);
         }
         let boxed_ports: Box<[Port]> = ports.into_boxed_slice();
-        let (cell_agent, _cm_join_handle) = CellAgent::new(cell_id, cell_type, config, num_phys_ports, ca_to_ports, cm_to_ca, pe_from_ports, pe_to_ports, border_port_nos).context(NalcellError::Chain { func_name: "new", comment: S("cell agent create") })?;
+        let (cm_to_ca, ca_from_cm): (CmToCa, CaFromCm) = channel();
+        let (ca_to_cm, cm_from_ca): (CaToCm, CmFromCa) = channel();
+        let (pe_to_cm, cm_from_pe): (PeToCm, CmFromPe) = channel();
+        let (cm_to_pe, pe_from_cm): (CmToPe, PeFromCm) = channel();
+        let (cell_agent, _cm_join_handle) = CellAgent::new(cell_id, tree_ids, cell_type, config,
+                 num_phys_ports, ca_to_ports.clone(), cm_to_ca.clone(),
+                  pe_from_ports, pe_to_ports,
+                  border_port_nos,
+                  ca_to_cm.clone(), cm_from_ca, pe_to_cm.clone(),
+                            cm_from_pe, cm_to_pe.clone(), pe_from_cm).context(NalcellError::Chain { func_name: "new", comment: S("cell agent create") })?;
         let ca_join_handle = cell_agent.start(ca_from_cm, ca_from_ports);
+        if CONFIG.replay {
+            thread::spawn(move || -> Result<(), Error> {
+                loop {
+                    match trace_lines.next().transpose()? {
+                        None => break,
+                        Some(record) => {
+                            let trace_format = process_trace_record(record.clone())?;
+                            match trace_format {
+                                TraceFormat::EmptyFormat => (),
+                                TraceFormat::CaNewFormat(_, _, _, _) => println!("nalcell {}: {} ca_new out of order", cell_id, _f),
+                                TraceFormat::CaToCmEntryFormat(entry) => {
+                                    ca_to_cm.send(CaToCmBytes::Entry(entry))?;
+                                },
+                                TraceFormat::CaFromCmBytesMsg(port_no, is_ait, uuid, msg) => {
+                                    cm_to_ca.send(CmToCaBytes::Bytes((port_no, is_ait, uuid, msg)))?;
+                                }
+                                TraceFormat::CaFromCmBytesStatus(port_no, is_border, number_of_packets, status) => {
+                                    cm_to_ca.send(CmToCaBytes::Status((port_no, is_border, number_of_packets, status)))?;
+                                }
+                                TraceFormat::CaToNoc(noc_port, bytes) => {
+                                    let ca_to_port = ca_to_ports.get(&noc_port).expect("cellagent.rs: border port sender must be set");
+                                    ca_to_port.send(bytes)?;
+    
+                                }
+                            };
+                        }
+                    }
+                }
+                Ok(())
+            });
+        }
         Ok((NalCell {
             id: cell_id,
             cell_type,
             config,
             ports: boxed_ports,
             cell_agent,
-            vms: Vec::new(),
             ports_from_pe,
             ports_from_ca,
             ecnl,
@@ -212,10 +270,8 @@ impl Drop for NalCell {
     }
 }
 
-
 // Errors
 use failure::{Error, ResultExt};
-use crate::app_message_formats::{PortToCa, CaFromPort, CaToPort, PortFromCa};
 
 #[derive(Debug, Fail)]
 pub enum NalcellError {
@@ -226,5 +282,7 @@ pub enum NalcellError {
     #[fail(display = "NalcellError::NoFreePorts {}: All ports have been assigned for cell {}", func_name, cell_id)]
     NoFreePorts { func_name: &'static str, cell_id: CellID },
     #[fail(display = "NalcellError::NumberPorts {}: You asked for {:?} ports, but only {:?} are allowed", func_name, num_phys_ports, max_num_phys_ports)]
-    NumberPorts { func_name: &'static str, num_phys_ports: PortQty, max_num_phys_ports: PortQty }
+    NumberPorts { func_name: &'static str, num_phys_ports: PortQty, max_num_phys_ports: PortQty },
+    #[fail(display = "NalCellError::Replay {}: Error opening replay file {}", func_name, cell_name)]
+    Replay { func_name: &'static str, cell_name: String }
 }

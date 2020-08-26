@@ -79,7 +79,7 @@ impl PacketEngine {
     pub fn start(&self, pe_from_cm: PeFromCm, pe_from_ports: PeFromPort) -> JoinHandle<()> {
         let _f = "start_packet_engine";
         {
-            if CONFIG.trace_options.all || CONFIG.trace_options.nal {
+            if CONFIG.trace_options.all || CONFIG.trace_options.pe {
                 let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "nalcell_start_pe" };
                 let trace = json!({ "cell_id": self.get_cell_id() });
                 let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
@@ -314,7 +314,9 @@ impl PacketEngine {
                         let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
                     }
                 }
-                self.pe_to_cm.send(PeToCmPacket::Status((port_no, is_border, number_of_packets, status))).context(PacketEngineError::Chain { func_name: "listen_port", comment: S("send status to ca ") + &self.cell_id.get_name() })?
+                if !CONFIG.replay {
+                    self.pe_to_cm.send(PeToCmPacket::Status((port_no, is_border, number_of_packets, status))).context(PacketEngineError::Chain { func_name: "listen_port", comment: S("send status to ca ") + &self.cell_id.get_name() })?
+                }
             },
             
             // recv from neighbor

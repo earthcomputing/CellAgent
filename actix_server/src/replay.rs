@@ -20,7 +20,7 @@ fn replay_from_file(appcells: web::Data<AppCells>, appgeometry: web::Data<AppGeo
                     -> Result<impl Responder, Error> {
     reset(appcells.clone(), appgeometry.clone());
     let filename = if form_data.filename == "" {
-        "../trace/trace.json"
+        "../cellagent/trace/trace.json"
     } else {
         &form_data.filename
     };

@@ -1,7 +1,7 @@
 use std::{fmt,
           collections::{HashSet, HashMap},
           ops::Deref,
-          thread::ThreadId
+          thread, thread::ThreadId
 };
 
 use serde_json;
@@ -159,8 +159,7 @@ PORT - "port_no":{"v":[0-9]*},"is_border":[a-z]*
 lazy_static!{
     static ref STARTING_EPOCH: u64 = timestamp();
 }
-use std::thread;
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TraceHeader {
     starting_epoch: u64,
     epoch: u64,
@@ -168,11 +167,11 @@ pub struct TraceHeader {
     thread_id: u64,
     event_id: Vec<u64>,
     trace_type: TraceType,
-    module: &'static str,
+    module: String,
     line_no: u32,
-    function: &'static str,
-    format: &'static str,
-    repo: &'static str,
+    function: String,
+    format: String,
+    repo: String,
 }
 impl TraceHeader {
     pub fn new() -> TraceHeader {
@@ -183,7 +182,7 @@ impl TraceHeader {
         TraceHeader { starting_epoch: *STARTING_EPOCH, epoch,
             thread_id, spawning_thread_id: thread_id,
             event_id: vec![0], trace_type: TraceType::Trace,
-            module: "", line_no: 0, function: "", format: "", repo: REPO }
+            module: S(""), line_no: 0, function: S(""), format: S(""), repo: S(REPO) }
     }
     pub fn starting_epoch(&self) -> u64 { self.starting_epoch }
     pub fn epoch(&self) -> u64 { self.epoch }
@@ -191,11 +190,11 @@ impl TraceHeader {
     pub fn thread_id(&self) -> u64 { self.thread_id }
     pub fn event_id(&self) -> &Vec<u64> { &self.event_id }
     pub fn trace_type(&self) -> TraceType { self.trace_type }
-    pub fn module(&self) -> &str { self.module }
+    pub fn module(&self) -> &str { &self.module }
     pub fn line_no(&self) -> u32 { self.line_no }
-    pub fn function(&self) -> &str { self.function }
-    pub fn format(&self) -> &str { self.format }
-    pub fn repo(&self) -> &str { self.repo }
+    pub fn function(&self) -> &str { &self.function }
+    pub fn format(&self) -> &str { &self.format }
+    pub fn repo(&self) -> &str { &self.repo }
 
     pub fn next(&mut self, trace_type: TraceType) {
         let last = self.event_id.len() - 1;
@@ -211,13 +210,14 @@ impl TraceHeader {
         TraceHeader { starting_epoch: *STARTING_EPOCH, epoch: timestamp(),
             thread_id, spawning_thread_id: thread_id,
             event_id, trace_type: self.trace_type,
-            module: self.module, line_no: self.line_no, function: self.function, format: self.format, repo: REPO }
+            module: self.module.clone(), line_no: self.line_no, function: self.function.clone(),
+            format: self.format.clone(), repo: S(REPO) }
     }
     pub fn update(&mut self, params: &TraceHeaderParams) {
-        self.module    = params.get_module();
+        self.module    = S(params.get_module());
         self.line_no   = params.get_line_no();
-        self.function  = params.get_function();
-        self.format    = params.get_format();
+        self.function  = S(params.get_function());
+        self.format    = S(params.get_format());
         self.epoch     = timestamp();
         self.thread_id = TraceHeader::parse(thread::current().id());
     }
@@ -254,7 +254,7 @@ impl fmt::Display for TraceHeader {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "Thread id {}, Event id {:?}", self.thread_id, self.event_id) }
 }
-#[derive(Debug, Copy, Clone, Serialize)]
+#[derive(Debug, Copy, Clone, Serialize, Deserialize)]
 pub enum TraceType {
     Trace,
     Debug,

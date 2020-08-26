@@ -5,7 +5,6 @@ use std::{fmt, fmt::Write,
 };
 
 use failure::{Error, ResultExt};
-use crossbeam::crossbeam_channel::unbounded as channel;
 
 use crate::config::{CONFIG};
 use crate::dal::{add_to_trace, fork_trace_header, update_trace_header};
@@ -29,10 +28,12 @@ impl Cmodel {
     pub fn get_name(&self) -> String { self.cell_id.get_name() }
     pub fn get_cell_id(&self) -> &CellID { &self.cell_id }
     // NEW
-    pub fn new(cell_id: CellID, connected_tree_id: TreeID, pe_to_cm: PeToCm, cm_to_ca: CmToCa, pe_from_ports: PeFromPort, pe_to_ports: HashMap<PortNo, PeToPort>, border_port_nos: &HashSet<PortNo> ) -> (Cmodel, JoinHandle<()>) {
+    pub fn new(cell_id: CellID, connected_tree_id: TreeID, pe_to_cm: PeToCm, cm_to_ca: CmToCa,
+               pe_from_ports: PeFromPort, pe_to_ports: HashMap<PortNo, PeToPort>,
+               border_port_nos: &HashSet<PortNo>,
+               cm_to_pe: CmToPe, pe_from_cm: PeFromCm) -> (Cmodel, JoinHandle<()>) {
         let packet_engine = PacketEngine::new(cell_id, connected_tree_id,
                                               pe_to_cm, pe_to_ports, &border_port_nos);
-        let (cm_to_pe, pe_from_cm): (CmToPe, PeFromCm) = channel();
         let pe_join_handle = packet_engine.start(pe_from_cm, pe_from_ports);
         (Cmodel { cell_id,
                   packet_engine,
@@ -249,12 +250,14 @@ impl Cmodel {
                         let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
                     }
                 }
-                self.cm_to_ca.send(CmToCaBytes::Status((port_no, is_border, number_of_packets, status)))?
+                if !CONFIG.replay {
+                    self.cm_to_ca.send(CmToCaBytes::Status((port_no, is_border, number_of_packets, status)))?;
+                }
             },
         
             // de-packetize
             PeToCmPacket::Packet((port_no, packet)) => {
-                self.process_packet(port_no, packet)?
+                self.process_packet(port_no, packet)?;
             }
         };
         Ok(())
@@ -287,7 +290,8 @@ packets: Vec<Packet>,
                 if CONFIG.trace_options.all || CONFIG.trace_options.cm {
                     let msg: Box<dyn Message> = serde_json::from_str(&bytes.to_string()?)?;
                     let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "cm_to_ca_bytes" };
-                    let trace = json!({ "cell_id": &self.cell_id, "port": port_no, "msg": msg });
+                    let trace = json!({ "cell_id": &self.cell_id, "port": port_no, 
+                        "is_ait": is_ait, "tree_uuid": uuid, "msg": msg });
                     let _ = add_to_trace(TraceType::Debug, trace_params, &trace, _f); // sender side, dup
                 }
             }
@@ -305,7 +309,9 @@ packets: Vec<Packet>,
                 }
             }
             let msg = CmToCaBytes::Bytes((port_no, is_ait, uuid, bytes));
-            self.cm_to_ca.send(msg)?;
+            if !CONFIG.replay {
+                self.cm_to_ca.send(msg)?;
+            }
         }
         Ok(())
     }
