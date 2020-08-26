@@ -65,6 +65,27 @@ pub struct ECNL_Port {
 
 #[cfg(feature = "cell")]
 #[link(name = ":ecnl_proto.o")]
+impl InBufferDesc {
+     pub fn new() -> InBufferDesc {
+          const len : usize = size_of::<Packet>();
+          let mut ary: Vec<u16> = vec![0; len/2];
+	  for i in 0..len/2 { ary[i] = i as u16; } // might want: i | 0x8080 ?
+          let ary_FRAME : *mut u16 = ary.as_mut_ptr();
+          const shortened : usize = len;// 1500 + 26; // MTU + ethernet header
+	  unsafe {
+	         let blob_FRAME = std::mem::transmute::<*mut u16, *mut Packet>(ary_FRAME); // magic 'cast'
+		 let blob_buf : InBufferDesc = InBufferDesc {
+		     len: shortened as c_uint, // u32
+		     frame: blob_FRAME
+		 };
+                 std::mem::forget(ary);
+		 return blob_buf
+	  }
+     }
+}
+
+#[cfg(feature = "cell")]
+#[link(name = ":ecnl_proto.o")]
 impl ECNL_Port {
      pub fn new(port_id: u8) -> ECNL_Port {
      	  unsafe {
@@ -82,10 +103,7 @@ impl ECNL_Port {
      pub fn listen(&self, port: &Port, port_to_pe: mpsc::Sender<PortToPePacket>) -> Result<(), Error> {
          let _f = "listen";
 	 println!("Listening for events on port {}",  self.port_id);
-	 let mut bd = InBufferDesc {
-	     len: size_of::<Packet>() as c_uint, // Always receive fixed-length frames
-	     frame: null_mut(),
-	 };
+	 let mut bd = InBufferDesc::new();
      	 loop {
             let mut event : ECNL_Event;
             unsafe { 
