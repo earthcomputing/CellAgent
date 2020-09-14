@@ -1194,6 +1194,7 @@ static void ecnl_forward_ait_message(int module_id, int drv_index, struct sk_buf
 }
 
 static void ecnl_got_ait_message(int module_id, int port_id, int num_message) {
+    ECNL_INFO("ecnl_got_ait_message", "module_id: %d; port_id: %d; num_message: %d", module_id, port_id, num_message);
     //struct ethhdr *eth = (struct ethhdr *) skb->data;
     struct net_device *plug_in = ecnl_devices[module_id];
     ecnl_device_t *e_dev = (ecnl_device_t *) netdev_priv(plug_in);
