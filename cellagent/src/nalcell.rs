@@ -105,7 +105,7 @@ impl NalCell {
                     match ecnl_clone {
                         Some(ecnl_session) => {
                             #[cfg(feature = "cell")] {
-                                is_connected = ecnl_session.get_port(i).is_connected()
+                                is_connected = ecnl_session.get_port(i-1).is_connected()
                             }
                             // To keep compiler happy
                             #[cfg(feature = "simulator")] {
