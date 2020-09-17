@@ -23,7 +23,7 @@ pub const CONNECTED_PORTS_TREE_NAME: & str = "Connected";
 pub const BASE_TREE_NAME: & str = "Base";
 pub const PAYLOAD_DEFAULT_ELEMENT: u8 = 0;
 pub const PACKET_MIN: usize = 64;   // Can't be in Config because I use it as a const in packet.rs
-pub const PACKET_MAX: usize = 9000; // Can't be in Config because I use it as a const in packet.rs
+pub const PACKET_MAX: usize = 200; // Can't be in Config because I use it as a const in packet.rs
 
 lazy_static!{
     pub static ref CONFIG: Config = Config::new().expect("Error in config file");

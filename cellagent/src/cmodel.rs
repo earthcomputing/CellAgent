@@ -279,17 +279,25 @@ packets: Vec<Packet>,
     fn process_packet(&mut self, port_no: PortNo, packet: Packet) -> Result<(), Error> {
         let _f = "process_packet";
         let sender_msg_seq_no = packet.get_unique_msg_id();
-        let mut packet_assembler = self.packet_assemblers.remove(&sender_msg_seq_no).unwrap_or(PacketAssembler::new(sender_msg_seq_no)); // autovivification
+        let mut packet_assembler = self.packet_assemblers.entry(sender_msg_seq_no)
+            .or_insert(PacketAssembler::new(sender_msg_seq_no));
         let (last_packet, packets) = packet_assembler.add(packet.clone()); // Need clone only because of trace
-
+        let is_ait = packets[0].is_ait();
+        let uuid = packet.get_tree_uuid();
+        {
+            if CONFIG.trace_options.all || CONFIG.trace_options.cm {
+                let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "cm_to_ca_bytes" };
+                let trace = json!({ "cell_id": &self.cell_id, "port": port_no,
+                        "is_ait": is_ait, "tree_uuid": uuid, "last_packet": last_packet });
+                let _ = add_to_trace(TraceType::Debug, trace_params, &trace, _f); // sender side, dup
+            }
+        }
         if last_packet {
-            let is_ait = packets[0].is_ait();
-            let uuid = packet.get_tree_uuid();
             let bytes = Packetizer::unpacketize(&packets).context(CmodelError::Chain { func_name: _f, comment: S("") })?;
             {
                 if CONFIG.trace_options.all || CONFIG.trace_options.cm {
                     let msg: Box<dyn Message> = serde_json::from_str(&bytes.to_string()?)?;
-                    let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "cm_to_ca_bytes" };
+                    let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "cm_to_ca_bytes_last" };
                     let trace = json!({ "cell_id": &self.cell_id, "port": port_no, 
                         "is_ait": is_ait, "tree_uuid": uuid, "msg": msg });
                     let _ = add_to_trace(TraceType::Debug, trace_params, &trace, _f); // sender side, dup

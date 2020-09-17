@@ -56,6 +56,7 @@ impl Packet {
     pub fn _get_header(&self) -> PacketHeader { self.header }
     pub fn _get_payload(&self) -> &Payload { &self.payload }
     pub fn get_count(&self) -> usize { self.packet_count }
+    pub fn get_uuid(&self) -> Uuid { self.header.get_uuid() }
     
     // Used for trace records
     pub fn to_string(&self) -> Result<String, Error> {
@@ -106,12 +107,6 @@ impl Packet {
         } else {
             false
         }
-    }
-    // Payload (Deep Packet Inspection)
-    // Debug hack to get tree name out of packets.  Assumes msg is one packet
-    pub fn get_port_tree_id(&self) -> PortTreeID {
-        let msg = MsgType::get_msg(&vec![self.clone()]).unwrap();
-        msg.get_port_tree_id()
     }
 }
 impl fmt::Display for Packet {
@@ -243,15 +238,16 @@ impl Packetizer {
         Ok(packets)
     }
     pub fn unpacketize(packets: &Vec<Packet>) -> Result<ByteArray, Error> {
-        let mut msg = Vec::new();
+        let _f = "unpacketize";
+        let mut msg_bytes = Vec::new();
         for packet in packets.iter() {
             let mut bytes = packet.get_bytes();
             let frag = *packet.get_size() as usize;
             let is_last_packet = packet.is_last_packet();
             if is_last_packet { bytes.truncate(frag) };
-            msg.extend_from_slice(&bytes);
+            msg_bytes.extend_from_slice(&bytes);
         }
-        let msg = std::str::from_utf8(&msg)?;
+        let msg = std::str::from_utf8(&msg_bytes)?;
         Ok(ByteArray::new(msg))
         //Ok(str::from_utf8(&msg).context(PacketError::Chain { func_name: "unpacketize", comment: S("")})?.to_string())
     }
@@ -273,6 +269,7 @@ impl PacketAssembler {
         PacketAssembler { unique_msg_id, packets: Vec::new() }
     }
     pub fn add(&mut self, packet: Packet) -> (bool, &Vec<Packet>) {
+        let _f = "PacketAssembler::add";
         let is_last = packet.is_last_packet(); // Because I move packet on next line
         self.packets.push(packet);
         (is_last, &self.packets)
