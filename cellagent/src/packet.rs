@@ -2,6 +2,7 @@ use std::{fmt,
           collections::HashMap,
           convert::TryFrom,
           cmp::min,
+	  mem::{size_of},
           ops::Deref,
           sync::atomic::{AtomicUsize, Ordering},
           str};
@@ -11,16 +12,16 @@ use serde;
 use serde_json;
 
 use crate::app_message::SenderMsgSeqNo;
-use crate::config::{PACKET_MIN, PACKET_MAX, PAYLOAD_DEFAULT_ELEMENT, PacketNo};
+use crate::config::{PACKET_MIN, PACKET_MAX, PACKET_PADDING, PAYLOAD_DEFAULT_ELEMENT, PacketNo};
 use crate::ec_message::{Message, MsgType};
 use crate::name::{PortTreeID, Name};
 use crate::utility::{ByteArray, S, Stack};
 use crate::uuid_ec::{Uuid, AitState};
  
 //const LARGEST_MSG: usize = std::u32::MAX as usize;
-const PACKET_HEADER_SIZE: usize = 16; // PacketHeader / Uuid
-const PAYLOAD_MIN: usize = PACKET_MIN - PACKET_HEADER_SIZE;
-const PAYLOAD_MAX: usize = PACKET_MAX - PACKET_HEADER_SIZE;
+const NON_PAYLOAD_SIZE: usize = size_of::<PacketHeader>() + size_of::<usize>() + size_of::<SenderMsgSeqNo>() + PACKET_PADDING;
+const PAYLOAD_MIN: usize = PACKET_MIN - NON_PAYLOAD_SIZE;
+const PAYLOAD_MAX: usize = PACKET_MAX - NON_PAYLOAD_SIZE;
 
 pub type PacketAssemblers = HashMap<UniqueMsgId, PacketAssembler>;
 
@@ -30,8 +31,10 @@ impl UniqueMsgId { fn new() -> UniqueMsgId { UniqueMsgId(rand::random()) } }
 impl Deref for UniqueMsgId { type Target = u64; fn deref(&self) -> &Self::Target { &self.0 } }
 
 static PACKET_COUNT: AtomicUsize = AtomicUsize::new(0);
+#[repr(C)]
 #[derive(Debug, Clone, Serialize)]
 pub struct Packet {
+    // Changes here must be reflected in the calculations of PAYLOAD_MIN and PAYLOAD_MAX in packet.rs
     header: PacketHeader,
     payload: Payload,
     packet_count: usize,
@@ -126,6 +129,8 @@ impl fmt::Display for Packet {
         write!(f, "{}", s)
     }
 }
+
+#[repr(C)]
 #[derive(Debug, Copy, Clone, Serialize)]
 pub struct PacketHeader {
     uuid: Uuid,     // Tree identifier 16 bytes
@@ -148,6 +153,7 @@ impl fmt::Display for PacketHeader {
     }
 }
 
+#[repr(C)]
 #[derive(Clone)]
 pub struct Payload {
     unique_msg_id: UniqueMsgId,  // Unique identifier of this message

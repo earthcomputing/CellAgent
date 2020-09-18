@@ -58,56 +58,92 @@ static void get_link_state(ecnl_port_t *port, link_state_t *link_state) {
 
 // --
 
-extern void port_do_read_async(ecnl_port_t *port, port_buf_desc_t *actual_buf) {
+extern void port_do_read_async(ecnl_port_t *port, port_buf_desc_t *bdp) {
     // FIXME: how do we know buffer length?
-    memset(actual_buf, 0, sizeof(port_buf_desc_t));
-    alo_reg_t alo_reg = { .ar_no = 0, .ar_data = 0, };
     uint32_t actual_module_id;
     uint32_t actual_port_id = 0;
     struct nl_msg *msg = nlmsg_alloc();
-    int rc = retrieve_ait_message((struct nl_sock *) (port->port_sock), msg, port->port_module_id, port->port_id, alo_reg, &actual_module_id, &actual_port_id, (buf_desc_t *) actual_buf); // ICK cast.
+
+    alo_reg_t alo_reg = { .ar_no = 0, .ar_data = 0, };
+    // memset(bdp, 0, sizeof(buf_desc_t));
+    int rc = retrieve_ait_message((struct nl_sock *) (port->port_sock), msg, port->port_module_id, port->port_id, alo_reg, &actual_module_id, &actual_port_id, (buf_desc_t *) bdp);
     if (rc < 0) fatal_error(rc, "retrieve_ait_message");
     if (actual_module_id != port->port_module_id) fatal_error(-1, "module mismatch: %d, %d", port->port_module_id, actual_module_id);
     if (actual_port_id != port->port_id) fatal_error(-1, "port mismatch: %d, %d", port->port_id, actual_port_id);
     nlmsg_free(msg);
-    PORT_DEBUG("async: (len %d)", actual_buf->len);
+    PORT_DEBUG("async: (len %d)", bdp->len);
 }
 
-extern void port_dumpbuf(ecnl_port_t *port, char *tag, port_buf_desc_t *buf) {
+extern void port_dumpbuf(ecnl_port_t *port, char *tag, const port_buf_desc_t *bdp) {
     // no data
-    if ((buf->len < 1) || (!buf->frame)) {
-        PORT_DEBUG("retr: (empty %d)", buf->len);
+    if ((bdp->len < 1) || (!bdp->frame)) {
+        PORT_DEBUG("retr: (empty %d)", bdp->len);
         return;
     }
 
-    int asciz = scanbuf((unsigned char *) buf->frame, buf->len);
+    int asciz = scanbuf((unsigned char *) bdp->frame, bdp->len);
     char *flavor = (asciz) ? "asciz" : "blob";
-    PORT_DEBUG("%s (%s %d) - '%s'", tag, flavor, buf->len, (asciz) ? (char *) buf->frame : "");
+    PORT_DEBUG("%s (%s %d) - '%s'", tag, flavor, bdp->len, (asciz) ? (char *) bdp->frame : "");
 }
 
-extern void port_do_read(ecnl_port_t *port, port_buf_desc_t *actual_buf, int nsecs) {
-    // memset(actual_buf, 0, sizeof(port_buf_desc_t));
+extern void port_do_read(ecnl_port_t *port, port_buf_desc_t *bdp, int nsecs) {
+    // memset(bdp, 0, sizeof(port_buf_desc_t));
     for (int i = 0; i < nsecs; i++) {
-        port_do_read_async(port, actual_buf);
-        if ((actual_buf->len < 1) || (!actual_buf->frame)) {
+        port_do_read_async(port, bdp);
+        if ((bdp->len < 1) || (!bdp->frame)) {
             sleep(1);
             continue;
         }
         break;
     }
 
-    port_dumpbuf(port, "port_do_read", actual_buf);
+    port_dumpbuf(port, "port_do_read", bdp);
 }
 
-extern void port_do_xmit(ecnl_port_t *port, port_buf_desc_t *buf) {
+extern void port_do_xmit(ecnl_port_t *port, const port_buf_desc_t *bdp) {
     uint32_t actual_module_id;
     uint32_t actual_port_id = 0;
     struct nl_msg *msg = nlmsg_alloc();
 
-    port_dumpbuf(port, "port_do_xmit", buf);
+    port_dumpbuf(port, "port_do_xmit", bdp);
 
-    int rc = send_ait_message((struct nl_sock *) (port->port_sock), msg, port->port_module_id, port->port_id, *(buf_desc_t *) buf, &actual_module_id, &actual_port_id); // ICK cast.
+    int rc = send_ait_message((struct nl_sock *) (port->port_sock), msg, port->port_module_id, port->port_id, *(buf_desc_t *) bdp, &actual_module_id, &actual_port_id); // ICK cast.
     if (rc < 0) fatal_error(rc, "send_ait_message");
+    if (actual_module_id != port->port_module_id) fatal_error(-1, "module mismatch: %d, %d", port->port_module_id, actual_module_id);
+    if (actual_port_id != port->port_id) fatal_error(-1, "port mismatch: %d, %d", port->port_id, actual_port_id);
+    nlmsg_free(msg);
+}
+
+void port_read_alo_register(ecnl_port_t *port, uint32_t alo_reg_no, uint64_t *alo_reg_data_p) {
+    uint32_t actual_module_id;
+    uint32_t actual_port_id = 0;
+    struct nl_msg *msg = nlmsg_alloc();
+
+    alo_reg_t alo_reg;
+    alo_reg.ar_no = alo_reg_no;
+    uint32_t *fp = NULL; // FIX ME
+    uint64_t **vp = NULL; // FIX ME
+    // NOT DEFINED TO TAKE A POINTER FOR alo_reg
+    // WHAT's fp & vp?
+    // THIS IS WRONG -- MUST TAKE &alo_reg
+    int rc = read_alo_registers((struct nl_sock *) (port->port_sock), msg, port->port_module_id, port->port_id, alo_reg, &actual_module_id, &actual_port_id, fp, vp);
+    if (rc < 0) fatal_error(rc, "read alo register");
+    if (actual_module_id != port->port_module_id) fatal_error(-1, "module mismatch: %d, %d", port->port_module_id, actual_module_id);
+    if (actual_port_id != port->port_id) fatal_error(-1, "port mismatch: %d, %d", port->port_id, actual_port_id);
+    *alo_reg_data_p = alo_reg.ar_data;
+    nlmsg_free(msg);
+}
+
+void port_write_alo_register(ecnl_port_t *port, uint32_t alo_reg_no, uint64_t alo_reg_data) {
+    uint32_t actual_module_id;
+    uint32_t actual_port_id = 0;
+    struct nl_msg *msg = nlmsg_alloc();
+
+    alo_reg_t alo_reg;
+    alo_reg.ar_no = alo_reg_no;
+    alo_reg.ar_data = alo_reg_data;
+    int rc = write_alo_register((struct nl_sock *) (port->port_sock), msg, port->port_module_id, port->port_id, alo_reg, &actual_module_id, &actual_port_id);
+    if (rc < 0) fatal_error(rc, "write_alo_register");
     if (actual_module_id != port->port_module_id) fatal_error(-1, "module mismatch: %d, %d", port->port_module_id, actual_module_id);
     if (actual_port_id != port->port_id) fatal_error(-1, "port mismatch: %d, %d", port->port_id, actual_port_id);
     nlmsg_free(msg);
@@ -197,4 +233,5 @@ int main(int argc, char *argv[]) {
         ecnl_port_t *port = port_create(port_id);
     }
 }
+
 #endif
