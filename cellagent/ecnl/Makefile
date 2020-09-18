@@ -11,9 +11,9 @@ else
 EARTH_CUSTOM=3.4.2.1
 endif
 
-ENTL_E1000E=../../../bjackson-e1000e/e1000e-$(EARTH_CUSTOM)/src
-ENTL_ECNL_LIB=../../../bjackson-ecnl/lib
-ENTL_ECNL_SRC=../../../bjackson-ecnl/src
+ENTL_E1000E=../../driver/e1000e/e1000e-$(EARTH_CUSTOM)/src
+ENTL_ECNL_LIB=../../driver/ecnl/lib
+ENTL_ECNL_SRC=../../driver/ecnl/src
 
 CFLAGS += -I$(ENTL_E1000E)
 CFLAGS += -I$(ENTL_ECNL_SRC)
