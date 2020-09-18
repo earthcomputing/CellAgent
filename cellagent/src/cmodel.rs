@@ -316,6 +316,8 @@ packets: Vec<Packet>,
                     }
                 }
             }
+            // Must be after last use of packets
+            self.packet_assemblers.remove(&sender_msg_seq_no);  // Forget packets once assembly is done
             let msg = CmToCaBytes::Bytes((port_no, is_ait, uuid, bytes));
             if !CONFIG.replay {
                 self.cm_to_ca.send(msg)?;
