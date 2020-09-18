@@ -1,0 +1,48 @@
+
+--
+
+bjackson-e1000e/src/entl_device.c - entl_watchdog_task => notify_manager => *emf_event()
+bjackson-ecnl/src/ecnl_device.c - mgr->emf_event => adapt_event =>
+ 
+    SIGUSR1 : ecnl_link_status_update => genlmsg_multicast_allns(... NL_ECNL_MCGRP_LINKSTATUS ...) / NL_ECNL_CMD_GET_PORT_STATE (3)
+    SIGUSR2 : ecnl_got_ait_message => genlmsg_multicast_allns(... NL_ECNL_MCGRP_AIT ...) / NL_ECNL_CMD_SIGNAL_AIT_MESSAGE (13)
+
+bjackson-rust-ffi/libept/src/ecnl_endpoint.rs - event_listener (spawn thread) => event_loop => ept_get_event
+bjackson-rust-ffi/libept/src/ecnl_endpoint.c - ept_get_event => read_event
+bjackson-ecnl/lib/ecnl_proto.c - read_event
+
+--
+
+unfortunately, the driver (e1000e) records 'state' (i.e. levels), so it can't disambiguate among/between multiple events that drive/set the state (i.e. we get event "overrun")
+
+ENTL_DEVICE_FLAG_SIGNAL -
+set by :  entl_device_link_down, entl_device_link_up
+or : entl_send_inject (ENTL_ERROR_FATAL)
+or : entl_device_process_rx_packet (ENTL_ACTION_ERROR / ENTL_ACTION_SIG_ERR)
+
+ENTL_DEVICE_FLAG_SIGNAL2 -
+set by : entl_device_process_rx_packet (ENTL_ACTION_SIG_AIT)
+or : entl_device_process_tx_packet (ENTL_ACTION_SIG_AIT)
+
+--
+
+when things are locked up (link down / fatal error),
+need to perform: entl_read_error_state() to clear the error
+
+need to add an entry point so that ECNL can perform a driver (e1000e) operation
+e1000e "extended" entry points exist in the 'funcs' vector [ref: ecnl_entl_if.h] :
+
+    static entl_driver_funcs_t entl_adapt_funcs
+
+The linking phase of the kmod loader resolves : EXPORT_SYMBOL(entl_adapt_funcs);
+
+--
+
+a kind of mirror-image structure exists for 'upcalls' from the driver (e1000e) to the kernel netlink module (i.e. ECNL plug-in) [ref: entl_device.h] :
+
+    typedef struct entl_mgr
+
+The extended entry point 'adapt_validate' registers a (singleton) mgr with the driver.
+
+--
+
