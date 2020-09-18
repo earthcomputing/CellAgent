@@ -1,9 +1,14 @@
 #[macro_use] extern crate failure;
 
+use rand::{
+    {Rng, thread_rng},
+    distributions::{Alphanumeric},
+};
+
 use std::{collections::{HashSet},
           fmt,
           fs::{File, OpenOptions},
-	  iter::FromIterator,
+	  iter::{FromIterator, repeat},
           process::{Command, Stdio},
           sync::{Arc}
 };
@@ -22,7 +27,11 @@ fn main() -> Result<(), Error> {
         .write(true)
         .truncate(true)
 	.open(&CONFIG.output_file_name);
-    let cell_name = "Carol"; /* if needed, can read cell name from config file */
+    let mut rng = thread_rng();
+    let cell_name = repeat(())
+        .map(|()| rng.sample(Alphanumeric))
+        .take(11)
+        .collect::<String>();
     let mut wc_cmd_outer;
     let num_phys_ports_str = {
         let lspci_cmd = Command::new("lspci")
@@ -58,7 +67,7 @@ fn main() -> Result<(), Error> {
     let border_port_list : Vec<PortNo> = (*num_ecnl_ports+1..*num_phys_ports+1)
         .map(|i| PortNo(i))
 	.collect();
-    let (mut nal_cell, ca_join_handle) = NalCell::new(cell_name,
+    let (mut nal_cell, ca_join_handle) = NalCell::new(&cell_name,
                                                       num_phys_ports,
                                                       &HashSet::from_iter(border_port_list),
                                                       CellConfig::Large,
