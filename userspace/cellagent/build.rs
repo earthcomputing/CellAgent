@@ -8,5 +8,5 @@ fn main() {
     #[cfg(feature = "cell")]
     println!(r"cargo:rustc-link-search={}/ecnl", cell_agent_dir);
     #[cfg(feature = "cell")]
-    println!(r"cargo:rustc-link-search={}/../../bjackson-ecnl/lib", cell_agent_dir);
+    println!(r"cargo:rustc-link-search={}/../../driver/ecnl/lib", cell_agent_dir);
 }

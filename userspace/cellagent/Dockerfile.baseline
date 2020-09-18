@@ -9,7 +9,7 @@ RUN apt-get update && \
     apt-get clean
 
 RUN USER=root cargo new --bin /usr/src/CellAgent
-RUN export CELL_AGENT_DIR='/usr/src/CellAgent/'
+RUN export CELL_AGENT_DIR='/usr/src/CellAgent/userspace/cellagent'
 WORKDIR /usr/src/CellAgent
 
 #COPY Cargo.lock Cargo.lock
