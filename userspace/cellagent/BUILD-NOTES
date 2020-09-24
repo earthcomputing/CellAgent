@@ -1,9 +1,10 @@
+Also see manual build process in README.md
 
 For dev:
-sudo docker build . -f Dockerfile.baseline -t ec/baseline
-sudo docker run --interactive --tty --rm --name baseline ec/baseline
+$ sudo docker build . -f Dockerfile.baseline -t ec/baseline
+$ sudo docker run --interactive --tty --rm --name baseline ec/baseline
 
 For release:
-sudo docker build . -f Dockerfile.baseline -t ec/baseline
-sudo docker build . -f Dockerfile.cell -t ec/cell
-sudo docker run --interactive --tty --rm --name baseline ec/cell
+$ sudo docker build . -f Dockerfile.baseline -t ec/baseline
+$ sudo docker build . -f Dockerfile.cell -t ec/cell
+$ sudo docker run --interactive --tty --rm --name baseline ec/cell
