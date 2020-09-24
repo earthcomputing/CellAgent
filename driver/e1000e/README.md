@@ -6,6 +6,8 @@
     The build then combines the patch intel files with a set of Earth Computing additional files.
 
 ## build steps
+$ cd driver/e1000e
+driver/e1000e$ make
 
 ## Copyright
 
