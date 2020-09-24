@@ -1,16 +1,9 @@
-Assuming this file is in cellagent directory of CellAgent repository.
+Assuming this file is in the userspace/cellagent directory of CellAgent repository.
 
 An environment variable CELL_AGENT_DIR must be set.
 An environment variable SERVER_URL must be set if you want to send trace records to the web server.
 
-To load the new driver:
-Edit (using sudo) /etc/modprobe.d/e1000e.conf to uncomment "blacklist e1000e".
-$ sudo depmod -ae && sudo update-initramfs -u
-Then reboot.  TO RETURN TO OLD-DEMO BEHAVIOR, RECOMMENT THE LINE IN /etc/modprobe.d/e1000e.conf
-
-After turning on cell:
-$ sudo insmod ../driver/e1000e/e1000e-3.3.4/src/e1000e.ko
-$ sudo insmod ../driver/ecnl/src/ecnl_device.ko
+This requires that the e1000e and ecnl driver kernel modules be loaded.
 
 There are three executables in multicell/userspace/cellagent.
 To execute:
