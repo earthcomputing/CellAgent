@@ -6,6 +6,11 @@
     The build then combines the patch intel files with a set of Earth Computing additional files.
 
 ## build steps
+$ cd driver/e1000e
+driver/e1000e$ make
+
+It will be necessary to load the kernel module on startup:
+driver/e1000e$ sudo insmod e1000e-3.3.4/src/e1000e.ko
 
 ## Copyright
 
