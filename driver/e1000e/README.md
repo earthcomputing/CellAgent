@@ -9,9 +9,6 @@
 $ cd driver/e1000e
 driver/e1000e$ make
 
-It will be necessary to load the kernel module on startup:
-driver/e1000e$ sudo insmod e1000e-3.3.4/src/e1000e.ko
-
 ## Copyright
 
     It's unclear what legal (copyright & patent) implications there are here. Before Earth Computing distributes the combined, derivitive e1000e device driver a formal legal determination needs to be made.
