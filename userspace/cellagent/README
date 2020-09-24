@@ -5,34 +5,37 @@ An environment variable SERVER_URL must be set if you want to send trace records
 
 To load the new driver:
 Edit (using sudo) /etc/modprobe.d/e1000e.conf to uncomment "blacklist e1000e".
-sudo depmod -ae && sudo update-initramfs -u
-Then reboot.  RECOMMENT THE LINE IN /etc/modprobe.d/e1000e.conf AND RERUN ABOVE LINE WHEN DONE!
+$ sudo depmod -ae && sudo update-initramfs -u
+Then reboot.  TO RETURN TO OLD-DEMO BEHAVIOR, RECOMMENT THE LINE IN /etc/modprobe.d/e1000e.conf
 
 After turning on cell:
-$ sudo insmod ../../bjackson-e1000e/e1000e-3.3.4/src/e1000e.ko
-$ sudo insmod ../../bjackson-ecnl/src/ecnl_device.ko
+$ sudo insmod ../driver/e1000e/e1000e-3.3.4/src/e1000e.ko
+$ sudo insmod ../driver/ecnl/src/ecnl_device.ko
 
+There are three executables in multicell/userspace/cellagent.
+To execute:
+$ cd userspace/cellagent
+userspace/cellagent$ cargo run --bin simulator --features="simulator" -- config_file_name
+userspace/cellagent$ cargo run --bin external_echoDemo --features="noc"
 
+The third is cell.
+Manual build process:
 Make the driver interface code in C:
 $ cd ecnl
-ecnl$ make
-
+userspace/cellagent/ecnl$ make
 $ cd ..
+userspace/cellagent$ cargo build --release --bin cell --features="cell"
 
-There are three executables in multicell/cellagent.
-$ cargo run --bin simulator --features="simulator" -- config_file_name
-$ cargo run --bin external_echoDemo --features="noc"
-
-$ cargo build --release --bin cell --features="cell"
-$ sudo target/release/cell
+Then, to execute:
+userspace/cellagent$ sudo target/release/cell
 
 There are currently 3 configuration files in multicell/cellagent/configs.
 
 If you want to display the simulator output in a browser,
-from multicall/actix_server
-$ cargo run
-and from multicell/cellagent
-$ cargo run --bin simulator --features="webserver simulator"  -- config_file_name
+$ cd ../actix_server
+userspace/actix_server$ cargo run
+and when starting simulator:
+userspace/cellagent$ cargo run --bin simulator --features="webserver simulator"  -- config_file_name
 
 You MUST start the web server before the simulator.
 
