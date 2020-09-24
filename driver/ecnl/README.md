@@ -44,6 +44,15 @@
 
     https://www.kernel.org/doc/Documentation/kbuild/modules.txt
 
+$ cd driver/ecnl/src
+driver/ecnl/src$ make
+driver/ecnl/src$ cd ../lib
+driver/ecnl/lib$ make
+
+It will be necessary to load the kernel module on startup:
+$ cd ..
+driver/ecnl$ sudo insmod src/ecnl_device.ko
+
 ## Ubuntu Bionic
 
     find /lib/modules/$(uname -r) -name e1000e.ko -ls
