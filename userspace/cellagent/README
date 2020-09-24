@@ -29,7 +29,7 @@ userspace/cellagent$ cargo build --release --bin cell --features="cell"
 Then, to execute:
 userspace/cellagent$ sudo target/release/cell
 
-There are currently 3 configuration files in multicell/cellagent/configs.
+Configuration files are read from userspace/cellagent/configs.
 
 If you want to display the simulator output in a browser,
 $ cd ../actix_server
