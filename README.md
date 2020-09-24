@@ -56,7 +56,7 @@ Various subsystems are arranged abstractly as follows:
 
 For each subsystem, there is a branch <subsystem>-master and a branch <subsystem>-staging, such that each 'staging' branch is fed by the 'master' branches of its downstream subsystems and is the sole feed of a 'master' branch of the same subsystem, the intention being that 'staging' branches accept merges from various downstream subsystems in some arbitrary order, and that these are merged into the 'master' branch only when a consistent set of subsystems is in place, so that every commit in a 'master' branch is consistent. The branches for the 'top' subsytem are simply called 'master' and 'staging'.
 
-## Guidelines
+## Repository Maintenance Guidelines
 Feature branches should be named <subsystem>-<feature>.
 Do work in the lowest-level branch for which it is meaningful and appropriate.
 The steps below assume that commits are not changed in any remote subsystem branch through a forced push.
@@ -109,3 +109,10 @@ If not:
 ```
 $ git merge --abort
 ```
+
+## Build and Execution Instructions for cells running drivers
+1. Build e1000e kernel module as described [here](driver/e1000e/README.md)
+1. Build ECNL kernel module as described [here](driver/ecnl/README.md)
+1. Build ECNL-Rust interface and cell binary as described [here](userspace/cellagent/README.md)
+1. Restart, loading drivers as described [here](driver/README.md)
+1. Run cell binary as described [here](userspace/cellagent/README.md)
