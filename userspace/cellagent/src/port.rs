@@ -231,7 +231,7 @@ impl Port {
                             },
 			}
                     }
-		}
+        }
 		match msg {
                     LinkToPortPacket::Status(status) => {
 			match status {
