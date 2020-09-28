@@ -1,0 +1,24 @@
+{
+    "version": "2.0.0",
+    "command": "/Users/alan/.cargo/bin/cargo",
+    "tasks": [
+        {
+            "label": "cargo run",
+            "type": "shell",
+            "command": "cargo",
+            "args": [
+                "run",
+            ],
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            },
+            "options": {
+                "env": {
+                    "SERVER_URL": "127.0.0.1:8088",
+                    "HTML": "html/index.html"
+                }
+            }
+        }
+    ]
+}

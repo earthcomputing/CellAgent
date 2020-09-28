@@ -23,7 +23,8 @@
         "stopOnEntry": false,
         "sourceLanguages": [
           "rust"
-        ]
+        ],
+        "env":{"SERVER_URL":"127.0.0.1:8088", "HTML": "html/index.html"}
       }
     ]
 }
