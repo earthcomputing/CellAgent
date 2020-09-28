@@ -5,3 +5,4 @@ cellagent/target
 trace
 trace-replay
 cellagent/cellagent.imi
+actix-server.code-workspace
