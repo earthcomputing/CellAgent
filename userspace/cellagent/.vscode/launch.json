@@ -1,16 +1,30 @@
 {
-    "version": "0.2.0",
+    "version": "2.0.0",
     "configurations": [
-        
-        {
-            "type": "lldb",
-            "request": "launch",
-            "name": "Debug",
-            "program": "/Users/alan/Documents/Eclipse/multicell/cellagent/target/debug/simulator",
-            "args": ["config.json"],
-            "cwd": "/Users/alan/Documents/Eclipse/multicell/cellagent",
-            //"preLaunchTask": "/Users/alan/.cargo/bin/cargo",
-            "sourceLanguages": ["rust"],    
-        }
+      {
+        "type": "lldb",
+        "request": "launch",
+        "name": "Launch",
+        "cargo": {
+          "args": [
+            "build",
+            "--bin=simulator",
+            "--features=simulator"
+          ]
+        },
+        "args": [
+            "${workspaceFolder}/configs/10cell_config.json"       
+        ],
+        "program": "${workspaceFolder}/target/debug/simulator",
+        "windows": {
+          "program": "${workspaceFolder}/target/debug/simulator.exe"
+        },
+        "cwd": "${workspaceFolder}",
+        "stopOnEntry": false,
+        "sourceLanguages": [
+          "rust"
+        ],
+        "env":{"SERVER_URL":"127.0.0.1:8088", "HTML": "html/index.html"}
+      }
     ]
 }
