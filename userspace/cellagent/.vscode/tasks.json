@@ -1,6 +1,6 @@
 {
     "version": "2.0.0",
-    "command": "/Users/alan/.cargo/bin/cargo",
+    "command": "~/.cargo/bin/cargo",
     "tasks": [
         {
             "label": "cargo run",
