@@ -283,18 +283,11 @@ pub struct DiscoverPayload {
     root_port_no: PortNo,
     hops: PathLength,
     path: Path,
-    gvm_eqn: GvmEquation,
 }
 impl DiscoverPayload {
     fn new(port_tree_id: PortTreeID,  hops: PathLength, path: Path) -> DiscoverPayload {
-        let mut eqns = HashSet::new();
-        eqns.insert(GvmEqn::Recv("true"));
-        eqns.insert(GvmEqn::Send("true"));
-        eqns.insert(GvmEqn::Xtnd("true"));
-        eqns.insert(GvmEqn::Save("false"));
-        let gvm_eqn = GvmEquation::new(&eqns, &Vec::new());
         let root_port_no = port_tree_id.get_port_no();
-        DiscoverPayload { port_tree_id, root_port_no, hops, path, gvm_eqn }
+        DiscoverPayload { port_tree_id, root_port_no, hops, path }
     }
     pub fn get_hops(&self) -> PathLength { self.hops }
     pub fn hops_plus_one(&self) -> PathLength { PathLength(CellQty(**self.hops + 1)) }

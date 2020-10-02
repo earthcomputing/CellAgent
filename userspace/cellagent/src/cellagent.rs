@@ -1103,12 +1103,7 @@ impl CellAgent {
             Quench::RootPort => port_tree_seen, // Must see every root port for this tree once
             Quench::MyPort   => my_port_seen,   // Must see every tree on every connected port
         };
-        let mut eqns = HashSet::new();
-        eqns.insert(GvmEqn::Recv("true"));
-        eqns.insert(GvmEqn::Send("true"));
-        eqns.insert(GvmEqn::Xtnd("true"));
-        eqns.insert(GvmEqn::Save("false"));
-        let gvm_equation = GvmEquation::new(&eqns, &Vec::new());
+        let gvm_equation = Default::default();
         {
             if CONFIG.debug_options.all || CONFIG.debug_options.discoverd {
                 let seen_ports = self.discoverd_seen_on_tree.get(&new_tree_id);
