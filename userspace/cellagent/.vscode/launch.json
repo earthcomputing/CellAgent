@@ -1,0 +1,16 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug",
+            "program": "/Users/alan/Documents/Eclipse/multicell/cellagent/target/debug/simulator",
+            "args": ["config.json"],
+            "cwd": "/Users/alan/Documents/Eclipse/multicell/cellagent",
+            //"preLaunchTask": "/Users/alan/.cargo/bin/cargo",
+            "sourceLanguages": ["rust"],    
+        }
+    ]
+}
