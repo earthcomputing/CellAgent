@@ -1,0 +1,25 @@
+<!DOCTYPE html><meta charset="utf8">
+<html>
+<head>
+    <script src="visualize.js"></script>
+    <link rel="stylesheet" type="text/css" href="visualizer.css">
+</head>
+<body id="body">
+<h1 id="title">EARTH Computing Trace Visualizer</h1>
+<div id="loader"></div>
+<div id="buttons">
+    <form action="/replay" method="post" onsubmit="clear_dispay()">
+        <input type="submit" value="Show Datacenter">
+        <input type="text" name="filename" value="../cellagent/trace/trace.json">
+    </form>
+</div>
+<div id="spinner"></div>
+<div id="viz-container">
+    <div id="tooltip" style="display:none">
+        Label
+    </div>
+    <svg id="viz-canvas">
+    </svg>
+</div>
+</body>
+</html>
