@@ -1,0 +1,979 @@
+Multicell Routing: Output to file /dev/null (set in config.rs)
+
+Main: 6 ports for each of 10 cells
+
+Blueprint
+  Border Cell 2: Border Ports: 2, Interior Ports: 0 1 3 4 5 6 7
+  Border Cell 7: Border Ports: 2, Interior Ports: 0 1 3 4 5
+  Interior Cell 0: Interior Ports: 0 1 2 3 4 5
+  Interior Cell 1: Interior Ports: 0 1 2 3 4 5
+  Interior Cell 3: Interior Ports: 0 1 2 3 4 5
+  Interior Cell 4: Interior Ports: 0 1 2 3 4 5
+  Interior Cell 5: Interior Ports: 0 1 2 3
+  Interior Cell 6: Interior Ports: 0 1 2 3 4 5
+  Interior Cell 8: Interior Ports: 0 1 2 3 4 5
+  Interior Cell 9: Interior Ports: 0 1 2 3 4 5
+  Edges: (0,1)(1,2)(1,6)(3,4)(5,6)(6,7)(7,8)(8,9)(0,5)(2,3)(2,7)(3,8)(4,9)
+---> Change line in noc.rs with ---> to print datacenter
+Links
+Link C:0+P:1+C:1+P:1 is connected
+Link C:1+P:2+C:2+P:1 is connected
+Link C:1+P:3+C:6+P:1 is connected
+Link C:3+P:1+C:4+P:1 is connected
+Link C:5+P:1+C:6+P:2 is connected
+Link C:6+P:3+C:7+P:1 is connected
+Link C:7+P:3+C:8+P:1 is connected
+Link C:8+P:2+C:9+P:1 is connected
+Link C:0+P:2+C:5+P:2 is connected
+Link C:2+P:3+C:3+P:2 is connected
+Link C:2+P:4+C:7+P:4 is connected
+Link C:3+P:3+C:8+P:3 is connected
+Link C:4+P:2+C:9+P:2 is connected
+Cells
+Cell C:0 Large
+Cell Agent
+Traph C:8 d1a38383-52f4-4533-9e3e-bff111521421
+  Stacked Trees
+  TreeID C:8, GVM: receive 'true', send 'true', extend 'true', save 'false', Variables:
+Port Other Connected Broken Status Hops Path
+   1     8 true      false  Parent    4    1
+   2     8 true      false  Pruned    4    1
+Traph C:9 6b156447-1273-43eb-a440-282f3262ace5
+  Stacked Trees
+  TreeID C:9, GVM: receive 'true', send 'true', extend 'true', save 'false', Variables:
+Port Other Connected Broken Status Hops Path
+   1    11 true      false  Pruned    5    1
+   2     9 true      false  Parent    5    1
+Traph C:0+Control 1995e3a3-4853-456d-99b6-fd8015d67ab0
+  Stacked Trees
+  TreeID C:0+Control, GVM: receive 'true', send 'true', extend 'true', save 'false', Variables:
+Port Other Connected Broken Status Hops Path
+   0     0 true      false  Parent    0 None
+Traph C:6 21bdd39f-7735-4203-8ec6-dc0a5cbf97df
+  Stacked Trees
+  TreeID C:6, GVM: receive 'true', send 'true', extend 'true', save 'false', Variables:
+Port Other Connected Broken Status Hops Path
+   1     5 true      false  Parent    2    1
+   2     3 true      false  Pruned    2    2
+Traph C:0+Connected b443c4d5-9b18-43a0-bea3-49d72e94ef2e
+  Stacked Trees
+  TreeID C:0+Connected, GVM: receive 'false', send 'true', extend 'true', save 'false', Variables:
+Port Other Connected Broken Status Hops Path
+   0     0 true      false  Parent    0 None
+Traph C:5 20f639fe-9fbf-416a-a5eb-eefcb2aeb864
+  Stacked Trees
+  TreeID C:5, GVM: receive 'true', send 'true', extend 'true', save 'false', Variables:
+Port Other Connected Broken Status Hops Path
+   1     6 true      false  Parent    3    1
+   2     2 true      false  Pruned    1    2
+Traph C:4 591cb8ce-1d63-4468-94af-49b026b9c86f
+  Stacked Trees
+  TreeID C:4, GVM: receive 'true', send 'true', extend 'true', save 'false', Variables:
+Port Other Connected Broken Status Hops Path
+   1    10 true      false  Parent    4    1
+   2    11 true      false  Pruned    6    1
+Traph C:2 3b24ecf9-4446-4be5-b820-13c8150549bb
+  Stacked Trees
+  TreeID C:2, GVM: receive 'true', send 'true', extend 'true', save 'false', Variables:
+Port Other Connected Broken Status Hops Path
+   1     4 true      false  Parent    2    1
+   2     7 true      false  Child     3    1
+Traph C:3 a2cd8471-feff-4ec5-b1be-38307483fd2e
+  Stacked Trees
+  TreeID C:3, GVM: receive 'true', send 'true', extend 'true', save 'false', Variables:
+Port Other Connected Broken Status Hops Path
+   1     9 true      false  Parent    3    2
+   2    10 true      false  Pruned    5    2
+Traph C:7 a84898c6-44a3-4045-8240-753901491852
+  Stacked Trees
+  TreeID C:7, GVM: receive 'true', send 'true', extend 'true', save 'false', Variables:
+Port Other Connected Broken Status Hops Path
+   1     7 true      false  Pruned    3    1
+   2     5 true      false  Parent    3    1
+Traph C:0 acb033a2-7691-4901-a63f-e240c045b434
+  Stacked Trees
+  TreeID C:0, GVM: receive 'true', send 'true', extend 'true', save 'false', Variables:
+Port Other Connected Broken Status Hops Path
+   0     0 true      false  Parent    0 None
+   1     3 true      false  Child     1 None
+   2     6 true      false  Pruned    4    1
+Traph C:1 a272b00d-d842-4494-b3dc-0abf4550ee88
+  Stacked Trees
+  TreeID C:1, GVM: receive 'true', send 'true', extend 'true', save 'false', Variables:
+Port Other Connected Broken Status Hops Path
+   1     2 true      false  Parent    1    1
+   2     4 true      false  Pruned    3    3
+Packet Engine for cell C:0
+Routing Table with 64 Entries
+ Index Tree UUID  In Use Send? Parent Mask             Indices
+     0 "1995e3a3"  Yes    Yes       0 0000000000000001 [0, 0, 0, 0, 0, 0, 0, 0]
+     1 "b443c4d5"  Yes    Yes       0 0000000000000110 [0, 0, 0, 0, 0, 0, 0, 0]
+     2 "acb033a2"  Yes    Yes       0 0000000000000011 [0, 3, 6, 0, 0, 0, 0, 0]
+     3 "a272b00d"  Yes    Yes       1 0000000000000001 [0, 2, 4, 0, 0, 0, 0, 0]
+     4 "3b24ecf9"  Yes    Yes       1 0000000000000101 [0, 4, 7, 0, 0, 0, 0, 0]
+     5 "21bdd39f"  Yes    Yes       1 0000000000000001 [0, 5, 3, 0, 0, 0, 0, 0]
+     6 "20f639fe"  Yes    Yes       1 0000000000000001 [0, 6, 2, 0, 0, 0, 0, 0]
+     7 "a84898c6"  Yes    Yes       2 0000000000000001 [0, 7, 5, 0, 0, 0, 0, 0]
+     8 "d1a38383"  Yes    Yes       1 0000000000000001 [0, 8, 8, 0, 0, 0, 0, 0]
+     9 "a2cd8471"  Yes    Yes       1 0000000000000001 [0, 9, 10, 0, 0, 0, 0, 0]
+    10 "591cb8ce"  Yes    Yes       1 0000000000000001 [0, 10, 11, 0, 0, 0, 0, 0]
+    11 "6b156447"  Yes    Yes       2 0000000000000001 [0, 11, 9, 0, 0, 0, 0, 0]
+Cell C:1 Large
+Cell Agent
+Traph C:4 591cb8ce-1d63-4468-94af-49b026b9c86f
+  Stacked Trees
+  TreeID C:4, GVM: receive 'true', send 'true', extend 'true', save 'false', Variables:
+Port Other Connected Broken Status Hops Path
+   1    10 true      false  Child     4    1
+   2     9 true      false  Parent    3    1
+   3    11 true      false  Child     4    1
+Traph C:1+Control d9a053c6-2c9f-404a-99f5-6794ad926715
+  Stacked Trees
+  TreeID C:1+Control, GVM: receive 'true', send 'true', extend 'true', save 'false', Variables:
+Port Other Connected Broken Status Hops Path
+   0     0 true      false  Parent    0 None
+Traph C:5 20f639fe-9fbf-416a-a5eb-eefcb2aeb864
+  Stacked Trees
+  TreeID C:5, GVM: receive 'true', send 'true', extend 'true', save 'false', Variables:
+Port Other Connected Broken Status Hops Path
+   1     6 true      false  Child     3    1
+   2     6 true      false  Child     3    1
+   3     3 true      false  Parent    2    1
+Traph C:8 d1a38383-52f4-4533-9e3e-bff111521421
+  Stacked Trees
+  TreeID C:8, GVM: receive 'true', send 'true', extend 'true', save 'false', Variables:
+Port Other Connected Broken Status Hops Path
+   1     8 true      false  Child     4    1
+   2    11 true      false  Pruned    3    1
+   3     8 true      false  Parent    3    1
+Traph C:6 21bdd39f-7735-4203-8ec6-dc0a5cbf97df
+  Stacked Trees
+  TreeID C:6, GVM: receive 'true', send 'true', extend 'true', save 'false', Variables:
+Port Other Connected Broken Status Hops Path
+   1     5 true      false  Child     2    1
+   2     5 true      false  Child     2    1
+   3     2 true      false  Parent    1    1
+Traph C:2 3b24ecf9-4446-4be5-b820-13c8150549bb
+  Stacked Trees
+  TreeID C:2, GVM: receive 'true', send 'true', extend 'true', save 'false', Variables:
+Port Other Connected Broken Status Hops Path
+   1     4 true      false  Child     2    1
+   2     2 true      false  Parent    1    1
+   3     7 true      false  Child     2    1
+Traph C:9 6b156447-1273-43eb-a440-282f3262ace5
+  Stacked Trees
+  TreeID C:9, GVM: receive 'true', send 'true', extend 'true', save 'false', Variables:
+Port Other Connected Broken Status Hops Path
+   1    11 true      false  Pruned    6    1
+   2    12 true      false  Pruned    4    1
+   3     9 true      false  Parent    4    1
+Traph C:0 acb033a2-7691-4901-a63f-e240c045b434
+  Stacked Trees
+  TreeID C:0, GVM: receive 'true', send 'true', extend 'true', save 'false', Variables:
+Port Other Connected Broken Status Hops Path
+   1     2 true      false  Parent    1    1
+   2     4 true      false  Child     2    1
+   3     6 true      false  Child     2    1
+Traph C:1 a272b00d-d842-4494-b3dc-0abf4550ee88
+  Stacked Trees
+  TreeID C:1, GVM: receive 'true', send 'true', extend 'true', save 'false', Variables:
+Port Other Connected Broken Status Hops Path
+   0     0 true      false  Parent    0 None
+   1     3 true      false  Child     1 None
+   2     3 true      false  Child     1 None
+   3     4 true      false  Child     1 None
+Traph C:1+Connected d9c85ed2-cc88-45b2-bdc1-ea1cd0eb1a95
+  Stacked Trees
+  TreeID C:1+Connected, GVM: receive 'false', send 'true', extend 'true', save 'false', Variables:
+Port Other Connected Broken Status Hops Path
+   0     0 true      false  Parent    0 None
+Traph C:7 a84898c6-44a3-4045-8240-753901491852
+  Stacked Trees
+  TreeID C:7, GVM: receive 'true', send 'true', extend 'true', save 'false', Variables:
+Port Other Connected Broken Status Hops Path
+   1     7 true      false  Pruned    4    1
+   2     7 true      false  Child     3    1
+   3     5 true      false  Parent    2    1
+Traph C:3 a2cd8471-feff-4ec5-b1be-38307483fd2e
+  Stacked Trees
+  TreeID C:3, GVM: receive 'true', send 'true', extend 'true', save 'false', Variables:
+Port Other Connected Broken Status Hops Path
+   1     9 true      false  Child     3    2
+   2     8 true      false  Parent    2    2
+   3    10 true      false  Child     3    2
+Packet Engine for cell C:1
+Routing Table with 64 Entries
+ Index Tree UUID  In Use Send? Parent Mask             Indices
+     0 "d9a053c6"  Yes    Yes       0 0000000000000001 [0, 0, 0, 0, 0, 0, 0, 0]
+     1 "d9c85ed2"  Yes    Yes       0 0000000000001110 [0, 0, 0, 0, 0, 0, 0, 0]
+     2 "a272b00d"  Yes    Yes       0 0000000000001111 [0, 3, 3, 4, 0, 0, 0, 0]
+     3 "acb033a2"  Yes    Yes       1 0000000000001101 [0, 2, 4, 6, 0, 0, 0, 0]
+     4 "3b24ecf9"  Yes    Yes       2 0000000000001011 [0, 4, 2, 7, 0, 0, 0, 0]
+     5 "21bdd39f"  Yes    Yes       3 0000000000000111 [0, 5, 5, 2, 0, 0, 0, 0]
+     6 "20f639fe"  Yes    Yes       3 0000000000000111 [0, 6, 6, 3, 0, 0, 0, 0]
+     7 "a84898c6"  Yes    Yes       3 0000000000000101 [0, 7, 7, 5, 0, 0, 0, 0]
+     8 "d1a38383"  Yes    Yes       3 0000000000000011 [0, 8, 11, 8, 0, 0, 0, 0]
+     9 "a2cd8471"  Yes    Yes       2 0000000000001011 [0, 9, 8, 10, 0, 0, 0, 0]
+    10 "591cb8ce"  Yes    Yes       2 0000000000001011 [0, 10, 9, 11, 0, 0, 0, 0]
+    11 "6b156447"  Yes    Yes       3 0000000000000001 [0, 11, 12, 9, 0, 0, 0, 0]
+Border Cell C:2 Large
+Cell Agent
+Traph C:9 6b156447-1273-43eb-a440-282f3262ace5
+  Stacked Trees
+  TreeID C:9, GVM: receive 'true', send 'true', extend 'true', save 'false', Variables:
+Port Other Connected Broken Status Hops Path
+   1    11 true      false  Pruned    5    1
+   3    11 true      false  Pruned    3    1
+   4     9 true      false  Parent    3    1
+Traph C:3 a2cd8471-feff-4ec5-b1be-38307483fd2e
+  Stacked Trees
+  TreeID C:3, GVM: receive 'true', send 'true', extend 'true', save 'false', Variables:
+Port Other Connected Broken Status Hops Path
+   1     9 true      false  Child     2    2
+   3     2 true      false  Parent    1    2
+   4    10 true      false  Child     2    2
+Traph C:8 d1a38383-52f4-4533-9e3e-bff111521421
+  Stacked Trees
+  TreeID C:8, GVM: receive 'true', send 'true', extend 'true', save 'false', Variables:
+Port Other Connected Broken Status Hops Path
+   1     8 true      false  Pruned    4    1
+   3    10 true      false  Pruned    2    3
+   4     5 true      false  Parent    2    1
+Traph C:4 591cb8ce-1d63-4468-94af-49b026b9c86f
+  Stacked Trees
+  TreeID C:4, GVM: receive 'true', send 'true', extend 'true', save 'false', Variables:
+Port Other Connected Broken Status Hops Path
+   1    10 true      false  Child     3    1
+   3     3 true      false  Parent    2    1
+   4    11 true      false  Child     3    1
+Traph C:1 a272b00d-d842-4494-b3dc-0abf4550ee88
+  Stacked Trees
+  TreeID C:1, GVM: receive 'true', send 'true', extend 'true', save 'false', Variables:
+Port Other Connected Broken Status Hops Path
+   1     2 true      false  Parent    1    2
+   3     5 true      false  Child     2    2
+   4     6 true      false  Pruned    3    3
+Traph C:0 acb033a2-7691-4901-a63f-e240c045b434
+  Stacked Trees
+  TreeID C:0, GVM: receive 'true', send 'true', extend 'true', save 'false', Variables:
+Port Other Connected Broken Status Hops Path
+   1     3 true      false  Parent    2    1
+   3     6 true      false  Child     3    1
+   4     7 true      false  Pruned    4    1
+Traph C:6 21bdd39f-7735-4203-8ec6-dc0a5cbf97df
+  Stacked Trees
+  TreeID C:6, GVM: receive 'true', send 'true', extend 'true', save 'false', Variables:
+Port Other Connected Broken Status Hops Path
+   1     5 true      false  Parent    2    1
+   3     7 true      false  Child     3    1
+   4     3 true      false  Pruned    2    3
+Traph C:5 20f639fe-9fbf-416a-a5eb-eefcb2aeb864
+  Stacked Trees
+  TreeID C:5, GVM: receive 'true', send 'true', extend 'true', save 'false', Variables:
+Port Other Connected Broken Status Hops Path
+   1     6 true      false  Parent    3    1
+   3     8 true      false  Child     4    1
+   4     4 true      false  Pruned    3    1
+Traph C:2+Connected dfe53423-8672-423d-9cbb-80831e563bd3
+  Stacked Trees
+  TreeID C:2+Connected, GVM: receive 'false', send 'true', extend 'true', save 'false', Variables:
+Port Other Connected Broken Status Hops Path
+   0     0 true      false  Parent    0 None
+Traph C:2+Noc 97dad10e-bdbc-4c36-bcc8-f717dd12fdbb
+  Stacked Trees
+  TreeID C:2+Noc, GVM: receive 'true', send 'true', extend 'false', save 'false', Variables:
+Port Other Connected Broken Status Hops Path
+   2     0 true      false  Parent    1 None
+Traph C:2 3b24ecf9-4446-4be5-b820-13c8150549bb
+  Stacked Trees
+  TreeID C:2, GVM: receive 'true', send 'true', extend 'true', save 'false', Variables:
+Port Other Connected Broken Status Hops Path
+   0     0 true      false  Parent    0 None
+   1     4 true      false  Child     1 None
+   3     4 true      false  Child     1 None
+   4     8 true      false  Pruned    4    1
+Traph C:7 a84898c6-44a3-4045-8240-753901491852
+  Stacked Trees
+  TreeID C:7, GVM: receive 'true', send 'true', extend 'true', save 'false', Variables:
+Port Other Connected Broken Status Hops Path
+   1     7 true      false  Parent    3    1
+   3     9 true      false  Child     4    1
+   4     2 true      false  Pruned    1    4
+Traph C:2+Control 9e7136ae-81cf-44e8-b8d2-174816656014
+  Stacked Trees
+  TreeID C:2+Control, GVM: receive 'true', send 'true', extend 'true', save 'false', Variables:
+Port Other Connected Broken Status Hops Path
+   0     0 true      false  Parent    0 None
+Packet Engine for cell C:2
+Routing Table with 64 Entries
+ Index Tree UUID  In Use Send? Parent Mask             Indices
+     0 "9e7136ae"  Yes    Yes       0 0000000000000001 [0, 0, 0, 0, 0, 0, 0, 0]
+     1 "dfe53423"  Yes    Yes       0 0000000000011010 [0, 0, 0, 0, 0, 0, 0, 0]
+     2 "3b24ecf9"  Yes    Yes       0 0000000000001011 [0, 4, 0, 4, 8, 0, 0, 0]
+     3 "a272b00d"  Yes    Yes       1 0000000000001001 [0, 2, 0, 5, 6, 0, 0, 0]
+     4 "acb033a2"  Yes    Yes       1 0000000000001001 [0, 3, 0, 6, 7, 0, 0, 0]
+     5 "21bdd39f"  Yes    Yes       1 0000000000001001 [0, 5, 0, 7, 3, 0, 0, 0]
+     6 "20f639fe"  Yes    Yes       1 0000000000001001 [0, 6, 0, 8, 4, 0, 0, 0]
+     7 "a84898c6"  Yes    Yes       1 0000000000001001 [0, 7, 0, 9, 2, 0, 0, 0]
+     8 "a2cd8471"  Yes    Yes       3 0000000000010011 [0, 9, 0, 2, 10, 0, 0, 0]
+     9 "591cb8ce"  Yes    Yes       3 0000000000010011 [0, 10, 0, 3, 11, 0, 0, 0]
+    10 "97dad10e"  Yes    Yes       2 0000000000000001 [0, 0, 0, 0, 0, 0, 0, 0]
+    11 "d1a38383"  Yes    Yes       4 0000000000000001 [0, 8, 0, 10, 5, 0, 0, 0]
+    12 "6b156447"  Yes    Yes       4 0000000000000001 [0, 11, 0, 11, 9, 0, 0, 0]
+Cell C:3 Large
+Cell Agent
+Traph C:6 21bdd39f-7735-4203-8ec6-dc0a5cbf97df
+  Stacked Trees
+  TreeID C:6, GVM: receive 'true', send 'true', extend 'true', save 'false', Variables:
+Port Other Connected Broken Status Hops Path
+   1    10 true      false  Pruned    5    3
+   2     5 true      false  Parent    3    1
+   3     4 true      false  Pruned    3    3
+Traph C:3 a2cd8471-feff-4ec5-b1be-38307483fd2e
+  Stacked Trees
+  TreeID C:3, GVM: receive 'true', send 'true', extend 'true', save 'false', Variables:
+Port Other Connected Broken Status Hops Path
+   0     0 true      false  Parent    0 None
+   1     3 true      false  Child     1 None
+   2     8 true      false  Child     1 None
+   3    10 true      false  Child     1 None
+Traph C:9 6b156447-1273-43eb-a440-282f3262ace5
+  Stacked Trees
+  TreeID C:9, GVM: receive 'true', send 'true', extend 'true', save 'false', Variables:
+Port Other Connected Broken Status Hops Path
+   1     7 true      false  Pruned    2    2
+   2    12 true      false  Pruned    4    1
+   3     6 true      false  Parent    2    1
+Traph C:4 591cb8ce-1d63-4468-94af-49b026b9c86f
+  Stacked Trees
+  TreeID C:4, GVM: receive 'true', send 'true', extend 'true', save 'false', Variables:
+Port Other Connected Broken Status Hops Path
+   1     2 true      false  Parent    1    1
+   2     9 true      false  Child     2    1
+   3    11 true      false  Child     2    1
+Traph C:3+Control 10545278-172d-41ee-b168-58e88ce568fe
+  Stacked Trees
+  TreeID C:3+Control, GVM: receive 'true', send 'true', extend 'true', save 'false', Variables:
+Port Other Connected Broken Status Hops Path
+   0     0 true      false  Parent    0 None
+Traph C:0 acb033a2-7691-4901-a63f-e240c045b434
+  Stacked Trees
+  TreeID C:0, GVM: receive 'true', send 'true', extend 'true', save 'false', Variables:
+Port Other Connected Broken Status Hops Path
+   1     6 true      false  Child     4    1
+   2     4 true      false  Parent    3    1
+   3     8 true      false  Pruned    5    1
+Traph C:7 a84898c6-44a3-4045-8240-753901491852
+  Stacked Trees
+  TreeID C:7, GVM: receive 'true', send 'true', extend 'true', save 'false', Variables:
+Port Other Connected Broken Status Hops Path
+   1     9 true      false  Pruned    4    3
+   2     7 true      false  Parent    4    1
+   3     3 true      false  Pruned    2    3
+Traph C:2 3b24ecf9-4446-4be5-b820-13c8150549bb
+  Stacked Trees
+  TreeID C:2, GVM: receive 'true', send 'true', extend 'true', save 'false', Variables:
+Port Other Connected Broken Status Hops Path
+   1     4 true      false  Child     2    3
+   2     2 true      false  Parent    1    3
+   3     9 true      false  Pruned    5    1
+Traph C:8 d1a38383-52f4-4533-9e3e-bff111521421
+  Stacked Trees
+  TreeID C:8, GVM: receive 'true', send 'true', extend 'true', save 'false', Variables:
+Port Other Connected Broken Status Hops Path
+   1     8 true      false  Pruned    3    2
+   2    11 true      false  Pruned    3    1
+   3     2 true      false  Parent    1    3
+Traph C:1 a272b00d-d842-4494-b3dc-0abf4550ee88
+  Stacked Trees
+  TreeID C:1, GVM: receive 'true', send 'true', extend 'true', save 'false', Variables:
+Port Other Connected Broken Status Hops Path
+   1     5 true      false  Child     3    2
+   2     3 true      false  Parent    2    2
+   3     7 true      false  Pruned    4    3
+Traph C:3+Connected 3559c2a8-2655-4c15-954a-4611f23f933c
+  Stacked Trees
+  TreeID C:3+Connected, GVM: receive 'false', send 'true', extend 'true', save 'false', Variables:
+Port Other Connected Broken Status Hops Path
+   0     0 true      false  Parent    0 None
+Traph C:5 20f639fe-9fbf-416a-a5eb-eefcb2aeb864
+  Stacked Trees
+  TreeID C:5, GVM: receive 'true', send 'true', extend 'true', save 'false', Variables:
+Port Other Connected Broken Status Hops Path
+   1    11 true      false  Pruned    6    1
+   2     6 true      false  Parent    4    1
+   3     5 true      false  Pruned    4    1
+Packet Engine for cell C:3
+Routing Table with 64 Entries
+ Index Tree UUID  In Use Send? Parent Mask             Indices
+     0 "10545278"  Yes    Yes       0 0000000000000001 [0, 0, 0, 0, 0, 0, 0, 0]
+     1 "3559c2a8"  Yes    Yes       0 0000000000001110 [0, 0, 0, 0, 0, 0, 0, 0]
+     2 "a2cd8471"  Yes    Yes       0 0000000000001111 [0, 3, 8, 10, 0, 0, 0, 0]
+     3 "591cb8ce"  Yes    Yes       1 0000000000001101 [0, 2, 9, 11, 0, 0, 0, 0]
+     4 "3b24ecf9"  Yes    Yes       2 0000000000000011 [0, 4, 2, 9, 0, 0, 0, 0]
+     5 "a272b00d"  Yes    Yes       2 0000000000000011 [0, 5, 3, 7, 0, 0, 0, 0]
+     6 "acb033a2"  Yes    Yes       2 0000000000000011 [0, 6, 4, 8, 0, 0, 0, 0]
+     7 "21bdd39f"  Yes    Yes       2 0000000000000001 [0, 10, 5, 4, 0, 0, 0, 0]
+     8 "20f639fe"  Yes    Yes       2 0000000000000001 [0, 11, 6, 5, 0, 0, 0, 0]
+     9 "a84898c6"  Yes    Yes       2 0000000000000001 [0, 9, 7, 3, 0, 0, 0, 0]
+    10 "d1a38383"  Yes    Yes       3 0000000000000001 [0, 8, 11, 2, 0, 0, 0, 0]
+    11 "6b156447"  Yes    Yes       3 0000000000000001 [0, 7, 12, 6, 0, 0, 0, 0]
+Cell C:4 Large
+Cell Agent
+Traph C:1 a272b00d-d842-4494-b3dc-0abf4550ee88
+  Stacked Trees
+  TreeID C:1, GVM: receive 'true', send 'true', extend 'true', save 'false', Variables:
+Port Other Connected Broken Status Hops Path
+   1     5 true      false  Parent    3    2
+   2     7 true      false  Pruned    5    3
+Traph C:8 d1a38383-52f4-4533-9e3e-bff111521421
+  Stacked Trees
+  TreeID C:8, GVM: receive 'true', send 'true', extend 'true', save 'false', Variables:
+Port Other Connected Broken Status Hops Path
+   1    10 true      false  Pruned    2    3
+   2     3 true      false  Parent    2    2
+Traph C:7 a84898c6-44a3-4045-8240-753901491852
+  Stacked Trees
+  TreeID C:7, GVM: receive 'true', send 'true', extend 'true', save 'false', Variables:
+Port Other Connected Broken Status Hops Path
+   1     9 true      false  Pruned    5    1
+   2     4 true      false  Parent    3    3
+Traph C:6 21bdd39f-7735-4203-8ec6-dc0a5cbf97df
+  Stacked Trees
+  TreeID C:6, GVM: receive 'true', send 'true', extend 'true', save 'false', Variables:
+Port Other Connected Broken Status Hops Path
+   1     7 true      false  Pruned    4    1
+   2     5 true      false  Parent    4    3
+Traph C:3 a2cd8471-feff-4ec5-b1be-38307483fd2e
+  Stacked Trees
+  TreeID C:3, GVM: receive 'true', send 'true', extend 'true', save 'false', Variables:
+Port Other Connected Broken Status Hops Path
+   1     2 true      false  Parent    1    1
+   2    11 true      false  Child     2    1
+Traph C:9 6b156447-1273-43eb-a440-282f3262ace5
+  Stacked Trees
+  TreeID C:9, GVM: receive 'true', send 'true', extend 'true', save 'false', Variables:
+Port Other Connected Broken Status Hops Path
+   1    11 true      false  Pruned    3    1
+   2     2 true      false  Parent    1    2
+Traph C:4+Connected 02735596-72a1-4f60-85ec-c110bbfb29d6
+  Stacked Trees
+  TreeID C:4+Connected, GVM: receive 'false', send 'true', extend 'true', save 'false', Variables:
+Port Other Connected Broken Status Hops Path
+   0     0 true      false  Parent    0 None
+Traph C:4 591cb8ce-1d63-4468-94af-49b026b9c86f
+  Stacked Trees
+  TreeID C:4, GVM: receive 'true', send 'true', extend 'true', save 'false', Variables:
+Port Other Connected Broken Status Hops Path
+   0     0 true      false  Parent    0 None
+   1     3 true      false  Child     1 None
+   2    10 true      false  Child     1 None
+Traph C:5 20f639fe-9fbf-416a-a5eb-eefcb2aeb864
+  Stacked Trees
+  TreeID C:5, GVM: receive 'true', send 'true', extend 'true', save 'false', Variables:
+Port Other Connected Broken Status Hops Path
+   1     8 true      false  Pruned    5    1
+   2     6 true      false  Parent    5    1
+Traph C:4+Control b754a4cb-d642-4c8f-8904-d3cba69bcce7
+  Stacked Trees
+  TreeID C:4+Control, GVM: receive 'true', send 'true', extend 'true', save 'false', Variables:
+Port Other Connected Broken Status Hops Path
+   0     0 true      false  Parent    0 None
+Traph C:0 acb033a2-7691-4901-a63f-e240c045b434
+  Stacked Trees
+  TreeID C:0, GVM: receive 'true', send 'true', extend 'true', save 'false', Variables:
+Port Other Connected Broken Status Hops Path
+   1     6 true      false  Parent    4    1
+   2     8 true      false  Pruned    6    1
+Traph C:2 3b24ecf9-4446-4be5-b820-13c8150549bb
+  Stacked Trees
+  TreeID C:2, GVM: receive 'true', send 'true', extend 'true', save 'false', Variables:
+Port Other Connected Broken Status Hops Path
+   1     4 true      false  Parent    2    3
+   2     9 true      false  Pruned    6    1
+Packet Engine for cell C:4
+Routing Table with 64 Entries
+ Index Tree UUID  In Use Send? Parent Mask             Indices
+     0 "b754a4cb"  Yes    Yes       0 0000000000000001 [0, 0, 0, 0, 0, 0, 0, 0]
+     1 "02735596"  Yes    Yes       0 0000000000000110 [0, 0, 0, 0, 0, 0, 0, 0]
+     2 "591cb8ce"  Yes    Yes       0 0000000000000111 [0, 3, 10, 0, 0, 0, 0, 0]
+     3 "a2cd8471"  Yes    Yes       1 0000000000000101 [0, 2, 11, 0, 0, 0, 0, 0]
+     4 "3b24ecf9"  Yes    Yes       1 0000000000000001 [0, 4, 9, 0, 0, 0, 0, 0]
+     5 "a272b00d"  Yes    Yes       1 0000000000000001 [0, 5, 7, 0, 0, 0, 0, 0]
+     6 "acb033a2"  Yes    Yes       1 0000000000000001 [0, 6, 8, 0, 0, 0, 0, 0]
+     7 "6b156447"  Yes    Yes       2 0000000000000001 [0, 11, 2, 0, 0, 0, 0, 0]
+     8 "d1a38383"  Yes    Yes       2 0000000000000001 [0, 10, 3, 0, 0, 0, 0, 0]
+     9 "a84898c6"  Yes    Yes       2 0000000000000001 [0, 9, 4, 0, 0, 0, 0, 0]
+    10 "21bdd39f"  Yes    Yes       2 0000000000000001 [0, 7, 5, 0, 0, 0, 0, 0]
+    11 "20f639fe"  Yes    Yes       2 0000000000000001 [0, 8, 6, 0, 0, 0, 0, 0]
+Cell C:5 Large
+Cell Agent
+Traph C:5+Connected 4bca83ef-b550-4fa5-a86a-358fdf39f64a
+  Stacked Trees
+  TreeID C:5+Connected, GVM: receive 'false', send 'true', extend 'true', save 'false', Variables:
+Port Other Connected Broken Status Hops Path
+   0     0 true      false  Parent    0 None
+Traph C:6 21bdd39f-7735-4203-8ec6-dc0a5cbf97df
+  Stacked Trees
+  TreeID C:6, GVM: receive 'true', send 'true', extend 'true', save 'false', Variables:
+Port Other Connected Broken Status Hops Path
+   1     2 true      false  Parent    1    2
+   2     5 true      false  Pruned    3    1
+Traph C:5+Control 2b9e1ee4-35c7-49ab-86d1-529ff2652523
+  Stacked Trees
+  TreeID C:5+Control, GVM: receive 'true', send 'true', extend 'true', save 'false', Variables:
+Port Other Connected Broken Status Hops Path
+   0     0 true      false  Parent    0 None
+Traph C:1 a272b00d-d842-4494-b3dc-0abf4550ee88
+  Stacked Trees
+  TreeID C:1, GVM: receive 'true', send 'true', extend 'true', save 'false', Variables:
+Port Other Connected Broken Status Hops Path
+   1     4 true      false  Parent    2    3
+   2     3 true      false  Pruned    2    1
+Traph C:9 6b156447-1273-43eb-a440-282f3262ace5
+  Stacked Trees
+  TreeID C:9, GVM: receive 'true', send 'true', extend 'true', save 'false', Variables:
+Port Other Connected Broken Status Hops Path
+   1     9 true      false  Parent    4    1
+   2    11 true      false  Child     5    1
+Traph C:7 a84898c6-44a3-4045-8240-753901491852
+  Stacked Trees
+  TreeID C:7, GVM: receive 'true', send 'true', extend 'true', save 'false', Variables:
+Port Other Connected Broken Status Hops Path
+   1     5 true      false  Parent    2    1
+   2     7 true      false  Child     3    1
+Traph C:5 20f639fe-9fbf-416a-a5eb-eefcb2aeb864
+  Stacked Trees
+  TreeID C:5, GVM: receive 'true', send 'true', extend 'true', save 'false', Variables:
+Port Other Connected Broken Status Hops Path
+   0     0 true      false  Parent    0 None
+   1     3 true      false  Child     1 None
+   2     6 true      false  Pruned    4    1
+Traph C:8 d1a38383-52f4-4533-9e3e-bff111521421
+  Stacked Trees
+  TreeID C:8, GVM: receive 'true', send 'true', extend 'true', save 'false', Variables:
+Port Other Connected Broken Status Hops Path
+   1     8 true      false  Parent    3    1
+   2     8 true      false  Pruned    5    1
+Traph C:4 591cb8ce-1d63-4468-94af-49b026b9c86f
+  Stacked Trees
+  TreeID C:4, GVM: receive 'true', send 'true', extend 'true', save 'false', Variables:
+Port Other Connected Broken Status Hops Path
+   1    11 true      false  Parent    5    1
+   2    10 true      false  Pruned    5    1
+Traph C:0 acb033a2-7691-4901-a63f-e240c045b434
+  Stacked Trees
+  TreeID C:0, GVM: receive 'true', send 'true', extend 'true', save 'false', Variables:
+Port Other Connected Broken Status Hops Path
+   1     6 true      false  Parent    3    1
+   2     2 true      false  Pruned    1    2
+Traph C:3 a2cd8471-feff-4ec5-b1be-38307483fd2e
+  Stacked Trees
+  TreeID C:3, GVM: receive 'true', send 'true', extend 'true', save 'false', Variables:
+Port Other Connected Broken Status Hops Path
+   1    10 true      false  Parent    4    2
+   2     9 true      false  Pruned    4    2
+Traph C:2 3b24ecf9-4446-4be5-b820-13c8150549bb
+  Stacked Trees
+  TreeID C:2, GVM: receive 'true', send 'true', extend 'true', save 'false', Variables:
+Port Other Connected Broken Status Hops Path
+   1     7 true      false  Pruned    3    1
+   2     4 true      false  Parent    3    1
+Packet Engine for cell C:5
+Routing Table with 64 Entries
+ Index Tree UUID  In Use Send? Parent Mask             Indices
+     0 "2b9e1ee4"  Yes    Yes       0 0000000000000001 [0, 0, 0, 0, 0, 0, 0, 0]
+     1 "4bca83ef"  Yes    Yes       0 0000000000000110 [0, 0, 0, 0, 0, 0, 0, 0]
+     2 "20f639fe"  Yes    Yes       0 0000000000000011 [0, 3, 6, 0, 0, 0, 0, 0]
+     3 "21bdd39f"  Yes    Yes       1 0000000000000001 [0, 2, 5, 0, 0, 0, 0, 0]
+     4 "a272b00d"  Yes    Yes       1 0000000000000001 [0, 4, 3, 0, 0, 0, 0, 0]
+     5 "a84898c6"  Yes    Yes       1 0000000000000101 [0, 5, 7, 0, 0, 0, 0, 0]
+     6 "acb033a2"  Yes    Yes       1 0000000000000001 [0, 6, 2, 0, 0, 0, 0, 0]
+     7 "3b24ecf9"  Yes    Yes       2 0000000000000001 [0, 7, 4, 0, 0, 0, 0, 0]
+     8 "d1a38383"  Yes    Yes       1 0000000000000001 [0, 8, 8, 0, 0, 0, 0, 0]
+     9 "6b156447"  Yes    Yes       1 0000000000000101 [0, 9, 11, 0, 0, 0, 0, 0]
+    10 "a2cd8471"  Yes    Yes       1 0000000000000001 [0, 10, 9, 0, 0, 0, 0, 0]
+    11 "591cb8ce"  Yes    Yes       1 0000000000000001 [0, 11, 10, 0, 0, 0, 0, 0]
+Cell C:6 Large
+Cell Agent
+Traph C:6 21bdd39f-7735-4203-8ec6-dc0a5cbf97df
+  Stacked Trees
+  TreeID C:6, GVM: receive 'true', send 'true', extend 'true', save 'false', Variables:
+Port Other Connected Broken Status Hops Path
+   0     0 true      false  Parent    0 None
+   1     5 true      false  Child     1 None
+   2     3 true      false  Child     1 None
+   3     3 true      false  Child     1 None
+Traph C:6+Connected e7e2645a-7eed-4275-aeae-3e0ddf6f5539
+  Stacked Trees
+  TreeID C:6+Connected, GVM: receive 'false', send 'true', extend 'true', save 'false', Variables:
+Port Other Connected Broken Status Hops Path
+   0     0 true      false  Parent    0 None
+Traph C:9 6b156447-1273-43eb-a440-282f3262ace5
+  Stacked Trees
+  TreeID C:9, GVM: receive 'true', send 'true', extend 'true', save 'false', Variables:
+Port Other Connected Broken Status Hops Path
+   1    11 true      false  Child     4    1
+   2     9 true      false  Child     4    1
+   3     9 true      false  Parent    3    1
+Traph C:4 591cb8ce-1d63-4468-94af-49b026b9c86f
+  Stacked Trees
+  TreeID C:4, GVM: receive 'true', send 'true', extend 'true', save 'false', Variables:
+Port Other Connected Broken Status Hops Path
+   1    10 true      false  Parent    4    1
+   2    11 true      false  Child     5    1
+   3    11 true      false  Pruned    4    1
+Traph C:0 acb033a2-7691-4901-a63f-e240c045b434
+  Stacked Trees
+  TreeID C:0, GVM: receive 'true', send 'true', extend 'true', save 'false', Variables:
+Port Other Connected Broken Status Hops Path
+   1     3 true      false  Parent    2    1
+   2     6 true      false  Child     3    1
+   3     7 true      false  Child     3    1
+Traph C:5 20f639fe-9fbf-416a-a5eb-eefcb2aeb864
+  Stacked Trees
+  TreeID C:5, GVM: receive 'true', send 'true', extend 'true', save 'false', Variables:
+Port Other Connected Broken Status Hops Path
+   1     6 true      false  Child     2    1
+   2     2 true      false  Parent    1    1
+   3     4 true      false  Child     2    1
+Traph C:7 a84898c6-44a3-4045-8240-753901491852
+  Stacked Trees
+  TreeID C:7, GVM: receive 'true', send 'true', extend 'true', save 'false', Variables:
+Port Other Connected Broken Status Hops Path
+   1     7 true      false  Child     2    1
+   2     5 true      false  Child     2    1
+   3     2 true      false  Parent    1    1
+Traph C:2 3b24ecf9-4446-4be5-b820-13c8150549bb
+  Stacked Trees
+  TreeID C:2, GVM: receive 'true', send 'true', extend 'true', save 'false', Variables:
+Port Other Connected Broken Status Hops Path
+   1     4 true      false  Parent    2    1
+   2     7 true      false  Pruned    4    1
+   3     8 true      false  Child     3    1
+Traph C:8 d1a38383-52f4-4533-9e3e-bff111521421
+  Stacked Trees
+  TreeID C:8, GVM: receive 'true', send 'true', extend 'true', save 'false', Variables:
+Port Other Connected Broken Status Hops Path
+   1     8 true      false  Child     3    1
+   2     8 true      false  Child     3    1
+   3     5 true      false  Parent    2    1
+Traph C:6+Control 7b6ab6b6-2587-4343-9d19-55c839a63763
+  Stacked Trees
+  TreeID C:6+Control, GVM: receive 'true', send 'true', extend 'true', save 'false', Variables:
+Port Other Connected Broken Status Hops Path
+   0     0 true      false  Parent    0 None
+Traph C:1 a272b00d-d842-4494-b3dc-0abf4550ee88
+  Stacked Trees
+  TreeID C:1, GVM: receive 'true', send 'true', extend 'true', save 'false', Variables:
+Port Other Connected Broken Status Hops Path
+   1     2 true      false  Parent    1    3
+   2     4 true      false  Child     2    3
+   3     6 true      false  Child     2    3
+Traph C:3 a2cd8471-feff-4ec5-b1be-38307483fd2e
+  Stacked Trees
+  TreeID C:3, GVM: receive 'true', send 'true', extend 'true', save 'false', Variables:
+Port Other Connected Broken Status Hops Path
+   1     9 true      false  Parent    3    2
+   2    10 true      false  Child     4    2
+   3    10 true      false  Pruned    3    2
+Packet Engine for cell C:6
+Routing Table with 64 Entries
+ Index Tree UUID  In Use Send? Parent Mask             Indices
+     0 "7b6ab6b6"  Yes    Yes       0 0000000000000001 [0, 0, 0, 0, 0, 0, 0, 0]
+     1 "e7e2645a"  Yes    Yes       0 0000000000001110 [0, 0, 0, 0, 0, 0, 0, 0]
+     2 "21bdd39f"  Yes    Yes       0 0000000000001111 [0, 5, 3, 3, 0, 0, 0, 0]
+     3 "20f639fe"  Yes    Yes       2 0000000000001011 [0, 6, 2, 4, 0, 0, 0, 0]
+     4 "a272b00d"  Yes    Yes       1 0000000000001101 [0, 2, 4, 6, 0, 0, 0, 0]
+     5 "a84898c6"  Yes    Yes       3 0000000000000111 [0, 7, 5, 2, 0, 0, 0, 0]
+     6 "acb033a2"  Yes    Yes       1 0000000000001101 [0, 3, 6, 7, 0, 0, 0, 0]
+     7 "3b24ecf9"  Yes    Yes       1 0000000000001001 [0, 4, 7, 8, 0, 0, 0, 0]
+     8 "d1a38383"  Yes    Yes       3 0000000000000111 [0, 8, 8, 5, 0, 0, 0, 0]
+     9 "6b156447"  Yes    Yes       3 0000000000000111 [0, 11, 9, 9, 0, 0, 0, 0]
+    10 "a2cd8471"  Yes    Yes       1 0000000000000101 [0, 9, 10, 10, 0, 0, 0, 0]
+    11 "591cb8ce"  Yes    Yes       1 0000000000000101 [0, 10, 11, 11, 0, 0, 0, 0]
+Border Cell C:7 Large
+Cell Agent
+Traph C:7+Connected dba282e8-ca43-47fb-b7b0-b3ad59c389a2
+  Stacked Trees
+  TreeID C:7+Connected, GVM: receive 'false', send 'true', extend 'true', save 'false', Variables:
+Port Other Connected Broken Status Hops Path
+   0     0 true      false  Parent    0 None
+Traph C:3 a2cd8471-feff-4ec5-b1be-38307483fd2e
+  Stacked Trees
+  TreeID C:3, GVM: receive 'true', send 'true', extend 'true', save 'false', Variables:
+Port Other Connected Broken Status Hops Path
+   1    10 true      false  Pruned    4    2
+   3    10 true      false  Pruned    2    3
+   4     8 true      false  Parent    2    2
+Traph C:7+Control c89e6f7a-32ea-4e9c-a3ac-5f579e737563
+  Stacked Trees
+  TreeID C:7+Control, GVM: receive 'true', send 'true', extend 'true', save 'false', Variables:
+Port Other Connected Broken Status Hops Path
+   0     0 true      false  Parent    0 None
+Traph C:4 591cb8ce-1d63-4468-94af-49b026b9c86f
+  Stacked Trees
+  TreeID C:4, GVM: receive 'true', send 'true', extend 'true', save 'false', Variables:
+Port Other Connected Broken Status Hops Path
+   1    11 true      false  Pruned    5    1
+   3    11 true      false  Pruned    3    1
+   4     9 true      false  Parent    3    1
+Traph C:7 a84898c6-44a3-4045-8240-753901491852
+  Stacked Trees
+  TreeID C:7, GVM: receive 'true', send 'true', extend 'true', save 'false', Variables:
+Port Other Connected Broken Status Hops Path
+   0     0 true      false  Parent    0 None
+   1     5 true      false  Child     1 None
+   3     3 true      false  Child     1 None
+   4     7 true      false  Pruned    4    1
+Traph C:6 21bdd39f-7735-4203-8ec6-dc0a5cbf97df
+  Stacked Trees
+  TreeID C:6, GVM: receive 'true', send 'true', extend 'true', save 'false', Variables:
+Port Other Connected Broken Status Hops Path
+   1     2 true      false  Parent    1    3
+   3     4 true      false  Child     2    3
+   4     5 true      false  Pruned    3    1
+Traph C:8 d1a38383-52f4-4533-9e3e-bff111521421
+  Stacked Trees
+  TreeID C:8, GVM: receive 'true', send 'true', extend 'true', save 'false', Variables:
+Port Other Connected Broken Status Hops Path
+   1     8 true      false  Child     2    1
+   3     2 true      false  Parent    1    1
+   4    11 true      false  Child     2    1
+Traph C:5 20f639fe-9fbf-416a-a5eb-eefcb2aeb864
+  Stacked Trees
+  TreeID C:5, GVM: receive 'true', send 'true', extend 'true', save 'false', Variables:
+Port Other Connected Broken Status Hops Path
+   1     3 true      false  Parent    2    1
+   3     5 true      false  Child     3    1
+   4     6 true      false  Pruned    4    1
+Traph C:1 a272b00d-d842-4494-b3dc-0abf4550ee88
+  Stacked Trees
+  TreeID C:1, GVM: receive 'true', send 'true', extend 'true', save 'false', Variables:
+Port Other Connected Broken Status Hops Path
+   1     4 true      false  Parent    2    3
+   3     7 true      false  Child     3    3
+   4     3 true      false  Pruned    2    2
+Traph C:2 3b24ecf9-4446-4be5-b820-13c8150549bb
+  Stacked Trees
+  TreeID C:2, GVM: receive 'true', send 'true', extend 'true', save 'false', Variables:
+Port Other Connected Broken Status Hops Path
+   1     7 true      false  Parent    3    1
+   3     9 true      false  Child     4    1
+   4     2 true      false  Pruned    1    4
+Traph C:9 6b156447-1273-43eb-a440-282f3262ace5
+  Stacked Trees
+  TreeID C:9, GVM: receive 'true', send 'true', extend 'true', save 'false', Variables:
+Port Other Connected Broken Status Hops Path
+   1     9 true      false  Child     3    1
+   3     6 true      false  Parent    2    1
+   4    12 true      false  Child     3    1
+Traph C:0 acb033a2-7691-4901-a63f-e240c045b434
+  Stacked Trees
+  TreeID C:0, GVM: receive 'true', send 'true', extend 'true', save 'false', Variables:
+Port Other Connected Broken Status Hops Path
+   1     6 true      false  Parent    3    1
+   3     8 true      false  Child     4    1
+   4     4 true      false  Pruned    3    1
+Packet Engine for cell C:7
+Routing Table with 64 Entries
+ Index Tree UUID  In Use Send? Parent Mask             Indices
+     0 "c89e6f7a"  Yes    Yes       0 0000000000000001 [0, 0, 0, 0, 0, 0, 0, 0]
+     1 "dba282e8"  Yes    Yes       0 0000000000011010 [0, 0, 0, 0, 0, 0, 0, 0]
+     2 "a84898c6"  Yes    Yes       0 0000000000001011 [0, 5, 0, 3, 7, 0, 0, 0]
+     3 "21bdd39f"  Yes    Yes       1 0000000000001001 [0, 2, 0, 4, 5, 0, 0, 0]
+     4 "20f639fe"  Yes    Yes       1 0000000000001001 [0, 3, 0, 5, 6, 0, 0, 0]
+     5 "d1a38383"  Yes    Yes       3 0000000000010011 [0, 8, 0, 2, 11, 0, 0, 0]
+     6 "a272b00d"  Yes    Yes       1 0000000000001001 [0, 4, 0, 7, 3, 0, 0, 0]
+     7 "acb033a2"  Yes    Yes       1 0000000000001001 [0, 6, 0, 8, 4, 0, 0, 0]
+     8 "3b24ecf9"  Yes    Yes       1 0000000000001001 [0, 7, 0, 9, 2, 0, 0, 0]
+     9 "6b156447"  Yes    Yes       3 0000000000010011 [0, 9, 0, 6, 12, 0, 0, 0]
+    10 "a2cd8471"  Yes    Yes       4 0000000000000001 [0, 10, 0, 10, 8, 0, 0, 0]
+    11 "591cb8ce"  Yes    Yes       4 0000000000000001 [0, 11, 0, 11, 9, 0, 0, 0]
+Cell C:8 Large
+Cell Agent
+Traph C:8 d1a38383-52f4-4533-9e3e-bff111521421
+  Stacked Trees
+  TreeID C:8, GVM: receive 'true', send 'true', extend 'true', save 'false', Variables:
+Port Other Connected Broken Status Hops Path
+   0     0 true      false  Parent    0 None
+   1     5 true      false  Child     1 None
+   2     3 true      false  Child     1 None
+   3    10 true      false  Child     1 None
+Traph C:8+Control d6463d16-11fa-4975-b30e-7db926de90be
+  Stacked Trees
+  TreeID C:8+Control, GVM: receive 'true', send 'true', extend 'true', save 'false', Variables:
+Port Other Connected Broken Status Hops Path
+   0     0 true      false  Parent    0 None
+Traph C:3 a2cd8471-feff-4ec5-b1be-38307483fd2e
+  Stacked Trees
+  TreeID C:3, GVM: receive 'true', send 'true', extend 'true', save 'false', Variables:
+Port Other Connected Broken Status Hops Path
+   1    10 true      false  Pruned    3    2
+   2    11 true      false  Pruned    3    1
+   3     2 true      false  Parent    1    3
+Traph C:5 20f639fe-9fbf-416a-a5eb-eefcb2aeb864
+  Stacked Trees
+  TreeID C:5, GVM: receive 'true', send 'true', extend 'true', save 'false', Variables:
+Port Other Connected Broken Status Hops Path
+   1     4 true      false  Parent    3    1
+   2     6 true      false  Child     4    1
+   3     8 true      false  Pruned    5    1
+Traph C:9 6b156447-1273-43eb-a440-282f3262ace5
+  Stacked Trees
+  TreeID C:9, GVM: receive 'true', send 'true', extend 'true', save 'false', Variables:
+Port Other Connected Broken Status Hops Path
+   1     9 true      false  Child     2    1
+   2     2 true      false  Parent    1    1
+   3    11 true      false  Child     2    1
+Traph C:4 591cb8ce-1d63-4468-94af-49b026b9c86f
+  Stacked Trees
+  TreeID C:4, GVM: receive 'true', send 'true', extend 'true', save 'false', Variables:
+Port Other Connected Broken Status Hops Path
+   1    11 true      false  Pruned    4    1
+   2    10 true      false  Pruned    2    2
+   3     3 true      false  Parent    2    1
+Traph C:7 a84898c6-44a3-4045-8240-753901491852
+  Stacked Trees
+  TreeID C:7, GVM: receive 'true', send 'true', extend 'true', save 'false', Variables:
+Port Other Connected Broken Status Hops Path
+   1     2 true      false  Parent    1    3
+   2     4 true      false  Child     2    3
+   3     9 true      false  Pruned    5    1
+Traph C:8+Connected 10de387f-9789-4bbf-ab2a-136bbe55be02
+  Stacked Trees
+  TreeID C:8+Connected, GVM: receive 'false', send 'true', extend 'true', save 'false', Variables:
+Port Other Connected Broken Status Hops Path
+   0     0 true      false  Parent    0 None
+Traph C:0 acb033a2-7691-4901-a63f-e240c045b434
+  Stacked Trees
+  TreeID C:0, GVM: receive 'true', send 'true', extend 'true', save 'false', Variables:
+Port Other Connected Broken Status Hops Path
+   1     7 true      false  Parent    4    1
+   2     8 true      false  Child     5    1
+   3     6 true      false  Pruned    4    1
+Traph C:1 a272b00d-d842-4494-b3dc-0abf4550ee88
+  Stacked Trees
+  TreeID C:1, GVM: receive 'true', send 'true', extend 'true', save 'false', Variables:
+Port Other Connected Broken Status Hops Path
+   1     6 true      false  Parent    3    3
+   2     7 true      false  Child     4    3
+   3     5 true      false  Pruned    3    2
+Traph C:2 3b24ecf9-4446-4be5-b820-13c8150549bb
+  Stacked Trees
+  TreeID C:2, GVM: receive 'true', send 'true', extend 'true', save 'false', Variables:
+Port Other Connected Broken Status Hops Path
+   1     8 true      false  Parent    4    1
+   2     9 true      false  Child     5    1
+   3     4 true      false  Pruned    2    3
+Traph C:6 21bdd39f-7735-4203-8ec6-dc0a5cbf97df
+  Stacked Trees
+  TreeID C:6, GVM: receive 'true', send 'true', extend 'true', save 'false', Variables:
+Port Other Connected Broken Status Hops Path
+   1     3 true      false  Parent    2    3
+   2     5 true      false  Child     3    3
+   3     7 true      false  Pruned    4    1
+Packet Engine for cell C:8
+Routing Table with 64 Entries
+ Index Tree UUID  In Use Send? Parent Mask             Indices
+     0 "d6463d16"  Yes    Yes       0 0000000000000001 [0, 0, 0, 0, 0, 0, 0, 0]
+     1 "10de387f"  Yes    Yes       0 0000000000001110 [0, 0, 0, 0, 0, 0, 0, 0]
+     2 "d1a38383"  Yes    Yes       0 0000000000001111 [0, 5, 3, 10, 0, 0, 0, 0]
+     3 "a84898c6"  Yes    Yes       1 0000000000000101 [0, 2, 4, 9, 0, 0, 0, 0]
+     4 "21bdd39f"  Yes    Yes       1 0000000000000101 [0, 3, 5, 7, 0, 0, 0, 0]
+     5 "20f639fe"  Yes    Yes       1 0000000000000101 [0, 4, 6, 8, 0, 0, 0, 0]
+     6 "6b156447"  Yes    Yes       2 0000000000001011 [0, 9, 2, 11, 0, 0, 0, 0]
+     7 "a272b00d"  Yes    Yes       1 0000000000000101 [0, 6, 7, 5, 0, 0, 0, 0]
+     8 "acb033a2"  Yes    Yes       1 0000000000000101 [0, 7, 8, 6, 0, 0, 0, 0]
+     9 "3b24ecf9"  Yes    Yes       1 0000000000000101 [0, 8, 9, 4, 0, 0, 0, 0]
+    10 "a2cd8471"  Yes    Yes       3 0000000000000001 [0, 10, 11, 2, 0, 0, 0, 0]
+    11 "591cb8ce"  Yes    Yes       3 0000000000000001 [0, 11, 10, 3, 0, 0, 0, 0]
+Cell C:9 Large
+Cell Agent
+Traph C:3 a2cd8471-feff-4ec5-b1be-38307483fd2e
+  Stacked Trees
+  TreeID C:3, GVM: receive 'true', send 'true', extend 'true', save 'false', Variables:
+Port Other Connected Broken Status Hops Path
+   1    10 true      false  Pruned    2    3
+   2     3 true      false  Parent    2    1
+Traph C:9+Control 77166fef-6247-47ad-a291-28d68389c510
+  Stacked Trees
+  TreeID C:9+Control, GVM: receive 'true', send 'true', extend 'true', save 'false', Variables:
+Port Other Connected Broken Status Hops Path
+   0     0 true      false  Parent    0 None
+Traph C:1 a272b00d-d842-4494-b3dc-0abf4550ee88
+  Stacked Trees
+  TreeID C:1, GVM: receive 'true', send 'true', extend 'true', save 'false', Variables:
+Port Other Connected Broken Status Hops Path
+   1     7 true      false  Parent    4    3
+   2     5 true      false  Pruned    4    2
+Traph C:6 21bdd39f-7735-4203-8ec6-dc0a5cbf97df
+  Stacked Trees
+  TreeID C:6, GVM: receive 'true', send 'true', extend 'true', save 'false', Variables:
+Port Other Connected Broken Status Hops Path
+   1     4 true      false  Parent    3    3
+   2    10 true      false  Child     4    3
+Traph C:5 20f639fe-9fbf-416a-a5eb-eefcb2aeb864
+  Stacked Trees
+  TreeID C:5, GVM: receive 'true', send 'true', extend 'true', save 'false', Variables:
+Port Other Connected Broken Status Hops Path
+   1     5 true      false  Parent    4    1
+   2    11 true      false  Child     5    1
+Traph C:4 591cb8ce-1d63-4468-94af-49b026b9c86f
+  Stacked Trees
+  TreeID C:4, GVM: receive 'true', send 'true', extend 'true', save 'false', Variables:
+Port Other Connected Broken Status Hops Path
+   1    11 true      false  Pruned    3    1
+   2     2 true      false  Parent    1    2
+Traph C:7 a84898c6-44a3-4045-8240-753901491852
+  Stacked Trees
+  TreeID C:7, GVM: receive 'true', send 'true', extend 'true', save 'false', Variables:
+Port Other Connected Broken Status Hops Path
+   1     3 true      false  Parent    2    3
+   2     9 true      false  Child     3    3
+Traph C:0 acb033a2-7691-4901-a63f-e240c045b434
+  Stacked Trees
+  TreeID C:0, GVM: receive 'true', send 'true', extend 'true', save 'false', Variables:
+Port Other Connected Broken Status Hops Path
+   1     8 true      false  Parent    5    1
+   2     6 true      false  Pruned    5    1
+Traph C:2 3b24ecf9-4446-4be5-b820-13c8150549bb
+  Stacked Trees
+  TreeID C:2, GVM: receive 'true', send 'true', extend 'true', save 'false', Variables:
+Port Other Connected Broken Status Hops Path
+   1     9 true      false  Parent    5    1
+   2     4 true      false  Pruned    3    3
+Traph C:9 6b156447-1273-43eb-a440-282f3262ace5
+  Stacked Trees
+  TreeID C:9, GVM: receive 'true', send 'true', extend 'true', save 'false', Variables:
+Port Other Connected Broken Status Hops Path
+   0     0 true      false  Parent    0 None
+   1     6 true      false  Child     1 None
+   2     7 true      false  Child     1 None
+Traph C:9+Connected 1d8e8d7f-c7b4-4d1b-84bb-1c8535dfb47e
+  Stacked Trees
+  TreeID C:9+Connected, GVM: receive 'false', send 'true', extend 'true', save 'false', Variables:
+Port Other Connected Broken Status Hops Path
+   0     0 true      false  Parent    0 None
+Traph C:8 d1a38383-52f4-4533-9e3e-bff111521421
+  Stacked Trees
+  TreeID C:8, GVM: receive 'true', send 'true', extend 'true', save 'false', Variables:
+Port Other Connected Broken Status Hops Path
+   1     2 true      false  Parent    1    2
+   2     8 true      false  Child     2    2
+Packet Engine for cell C:9
+Routing Table with 64 Entries
+ Index Tree UUID  In Use Send? Parent Mask             Indices
+     0 "77166fef"  Yes    Yes       0 0000000000000001 [0, 0, 0, 0, 0, 0, 0, 0]
+     1 "1d8e8d7f"  Yes    Yes       0 0000000000000110 [0, 0, 0, 0, 0, 0, 0, 0]
+     2 "6b156447"  Yes    Yes       0 0000000000000111 [0, 6, 7, 0, 0, 0, 0, 0]
+     3 "d1a38383"  Yes    Yes       1 0000000000000101 [0, 2, 8, 0, 0, 0, 0, 0]
+     4 "a84898c6"  Yes    Yes       1 0000000000000101 [0, 3, 9, 0, 0, 0, 0, 0]
+     5 "21bdd39f"  Yes    Yes       1 0000000000000101 [0, 4, 10, 0, 0, 0, 0, 0]
+     6 "20f639fe"  Yes    Yes       1 0000000000000101 [0, 5, 11, 0, 0, 0, 0, 0]
+     7 "a272b00d"  Yes    Yes       1 0000000000000001 [0, 7, 5, 0, 0, 0, 0, 0]
+     8 "acb033a2"  Yes    Yes       1 0000000000000001 [0, 8, 6, 0, 0, 0, 0, 0]
+     9 "3b24ecf9"  Yes    Yes       1 0000000000000001 [0, 9, 4, 0, 0, 0, 0, 0]
+    10 "591cb8ce"  Yes    Yes       2 0000000000000001 [0, 11, 2, 0, 0, 0, 0, 0]
+    11 "a2cd8471"  Yes    Yes       2 0000000000000001 [0, 10, 3, 0, 0, 0, 0, 0]
+Enter the name of a file containing a manifest
