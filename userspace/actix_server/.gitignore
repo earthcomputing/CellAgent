@@ -1,0 +1,8 @@
+Cargo.lock
+manifest.txt
+out
+target
+.idea
+node_modules
+.vscode
+
