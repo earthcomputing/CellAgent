@@ -14,7 +14,7 @@
 
 // IOCTL signal event
 // ref: ENTL_ACTION_PROC_AIT, entl_device_process_rx_packet, entl_new_AIT_message
-#define MAX_AIT_MESSAGE_SIZE 9000
+#define MAX_AIT_MESSAGE_SIZE 256
 
 // FIXME: unused num_messages, num_queued?
 typedef struct entt_ioctl_ait_data {
