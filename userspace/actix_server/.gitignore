@@ -4,5 +4,4 @@ out
 target
 .idea
 node_modules
-.vscode
-
+actix_server.iml
