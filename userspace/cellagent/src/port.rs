@@ -333,19 +333,6 @@ impl Port {
                 }
             }
 	        let ait_state = packet.get_ait_state();
-            match ait_state {
-                AitState::AitD |
-                AitState::Tick |
-                AitState::Tock |
-                AitState::Tack |
-                AitState::Teck => return Err(PortError::Ait { func_name: _f, ait_state }.into()), // Not allowed here
-                
-                AitState::Ait => {
-                    packet.next_ait_state()?;
-                },
-                AitState::Entl | // Only needed for simulator, should be handled by port
-                AitState::Normal => ()
-            }
             {
                 if CONFIG.trace_options.all | CONFIG.trace_options.port {
                     let ait_state = packet.get_ait_state();
@@ -356,7 +343,20 @@ impl Port {
             }
             #[cfg(any(feature = "noc", feature = "simulator"))]
             {
-		        port_to_link_or_ecnl_port.clone().left().expect("ecnl port in simulator").send(packet)?;
+		match ait_state {
+	            AitState::AitD |
+                    AitState::Tick |
+		    AitState::Tock |
+		    AitState::Tack |
+		    AitState::Teck => return Err(PortError::Ait { func_name: _f, ait_state }.into()), // Not allowed here
+                
+		    AitState::Ait => {
+                        packet.next_ait_state()?;
+            	    },
+                    AitState::Entl | // Only needed for simulator, should be handled by port
+                    AitState::Normal => ()
+                }
+		port_to_link_or_ecnl_port.clone().left().expect("ecnl port in simulator").send(packet)?;
             }
             #[cfg(feature = "cell")]
             {
