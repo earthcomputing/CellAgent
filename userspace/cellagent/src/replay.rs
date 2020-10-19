@@ -3,12 +3,11 @@ use serde_json::Value;
 use std::{fmt, fmt::Write};
 
 // Structs to parse trace records
-use crate::ec_message::{MsgType};
 use crate::name::{CellID, TreeID};
 use crate::packet_engine::NumberOfPackets;
 use crate::port::PortStatus;
 use crate::routing_table_entry::RoutingTableEntry;
-use crate::utility::{ByteArray, PortNo, TraceType};
+use crate::utility::{CellNo, ByteArray, PortNo, TraceType};
 use crate::uuid_ec::Uuid;
 
 #[derive(Debug)]
@@ -19,6 +18,7 @@ pub enum TraceFormat {
     CaFromCmBytesMsg(PortNo, bool, Uuid, ByteArray),
     CaFromCmBytesStatus(PortNo, bool, NumberOfPackets, PortStatus),
     CaToNoc(PortNo, ByteArray),
+    BorderCell(CellNo)
 }
 impl fmt::Display for TraceFormat {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -28,7 +28,8 @@ impl fmt::Display for TraceFormat {
             TraceFormat::CaToCmEntryFormat(_) => "CaToCmEntry",
             TraceFormat::CaFromCmBytesMsg(_, _, _, _) => "CaFromCmBytesMsg",
             TraceFormat::CaFromCmBytesStatus(_, _, _, _) => "CaFromCmBytesStatus",
-            TraceFormat::CaToNoc(_, _) => "CaToNoc"
+            TraceFormat::CaToNoc(_, _) => "CaToNoc",
+            TraceFormat::BorderCell(_) => "BorderCell"
         };
         write!(f, "{}", s)
     }
@@ -77,6 +78,16 @@ pub fn process_trace_record(mut record: String) -> Result<TraceFormat, Error> {
                 }
             };
             TraceFormat::CaToNoc(a2n.noc_port, a2n.bytes)
+        }
+        "border_cell" => {
+            let bc: BorderCell = match serde_json::from_value(trace.body) {
+                Ok(c) => c,
+                Err(e) => {
+                    println!("Replay {} error {}", format, e);
+                    return Err(e.into());
+                }
+            };
+            TraceFormat::BorderCell(bc.cell_no)
         }
         _ => TraceFormat::EmptyFormat
     };
@@ -168,6 +179,15 @@ struct TraceRecordCaToNoc {
 struct CaToNoc {
     noc_port: PortNo,
     bytes: ByteArray
+}
+#[derive(Debug, Clone, Serialize, Deserialize)]
+struct TraceRecordBorderCell {
+    header: TraceHeader,
+    body: BorderCell
+}
+#[derive(Debug, Clone, Serialize, Deserialize)]
+struct BorderCell {
+    cell_no: CellNo
 }
 #[derive(Debug, Fail)]
 pub enum ReplayError {
