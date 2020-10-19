@@ -13,7 +13,7 @@ use serde_json;
 
 use crate::app_message::SenderMsgSeqNo;
 use crate::config::{PACKET_MIN, PACKET_MAX, PACKET_PADDING, PAYLOAD_DEFAULT_ELEMENT, PacketNo};
-use crate::ec_message::{Message, MsgType};
+use crate::ec_message::{Message};
 use crate::name::{PortTreeID, Name};
 use crate::utility::{ByteArray, S, Stack};
 use crate::uuid_ec::{Uuid, AitState};

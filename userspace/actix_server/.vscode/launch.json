@@ -22,7 +22,8 @@
                 "rust",
                 "JavaScript"
             ],
-            "env": {"SERVER_URL":"127.0.0.1:8088", "HTML":"html/index.html"}
+            "env": {"SERVER_URL":"127.0.0.1:8088", "HTML":"html/index.html"},
+            "preLaunchTask": "cargo build"
         }
     ]
 }

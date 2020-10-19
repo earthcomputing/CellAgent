@@ -1107,7 +1107,7 @@ impl CellAgent {
         {
             if CONFIG.debug_options.all || CONFIG.debug_options.discoverd {
                 let seen_ports = self.discoverd_seen_on_tree.get(&new_tree_id);
-                let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "ca_process_discoverd_msg_dbg" };
+                let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "ca_process_discover_msg_dbg" };
                 let trace = json!({ "cell_id": &self.cell_id, "port_no": port_no, "msg": msg.value() ,
                             "port_tree_id": new_port_tree_id,
                             "seen ports": seen_ports,
@@ -1211,7 +1211,6 @@ impl CellAgent {
                 // Setting hops to 0 is a hack so I can use update_traph()
                 self.update_traph(port_tree_id, port_number, port_state, &gvm_eqn,
                                           children, PathLength(CellQty(0)), path)?;
-                let traph = self.traphs.get(&tree_id.get_uuid()).expect("Traph was just set");
                 let parents_seen_on_tree = {
                     let count = self.parents_seen_on_tree
                         .entry(tree_id)
@@ -1219,22 +1218,24 @@ impl CellAgent {
                     *count += 1;
                     *count
                 };
+                let done_test = 
+                    tree_id == self.my_tree_id &&
+                    self.is_border_port_connected &&
+                    !self.sent_to_noc &&
+                    self.is_border() &&
+                    self.discoverd_done(tree_id, "DiscoverD::Parent");
                 {
-                    if CONFIG.debug_options.all || CONFIG.debug_options.discoverd {
+                    if CONFIG.debug_options.all || CONFIG.debug_options.discoverd { 
                         let seen_ports = self.discoverd_seen_on_tree.get(&tree_id);
                         let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "ca_process_discoverd_msg_noc" };
                         let trace = json!({ "cell_id": &self.cell_id, "port_no": port_no, "msg": msg.value(),
-                            "tree_id": tree_id, "border port connected": self.is_border_port_connected,
+                            "tree_id": tree_id, "done_test": done_test, "border port connected": self.is_border_port_connected,
                             "sent to NOC": self.sent_to_noc, "is border": self.is_border(),
                             "parents seen on tree": parents_seen_on_tree, "neighbor count": self.neighbors.len()});
                         let _ = add_to_trace(TraceType::Debug, trace_params, &trace, _f);
                     }
                 }
-                if tree_id == self.my_tree_id &&
-                    self.is_border_port_connected &&
-                    !self.sent_to_noc &&
-                    self.is_border() &&
-                    self.discoverd_done(tree_id, "DiscoverD::Parent") {
+                if done_test {
                     self.send_base_tree_to_noc()?;
                 }
             }
@@ -1631,29 +1632,15 @@ impl CellAgent {
             if parent_port == PortNo(0) {
                 // I am the root of the tree.  I need to tell the sender.
                 let allowed_tree_id = port_tree_id.to_tree_id();
-                let allowed_tree = self.name_from_tree(originator_id, allowed_tree_id).context(CellagentError::Chain { func_name: _f, comment: S("") })?;
+                let tree_name = self.name_from_tree(originator_id, allowed_tree_id).context(CellagentError::Chain { func_name: _f, comment: S("") })?;
                 let originator_id = msg.get_header().get_originator_id();
-                self.add_tree_name_map_item(originator_id, &allowed_tree, allowed_tree_id);
+                self.add_tree_name_map_item(originator_id, &tree_name, allowed_tree_id);
                 let tree_name_msg = AppTreeNameMsg::new("noc",
                                &AllowedTree::new(&parent_port_tree_id.get_name()),
-                                    &allowed_tree);
+                                    &tree_name);
                 let serialized = serde_json::to_string(&tree_name_msg as &dyn AppMessage).context(CellagentError::Chain { func_name: "port_connected", comment: S(self.cell_id) })?;
                 let bytes = ByteArray::new(&serialized);
-                let noc_port_no = self.get_border_port(originator_id)
-                    .context(CellagentError::Chain { func_name: _f, comment: format!("{:?}", originator_id)})?
-                    .get_port_no();
-                {
-                    if CONFIG.trace_options.all || CONFIG.trace_options.ca || CONFIG.trace_options.replay {
-                        let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "ca_to_noc_tree_name" };
-                        let trace = json!({ "cell_id": &self.cell_id, "port": port_no,
-                            "noc_port": noc_port_no, "tree_name_msg": tree_name_msg, "bytes":  bytes });
-                        let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
-                    }
-                }
-                if !CONFIG.replay {
-                    let ca_to_port = self.ca_to_ports.get(&noc_port_no).expect("cellagent.rs: border port sender must be set");
-                    ca_to_port.send(bytes)?;
-                }
+                self.send_tree_name_msg(&tree_name)?;
             } else {
                 let mask = Mask::new(port_number);
                 let in_reply_to = msg.get_sender_msg_seq_no();
@@ -1675,9 +1662,28 @@ impl CellAgent {
         let _f = "send_base_tree_to_noc";
         // The first mover always gets access to Base tree
         let base_tree_name = AllowedTree::new(BASE_TREE_NAME);
-        if let Some(port_number) = self.border_port_tree_id_map.keys().next() {
-            self.send_tree_name_msg(port_number.get_port_no(), &base_tree_name)?;
-            self.sent_to_noc = true;
+        self.send_tree_name_msg(&base_tree_name)?;
+        self.sent_to_noc = true;
+        Ok(())
+    }
+    fn send_tree_name_msg(&self, tree_name: &AllowedTree) -> Result<(), Error> {
+        let _f = "send_tree_name_msg";
+        let port_number = self.border_port_tree_id_map.keys().next().expect("Border tree port number must have been set");
+        let port_no = port_number.get_port_no();
+        let tree_name_msg = AppTreeNameMsg::new("cell_agent",
+                                                tree_name, tree_name);
+                                                let serialized = serde_json::to_string(&tree_name_msg as &dyn AppMessage).context(CellagentError::Chain { func_name: "port_connected", comment: S(self.cell_id) })?;
+                                                let bytes = ByteArray::new(&serialized);
+                                            {
+            if CONFIG.trace_options.all || CONFIG.trace_options.ca || CONFIG.trace_options.replay {
+                let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "ca_to_noc_tree_name" };
+                let trace = json!({ "cell_id": &self.cell_id, "noc_port": port_no, "app_msg": tree_name_msg, "bytes": bytes });
+                let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
+            }
+        }
+        if !CONFIG.replay {
+            let ca_to_port = self.ca_to_ports.get(&port_no).expect("cellagent.rs send_tree_name_msg: send port must be set");
+            ca_to_port.send(bytes)?;
         }
         Ok(())
     }
@@ -1880,23 +1886,6 @@ impl CellAgent {
         self.send_msg(outside_tree_id.get_uuid(), &packets, port_no_mask);
     }
     */
-    fn send_tree_name_msg(&self, port_no: PortNo, base_tree_name: &AllowedTree) -> Result<(), Error> {
-        let _f = "send_tree_name_msg";
-        let tree_name_msg = AppTreeNameMsg::new("cell_agent",
-                                                base_tree_name, base_tree_name);
-        {
-            if CONFIG.trace_options.all || CONFIG.trace_options.ca {
-                let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "ca_to_noc_base_tree_name" };
-                let trace = json!({ "cell_id": &self.cell_id, "port": port_no, "app_msg": tree_name_msg });
-                let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
-            }
-        }
-        let serialized = serde_json::to_string(&tree_name_msg as &dyn AppMessage).context(CellagentError::Chain { func_name: "port_connected", comment: S(self.cell_id) })?;
-        let bytes = ByteArray::new(&serialized);
-        let ca_to_port = self.ca_to_ports.get(&port_no).expect("cellagent.rs send_tree_name_msg: send port must be set");
-        ca_to_port.send(bytes)?;
-        Ok(())
-    }
     fn port_connected(&mut self, port_no: PortNo, is_border: bool) -> Result<(), Error> {
         let _f = "port_connected";
         {

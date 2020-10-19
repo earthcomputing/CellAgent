@@ -8,7 +8,7 @@ use serde_json;
 use crate::app_message::{SenderMsgSeqNo, AppMsgDirection, AppInterapplicationMsg, get_next_count};
 use crate::cellagent::{CellAgent};
 use crate::config::{CellQty, PathLength};
-use crate::gvm_equation::{GvmEquation, GvmEqn};
+use crate::gvm_equation::{GvmEquation};
 use crate::name::{Name, CellID, PortTreeID, OriginatorID, TreeID};
 use crate::packet::{Packet, Packetizer, Serializer};
 use crate::packet_engine::NumberOfPackets;
