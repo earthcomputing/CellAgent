@@ -1,5 +1,6 @@
 This is a unified repository for Earth Computing, intended to painlessly keep work on different subsystems in sync, for as long as it is practical to do so in this way.
-Various subsystems are arranged abstractly as follows:
+## Repository Structure
+Various subsystems are arranged abstractly as follows, both as directories and as branches:
 
 ```
   ^
@@ -54,12 +55,13 @@ Various subsystems are arranged abstractly as follows:
                                         server
 ```
 
-For each subsystem, there is a branch <subsystem>-master and a branch <subsystem>-staging, such that each 'staging' branch is fed by the 'master' branches of its downstream subsystems and is the sole feed of a 'master' branch of the same subsystem, the intention being that 'staging' branches accept merges from various downstream subsystems in some arbitrary order, and that these are merged into the 'master' branch only when a consistent set of subsystems is in place, so that every commit in a 'master' branch is consistent. The branches for the 'top' subsytem are simply called 'master' and 'staging'.
+For each subsystem, there is a branch <subsystem>-master and a branch <subsystem>-staging, such that each 'staging' branch is fed by the 'master' branches of its downstream subsystems and is the sole feed of a 'master' branch of the same subsystem, the intention being that 'staging' branches accept merges from various downstream subsystems in some arbitrary order, and that these are merged into the 'master' branch only when a consistent set of subsystems is in place, so that every commit in a 'master' branch is consistent. The branches for the 'top' subsytem are simply called 'master' and 'staging'.  Another motivation for this system is that the history of subsystems remains untangled with that of parallel subsystems, although their commits intermingle at higher levels in the hierarchy.  This makes it feasible to separate out subsystems into their own repository if we ultimately find it useful to do that.
 
 ## Repository Maintenance Guidelines
 Feature branches should be named <subsystem>-<feature>.
-Do work in the lowest-level branch for which it is meaningful and appropriate.
-The steps below assume that commits are not changed in any remote subsystem branch through a forced push.
+Commit work in the lowest-level branch for which it is meaningful and appropriate. It is sometimes useful to work in a temporary branch off of master and then distribute the commits to where they belong.
+The instructions below assume that commits are not changed in any remote subsystem branch through a forced push.
+The instructions below are not intended as a substitute for a working knowledge of git.
 
 To create a feature branch <subsystem>-<feature>:
 ```
@@ -87,6 +89,11 @@ If not:
 ```
 $ git rebase --abort
 ```
+Upon successful completion of the rebase (coordinate with other users if branch is shared):
+```
+$ git push --force origin <subsystem>-<feature>
+
+```
 
 To promote enhancements to a feature branch to the subsystem branch:
 ```
@@ -104,6 +111,7 @@ Ensure that this feature enhancement is consistent with the rest of the subsyste
 If so:
 ```
 $ git commit
+$ git push origin <subsystem>-master
 ```
 If not:
 ```
