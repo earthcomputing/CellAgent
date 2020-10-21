@@ -14,7 +14,7 @@ use {
     std::sync::atomic::Ordering
 };
 
-use futures::Future; // Needed for rdkafka
+//use futures::Future; // Needed for rdkafka
 use lazy_static::lazy_static;
 //use rdkafka::{config::ClientConfig, producer::{FutureProducer, FutureRecord}};
 use serde_json;

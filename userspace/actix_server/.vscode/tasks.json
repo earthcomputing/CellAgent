@@ -19,6 +19,17 @@
                     "HTML": "html/index.html"
                 }
             }
-        }
+        },
+        {
+            "label": "cargo build",
+            "type": "shell",
+            "command": "cargo",
+            "args": [
+                "build",
+            ],
+            "group": "build",
+            "problemMatcher": []
+        },
+
     ]
 }

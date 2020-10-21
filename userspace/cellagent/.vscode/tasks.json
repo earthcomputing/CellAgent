@@ -8,7 +8,7 @@
             "command": "cargo",
             "args": [
                 "run",
-                 "--bin",
+                "--bin",
                 "simulator",
                 "--features",
                 "simulator",
@@ -18,7 +18,22 @@
             "group": {
                 "kind": "build",
                 "isDefault": true
-            }
-        }
+            },
+            "problemMatcher": []
+        },
+        {
+            "label": "cargo build",
+            "type": "shell",
+            "command": "cargo",
+            "args": [
+                "build",
+                "--bin",
+                "simulator",
+                "--features",
+                "simulator"
+            ],
+            "group": "build",
+            "problemMatcher": []
+        },
     ]
 }

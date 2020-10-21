@@ -76,6 +76,16 @@ impl GvmEquation {
         Ok(result == to_value(true))
     }
 }
+impl Default for GvmEquation {
+    fn default() -> Self {
+        let mut eqns = HashSet::new();
+        eqns.insert(GvmEqn::Recv("true"));
+        eqns.insert(GvmEqn::Send("true"));
+        eqns.insert(GvmEqn::Xtnd("true"));
+        eqns.insert(GvmEqn::Save("false"));
+        GvmEquation::new(&eqns, &Vec::new()) 
+    }
+}
 impl fmt::Display for GvmEquation {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let mut s = format!("GVM: receive '{}', send '{}', extend '{}', save '{}', Variables:",

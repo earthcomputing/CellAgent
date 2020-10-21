@@ -14,7 +14,7 @@ use crate::dal::{add_to_trace, fork_trace_header, update_trace_header};
 use crate::gvm_equation::{GvmEquation, GvmEqn, GvmVariable, GvmVariableType};
 use crate::uptree_spec::{AllowedTree, ContainerSpec, Manifest, UpTreeSpec, VmSpec};
 use crate::utility::{ByteArray, CellConfig, S, TraceHeader, TraceHeaderParams, TraceType,
-                     get_geometry, sleep, vec_from_hashset, write_err};
+                     get_geometry, vec_from_hashset, write_err};
 
 const NOC_MASTER_DEPLOY_TREE_NAME: &str = "NocMasterDeploy";
 const NOC_AGENT_DEPLOY_TREE_NAME:  &str = "NocAgentDeploy";
@@ -115,7 +115,14 @@ impl Noc {
     pub fn app_process_tree_name(&mut self, msg: &AppTreeNameMsg, noc_to_port: &NocToPort) -> Result<(), Error> {
         let _f = "app_process_tree_name";
         let tree_name = msg.get_tree_name();
-        // Handle duplicate notifications
+        {
+            if CONFIG.trace_options.all || CONFIG.trace_options.noc {
+                let trace_params = &TraceHeaderParams { module: "src/noc.rs", line_no: line!(), function: _f, format: "app_process_tree_name" };
+                let trace = json!({ "id": self.get_name(), "app_msg": msg });
+                let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
+            }
+        }
+    // Handle duplicate notifications
         if self.allowed_trees.get(tree_name).is_some() { return Ok(()); }
         let master_agent = AllowedTree::new(NOC_CONTROL_TREE_NAME);
         let agent_master = AllowedTree::new(NOC_LISTEN_TREE_NAME);

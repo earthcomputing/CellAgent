@@ -9,10 +9,8 @@ use std::{
     sync::Arc,
 };
 use crossbeam::crossbeam_channel::unbounded as channel;
-
 use either::Either;
-
-use serde_json::{Value};
+use serde_json::Value;
 
 use crate::app_message::AppMessage;
 use crate::app_message_formats::{CaToPort, PortFromCa, PortToCa, CaFromPort};
@@ -66,9 +64,7 @@ impl NalCell {
         };
         let (port_to_pe, pe_from_ports): (PortToPe, PeFromPort) = channel();
         let (port_to_ca, ca_from_ports): (PortToCa, CaFromPort) = channel();
-        let port_list: Vec<PortNo> = (0..*num_phys_ports)
-            .map(|i| PortNo(i as u8))
-            .collect();
+        let port_list: Vec<PortNo> = (0..*num_phys_ports).map(|i| PortNo(i as u8)).collect();
         let all: HashSet<PortNo> = HashSet::from_iter(port_list);
         let mut interior_port_list = all
             .difference(&border_port_nos)
@@ -147,13 +143,14 @@ impl NalCell {
                     match trace_lines.next().transpose()? {
                         None => break,
                         Some(record) => {
-                            let trace_format = process_trace_record(record.clone())?;
+                            let trace_format = process_trace_record(record)?;
                             match trace_format {
                                 TraceFormat::EmptyFormat => (),
+                                TraceFormat::BorderCell(_) => (),
                                 TraceFormat::CaNewFormat(_, _, _, _) => println!("nalcell {}: {} ca_new out of order", cell_id, _f),
                                 TraceFormat::CaToCmEntryFormat(entry) => {
                                     ca_to_cm.send(CaToCmBytes::Entry(entry))?;
-                                },
+                                }
                                 TraceFormat::CaFromCmBytesMsg(port_no, is_ait, uuid, msg) => {
                                     cm_to_ca.send(CmToCaBytes::Bytes((port_no, is_ait, uuid, msg)))?;
                                 }
@@ -169,21 +166,14 @@ impl NalCell {
                         }
                     }
                 }
+                std::thread::sleep(std::time::Duration::from_secs(100));
+                println!("Noc {} thread exit", cell_id);
                 Ok(())
             });
         }
-        Ok((NalCell {
-            id: cell_id,
-            cell_type,
-            config,
-            ports: boxed_ports,
-            cell_agent,
-            ports_from_pe,
-            ports_from_ca,
-            ecnl,
-        },
-            ca_join_handle,
-        ))
+        Ok((NalCell { id: cell_id, cell_type, config, ports: boxed_ports, cell_agent,
+            ports_from_pe, ports_from_ca, ecnl },
+            ca_join_handle))
     }
 
     pub fn get_id(&self) -> CellID { self.id }
@@ -251,11 +241,12 @@ impl fmt::Display for NalCell {
         let mut s = String::new();
         match self.cell_type {
             CellType::Border => write!(s, "Border Cell {}", self.id)?,
-            CellType::Interior => write!(s, "Cell {}", self.id)?
+            CellType::Interior => write!(s, "Cell {}", self.id)?,
         }
         write!(s, " {}", self.config)?;
         write!(s, "\n{}", self.cell_agent)?;
-        write!(f, "{}", s) }
+        write!(f, "{}", s)
+    }
 }
 
 impl Drop for NalCell {
