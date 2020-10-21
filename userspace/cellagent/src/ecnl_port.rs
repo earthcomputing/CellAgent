@@ -5,6 +5,8 @@ use std::{
     mem::{size_of},
     os::raw::{c_char, c_int, c_uchar, c_uint, c_ulong, c_void},
     ptr::{null, null_mut},
+    thread::{sleep},
+    time::Duration,
 };
 
 use crossbeam::crossbeam_channel as mpsc;
@@ -116,7 +118,22 @@ impl ECNL_Port {
 		    }
 		    cmd_id if (cmd_id == NL_ECND_Commands::NL_ECNL_CMD_SIGNAL_AIT_MESSAGE as c_int) => {
                         println!("AIT Message Signal Received...");
-			port_to_pe.send(PortToPePacket::Packet((PortNo(self.port_id), self.retrieve(&mut bd)?))).unwrap();
+			let mut first: bool = true; // Require at least one packet
+			while true {
+			    let possible_packet_or_err: Option<Result<Packet, Error>> = self.retrieve(&mut bd);
+			    match possible_packet_or_err {
+		                Some(packet_or_err) => {
+				    port_to_pe.send(PortToPePacket::Packet((PortNo(self.port_id), packet_or_err?))).unwrap();
+				    first = false;
+				},
+				None => {
+				    if first {
+				        return Err(ECNL_PortError::NoPacketRetrieved { func_name: _f, port_id: self.port_id }.into())
+				    }
+				    break;
+				},
+		            }
+			}
 		    }
 		    _ => {
 			return Err(ECNL_PortError::UnknownCommand { func_name: _f, cmd_id: event.event_cmd_id}.into());
@@ -126,14 +143,19 @@ impl ECNL_Port {
          }
 
      }
-     pub fn retrieve(&self, bdp: &mut InBufferDesc) -> Result<Packet, Error> {
+     pub fn retrieve(&self, bdp: &mut InBufferDesc) -> Option<Result<Packet, Error>> {
          let _f = "retrieve";
          println!("Retrieving Packet...");
     	 unsafe {
              port_do_read_async(self, bdp);
-	     let packet: &Packet = &*((*bdp).frame);
-             println!("Received Packet: {}", packet.to_string()?); // Probably usually sufficient to print ec_msg_type.
-	     return Ok((*packet).clone()); // Can't keep this clone!
+	     if ((*bdp).frame != null_mut() && (*bdp).len != 0) {
+	         sleep(Duration::from_millis(100));
+	         let packet: &Packet = &*((*bdp).frame);
+                 println!("Received Packet: {}", packet.to_string().unwrap()); // Probably usually sufficient to print ec_msg_type.
+	         return Some(Ok((*packet).clone())); // Can't keep this clone!
+	     } else {
+	         return None;
+	     }
 	 }
      }
     pub fn send(&self, packet: &Packet) -> Result<(), Error> {
@@ -188,6 +210,6 @@ pub enum ECNL_PortError {
     Chain { func_name: &'static str, comment: String },
     #[fail(display = "ECNL_PortError::UnknownCommand {}: Unknown event command {}", func_name, cmd_id)]
     UnknownCommand { func_name: &'static str, cmd_id: c_int},
-    #[fail(display = "ECNL_PortError::RetrievedNull {}: Retrieved null message", func_name)]
-    RetrievedNull { func_name: &'static str},
+    #[fail(display = "ECNL_PortError::NoPacketRetrieved {}: No packet retrieved on port {}", func_name, port_id)]
+    NoPacketRetrieved { func_name: &'static str, port_id: u8},
 }
