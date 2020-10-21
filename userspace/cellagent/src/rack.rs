@@ -1,5 +1,5 @@
 use either::{Either, Left, Right};
-use multi_mut::{HashMapMultiMut};
+use multi_mut::HashMapMultiMut;
 use std::{fmt, fmt::Write,
           collections::{HashMap, HashSet},
           iter::FromIterator,
@@ -10,12 +10,13 @@ use crossbeam::crossbeam_channel::unbounded as channel;
 use crate::app_message_formats::{PortToNoc, PortFromNoc};
 use crate::blueprint::{Blueprint, Cell, };
 use crate::config::{CONFIG, CellQty, LinkQty};
-use crate::dal::{add_to_trace, fork_trace_header, update_trace_header};
+use crate::dal::{add_to_trace, fork_trace_header, get_cell_replay_lines, update_trace_header};
 use crate::ec_message_formats::{LinkToPort, PortFromLink, PortToLink, LinkFromPort, PortFromPe};
 use crate::link::{Link};
 use crate::nalcell::{NalCell};
 use crate::name::{CellID, LinkID};
 use crate::port::{Port};
+use crate::replay::{process_trace_record, TraceFormat};
 use crate::utility::{CellNo, CellConfig, Edge, S, TraceHeaderParams, TraceType};
 
 #[derive(Debug, Default)]
@@ -139,15 +140,41 @@ impl Rack {
     pub fn connect_to_noc(&mut self, port_to_noc: PortToNoc, port_from_noc: PortFromNoc)
             -> Result<(), Error> {
         let _f = "connect_to_noc";
-        let cell = self.cells
-            .iter_mut()
-            .filter(|binding| binding.1.is_border())
-            .map(|binding| binding.1)
-            .nth(0)
-            .ok_or::<Error>(RackError::Boundary { func_name: _f }.into())?;
-        let (port, port_from_ca) = cell.get_free_boundary_port_mut()?;
+        let (cell_no, cell) = if CONFIG.replay {
+            let mut trace_lines = get_cell_replay_lines("Rack").context(RackError::Chain { func_name: _f, comment: S("Rack") })?;
+            let mut record = trace_lines.next().transpose()?.expect(&format!("First record for rack must be there"));
+            let trace_format = process_trace_record(record)?;
+            match trace_format {
+                TraceFormat::BorderCell(cell_no,) => {
+                    let cell = self.cells.get_mut(&cell_no)
+                        .ok_or::<Error>(RackError::Boundary { func_name: _f }.into())?;
+                    (cell_no, cell)
+                },
+                _ => {
+                    unimplemented!()
+                }
+            }
+        } else {
+            self.cells
+                .iter_mut()
+                .find(|(cell_no, nalcell)| nalcell.is_border())
+                .map(|(cell_no, cell)| (*cell_no, cell))
+                .ok_or::<Error>(RackError::Boundary { func_name: _f }.into())?
+        };
+        {
+            { 
+                let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "border_cell" };
+                let trace = json!({ "cell_id": {"name": "Rack"}, "cell_no": cell_no});
+                let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
+            }
+        }
+       let (port, port_from_ca) = cell.get_free_boundary_port_mut()?;
         port.noc_channel(port_to_noc, port_from_noc, port_from_ca)?;
-        println!("Connecting NOC to cell {}", cell.get_id());
+        if CONFIG.replay {
+            println!("Connecting NOC to border cell {} for replay", cell.get_id());
+        } else {
+            println!("Connecting NOC to border cell {}", cell.get_id());
+        }
         Ok(())
     }
 }

@@ -6,7 +6,6 @@ use failure::{Error};
 use crate::name::{CellID};
 use crate::routing_table_entry::{RoutingTableEntry};
 use crate::uuid_ec::Uuid;
-use crate::blueprint::BlueprintError::DefaultNumPhysPortsPerCell;
 
 #[derive(Debug, Clone, Default)]
 pub struct RoutingTable {

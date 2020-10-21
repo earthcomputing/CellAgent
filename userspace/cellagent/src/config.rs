@@ -2,7 +2,7 @@ use std;
 use std::{fmt,
           collections::HashMap,
           env::args,
-          fs::{OpenOptions, create_dir, remove_dir_all, rename},
+          fs::{OpenOptions, create_dir, remove_dir_all},
           path::Path,
           ops::{Deref}};
 
