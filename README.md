@@ -59,8 +59,9 @@ For each subsystem, there is a branch <subsystem>-master and a branch <subsystem
 
 ## Repository Maintenance Guidelines
 Feature branches should be named <subsystem>-<feature>.
-Do work in the lowest-level branch for which it is meaningful and appropriate.
-The steps below assume that commits are not changed in any remote subsystem branch through a forced push.
+Commit work in the lowest-level branch for which it is meaningful and appropriate. It is sometimes useful to work in a temporary branch off of master and then distribute the commits to where they belong.
+The instructions below assume that commits are not changed in any remote subsystem branch through a forced push.
+The instructions below are not intended as a substitute for a working knowledge of git.
 
 To create a feature branch <subsystem>-<feature>:
 ```
@@ -88,6 +89,11 @@ If not:
 ```
 $ git rebase --abort
 ```
+Upon successful completion of the rebase (coordinate with other users if branch is shared):
+```
+$ git push --force origin <subsystem>-<feature>
+
+```
 
 To promote enhancements to a feature branch to the subsystem branch:
 ```
@@ -105,6 +111,7 @@ Ensure that this feature enhancement is consistent with the rest of the subsyste
 If so:
 ```
 $ git commit
+$ git push origin <subsystem>-master
 ```
 If not:
 ```
