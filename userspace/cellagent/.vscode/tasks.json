@@ -2,8 +2,8 @@
     "version": "2.0.0",
     "command": "~/.cargo/bin/cargo",
     "tasks": [
-        {
-            "label": "cargo run",
+       {
+            "label": "simulator run",
             "type": "shell",
             "command": "cargo",
             "args": [
@@ -28,7 +28,7 @@
             "problemMatcher": []
         },
         {
-            "label": "cargo build",
+            "label": "simulator build",
             "type": "shell",
             "command": "cargo",
             "args": [
@@ -42,7 +42,7 @@
             "problemMatcher": []
         },
         {
-            "label": "cargo check",
+            "label": "simulator check",
             "type": "shell",
             "command": "cargo",
             "args": [
@@ -50,7 +50,7 @@
                 "--bin",
                 "simulator",
                 "--features",
-                "simulator,webserver",
+                "simulator,webserver"
             ],
             "group": "build",
             "problemMatcher": "$rustc-watch",
@@ -63,6 +63,23 @@
             "command": "cargo watch",
             "problemMatcher": "$rustc-watch",
             "isBackground": true
-        }
+        },
+        {
+            "label": "cell check",
+            "type": "shell",
+            "command": "cargo",
+            "args": [
+                "check",
+                "--bin",
+                "cell",
+                "--features",
+                "cell"
+            ],
+            "group": "build",
+            "options": {
+                "env": {"CELL_AGENT_DIR":"/tmp"}
+            },
+            "problemMatcher": []
+        },
     ]
 }

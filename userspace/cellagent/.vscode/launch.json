@@ -2,7 +2,7 @@
     "version": "2.0.0",
     "configurations": [
       {
-        "name": "Launch",
+        "name": "Launch simulator",
         "type": "lldb",
         "request": "launch",
         "args": [
