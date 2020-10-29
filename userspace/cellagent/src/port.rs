@@ -10,10 +10,10 @@ use crate::config::CONFIG;
 use crate::dal::{add_to_trace, fork_trace_header, update_trace_header};
 use crate::ec_message_formats::{PortToLink, PortFromLink, PortToPe, PortFromPe, LinkToPortPacket,
                                 PortToPePacket};
-#[cfg(feature = "cell")]
+#[cfg(cell)]
 use crate::ecnl_port::{ECNL_Port};
 use crate::name::{Name, PortID, CellID};
-#[cfg(feature = "cell")]
+#[cfg(cell)]
 use crate::packet::{Packet, UniqueMsgId};
 use crate::utility::{ByteArray, PortNo, PortNumber, S, TraceHeader, TraceHeaderParams, TraceType,
                      write_err};
@@ -34,8 +34,8 @@ impl fmt::Display for PortStatus {
         }
     }
 }
-#[cfg(any(feature="simulator",feature="noc"))]
 #[allow(non_camel_case_types)]
+#[cfg(not(cell))]
 type ECNL_Port = usize;
 #[derive(Debug, Clone)]
 pub struct Port {
@@ -170,8 +170,8 @@ impl Port {
         let mut port = self.clone();
         let child_trace_header = fork_trace_header();
         let thread_name = format!("Port {} listen_link", self.get_id().get_name());
-        #[cfg(any(feature = "noc", feature = "simulator"))]
-        let port_link_channel_clone_or_ecnl_port = {
+        #[cfg(not(cell))]
+        let port_link_channel_clone_or_ecnl_port: Either<(PortToLink, PortFromLink), Arc<ECNL_Port>> = {
             let (port_to_link, port_from_link) = port_link_channel_or_ecnl_port.clone().left().expect("ecnl in simulator");
             let port_to_link_clone = port_to_link.clone();
             Either::Left((port_to_link_clone, port_from_link))
@@ -190,9 +190,9 @@ impl Port {
         let thread_name = format!("Port {} listen_pe", self.get_id().get_name());
         thread::Builder::new().name(thread_name).spawn( move || {
             update_trace_header(child_trace_header);
-            //#[cfg(any(feature="noc", feature = "simulator"))] the variable might never be set if none of the cases is conditional
-            let port_to_link_or_ecnl_port = {
-                let (port_to_link, _port_from_link) = port_link_channel_or_ecnl_port.left().expect("ecnl in simulator");
+            #[cfg(not(cell))]
+            let port_to_link_or_ecnl_port: Either<PortToLink, Arc<ECNL_Port>> = {
+                let (port_to_link, _port_from_link) = port_link_channel_or_ecnl_port.clone().left().expect("ecnl in simulator");
                 Either::Left(port_to_link)
             };
             #[cfg(feature = "cell")]
@@ -216,7 +216,7 @@ impl Port {
         }
         let port_to_pe = self.port_to_pe_or_ca.clone().left().expect("Port: Sender to Pe must be set");
         let mut msg: LinkToPortPacket;
-        #[cfg(any(feature = "noc", feature = "simulator"))] 
+        #[cfg(not(cell))] 
         { 
             loop {
                 let (port_to_link, port_from_link) = port_link_channel_or_ecnl_port.clone().left().expect("ecnl in simulator");
@@ -309,7 +309,7 @@ impl Port {
 		        }
             }
         }
-        #[cfg(feature = "cell")]
+        #[cfg(cell)]
         {
             let ecnl_port = port_link_channel_or_ecnl_port.clone().right().expect("port_link_channel in cell");
 	        return ecnl_port.listen(self, port_to_pe);
@@ -346,7 +346,7 @@ impl Port {
                     let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
                 }
             }
-            #[cfg(any(feature = "noc", feature = "simulator"))]
+            #[cfg(not(cell))]
             {
 		        match ait_state {
 	                AitState::AitD |
@@ -363,10 +363,8 @@ impl Port {
                 }
 		        port_to_link_or_ecnl_port.clone().left().expect("ecnl port in simulator").send(packet)?;
             }
-            #[cfg(feature = "cell")]
-            {
-                port_to_link_or_ecnl_port.clone().right().expect("simulated port in cell").send(&packet)?;
-            }
+            #[cfg(cell)]
+            port_to_link_or_ecnl_port.clone().right().expect("simulated port in cell").send(&packet)?;
         }
     }
     fn send_to_noc(&self, port_to_noc: &PortToNoc, bytes: ByteArray) -> Result<(), Error> {

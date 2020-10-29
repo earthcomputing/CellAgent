@@ -1,6 +1,3 @@
-#[cfg(feature = "cell")]
-extern crate libc;
-
 use std::{
     fmt, fmt::Write,
     collections::{HashMap, HashSet},
@@ -19,14 +16,14 @@ use crate::ec_message_formats::{PortToPe, PeFromPort, PeToPort, PortFromPe,
                                 CmToCa, CaFromCm, CaToCm, CmFromCa, CaToCmBytes, CmToCaBytes,
                                 PeToCm, CmFromPe, CmToPe, PeFromCm};
 #[cfg(cell)]
-use crate::ecnl::{ECNL_Session};
+use crate::ecnl::ECNL_Session;
 use crate::name::CellID;
 use crate::port::Port;
 use crate::replay::{TraceFormat, process_trace_record};
 use crate::utility::{CellConfig, CellType, PortNo, S,
                      TraceHeaderParams, TraceType};
 
-#[cfg(any(feature="simulator",feature="noc"))]
+//#[cfg(not(cell))]
 #[allow(non_camel_case_types)]
 type ECNL_Session = usize;
 #[derive(Debug)]
@@ -86,6 +83,7 @@ impl NalCell {
         }
         let cell_type = if border_port_nos.is_empty() { CellType::Interior } else { CellType::Border };
         for i in 0..=*num_phys_ports {
+            #[cfg(cell)]
             let ecnl_clone = ecnl.clone();
             let is_border_port = border_port_nos.contains(&PortNo(i));
             let is_connected;
@@ -96,27 +94,22 @@ impl NalCell {
                 ports_from_ca.insert(PortNo(i), port_from_ca);
                 Either::Right(port_to_ca.clone())
             } else {
-                if i == 0 {
-                    is_connected = true;
+                is_connected = if i == 0 {
+                    true
                 } else {
+                    #[cfg(not(cell))] {
+                        false
+                    }
+                    #[cfg(cell)]
                     match ecnl_clone {
-                        Some(_ecnl_session) => {
-                            #[cfg(feature = "cell")] {
-                                is_connected = ecnl_session.get_port(i-1).is_connected()
-                            }
-                            // To keep compiler happy
-                            #[cfg(feature = "simulator")] {
-                                is_connected = false;
-                            }
-                            #[cfg(feature = "noc")] {
-                                is_connected = false;
-                            }
+                        Some(ecnl_session) => {
+                                ecnl_session.get_port(i-1).is_connected()
                         }
                         None => {
-                            is_connected = false;
+                            false
                         }
                     }
-                }
+                };
                 let (pe_to_port, port_from_pe): (PeToPort, PortFromPe) = channel();
                 pe_to_ports.insert(PortNo(i), pe_to_port);
                 ports_from_pe.insert(PortNo(i), port_from_pe);
@@ -220,13 +213,13 @@ impl NalCell {
             .ok_or::<Error>(NalcellError::Channel { port_no: port.get_port_no(), func_name: _f }.into())?;
         Ok((port, recvr))
     }
-    #[cfg(feature = "cell")]
+    #[cfg(cell)]
     pub fn link_ecnl_channels(&mut self, ecnl: Arc<ECNL_Session>) -> Result<&mut Self, Error> {
         let _f = "link_ecnl_channels";
         {
             if CONFIG.trace_options.all || CONFIG.trace_options.ca {
                 let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "worker" };
-                let trace = json!({ "thread_name": thread::current().name(), "thread_id": TraceHeader::parse(thread::current().id()) });
+                let trace = json!({ "thread_name": thread::current().name(), "thread_id": utility::TraceHeader::parse(thread::current().id()) });
                 let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
             }
         }
