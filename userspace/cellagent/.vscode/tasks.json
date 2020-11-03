@@ -60,7 +60,7 @@
             "label": "Watch",
             "group": "build",
             "type": "shell",
-            "command": "cargo watch",
+            "command": "cargo check",
             "problemMatcher": "$rustc-watch",
             "isBackground": true
         },

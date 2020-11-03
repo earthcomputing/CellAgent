@@ -171,7 +171,7 @@ impl PacketEngine {
     fn add_seen_packet_count(&mut self, port_no: PortNo) {
         PacketEngine::add_to_packet_count(&mut self.no_seen_packets, port_no);
     }
-    fn _clear_seen_packet_count(&mut self, port_no: PortNo) {
+    fn clear_seen_packet_count(&mut self, port_no: PortNo) {
         self.no_seen_packets[port_no.as_usize()] = 0;
     }
     fn add_sent_packet(&mut self, port_no: PortNo, packet: Packet) {
@@ -179,7 +179,8 @@ impl PacketEngine {
         PacketEngine::add_to_packet_count(&mut self.no_sent_packets, port_no);
     }
     fn clear_sent_packets(&mut self, port_no: PortNo) {
-        self.no_seen_packets[port_no.as_usize()] = 0;
+        self.sent_packets.get_mut(*port_no as usize).expect("PacketEngine: sent_packets entry must be set").clear();
+        self.clear_seen_packet_count(port_no);
     }
     fn pop_first(array: &mut PacketArray, port_no: PortNo) -> Option<Packet> {
         let item = array.get_mut(port_no.as_usize()).unwrap(); // Safe since vector always has MAX_NUM_PHYS_PORTS_PER_CELL entries
