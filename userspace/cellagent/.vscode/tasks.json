@@ -22,7 +22,8 @@
             "options": {
                 "env": {
                     "SERVER_URL":"127.0.0.1:8088", 
-                    "HTML": "html/index.html"
+                    "HTML": "html/index.html",
+                    "RA_LOG": "info"
                 }
             },
             "problemMatcher": []
