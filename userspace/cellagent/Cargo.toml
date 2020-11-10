@@ -48,7 +48,7 @@ bimap = {version = "0.3.1", features = ["serde"]} # bi-directional hashmap h: H(
 #bincode = "1.1.2" # for binary serialization
 #chrono = { version = "0.4.3", features = ["serde"] }
 crossbeam = "0.7.1"
-crossbeam-channel = "0.3.9"
+crossbeam-channel = "0.4.4"
 #[cfg(feature = "cell")]
 c_string = "0.7.0"
 #displaydoc = "0.1.4" // Derive Display from doc comments
