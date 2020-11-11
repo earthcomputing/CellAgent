@@ -26,7 +26,7 @@ const MAX_SLOTS: usize = 10; //MAX_NUM_PHYS_PORTS_PER_CELL.0 as usize + 1;
 
 type BoolArray = [bool; MAX_SLOTS];
 type UsizeArray = [usize; MAX_SLOTS];
-type PacketArray = Vec<VecDeque<Packet>>;
+type PacketArray = Vec<VecDeque<(Option<PortNo>, Packet)>>;
 type Reroute = [PortNo; MAX_SLOTS];
 
 #[derive(Debug, Clone)]
@@ -40,7 +40,7 @@ pub struct PacketEngine {
     no_sent_packets: UsizeArray, // Number of packets sent since last packet received
     sent_packets: PacketArray, // Packets that may need to be resent
     out_buffers: PacketArray,   // Packets waiting to go on the out port
-    in_buffer: PacketArray,    // Packets on the in port waiting to into out_buf on the out port
+    in_buffer: Vec<VecDeque<Packet>>,    // Packets on the in port waiting to into out_buf on the out port
     port_got_event: BoolArray,
     reroute: Reroute,
     pe_to_cm: PeToCm,
@@ -54,8 +54,6 @@ impl PacketEngine {
                border_port_nos: &HashSet<PortNo>) -> PacketEngine {
         let routing_table = RoutingTable::new(cell_id);
         let routing_table_mutex = Arc::new(Mutex::new(routing_table.clone()));
-        let mut array = vec![];
-        for _ in 0..MAX_SLOTS { array.push(VecDeque::new()); }
         let count = [0; MAX_SLOTS];
         PacketEngine {
             cell_id,
@@ -65,9 +63,9 @@ impl PacketEngine {
             border_port_nos: border_port_nos.clone(),
             no_seen_packets: count,
             no_sent_packets: count,
-            sent_packets: array.clone(),
-            out_buffers: array.clone(),
-            in_buffer: array,
+            sent_packets: vec![Default::default(); MAX_SLOTS],
+            out_buffers: vec![Default::default(); MAX_SLOTS],
+            in_buffer: vec![Default::default(); MAX_SLOTS],
             port_got_event: [false; MAX_SLOTS],
             reroute: [PortNo(0); MAX_SLOTS],
             pe_to_cm,
@@ -123,34 +121,27 @@ impl PacketEngine {
     fn set_may_send(&mut self, port_no: PortNo) {
         self.port_got_event[port_no.as_usize()] = true;
     }
-    fn _get_outbuf(&self, port_no: PortNo) -> VecDeque<Packet> {
-        self.out_buffers.get(port_no.as_usize()).unwrap().clone()
+    fn get_outbuf(&self, port_no: PortNo) -> &VecDeque<(Option<PortNo>, Packet)> {
+        self.out_buffers.get(port_no.as_usize()).expect("PacketEngine: get_outbuf must succeed")
+    }
+    fn get_outbuf_mut(&mut self, port_no: PortNo) -> &mut VecDeque<(Option<PortNo>, Packet)> {
+        self.out_buffers.get_mut(port_no.as_usize()).expect("PacketEngine: get_outbuf must succeed")
     }
     fn get_size(array: &PacketArray, port_no: PortNo) -> usize {
-        (*array)[port_no.as_usize()].len()
+        array[port_no.as_usize()].len()
     }
     fn get_outbuf_size(&self, port_no: PortNo) -> usize {
         PacketEngine::get_size(&self.out_buffers, port_no)
     }
-    fn _get_inbuf_size(&self, port_no: PortNo) -> usize {
-        PacketEngine::get_size(&self.in_buffer, port_no)
-    }
-    fn _get_sent_size(&self, port_no: PortNo) -> usize {
-        PacketEngine::get_size(&self.sent_packets, port_no)
-    }
     fn get_outbuf_first_type(&self, port_no: PortNo) -> Option<MsgType> {
-        (*self.out_buffers)
-            .get(port_no.as_usize())
-            .unwrap()
+        self.get_outbuf(port_no)
             .get(0)
-            .map(|packet| MsgType::msg_type(packet))
+            .map(|(_, packet)| MsgType::msg_type(packet))
     }
     fn get_outbuf_first_ait_state(&self, port_no: PortNo) -> Option<AitState> {
-        (*self.out_buffers)
-            .get(port_no.as_usize())
-            .unwrap()
+        self.get_outbuf(port_no)
             .get(0)
-            .map(|packet| packet.get_ait_state())
+            .map(|(_, packet)| packet.get_ait_state())
     }
     fn add_to_packet_count(packet_count: &mut UsizeArray, port_no: PortNo) {
          if packet_count.len() == 1 { // Replace 1 with PACKET_PIPELINE_SIZE when adding pipelining
@@ -171,53 +162,31 @@ impl PacketEngine {
     fn add_seen_packet_count(&mut self, port_no: PortNo) {
         PacketEngine::add_to_packet_count(&mut self.no_seen_packets, port_no);
     }
-    fn _clear_seen_packet_count(&mut self, port_no: PortNo) {
+    fn clear_seen_packet_count(&mut self, port_no: PortNo) {
         self.no_seen_packets[port_no.as_usize()] = 0;
     }
     fn add_sent_packet(&mut self, port_no: PortNo, packet: Packet) {
-        PacketEngine::add_packet_to_back(&mut self.sent_packets, port_no, packet);
+        let sent_packets = self.sent_packets.get_mut(port_no.as_usize()).expect("PacketEngine: sent_packets must be set");
+        sent_packets.push_back((None,packet));
         PacketEngine::add_to_packet_count(&mut self.no_sent_packets, port_no);
     }
     fn clear_sent_packets(&mut self, port_no: PortNo) {
-        self.no_seen_packets[port_no.as_usize()] = 0;
+        self.sent_packets.get_mut(*port_no as usize).expect("PacketEngine: sent_packets entry must be set").clear();
+        self.clear_seen_packet_count(port_no);
     }
-    fn pop_first(array: &mut PacketArray, port_no: PortNo) -> Option<Packet> {
-        let item = array.get_mut(port_no.as_usize()).unwrap(); // Safe since vector always has MAX_NUM_PHYS_PORTS_PER_CELL entries
-        item.pop_front()
+    fn pop_first_outbuf(&mut self, port_no: PortNo) -> Option<(Option<PortNo>, Packet)> {
+        self.get_outbuf_mut(port_no).pop_front()
     }
-    fn _pop_first_outbuf(&mut self, port_no: PortNo) -> Option<Packet> {
-        PacketEngine::pop_first(&mut self.out_buffers, port_no)
-    }
-    fn _pop_first_inbuf(&mut self, port_no: PortNo) -> Option<Packet> {
-        PacketEngine::pop_first(&mut self.in_buffer, port_no)
-    }
-    fn _pop_first_sent(&mut self, port_no: PortNo) -> Option<Packet> {
-        PacketEngine::pop_first(&mut self.sent_packets, port_no)
-    }
-    fn add_packet(to_end: bool, array: &mut PacketArray, port_no: PortNo, packet: Packet) {
-        let item = array.get_mut(port_no.as_usize()).unwrap();
-        if to_end { item.push_back(packet); } else { item.push_front(packet); }
-    }
-    fn add_packet_to_front(array: &mut PacketArray, port_no: PortNo, packet: Packet) {
-        PacketEngine::add_packet(false, array, port_no, packet);
-    }
-    fn add_packet_to_back(array: &mut PacketArray, port_no: PortNo, packet: Packet) {
-        PacketEngine::add_packet(true, array, port_no, packet);
-    }
-    #[allow(dead_code)]
-    fn add_to_out_buffer_front(&mut self, port_no: PortNo, packet: Packet) {
-        let _f = "add_to_out_buffer_front";
-        PacketEngine::add_packet_to_front(&mut self.out_buffers, port_no, packet);
-    }
-    fn add_to_out_buffer_back(&mut self, port_no: PortNo, packet: Packet) {
+    fn add_to_out_buffer_back(&mut self, recv_port_no: Option<PortNo>, port_no: PortNo, packet: Packet) -> bool {
         let _f = "add_to_out_buffer_back";
-        PacketEngine::add_packet_to_back(&mut self.out_buffers, port_no, packet);
-    }
-    fn _add_to_in_buffer_back(&mut self, port_no: PortNo, packet: Packet) {
-        PacketEngine::add_packet_to_back(&mut self.in_buffer, port_no, packet);
-    }
-    fn _add_to_sent_back(&mut self, port_no: PortNo, packet: Packet) {
-        PacketEngine::add_packet_to_back(&mut self.sent_packets, port_no, packet);
+        let outbuf = self.get_outbuf_mut(port_no);
+        if outbuf.len() < MAX_SLOTS {
+            outbuf.push_back((None, packet));
+            true
+        } else {
+            outbuf.push_back((recv_port_no, packet));
+            false
+        }
     }
     // SPAWN THREAD (listen_cm_loop)
     fn listen_cm(&mut self, msg: CmToPePacket) -> Result<(), Error> {
@@ -271,7 +240,7 @@ impl PacketEngine {
         
             // route packet, xmit to neighbor(s) or up to CModel
             CmToPePacket::Packet((user_mask, packet)) => {
-                self.route_cm_packet(user_mask, packet)?;
+                self.process_packet_from_cm(user_mask, packet)?;
             }
         };
         Ok(())
@@ -335,12 +304,13 @@ impl PacketEngine {
         let no_her_seen_packets = no_packets.get_number_seen();
         let no_resend = no_my_sent_packets - no_her_seen_packets;
         let mut remaining_sent = sent_buf.split_off(no_resend);
-        let broken_outbuf = &mut self.out_buffers[broken_port_no.as_usize()].clone();
-        let new_parent_outbuf = &mut self.out_buffers[new_parent.as_usize()];
+        let broken_outbuf = &mut self.get_outbuf_mut(broken_port_no).clone();
+        let new_parent_outbuf = &mut self.get_outbuf_mut(new_parent);
         new_parent_outbuf.append(&mut remaining_sent);
-        new_parent_outbuf.append(broken_outbuf);
+        new_parent_outbuf.append(broken_outbuf); 
+        self.get_outbuf_mut(broken_port_no).clear(); // Because I had to clone the buffer
     }
-    fn route_cm_packet(&mut self, user_mask: Mask, packet: Packet) -> Result<(), Error> {
+    fn process_packet_from_cm(&mut self, user_mask: Mask, packet: Packet) -> Result<(), Error> {
         let _f = "route_cm_packet";
         let uuid = packet.get_tree_uuid().for_lookup();  // Strip AIT info for lookup
         let entry = self.routing_table.get_entry(uuid).context(PacketEngineError::Chain { func_name: _f, comment: S(self.cell_id.get_name()) })?;
@@ -391,12 +361,11 @@ impl PacketEngine {
         if reroute_port_no == PortNo(0) {
             reroute_port_no = port_no;
         } else {
-            let broken_outbuf = &mut self.out_buffers[port_no.as_usize()];
+            let broken_outbuf = &mut self.get_outbuf_mut(port_no).clone();
             if broken_outbuf.len() > 0 {
-                // Only clone if there are packets in the broken out buffer
-                let broken_outbuf = &mut self.out_buffers[port_no.as_usize()].clone();
-                let reroute_outbuf = &mut self.out_buffers[reroute_port_no.as_usize()];
+                let reroute_outbuf = self.get_outbuf_mut(reroute_port_no);
                 reroute_outbuf.append(broken_outbuf);
+                self.get_outbuf_mut(port_no).clear();
             }
         }
         if port_no == PortNo(0) {
@@ -410,8 +379,17 @@ impl PacketEngine {
     }
     fn send_packet_flow_control(&mut self, port_no: PortNo) -> Result<(), Error> {
         let _f = "send_packet";
-        if self.may_send(port_no) {
-            if let Some(packet) = self._pop_first_outbuf(port_no) {
+        let may_send = self.may_send(port_no);
+        if may_send {
+            let first = self.pop_first_outbuf(port_no);
+            if let Some((_, packet)) = first {
+                let last_item = self.get_outbuf(port_no).get(MAX_SLOTS as usize);
+                if let Some((recv_port_no_opt, _)) = last_item {
+                    if let Some(recv_port_no) = recv_port_no_opt {
+                        let port_no = *recv_port_no; // Needed to avoid https://github.com/rust-lang/rust/issues/59159>
+                        self.send_next_packet_or_entl(port_no)?;
+                    }
+                 }
                 self.set_may_not_send(port_no);
                 {
                     if CONFIG.debug_options.all || CONFIG.debug_options.flow_control {
@@ -428,6 +406,8 @@ impl PacketEngine {
                 }
                 self.send_packet(port_no, &packet)?;
                 self.add_sent_packet(port_no, packet);
+            } else {
+                // Buffer is empty because simulator doesn't send ENTL in response to ENTL
             }
         } else { // Debug only
             {
@@ -448,7 +428,7 @@ impl PacketEngine {
         let _f = "send_next_packet_or_entl";
         // TOCTTOU race here, but the only cost is sending an extra ENTL packet
         if self.get_outbuf_size(port_no) == 0 {
-            self.add_to_out_buffer_back(port_no, Packet::make_entl_packet());
+            self.add_to_out_buffer_back(None, port_no, Packet::make_entl_packet());
         }
         self.send_packet_flow_control(port_no)
     }
@@ -480,7 +460,7 @@ impl PacketEngine {
                 self.send_next_packet_or_entl(port_no)?; // Don't lock up the port on an error
                 return Err(PacketEngineError::Ait { func_name: _f, ait_state: packet.get_ait_state() }.into())
             },
-            AitState::Entl => self.send_packet_flow_control(port_no)?,
+            AitState::Entl => self.send_packet_flow_control(port_no)?, // send_next_packet_or_entl() does ping pong which spins the CPU in the simulator
             AitState::Ait  => {
                 {
                     if CONFIG.trace_options.all | CONFIG.trace_options.pe {
@@ -530,15 +510,10 @@ impl PacketEngine {
                     }
                 }
                 if entry.is_in_use() {
-                    if entry.get_uuid() == uuid {
-                        // Put packets on the right port's queue
-                        let mask = entry.get_mask();
-                        self.forward(port_no, entry, mask, &packet).context(PacketEngineError::Chain { func_name: "process_packet", comment: S("forward ") + &self.cell_id.get_name() })?;
-                    } else {
-                        let msg_type = MsgType::msg_type(&packet);
-                        return Err(PacketEngineError::Uuid { cell_id: self.cell_id, func_name: _f, msg_type, packet_uuid: packet.get_tree_uuid(), table_uuid: entry.get_uuid() }.into());
-                    }
-                    // Send the packet at the head of the port's queue
+                    // Put packets on the right port's queue
+                    let mask = entry.get_mask();
+                    self.forward(port_no, entry, mask, &packet).context(PacketEngineError::Chain { func_name: "process_packet", comment: S("forward ") + &self.cell_id.get_name() })?;
+                    // Send the packet at the head of this port's queue
                     self.send_next_packet_or_entl(port_no)?;
                 }
             }
@@ -570,7 +545,7 @@ impl PacketEngine {
                 }
             }
             for port_no in port_nos.into_iter() {
-                self.send_packet(port_no, packet_ref)?;
+                self.send_packet(port_no, packet_ref)?;  // Control message so just send
             }
         } else {
             if recv_port_no != entry.get_parent() {
@@ -611,8 +586,11 @@ impl PacketEngine {
                             let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
                         }
                     }
-                    self.add_to_out_buffer_back(parent, packet);
-                    self.send_next_packet_or_entl(entry.get_parent())?;
+                    // Send reply if there is room for my packet in the buffer of the out port
+                    let has_room = self.add_to_out_buffer_back(Some(recv_port_no), parent, packet);
+                    if has_room {
+                        self.send_next_packet_or_entl(entry.get_parent())?;
+                    }
                 }
             } else {
                 // Send leafward if recv port is parent
@@ -625,7 +603,7 @@ impl PacketEngine {
                         {
                             if CONFIG.trace_options.all | CONFIG.trace_options.pe {
                                 let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "pe_to_cm_leafward_uptree" };
-                                let trace = json!({ "cell_id": &self.cell_id, "port": recv_port_no, "packet": packet.to_string()? });
+                                let trace = json!({ "cell_id": &self.cell_id, "port": recv_port_no, "packet": packet_ref.to_string()? });
                                 let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
                             }
                         }
@@ -646,8 +624,11 @@ impl PacketEngine {
                                 }
                             }
                         }
-                        self.add_to_out_buffer_back(port_no, packet.clone());
-                        self.send_next_packet_or_entl(port_no)?;
+                   // Send reply if there is room for my packet in the buffer of the out port
+                   let has_room = self.add_to_out_buffer_back(Some(recv_port_no), port_no, packet.clone());
+                        if has_room {
+                            self.send_next_packet_or_entl(port_no)?;
+                        }
                     }
                 }
             }

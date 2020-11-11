@@ -48,13 +48,14 @@ bimap = {version = "0.3.1", features = ["serde"]} # bi-directional hashmap h: H(
 #bincode = "1.1.2" # for binary serialization
 #chrono = { version = "0.4.3", features = ["serde"] }
 crossbeam = "0.7.1"
-crossbeam-channel = "0.3.9"
+crossbeam-channel = "0.4.4"
 #[cfg(feature = "cell")]
 c_string = "0.7.0"
 #displaydoc = "0.1.4" // Derive Display from doc comments
 #ditto = "0.2.0" # CRDT library
 either = "1.5"
-eval = "^0.4.1"
+eval = "^0.4.1" # Abandoned
+#evalexpr = "5" # A more comprehensive eval
 failure = "0.1.5"
 failure_derive = "0.1.0"
 futures = "0.1.23" # used in dal.rs
@@ -67,6 +68,8 @@ lazy_static = "1.1.0"
 libc = "0.2.57"
 #log = {version = "0.4.6", features = ["std", "serde"]} # Should use instead of my trace approach
 multi_mut = "0.1"
+#puffin = "0.3" # Simple to use profiler
+#puffin-imgui = "??" # Visualizer for puffin
 rand = "0.5.4"
 #rdkafka = "0.17.0"
 reqwest = "0.9.11"

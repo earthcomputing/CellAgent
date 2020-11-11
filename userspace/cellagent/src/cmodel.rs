@@ -279,7 +279,7 @@ packets: Vec<Packet>,
     fn process_packet(&mut self, port_no: PortNo, packet: Packet) -> Result<(), Error> {
         let _f = "process_packet";
         let sender_msg_seq_no = packet.get_unique_msg_id();
-        let mut packet_assembler = self.packet_assemblers.entry(sender_msg_seq_no).or_insert(PacketAssembler::new(sender_msg_seq_no)); // autovivification
+        let packet_assembler = self.packet_assemblers.entry(sender_msg_seq_no).or_insert(PacketAssembler::new(sender_msg_seq_no)); // autovivification
         let (last_packet, packets) = packet_assembler.add(packet.clone()); // Need clone only because of trace
         let is_ait = packets[0].is_ait();
         let uuid = packet.get_tree_uuid();
