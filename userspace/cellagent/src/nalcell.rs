@@ -15,18 +15,16 @@ use crate::dal::{add_to_trace, get_cell_replay_lines};
 use crate::ec_message_formats::{PortToPe, PeFromPort, PeToPort, PortFromPe,
                                 CmToCa, CaFromCm, CaToCm, CmFromCa, CaToCmBytes, CmToCaBytes,
                                 PeToCm, CmFromPe, CmToPe, PeFromCm};
-#[cfg(cell)]
+#[cfg(feature = "cell")]
 use crate::ecnl::ECNL_Session;
 use crate::name::CellID;
 use crate::port::Port;
 use crate::replay::{TraceFormat, process_trace_record};
 use crate::utility::{CellConfig, CellType, PortNo, S,
-                     TraceHeaderParams, TraceType};
+                     TraceHeaderParams, TraceHeader, TraceType};
 
-//#[cfg(not(cell))]
-#[allow(non_camel_case_types)]
-type ECNL_Session = usize;
 #[derive(Debug)]
+#[allow(non_camel_case_types)]
 pub struct NalCell {
     id: CellID,
     cell_type: CellType,
@@ -83,7 +81,7 @@ impl NalCell {
         }
         let cell_type = if border_port_nos.is_empty() { CellType::Interior } else { CellType::Border };
         for i in 0..=*num_phys_ports {
-            #[cfg(cell)]
+            #[cfg(feature = "cell")]
             let ecnl_clone = ecnl.clone();
             let is_border_port = border_port_nos.contains(&PortNo(i));
             let is_connected;
@@ -97,10 +95,10 @@ impl NalCell {
                 is_connected = if i == 0 {
                     true
                 } else {
-                    #[cfg(not(cell))] {
+                    #[cfg(not(feature = "cell"))] {
                         false
                     }
-                    #[cfg(cell)]
+                    #[cfg(feature = "cell")]
                     match ecnl_clone {
                         Some(ecnl_session) => {
                                 ecnl_session.get_port(i-1).is_connected()
@@ -213,13 +211,13 @@ impl NalCell {
             .ok_or::<Error>(NalcellError::Channel { port_no: port.get_port_no(), func_name: _f }.into())?;
         Ok((port, recvr))
     }
-    #[cfg(cell)]
+    #[cfg(feature = "cell")]
     pub fn link_ecnl_channels(&mut self, ecnl: Arc<ECNL_Session>) -> Result<&mut Self, Error> {
         let _f = "link_ecnl_channels";
         {
             if CONFIG.trace_options.all || CONFIG.trace_options.ca {
                 let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "worker" };
-                let trace = json!({ "thread_name": thread::current().name(), "thread_id": utility::TraceHeader::parse(thread::current().id()) });
+                let trace = json!({ "thread_name": thread::current().name(), "thread_id": TraceHeader::parse(thread::current().id()) });
                 let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
             }
         }
