@@ -2,13 +2,23 @@
 // send_ait_message
 // get_module_info
 
+#include <net/if.h> // for struct ifreq
 #include <unistd.h>
+#include <pthread.h>
+#include <time.h>
 #include "ecnl_proto.h"
+#include "entl_ioctl.h"
 #include "port.h"
+#include <syslog.h>
+#include <sys/ioctl.h>
 
 // context sensitive (port)
 int port_verbose = 1;
 #define PORT_DEBUG(fmt, args...) if (port_verbose) { printf("%s (%d) " fmt "\n", port->port_name, port->port_id, ## args); } else { }
+
+int priority = LOG_DAEMON | LOG_INFO;
+// #define SYSLOG(fmt, ...) printf(fmt "\n", ...)
+#define SYSLOG(fmt, args...) syslog(priority, fmt "\n", ## args)
 
 // --
 
@@ -214,6 +224,10 @@ extern ecnl_port_t port_create(uint8_t port_id) {
 extern void port_destroy(ecnl_port_t *port) {
     nl_close((struct nl_sock *) (port->port_sock));
     nl_socket_free((struct nl_sock *) (port->port_sock));
+}
+
+// FIXME: this is where "route repair" would happen
+static void service_device(struct ifreq *r) {
 }
 
 // --
