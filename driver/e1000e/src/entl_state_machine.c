@@ -753,18 +753,37 @@ void entl_read_current_state(entl_state_machine_t *mcn, entl_state_t *st, entl_s
     STM_UNLOCK;
 }
 
-void entl_read_error_state(entl_state_machine_t *mcn, entl_state_t *st, entl_state_t *err) {
+void entl_clear_error_state(entl_state_machine_t *mcn, entl_state_t *st, entl_state_t *err) {
     struct timespec ts = current_kernel_time();
     STM_LOCK;
-        memcpy(st, &mcn->current_state, sizeof(entl_state_t));
-        memcpy(err, &mcn->error_state, sizeof(entl_state_t));
-        memset(&mcn->error_state, 0, sizeof(entl_state_t)); // clears error state!
+        memset(&mcn->error_state, 0, sizeof(entl_state_t));
     STM_UNLOCK;
     uint32_t was_state = st->current_state;
     uint32_t count = err->error_count;
     uint32_t error_flag = err->error_flag;
     uint32_t mask = err->p_error_flag;
-    STM_TDEBUG("state %s (%d) read-and-clear error_state -"
+    STM_TDEBUG("state %s (%d) set error_state -"
+        " flag %s (0x%04x)"
+        " count %d"
+        " mask 0x%04x",
+        mcn_state2name(was_state), was_state,
+        mcn_flag2name(error_flag), error_flag,
+        count,
+        mask
+    );
+}
+
+void entl_read_error_state(entl_state_machine_t *mcn, entl_state_t *st, entl_state_t *err) {
+    struct timespec ts = current_kernel_time();
+    STM_LOCK;
+        memcpy(st, &mcn->current_state, sizeof(entl_state_t));
+        memcpy(err, &mcn->error_state, sizeof(entl_state_t));
+    STM_UNLOCK;
+    uint32_t was_state = st->current_state;
+    uint32_t count = err->error_count;
+    uint32_t error_flag = err->error_flag;
+    uint32_t mask = err->p_error_flag;
+    STM_TDEBUG("state %s (%d) read error_state -"
         " flag %s (0x%04x)"
         " count %d"
         " mask 0x%04x",
