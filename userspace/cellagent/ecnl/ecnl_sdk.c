@@ -24,38 +24,8 @@ struct nl_sock *init_sock();
 #include <unistd.h>
 #include <sys/ioctl.h>
 #include <sys/types.h>
-extern void perror (const char *__s); //usr/include/stdio.h
 
 #include "entl_ioctl.h"
-
-#if 0
-typedef struct {
-    char *name; // unused
-    int linkState;
-    int entlState;
-    int entlCount;
-    char AITMessageR[256]; // unused
-    char AITMessageS[256]; // unused
-    char json[512];
-} link_device_t;
-
-static void init_link(link_device_t *link, char *n) {
-    memset(link, 0, sizeof(link_device_t));
-    link->name = n;
-    link->entlState = 100; // unknown
-    sprintf(link->AITMessageS, " ");
-    sprintf(link->AITMessageR, " ");
-}
-
-static void share_data(struct entl_ioctl_data *q) {
-    link_device_t p;
-    p.entlState = q->state.current_state;
-    p.entlCount = q->state.event_i_know;
-    p.linkState = q->link_state;
-    int len = toJSON(&p);
-    toServer(p.json);
-}
-#endif
 
 // Interface routines
 int alloc_nl_session(void **nl_session_ptr) {
