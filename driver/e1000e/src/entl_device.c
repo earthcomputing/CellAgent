@@ -132,9 +132,6 @@ static void entl_device_init(entl_device_t *edev) {
 static void entl_device_link_down(entl_device_t *dev) {
     entl_state_machine_t *stm = &dev->edev_stm;
 
-    // FIXME : hello_valid is never checked!
-    stm->hello_valid = 0; // invalidate neighbor
-    entl_state_error(stm, ENTL_ERROR_FLAG_LINKDONW);
     dev->edev_flag = ENTL_DEVICE_FLAG_SIGNAL;
     mod_timer(&dev->edev_watchdog_timer, jiffies + 1);
 }
