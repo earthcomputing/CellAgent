@@ -28,21 +28,6 @@ pub struct ModuleInfo {
     num_ports: c_uint,
 }
 
-#[derive(Debug)]
-#[repr(C)]
-pub struct PortState {
-    module_name: *const c_char,
-    port_name: *const c_char,
-    port_link_state: c_uint,
-    port_s_counter: c_ulong,
-    port_r_counter: c_ulong,
-    port_recover_counter: c_ulong,
-    port_recovered_counter: c_ulong,
-    port_entt_count: c_ulong,
-    port_aop_count: c_ulong,
-    num_ait_messages: c_uint,
-}
-
 #[derive(Debug, Clone)]
 #[repr(C)]
 pub struct ECNL_Session {
