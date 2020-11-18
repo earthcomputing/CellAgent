@@ -730,14 +730,10 @@ void entl_state_error(entl_state_machine_t *mcn, uint32_t error_flag) {
     struct timespec ts = current_kernel_time();
 
     uint32_t was_state = get_atomic_state(mcn);
-    if ((error_flag == ENTL_ERROR_FLAG_LINKDONW) && (was_state == ENTL_STATE_IDLE)) return;
 
     STM_LOCK;
         set_error(mcn, error_flag);
-        if (error_flag == ENTL_ERROR_FLAG_LINKDONW) {
-            set_atomic_state(mcn, ENTL_STATE_IDLE);
-        }
-        else if (error_flag == ENTL_ERROR_FLAG_SEQUENCE) {
+        if (error_flag == ENTL_ERROR_FLAG_SEQUENCE) {
             // FIXME : seems redundant ?
             unicorn(mcn, ENTL_STATE_HELLO); set_update_time(mcn, ts);
             clear_error(mcn);
