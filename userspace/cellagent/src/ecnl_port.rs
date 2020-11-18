@@ -2,6 +2,7 @@
 #[allow(unused)]
 
 use std::{
+    ffi::CStr,
     mem::{size_of},
     os::raw::{c_char, c_int, c_uchar, c_uint, c_ulong, c_void},
     ptr::{null, null_mut},
@@ -91,7 +92,9 @@ impl InBufferDesc {
 impl ECNL_Port {
      pub fn new(port_id: u8) -> ECNL_Port {
      	  unsafe {
-	      return port_create(port_id);
+              let ecnl_port: ECNL_Port = port_create(port_id);
+              println!("Created ECNL port #{}, {} as {}", port_id, ecnl_port.get_port_name(), ecnl_port.port_id);
+              return ecnl_port;
 	  }
      }
      pub fn is_connected(&self) -> bool {
@@ -168,6 +171,11 @@ impl ECNL_Port {
 	    port_do_xmit(self, &bufferDesc)
 	}
 	return Ok(())
+    }
+    pub fn get_port_name(&self) -> String {
+        unsafe {
+            return CStr::from_ptr(self.port_name).to_string_lossy().into_owned();
+        }
     }
 }
 

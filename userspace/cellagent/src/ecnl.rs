@@ -74,33 +74,37 @@ extern {
 
 impl ECNL_Session {
     pub fn new() -> ECNL_Session {
-        let nsp: *mut c_void = null_mut();
-        let mip: *const ModuleInfo = null();
+        let nsp: *mut c_void = null_mut(); // initialization required to keep Rust compiler happy
+        let mip: *const ModuleInfo = null(); // initialization required to keep Rust compiler happy
         let mut eppv: Vec<ECNL_Port>;
         #[cfg(feature = "cell")]
         unsafe {
             alloc_nl_session(&nsp);
             ecnl_get_module_info(nsp, &mip as *const *const ModuleInfo);
-            let module_id = (*mip).module_id;
-            println!("Module id: {:?} ", module_id);
-            let module_name = CStr::from_ptr((*mip).module_name).to_string_lossy().into_owned();
-            println!("Module name: {:?} ", module_name);
+        }
+        let ecnl_session: ECNL_Session;
+        #[cfg(any(feature = "noc", feature = "simulator"))] {
+            return ECNL_Session {
+                nl_session: null_mut(),
+                module_info_ptr: null(),
+                ecnl_port_ptr_vector: Vec::new(),
+            };
+        }
+        #[cfg(feature = "cell")]
+        unsafe {
             let num_ports = ((*mip).num_ports as u8);
-            println!("Num ecnl ports: {} ", num_ports);
             eppv = Vec::with_capacity(num_ports as usize);
             for port_id in 0..=num_ports-1 {
                 eppv.push(ECNL_Port::new(port_id as u8));
-		println!("Created ECNL port {} as {}", port_id, eppv[port_id as usize].port_id);
             }
+            let ecnl_session: ECNL_Session = ECNL_Session {
+                nl_session: nsp,
+                module_info_ptr: mip,
+                ecnl_port_ptr_vector: eppv,
+            };
+            println!("Created ECNL session for module #{}, {} with {} ECNL ports", (*mip).module_id, ecnl_session.get_module_name(), num_ports);
+            return ecnl_session
         }
-        #[cfg(any(feature = "noc", feature = "simulator"))] {
-            eppv = Vec::new();
-        }
-        return ECNL_Session {
-            nl_session: nsp,
-            module_info_ptr: mip,
-            ecnl_port_ptr_vector: eppv,
-        };
     }
     pub fn num_ecnl_ports(&self) -> PortQty {
         unsafe {
@@ -109,6 +113,11 @@ impl ECNL_Session {
     }
     pub fn get_port(&self, port_id: u8) -> ECNL_Port {
 	return self.ecnl_port_ptr_vector[port_id as usize];
+    }
+    pub fn get_module_name(&self) -> String {
+        unsafe {
+            return CStr::from_ptr((*(self.module_info_ptr)).module_name).to_string_lossy().into_owned();
+        }
     }
 }
 
