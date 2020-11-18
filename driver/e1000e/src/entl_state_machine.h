@@ -114,7 +114,7 @@ static inline void* sendq_pop(entl_state_machine_t *mcn) { return ENTT_queue_fro
 static inline int sendq_push(entl_state_machine_t *mcn, void *data) { return ENTT_queue_back_push(&mcn->send_ATI_queue, data); }
 
 // when the 3 members (event_i_sent, event_i_know, event_send_next) are all zero, things are fresh out of Hello handshake
-static inline void entl_state_machine_init(entl_state_machine_t *mcn) {
+static inline void entl_state_machine_init(entl_state_machine_t *mcn, int user_pid) {
     mcn->state_count = 0;
     // current_state
         set_i_know(mcn, 0);
@@ -130,7 +130,7 @@ static inline void entl_state_machine_init(entl_state_machine_t *mcn) {
     mcn->error_state.current_state = 0; // ENTL_STATE_IDLE
     mcn->error_state.error_flag = 0;
     // return_state
-    mcn->user_pid = 0;
+    mcn->user_pid = user_pid;
     // AIT mesage handling
     mcn->receive_buffer = NULL;
     ENTT_queue_init(&mcn->send_ATI_queue);

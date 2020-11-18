@@ -110,7 +110,7 @@ static void entl_device_init(entl_device_t *edev) {
     memset(edev, 0, sizeof(struct entl_device));
 
     entl_state_machine_t *stm = &edev->edev_stm;
-    entl_state_machine_init(stm); // FIXME: huh?
+    entl_state_machine_init(stm, edev->edev_user_pid); // FIXME: huh?
 
     // FIXME: name not set until register_netdev ??
     // size_t elen = strlcpy(edev->edev_name, edev->name, sizeof(edev->edev_name));
