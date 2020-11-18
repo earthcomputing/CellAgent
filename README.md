@@ -123,4 +123,6 @@ $ git merge --abort
 1. Build ECNL kernel module as described [here](driver/ecnl/README.md)
 1. Build ECNL-Rust interface and cell binary as described [here](userspace/cellagent/README.md)
 1. Restart, loading drivers as described [here](driver/README.md)
-1. Run cell binary as described [here](userspace/cellagent/README.md)
+1. Disconnect machines
+1. Run cell binary on each machine as described [here](userspace/cellagent/README.md)
+1. Connect 3rd port of one machine to second port of another
