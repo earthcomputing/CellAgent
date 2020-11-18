@@ -48,7 +48,7 @@ pub struct BuffDesc {
 
 #[cfg(feature = "cell")]
 #[allow(improper_ctypes)]
-#[link(name = ":ecnl_sdk.o")]
+#[link(name = ":session.o")]
 #[link(name = ":ecnl_proto.o")]
 #[link(name = ":libnl-3.so")]
 #[link(name = ":libnl-genl-3.so")]
