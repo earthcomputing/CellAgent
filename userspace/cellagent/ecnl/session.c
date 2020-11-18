@@ -3,7 +3,7 @@
 #include <linux/genetlink.h>
 
 
-#include "ecnl_sdk.h"
+#include "session.h"
 
 typedef struct {
   struct nl_sock *sock;
