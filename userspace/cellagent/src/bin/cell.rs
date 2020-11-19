@@ -14,11 +14,6 @@ use ec_fabrix::ecnl::{ECNL_Session};
 use ec_fabrix::nalcell::{NalCell};
 use ec_fabrix::utility::{CellConfig, PortNo};
 
-#[cfg(not(cell))]
-fn main() -> Result<(), Error> {
-    Ok(())
-}
-#[cfg(cell)]
 fn main() -> Result<(), Error> {
     let _f = "main";
     println!("Multicell Routing: Output to file {} (set in config.rs)", CONFIG.output_file_name);
