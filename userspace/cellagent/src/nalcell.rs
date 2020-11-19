@@ -15,7 +15,7 @@ use crate::dal::{add_to_trace, get_cell_replay_lines};
 use crate::ec_message_formats::{PortToPe, PeFromPort, PeToPort, PortFromPe,
                                 CmToCa, CaFromCm, CaToCm, CmFromCa, CaToCmBytes, CmToCaBytes,
                                 PeToCm, CmFromPe, CmToPe, PeFromCm};
-#[cfg(cell)]
+#[cfg(feature = "cell")]
 use crate::ecnl::ECNL_Session;
 use crate::name::CellID;
 use crate::port::Port;
@@ -23,7 +23,7 @@ use crate::replay::{TraceFormat, process_trace_record};
 use crate::utility::{CellConfig, CellType, PortNo, S,
                      TraceHeaderParams, TraceType};
 
-//#[cfg(not(cell))]
+#[cfg(not(feature = "cell"))]
 #[allow(non_camel_case_types)]
 type ECNL_Session = usize;
 #[derive(Debug)]
@@ -83,7 +83,7 @@ impl NalCell {
         }
         let cell_type = if border_port_nos.is_empty() { CellType::Interior } else { CellType::Border };
         for i in 0..=*num_phys_ports {
-            #[cfg(cell)]
+            #[cfg(features= "cell")]
             let ecnl_clone = ecnl.clone();
             let is_border_port = border_port_nos.contains(&PortNo(i));
             let is_connected;
@@ -97,10 +97,10 @@ impl NalCell {
                 is_connected = if i == 0 {
                     true
                 } else {
-                    #[cfg(not(cell))] {
+                    #[cfg(not(features= "cell"))] {
                         false
                     }
-                    #[cfg(cell)]
+                    #[cfg(features= "cell")]
                     match ecnl_clone {
                         Some(ecnl_session) => {
                                 ecnl_session.get_port(i-1).is_connected()
@@ -213,7 +213,7 @@ impl NalCell {
             .ok_or::<Error>(NalcellError::Channel { port_no: port.get_port_no(), func_name: _f }.into())?;
         Ok((port, recvr))
     }
-    #[cfg(cell)]
+    #[cfg(features= "cell")]
     pub fn link_ecnl_channels(&mut self, ecnl: Arc<ECNL_Session>) -> Result<&mut Self, Error> {
         let _f = "link_ecnl_channels";
         {

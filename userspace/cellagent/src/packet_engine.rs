@@ -63,7 +63,7 @@ impl PacketEngine {
             border_port_nos: border_port_nos.clone(),
             no_seen_packets: count,
             no_sent_packets: count,
-            sent_packets: vec![Default::default(); MAX_SLOTS],
+            sent_packets: vec![Default::default(); MAX_SLOTS], // Slots need to be allocated ahead of time
             out_buffers: vec![Default::default(); MAX_SLOTS],
             in_buffer: vec![Default::default(); MAX_SLOTS],
             port_got_event: [false; MAX_SLOTS],

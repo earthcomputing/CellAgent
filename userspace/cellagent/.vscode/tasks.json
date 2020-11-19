@@ -82,5 +82,22 @@
             },
             "problemMatcher": []
         },
-    ]
+        {
+            "label": "cell run",
+            "type": "shell",
+            "command": "cargo",
+            "args": [
+                "run",
+                "--bin",
+                "cell",
+                "--features",
+                "cell"
+            ],
+            "group": "build",
+            "options": {
+                "env": {"CELL_AGENT_DIR":"/tmp"}
+            },
+            "problemMatcher": []
+        },
+     ]
 }
