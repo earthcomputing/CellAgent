@@ -9,7 +9,6 @@ use std::{collections::{HashSet},
 };
 
 use ec_fabrix::config::{CONFIG, PortQty};
-#[cfg(cell)]
 use ec_fabrix::ecnl::{ECNL_Session};
 use ec_fabrix::nalcell::{NalCell};
 use ec_fabrix::utility::{CellConfig, PortNo};
