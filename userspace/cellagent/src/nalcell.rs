@@ -230,7 +230,7 @@ impl NalCell {
             }
         }
         for i in 0..=*(ecnl.num_ecnl_ports())-1 {
-            (*self.ports)[i as usize].link_channel(Either::Right(Arc::new(ecnl.get_port(i as u8))), (self.ports_from_pe[&PortNo(i as u8)]).clone());
+            (*self.ports)[i as usize].link_channel(&Either::Right(Arc::new(ecnl.get_port(i as u8))), (self.ports_from_pe[&PortNo(i as u8)]).clone());
         }
         println!("Linked ecnl channels");
         Ok(self)
