@@ -17,8 +17,6 @@ use crate::config::{CONFIG, PortQty};
 use crate::dal::{add_to_trace};
 use crate::ec_message_formats::{LinkToPortPacket};
 use crate::ecnl_port::{ECNL_Port};
-use crate::name::{CellID};
-use crate::port::{Port};
 
 #[derive(Debug)]
 #[repr(C)]
