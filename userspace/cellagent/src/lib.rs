@@ -24,6 +24,7 @@ pub mod dumpstack;
 pub mod ecnl;
 pub mod errors;
 pub mod gvm_equation;
+#[cfg(any(feature = "simulator"))]
 pub mod link;
 pub mod ec_message;
 pub mod ec_message_formats;
