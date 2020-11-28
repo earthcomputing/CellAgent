@@ -100,9 +100,12 @@ impl ECNL_Session {
 	return self.ecnl_port_ptr_vector[port_id as usize];
     }
     pub fn get_module_name(&self) -> String {
+        #[cfg(feature = "cell")]
         unsafe {
             return CStr::from_ptr((*(self.module_info_ptr)).module_name).to_string_lossy().into_owned();
         }
+        #[cfg(any(feature = "noc", feature = "simulator"))]
+        return "Simulated Module".to_string();
     }
 }
 
