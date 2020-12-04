@@ -26,7 +26,8 @@ const MAX_SLOTS: usize = 10; //MAX_NUM_PHYS_PORTS_PER_CELL.0 as usize + 1;
 
 type BoolArray = [bool; MAX_SLOTS];
 type UsizeArray = [usize; MAX_SLOTS];
-type PacketArray = Vec<VecDeque<(Option<PortNo>, Packet)>>;
+type Buffer = VecDeque<(Option<PortNo>, Packet)>;
+type PacketArray = Vec<Buffer>;
 type Reroute = [PortNo; MAX_SLOTS];
 
 #[derive(Debug, Clone)]
@@ -40,7 +41,7 @@ pub struct PacketEngine {
     no_sent_packets: UsizeArray, // Number of packets sent since last packet received
     sent_packets: PacketArray, // Packets that may need to be resent
     out_buffers: PacketArray,   // Packets waiting to go on the out port
-    in_buffer: Vec<VecDeque<Packet>>,    // Packets on the in port waiting to into out_buf on the out port
+    in_buffer: Vec<Buffer>,    // Packets on the in port waiting to into out_buf on the out port
     port_got_event: BoolArray,
     reroute: Reroute,
     pe_to_cm: PeToCm,
@@ -121,10 +122,10 @@ impl PacketEngine {
     fn set_may_send(&mut self, port_no: PortNo) {
         self.port_got_event[port_no.as_usize()] = true;
     }
-    fn get_outbuf(&self, port_no: PortNo) -> &VecDeque<(Option<PortNo>, Packet)> {
+    fn get_outbuf(&self, port_no: PortNo) -> &Buffer {
         self.out_buffers.get(port_no.as_usize()).expect("PacketEngine: get_outbuf must succeed")
     }
-    fn get_outbuf_mut(&mut self, port_no: PortNo) -> &mut VecDeque<(Option<PortNo>, Packet)> {
+    fn get_outbuf_mut(&mut self, port_no: PortNo) -> &mut Buffer {
         self.out_buffers.get_mut(port_no.as_usize()).expect("PacketEngine: get_outbuf must succeed")
     }
     fn get_size(array: &PacketArray, port_no: PortNo) -> usize {
@@ -179,6 +180,10 @@ impl PacketEngine {
     }
     fn add_to_out_buffer_back(&mut self, recv_port_no: Option<PortNo>, port_no: PortNo, packet: Packet) -> bool {
         let _f = "add_to_out_buffer_back";
+        // If the packet was put into the first half of the buffer, then the pong was sent.  We use None for the
+        // recv_port_no to denote this case.  If the packet was put into the second half of the buffer, the pong
+        // was not sent.  In that case, we remember the recv_port_no and use it to send the pong when the packet
+        // reaches the first half of the buffer.  We then replace it with None.
         let outbuf = self.get_outbuf_mut(port_no);
         if outbuf.len() < MAX_SLOTS {
             outbuf.push_back((None, packet));
@@ -379,27 +384,31 @@ impl PacketEngine {
     }
     fn send_packet_flow_control(&mut self, port_no: PortNo) -> Result<(), Error> {
         let _f = "send_packet";
+        let cell_id = self.cell_id;
+        let outbuf_size = self.get_outbuf_size(port_no);
         let may_send = self.may_send(port_no);
         if may_send {
             let first = self.pop_first_outbuf(port_no);
             if let Some((_, packet)) = first {
-                let last_item = self.get_outbuf(port_no).get(MAX_SLOTS as usize);
-                if let Some((recv_port_no_opt, _)) = last_item {
+                let outbuf = self.get_outbuf_mut(port_no);
+                let last_item = outbuf.get(MAX_SLOTS as usize);
+                if let Some((recv_port_no_opt, last_packet)) = last_item {
+                    {
+                        if CONFIG.debug_options.all || CONFIG.debug_options.flow_control {
+                            let msg_type = MsgType::msg_type(&packet);
+                            match packet.get_ait_state() {
+                                AitState::Normal => println!("PacketEngine {}: port {} {} outbuf size {} {} {}", cell_id, *port_no, _f, outbuf_size, msg_type, packet.get_ait_state()),
+                                _ => ()
+                            }
+                        }
+                    }
                     if let Some(recv_port_no) = recv_port_no_opt {
                         let port_no = *recv_port_no; // Needed to avoid https://github.com/rust-lang/rust/issues/59159>
+                        outbuf[MAX_SLOTS as usize] = (None, last_packet.clone());
                         self.send_next_packet_or_entl(port_no)?;
                     }
                  }
                 self.set_may_not_send(port_no);
-                {
-                    if CONFIG.debug_options.all || CONFIG.debug_options.flow_control {
-                        let msg_type = MsgType::msg_type(&packet);
-                        match packet.get_ait_state() {
-                            AitState::Normal => println!("PacketEngine {}: port {} {} outbuf size {} {} {}", self.cell_id, *port_no, _f, self.get_outbuf_size(port_no), msg_type, packet.get_ait_state()),
-                            _ => ()
-                        }
-                    }
-                }
                 match packet.get_ait_state() {
                     AitState::Entl => self.set_may_send(port_no),
                     _              => self.set_may_not_send(port_no)

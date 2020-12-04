@@ -70,6 +70,9 @@ impl Packet {
         let default_as_char = PAYLOAD_DEFAULT_ELEMENT as char;
         Ok(string.replace(default_as_char, ""))
     }
+    pub fn get_uniquifier(&self) -> PacketUniquifier {
+        PacketUniquifier::new( self )
+    }
 
     // PacketHeader (delegate)
     pub fn get_tree_uuid(&self) -> Uuid { self.header.get_uuid() }
@@ -204,6 +207,27 @@ impl fmt::Debug for Payload {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let s = &format!("{:?}", &self.bytes[0..10]);
         write!(f, "{}", s)
+    }
+}
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+pub struct PacketUniquifier {
+    unique_msg_id: UniqueMsgId,  // Unique identifier of this message
+    size: PacketNo, // Number of packets remaining in message if not last packet
+                    // Number of bytes in last packet if last packet, 0 => Error
+    is_last: bool,
+}
+impl PacketUniquifier {
+    fn new(packet: &Packet) -> PacketUniquifier {
+        PacketUniquifier {
+            unique_msg_id: packet.get_unique_msg_id(),
+            size: packet.get_size(),
+            is_last: packet.is_last_packet()
+        }
+    }
+}
+impl fmt::Display for PacketUniquifier {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "({}, {}, {})", self.unique_msg_id.0, self.size.0, self.is_last)
     }
 }
 pub struct Serializer {}
