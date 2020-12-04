@@ -43,6 +43,7 @@ pub mod replay;
 pub mod routing_table;
 pub mod routing_table_entry;
 pub mod service;
+pub mod simulated_port;
 pub mod tenant;
 pub mod traph;
 pub mod traph_element;
