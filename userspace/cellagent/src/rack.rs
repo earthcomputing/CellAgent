@@ -11,12 +11,13 @@ use crate::app_message_formats::{PortToNoc, PortFromNoc};
 use crate::blueprint::{Blueprint, Cell, };
 use crate::config::{CONFIG, CellQty, LinkQty};
 use crate::dal::{add_to_trace, fork_trace_header, get_cell_replay_lines, update_trace_header};
-use crate::ec_message_formats::{LinkToPort, PortFromLink, PortToLink, LinkFromPort, PortFromPe};
+use crate::ec_message_formats::{LinkToPort, LinkFromPort, PortFromPe};
 use crate::link::{Link};
 use crate::nalcell::{NalCell};
 use crate::name::{CellID, LinkID};
 use crate::port::{Port};
 use crate::replay::{process_trace_record, TraceFormat};
+use crate::simulated_port::{PortFromLink, PortToLink, SimulatedPort};
 use crate::utility::{CellNo, CellConfig, Edge, S, TraceHeaderParams, TraceType};
 
 #[derive(Debug, Default)]
@@ -97,8 +98,8 @@ impl Rack {
             let (left_to_link, link_from_left): (PortToLink, LinkFromPort) = channel();
             let (link_to_rite, rite_from_link): (LinkToPort, PortFromLink) = channel();
             let (rite_to_link, link_from_rite): (PortToLink, LinkFromPort) = channel();
-            left_port.link_channel(Either::Left((left_to_link, left_from_link)).clone(), left_from_pe);
-            rite_port.link_channel(Either::Left((rite_to_link, rite_from_link)).clone(), rite_from_pe);
+            left_port.link_channel(Either::Left(SimulatedPort::new(left_to_link, left_from_link)), left_from_pe);
+            rite_port.link_channel(Either::Left(SimulatedPort::new(rite_to_link, rite_from_link)), rite_from_pe);
             let link = Link::new(left_port.get_id(), rite_port.get_id(),
                                            link_to_left, link_to_rite)?;
             {
