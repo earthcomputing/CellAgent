@@ -667,7 +667,7 @@ impl CellAgent {
             let up_tree_name = vm_spec.get_id();
             let mut allowed_trees = HashSet::new();
             allowed_trees.insert(AllowedTree::new(CONTROL_TREE_NAME));
-            let mut vm = VirtualMachine::new(&vm_id, vm_to_ca, vm_allowed_trees);
+            let mut vm = VirtualMachine::new(vm_id, vm_to_ca, vm_allowed_trees);
             for vm_allowed_tree in vm_allowed_trees {
                 tree_name_map
                     .get_by_right(vm_allowed_tree)

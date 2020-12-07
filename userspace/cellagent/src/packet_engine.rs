@@ -26,7 +26,7 @@ const MAX_SLOTS: usize = 10; //MAX_NUM_PHYS_PORTS_PER_CELL.0 as usize + 1;
 
 type BoolArray = [bool; MAX_SLOTS];
 type UsizeArray = [usize; MAX_SLOTS];
-type Buffer = VecDeque<(Option<PortNo>, Packet)>;
+type Buffer = VecDeque<(bool, PortNo, Packet)>;
 type PacketArray = Vec<Buffer>;
 type Reroute = [PortNo; MAX_SLOTS];
 
@@ -137,12 +137,12 @@ impl PacketEngine {
     fn get_outbuf_first_type(&self, port_no: PortNo) -> Option<MsgType> {
         self.get_outbuf(port_no)
             .get(0)
-            .map(|(_, packet)| MsgType::msg_type(packet))
+            .map(|(_, _, packet)| MsgType::msg_type(packet))
     }
     fn get_outbuf_first_ait_state(&self, port_no: PortNo) -> Option<AitState> {
         self.get_outbuf(port_no)
             .get(0)
-            .map(|(_, packet)| packet.get_ait_state())
+            .map(|(_, _, packet)| packet.get_ait_state())
     }
     fn add_to_packet_count(packet_count: &mut UsizeArray, port_no: PortNo) {
          if packet_count.len() == 1 { // Replace 1 with PACKET_PIPELINE_SIZE when adding pipelining
@@ -168,28 +168,28 @@ impl PacketEngine {
     }
     fn add_sent_packet(&mut self, port_no: PortNo, packet: Packet) {
         let sent_packets = self.sent_packets.get_mut(port_no.as_usize()).expect("PacketEngine: sent_packets must be set");
-        sent_packets.push_back((None,packet));
+        sent_packets.push_back((true, port_no, packet));
         PacketEngine::add_to_packet_count(&mut self.no_sent_packets, port_no);
     }
     fn clear_sent_packets(&mut self, port_no: PortNo) {
         self.sent_packets.get_mut(*port_no as usize).expect("PacketEngine: sent_packets entry must be set").clear();
         self.clear_seen_packet_count(port_no);
     }
-    fn pop_first_outbuf(&mut self, port_no: PortNo) -> Option<(Option<PortNo>, Packet)> {
+    fn pop_first_outbuf(&mut self, port_no: PortNo) -> Option<(bool, PortNo, Packet)> {
         self.get_outbuf_mut(port_no).pop_front()
     }
-    fn add_to_out_buffer_back(&mut self, recv_port_no: Option<PortNo>, port_no: PortNo, packet: Packet) -> bool {
+    fn add_to_out_buffer_back(&mut self, recv_port_no: PortNo, port_no: PortNo, packet: Packet) -> bool {
         let _f = "add_to_out_buffer_back";
-        // If the packet was put into the first half of the buffer, then the pong was sent.  We use None for the
-        // recv_port_no to denote this case.  If the packet was put into the second half of the buffer, the pong
+        // If the packet was put into the first half of the buffer, then the pong was sent.  We use true for
+        // pong_sent to denote this case.  If the packet was put into the second half of the buffer, the pong
         // was not sent.  In that case, we remember the recv_port_no and use it to send the pong when the packet
-        // reaches the first half of the buffer.  We then replace it with None.
+        // reaches the first half of the buffer.  We then set pong_sent to true.
         let outbuf = self.get_outbuf_mut(port_no);
         if outbuf.len() < MAX_SLOTS {
-            outbuf.push_back((None, packet));
+            outbuf.push_back((false, recv_port_no, packet));
             true
         } else {
-            outbuf.push_back((recv_port_no, packet));
+            outbuf.push_back((true, recv_port_no, packet));
             false
         }
     }
@@ -389,10 +389,10 @@ impl PacketEngine {
         let may_send = self.may_send(port_no);
         if may_send {
             let first = self.pop_first_outbuf(port_no);
-            if let Some((_, packet)) = first {
+            if let Some((_, _, packet)) = first {
                 let outbuf = self.get_outbuf_mut(port_no);
                 let last_item = outbuf.get(MAX_SLOTS as usize);
-                if let Some((recv_port_no_opt, last_packet)) = last_item {
+                if let Some((pong_sent, recv_port_no, last_packet)) = last_item {
                     {
                         if CONFIG.debug_options.all || CONFIG.debug_options.flow_control {
                             let msg_type = MsgType::msg_type(&packet);
@@ -402,10 +402,10 @@ impl PacketEngine {
                             }
                         }
                     }
-                    if let Some(recv_port_no) = recv_port_no_opt {
-                        let port_no = *recv_port_no; // Needed to avoid https://github.com/rust-lang/rust/issues/59159>
-                        outbuf[MAX_SLOTS as usize] = (None, last_packet.clone());
-                        self.send_next_packet_or_entl(port_no)?;
+                    if !pong_sent {
+                        let recv_port_no = *recv_port_no; // Needed to avoid https://github.com/rust-lang/rust/issues/59159>
+                        outbuf[MAX_SLOTS as usize] = (true, recv_port_no, last_packet.clone());
+                        self.send_next_packet_or_entl(recv_port_no)?;
                     }
                  }
                 self.set_may_not_send(port_no);
@@ -437,7 +437,8 @@ impl PacketEngine {
         let _f = "send_next_packet_or_entl";
         // TOCTTOU race here, but the only cost is sending an extra ENTL packet
         if self.get_outbuf_size(port_no) == 0 {
-            self.add_to_out_buffer_back(None, port_no, Packet::make_entl_packet());
+            // ENTL packets have no recv_port_no, so use 0 instead
+            self.add_to_out_buffer_back(PortNo(0), port_no, Packet::make_entl_packet());
         }
         self.send_packet_flow_control(port_no)
     }
@@ -596,7 +597,7 @@ impl PacketEngine {
                         }
                     }
                     // Send reply if there is room for my packet in the buffer of the out port
-                    let has_room = self.add_to_out_buffer_back(Some(recv_port_no), parent, packet);
+                    let has_room = self.add_to_out_buffer_back(recv_port_no, parent, packet);
                     if has_room {
                         self.send_next_packet_or_entl(entry.get_parent())?;
                     }
@@ -634,7 +635,7 @@ impl PacketEngine {
                             }
                         }
                    // Send reply if there is room for my packet in the buffer of the out port
-                   let has_room = self.add_to_out_buffer_back(Some(recv_port_no), port_no, packet.clone());
+                   let has_room = self.add_to_out_buffer_back(recv_port_no, port_no, packet.clone());
                         if has_room {
                             self.send_next_packet_or_entl(port_no)?;
                         }

@@ -58,6 +58,21 @@
             "isBackground": true
         },
         {
+            "label": "simulator clippy",
+            "type": "shell",
+            "command": "cargo",
+            "args": [
+                "clippy",
+                "--bin",
+                "simulator",
+                "--features",
+                "simulator,webserver"
+            ],
+            "group": "build",
+            "problemMatcher": "$rustc-watch",
+            "isBackground": true
+        },
+        {
             "label": "Watch",
             "group": "build",
             "type": "shell",
