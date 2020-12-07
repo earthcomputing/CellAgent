@@ -209,7 +209,7 @@ impl fmt::Debug for Payload {
         write!(f, "{}", s)
     }
 }
-#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+#[derive(Debug, Copy, Clone, Hash, PartialEq, Eq)]
 pub struct PacketUniquifier {
     unique_msg_id: UniqueMsgId,  // Unique identifier of this message
     size: PacketNo, // Number of packets remaining in message if not last packet

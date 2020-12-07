@@ -185,7 +185,7 @@ impl Deref for LinkQty { type Target = usize; fn deref(&self) -> &Self::Target {
 #[derive(Debug, Copy, Clone, Default, Eq, PartialEq, Hash, Serialize, Deserialize)]
 pub struct MaskValue(pub MaskType);
 impl Deref for MaskValue { type Target = MaskType; fn deref(&self) -> &Self::Target { &self.0 } }
-#[derive(Debug, Copy, Clone, Default, PartialEq, Eq, Serialize)]
+#[derive(Debug, Copy, Clone, Default, Hash, PartialEq, Eq, Serialize)]
 pub struct PacketNo(pub u16);
 impl Deref for PacketNo { type Target = u16; fn deref(&self) -> &Self::Target { &self.0 } }
 #[derive(Debug, Copy, Clone, Default, Hash, Eq, PartialEq, Ord, PartialOrd, Serialize, Deserialize)]

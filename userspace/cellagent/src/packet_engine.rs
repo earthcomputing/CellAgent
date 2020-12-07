@@ -12,10 +12,11 @@ use crate::ec_message_formats::{PeFromCm, PeToCm,
                                 PeToPort, PeFromPort, PortToPePacket,
                                 CmToPePacket, PeToCmPacket};
 use crate::name::{Name, CellID, TreeID};
-use crate::packet::Packet;
+use crate::packet::{Packet, PacketUniquifier};
 use crate::port::PortStatus;
 use crate::routing_table::RoutingTable;
 use crate::routing_table_entry::{RoutingTableEntry};
+use crate::snake::Snake;
 use crate::utility::{Mask, PortNo, S, TraceHeaderParams, TraceType, write_err };
 use crate::uuid_ec::{AitState, Uuid};
 
@@ -42,6 +43,7 @@ pub struct PacketEngine {
     sent_packets: PacketArray, // Packets that may need to be resent
     out_buffers: PacketArray,   // Packets waiting to go on the out port
     in_buffer: Vec<Buffer>,    // Packets on the in port waiting to into out_buf on the out port
+    snakes: HashMap<PacketUniquifier, Snake>,
     port_got_event: BoolArray,
     reroute: Reroute,
     pe_to_cm: PeToCm,
@@ -67,6 +69,7 @@ impl PacketEngine {
             sent_packets: vec![Default::default(); MAX_SLOTS], // Slots need to be allocated ahead of time
             out_buffers: vec![Default::default(); MAX_SLOTS],
             in_buffer: vec![Default::default(); MAX_SLOTS],
+            snakes: Default::default(),
             port_got_event: [false; MAX_SLOTS],
             reroute: [PortNo(0); MAX_SLOTS],
             pe_to_cm,
@@ -245,6 +248,7 @@ impl PacketEngine {
         
             // route packet, xmit to neighbor(s) or up to CModel
             CmToPePacket::Packet((user_mask, packet)) => {
+                self.snakes.insert(packet.get_uniquifier(), Snake::new(PortNo(0), packet.clone()));
                 self.process_packet_from_cm(user_mask, packet)?;
             }
         };
@@ -295,6 +299,7 @@ impl PacketEngine {
             
             // recv from neighbor
             PortToPePacket::Packet((port_no, packet)) => {
+                self.snakes.insert(packet.get_uniquifier(), Snake::new(port_no, packet.clone()));
                 self.process_packet_from_port(port_no, packet).context(PacketEngineError::Chain { func_name: "listen_port", comment: S("process_packet ") + &self.cell_id.get_name() })?
             }
         };
@@ -383,7 +388,7 @@ impl PacketEngine {
         Ok(())
     }
     fn send_packet_flow_control(&mut self, port_no: PortNo) -> Result<(), Error> {
-        let _f = "send_packet";
+        let _f = "send_packet_flow_control";
         let cell_id = self.cell_id;
         let outbuf_size = self.get_outbuf_size(port_no);
         let may_send = self.may_send(port_no);
@@ -554,6 +559,8 @@ impl PacketEngine {
                     let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
                 }
             }
+            let snake = self.snakes.get_mut(&packet_ref.get_uniquifier()).expect("Snake entry must exist for packet");
+            snake.set_count(port_nos.len());
             for port_no in port_nos.into_iter() {
                 self.send_packet(port_no, packet_ref)?;  // Control message so just send
             }
