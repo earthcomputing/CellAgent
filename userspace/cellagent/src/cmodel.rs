@@ -213,10 +213,10 @@ impl Cmodel {
                             let trace = json!({ "cell_id": &self.cell_id, "user_mask": user_mask, "msg": packet.to_string()? });
                             let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
                         }
-                        self.cm_to_pe.send(CmToPePacket::Packet((user_mask, packet)))?;
                     }
+                    self.cm_to_pe.send(CmToPePacket::Packet((user_mask, packet)))?;
                 }
-            },
+            }
         }
         Ok(())
     }
