@@ -248,7 +248,6 @@ impl PacketEngine {
         
             // route packet, xmit to neighbor(s) or up to CModel
             CmToPePacket::Packet((user_mask, packet)) => {
-                self.snakes.insert(packet.get_uniquifier(), Snake::new(PortNo(0), packet.clone()));
                 self.process_packet_from_cm(user_mask, packet)?;
             }
         };
@@ -299,7 +298,6 @@ impl PacketEngine {
             
             // recv from neighbor
             PortToPePacket::Packet((port_no, packet)) => {
-                self.snakes.insert(packet.get_uniquifier(), Snake::new(port_no, packet.clone()));
                 self.process_packet_from_port(port_no, packet).context(PacketEngineError::Chain { func_name: "listen_port", comment: S("process_packet ") + &self.cell_id.get_name() })?
             }
         };
@@ -335,20 +333,18 @@ impl PacketEngine {
             AitState::Normal |
             AitState::Ait => {
                 { // Debug block
-                    let msg_type = MsgType::msg_type(&packet);
-                    let uuid = packet.get_uuid();
-                    let ait_state = packet.get_ait_state();
-                    {
-                        if CONFIG.trace_options.all || CONFIG.trace_options.pe_cm {
-                            let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "pe_packet_from_cm" };
-                            let trace = json!({ "cell_id": self.cell_id, "uuid": uuid, "ait_state": ait_state, "packet": packet.to_string()? });
-                            let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
-                        }
-                        if CONFIG.debug_options.pe_pkt_recv {
-                            match msg_type {
-                                MsgType::Manifest => println!("PacketEngine {}: {} got from cm {} {}", self.cell_id, _f, msg_type, user_mask),
-                                _ => (),
-                            }
+                    if CONFIG.trace_options.all || CONFIG.trace_options.pe_cm {
+                        let uuid = packet.get_uuid();
+                        let ait_state = packet.get_ait_state();
+                        let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "pe_packet_from_cm" };
+                        let trace = json!({ "cell_id": self.cell_id, "uuid": uuid, "ait_state": ait_state, "packet": packet.to_string()? });
+                        let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
+                    }
+                    if CONFIG.debug_options.pe_pkt_recv {
+                        let msg_type = MsgType::msg_type(&packet);
+                        match msg_type {
+                            MsgType::Manifest => println!("PacketEngine {}: {} got from cm {} {}", self.cell_id, _f, msg_type, user_mask),
+                            _ => (),
                         }
                     }
                 }
@@ -547,7 +543,8 @@ impl PacketEngine {
             }
         }
         if packet.get_tree_uuid().for_lookup() == self.connected_tree_uuid {
-           // Send with CA flow control (currently none)
+            // No snake for hop-by-hop messages
+            // Send with CA flow control (currently none)
             let mask = user_mask.and(entry.get_mask());
             let port_nos = mask.get_port_nos();
             {
@@ -559,13 +556,14 @@ impl PacketEngine {
                     let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
                 }
             }
-            let snake = self.snakes.get_mut(&packet_ref.get_uniquifier()).expect("Snake entry must exist for packet");
-            snake.set_count(port_nos.len());
             for port_no in port_nos.into_iter() {
                 self.send_packet(port_no, packet_ref)?;  // Control message so just send
             }
         } else {
+            let uniquifier = packet.get_uniquifier();  // Get this before I move packet
+            let mut snake = Snake::new(PortNo(0), packet.clone());
             if recv_port_no != entry.get_parent() {
+                snake.set_count(1);
                 // Send to root if recv port is not parent
                 let parent = entry.get_parent();
                 if *parent == 0 {
@@ -613,6 +611,7 @@ impl PacketEngine {
                 // Send leafward if recv port is parent
                 let mask = user_mask.and(entry.get_mask());
                 let port_nos = mask.get_port_nos();
+                snake.set_count(port_nos.len());
                 // Only side effects so use explicit loop instead of map
                 for port_no in port_nos.iter().cloned() {
                     if *port_no == 0 {
@@ -649,6 +648,7 @@ impl PacketEngine {
                     }
                 }
             }
+            self.snakes.insert(uniquifier, snake);
         }
         Ok(())
     }
