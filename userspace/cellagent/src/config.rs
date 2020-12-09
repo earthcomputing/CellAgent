@@ -138,6 +138,7 @@ pub struct TraceOptions {
     pub port:      bool,
     pub link:      bool,
     pub replay:    bool,
+    pub snake:     bool,
     pub visualize: bool,
 }
 

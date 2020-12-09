@@ -9,7 +9,7 @@ use std::{fmt};
 
 use crate::packet::Packet;
 use crate::utility::PortNo;
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Serialize)]
 pub struct Snake {
     ack_port_no: PortNo,
     packet: Packet,
@@ -27,7 +27,8 @@ impl Snake {
 }
 impl fmt::Display for Snake {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let s = format!("Snake: {} {}\n{}", self.count, self.ack_port_no, self.packet);
+        let s = format!("Snake: {} {} {} {:?}", self.count, self.ack_port_no, 
+                            self.packet.get_uniquifier(), self.packet.to_string());
         write!(f, "{}", s)
     }
 }

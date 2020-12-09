@@ -560,7 +560,7 @@ impl PacketEngine {
                 self.send_packet(port_no, packet_ref)?;  // Control message so just send
             }
         } else {
-            let uniquifier = packet.get_uniquifier();  // Get this before I move packet
+            let uniquifier = packet.get_uniquifier();  // Get uniquifier before I move packet
             let mut snake = Snake::new(PortNo(0), packet.clone());
             if recv_port_no != entry.get_parent() {
                 snake.set_count(1);
@@ -646,6 +646,13 @@ impl PacketEngine {
                             self.send_next_packet_or_entl(port_no)?;
                         }
                     }
+                }
+            }
+            {
+                if CONFIG.trace_options.all | CONFIG.trace_options.snake {
+                    let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "snake" };
+                    let trace = json!({ "cell_id": &self.cell_id, "port": recv_port_no, "snake": snake.to_string() });
+                    let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
                 }
             }
             self.snakes.insert(uniquifier, snake);
