@@ -10,6 +10,7 @@ use std::{fmt,
 use rand;
 use serde;
 use serde_json;
+use serde::ser::{Serialize, SerializeStruct};
 
 use crate::app_message::SenderMsgSeqNo;
 use crate::config::{PACKET_MIN, PACKET_MAX, PACKET_PADDING, PAYLOAD_DEFAULT_ELEMENT, PacketNo};
@@ -65,8 +66,12 @@ impl Packet {
     pub fn to_string(&self) -> Result<String, Error> {
         let bytes = self.get_bytes();
         let is_last = self.payload.is_last;
-        let len = bytes.len();
-        let string = format!("is last {}, length {} msg_no {} msg {}", is_last, len, self.sender_msg_seq_no.0, ByteArray::new_from_bytes(&bytes).to_string()?);
+        let len = if is_last {
+            self.get_size()
+        } else {
+            PacketNo(u16::try_from(bytes.len())?)
+        };
+        let string = format!("is last {}, length {} msg_no {} msg {}", is_last, *len, self.sender_msg_seq_no.0, ByteArray::new_from_bytes(&bytes).to_string()?);
         let default_as_char = PAYLOAD_DEFAULT_ELEMENT as char;
         Ok(string.replace(default_as_char, ""))
     }
@@ -245,7 +250,7 @@ impl Packetizer {
         let msg_bytes = msg.get_bytes();
         let mtu = Packetizer::packet_payload_size(msg_bytes.len());
         let num_packets = (msg_bytes.len() + mtu - 1)/ mtu; // Poor man's ceiling
-        let frag = msg_bytes.len() - (num_packets - 1) * mtu;
+        let frag = msg_bytes.len() - (num_packets - 1) * mtu; // Remainder after filling num_packets-1 packets
         let unique_msg_id = UniqueMsgId(rand::random()); // Can't use hash in case two cells send the same message
         let mut packets = Vec::new();
         for i in 0..num_packets {
@@ -283,9 +288,9 @@ impl Packetizer {
     }
     fn packet_payload_size(len: usize) -> usize {
         match len-1 {
-            0..=PACKET_MIN                   => PAYLOAD_MIN,
+            0..=PACKET_MIN            => PAYLOAD_MIN,
             PAYLOAD_MIN..=PAYLOAD_MAX => len,
-            _                                => PAYLOAD_MAX
+            _                         => PAYLOAD_MAX
         }
     }
 }
@@ -319,7 +324,6 @@ impl ToHex for [u8] {
             .trim_end_matches("00").to_string()
     }
 }
-use serde::ser::{Serialize, SerializeStruct};
 // Errors
 use failure::{Error, ResultExt};
 #[derive(Debug, Fail)]
