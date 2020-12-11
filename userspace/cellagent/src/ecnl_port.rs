@@ -12,7 +12,7 @@ use std::{
 
 use crossbeam::crossbeam_channel as mpsc;
 
-use crate::ec_message_formats::{LinkToPortPacket, PortToPePacket};
+use crate::ec_message_formats::{PortToPePacket};
 use crate::packet::{Packet};
 use crate::port::{Port, PortStatus};
 use crate::utility::{PortNo};
@@ -154,7 +154,7 @@ impl ECNL_Port {
 	     if ((*bdp).frame != null_mut() && (*bdp).len != 0) {
 	         sleep(Duration::from_millis(100));
 	         let packet: &Packet = &*((*bdp).frame);
-                 println!("Received Packet: {}", packet.to_string().unwrap()); // Probably usually sufficient to print ec_msg_type.
+                 println!("Received Packet: {}", packet.to_string()); // Probably usually sufficient to print ec_msg_type.
 	         return Some(Ok((*packet).clone())); // Can't keep this clone!
 	     } else {
 	         return None;
@@ -166,7 +166,7 @@ impl ECNL_Port {
 	    len: size_of::<Packet>() as c_uint, // Always send fixed-length frames
 	    frame: packet,
 	};
-	println!("Sending Packet: {}", packet.to_string()?); // Probably usually sufficient to print ec_msg_type.
+	println!("Sending Packet: {}", packet.to_string()); // Probably usually sufficient to print ec_msg_type.
         unsafe {
 	    port_do_xmit(self, &bufferDesc)
 	}

@@ -15,7 +15,6 @@ use std::{
 
 use crate::config::{CONFIG, PortQty};
 use crate::dal::{add_to_trace};
-use crate::ec_message_formats::{LinkToPortPacket};
 use crate::ecnl_port::{ECNL_Port};
 
 #[derive(Debug)]
