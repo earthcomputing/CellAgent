@@ -71,7 +71,8 @@ impl Packet {
         } else {
             PacketNo(u16::try_from(bytes.len())?)
         };
-        let string = format!("is last {}, length {} msg_no {} msg {}", is_last, *len, self.sender_msg_seq_no.0, ByteArray::new_from_bytes(&bytes).to_string()?);
+        let string = format!("is last {}, length {} msg_no {} tree id {} msg {}", 
+            is_last, *len, self.sender_msg_seq_no.0, self.header.uuid, ByteArray::new_from_bytes(&bytes).to_string()?);
         let default_as_char = PAYLOAD_DEFAULT_ELEMENT as char;
         Ok(string.replace(default_as_char, ""))
     }
