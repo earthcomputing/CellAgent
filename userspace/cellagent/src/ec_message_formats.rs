@@ -48,10 +48,6 @@ pub type PeToPortPacket = Packet;
 pub type PeToPort = mpsc::Sender<PeToPortPacket>;
 pub type PortFromPe = mpsc::Receiver<PeToPortPacket>;
 //pub type PePortError = mpsc::SendError<PeToPortPacket>;
-// PacketEngine to Port, Port to Link
-pub type PortToLinkPacket = Packet; // SimulatedPacket
-pub type LinkFromPort = mpsc::Receiver<PortToLinkPacket>;
-//pub type PortLinkError = mpsc::SendError<PortToLinkPacket>;
 // Port to PacketEngine
 #[derive(Debug, Clone, Serialize)]
 pub enum PortToPePacket {

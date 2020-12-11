@@ -4,8 +4,7 @@ use crossbeam::crossbeam_channel as mpsc;
 
 use crate::config::{CONFIG};
 use crate::dal::{add_to_trace};
-use crate::ec_message_formats::{PortToLinkPacket,
-                                PortToPePacket, PortToPe};
+use crate::ec_message_formats::{PortToPePacket, PortToPe};
 use crate::name::{Name, PortID};
 use crate::packet::{Packet}; // Eventually use SimulatedPacket
 use crate::port::{Port, PortStatus};
@@ -157,6 +156,11 @@ pub enum LinkToPortPacket {
 }
 pub type LinkToPort = mpsc::Sender<LinkToPortPacket>;
 //pub type LinkPortError = mpsc::SendError<LinkToPortPacket>;
+
+// Port to Link
+pub type PortToLinkPacket = Packet; // SimulatedPacket
+pub type LinkFromPort = mpsc::Receiver<PortToLinkPacket>;
+//pub type PortLinkError = mpsc::SendError<PortToLinkPacket>;
 
 #[derive(Debug, Copy, Clone, Serialize)]
 pub struct FailoverInfo {
