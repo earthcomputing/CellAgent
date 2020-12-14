@@ -54,6 +54,13 @@ impl Packet {
         Packet::new(UniqueMsgId::new(), &uuid, PacketNo(1),
                     false, SenderMsgSeqNo(0), vec![])
     }
+    pub fn make_snake_ack(uniquifier: PacketUniquifier) -> Result<Packet, Error> {
+        let mut packet = Packet::make_entl_packet();
+        let serialized = serde_json::to_string(&uniquifier)?;
+        let bytes = ByteArray::new(&serialized);
+        packet.payload.set_bytes(bytes);
+        Ok(packet)
+    }
     
     pub fn get_next_count() -> usize { PACKET_COUNT.fetch_add(1, Ordering::SeqCst) }
 
@@ -177,6 +184,10 @@ impl Payload {
         Payload { unique_msg_id, size, is_last, bytes, wrapped_header: Stack::new() }
     }
     fn get_bytes(&self) -> Vec<u8> { self.bytes.iter().cloned().collect() }
+    fn set_bytes(&mut self, bytes: ByteArray) { 
+        self.bytes = [PAYLOAD_DEFAULT_ELEMENT; PAYLOAD_MAX];
+        for i in 0..bytes.len() { self.bytes[i] = bytes.get_bytes()[i] }
+    }
     fn get_unique_msg_id(&self) -> UniqueMsgId { self.unique_msg_id }
     fn get_size(&self) -> PacketNo { self.size }
     fn is_last_packet(&self) -> bool { self.is_last }
@@ -215,7 +226,7 @@ impl fmt::Debug for Payload {
         write!(f, "{}", s)
     }
 }
-#[derive(Debug, Copy, Clone, Hash, PartialEq, Eq)]
+#[derive(Debug, Copy, Clone, Hash, PartialEq, Eq, Serialize, Deserialize)]
 pub struct PacketUniquifier {
     unique_msg_id: UniqueMsgId,  // Unique identifier of this message
     size: PacketNo, // Number of packets remaining in message if not last packet

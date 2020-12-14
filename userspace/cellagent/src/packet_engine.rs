@@ -471,7 +471,13 @@ impl PacketEngine {
                 self.send_next_packet_or_entl(port_no)?; // Don't lock up the port on an error
                 return Err(PacketEngineError::Ait { func_name: _f, ait_state: packet.get_ait_state() }.into())
             },
-            AitState::Entl => self.send_packet_flow_control(port_no)?, // send_next_packet_or_entl() does ping pong which spins the CPU in the simulator
+            AitState::Entl => {
+                if true {  // TODO: Replace with actual ack test
+                    let snake_ack = Packet::make_snake_ack(packet.get_uniquifier())?;
+                    self.add_to_out_buffer_back(PortNo(0), port_no, snake_ack);
+                }
+                self.send_packet_flow_control(port_no)? // send_next_packet_or_entl() does ping pong which spins the CPU in the simulator
+            },
             AitState::Ait  => {
                 {
                     if CONFIG.trace_options.all | CONFIG.trace_options.pe {
