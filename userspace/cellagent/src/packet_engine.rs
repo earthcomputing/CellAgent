@@ -1,5 +1,6 @@
 use std::{fmt, fmt::Write,
           collections::{HashMap, HashSet, VecDeque},
+          str,
           sync::{Arc, Mutex},
           thread,
           thread::JoinHandle,
@@ -12,7 +13,7 @@ use crate::ec_message_formats::{PeFromCm, PeToCm,
                                 PeToPort, PeFromPort, PortToPePacket,
                                 CmToPePacket, PeToCmPacket};
 use crate::name::{Name, CellID, TreeID};
-use crate::packet::{Packet, PacketUniquifier};
+use crate::packet::{Packet, Packetizer, PacketUniquifier};
 use crate::port::PortStatus;
 use crate::routing_table::RoutingTable;
 use crate::routing_table_entry::{RoutingTableEntry};
@@ -472,6 +473,20 @@ impl PacketEngine {
                 return Err(PacketEngineError::Ait { func_name: _f, ait_state: packet.get_ait_state() }.into())
             },
             AitState::Entl => {
+                let msg_bytes = Packetizer::unpacketize(&vec![packet.clone()])?;
+                let bytes = msg_bytes.get_bytes(); 
+                let string = str::from_utf8(bytes)?;
+                match serde_json::from_str::<PacketUniquifier>(string) {
+                    Ok(snake_ack) => { 
+                        if let Some(snake) = self.snakes.remove(&snake_ack) {
+                            let ack_port = snake.get_ack_port_no();
+                            if ack_port != PortNo(0) {
+                                self.add_to_out_buffer_back(PortNo(0),ack_port, packet.clone());
+                            }
+                         }
+                    }
+                    Err(_) => ()
+                }
                 if true {  // TODO: Replace with actual ack test
                     let snake_ack = Packet::make_snake_ack(packet.get_uniquifier())?;
                     self.add_to_out_buffer_back(PortNo(0), port_no, snake_ack);

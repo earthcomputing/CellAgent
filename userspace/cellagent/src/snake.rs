@@ -19,7 +19,7 @@ impl Snake {
     pub fn new(port_no: PortNo, packet: Packet) -> Snake {
         Snake { ack_port_no: port_no, packet, count: 0}
     }
-    pub fn get_port_no(&self) -> PortNo { self.ack_port_no }
+    pub fn get_ack_port_no(&self) -> PortNo { self.ack_port_no }
     pub fn get_packet(&self) -> &Packet { &self.packet }
     pub fn get_count(&self) -> usize {self.count }
     pub fn set_count(&mut self, count: usize) { self.count = count; }
