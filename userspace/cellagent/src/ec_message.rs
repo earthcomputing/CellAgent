@@ -129,6 +129,7 @@ pub trait Message {
     }
     fn is_leafward(&self) -> bool { !self.is_rootward() }
     fn is_ait(&self) -> bool { self.get_header().get_ait() }
+    fn is_snake(&self) -> bool { self.get_header().get_snake() }
     fn value(&self) -> serde_json::Value;
     fn get_sender_msg_seq_no(&self) -> SenderMsgSeqNo { self.get_header().get_sender_msg_seq_no() }
     fn get_originator_id(&self) -> OriginatorID { self.get_header().get_originator_id() }
@@ -162,15 +163,16 @@ pub struct MsgHeader {
     sender_msg_seq_no: SenderMsgSeqNo, // Debugging only on simulator
     originator_id: OriginatorID, // Originator of message, used to find set of AllowedTrees
     is_ait: bool,
+    is_snake: bool,
     msg_type: MsgType,
     direction: MsgDirection,
     tree_map: MsgTreeMap,
 }
 impl MsgHeader {
-    pub fn new(sending_cell_id: CellID, originator_id: OriginatorID, is_ait: bool, tree_map: MsgTreeMap,
-               msg_type: MsgType, direction: MsgDirection) -> MsgHeader {
+    pub fn new(sending_cell_id: CellID, originator_id: OriginatorID, is_ait: bool, is_snake: bool,
+            tree_map: MsgTreeMap, msg_type: MsgType, direction: MsgDirection) -> MsgHeader {
         let msg_count = get_next_count();
-        MsgHeader { sending_cell_id, originator_id, is_ait, msg_type, direction,
+        MsgHeader { sending_cell_id, originator_id, is_ait,is_snake, msg_type, direction,
             sender_msg_seq_no: msg_count, tree_map: tree_map.clone() }
     }
     pub fn get_msg_type(&self) -> MsgType { self.msg_type }
@@ -179,6 +181,7 @@ impl MsgHeader {
     pub fn get_sender_msg_seq_no(&self) -> SenderMsgSeqNo { self.sender_msg_seq_no }
     pub fn get_originator_id(&self) -> OriginatorID { self.originator_id }
     pub fn get_ait(&self) -> bool { self.is_ait }
+    pub fn get_snake(&self) -> bool { self.is_snake }
     pub fn _get_direction(&self) -> MsgDirection { self.direction }
     pub fn get_tree_map(&self) -> &MsgTreeMap { &self.tree_map }
 }
@@ -196,7 +199,7 @@ pub struct DeleteTreeMsg {
 impl DeleteTreeMsg {
     pub fn new(sending_cell_id: CellID, originator_id: OriginatorID, delete_tree_id: TreeID) -> DeleteTreeMsg {
         let header = MsgHeader::new(sending_cell_id,
-            originator_id, false, HashMap::new(),
+            originator_id, false, false, HashMap::new(),
             MsgType::DeleteTree,
             MsgDirection::Leafward);
         let payload = DeleteTreeMsgPayload::new(delete_tree_id);
@@ -244,7 +247,7 @@ impl DiscoverMsg {
     pub fn new(sending_cell_id: CellID, originator_id: OriginatorID, port_tree_id: PortTreeID,
                hops: PathLength, path: Path) -> DiscoverMsg {
         let header = MsgHeader::new(sending_cell_id, originator_id,
-                                    true, HashMap::new(),
+                                    true, false, HashMap::new(),
                                     MsgType::Discover, MsgDirection::Leafward);
         let payload = DiscoverPayload::new(port_tree_id, hops, path);
         DiscoverMsg { header, payload }
@@ -317,7 +320,7 @@ impl DiscoverDMsg {
         // Note that direction is leafward so we can use the connected ports tree
         // If we send rootward, then the first recipient forwards the DiscoverD
         let header = MsgHeader::new(sending_cell_id, originator_id,
-                                    true, HashMap::new(),
+                                    true, false, HashMap::new(),
                                     MsgType::DiscoverD, MsgDirection::Leafward);
         let payload = DiscoverDPayload::new(in_reply_to,
                                             port_tree_id, path, discover_type);
@@ -394,7 +397,7 @@ impl FailoverMsg {
         // Note that direction is leafward so we can use the connected ports tree
         // If we send rootward, then the first recipient forwards the FailoverMsg
         let header = MsgHeader::new(sending_cell_id, originator_id,
-                                    true, HashMap::new(),
+                                    true, false, HashMap::new(),
                                     MsgType::Failover, MsgDirection::Leafward);
         let payload = FailoverMsgPayload::new(rw_port_tree_id, lw_port_tree_id,
                                               broken_tree_ids, path);
@@ -454,7 +457,7 @@ impl FailoverDMsg {
         // Note that direction is leafward so we can use the connected ports tree
         // If we send rootward, then the first recipient forwards the FailoverMsg
         let header = MsgHeader::new(sending_cell_id, originator_id,
-                                    true, HashMap::new(),
+                                    true, false, HashMap::new(),
                                     MsgType::FailoverD, MsgDirection::Leafward);
         let payload = FailoverDMsgPayload::new(in_reply_to, response,
                                                no_packets, failover_payload);
@@ -524,7 +527,7 @@ impl HelloMsg {
         // Note that direction is leafward so we can use the connected ports tree
         // If we send rootward, then the first recipient forwards the FailoverMsg
         let header = MsgHeader::new(sending_cell_id, originator_id,
-                                    true, HashMap::new(),
+                                    true, false, HashMap::new(),
                                     MsgType::Hello, MsgDirection::Leafward);
         let payload = HelloMsgPayload::new(cell_id, port_no);
         HelloMsg { header, payload }
@@ -576,7 +579,7 @@ impl DiscoverAckDMsg {
         // Note that direction is leafward so we can use the connected ports tree
         // If we send rootward, then the first recipient forwards the Prepare
         let header = MsgHeader::new(sending_cell_id, originator_id,
-                                    true, HashMap::new(),
+                                    true, false, HashMap::new(),
                                     MsgType::Prepare, MsgDirection::Leafward);
         let payload = DiscoverAckDPayload::new(in_reply_to, port_tree_id);
         DiscoverAckDMsg { header, payload }
@@ -626,7 +629,7 @@ impl DiscoverAckMsg {
         // Note that direction is leafward so we can use the connected ports tree
         // If we send rootward, then the first recipient forwards the PrepareD
         let header = MsgHeader::new(sending_cell_id, originator_id,
-                                    true, HashMap::new(),
+                                    true, false, HashMap::new(),
                                     MsgType::PrepareD, MsgDirection::Leafward);
         let payload = DiscoverAckPayload::new(in_reply_to, port_tree_id);
         DiscoverAckMsg { header, payload }
@@ -675,7 +678,7 @@ impl StackTreeMsg {
     pub fn new(sending_cell_id: CellID, originator_id: OriginatorID, new_tree_name: &AllowedTree, new_tree_id: TreeID, parent_tree_id: TreeID,
                direction: MsgDirection, gvm_eqn: &GvmEquation) -> StackTreeMsg {
         let header = MsgHeader::new(sending_cell_id,  originator_id,
-                                    true, HashMap::new(),
+                                    true, false, HashMap::new(),
                                      MsgType::StackTree, direction);
         let payload = StackTreeMsgPayload::new(new_tree_name,
                                                new_tree_id, parent_tree_id, gvm_eqn);
@@ -736,7 +739,7 @@ impl StackTreeDMsg {
     pub fn new(in_reply_to: SenderMsgSeqNo, sending_cell_id: CellID, originator_id: OriginatorID, port_tree_id: PortTreeID,
                parent_port_tree_id: PortTreeID, join: bool) -> StackTreeDMsg {
         let header = MsgHeader::new(sending_cell_id, originator_id,
-                                    true, HashMap::new(),
+                                    true, false, HashMap::new(),
                                     MsgType::StackTreeD, MsgDirection::Leafward);
         let payload = StackTreeMsgDPayload::new(in_reply_to, port_tree_id, parent_port_tree_id, join);
         StackTreeDMsg { header, payload}
@@ -793,7 +796,7 @@ impl ManifestMsg {
     pub fn new(sending_cell_id: CellID, originator_id: OriginatorID, is_ait: bool, deploy_tree_id: TreeID, tree_map: &MsgTreeMap, manifest: &Manifest) -> ManifestMsg {
         // Note that direction is leafward so cell agent will get the message
         let header = MsgHeader::new(sending_cell_id, originator_id,
-                                    is_ait, tree_map.clone(),
+                                    is_ait, false, tree_map.clone(),
                                         MsgType::Manifest, MsgDirection::Leafward);
 
         let payload = ManifestMsgPayload::new(deploy_tree_id.to_port_tree_id_0(), &manifest);
@@ -848,7 +851,7 @@ impl InterapplicationMsg {
     pub fn new(sending_cell_id: CellID, originator_id: OriginatorID, is_ait: bool, tree_id: TreeID, direction: MsgDirection,
                tree_map: &MsgTreeMap, app_msg: &AppInterapplicationMsg) -> InterapplicationMsg {
         let header = MsgHeader::new(sending_cell_id, originator_id,
-                                    is_ait, tree_map.clone(),
+                                    is_ait, false, tree_map.clone(),
                                     MsgType::Interapplication, direction);
         let payload = InterapplicationMsgPayload::new(tree_id.to_port_tree_id_0(), app_msg);
         InterapplicationMsg { header, payload }
@@ -904,7 +907,7 @@ impl TreeNameMsg {
     pub fn _new(sending_cell_id: CellID, originator_id: OriginatorID, tree_name: &str) -> TreeNameMsg {
         // Note that direction is rootward so cell agent will get the message
         let header = MsgHeader::new(sending_cell_id, originator_id,
-                                    false, HashMap::new(),
+                                    false, false, HashMap::new(),
                                     MsgType::TreeName, MsgDirection::Rootward);
         let payload = TreeNameMsgPayload::_new(tree_name);
         TreeNameMsg { header, payload }

@@ -326,6 +326,8 @@ impl PacketEngine {
         match packet.get_ait_state() {
             AitState::AitD |
             AitState::Entl |
+            AitState::Snake |
+            AitState::SnakeD |
             AitState::Tick |
             AitState::Tock |
             AitState::Tack |
@@ -472,7 +474,7 @@ impl PacketEngine {
                 self.send_next_packet_or_entl(port_no)?; // Don't lock up the port on an error
                 return Err(PacketEngineError::Ait { func_name: _f, ait_state: packet.get_ait_state() }.into())
             },
-            AitState::Entl => {
+            AitState::Entl | AitState::Snake | AitState::SnakeD => {
                 let msg_bytes = Packetizer::unpacketize(&vec![packet.clone()])?;
                 let bytes = msg_bytes.get_bytes(); 
                 let string = str::from_utf8(bytes)?;

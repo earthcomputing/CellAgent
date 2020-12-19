@@ -1653,7 +1653,7 @@ impl CellAgent {
         let _f = "send_tree_name_msg";
         let port_number = self.border_port_tree_id_map.keys().next().expect("Border tree port number must have been set");
         let port_no = port_number.get_port_no();
-        let tree_name_msg = AppTreeNameMsg::new("cell_agent",
+        let tree_name_msg = AppTreeNameMsg::new("cell_agent", false, false,
                                                 tree_name, tree_name);
                                                 let serialized = serde_json::to_string(&tree_name_msg as &dyn AppMessage).context(CellagentError::Chain { func_name: "port_connected", comment: S(self.cell_id) })?;
                                                 let bytes = ByteArray::new(&serialized);
@@ -1986,9 +1986,9 @@ impl CellAgent {
                 let _ = add_to_trace(TraceType::Debug, trace_params, &trace, _f);
             }
         }
-        self.send_bytes(line_no, tree_id, msg.is_ait(), user_mask, seq_no, bytes).map_err(Error::from)
+        self.send_bytes(line_no, tree_id, msg.is_ait(), msg.is_snake(), user_mask, seq_no, bytes).map_err(Error::from)
     }
-    fn send_bytes(&self, line_no: u32, tree_id: TreeID, is_ait: bool, user_mask: Mask,
+    fn send_bytes(&self, line_no: u32, tree_id: TreeID, is_ait: bool, is_snake: bool, user_mask: Mask,
                   seq_no: SenderMsgSeqNo, bytes: ByteArray) -> Result<(), Error> {
         let _f = "send_bytes";
         let tree_uuid = tree_id.get_uuid();
@@ -2012,7 +2012,7 @@ impl CellAgent {
                 let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
             }
         }
-        let msg = CaToCmBytes::Bytes((tree_id, is_ait, user_mask, seq_no, bytes));
+        let msg = CaToCmBytes::Bytes((tree_id, is_ait, is_snake, user_mask, seq_no, bytes));
         if !CONFIG.replay {
             self.ca_to_cm[0].send(msg)?;
         }
