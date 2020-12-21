@@ -1745,7 +1745,7 @@ impl CellAgent {
             return Err(CellagentError::MayNotSend { func_name: _f, cell_id: self.cell_id, tree_id }.into());
         }
         let msg = InterapplicationMsg::new(self.cell_id, originator_id,
-                                           false, tree_id, direction, &tree_map, app_msg);
+                                           false, false, tree_id, direction, &tree_map, app_msg);
         {
             if CONFIG.debug_options.all || CONFIG.debug_options.process_msg {   // Debug
                 let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "ca_got_app_interapplication_msg" };
@@ -1769,10 +1769,10 @@ impl CellAgent {
                     .map(|entry| entry.get_parent() == PortNo(0)) {
                     if is_root {
                         let msg = DeleteTreeMsg::new(self.cell_id,
-                                                     originator_id, delete_tree_id);
+                                                     originator_id, false, false, delete_tree_id);
                         {
                             if CONFIG.debug_options.all || CONFIG.debug_options.process_msg {   // Debug
-                                let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "ca_got_app_interapplication_msg" };
+                                let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "ca_got_app_delete_tree_msg" };
                                 let trace = json!({ "cell_id": &self.cell_id, "delete_tree_id": delete_tree_id, "msg": msg.value() });
                                 let _ = add_to_trace(TraceType::Debug, trace_params, &trace, _f);
                            }
@@ -1800,7 +1800,7 @@ impl CellAgent {
         }
         let manifest = app_msg.get_payload().get_manifest();
         let msg = ManifestMsg::new(self.cell_id, originator_id,
-                                   false, deploy_tree_id.clone(), &tree_map, &manifest);
+                                   false, false, deploy_tree_id.clone(), &tree_map, &manifest);
         let mask = self.get_mask(deploy_port_tree_id)?;
         {
             if CONFIG.debug_options.all || CONFIG.debug_options.process_msg {   // Debug

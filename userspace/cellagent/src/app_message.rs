@@ -76,6 +76,7 @@ pub trait AppMessage: fmt::Display {
     }
     fn is_leafward(&self) -> bool { !self.is_rootward() }
     fn is_ait(&self) -> bool { self.get_header().is_ait() }
+    fn is_snake(&self) -> bool { self.get_header().is_snake() }
     fn get_target_tree_name(&self) -> &AllowedTree { self.get_header().get_target_tree_name() }
     fn value(&self) -> serde_json::Value;
     fn get_sender_msg_seq_no(&self) -> SenderMsgSeqNo { self.get_header().get_sender_msg_seq_no() } // Should prepend self.get_header().get_sender_id()
@@ -111,6 +112,7 @@ impl AppMsgHeader {
     fn get_sender_name(&self) -> &str { &self.sender_name }
     fn _get_msg_type(&self) -> AppMsgType { self.msg_type }
     fn is_ait(&self) -> bool { self.is_ait }
+    fn is_snake(&self) -> bool { self.is_snake }
     fn get_direction(&self) -> AppMsgDirection { self.direction }
     fn get_allowed_trees(&self) -> &Vec<AllowedTree> { &self.allowed_trees }
 }

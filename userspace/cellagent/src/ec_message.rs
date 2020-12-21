@@ -172,7 +172,7 @@ impl MsgHeader {
     pub fn new(sending_cell_id: CellID, originator_id: OriginatorID, is_ait: bool, is_snake: bool,
             tree_map: MsgTreeMap, msg_type: MsgType, direction: MsgDirection) -> MsgHeader {
         let msg_count = get_next_count();
-        MsgHeader { sending_cell_id, originator_id, is_ait,is_snake, msg_type, direction,
+        MsgHeader { sending_cell_id, originator_id, is_ait, is_snake, msg_type, direction,
             sender_msg_seq_no: msg_count, tree_map: tree_map.clone() }
     }
     pub fn get_msg_type(&self) -> MsgType { self.msg_type }
@@ -197,9 +197,10 @@ pub struct DeleteTreeMsg {
     payload: DeleteTreeMsgPayload
 }
 impl DeleteTreeMsg {
-    pub fn new(sending_cell_id: CellID, originator_id: OriginatorID, delete_tree_id: TreeID) -> DeleteTreeMsg {
+    pub fn new(sending_cell_id: CellID, originator_id: OriginatorID, is_ait: bool, is_snake: bool,
+            delete_tree_id: TreeID) -> DeleteTreeMsg {
         let header = MsgHeader::new(sending_cell_id,
-            originator_id, false, false, HashMap::new(),
+            originator_id, is_ait, is_snake, HashMap::new(),
             MsgType::DeleteTree,
             MsgDirection::Leafward);
         let payload = DeleteTreeMsgPayload::new(delete_tree_id);
@@ -793,10 +794,11 @@ pub struct ManifestMsg {
     payload: ManifestMsgPayload
 }
 impl ManifestMsg {
-    pub fn new(sending_cell_id: CellID, originator_id: OriginatorID, is_ait: bool, deploy_tree_id: TreeID, tree_map: &MsgTreeMap, manifest: &Manifest) -> ManifestMsg {
+    pub fn new(sending_cell_id: CellID, originator_id: OriginatorID, is_ait: bool, is_snake: bool,
+                deploy_tree_id: TreeID, tree_map: &MsgTreeMap, manifest: &Manifest) -> ManifestMsg {
         // Note that direction is leafward so cell agent will get the message
         let header = MsgHeader::new(sending_cell_id, originator_id,
-                                    is_ait, false, tree_map.clone(),
+                                    is_ait, is_snake, tree_map.clone(),
                                         MsgType::Manifest, MsgDirection::Leafward);
 
         let payload = ManifestMsgPayload::new(deploy_tree_id.to_port_tree_id_0(), &manifest);
@@ -848,10 +850,11 @@ pub struct InterapplicationMsg {
     payload: InterapplicationMsgPayload
 }
 impl InterapplicationMsg {
-    pub fn new(sending_cell_id: CellID, originator_id: OriginatorID, is_ait: bool, tree_id: TreeID, direction: MsgDirection,
+    pub fn new(sending_cell_id: CellID, originator_id: OriginatorID, is_ait: bool, is_snake: bool,
+                tree_id: TreeID, direction: MsgDirection,
                tree_map: &MsgTreeMap, app_msg: &AppInterapplicationMsg) -> InterapplicationMsg {
         let header = MsgHeader::new(sending_cell_id, originator_id,
-                                    is_ait, false, tree_map.clone(),
+                                    is_ait, is_snake, tree_map.clone(),
                                     MsgType::Interapplication, direction);
         let payload = InterapplicationMsgPayload::new(tree_id.to_port_tree_id_0(), app_msg);
         InterapplicationMsg { header, payload }
@@ -904,10 +907,11 @@ pub struct TreeNameMsg {
     payload: TreeNameMsgPayload
 }
 impl TreeNameMsg {
-    pub fn _new(sending_cell_id: CellID, originator_id: OriginatorID, tree_name: &str) -> TreeNameMsg {
+    pub fn _new(sending_cell_id: CellID, originator_id: OriginatorID, is_ait: bool, is_snake: bool,
+                tree_name: &str) -> TreeNameMsg {
         // Note that direction is rootward so cell agent will get the message
         let header = MsgHeader::new(sending_cell_id, originator_id,
-                                    false, false, HashMap::new(),
+                                    is_ait, is_snake, HashMap::new(),
                                     MsgType::TreeName, MsgDirection::Rootward);
         let payload = TreeNameMsgPayload::_new(tree_name);
         TreeNameMsg { header, payload }
