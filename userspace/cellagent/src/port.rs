@@ -259,7 +259,7 @@ impl Port {
                             AitState::Ait => return Err(PortError::Ait { func_name: _f, ait_state }.into()),
 
                             AitState::Tick => (), // TODO: Send AitD to packet engine
-                            AitState::Entl | AitState::Snake | AitState::SnakeD |
+                            AitState::Entl | 
                             AitState::Normal => {
                                 {
                                     if CONFIG.trace_options.all || CONFIG.trace_options.port {
@@ -359,7 +359,6 @@ impl Port {
                         packet.next_ait_state()?;
             	    },
                     AitState::Entl | // Only needed for simulator, should be handled by port
-                    AitState::Snake | AitState::SnakeD |
                     AitState::Normal => ()
                 }
 		        port_to_link_or_ecnl_port.clone().left().expect("ecnl port in simulator").send(packet)?;

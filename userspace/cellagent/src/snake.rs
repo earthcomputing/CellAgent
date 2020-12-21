@@ -16,8 +16,8 @@ pub struct Snake {
     count: usize,
 }
 impl Snake {
-    pub fn new(port_no: PortNo, packet: Packet) -> Snake {
-        Snake { ack_port_no: port_no, packet, count: 0}
+    pub fn new(port_no: PortNo, count: usize, packet: Packet) -> Snake {
+        Snake { ack_port_no: port_no, packet, count}
     }
     pub fn get_ack_port_no(&self) -> PortNo { self.ack_port_no }
     pub fn get_packet(&self) -> &Packet { &self.packet }

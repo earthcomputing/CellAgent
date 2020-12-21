@@ -9,7 +9,7 @@ use crate::app_message::{SenderMsgSeqNo, AppMsgDirection, AppInterapplicationMsg
 use crate::cellagent::{CellAgent};
 use crate::config::{CellQty, PathLength};
 use crate::gvm_equation::{GvmEquation};
-use crate::name::{Name, CellID, PortTreeID, OriginatorID, TreeID};
+use crate::name::{CellID, PortTreeID, OriginatorID, TreeID};
 use crate::packet::{Packet, Packetizer, Serializer};
 use crate::packet_engine::NumberOfPackets;
 use crate::uptree_spec::{AllowedTree, Manifest};
@@ -137,14 +137,6 @@ pub trait Message {
         let _f = "to_bytes";
         let bytes = Serializer::serialize(self).context(MessageError::Chain { func_name: _f, comment: S("")})?;
         Ok(ByteArray::new(&bytes))
-    }
-    fn to_packets(&self, tree_id: TreeID) -> Result<Vec<Packet>, Error>
-            where Self:std::marker::Sized + serde::Serialize {
-        let _f = "to_packets";
-        let bytes = Serializer::serialize(self).context(MessageError::Chain { func_name: _f, comment: S("")})?;
-        let packets = Packetizer::packetize(&tree_id.get_uuid(),
-                                            self.get_sender_msg_seq_no(), &ByteArray::new(&bytes))?;
-        Ok(packets)
     }
     fn process_ca(&mut self, _cell_agent: &mut CellAgent, _port_no: PortNo,
                   _msg_tree_id: PortTreeID, _is_ait: bool) -> Result<(), Error>;

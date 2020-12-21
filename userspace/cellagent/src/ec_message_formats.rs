@@ -76,6 +76,7 @@ pub type PeFromPort = mpsc::Receiver<PortToPePacket>;
 pub enum PeToCmPacket {
     Status(STATUS),
     Packet((PortNo, Packet)),
+    Snake((PortNo, usize, Packet))
 }
 pub type PeToCm = mpsc::Sender<PeToCmPacket>;
 pub type CmFromPe = mpsc::Receiver<PeToCmPacket>;

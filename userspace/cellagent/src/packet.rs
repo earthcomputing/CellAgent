@@ -105,6 +105,7 @@ impl Packet {
     pub fn is_ait(&self) -> bool { self.is_ait_recv() || self.is_ait_recv() }
     pub fn is_ait_send(&self) -> bool { self.header.get_uuid().is_ait_send() }
     pub fn is_ait_recv(&self) -> bool { self.header.get_uuid().is_ait_recv() }
+    pub fn is_snake(&self) -> bool { self.header.get_uuid().is_snake() }
     pub fn _is_entl(&self) -> bool { self.header.get_uuid()._is_entl() }
     pub fn get_ait_state(&self) -> AitState { self.get_tree_uuid().get_ait_state() }
     pub fn time_reverse(&mut self) { self.header.get_uuid().time_reverse(); }

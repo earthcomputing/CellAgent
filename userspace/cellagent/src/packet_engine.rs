@@ -13,11 +13,10 @@ use crate::ec_message_formats::{PeFromCm, PeToCm,
                                 PeToPort, PeFromPort, PortToPePacket,
                                 CmToPePacket, PeToCmPacket};
 use crate::name::{Name, CellID, TreeID};
-use crate::packet::{Packet, Packetizer, PacketUniquifier};
+use crate::packet::{Packet};
 use crate::port::PortStatus;
 use crate::routing_table::RoutingTable;
 use crate::routing_table_entry::{RoutingTableEntry};
-use crate::snake::Snake;
 use crate::utility::{Mask, PortNo, S, TraceHeaderParams, TraceType, write_err };
 use crate::uuid_ec::{AitState, Uuid};
 
@@ -44,7 +43,6 @@ pub struct PacketEngine {
     sent_packets: PacketArray, // Packets that may need to be resent
     out_buffers: PacketArray,   // Packets waiting to go on the out port
     in_buffer: Vec<Buffer>,    // Packets on the in port waiting to into out_buf on the out port
-    snakes: HashMap<PacketUniquifier, Snake>,
     port_got_event: BoolArray,
     reroute: Reroute,
     pe_to_cm: PeToCm,
@@ -70,7 +68,6 @@ impl PacketEngine {
             sent_packets: vec![Default::default(); MAX_SLOTS], // Slots need to be allocated ahead of time
             out_buffers: vec![Default::default(); MAX_SLOTS],
             in_buffer: vec![Default::default(); MAX_SLOTS],
-            snakes: Default::default(),
             port_got_event: [false; MAX_SLOTS],
             reroute: [PortNo(0); MAX_SLOTS],
             pe_to_cm,
@@ -326,8 +323,6 @@ impl PacketEngine {
         match packet.get_ait_state() {
             AitState::AitD |
             AitState::Entl |
-            AitState::Snake |
-            AitState::SnakeD |
             AitState::Tick |
             AitState::Tock |
             AitState::Tack |
@@ -474,25 +469,7 @@ impl PacketEngine {
                 self.send_next_packet_or_entl(port_no)?; // Don't lock up the port on an error
                 return Err(PacketEngineError::Ait { func_name: _f, ait_state: packet.get_ait_state() }.into())
             },
-            AitState::Entl | AitState::Snake | AitState::SnakeD => {
-                let msg_bytes = Packetizer::unpacketize(&vec![packet.clone()])?;
-                let bytes = msg_bytes.get_bytes(); 
-                let string = str::from_utf8(bytes)?;
-                match serde_json::from_str::<PacketUniquifier>(string) {
-                    Ok(snake_ack) => { 
-                        if let Some(snake) = self.snakes.remove(&snake_ack) {
-                            let ack_port = snake.get_ack_port_no();
-                            if ack_port != PortNo(0) {
-                                self.add_to_out_buffer_back(PortNo(0),ack_port, packet.clone());
-                            }
-                         }
-                    }
-                    Err(_) => ()
-                }
-                if true {  // TODO: Replace with actual ack test
-                    let snake_ack = Packet::make_snake_ack(packet.get_uniquifier())?;
-                    self.add_to_out_buffer_back(PortNo(0), port_no, snake_ack);
-                }
+            AitState::Entl => {
                 self.send_packet_flow_control(port_no)? // send_next_packet_or_entl() does ping pong which spins the CPU in the simulator
             },
             AitState::Ait  => {
@@ -565,7 +542,7 @@ impl PacketEngine {
                 let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
             }
         }
-        if packet.get_tree_uuid().for_lookup() == self.connected_tree_uuid {
+        let count = if packet.get_tree_uuid().for_lookup() == self.connected_tree_uuid {
             // No snake for hop-by-hop messages
             // Send with CA flow control (currently none)
             let mask = user_mask.and(entry.get_mask());
@@ -579,14 +556,13 @@ impl PacketEngine {
                     let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
                 }
             }
-            for port_no in port_nos.into_iter() {
-                self.send_packet(port_no, packet_ref)?;  // Control message so just send
+            for port_no in port_nos.iter() {
+                self.send_packet(*port_no, packet_ref)?;  // Control message so just send
             }
+            port_nos.len()
         } else {
-            let uniquifier = packet.get_uniquifier();  // Get uniquifier before I move packet
-            let mut snake = Snake::new(PortNo(0), packet.clone());
             if recv_port_no != entry.get_parent() {
-                snake.set_count(1);
+                // send snake msg to cmodel
                 // Send to root if recv port is not parent
                 let parent = entry.get_parent();
                 if *parent == 0 {
@@ -614,7 +590,7 @@ impl PacketEngine {
                             }
                         }
                     }
-                    self.pe_to_cm.send(PeToCmPacket::Packet((recv_port_no, packet)))?;
+                    self.pe_to_cm.send(PeToCmPacket::Packet((recv_port_no, packet.clone())))?;
                 } else {
                     // Forward rootward
                     {
@@ -625,16 +601,17 @@ impl PacketEngine {
                         }
                     }
                     // Send reply if there is room for my packet in the buffer of the out port
-                    let has_room = self.add_to_out_buffer_back(recv_port_no, parent, packet);
+                    let has_room = self.add_to_out_buffer_back(recv_port_no, parent, packet.clone());
                     if has_room {
                         self.send_next_packet_or_entl(entry.get_parent())?;
                     }
                 }
+                1
             } else {
                 // Send leafward if recv port is parent
                 let mask = user_mask.and(entry.get_mask());
                 let port_nos = mask.get_port_nos();
-                snake.set_count(port_nos.len());
+                // send snake msg to cmodel
                 // Only side effects so use explicit loop instead of map
                 for port_no in port_nos.iter().cloned() {
                     if *port_no == 0 {
@@ -670,16 +647,10 @@ impl PacketEngine {
                         }
                     }
                 }
+                port_nos.len()
             }
-            {
-                if CONFIG.trace_options.all | CONFIG.trace_options.snake {
-                    let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "snake" };
-                    let trace = json!({ "cell_id": &self.cell_id, "port": recv_port_no, "snake": snake.to_string() });
-                    let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
-                }
-            }
-            self.snakes.insert(uniquifier, snake);
-        }
+        };
+        self.pe_to_cm.send(PeToCmPacket::Snake((recv_port_no, count, packet)))?;
         Ok(())
     }
 }

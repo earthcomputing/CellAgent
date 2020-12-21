@@ -13,7 +13,8 @@ use crate::ec_message_formats::{CaToCmBytes, CmToCa, CmFromCa, CmToPe, CmFromPe,
                                 PeToCmPacket, CmToPePacket, CmToCaBytes};
 use crate::name::{Name, CellID, TreeID};
 use crate::packet_engine::{PacketEngine};
-use crate::packet::{Packet, PacketAssembler, PacketAssemblers, Packetizer};
+use crate::packet::{Packet, PacketAssembler, PacketAssemblers, Packetizer, PacketUniquifier};
+use crate::snake::Snake;
 use crate::utility::{PortNo, S, TraceHeader, TraceHeaderParams, TraceType};
 
 #[derive(Debug, Clone)]
@@ -21,6 +22,7 @@ pub struct Cmodel {
     cell_id: CellID,
     packet_engine: PacketEngine,
     packet_assemblers: PacketAssemblers,
+    snakes: HashMap<PacketUniquifier, Snake>,
     cm_to_ca: CmToCa,
     cm_to_pe: CmToPe,
 }
@@ -30,7 +32,7 @@ impl Cmodel {
     // NEW
     pub fn new(cell_id: CellID, connected_tree_id: TreeID, pe_to_cm: PeToCm, cm_to_ca: CmToCa,
                pe_from_ports: PeFromPort, pe_to_ports: HashMap<PortNo, PeToPort>,
-               border_port_nos: &HashSet<PortNo>,
+               border_port_nos: &HashSet<PortNo>, 
                cm_to_pe: CmToPe, pe_from_cm: PeFromCm) -> (Cmodel, JoinHandle<()>) {
         let packet_engine = PacketEngine::new(cell_id, connected_tree_id,
                                               pe_to_cm, pe_to_ports, &border_port_nos);
@@ -38,6 +40,7 @@ impl Cmodel {
         (Cmodel { cell_id,
                   packet_engine,
                   packet_assemblers: PacketAssemblers::new(),
+                  snakes: Default::default(),
                   cm_to_ca, cm_to_pe },
          pe_join_handle)
     }
@@ -237,6 +240,11 @@ impl Cmodel {
                         let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "cm_from_pe_status" };
                         let trace = json!({ "cell_id": &self.cell_id, "port": port_no, "is_border": is_border, "no_packets": number_of_packets, "status": status});
                         let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
+                    },
+                    PeToCmPacket::Snake((ack_port_no, count, packet)) => {
+                        let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "cm_from_pe_snake" };
+                        let trace = json!({ "cell_id": self.cell_id, "ack_port_no": ack_port_no, "count": count, "packet": packet.to_string()? });
+                        let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);                       
                     }
                 }
             }
@@ -259,6 +267,13 @@ impl Cmodel {
             // de-packetize
             PeToCmPacket::Packet((port_no, packet)) => {
                 self.process_packet(port_no, packet)?;
+            },
+            PeToCmPacket::Snake((ack_port_no, count, packet)) => {
+                let uniquifier = packet.get_uniquifier();
+                let snake = Snake::new(ack_port_no, count, packet);
+                if let Some(_) = self.snakes.insert(uniquifier, snake) {
+                    return Err(CmodelError::Snake { func_name: _f, old_value: uniquifier }.into() )
+                }
             }
         };
         Ok(())
@@ -339,4 +354,6 @@ impl fmt::Display for Cmodel {
 pub enum CmodelError {
     #[fail(display = "CmodelError::Chain {} {}", func_name, comment)]
     Chain { func_name: &'static str, comment: String },
+    #[fail(display = "CmodelError::Snake {} duplicate packet {}", func_name, old_value)]
+    Snake { func_name: &'static str, old_value: PacketUniquifier },
 }
