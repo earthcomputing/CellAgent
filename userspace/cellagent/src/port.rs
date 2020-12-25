@@ -209,10 +209,14 @@ impl Port {
                 .clone()
                 .left()
                 .expect("ecnl in simulator")
-                .listen(self, port_to_pe)
+                .listen(port_to_pe)
         }
         #[cfg(feature = "cell")] {
-            return simulated_port_or_ecnl_port.clone().right().expect("port_link_channel in cell").listen(self, port_to_pe);
+            simulated_port_or_ecnl_port
+                .clone()
+                .right()
+                .expect("port_link_channel in cell")
+                .listen(port_to_pe)
 	}
         #[cfg(feature = "noc")]
         return Ok(()) // For now, needs to be fleshed out!
