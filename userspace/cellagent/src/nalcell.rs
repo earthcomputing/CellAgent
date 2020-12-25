@@ -3,7 +3,6 @@ use std::{
     collections::{HashMap, HashSet},
     thread, thread::JoinHandle,
     iter::FromIterator,
-    sync::Arc,
 };
 use crossbeam::crossbeam_channel::unbounded as channel;
 use either::Either;
@@ -17,6 +16,8 @@ use crate::ec_message_formats::{PortToPe, PeFromPort, PeToPort, PortFromPe,
                                 PeToCm, CmFromPe, CmToPe, PeFromCm}; 
 #[cfg(feature = "cell")]
 use crate::ecnl::ECNL_Session;
+#[cfg(feature = "cell")]
+use crate::ecnl_port::{ECNL_Port};
 use crate::name::CellID;
 use crate::port::Port;
 use crate::replay::{TraceFormat, process_trace_record};
@@ -37,11 +38,11 @@ pub struct NalCell {
     cell_agent: CellAgent,
     ports_from_pe: HashMap<PortNo, PortFromPe>,
     ports_from_ca: HashMap<PortNo, PortFromCa>,
-    ecnl: Option<Arc<ECNL_Session>>,
+    ecnl: Option<ECNL_Session>,
 }
 
 impl NalCell {
-    pub fn new(name: &str, num_phys_ports: PortQty, border_port_nos: &HashSet<PortNo>, config: CellConfig, ecnl: Option<Arc<ECNL_Session>>)
+    pub fn new(name: &str, num_phys_ports: PortQty, border_port_nos: &HashSet<PortNo>, config: CellConfig, ecnl: Option<ECNL_Session>)
             -> Result<(NalCell, JoinHandle<()>), Error> {
         let _f = "new";
         if *num_phys_ports > *CONFIG.max_num_phys_ports_per_cell {
@@ -216,7 +217,7 @@ impl NalCell {
         Ok((port, recvr))
     }
     #[cfg(feature = "cell")]
-    pub fn link_ecnl_channels(&mut self, ecnl: Arc<ECNL_Session>) -> Result<&mut Self, Error> {
+    pub fn link_ecnl_channels(&mut self, mut ecnl: ECNL_Session) -> Result<&mut Self, Error> {
         let _f = "link_ecnl_channels";
         {
             if CONFIG.trace_options.all || CONFIG.trace_options.ca {
@@ -225,8 +226,11 @@ impl NalCell {
                 add_to_trace(TraceType::Trace, trace_params, &trace, _f);
             }
         }
-        for i in 0..=*(ecnl.num_ecnl_ports())-1 {
-            (*self.ports)[i as usize].link_channel(Either::Right(Arc::new(ecnl.get_port(i as u8))), (self.ports_from_pe[&PortNo(i as u8)]).clone());
+        for port_id in 0..=*(ecnl.num_ecnl_ports())-1 {
+            let port = self.ports[port_id as usize].clone();
+            let ecnl_port: ECNL_Port = ECNL_Port::new(port_id as u8, port.clone());
+            port.link_channel(Either::Right(ecnl_port.clone()), (self.ports_from_pe[&PortNo(port_id as u8)]).clone());
+            ecnl.push_port(ecnl_port);
         }
         println!("Linked ecnl channels");
         Ok(self)

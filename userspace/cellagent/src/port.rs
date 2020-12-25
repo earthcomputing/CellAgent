@@ -1,8 +1,7 @@
 use std::{fmt,
           thread,
           thread::JoinHandle,
-          sync::{Arc}
-        };
+};
 
 use either::Either;
 
@@ -58,7 +57,6 @@ impl Port {
     pub fn get_cell_id(&self) -> CellID { self.cell_id }
     pub fn get_port_no(&self) -> PortNo { self.port_number.get_port_no() }
 //  pub fn get_port_number(&self) -> PortNumber { self.port_number }
-//  pub fn get_is_connected(&self) -> Arc<AtomicBool> { self.is_connected.clone() }
     pub fn is_connected(&self) -> bool { self.is_connected }
     pub fn set_connected(&mut self) { self.is_connected = true; }
     pub fn set_disconnected(&mut self) { self.is_connected = false; }
@@ -164,7 +162,7 @@ impl Port {
     }
 
     // SPAWN THREAD (listen_link, listen_pe)
-    pub fn link_channel(&self, simulated_port_or_ecnl_port: Either<SimulatedPort, Arc<ECNL_Port>>,
+    pub fn link_channel(&self, simulated_port_or_ecnl_port: Either<SimulatedPort, ECNL_Port>,
                         port_from_pe: PortFromPe) {
         let _f = "link_channel";
         let mut port = self.clone();
@@ -196,7 +194,7 @@ impl Port {
     }
 
     // WORKER (PortFromLink)
-    fn listen_link_loop(&mut self, simulated_port_or_ecnl_port: Either<SimulatedPort, Arc<ECNL_Port>>) -> Result<(), Error> {
+    fn listen_link_loop(&mut self, simulated_port_or_ecnl_port: Either<SimulatedPort, ECNL_Port>) -> Result<(), Error> {
         let _f = "listen_link_loop";
         {
             if CONFIG.trace_options.all || CONFIG.trace_options.port {
@@ -220,7 +218,7 @@ impl Port {
         return Ok(()) // For now, needs to be fleshed out!
     }
     // WORKER (PortFromPe)
-    fn listen_pe_loop(&self, simulated_port_or_ecnl_port: &Either<SimulatedPort, Arc<ECNL_Port>>, port_from_pe: &PortFromPe) -> Result<(), Error> {
+    fn listen_pe_loop(&self, simulated_port_or_ecnl_port: &Either<SimulatedPort, ECNL_Port>, port_from_pe: &PortFromPe) -> Result<(), Error> {
         let _f = "listen_pe_loop";
         {
             if CONFIG.trace_options.all || CONFIG.trace_options.port {

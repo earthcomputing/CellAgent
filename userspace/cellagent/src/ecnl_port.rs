@@ -57,13 +57,19 @@ pub struct OutBufferDesc {
 
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
-pub struct ECNL_Port {
+pub struct ECNL_Port_Sub {
     pub port_module_id: u32,
     pub port_sock: *mut c_void, // Can this be const?
     pub port_esock: *const c_void,
     pub port_name: *const c_char,
     pub port_id: u8,
     pub port_up_down: c_int,
+}
+
+#[derive(Debug, Clone)]
+pub struct ECNL_Port {
+    port: Port,
+    pub ecnl_port_sub_ptr: *mut ECNL_Port_Sub,
 }
 
 #[cfg(feature = "cell")]
@@ -90,15 +96,22 @@ impl InBufferDesc {
 #[cfg(feature = "cell")]
 #[link(name = ":ecnl_proto.o")]
 impl ECNL_Port {
-     pub fn new(port_id: u8) -> ECNL_Port {
+     pub fn new(port_id: u8, port: Port) -> ECNL_Port {
      	  unsafe {
-              let ecnl_port: ECNL_Port = port_create(port_id);
-              println!("Created ECNL port #{}, {} as {}", port_id, ecnl_port.get_port_name(), ecnl_port.port_id);
+              let ecnl_port_sub_ptr: *mut ECNL_Port_Sub = port_create(port_id);
+              let ecnl_port = ECNL_Port {
+                  port,
+                  ecnl_port_sub_ptr: ecnl_port_sub_ptr,
+              };
+              println!("Created ECNL port #{}, {} as {}", port_id, ecnl_port.get_port_name(), (*ecnl_port_sub_ptr).port_id);
               return ecnl_port;
 	  }
      }
      pub fn is_connected(&self) -> bool {
-	 return self.port_up_down > 0;
+         unsafe {
+             let ecnl_port_sub = (*(self.ecnl_port_sub_ptr));
+	     return ecnl_port_sub.port_up_down > 0;
+         }
      }
      pub fn refresh_connected_status(&self) {
          unsafe {
@@ -107,17 +120,18 @@ impl ECNL_Port {
      }
      pub fn listen(&self, port: &Port, port_to_pe: mpsc::Sender<PortToPePacket>) -> Result<(), Error> {
          let _f = "listen";
-	 println!("Listening for events on port {}",  self.port_id);
-	 let mut bd = InBufferDesc::new();
-     	 loop {
-            let mut event : ECNL_Event;
-            unsafe { 
-                event = std::mem::uninitialized();
-                port_get_event(self, &mut event);
-		match event.event_cmd_id {
-		    cmd_id if (cmd_id == NL_ECND_Commands::NL_ECNL_CMD_GET_PORT_STATE as c_int) => {
-			println!("Port {} is {}", self.port_id, if (event.event_up_down != 0) {"up"} else {"down"});
-			port_to_pe.send(PortToPePacket::Status((PortNo(self.port_id), port.is_border(), if (event.event_up_down != 0) {PortStatus::Connected} else {PortStatus::Disconnected}))).unwrap();
+         unsafe {
+             let ecnl_port_sub = (*(self.ecnl_port_sub_ptr));
+	     println!("Listening for events on port {}",  ecnl_port_sub.port_id);
+	     let mut bd = InBufferDesc::new();
+             loop {
+                 let mut event : ECNL_Event;
+                 event = std::mem::uninitialized();
+                 port_get_event(self, &mut event);
+		 match event.event_cmd_id {
+		     cmd_id if (cmd_id == NL_ECND_Commands::NL_ECNL_CMD_GET_PORT_STATE as c_int) => {
+			println!("Port {} is {}", ecnl_port_sub.port_id, if (event.event_up_down != 0) {"up"} else {"down"});
+			port_to_pe.send(PortToPePacket::Status((PortNo(ecnl_port_sub.port_id), port.is_border(), if (event.event_up_down != 0) {PortStatus::Connected} else {PortStatus::Disconnected}))).unwrap();
 		    }
 		    cmd_id if (cmd_id == NL_ECND_Commands::NL_ECNL_CMD_SIGNAL_AIT_MESSAGE as c_int) => {
                         println!("AIT Message Signal Received...");
@@ -126,12 +140,12 @@ impl ECNL_Port {
 			    let possible_packet_or_err: Option<Result<Packet, Error>> = self.retrieve(&mut bd);
 			    match possible_packet_or_err {
 		                Some(packet_or_err) => {
-				    port_to_pe.send(PortToPePacket::Packet((PortNo(self.port_id), packet_or_err?))).unwrap();
+				    port_to_pe.send(PortToPePacket::Packet((PortNo(ecnl_port_sub.port_id), packet_or_err?))).unwrap();
 				    first = false;
 				},
 				None => {
 				    if first {
-				        return Err(ECNL_PortError::NoPacketRetrieved { func_name: _f, port_id: self.port_id }.into())
+				        return Err(ECNL_PortError::NoPacketRetrieved { func_name: _f, port_id: ecnl_port_sub.port_id }.into())
 				    }
 				    break;
 				},
@@ -174,7 +188,7 @@ impl ECNL_Port {
     }
     pub fn get_port_name(&self) -> String {
         unsafe {
-            return CStr::from_ptr(self.port_name).to_string_lossy().into_owned();
+            return CStr::from_ptr((*(self.ecnl_port_sub_ptr)).port_name).to_string_lossy().into_owned();
         }
     }
 }
@@ -196,8 +210,8 @@ pub struct ECNL_Event {
 #[link(name = ":port.o")]
 extern "C" {
     pub fn ecnl_init(debug: bool) -> ::std::os::raw::c_int;
-    pub fn port_create(port_id: u8) -> ECNL_Port;
-    pub fn port_destroy(port: *const ECNL_Port);
+    pub fn port_create(port_id: u8) -> *mut ECNL_Port_Sub;
+    pub fn port_destroy(port: *const ECNL_Port_Sub);
 
     // which of these should we be using
     pub fn port_do_read_async(port: *const ECNL_Port, bdp: *mut InBufferDesc);

@@ -58,7 +58,7 @@ impl ECNL_Session {
     pub fn new() -> ECNL_Session {
         let nsp: *mut c_void = null_mut(); // initialization required to keep Rust compiler happy
         let mip: *const ModuleInfo = null(); // initialization required to keep Rust compiler happy
-        let mut eppv: Vec<ECNL_Port>;
+        let eppv: Vec<ECNL_Port>;
         #[cfg(feature = "cell")]
         unsafe {
             alloc_nl_session(&nsp);
@@ -72,13 +72,9 @@ impl ECNL_Session {
                 ecnl_port_ptr_vector: Vec::new(),
             };
         }
-        #[cfg(feature = "cell")]
         unsafe {
             let num_ports = ((*mip).num_ports as u8);
             eppv = Vec::with_capacity(num_ports as usize);
-            for port_id in 0..=num_ports-1 {
-                eppv.push(ECNL_Port::new(port_id as u8));
-            }
             let ecnl_session: ECNL_Session = ECNL_Session {
                 nl_session: nsp,
                 module_info_ptr: mip,
@@ -94,7 +90,10 @@ impl ECNL_Session {
         }
     }
     pub fn get_port(&self, port_id: u8) -> ECNL_Port {
-	return self.ecnl_port_ptr_vector[port_id as usize];
+	return self.ecnl_port_ptr_vector[port_id as usize].clone();
+    }
+    pub fn push_port(&mut self, ecnl_port: ECNL_Port) -> () {
+        self.ecnl_port_ptr_vector.push(ecnl_port);
     }
     pub fn get_module_name(&self) -> String {
         #[cfg(feature = "cell")]

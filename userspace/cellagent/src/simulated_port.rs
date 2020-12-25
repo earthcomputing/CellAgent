@@ -16,15 +16,15 @@ pub type PortFromLink = mpsc::Receiver<LinkToPortPacket>;
 
 #[derive(Clone)]
 pub struct SimulatedPort {
-    port_id: PortID,
+    port: Port,
     failover_info: FailoverInfo,
     port_to_link: PortToLink,
     port_from_link: PortFromLink,
 }
-
 impl SimulatedPort {
-    pub fn new(port_id: PortID, port_to_link: PortToLink, port_from_link: PortFromLink) -> SimulatedPort {
-      	SimulatedPort{ port_id, port_to_link, port_from_link, failover_info: FailoverInfo::new(port_id) }
+    pub fn new(port: Port, port_to_link: PortToLink, port_from_link: PortFromLink) -> SimulatedPort {
+        let port_id = port.get_id();
+      	SimulatedPort{ port, port_to_link, port_from_link, failover_info: FailoverInfo::new(port_id) }
     }
     pub fn listen(&mut self, port: &mut Port, port_to_pe: PortToPe) -> Result<(), Error> {
         let _f = "listen";
@@ -66,7 +66,7 @@ impl SimulatedPort {
 			            let ait_state = packet.get_ait_state();
 			            match ait_state {
                             AitState::AitD |
-                            AitState::Ait => return Err(SimulatedPortError::Ait { func_name: _f, port_id: self.port_id, ait_state }.into()),
+                            AitState::Ait => return Err(SimulatedPortError::Ait { func_name: _f, port_id: self.port.get_id(), ait_state }.into()),
 
                             AitState::Tick => (), // TODO: Send AitD to packet engine
                             AitState::Entl |
@@ -128,7 +128,7 @@ impl SimulatedPort {
             AitState::Tick |
 		    AitState::Tock |
 		    AitState::Tack |
-		    AitState::Teck => return Err(SimulatedPortError::Ait { func_name: _f, port_id: self.port_id, ait_state }.into()), // Not allowed here 
+		    AitState::Teck => return Err(SimulatedPortError::Ait { func_name: _f, port_id: self.port.get_id(), ait_state }.into()), // Not allowed here 
 		    AitState::Ait => { packet.next_ait_state()?; },
             AitState::Entl | // Only needed for simulator, should be handled by port
             AitState::SnakeD |
