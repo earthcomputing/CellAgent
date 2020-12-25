@@ -23,7 +23,10 @@ impl Snake {
     pub fn get_packet(&self) -> &Packet { &self.packet }
     pub fn get_count(&self) -> usize {self.count }
     pub fn set_count(&mut self, count: usize) { self.count = count; }
-    pub fn decrement_count(&mut self) { self.count = self.count - 1; }
+    pub fn decrement_count(&mut self) -> usize { 
+        self.count = self.count - 1;
+        self.count 
+    }
 }
 impl fmt::Display for Snake {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {

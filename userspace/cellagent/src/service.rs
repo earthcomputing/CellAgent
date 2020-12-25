@@ -67,7 +67,7 @@ impl NocMaster {
         let base_tree = AllowedTree::new(NOC_CONTROL_TREE_NAME);
         let body = "Hello From Master";
         let app_msg = AppInterapplicationMsg::new(&self.get_name(),
-            false, false, &base_tree, AppMsgDirection::Leafward, &Vec::new(), body);
+            false, true, &base_tree, AppMsgDirection::Leafward, &Vec::new(), body);
         let serialized = serde_json::to_string(&app_msg as &dyn AppMessage)?;
         let bytes:ByteArray = ByteArray::new(&serialized);
         {

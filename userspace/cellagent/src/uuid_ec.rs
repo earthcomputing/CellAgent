@@ -4,9 +4,10 @@ use std::fmt;
 use uuid;
 
 use crate::utility::{PortNo, PortNumber};
-
+// First 4 bits for flags, such as Snake and time direction
 const NORMAL:   u8 = 0b0000_0000;  // Used for all Name UUIDs, including TreeIDs and for normal packets
 const ENTL:     u8 = 0b0000_1111;  // Used just to generate a recv event for simulator only
+const SNAKED:   u8 = 0b0000_1110;  // Snake ack
 const AITD:     u8 = 0b0000_1011;  // AIT packet delivered or not (ACK/NACK depending on time reversal)
 const AIT:      u8 = 0b0000_1001;  // Sent AIT packet
 const TECK:     u8 = 0b0000_0111;
@@ -65,11 +66,14 @@ impl Uuid {
         self.get_ait_state() == AitState::Entl
     }
     pub fn is_snake(&self) -> bool {
-        SNAKE == (self.get_code() & SNAKE)
+        (self.get_code() & SNAKE) != 0
+    }
+    pub fn is_snaked(&self) -> bool {
+        self.get_ait_state() == AitState::SnakeD
     }
     pub fn get_ait_state(&self) -> AitState {
         let _f = "get_ait_state";
-        match self.get_code() {
+        match self.get_code() & 0b0000_1111 {
             TICK => AitState::Tick,
             TOCK => AitState::Tock,
             TACK => AitState::Tack,
@@ -77,6 +81,7 @@ impl Uuid {
             AITD => AitState::AitD,
             AIT => AitState::Ait,
             ENTL => AitState::Entl,
+            SNAKED => AitState::SnakeD,
             _    => AitState::Normal, // Bad uuid codes are treated as normal
         }
     }
@@ -114,9 +119,16 @@ impl Uuid {
         self.set_code(AIT);
         AitState::Ait
     }
-    pub fn make_snake(&mut self) {
+    pub fn make_snake(&mut self) -> AitState {
+        let ait_state = self.get_ait_state();
         let code = self.get_code();
-        self.set_code(code ^ SNAKE)
+        let new_code = code ^ SNAKE;
+        self.set_code(new_code);
+        ait_state
+    }
+    pub fn make_snaked(&mut self) -> AitState {
+        self.set_code(SNAKED);
+        AitState::SnakeD
     }
     // Tell sender if transfer succeeded or not
     pub fn make_ait_reply(&mut self) -> AitState {
@@ -202,7 +214,7 @@ impl PartialEq for Uuid {
 }
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum AitState {
-    Normal, Entl, AitD,
+    Normal, Entl, SnakeD, AitD,
     Ait, Teck, Tack, Tock, Tick
 }
 impl fmt::Display for AitState {
@@ -210,6 +222,7 @@ impl fmt::Display for AitState {
         let s = match *self {
             AitState::Normal => "Normal",
             AitState::Entl   => "Entl",
+            AitState::SnakeD => "SnakeD",
             AitState::Ait    => "Ait",
             AitState::AitD   => "AitD",
             AitState::Teck   => "TECK",

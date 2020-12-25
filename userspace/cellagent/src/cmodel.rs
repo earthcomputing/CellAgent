@@ -1,5 +1,6 @@
 use std::{fmt, fmt::Write,
           collections::{HashMap, HashSet},
+          collections::hash_map::Entry::{Occupied, Vacant},
           thread,
           thread::JoinHandle,
 };
@@ -16,6 +17,7 @@ use crate::packet_engine::{PacketEngine};
 use crate::packet::{Packet, PacketAssembler, PacketAssemblers, Packetizer, PacketUniquifier};
 use crate::snake::Snake;
 use crate::utility::{PortNo, S, TraceHeader, TraceHeaderParams, TraceType};
+use crate::uuid_ec::AitState;
 
 #[derive(Debug, Clone)]
 pub struct Cmodel {
@@ -72,7 +74,8 @@ impl Cmodel {
         {
             if CONFIG.trace_options.all || CONFIG.trace_options.cm {
                 let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "worker" };
-                let trace = json!({ "cell_id": &self.cell_id, "thread_name": thread::current().name(), "thread_id": TraceHeader::parse(thread::current().id()) });
+                let trace = json!({ "cell_id": &self.cell_id, "thread_name": thread::current().name(), 
+                    "thread_id": TraceHeader::parse(thread::current().id()) });
                 let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
             }
         }
@@ -101,9 +104,9 @@ impl Cmodel {
          {
             if CONFIG.trace_options.all || CONFIG.trace_options.cm {
                 match &msg {
-                    CaToCmBytes::Bytes((_, _, _, _, seq_no, bytes)) => {
+                    CaToCmBytes::Bytes((_, _, _, _, _, bytes)) => {
                         let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "cm_from_ca_bytes" };
-                        let trace = json!({"cell_id": &self.cell_id, "msg_len": bytes.len(), "msg_no": seq_no });
+                        let trace = json!({"cell_id": &self.cell_id, "bytes": bytes.to_string()? });
                         let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
                     },
                     CaToCmBytes::Delete(uuid) => {
@@ -199,7 +202,13 @@ impl Cmodel {
                 let mut uuid = tree_id.get_uuid();
                 if is_ait { uuid.make_ait_send(); }
                 if is_snake { uuid.make_snake(); }
-            
+                {
+                    if CONFIG.trace_options.all || CONFIG.trace_options.cm {
+                        let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "cm_to_pe_bytes" };
+                        let trace = json!({ "cell_id": &self.cell_id, "bytes": bytes.to_string()? });
+                        let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
+                    }
+                }           
                 let packets = Packetizer::packetize(&uuid, seq_no, &bytes).context(CmodelError::Chain { func_name: _f, comment: S("") })?;
                 let first = packets.get(0).expect("No packets from packetizer");
                 let dpi_is_ait = first.is_ait();
@@ -214,7 +223,8 @@ impl Cmodel {
                     {
                         if CONFIG.trace_options.all || CONFIG.trace_options.cm {
                             let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "cm_to_pe_packet" };
-                            let trace = json!({ "cell_id": &self.cell_id, "user_mask": user_mask, "msg": packet.to_string()? });
+                            let trace = json!({ "cell_id": &self.cell_id, "user_mask": user_mask, 
+                                "packet": packet.to_string()? });
                             let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
                         }
                     }
@@ -266,13 +276,51 @@ impl Cmodel {
         
             // de-packetize
             PeToCmPacket::Packet((port_no, packet)) => {
-                self.process_packet(port_no, packet)?;
+                if packet.get_ait_state() == AitState::SnakeD {
+                    let uniquifier = packet.get_uniquifier();
+                    match self.snakes.entry(uniquifier) {
+                        Vacant(_) => return Err(CmodelError::SnakeD { func_name: _f, uniquifier: uniquifier }.into()),
+                        Occupied(mut snake_entry) => {
+                            let snake = snake_entry.get_mut();
+                            let new_count = snake.decrement_count();
+                            {
+                                if CONFIG.trace_options.all || CONFIG.trace_options.snake {
+                                    let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "cm_to_ca_snaked" };
+                                    let trace = json!({ "cell_id": &self.cell_id, "new_count": new_count, "snake": snake });
+                                    let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
+                                }
+                            }
+                            if new_count == 0 {
+                                let snake = self.snakes.remove(&uniquifier).expect("Know value is set from match");
+                                let ack_port_no = snake.get_ack_port_no();
+                                let snaked_packet = Packet::make_snake_ack(uniquifier)?;
+                                self.cm_to_pe.send(CmToPePacket::SnakeD((ack_port_no, snaked_packet)))?;
+                            }
+                        },
+                    }
+                } else {
+                    self.process_packet(port_no, packet)?;
+                }
             },
             PeToCmPacket::Snake((ack_port_no, count, packet)) => {
                 let uniquifier = packet.get_uniquifier();
-                let snake = Snake::new(ack_port_no, count, packet);
-                if let Some(_) = self.snakes.insert(uniquifier, snake) {
-                    return Err(CmodelError::Snake { func_name: _f, old_value: uniquifier }.into() )
+                {
+                    if CONFIG.trace_options.all || CONFIG.trace_options.snake {
+                        let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "cm_to_ca_snake" };
+                        let trace = json!({ "cell_id": &self.cell_id, "uniquifier": uniquifier, "count": count, "ack_port_no": ack_port_no, "packet": packet.to_string()? });
+                        let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
+                    }
+                }
+                if count > 0 {
+                    let snake = Snake::new(ack_port_no, count, packet);
+                    if let Some(_) = self.snakes.insert(uniquifier, snake) {
+                       return Err(CmodelError::Snake { func_name: _f, old_value: uniquifier }.into() )
+                    }
+                } else {
+                    let snaked_packet = Packet::make_snake_ack(uniquifier)?;
+                    if !CONFIG.replay {
+                        self.cm_to_pe.send(CmToPePacket::SnakeD((ack_port_no, snaked_packet)))?;
+                    }
                 }
             }
         };
@@ -354,6 +402,8 @@ impl fmt::Display for Cmodel {
 pub enum CmodelError {
     #[fail(display = "CmodelError::Chain {} {}", func_name, comment)]
     Chain { func_name: &'static str, comment: String },
-    #[fail(display = "CmodelError::Snake {} duplicate packet {}", func_name, old_value)]
+    #[fail(display = "CmodelError::Snake {} duplicate packet in snakes {}", func_name, old_value)]
     Snake { func_name: &'static str, old_value: PacketUniquifier },
+    #[fail(display = "CmodelError::SnakeD {} Missing snake {}", func_name, uniquifier)]
+    SnakeD { func_name: &'static str, uniquifier: PacketUniquifier }
 }

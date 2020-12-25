@@ -1,10 +1,8 @@
-use std::{fmt, fmt::Write,
-          collections::{HashMap, HashSet, VecDeque},
-          str,
-          sync::{Arc, Mutex},
-          thread,
-          thread::JoinHandle,
-          };
+use std::{
+    collections::{HashMap, HashSet, VecDeque}, 
+    fmt, fmt::Write, str, 
+    sync::{Arc, Mutex}, 
+    thread, thread::JoinHandle};
 
 use crate::config::{CONFIG};
 use crate::dal::{add_to_trace, fork_trace_header, update_trace_header};
@@ -219,6 +217,11 @@ impl PacketEngine {
                         let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "pe_from_cm_reroute" };
                         let trace = json!({ "cell_id": &self.cell_id, "broken_port": broken_port_no, "new_parent": new_parent, "no_packets": no_packets });
                         let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
+                    },
+                    CmToPePacket::SnakeD((ack_port_no, packet)) => {
+                        let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "pe_from_cm_snaked" };
+                        let trace = json!({ "cell_id": &self.cell_id, "ack_port_no": ack_port_no, "packet": packet.to_string()? });
+                        let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
                     }
                 }
             }
@@ -247,7 +250,10 @@ impl PacketEngine {
             // route packet, xmit to neighbor(s) or up to CModel
             CmToPePacket::Packet((user_mask, packet)) => {
                 self.process_packet_from_cm(user_mask, packet)?;
-            }
+            },
+            CmToPePacket::SnakeD((ack_port_no, packet)) => {
+                self.add_to_out_buffer_back(PortNo(0), ack_port_no, packet.clone());
+             }
         };
         Ok(())
     }
@@ -296,7 +302,11 @@ impl PacketEngine {
             
             // recv from neighbor
             PortToPePacket::Packet((port_no, packet)) => {
-                self.process_packet_from_port(port_no, packet).context(PacketEngineError::Chain { func_name: "listen_port", comment: S("process_packet ") + &self.cell_id.get_name() })?
+                if packet.get_ait_state() == AitState::SnakeD {
+                    self.pe_to_cm.send(PeToCmPacket::Packet((port_no, packet.clone())))?;
+                } else {
+                    self.process_packet_from_port(port_no, packet).context(PacketEngineError::Chain { func_name: "listen_port", comment: S("process_packet ") + &self.cell_id.get_name() })?
+                }
             }
         };
         Ok(())
@@ -317,7 +327,7 @@ impl PacketEngine {
         self.get_outbuf_mut(broken_port_no).clear(); // Because I had to clone the buffer
     }
     fn process_packet_from_cm(&mut self, user_mask: Mask, packet: Packet) -> Result<(), Error> {
-        let _f = "route_cm_packet";
+        let _f = "process_packet_from_cm";
         let uuid = packet.get_tree_uuid().for_lookup();  // Strip AIT info for lookup
         let entry = self.routing_table.get_entry(uuid).context(PacketEngineError::Chain { func_name: _f, comment: S(self.cell_id.get_name()) })?;
         match packet.get_ait_state() {
@@ -327,7 +337,7 @@ impl PacketEngine {
             AitState::Tock |
             AitState::Tack |
             AitState::Teck => return Err(PacketEngineError::Ait { func_name: _f, ait_state: packet.get_ait_state() }.into()), // Not allowed here
-
+            AitState::SnakeD => {}, // Handled in listen_cm()
             AitState::Normal |
             AitState::Ait => {
                 { // Debug block
@@ -335,7 +345,8 @@ impl PacketEngine {
                         let uuid = packet.get_uuid();
                         let ait_state = packet.get_ait_state();
                         let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "pe_packet_from_cm" };
-                        let trace = json!({ "cell_id": self.cell_id, "uuid": uuid, "ait_state": ait_state, "packet": packet.to_string()? });
+                        let trace = json!({ "cell_id": self.cell_id, "uuid": uuid, "ait_state": ait_state, 
+                            "packet": packet.to_string()? });
                         let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
                     }
                     if CONFIG.debug_options.pe_pkt_recv {
@@ -472,6 +483,9 @@ impl PacketEngine {
             AitState::Entl => {
                 self.send_packet_flow_control(port_no)? // send_next_packet_or_entl() does ping pong which spins the CPU in the simulator
             },
+            AitState::SnakeD => {
+                self.pe_to_cm.send(PeToCmPacket::Packet((port_no, packet)))?;
+            },
             AitState::Ait  => {
                 {
                     if CONFIG.trace_options.all | CONFIG.trace_options.pe {
@@ -556,8 +570,9 @@ impl PacketEngine {
                     let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
                 }
             }
-            for port_no in port_nos.iter() {
-                self.send_packet(*port_no, packet_ref)?;  // Control message so just send
+            for &port_no in port_nos.iter() {
+                // Should add_to_buffer_front, but that may confuse my "when to send pong" algorithm
+                self.send_packet(port_no, packet_ref)?;  // Control message so just send
             }
             port_nos.len()
         } else {
@@ -600,18 +615,13 @@ impl PacketEngine {
                             let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
                         }
                     }
-                    // Send reply if there is room for my packet in the buffer of the out port
-                    let has_room = self.add_to_out_buffer_back(recv_port_no, parent, packet.clone());
-                    if has_room {
-                        self.send_next_packet_or_entl(entry.get_parent())?;
-                    }
+                    self.send_if_room(recv_port_no, parent, &packet)?;
                 }
                 1
             } else {
                 // Send leafward if recv port is parent
                 let mask = user_mask.and(entry.get_mask());
                 let port_nos = mask.get_port_nos();
-                // send snake msg to cmodel
                 // Only side effects so use explicit loop instead of map
                 for port_no in port_nos.iter().cloned() {
                     if *port_no == 0 {
@@ -640,17 +650,22 @@ impl PacketEngine {
                                 }
                             }
                         }
-                   // Send reply if there is room for my packet in the buffer of the out port
-                   let has_room = self.add_to_out_buffer_back(recv_port_no, port_no, packet.clone());
-                        if has_room {
-                            self.send_next_packet_or_entl(port_no)?;
-                        }
+                        self.send_if_room(recv_port_no, port_no, &packet)?;
                     }
                 }
                 port_nos.len()
             }
         };
-        self.pe_to_cm.send(PeToCmPacket::Snake((recv_port_no, count, packet)))?;
+        if packet.is_snake() { self.pe_to_cm.send(PeToCmPacket::Snake((recv_port_no, count, packet)))?; }
+        Ok(())
+    }
+    // Send reply if there is room for my packet in the buffer of the out port
+    fn send_if_room(&mut self, recv_port_no: PortNo, port_no: PortNo, packet: &Packet) ->
+            Result<(), Error> {
+        let has_room = self.add_to_out_buffer_back(recv_port_no, port_no, packet.clone());
+        if has_room {  // Send pong if packet went into first half of outbuf
+            self.send_next_packet_or_entl(port_no)?;
+        }
         Ok(())
     }
 }

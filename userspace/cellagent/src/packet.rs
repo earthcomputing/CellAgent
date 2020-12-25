@@ -78,8 +78,8 @@ impl Packet {
         } else {
             PacketNo(u16::try_from(bytes.len())?)
         };
-        let string = format!("is last {}, length {} msg_no {} tree id {} msg {}", 
-            is_last, *len, self.sender_msg_seq_no.0, self.header.uuid, ByteArray::new_from_bytes(&bytes).to_string()?);
+        let string = format!("is last {}, length {} msg_no {} tree id {} is_snake {} msg {}", 
+            is_last, *len, self.sender_msg_seq_no.0, self.header.uuid, self.is_snake(), ByteArray::new_from_bytes(&bytes).to_string()?);
         let default_as_char = PAYLOAD_DEFAULT_ELEMENT as char;
         Ok(string.replace(default_as_char, ""))
     }
@@ -106,6 +106,7 @@ impl Packet {
     pub fn is_ait_send(&self) -> bool { self.header.get_uuid().is_ait_send() }
     pub fn is_ait_recv(&self) -> bool { self.header.get_uuid().is_ait_recv() }
     pub fn is_snake(&self) -> bool { self.header.get_uuid().is_snake() }
+    pub fn is_snaked(&self) -> bool { self.header.get_uuid().is_snaked() }
     pub fn _is_entl(&self) -> bool { self.header.get_uuid()._is_entl() }
     pub fn get_ait_state(&self) -> AitState { self.get_tree_uuid().get_ait_state() }
     pub fn time_reverse(&mut self) { self.header.get_uuid().time_reverse(); }
@@ -137,7 +138,11 @@ impl fmt::Display for Packet {
         } else {
             bytes.len()
         };
-        let s = format!("Packet {}: Header: {}, Payload: {:?}", self.packet_count, self.header, str::from_utf8(&bytes[0..len]));
+        let is_snake = self.is_snake();
+        let is_ait = self.is_ait();
+        let is_snaked = self.is_snaked();
+        let s = format!("Packet {}: is_ait {} is_snake {} is_snaked {} Header: {}, Payload: {:?}", 
+            self.packet_count, is_ait, is_snake, is_snaked, self.header, str::from_utf8(&bytes[0..len]));
         write!(f, "{}", s)
     }
 }

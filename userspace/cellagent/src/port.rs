@@ -260,6 +260,7 @@ impl Port {
 
                             AitState::Tick => (), // TODO: Send AitD to packet engine
                             AitState::Entl | 
+                            AitState::SnakeD |
                             AitState::Normal => {
                                 {
                                     if CONFIG.trace_options.all || CONFIG.trace_options.port {
@@ -359,6 +360,7 @@ impl Port {
                         packet.next_ait_state()?;
             	    },
                     AitState::Entl | // Only needed for simulator, should be handled by port
+                    AitState::SnakeD |
                     AitState::Normal => ()
                 }
 		        port_to_link_or_ecnl_port.clone().left().expect("ecnl port in simulator").send(packet)?;

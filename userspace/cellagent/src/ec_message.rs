@@ -135,8 +135,8 @@ pub trait Message {
     fn get_originator_id(&self) -> OriginatorID { self.get_header().get_originator_id() }
     fn to_bytes(&self) -> Result<ByteArray, Error> where Self: serde::Serialize + Sized {
         let _f = "to_bytes";
-        let bytes = Serializer::serialize(self).context(MessageError::Chain { func_name: _f, comment: S("")})?;
-        Ok(ByteArray::new(&bytes))
+        let serialized = Serializer::serialize(self).context(MessageError::Chain { func_name: _f, comment: S("")})?;
+        Ok(ByteArray::new(&serialized))
     }
     fn process_ca(&mut self, _cell_agent: &mut CellAgent, _port_no: PortNo,
                   _msg_tree_id: PortTreeID, _is_ait: bool) -> Result<(), Error>;

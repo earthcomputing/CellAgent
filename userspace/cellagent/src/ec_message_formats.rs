@@ -39,6 +39,7 @@ pub enum CmToPePacket {
     Entry(RoutingTableEntry),
     Packet((Mask, Packet)),
     Reroute(REROUTE),
+    SnakeD((PortNo, Packet))
 }
 pub type CmToPe = mpsc::Sender<CmToPePacket>;
 pub type PeFromCm = mpsc::Receiver<CmToPePacket>;
