@@ -12,7 +12,7 @@ use std::{
 
 use crossbeam::crossbeam_channel as mpsc;
 
-use crate::ec_message_formats::{PortToPePacket};
+use crate::ec_message_formats::{PortToPePacket, PortToPe};
 use crate::packet::{Packet};
 use crate::port::{Port, PortStatus};
 use crate::utility::{PortNo};
@@ -118,7 +118,7 @@ impl ECNL_Port {
 	     return port_update(self);
 	 }
      }
-     pub fn listen(&mut self, port_to_pe: mpsc::Sender<PortToPePacket>) -> Result<(), Error> {
+     pub fn listen(&mut self, port_to_pe: PortToPe) -> Result<(), Error> {
          let _f = "listen";
          unsafe {
              let ecnl_port_sub = (*(self.ecnl_port_sub_ptr));
