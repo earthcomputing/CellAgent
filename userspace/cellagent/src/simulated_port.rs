@@ -92,7 +92,7 @@ impl SimulatedPort {
                                         add_to_trace(TraceType::Trace, trace_params, &trace, _f);
                                     }
                                 }
-                                self.direct_send(packet.clone())?;
+                                self.direct_send(&packet)?;
                             }
                             AitState::Tock => {
                                 packet.next_ait_state()?;
@@ -104,7 +104,7 @@ impl SimulatedPort {
                                         add_to_trace(TraceType::Trace, trace_params, &trace, _f);
                                     }
                                 }
-                                self.direct_send(packet.clone())?;
+                                self.direct_send(&packet)?;
                                 packet.make_ait_send();
                                 {
                                     if CONFIG.trace_options.all || CONFIG.trace_options.port {
@@ -120,7 +120,7 @@ impl SimulatedPort {
 		        }
             }
     }
-    pub fn send(&mut self, mut packet: Packet) -> Result<(), Error> {
+    pub fn send(&mut self, packet: &mut Packet) -> Result<(), Error> {
         let _f = "send";
 	    let ait_state = packet.get_ait_state();
 		match ait_state {
@@ -141,9 +141,9 @@ impl SimulatedPort {
         self.failover_info.clear_saved_packet();
         Ok(packet)
     }
-    fn direct_send(&mut self, packet: Packet) -> Result<(), Error> {
+    fn direct_send(&mut self, packet: &Packet) -> Result<(), Error> {
         self.failover_info.save_packet(&packet);
-        Ok(self.port_to_link.send(packet).context(SimulatedPortError::Chain {func_name: "new",comment: S("")})?)
+        Ok(self.port_to_link.send(packet.clone()).context(SimulatedPortError::Chain {func_name: "new",comment: S("")})?)
     }
 }
 

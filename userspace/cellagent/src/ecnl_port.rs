@@ -183,7 +183,7 @@ impl ECNL_Port {
 	     }
 	 }
      }
-    pub fn send(&self, packet: &Packet) -> Result<(), Error> {
+    pub fn send(&self, packet: &mut Packet) -> Result<(), Error> {
         let bufferDesc: OutBufferDesc = OutBufferDesc {
 	    len: size_of::<Packet>() as c_uint, // Always send fixed-length frames
 	    frame: packet,
