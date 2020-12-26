@@ -118,7 +118,7 @@ impl ECNL_Port {
 	     return port_update(self);
 	 }
      }
-     pub fn listen(&self, port_to_pe: mpsc::Sender<PortToPePacket>) -> Result<(), Error> {
+     pub fn listen(&mut self, port_to_pe: mpsc::Sender<PortToPePacket>) -> Result<(), Error> {
          let _f = "listen";
          unsafe {
              let ecnl_port_sub = (*(self.ecnl_port_sub_ptr));
@@ -130,7 +130,15 @@ impl ECNL_Port {
                  port_get_event(self, &mut event);
 		 match event.event_cmd_id {
 		     cmd_id if (cmd_id == NL_ECND_Commands::NL_ECNL_CMD_GET_PORT_STATE as c_int) => {
-			println!("Port {} is {}", ecnl_port_sub.port_id, if (event.event_up_down != 0) {"up"} else {"down"});
+                         let mut port_status_name: &str;
+                         if (event.event_up_down != 0) {
+                             port_status_name = "up";
+                             self.port.set_connected();
+                         } else {
+                             port_status_name = "down";
+                             self.port.set_disconnected();
+                         }
+			 println!("Port {} is {}", ecnl_port_sub.port_id, port_status_name);
 			port_to_pe.send(PortToPePacket::Status((PortNo(ecnl_port_sub.port_id), self.port.is_border(), if (event.event_up_down != 0) {PortStatus::Connected} else {PortStatus::Disconnected}))).unwrap();
 		    }
 		    cmd_id if (cmd_id == NL_ECND_Commands::NL_ECNL_CMD_SIGNAL_AIT_MESSAGE as c_int) => {
