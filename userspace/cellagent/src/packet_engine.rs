@@ -195,43 +195,26 @@ impl PacketEngine {
     // SPAWN THREAD (listen_cm_loop)
     fn listen_cm(&mut self, msg: CmToPePacket) -> Result<(), Error> {
         let _f = "listen_cm";
-        {
-            if CONFIG.trace_options.all || CONFIG.trace_options.pe_cm {
-                match &msg {
-                    CmToPePacket::Packet((user_mask, packet)) => {
-                        let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "pe_from_cm_packet" };
-                        let trace = json!({ "cell_id": self.cell_id, "user_mask": user_mask, "packet": packet.to_string()? });
-                        let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
-                    },
-                    CmToPePacket::Delete(uuid) => {
-                        let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "pe_from_cm_entry" };
-                        let trace = json!({ "cell_id": &self.cell_id, "uuid": uuid });
-                        let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
-                    },
-                    CmToPePacket::Entry(entry) => {
-                        let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "pe_from_cm_entry" };
-                        let trace = json!({ "cell_id": &self.cell_id, "entry": entry });
-                        let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
-                    },
-                    CmToPePacket::Reroute((broken_port_no, new_parent, no_packets)) => {
-                        let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "pe_from_cm_reroute" };
-                        let trace = json!({ "cell_id": &self.cell_id, "broken_port": broken_port_no, "new_parent": new_parent, "no_packets": no_packets });
-                        let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
-                    },
-                    CmToPePacket::SnakeD((ack_port_no, packet)) => {
-                        let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "pe_from_cm_snaked" };
-                        let trace = json!({ "cell_id": &self.cell_id, "ack_port_no": ack_port_no, "packet": packet.to_string()? });
-                        let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
-                    }
-                }
-            }
-        }
         match msg {
             // control plane from CellAgent
             CmToPePacket::Reroute((broken_port_no, new_parent, no_packets)) => {
+                {
+                    if CONFIG.trace_options.all || CONFIG.trace_options.pe_cm {
+                        let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "pe_from_cm_reroute" };
+                        let trace = json!({ "cell_id": &self.cell_id, "broken_port": broken_port_no, "new_parent": new_parent, "no_packets": no_packets });
+                        let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
+                    }
+                }
                 self.reroute_packets(broken_port_no, new_parent, no_packets);
             },
             CmToPePacket::Delete(uuid) => {
+                {
+                    if CONFIG.trace_options.all || CONFIG.trace_options.pe_cm {
+                        let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "pe_from_cm_entry" };
+                        let trace = json!({ "cell_id": &self.cell_id, "uuid": uuid });
+                        let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
+                    }
+                }
                 {
                     if CONFIG.debug_options.all || CONFIG.debug_options.pe_process_pkt {
                         let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "pe_delete_entry_dbg" };
@@ -243,16 +226,36 @@ impl PacketEngine {
                 (*self.routing_table_mutex.lock().unwrap()) = self.routing_table.clone();
             }
             CmToPePacket::Entry(entry) => {
+                {
+                    if CONFIG.trace_options.all || CONFIG.trace_options.pe_cm {
+                        let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "pe_from_cm_entry" };
+                        let trace = json!({ "cell_id": &self.cell_id, "entry": entry });
+                        let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
+                    }
+                }
                 self.routing_table.set_entry(entry);
                 (*self.routing_table_mutex.lock().unwrap()) = self.routing_table.clone();
-            },
-        
+            },       
             // route packet, xmit to neighbor(s) or up to CModel
             CmToPePacket::Packet((user_mask, packet)) => {
+                {
+                    if CONFIG.trace_options.all || CONFIG.trace_options.pe_cm {
+                        let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "pe_from_cm_packet" };
+                        let trace = json!({ "cell_id": self.cell_id, "user_mask": user_mask, "packet": packet.to_string()? });
+                        let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
+                    }
+                }
                 self.process_packet_from_cm(user_mask, packet)?;
             },
             CmToPePacket::SnakeD((ack_port_no, packet)) => {
-                self.add_to_out_buffer_back(PortNo(0), ack_port_no, packet.clone());
+                {
+                    if CONFIG.trace_options.all || CONFIG.trace_options.pe_cm {
+                        let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "pe_from_cm_snaked" };
+                        let trace = json!({ "cell_id": &self.cell_id, "ack_port_no": ack_port_no, "packet": packet.to_string()? });
+                        let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
+                    }
+                }
+                self.send_if_room(PortNo(0), ack_port_no, &packet)?;
              }
         };
         Ok(())
@@ -261,52 +264,46 @@ impl PacketEngine {
     // TODO: One thread for all ports; should be a different thread for each port
     fn listen_port(&mut self, msg: PortToPePacket) -> Result<(), Error> {
         let _f = "listen_port";
-        {
-            if CONFIG.trace_options.all || CONFIG.trace_options.pe_port {
-                match &msg {
-                    PortToPePacket::Packet((port_no, packet)) => {
-                        let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "pe_from_port_packet" };
-                        let trace = json!({ "cell_id": self.cell_id, "port_no": port_no, "packet": packet.to_string()? });
-                        let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
-                    },
-                    PortToPePacket::Status((port_no, is_border, port_status)) => {
+        match msg {
+            // deliver to CModel
+            PortToPePacket::Status((port_no, is_border, port_status)) => {
+                {
+                    if CONFIG.trace_options.all || CONFIG.trace_options.pe_port {
                         let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "pe_from_port_status" };
                         let trace = json!({ "cell_id": &self.cell_id,  "port": port_no, "is_border": is_border, "status": port_status});
                         let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
                     }
-                };
-            }
-        }
-        match msg {
-            // deliver to CModel
-            PortToPePacket::Status((port_no, is_border, status)) => {
+                }
                 let number_of_packets = NumberOfPackets {
                     sent: self.get_no_sent_packets(port_no),
                     recd: self.get_no_seen_packets(port_no)
                 };
-                match status {
+                match port_status {
                     PortStatus::Connected => self.set_may_send(port_no),
                     PortStatus::Disconnected => self.set_may_not_send(port_no)
                 }
                 {
                     if CONFIG.trace_options.all | CONFIG.trace_options.pe {
                         let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "pe_to_cm_status" };
-                        let trace = json!({ "cell_id": &self.cell_id, "port": port_no, "is_border": is_border, "no_packets": number_of_packets, "status": status });
+                        let trace = json!({ "cell_id": &self.cell_id, "port": port_no, "is_border": is_border, "no_packets": number_of_packets, "status": port_status });
                         let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
                     }
                 }
                 if !CONFIG.replay {
-                    self.pe_to_cm.send(PeToCmPacket::Status((port_no, is_border, number_of_packets, status))).context(PacketEngineError::Chain { func_name: "listen_port", comment: S("send status to ca ") + &self.cell_id.get_name() })?
+                    self.pe_to_cm.send(PeToCmPacket::Status((port_no, is_border, number_of_packets, port_status))).context(PacketEngineError::Chain { func_name: "listen_port", comment: S("send status to ca ") + &self.cell_id.get_name() })?
                 }
             },
             
             // recv from neighbor
             PortToPePacket::Packet((port_no, packet)) => {
-                if packet.get_ait_state() == AitState::SnakeD {
-                    self.pe_to_cm.send(PeToCmPacket::Packet((port_no, packet.clone())))?;
-                } else {
-                    self.process_packet_from_port(port_no, packet).context(PacketEngineError::Chain { func_name: "listen_port", comment: S("process_packet ") + &self.cell_id.get_name() })?
+                {
+                    if CONFIG.trace_options.all || CONFIG.trace_options.pe_port {
+                        let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "pe_from_port_packet" };
+                        let trace = json!({ "cell_id": self.cell_id, "port_no": port_no, "packet": packet.to_string()? });
+                        let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
+                    }
                 }
+                self.process_packet_from_port(port_no, packet).context(PacketEngineError::Chain { func_name: "listen_port", comment: S("process_packet ") + &self.cell_id.get_name() })?
             }
         };
         Ok(())
@@ -484,6 +481,13 @@ impl PacketEngine {
                 self.send_packet_flow_control(port_no)? // send_next_packet_or_entl() does ping pong which spins the CPU in the simulator
             },
             AitState::SnakeD => {
+                {
+                    if CONFIG.trace_options.all | CONFIG.trace_options.pe {
+                        let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "pe_to_cm_packet_snaked" };
+                        let trace = json!({ "cell_id": &self.cell_id, "port": port_no, "packet": packet.to_string()? });
+                        let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
+                    }
+                }
                 self.pe_to_cm.send(PeToCmPacket::Packet((port_no, packet)))?;
             },
             AitState::Ait  => {
@@ -552,7 +556,8 @@ impl PacketEngine {
         {
             if CONFIG.trace_options.all | CONFIG.trace_options.pe {
                 let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "pe_forward" };
-                let trace = json!({ "cell_id": &self.cell_id, "port": recv_port_no, "user_mask": user_mask, "entry_mask": entry.get_mask(), "packet": packet.to_string()? });
+                let trace = json!({ "cell_id": &self.cell_id, "port": recv_port_no, "user_mask": user_mask, 
+                    "entry_mask": entry.get_mask(), "packet": packet.to_string()? });
                 let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
             }
         }
@@ -570,14 +575,15 @@ impl PacketEngine {
                     let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
                 }
             }
+            let mut count = 0;
             for &port_no in port_nos.iter() {
+                if port_no != PortNo(0) { count = count + 1 ;}
                 // Should add_to_buffer_front, but that may confuse my "when to send pong" algorithm
                 self.send_packet(port_no, packet_ref)?;  // Control message so just send
             }
-            port_nos.len()
+            count
         } else {
             if recv_port_no != entry.get_parent() {
-                // send snake msg to cmodel
                 // Send to root if recv port is not parent
                 let parent = entry.get_parent();
                 if *parent == 0 {
@@ -595,7 +601,7 @@ impl PacketEngine {
                                 _ => {
                                     let uuid = packet.get_uuid();
                                     {
-                                        let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "pe_to_cm_rootward" };
+                                        let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "pe_to_cm_rootward_dbg" };
                                         let trace = json!({ "cell_id": self.cell_id, "uuid": &uuid, "msg_type": &msg_type, "parent_port": &parent });
                                         let _ = add_to_trace(TraceType::Debug, trace_params, &trace, _f);
                                     }
@@ -606,6 +612,7 @@ impl PacketEngine {
                         }
                     }
                     self.pe_to_cm.send(PeToCmPacket::Packet((recv_port_no, packet.clone())))?;
+                    0
                 } else {
                     // Forward rootward
                     {
@@ -616,12 +623,13 @@ impl PacketEngine {
                         }
                     }
                     self.send_if_room(recv_port_no, parent, &packet)?;
+                    1
                 }
-                1
             } else {
                 // Send leafward if recv port is parent
                 let mask = user_mask.and(entry.get_mask());
                 let port_nos = mask.get_port_nos();
+                let mut count = 0;
                 // Only side effects so use explicit loop instead of map
                 for port_no in port_nos.iter().cloned() {
                     if *port_no == 0 {
@@ -635,11 +643,12 @@ impl PacketEngine {
                         }
                         self.pe_to_cm.send(PeToCmPacket::Packet((recv_port_no, packet.clone()))).context(PacketEngineError::Chain { func_name: _f, comment: S("leafcast packet to ca ") + &self.cell_id.get_name() })?;
                     } else {
+                        count = count + 1;  // Only count ports other than 0
                         // forward to neighbor
                         {
                             if CONFIG.trace_options.all | CONFIG.trace_options.pe {
                                 let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "pe_to_port_leafward" };
-                                let trace = json!({ "cell_id": &self.cell_id, "port": recv_port_no, "packet": packet.to_string()? });
+                                let trace = json!({ "cell_id": &self.cell_id, "recv_port_no": recv_port_no, "port_no": port_no, "packet": packet.to_string()? });
                                 let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
                             }
                             if CONFIG.debug_options.all || CONFIG.debug_options.flow_control {
@@ -653,10 +662,19 @@ impl PacketEngine {
                         self.send_if_room(recv_port_no, port_no, &packet)?;
                     }
                 }
-                port_nos.len()
+                count
             }
         };
-        if packet.is_snake() { self.pe_to_cm.send(PeToCmPacket::Snake((recv_port_no, count, packet)))?; }
+        if packet.is_snake() {
+            {
+                if CONFIG.trace_options.all | CONFIG.trace_options.pe {
+                    let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "pe_to_cm_snake" };
+                    let trace = json!({ "cell_id": &self.cell_id, "recv_port_no": recv_port_no, "count": count, "is_snake": true, "packet": packet_ref.to_string()? });
+                    let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
+                }
+            }
+            self.pe_to_cm.send(PeToCmPacket::Snake((recv_port_no, count, packet)))?; 
+        }
         Ok(())
     }
     // Send reply if there is room for my packet in the buffer of the out port

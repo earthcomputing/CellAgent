@@ -24,14 +24,14 @@ impl Snake {
     pub fn get_count(&self) -> usize {self.count }
     pub fn set_count(&mut self, count: usize) { self.count = count; }
     pub fn decrement_count(&mut self) -> usize { 
-        self.count = self.count - 1;
+        if self.count > 0 { self.count = self.count - 1; }
         self.count 
     }
 }
 impl fmt::Display for Snake {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let s = format!("Snake: {} {} {} {:?}", self.count, self.ack_port_no, 
-                            self.packet.get_uniquifier(), self.packet.to_string());
+        let s = format!("Snake: {} {} {} {}", self.count, self.ack_port_no, 
+                            self.packet.get_uniquifier(), self.packet);
         write!(f, "{}", s)
     }
 }

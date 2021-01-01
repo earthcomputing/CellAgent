@@ -67,7 +67,7 @@ impl NocMaster {
         let base_tree = AllowedTree::new(NOC_CONTROL_TREE_NAME);
         let body = "Hello From Master";
         let app_msg = AppInterapplicationMsg::new(&self.get_name(),
-            false, true, &base_tree, AppMsgDirection::Leafward, &Vec::new(), body);
+            false, false, &base_tree, AppMsgDirection::Leafward, &Vec::new(), body);
         let serialized = serde_json::to_string(&app_msg as &dyn AppMessage)?;
         let bytes:ByteArray = ByteArray::new(&serialized);
         {
@@ -217,7 +217,7 @@ impl NocAgent {
             let msg = format!("Reply from {}", self.container_id);
             let target_tree = AllowedTree::new(NOC_LISTEN_TREE_NAME);
             let reply = AppInterapplicationMsg::new(self.get_name(),
-                false, false, &target_tree, AppMsgDirection::Rootward,
+                false, true, &target_tree, AppMsgDirection::Rootward,
                                                     &vec![], &msg);
             //println!("Service {} sending {}", self.container_id, msg);
             let serialized = serde_json::to_string(&reply as &dyn AppMessage)?;

@@ -54,8 +54,14 @@ impl Packet {
         Packet::new(UniqueMsgId::new(), &uuid, PacketNo(1),
                     false, SenderMsgSeqNo(0), vec![])
     }
+    pub fn make_snaked_packet() -> Packet {
+        let mut uuid = Uuid::new();
+        uuid.make_snaked();
+        Packet::new(UniqueMsgId::new(), &uuid, PacketNo(1),
+                        false, SenderMsgSeqNo(0), vec![])
+    }
     pub fn make_snake_ack(uniquifier: PacketUniquifier) -> Result<Packet, Error> {
-        let mut packet = Packet::make_entl_packet();
+        let mut packet = Packet::make_snaked_packet();
         let serialized = serde_json::to_string(&uniquifier)?;
         let bytes = ByteArray::new(&serialized);
         packet.payload.set_bytes(bytes);
@@ -78,7 +84,7 @@ impl Packet {
         } else {
             PacketNo(u16::try_from(bytes.len())?)
         };
-        let string = format!("is last {}, length {} msg_no {} tree id {} is_snake {} msg {}", 
+        let string = format!("is last: {}, length: {}, msg_no: {}, tree_id: {}, is_snake: {}, msg: {}", 
             is_last, *len, self.sender_msg_seq_no.0, self.header.uuid, self.is_snake(), ByteArray::new_from_bytes(&bytes).to_string()?);
         let default_as_char = PAYLOAD_DEFAULT_ELEMENT as char;
         Ok(string.replace(default_as_char, ""))

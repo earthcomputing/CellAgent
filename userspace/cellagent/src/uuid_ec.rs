@@ -72,7 +72,7 @@ impl Uuid {
         self.get_ait_state() == AitState::SnakeD
     }
     pub fn get_ait_state(&self) -> AitState {
-        let _f = "get_ait_state";
+        let _f = "get_ait_state"; 
         match self.get_code() & 0b0000_1111 {
             TICK => AitState::Tick,
             TOCK => AitState::Tock,
