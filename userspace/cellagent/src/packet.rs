@@ -30,7 +30,12 @@ pub type PacketAssemblers = HashMap<UniqueMsgId, PacketAssembler>;
 pub struct UniqueMsgId(pub u64);
 impl UniqueMsgId { fn new() -> UniqueMsgId { UniqueMsgId(rand::random()) } }
 impl Deref for UniqueMsgId { type Target = u64; fn deref(&self) -> &Self::Target { &self.0 } }
-
+impl fmt::Display for UniqueMsgId {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let s = format!("UniqueMsgId {}", self.0);
+        write!(f, "{}", s)
+    }
+}
 static PACKET_COUNT: AtomicUsize = AtomicUsize::new(0);
 #[repr(C)]
 #[derive(Debug, Clone, Serialize)]
@@ -84,8 +89,9 @@ impl Packet {
         } else {
             PacketNo(u16::try_from(bytes.len())?)
         };
-        let string = format!("is last: {}, length: {}, msg_no: {}, tree_id: {}, is_snake: {}, msg: {}", 
-            is_last, *len, self.sender_msg_seq_no.0, self.header.uuid, self.is_snake(), ByteArray::new_from_bytes(&bytes).to_string()?);
+        let string = format!("is_last: {}, length: {}, unique_msg_id: {}, tree_id: {}, is_snake: {}, msg: {}", 
+            is_last, *len, self.payload.unique_msg_id, self.header.uuid, self.is_snake(), 
+            ByteArray::new_from_bytes(&bytes).to_string()?);
         let default_as_char = PAYLOAD_DEFAULT_ELEMENT as char;
         Ok(string.replace(default_as_char, ""))
     }
@@ -207,7 +213,7 @@ impl Payload {
 }
 impl fmt::Display for Payload {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let mut s = format!("Sender Msg Seq No {}", *self.unique_msg_id);
+        let mut s = format!("Sender Unique MsgID {}", *self.unique_msg_id);
         if self.is_last_packet() { s = s + ", Last packet"; }
         else                     { s = s + ", Not last packet"; }
         s = s + &format!(", Size {}", *self.size);
