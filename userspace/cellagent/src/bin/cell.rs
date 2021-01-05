@@ -11,6 +11,7 @@ use ec_fabrix::config::{CONFIG, PortQty};
 use ec_fabrix::ecnl::{ECNL_Session};
 use ec_fabrix::ecnl_port::{ECNL_Port};
 use ec_fabrix::nalcell::{NalCell};
+use ec_fabrix::simulated_border_port::{SimulatedBorderPort};
 use ec_fabrix::utility::{CellConfig, PortNo};
 
 fn main() -> Result<(), Error> {
@@ -57,11 +58,12 @@ fn main() -> Result<(), Error> {
     let border_port_list : Vec<PortNo> = (*num_ecnl_ports+1..*num_phys_ports+1)
         .map(|i| PortNo(i))
 	.collect();
-    let (mut nal_cell, ca_join_handle) = NalCell::new(cell_name,
-                                                      num_phys_ports,
-                                                      &HashSet::from_iter(border_port_list),
-                                                      CellConfig::Large,
-                                                      Some(ecnl.clone()),
+    let (mut nal_cell, ca_join_handle) = NalCell::<ECNL_Port, SimulatedBorderPort>::new(
+        cell_name,
+        num_phys_ports,
+        &HashSet::from_iter(border_port_list),
+        CellConfig::Large,
+        Some(ecnl.clone()),
     )?;
     ecnl.link_channels(&mut nal_cell)?;
     match ca_join_handle.join() {
