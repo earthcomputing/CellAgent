@@ -2,35 +2,86 @@ use std::fmt;
 
 use crossbeam::crossbeam_channel as mpsc;
 
+use crate::app_message_formats::{PortToCa};
 use crate::config::{CONFIG};
 use crate::dal::{add_to_trace};
 use crate::ec_message_formats::{PortToPePacket, PortToPe};
-use crate::name::{Name, PortID};
+use crate::name::{Name, CellID, PortID};
 use crate::packet::{Packet}; // Eventually use SimulatedPacket
-use crate::port::{Port, PortStatus};
-use crate::utility::{S, TraceHeaderParams, TraceType};
+use crate::port::{InteriorPortLike, PortData, PortStatus};
+use crate::simulated_border_port::{SimulatedBorderPort};
+use crate::utility::{PortNumber, S, TraceHeaderParams, TraceType};
 use crate::uuid_ec::{AitState};
 
 pub type PortToLink = mpsc::Sender<PortToLinkPacket>;
 pub type PortFromLink = mpsc::Receiver<LinkToPortPacket>;
 
-#[derive(Clone)]
-pub struct SimulatedInternalPort {
-    port: Port,
+#[derive(Clone, Debug)]
+pub struct SimulatedInteriorPort {
+    port: PortData<SimulatedInteriorPort, SimulatedBorderPort>,
     failover_info: FailoverInfo,
     port_to_link: PortToLink,
     port_from_link: PortFromLink,
 }
-impl SimulatedInternalPort {
-    pub fn new(port: Port, port_to_link: PortToLink, port_from_link: PortFromLink) -> SimulatedInternalPort {
+impl SimulatedInteriorPort {
+    pub fn new(port: PortData<SimulatedInteriorPort, SimulatedBorderPort>, port_to_link: PortToLink, port_from_link: PortFromLink) -> Result<SimulatedInteriorPort, Error> {
         let port_id = port.get_id();
-      	SimulatedInternalPort{ port, port_to_link, port_from_link, failover_info: FailoverInfo::new(port_id) }
+        Ok( SimulatedInteriorPort {
+            port,
+            port_to_link,
+            port_from_link,
+            failover_info: FailoverInfo::new(port_id),
+        })
     }
-    pub fn listen(&mut self, port_to_pe: PortToPe) -> Result<(), Error> {
+    fn recv(&mut self) -> Result<LinkToPortPacket, Error> {
+        let _f = "recv";
+        let link_to_port_packet = self.port_from_link.recv()?;
+        {
+            if CONFIG.trace_options.all || CONFIG.trace_options.port {
+		let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "simulated_port_receive" };
+		let trace = json!({ "cell_id": self.port.get_cell_id(), "id": self.port.get_id().get_name(), "link_to_port_packet": link_to_port_packet });
+		add_to_trace(TraceType::Trace, trace_params, &trace, _f);
+            }
+	}
+        self.failover_info.clear_saved_packet();
+        Ok(link_to_port_packet)
+    }
+    fn direct_send(&mut self, packet: &Packet) -> Result<(), Error> {
+        let _f = "direct_send";
+        {
+            if CONFIG.trace_options.all || CONFIG.trace_options.port {
+		let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "simulated_port_direct_send" };
+		let trace = json!({ "cell_id": self.port.get_cell_id(), "id": self.port.get_id().get_name(), "packet": packet });
+		add_to_trace(TraceType::Trace, trace_params, &trace, _f);
+            }
+	}
+        self.failover_info.save_packet(&packet);
+        Ok(self.port_to_link.send(*packet).context(SimulatedInteriorPortError::Chain {func_name: "new",comment: S("")})?)
+    }
+}
+
+impl InteriorPortLike for SimulatedInteriorPort {
+    fn send(self: &mut Self, packet: &mut Packet) -> Result<(), Error> {
+        let _f = "send";
+	let ait_state = packet.get_ait_state();
+	match ait_state {
+	    AitState::AitD |
+            AitState::Tick |
+	    AitState::Tock |
+	    AitState::Tack |
+	    AitState::Teck => return Err(SimulatedInteriorPortError::Ait { func_name: _f, port_id: self.port.get_id(), ait_state }.into()), // Not allowed here
+	    AitState::Ait => { packet.next_ait_state()?; },
+            AitState::Entl | // Only needed for simulator, should be handled by simulated_internal_port
+            AitState::SnakeD |
+            AitState::Normal => ()
+        }
+	self.direct_send(packet)
+    }
+    fn listen(self: &mut Self, port_to_pe: PortToPe) -> Result<(), Error> {
         let _f = "listen";
         let mut msg: LinkToPortPacket;
             loop {
-                msg = self.recv().context(SimulatedInternalPortError::Chain { func_name: _f, comment: S(self.port.get_id().get_name()) + " recv from link"})?;
+                msg = self.recv().context(SimulatedInteriorPortError::Chain { func_name: _f, comment: S(self.port.get_id().get_name()) + " recv from link"})?;
 		        {
                     if CONFIG.trace_options.all || CONFIG.trace_options.port {
                         match &msg {
@@ -60,13 +111,13 @@ impl SimulatedInternalPort {
 				                add_to_trace(TraceType::Trace, trace_params, &trace, _f);
                             }
 			            }
-			            port_to_pe.send(PortToPePacket::Status((self.port.get_port_no(), self.port.is_border(), status))).context(SimulatedInternalPortError::Chain { func_name: _f, comment: S(self.port.get_id().get_name()) + " send status to pe"})?;
+			            port_to_pe.send(PortToPePacket::Status((self.port.get_port_no(), self.port.is_border(), status))).context(SimulatedInteriorPortError::Chain { func_name: _f, comment: S(self.port.get_id().get_name()) + " send status to pe"})?;
                     }
                     LinkToPortPacket::Packet(mut packet) => {
 			            let ait_state = packet.get_ait_state();
 			            match ait_state {
                             AitState::AitD |
-                            AitState::Ait => return Err(SimulatedInternalPortError::Ait { func_name: _f, port_id: self.port.get_id(), ait_state }.into()),
+                            AitState::Ait => return Err(SimulatedInteriorPortError::Ait { func_name: _f, port_id: self.port.get_id(), ait_state }.into()),
 
                             AitState::Tick => (), // TODO: Send AitD to packet engine
                             AitState::Entl |
@@ -120,31 +171,6 @@ impl SimulatedInternalPort {
 		        }
             }
     }
-    pub fn send(&mut self, packet: &mut Packet) -> Result<(), Error> {
-        let _f = "send";
-	    let ait_state = packet.get_ait_state();
-		match ait_state {
-	        AitState::AitD |
-            AitState::Tick |
-		    AitState::Tock |
-		    AitState::Tack |
-		    AitState::Teck => return Err(SimulatedInternalPortError::Ait { func_name: _f, port_id: self.port.get_id(), ait_state }.into()), // Not allowed here 
-		    AitState::Ait => { packet.next_ait_state()?; },
-            AitState::Entl | // Only needed for simulator, should be handled by port
-            AitState::SnakeD |
-            AitState::Normal => ()
-        }
-		self.direct_send(packet)
-    }
-    fn recv(&mut self) -> Result<LinkToPortPacket, Error> {
-        let packet = self.port_from_link.recv()?;
-        self.failover_info.clear_saved_packet();
-        Ok(packet)
-    }
-    fn direct_send(&mut self, packet: &Packet) -> Result<(), Error> {
-        self.failover_info.save_packet(&packet);
-        Ok(self.port_to_link.send(packet.clone()).context(SimulatedInternalPortError::Chain {func_name: "new",comment: S("")})?)
-    }
 }
 
 // Link to Port
@@ -196,9 +222,9 @@ impl fmt::Display for FailoverInfo {
 // Errors
 use failure::{Error, ResultExt};
 #[derive(Debug, Fail)]
-pub enum SimulatedInternalPortError {
-    #[fail(display = "SimulatedInternalPortError::Chain {} {}", func_name, comment)]
+pub enum SimulatedInteriorPortError {
+    #[fail(display = "SimulatedInteriorPortError::Chain {} {}", func_name, comment)]
     Chain { func_name: &'static str, comment: String },
-    #[fail(display = "SimulatedInternalPortError::Ait {} {} is not allowed here on port {}", func_name, port_id, ait_state)]
+    #[fail(display = "SimulatedInteriorPortError::Ait {} {} is not allowed here on port {}", func_name, port_id, ait_state)]
     Ait { func_name: &'static str, port_id: PortID, ait_state: AitState },
 }

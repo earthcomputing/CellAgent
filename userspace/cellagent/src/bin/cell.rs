@@ -9,6 +9,7 @@ use std::{collections::{HashSet},
 
 use ec_fabrix::config::{CONFIG, PortQty};
 use ec_fabrix::ecnl::{ECNL_Session};
+use ec_fabrix::ecnl_port::{ECNL_Port};
 use ec_fabrix::nalcell::{NalCell};
 use ec_fabrix::utility::{CellConfig, PortNo};
 
@@ -50,7 +51,7 @@ fn main() -> Result<(), Error> {
     };
     println!("num_phys_ports: {}", num_phys_ports_str);
     let num_phys_ports : PortQty = PortQty(num_phys_ports_str.trim().parse().unwrap());
-    let ecnl = ECNL_Session::new();
+    let mut ecnl = ECNL_Session::new();
     let num_ecnl_ports = ecnl.clone().num_ecnl_ports();
     println!("Num ecnl ports: {:?} ", num_ecnl_ports);
     let border_port_list : Vec<PortNo> = (*num_ecnl_ports+1..*num_phys_ports+1)
@@ -62,7 +63,7 @@ fn main() -> Result<(), Error> {
                                                       CellConfig::Large,
                                                       Some(ecnl.clone()),
     )?;
-    nal_cell.link_ecnl_channels(ecnl)?;
+    ecnl.link_channels(&mut nal_cell)?;
     match ca_join_handle.join() {
         Ok(()) => Ok(()),
         Err(e) => Err(MainError::Chain { func_name: _f, comment: format!("{:?}", e) }.into())

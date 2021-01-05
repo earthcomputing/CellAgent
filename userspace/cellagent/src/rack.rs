@@ -4,6 +4,7 @@ use std::{fmt, fmt::Write,
           collections::{HashMap, HashSet},
           iter::FromIterator,
           //sync::mpsc::channel,
+          sync::{Arc},
           thread, thread::{JoinHandle}};
 use crossbeam::crossbeam_channel::unbounded as channel;
 
@@ -15,15 +16,15 @@ use crate::ec_message_formats::{PortFromPe};
 use crate::link::{Link};
 use crate::nalcell::{NalCell};
 use crate::name::{CellID, LinkID};
-use crate::port::{Port};
+use crate::port::{PortData};
 use crate::replay::{process_trace_record, TraceFormat};
 use crate::simulated_border_port::{NocFromPort, NocToPort, PortFromNoc, PortToNoc, SimulatedBorderPort};
-use crate::simulated_internal_port::{LinkFromPort, LinkToPort, PortFromLink, PortToLink, SimulatedInternalPort};
+use crate::simulated_internal_port::{LinkFromPort, LinkToPort, PortFromLink, PortToLink, SimulatedInteriorPort};
 use crate::utility::{CellNo, CellConfig, Edge, S, TraceHeaderParams, TraceType};
 
-#[derive(Debug, Default)]
+#[derive(Clone, Debug, Default)]
 pub struct Rack {
-    cells: HashMap<CellNo, NalCell>,
+    cells: HashMap<CellNo, NalCell<SimulatedInteriorPort, SimulatedBorderPort>>,
     links: HashMap<Edge, Link>,
 }
 impl Rack {
@@ -37,12 +38,12 @@ impl Rack {
         for border_cell in blueprint.get_border_cells() {
             let cell_no = border_cell.get_cell_no();
             let border_ports = border_cell.get_border_ports();
-            let (nal_cell, _join_handle) = match NalCell::new(&border_cell.get_name(),
-                                                        border_cell.get_num_phys_ports(),
-                                                        &HashSet::from_iter(border_ports.clone()),
-                                                        CellConfig::Large,
-                                                        None,
-                                                        ) {
+            let (nal_cell, _join_handle) = match NalCell::<SimulatedInteriorPort, SimulatedBorderPort>::new(&border_cell.get_name(),
+                                                              border_cell.get_num_phys_ports(),
+                                                              &HashSet::from_iter(border_ports.clone()),
+                                                              CellConfig::Large,
+                                                              None,
+            ) {
                 Ok(t) => t,
                 Err(e) => {
                     println!("Rack: {} error from nalcell {}", _f, e);
@@ -62,7 +63,7 @@ impl Rack {
         }
         for interior_cell in blueprint.get_interior_cells() {
             let cell_no = interior_cell.get_cell_no();
-            let (nal_cell, _join_handle) = match NalCell::new(&interior_cell.get_name(),
+            let (nal_cell, _join_handle) = match NalCell::<SimulatedInteriorPort, SimulatedBorderPort>::new(&interior_cell.get_name(),
                                                         interior_cell.get_num_phys_ports(),
                                                         &HashSet::new(),
                                                         CellConfig::Large,
@@ -92,15 +93,15 @@ impl Rack {
                 .get_pair_mut(&edge.0, &edge.1)
                 .unwrap();
             let left_cell_id: CellID = left_cell.get_id(); // For Trace
-            let (left_port, left_from_pe): (&mut Port, PortFromPe) = left_cell.get_free_ec_port_mut()?;
+            let (left_port, left_from_pe): (&mut PortData<SimulatedInteriorPort, SimulatedBorderPort>, PortFromPe) = left_cell.get_free_ec_port_mut()?;
             let rite_cell_id: CellID = rite_cell.get_id(); // For Trace
-            let (rite_port, rite_from_pe): (&mut Port, PortFromPe) = rite_cell.get_free_ec_port_mut()?;
+            let (rite_port, rite_from_pe): (&mut PortData<SimulatedInteriorPort, SimulatedBorderPort>, PortFromPe) = rite_cell.get_free_ec_port_mut()?;
             let (link_to_left, left_from_link): (LinkToPort, PortFromLink) = channel();
             let (left_to_link, link_from_left): (PortToLink, LinkFromPort) = channel();
             let (link_to_rite, rite_from_link): (LinkToPort, PortFromLink) = channel();
             let (rite_to_link, link_from_rite): (PortToLink, LinkFromPort) = channel();
-            left_port.link_channel(Either::Left(SimulatedInternalPort::new(left_port.clone(), left_to_link, left_from_link)), left_from_pe);
-            rite_port.link_channel(Either::Left(SimulatedInternalPort::new(rite_port.clone(), rite_to_link, rite_from_link)), rite_from_pe);
+            left_port.link_channel(SimulatedInteriorPort::new(left_port.clone(), left_to_link, left_from_link)?, left_from_pe);
+            rite_port.link_channel(SimulatedInteriorPort::new(rite_port.clone(), rite_to_link, rite_from_link)?, rite_from_pe);
             let link = Link::new(left_port.get_id(), rite_port.get_id(),
                                            link_to_left, link_to_rite)?;
             {
@@ -130,7 +131,7 @@ impl Rack {
         let join_handles = rack.initialize(blueprint).context(RackError::Chain { func_name: _f, comment: S("initialize")})?;
         Ok((rack, join_handles))
     }
-    pub fn get_cells(&self) -> &HashMap<CellNo, NalCell> { &self.cells }
+    pub fn get_cells(&self) -> &HashMap<CellNo, NalCell<SimulatedInteriorPort, SimulatedBorderPort>> { &self.cells }
     pub fn get_links_mut(&mut self) -> &mut HashMap<Edge, Link> { &mut self.links }
     pub fn get_links(&self) -> &HashMap<Edge, Link> { &self.links }
     pub fn get_cell_ids(&self) -> HashMap<CellNo, CellID> {

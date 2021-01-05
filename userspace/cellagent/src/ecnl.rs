@@ -1,4 +1,3 @@
-use either::Either;
 use failure::{Error, ResultExt, Fail};
 #[cfg(feature = "cell")]
 use libc::{free};
@@ -11,11 +10,15 @@ use std::{
     collections::{HashMap},
     os::raw::{c_char, c_int, c_uchar, c_uint, c_ulong, c_void},
     ptr::{null, null_mut},
+    thread,
 };
 
 use crate::config::{CONFIG, PortQty};
 use crate::dal::{add_to_trace};
 use crate::ecnl_port::{ECNL_Port};
+use crate::nalcell::{NalCell};
+use crate::simulated_border_port::{SimulatedBorderPort};
+use crate::utility::{PortNo, TraceHeader, TraceHeaderParams, TraceType};
 
 #[derive(Debug)]
 #[repr(C)]
@@ -102,6 +105,26 @@ impl ECNL_Session {
         }
         #[cfg(any(feature = "noc", feature = "simulator"))]
         return "Simulated Module".to_string();
+    }
+    pub fn link_channels(&mut self, nalcell: &mut NalCell<ECNL_Port, SimulatedBorderPort>) -> Result<(), Error> {
+        let _f = "link_ecnl_channels";
+        {
+            if CONFIG.trace_options.all || CONFIG.trace_options.ca {
+                let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "worker" };
+                let trace = json!({ "thread_name": thread::current().name(), "thread_id": TraceHeader::parse(thread::current().id()) });
+                let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
+            }
+        }
+        #[cfg(feature="cell")]
+        for port_id in 0..=*(self.num_ecnl_ports())-1 {
+            let port = nalcell.get_ports()[port_id as usize].clone();
+            let ecnl_port: ECNL_Port = ECNL_Port::new(port_id as u8, port.clone());
+            port.link_channel(ecnl_port.clone(), nalcell.get_port_from_pe(&PortNo(port_id as u8)));
+            self.push_port(ecnl_port);
+        }
+        #[cfg(feature="cell")]
+        println!("Linked ecnl channels");
+        Ok(())
     }
 }
 

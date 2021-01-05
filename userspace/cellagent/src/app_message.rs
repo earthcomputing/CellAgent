@@ -9,7 +9,6 @@ use crate::cellagent::CellAgent;
 use crate::gvm_equation::{GvmEquation};
 use crate::name::{OriginatorID};
 use crate::noc::Noc;
-use crate::simulated_border_port::SimulatedBorderPort;
 use crate::uptree_spec::{AllowedTree, Manifest};
 use crate::utility::{ByteArray, S};
 

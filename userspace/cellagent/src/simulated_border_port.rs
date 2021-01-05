@@ -4,25 +4,47 @@ use crate::config::{CONFIG};
 use crate::dal::{add_to_trace};
 use crate::app_message_formats::{PortToCaMsg, PortToCa, APP};
 use crate::name::{Name};
-use crate::port::{Port, PortStatus};
+use crate::port::{BorderPortLike, PortData, PortStatus};
+use crate::simulated_internal_port::{SimulatedInteriorPort};
 use crate::utility::{ByteArray, S, TraceHeaderParams, TraceType};
 use crate::uuid_ec::{AitState};
 
 pub type PortToNoc = mpsc::Sender<PortToNocMsg>;
 pub type PortFromNoc = mpsc::Receiver<NocToPortMsg>;
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct SimulatedBorderPort {
-  port: Port,
+  port: PortData<SimulatedInteriorPort, SimulatedBorderPort>,
   port_to_noc: PortToNoc,
   port_from_noc: PortFromNoc,
 }
 
 impl SimulatedBorderPort {
-    pub fn new(port: Port, port_to_noc: PortToNoc, port_from_noc: PortFromNoc) -> SimulatedBorderPort {
+    pub fn new(port: PortData<SimulatedInteriorPort, SimulatedBorderPort>, port_to_noc: PortToNoc, port_from_noc: PortFromNoc) -> SimulatedBorderPort {
         SimulatedBorderPort{ port, port_to_noc, port_from_noc}
     }
-    pub fn listen(&mut self, port_to_ca: PortToCa) -> Result<(), Error> {
+    fn recv(&self) -> Result<NocToPortMsg, Error> {
+       Ok(self.port_from_noc.recv()?)
+    }
+    fn direct_send(&self, bytes: &ByteArray) -> Result<(), Error> {
+        let _f = "send_to_noc";
+        {
+            if CONFIG.trace_options.all | CONFIG.trace_options.port {
+                let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "port_to_noc" };
+                let trace = json!({ "cell_id": self.port.get_cell_id(), "id": self.port.get_id().get_name(), "bytes": bytes.stringify()? });
+                add_to_trace(TraceType::Trace, trace_params, &trace, _f);
+            }
+        }
+       Ok(self.port_to_noc.send(bytes.clone()).context(SimulatedBorderPortError::Chain {func_name: "new",comment: S("")})?)
+    }
+}
+
+impl BorderPortLike for SimulatedBorderPort {
+    fn send(&self, bytes: &mut ByteArray) -> Result<(), Error> {
+        let _f = "send";
+	self.direct_send(bytes)
+    }
+    fn listen(&mut self, port_to_ca: PortToCa) -> Result<(), Error> {
         let _f = "listen";
         loop {
             let msg = self.port_from_noc.recv()?;
@@ -42,24 +64,6 @@ impl SimulatedBorderPort {
             }
             port_to_ca.send(PortToCaMsg::AppMsg(self.port.get_port_no(), msg)).context(SimulatedBorderPortError::Chain { func_name: "listen_noc_for_pe", comment: S(self.port.get_id().get_name()) + " send app msg to pe"})?;
         }
-    }
-    pub fn send(&self, bytes: &mut ByteArray) -> Result<(), Error> {
-        let _f = "send";
-	self.direct_send(bytes)
-    }
-    fn recv(&self) -> Result<NocToPortMsg, Error> {
-       Ok(self.port_from_noc.recv()?)
-    }
-    fn direct_send(&self, bytes: &ByteArray) -> Result<(), Error> {
-        let _f = "send_to_noc";
-        {
-            if CONFIG.trace_options.all | CONFIG.trace_options.port {
-                let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "port_to_noc" };
-                let trace = json!({ "cell_id": self.port.get_cell_id(), "id": self.port.get_id().get_name(), "bytes": bytes.stringify()? });
-                add_to_trace(TraceType::Trace, trace_params, &trace, _f);
-            }
-        }
-       Ok(self.port_to_noc.send(bytes.clone()).context(SimulatedBorderPortError::Chain {func_name: "new",comment: S("")})?)
     }
 }
 

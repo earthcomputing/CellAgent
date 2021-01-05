@@ -12,10 +12,13 @@ use std::{
 
 use crossbeam::crossbeam_channel as mpsc;
 
+use crate::app_message_formats::{PortToCa};
 use crate::ec_message_formats::{PortToPePacket, PortToPe};
+use crate::name::{CellID};
 use crate::packet::{Packet};
-use crate::port::{Port, PortStatus};
-use crate::utility::{PortNo};
+use crate::port::{InteriorPortLike, PortData, PortStatus};
+use crate::simulated_border_port::{SimulatedBorderPort};
+use crate::utility::{PortNo, PortNumber};
 
 #[repr(C)]
 enum NL_ECND_Commands {
@@ -68,7 +71,7 @@ pub struct ECNL_Port_Sub {
 
 #[derive(Debug, Clone)]
 pub struct ECNL_Port {
-    port: Port,
+    port: PortData<ECNL_Port, SimulatedBorderPort>,
     pub ecnl_port_sub_ptr: *mut ECNL_Port_Sub,
 }
 
@@ -93,10 +96,10 @@ impl InBufferDesc {
      }
 }
 
-#[cfg(feature = "cell")]
+#[cfg(feature="cell")]
 #[link(name = ":ecnl_proto.o")]
 impl ECNL_Port {
-     pub fn new(port_id: u8, port: Port) -> ECNL_Port {
+     pub fn new(port_id: u8, port: PortData<ECNL_Port, SimulatedBorderPort>) -> ECNL_Port {
      	  unsafe {
               let ecnl_port_sub_ptr: *mut ECNL_Port_Sub = port_create(port_id);
               let ecnl_port = ECNL_Port {
@@ -118,7 +121,42 @@ impl ECNL_Port {
 	     return port_update(self);
 	 }
      }
-     pub fn listen(&mut self, port_to_pe: PortToPe) -> Result<(), Error> {
+     pub fn retrieve(&self, bdp: &mut InBufferDesc) -> Option<Result<Packet, Error>> {
+         let _f = "retrieve";
+         println!("Retrieving Packet...");
+	 unsafe {
+             port_do_read_async(self, bdp);
+	     if ((*bdp).frame != null_mut() && (*bdp).len != 0) {
+	         sleep(Duration::from_millis(100));
+	         let packet: &Packet = &*((*bdp).frame);
+                 println!("Received Packet: {}", packet.to_string()); // Probably usually sufficient to print ec_msg_type.
+	         return Some(Ok(*packet));
+	     } else {
+	         return None;
+	     }
+	 }
+     }
+    pub fn get_port_name(&self) -> String {
+        unsafe {
+            return CStr::from_ptr((*(self.ecnl_port_sub_ptr)).port_name).to_string_lossy().into_owned();
+        }
+    }
+}
+
+#[cfg(feature = "cell")]
+impl InteriorPortLike for ECNL_Port {
+     fn send(self: &mut Self, packet: &mut Packet) -> Result<(), Error> {
+        let bufferDesc: OutBufferDesc = OutBufferDesc {
+	    len: size_of::<Packet>() as c_uint, // Always send fixed-length frames
+	    frame: packet,
+	};
+	println!("Sending Packet: {}", packet.to_string()); // Probably usually sufficient to print ec_msg_type.
+        unsafe {
+	    port_do_xmit(self, &bufferDesc)
+	}
+	return Ok(())
+    }
+     fn listen(self: &mut Self, port_to_pe: PortToPe) -> Result<(), Error> {
          let _f = "listen";
          unsafe {
              let ecnl_port_sub = (*(self.ecnl_port_sub_ptr));
@@ -168,37 +206,6 @@ impl ECNL_Port {
          }
 
      }
-     pub fn retrieve(&self, bdp: &mut InBufferDesc) -> Option<Result<Packet, Error>> {
-         let _f = "retrieve";
-         println!("Retrieving Packet...");
-    	 unsafe {
-             port_do_read_async(self, bdp);
-	     if ((*bdp).frame != null_mut() && (*bdp).len != 0) {
-	         sleep(Duration::from_millis(100));
-	         let packet: &Packet = &*((*bdp).frame);
-                 println!("Received Packet: {}", packet.to_string()); // Probably usually sufficient to print ec_msg_type.
-	         return Some(Ok((*packet).clone())); // Can't keep this clone!
-	     } else {
-	         return None;
-	     }
-	 }
-     }
-    pub fn send(&self, packet: &mut Packet) -> Result<(), Error> {
-        let bufferDesc: OutBufferDesc = OutBufferDesc {
-	    len: size_of::<Packet>() as c_uint, // Always send fixed-length frames
-	    frame: packet,
-	};
-	println!("Sending Packet: {}", packet.to_string()); // Probably usually sufficient to print ec_msg_type.
-        unsafe {
-	    port_do_xmit(self, &bufferDesc)
-	}
-	return Ok(())
-    }
-    pub fn get_port_name(&self) -> String {
-        unsafe {
-            return CStr::from_ptr((*(self.ecnl_port_sub_ptr)).port_name).to_string_lossy().into_owned();
-        }
-    }
 }
 
 unsafe impl Send for ECNL_Port {}

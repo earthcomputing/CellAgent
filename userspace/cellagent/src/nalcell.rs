@@ -1,6 +1,7 @@
 use std::{
     fmt, fmt::Write,
     collections::{HashMap, HashSet},
+    marker::{PhantomData},
     thread, thread::JoinHandle,
     iter::FromIterator,
 };
@@ -13,37 +14,35 @@ use crate::config::{CONFIG, PortQty};
 use crate::dal::{add_to_trace, get_cell_replay_lines};
 use crate::ec_message_formats::{PortToPe, PeFromPort, PeToPort, PortFromPe,
                                 CmToCa, CaFromCm, CaToCm, CmFromCa, CaToCmBytes, CmToCaBytes,
-                                PeToCm, CmFromPe, CmToPe, PeFromCm}; 
+                                PeToCm, CmFromPe, CmToPe, PeFromCm};
 #[cfg(feature = "cell")]
 use crate::ecnl::ECNL_Session;
-#[cfg(feature = "cell")]
-use crate::ecnl_port::{ECNL_Port};
 use crate::name::CellID;
-use crate::port::Port;
+use crate::port::{InteriorPortLike, BorderPortLike, PortData};
 use crate::replay::{TraceFormat, process_trace_record};
 use crate::utility::{CellConfig, CellType, PortNo, S,
                      TraceHeaderParams, TraceType};
-#[cfg(feature = "cell")]
-use crate::utility::TraceHeader;
 
 #[cfg(not(feature = "cell"))]
 #[allow(non_camel_case_types)]
 type ECNL_Session = usize;
-#[derive(Debug)]
-pub struct NalCell {
+#[derive(Clone, Debug)]
+pub struct NalCell<InteriorPortType: 'static + Clone + InteriorPortLike, BorderPortType: 'static + Clone + BorderPortLike> {
     id: CellID,
     cell_type: CellType,
     config: CellConfig,
-    ports: Box<[Port]>,
+    ports: Box<[PortData<InteriorPortType, BorderPortType>]>,
     cell_agent: CellAgent,
     ports_from_pe: HashMap<PortNo, PortFromPe>,
     ports_from_ca: HashMap<PortNo, PortFromCa>,
+    interior_phantom: PhantomData<InteriorPortType>,
+    border_phantom: PhantomData<BorderPortType>,
     ecnl: Option<ECNL_Session>,
 }
 
-impl NalCell {
+impl<InteriorPortType: 'static + Clone + InteriorPortLike, BorderPortType: 'static + Clone + BorderPortLike> NalCell<InteriorPortType, BorderPortType> {
     pub fn new(name: &str, num_phys_ports: PortQty, border_port_nos: &HashSet<PortNo>, config: CellConfig, ecnl: Option<ECNL_Session>)
-            -> Result<(NalCell, JoinHandle<()>), Error> {
+            -> Result<(NalCell<InteriorPortType, BorderPortType>, JoinHandle<()>), Error> {
         let _f = "new";
         if *num_phys_ports > *CONFIG.max_num_phys_ports_per_cell {
             return Err(NalcellError::NumberPorts { num_phys_ports, func_name: "new", max_num_phys_ports: CONFIG.max_num_phys_ports_per_cell }.into())
@@ -119,10 +118,10 @@ impl NalCell {
                 Either::Left(port_to_pe.clone())
             };
             let port_number = PortNo(i).make_port_number(num_phys_ports).context(NalcellError::Chain { func_name: "new", comment: S("port number") })?;
-            let port = Port::new(cell_id, port_number, is_border_port, is_connected, port_to_pe_or_ca).context(NalcellError::Chain { func_name: "new", comment: S("port") })?;
+            let port = PortData::<InteriorPortType, BorderPortType>::new(cell_id, port_number, is_border_port, is_connected, port_to_pe_or_ca).context(NalcellError::Chain { func_name: "new", comment: S("port") })?;
             ports.push(port);
         }
-        let boxed_ports: Box<[Port]> = ports.into_boxed_slice();
+        let boxed_ports: Box<[PortData<InteriorPortType, BorderPortType>]> = ports.into_boxed_slice();
         let (cm_to_ca, ca_from_cm): (CmToCa, CaFromCm) = channel();
         let (ca_to_cm, cm_from_ca): (CaToCm, CmFromCa) = channel();
         let (pe_to_cm, cm_from_pe): (PeToCm, CmFromPe) = channel();
@@ -169,7 +168,7 @@ impl NalCell {
             });
         }
         Ok((NalCell { id: cell_id, cell_type, config, ports: boxed_ports, cell_agent,
-            ports_from_pe, ports_from_ca, ecnl },
+            ports_from_pe, ports_from_ca, interior_phantom: PhantomData, border_phantom: PhantomData, ecnl },
             ca_join_handle))
     }
 
@@ -177,8 +176,18 @@ impl NalCell {
     fn _get_name(&self) -> String { self.id.get_name() }                     // Used only in tests
     fn _get_num_ports(&self) -> PortQty { PortQty(self.ports.len() as u8) }  // Used only in tests
     pub fn get_cell_agent(&self) -> &CellAgent { &self.cell_agent }
-    pub fn take_port_from_ca(&mut self, port_no: PortNo) -> Option<PortFromCa> {
-        self.ports_from_ca.remove(&port_no)
+    pub fn get_ports(&self) -> &Box<[PortData<InteriorPortType, BorderPortType>]> { &self.ports }
+    pub fn get_port_from_ca(&self, port_no: &PortNo) -> PortFromCa {
+        return self.ports_from_ca[port_no].clone();
+    }
+    pub fn get_port_from_pe(&self, port_no: &PortNo) -> PortFromPe {
+        return self.ports_from_pe[port_no].clone();
+    }
+    pub fn take_port_from_ca(&mut self, port_no: &PortNo) -> Option<PortFromCa> {
+        self.ports_from_ca.remove(port_no)
+    }
+    pub fn take_port_from_pe(&mut self, port_no: &PortNo) -> Option<PortFromPe> {
+        self.ports_from_pe.remove(port_no)
     }
     pub fn is_border(&self) -> bool {
         match self.cell_type {
@@ -186,7 +195,7 @@ impl NalCell {
             CellType::Interior => false,
         }
     }
-    pub fn get_free_ec_port_mut(&mut self) -> Result<(&mut Port, PortFromPe), Error> {
+    pub fn get_free_ec_port_mut(&mut self) -> Result<(&mut PortData<InteriorPortType, BorderPortType>, PortFromPe), Error> {
         let _f = "get_free_ec_port_mut";
         let cell_id = self.id;
         let port = self.ports
@@ -197,11 +206,11 @@ impl NalCell {
             .nth(0)
             .ok_or::<Error>(NalcellError::NoFreePorts{ cell_id, func_name: _f }.into())?;
         port.set_connected();
-        let recvr = self.ports_from_pe.remove(&port.get_port_no())
+        let recvr = self.ports_from_pe.remove(&port.get_port_no()) // Should be self.take_port_from_pe(&port.get_port_no())
             .ok_or::<Error>(NalcellError::Channel { port_no: port.get_port_no(), func_name: _f }.into())?;
         Ok((port, recvr))
     }
-    pub fn get_free_boundary_port_mut(&mut self) -> Result<(&mut Port, PortFromCa), Error> {
+    pub fn get_free_boundary_port_mut(&mut self) -> Result<(&mut PortData<InteriorPortType, BorderPortType>, PortFromCa), Error> {
         let _f = "get_free_boundary_port_mut";
         let cell_id = self.id;
         let port = self.ports
@@ -212,31 +221,13 @@ impl NalCell {
             .nth(0)
             .ok_or::<Error>(NalcellError::NoFreePorts{ cell_id, func_name: _f }.into())?;
         port.set_connected();
-        let recvr = self.ports_from_ca.remove(&port.get_port_no())
+        let recvr = self.ports_from_ca.remove(&port.get_port_no()) // Should be self.take_port_from_pe(&port.get_port_no())
             .ok_or::<Error>(NalcellError::Channel { port_no: port.get_port_no(), func_name: _f }.into())?;
         Ok((port, recvr))
     }
-    #[cfg(feature = "cell")]
-    pub fn link_ecnl_channels(&mut self, mut ecnl: ECNL_Session) -> Result<&mut Self, Error> {
-        let _f = "link_ecnl_channels";
-        {
-            if CONFIG.trace_options.all || CONFIG.trace_options.ca {
-                let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "worker" };
-                let trace = json!({ "thread_name": thread::current().name(), "thread_id": TraceHeader::parse(thread::current().id()) });
-                add_to_trace(TraceType::Trace, trace_params, &trace, _f);
-            }
-        }
-        for port_id in 0..=*(ecnl.num_ecnl_ports())-1 {
-            let port = self.ports[port_id as usize].clone();
-            let ecnl_port: ECNL_Port = ECNL_Port::new(port_id as u8, port.clone());
-            port.link_channel(Either::Right(ecnl_port.clone()), (self.ports_from_pe[&PortNo(port_id as u8)]).clone());
-            ecnl.push_port(ecnl_port);
-        }
-        println!("Linked ecnl channels");
-        Ok(self)
-    }
 }
-impl fmt::Display for NalCell {
+
+impl<InteriorPortType: 'static + Clone + InteriorPortLike, BorderPortType: 'static + Clone + BorderPortLike> fmt::Display for NalCell<InteriorPortType, BorderPortType> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let mut s = String::new();
         match self.cell_type {
@@ -249,7 +240,7 @@ impl fmt::Display for NalCell {
     }
 }
 
-impl Drop for NalCell {
+impl<InteriorPortType: 'static + Clone + InteriorPortLike, BorderPortType: 'static + Clone + BorderPortLike> Drop for NalCell<InteriorPortType, BorderPortType> {
     fn drop(&mut self) {
         match &self.ecnl {
             Some(ecnl_session) => {
