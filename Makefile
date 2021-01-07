@@ -12,9 +12,12 @@ help:
 	@printf "\t\trun the cell agent and open a wireshark instance\n\t\t"
 	@printf "for each interface as well as open an xterm window\n\t\t"
 	@printf "that clears, scans, and prints any changes to the log\n\t\t"
-	@printf "relevant to our modules every 2 seconds\n\n\n"
+	@printf "relevant to our modules every 2 seconds\n"
+	@printf "\n\tmake DEV=<interface> local-ip-network\n"
+	@printf "\t\tset up ip configuration for switched-ping demo\n"
+	@echo ""
 	
-
+	
 MK := bash -c "make -j$(shell nproc)" 1>/dev/null
 
 ifeq ($(WS_PKT_CNT),)
@@ -127,6 +130,14 @@ cellagent: notraffic prep wireshark scan-log
 config-boot:
 	@sudo bash -c "echo \"blacklist e1000e\" > /etc/modprobe.d/e1000e.conf"
 	@sudo bash -c "depmod -ae && update-initramfs -u"
+
+local-ip-network:
+	@sudo ./scripts/ip-net-setup $$DEV
+
+ping-carol:
+	@ping 10.0.0.1
+ping-alice:
+	@ping 10.0.1.1
 
 reset: e1000e ecnl cell config-boot
 	reboot
