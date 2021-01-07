@@ -1,0 +1,19 @@
+#! /bin/bash
+echo "Is this carol? [y/n]"
+read is_carol
+
+carol () {
+	ip address add 10.0.0.1 dev $1
+	ip route add 10.0.0.0/16 dev $1
+}
+
+alice () {
+	ip address add 10.0.1.1 dev $1
+	ip route add 10.0.0.0/16 dev $1
+}
+
+if [ $is_carol = y ]; then
+	carol $1
+else
+	alice $1
+fi

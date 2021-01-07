@@ -1,9 +1,0 @@
-#! /bin/bash
-echo "Is this carol? [y/n]"
-read is_carol
-
-if [ $is_carol = y ]; then
-	echo "setting up ip-network for carol"
-else
-	echo "setting up ip-network for alice"
-fi
