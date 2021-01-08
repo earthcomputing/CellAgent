@@ -1,16 +1,23 @@
 use std::fmt;
 
 use crossbeam::crossbeam_channel as mpsc;
+use either::Either;
+
+use std::{
+    collections::{HashMap, },
+    marker::{PhantomData},
+};
 
 use crate::app_message_formats::{PortToCa};
+use crate::blueprint::{Blueprint, };
 use crate::config::{CONFIG};
 use crate::dal::{add_to_trace};
 use crate::ec_message_formats::{PortToPePacket, PortToPe};
+use crate::link::{Link};
 use crate::name::{Name, CellID, PortID};
 use crate::packet::{Packet}; // Eventually use SimulatedPacket
-use crate::port::{InteriorPortLike, BasePort, PortStatus};
-use crate::simulated_border_port::{SimulatedBorderPort};
-use crate::utility::{PortNumber, S, TraceHeaderParams, TraceType};
+use crate::port::{CommonPortLike, InteriorPortLike, PortSeed, BasePort, InteriorPortFactoryLike, PortStatus};
+use crate::utility::{CellNo, PortNo, PortNumber, Edge, S, TraceHeaderParams, TraceType};
 use crate::uuid_ec::{AitState};
 
 pub type PortToLink = mpsc::Sender<PortToLinkPacket>;
@@ -24,31 +31,73 @@ pub struct DuplexPortLinkChannel {
 
 #[derive(Clone, Debug)]
 pub struct SimulatedInteriorPort {
-    base_port: BasePort<SimulatedInteriorPort, SimulatedBorderPort>,
+    base_port: BasePort,
     failover_info: FailoverInfo,
-    duplex_port_link_channel: DuplexPortLinkChannel,
+    is_connected: bool,
+    duplex_port_link_channel: Option<DuplexPortLinkChannel>,
 }
-impl SimulatedInteriorPort {
-    pub fn new(base_port: BasePort<SimulatedInteriorPort, SimulatedBorderPort>, duplex_port_link_channel: DuplexPortLinkChannel) -> Result<SimulatedInteriorPort, Error> {
-        let port_id = base_port.get_id();
+
+#[derive(Clone, Debug)]
+pub struct SimulatedInteriorPortFactory {
+    port_seed: PortSeed,
+    blueprint: Blueprint,
+    duplex_port_link_channel_cell_port_map: HashMap<CellNo, HashMap<PortNo, DuplexPortLinkChannel>>,
+    cell_no: CellNo,
+    port_no: PortNo,
+}
+
+impl SimulatedInteriorPortFactory {
+    pub fn new(port_seed: PortSeed, blueprint: Blueprint, duplex_port_link_channel_cell_port_map: HashMap<CellNo, HashMap<PortNo, DuplexPortLinkChannel>>, cell_no: CellNo, port_no: PortNo, phantom: PhantomData<SimulatedInteriorPort>) -> SimulatedInteriorPortFactory {
+        SimulatedInteriorPortFactory { port_seed, blueprint, duplex_port_link_channel_cell_port_map, cell_no, port_no }
+    }
+}
+
+impl InteriorPortFactoryLike<SimulatedInteriorPort> for SimulatedInteriorPortFactory {
+    fn new_port(&self, cell_id: CellID, port_id: PortID, port_number: PortNumber, port_to_pe: PortToPe) -> Result<SimulatedInteriorPort, Error> {
+        println!("Trying on interior port no {} for cell {}", (*self).port_no, (*self).cell_no);
+        let ref duplex_port_link_channel_port_map = (*self).duplex_port_link_channel_cell_port_map[&(*self).cell_no];
         Ok( SimulatedInteriorPort {
-            base_port,
-            duplex_port_link_channel,
+            base_port: BasePort::new(
+                cell_id,
+                port_number,
+                false,
+                Either::Left(port_to_pe),
+            )?,
+            is_connected: duplex_port_link_channel_port_map.contains_key(&(*self).port_no),
+            duplex_port_link_channel: if duplex_port_link_channel_port_map.contains_key(&(*self).port_no) {
+                Some(duplex_port_link_channel_port_map[&(*self).port_no].clone())
+            } else {
+                None
+            },
             failover_info: FailoverInfo::new(port_id),
         })
     }
+    fn get_port_seed(&self) -> &PortSeed {
+        return &(*self).port_seed;
+    }
+    fn get_port_seed_mut(&mut self) -> &mut PortSeed {
+        return &mut (*self).port_seed;
+    }
+}
+
+impl SimulatedInteriorPort {
     fn recv(&mut self) -> Result<LinkToPortPacket, Error> {
         let _f = "recv";
-        let link_to_port_packet = self.duplex_port_link_channel.port_from_link.recv()?;
-        {
-            if CONFIG.trace_options.all || CONFIG.trace_options.port {
-		let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "simulated_port_receive" };
-		let trace = json!({ "cell_id": self.base_port.get_cell_id(), "id": self.base_port.get_id().get_name(), "link_to_port_packet": link_to_port_packet });
-		add_to_trace(TraceType::Trace, trace_params, &trace, _f);
-            }
-	}
-        self.failover_info.clear_saved_packet();
-        Ok(link_to_port_packet)
+        match &self.duplex_port_link_channel {
+            Some(connected_duplex_port_link_channel) => {
+                let link_to_port_packet = connected_duplex_port_link_channel.port_from_link.recv()?;
+                {
+                    if CONFIG.trace_options.all || CONFIG.trace_options.port {
+		        let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "simulated_port_receive" };
+		        let trace = json!({ "cell_id": self.base_port.get_cell_id(), "id": self.base_port.get_id().get_name(), "link_to_port_packet": link_to_port_packet });
+		        add_to_trace(TraceType::Trace, trace_params, &trace, _f);
+                    }
+	        }
+                self.failover_info.clear_saved_packet();
+                Ok(link_to_port_packet)
+            },
+            None => Err(SimulatedInteriorPortError::RecvDisconnected { func_name: _f, port_no: self.base_port.get_port_no(), cell_id: self.base_port.get_cell_id()}.into()),
+        }
     }
     fn direct_send(&mut self, packet: &Packet) -> Result<(), Error> {
         let _f = "direct_send";
@@ -60,10 +109,24 @@ impl SimulatedInteriorPort {
             }
 	}
         self.failover_info.save_packet(&packet);
-        Ok(self.duplex_port_link_channel.port_to_link.send(*packet).context(SimulatedInteriorPortError::Chain {func_name: "new",comment: S("")})?)
+        match &self.duplex_port_link_channel {
+            Some(connected_duplex_port_link_channel) => Ok(connected_duplex_port_link_channel.port_to_link.send(*packet).context(SimulatedInteriorPortError::Chain {func_name: "new",comment: S("")})?),
+            None => Err(SimulatedInteriorPortError::SendDisconnected { func_name: _f, port_no: self.base_port.get_port_no(), cell_id: self.base_port.get_cell_id()}.into()),
+        }
     }
 }
 
+impl CommonPortLike for SimulatedInteriorPort {
+    fn get_base_port(&self) -> &BasePort {
+        return &(*self).base_port;
+    }
+    fn get_base_port_mut(&mut self) -> &mut BasePort {
+        return &mut (*self).base_port;
+    }
+    fn get_whether_connected(&self) -> bool { return self.is_connected; }
+    fn set_connected(&mut self) -> () { self.is_connected = true; }
+    fn set_disconnected(&mut self) -> () { self.is_connected = false; }
+}
 impl InteriorPortLike for SimulatedInteriorPort {
     fn send(self: &mut Self, packet: &mut Packet) -> Result<(), Error> {
         let _f = "send";
@@ -99,27 +162,27 @@ impl InteriorPortLike for SimulatedInteriorPort {
                                 let trace = json!({ "cell_id": self.base_port.get_cell_id(), "id": self.base_port.get_id().get_name(), "status": status, "msg": msg});
                                 add_to_trace(TraceType::Trace, trace_params, &trace, _f);
                             },
-			            }
+			}
                     }
                 }
-		        match msg {
+		match msg {
                     LinkToPortPacket::Status(status) => {
-			            match status {
-                            PortStatus::Connected => self.base_port.set_connected(),
-                            PortStatus::Disconnected => self.base_port.set_disconnected()
-			            };
-			            {
+			match status {
+                            PortStatus::Connected => self.set_connected(),
+                            PortStatus::Disconnected => self.set_disconnected()
+			};
+			{
                             if CONFIG.trace_options.all || CONFIG.trace_options.port {
-				                let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "port_to_pe_status" };
-				                let trace = json!({ "cell_id": self.base_port.get_cell_id(), "id": self.base_port.get_id().get_name(), "status": status });
-				                add_to_trace(TraceType::Trace, trace_params, &trace, _f);
+				let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "port_to_pe_status" };
+				let trace = json!({ "cell_id": self.base_port.get_cell_id(), "id": self.base_port.get_id().get_name(), "status": status });
+				add_to_trace(TraceType::Trace, trace_params, &trace, _f);
                             }
-			            }
-			            port_to_pe.send(PortToPePacket::Status((self.base_port.get_port_no(), self.base_port.is_border(), status))).context(SimulatedInteriorPortError::Chain { func_name: _f, comment: S(self.base_port.get_id().get_name()) + " send status to pe"})?;
+			}
+			port_to_pe.send(PortToPePacket::Status((self.base_port.get_port_no(), self.base_port.is_border(), status))).context(SimulatedInteriorPortError::Chain { func_name: _f, comment: S(self.base_port.get_id().get_name()) + " send status to pe"})?;
                     }
                     LinkToPortPacket::Packet(mut packet) => {
-			            let ait_state = packet.get_ait_state();
-			            match ait_state {
+			let ait_state = packet.get_ait_state();
+			match ait_state {
                             AitState::AitD |
                             AitState::Ait => return Err(SimulatedInteriorPortError::Ait { func_name: _f, port_id: self.base_port.get_id(), ait_state }.into()),
 
@@ -227,6 +290,10 @@ impl fmt::Display for FailoverInfo {
 use failure::{Error, ResultExt};
 #[derive(Debug, Fail)]
 pub enum SimulatedInteriorPortError {
+    #[fail(display = "SimulatedInteriorPortError::RecvDisconnected {} Attempt to receive on disconnected port {} of cell {}", func_name, port_no,  cell_id)]
+    RecvDisconnected { func_name: &'static str, cell_id: CellID, port_no: PortNo },
+    #[fail(display = "SimulatedInteriorPortError::SendDisconnected {} Attempt to send on disconnected port {} of cell {}", func_name, port_no,  cell_id)]
+    SendDisconnected { func_name: &'static str, cell_id: CellID, port_no: PortNo },
     #[fail(display = "SimulatedInteriorPortError::Chain {} {}", func_name, comment)]
     Chain { func_name: &'static str, comment: String },
     #[fail(display = "SimulatedInteriorPortError::Ait {} {} is not allowed here on port {}", func_name, port_id, ait_state)]

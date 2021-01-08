@@ -18,7 +18,8 @@ use crate::dal::{add_to_trace};
 use crate::ec_message_formats::{PortFromPe};
 use crate::ecnl_port::{ECNL_Port};
 use crate::nalcell::{NalCell};
-use crate::simulated_border_port::{SimulatedBorderPort};
+use crate::port::{PortSeed, InteriorPortLike};
+use crate::simulated_border_port::{SimulatedBorderPort, SimulatedBorderPortFactory};
 use crate::utility::{PortNo, TraceHeader, TraceHeaderParams, TraceType};
 
 #[derive(Debug)]
@@ -63,20 +64,9 @@ impl ECNL_Session {
         let nsp: *mut c_void = null_mut(); // initialization required to keep Rust compiler happy
         let mip: *const ModuleInfo = null(); // initialization required to keep Rust compiler happy
         let eppv: Vec<ECNL_Port>;
-        #[cfg(feature = "cell")]
         unsafe {
             alloc_nl_session(&nsp);
             ecnl_get_module_info(nsp, &mip as *const *const ModuleInfo);
-        }
-        let ecnl_session: ECNL_Session;
-        #[cfg(any(feature = "noc", feature = "simulator"))] {
-            return ECNL_Session {
-                nl_session: null_mut(),
-                module_info_ptr: null(),
-                ecnl_port_ptr_vector: Vec::new(),
-            };
-        }
-        unsafe {
             let num_ports = ((*mip).num_ports as u8);
             eppv = Vec::with_capacity(num_ports as usize);
             let ecnl_session: ECNL_Session = ECNL_Session {
@@ -93,12 +83,6 @@ impl ECNL_Session {
             return PortQty((*(self.module_info_ptr)).num_ports as u8)
         }
     }
-    pub fn get_port(&self, port_id: u8) -> ECNL_Port {
-	return self.ecnl_port_ptr_vector[port_id as usize].clone();
-    }
-    pub fn push_port(&mut self, ecnl_port: ECNL_Port) -> () {
-        self.ecnl_port_ptr_vector.push(ecnl_port);
-    }
     pub fn get_module_name(&self) -> String {
         #[cfg(feature = "cell")]
         unsafe {
@@ -107,7 +91,7 @@ impl ECNL_Session {
         #[cfg(any(feature = "noc", feature = "simulator"))]
         return "Simulated Module".to_string();
     }
-    pub fn listen_link_and_pe_loops(&mut self, nalcell: &mut NalCell<ECNL_Port, SimulatedBorderPort>) -> Result<(), Error> {
+    pub fn listen_link_and_pe_loops(&mut self, nalcell: &mut NalCell<PortSeed, ECNL_Port, SimulatedBorderPortFactory, SimulatedBorderPort>) -> Result<(), Error> {
         let _f = "link_ecnl_channels";
         {
             if CONFIG.trace_options.all || CONFIG.trace_options.ca {
@@ -118,10 +102,7 @@ impl ECNL_Session {
         }
         #[cfg(feature="cell")]
         for port_id in 0..=*(self.num_ecnl_ports())-1 {
-            let port = nalcell.get_ports()[port_id as usize].clone();
-            let ecnl_port: ECNL_Port = ECNL_Port::new(port_id as u8, port.clone());
-            port.listen_link_and_pe(ecnl_port.clone(), nalcell.get_port_from_pe(&PortNo(port_id as u8)));
-            self.push_port(ecnl_port);
+            nalcell.get_port(&PortNo(port_id as u8)).clone().left().expect("ECNL got a border port").listen_link_and_pe(nalcell.get_port_from_pe_or_ca(&PortNo(port_id as u8)).left().expect("ECNL got a border port"));
         }
         #[cfg(feature="cell")]
         println!("Linked ecnl channels");

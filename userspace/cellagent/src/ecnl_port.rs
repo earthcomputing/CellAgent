@@ -11,13 +11,13 @@ use std::{
 };
 
 use crossbeam::crossbeam_channel as mpsc;
+use either::Either;
 
 use crate::app_message_formats::{PortToCa};
 use crate::ec_message_formats::{PortToPePacket, PortToPe};
-use crate::name::{CellID};
+use crate::name::{PortID, CellID};
 use crate::packet::{Packet};
-use crate::port::{InteriorPortLike, BasePort, PortStatus};
-use crate::simulated_border_port::{SimulatedBorderPort};
+use crate::port::{CommonPortLike, InteriorPortLike, BasePort, InteriorPortFactoryLike, PortStatus, PortSeed};
 use crate::utility::{PortNo, PortNumber};
 
 #[repr(C)]
@@ -71,7 +71,7 @@ pub struct ECNL_Port_Sub {
 
 #[derive(Debug, Clone)]
 pub struct ECNL_Port {
-    base_port: BasePort<ECNL_Port, SimulatedBorderPort>,
+    base_port: BasePort,
     pub ecnl_port_sub_ptr: *mut ECNL_Port_Sub,
 }
 
@@ -97,25 +97,36 @@ impl InBufferDesc {
 }
 
 #[cfg(feature="cell")]
+impl InteriorPortFactoryLike<ECNL_Port> for PortSeed {
+    fn new_port(&self, cell_id: CellID, id: PortID, port_number: PortNumber, port_to_pe: PortToPe) -> Result<ECNL_Port, Error> {
+	unsafe {
+            let base_port = BasePort::new(
+                cell_id,
+                port_number,
+                false,
+                Either::Left(port_to_pe),
+            )?;
+            let port_num = *(base_port.get_port_no());
+            let ecnl_port_sub_ptr: *mut ECNL_Port_Sub = port_create(port_num);
+            let ecnl_port = ECNL_Port {
+                base_port,
+                ecnl_port_sub_ptr: ecnl_port_sub_ptr,
+            };
+            println!("Created ECNL port #{}, {} as {}", port_num, ecnl_port.get_port_name(), (*ecnl_port_sub_ptr).port_id);
+            return Ok(ecnl_port);
+	}
+    }
+    fn get_port_seed(&self) -> &PortSeed {
+        return &(*self);
+    }
+    fn get_port_seed_mut(&mut self) -> &mut PortSeed {
+        return &mut (*self);
+    }
+}
+
+#[cfg(feature="cell")]
 #[link(name = ":ecnl_proto.o")]
 impl ECNL_Port {
-     pub fn new(port_id: u8, base_port: BasePort<ECNL_Port, SimulatedBorderPort>) -> ECNL_Port {
-     	  unsafe {
-              let ecnl_port_sub_ptr: *mut ECNL_Port_Sub = port_create(port_id);
-              let ecnl_port = ECNL_Port {
-                  base_port,
-                  ecnl_port_sub_ptr,
-              };
-              println!("Created ECNL port #{}, {} as {}", port_id, ecnl_port.get_port_name(), (*ecnl_port_sub_ptr).port_id);
-              return ecnl_port;
-	  }
-     }
-     pub fn is_connected(&self) -> bool {
-         unsafe {
-             let ecnl_port_sub = (*(self.ecnl_port_sub_ptr));
-	     return ecnl_port_sub.port_up_down > 0;
-         }
-     }
      pub fn refresh_connected_status(&self) {
          unsafe {
 	     return port_update(self);
@@ -141,6 +152,33 @@ impl ECNL_Port {
             return CStr::from_ptr((*(self.ecnl_port_sub_ptr)).port_name).to_string_lossy().into_owned();
         }
     }
+}
+
+impl CommonPortLike for ECNL_Port {
+    fn get_base_port(&self) -> &BasePort {
+        return &(*self).base_port;
+    }
+    fn get_base_port_mut(&mut self) -> &mut BasePort {
+        return &mut (*self).base_port;
+    }
+    fn get_whether_connected(&self) -> bool {
+         unsafe {
+             let ecnl_port_sub = (*(self.ecnl_port_sub_ptr));
+	     return ecnl_port_sub.port_up_down > 0;
+         }
+     }
+    fn set_connected(&mut self) -> () {
+         unsafe {
+             let mut ecnl_port_sub = (*(self.ecnl_port_sub_ptr));
+	     ecnl_port_sub.port_up_down = 1;
+         }
+     }
+    fn set_disconnected(&mut self) -> () {
+         unsafe {
+             let mut ecnl_port_sub = (*(self.ecnl_port_sub_ptr));
+	     ecnl_port_sub.port_up_down = 0;
+         }
+     }
 }
 
 #[cfg(feature = "cell")]
@@ -171,10 +209,10 @@ impl InteriorPortLike for ECNL_Port {
                          let mut port_status_name: &str;
                          if (event.event_up_down != 0) {
                              port_status_name = "up";
-                             self.base_port.set_connected();
+                             self.set_connected();
                          } else {
                              port_status_name = "down";
-                             self.base_port.set_disconnected();
+                             self.set_disconnected();
                          }
 			 println!("Port {} is {}", ecnl_port_sub.port_id, port_status_name);
 			port_to_pe.send(PortToPePacket::Status((PortNo(ecnl_port_sub.port_id), self.base_port.is_border(), if (event.event_up_down != 0) {PortStatus::Connected} else {PortStatus::Disconnected}))).unwrap();

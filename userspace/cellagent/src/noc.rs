@@ -1,27 +1,33 @@
 use std::{thread,
           thread::{JoinHandle},
           //sync::mpsc::channel,
-          collections::{HashSet}};
+          collections::{HashMap, HashSet}};
 use crossbeam::crossbeam_channel::unbounded as channel;
 
 use crate::app_message::{AppMsgType, AppMessage, AppMsgDirection,
                          AppDeleteTreeMsg, AppInterapplicationMsg, AppQueryMsg,
                          AppManifestMsg, AppStackTreeMsg, AppTreeNameMsg};
 use crate::app_message_formats::{NocFromPort, NocFromApplication, NocToApplication};
-use crate::blueprint::{Blueprint};
+use crate::blueprint::{Blueprint, Cell};
 use crate::config::{CONFIG, SCHEMA_VERSION};
 use crate::dal::{add_to_trace, fork_trace_header, update_trace_header};
 use crate::name::{CellID};  // CellID used for trace records
 use crate::gvm_equation::{GvmEquation, GvmEqn, GvmVariable, GvmVariableType};
 use crate::simulated_border_port::{PortToNoc, PortFromNoc, NocToPort};
 use crate::uptree_spec::{AllowedTree, ContainerSpec, Manifest, UpTreeSpec, VmSpec};
-use crate::utility::{ByteArray, CellConfig, S, TraceHeader, TraceHeaderParams, TraceType,
+use crate::utility::{ByteArray, CellNo, CellConfig, PortNo, S, TraceHeader, TraceHeaderParams, TraceType,
                      get_geometry, vec_from_hashset, write_err};
 
 const NOC_MASTER_DEPLOY_TREE_NAME: &str = "NocMasterDeploy";
 const NOC_AGENT_DEPLOY_TREE_NAME:  &str = "NocAgentDeploy";
 pub const NOC_CONTROL_TREE_NAME:   &str = "NocMasterAgent";
 pub const NOC_LISTEN_TREE_NAME:    &str = "NocAgentMaster";
+
+#[derive(Clone, Debug)]
+pub struct DuplexNocPortChannel {
+    pub noc_to_port: NocToPort,
+    pub noc_from_port: NocFromPort,
+}
 
 #[derive(Debug, Clone)]
 pub struct Noc {
@@ -30,14 +36,16 @@ pub struct Noc {
     allowed_trees: HashSet<AllowedTree>,
     deploy_done: bool,
     noc_to_application: NocToApplication,
+    duplex_noc_port_channel_cell_port_map: HashMap::<CellNo, HashMap<PortNo, DuplexNocPortChannel>>,
 }
 impl Noc {
-    pub fn new(noc_to_application: NocToApplication) -> Result<Noc, Error> {
+    pub fn new(duplex_noc_port_channel_cell_port_map: HashMap::<CellNo, HashMap<PortNo, DuplexNocPortChannel>>,
+               noc_to_application: NocToApplication) -> Result<Noc, Error> {
         let cell_id = CellID::new("Noc")?;
-        Ok(Noc { cell_id, base_tree: None, allowed_trees: HashSet::new(), deploy_done: false, noc_to_application })
+        Ok(Noc { cell_id, base_tree: None, allowed_trees: HashSet::new(), deploy_done: false, noc_to_application, duplex_noc_port_channel_cell_port_map })
     }
     pub fn initialize(&mut self, blueprint: &Blueprint, noc_from_application: NocFromApplication)
-            -> Result<(PortToNoc, PortFromNoc), Error> {
+            -> Result<(), Error> {
         let _f = "initialize";
         {
             if CONFIG.trace_options.all || CONFIG.trace_options.noc {
@@ -48,11 +56,15 @@ impl Noc {
                 add_to_trace(TraceType::Trace, trace_params, &trace, _f);
             }
         }
-        let (noc_to_port, port_from_noc): (NocToPort, NocFromPort) = channel();
-        let (port_to_noc, noc_from_port): (PortToNoc, PortFromNoc) = channel();
-        self.listen_application(noc_from_application, noc_to_port.clone());
-        self.listen_port(noc_to_port, noc_from_port);
-        Ok((port_to_noc, port_from_noc))
+        self.listen_application(noc_from_application); // We will need to assign border ports to applications and pass noc_to_port in here
+        for border_cell in blueprint.get_border_cells() {
+            let cell_no = border_cell.get_cell_no();
+            for border_port_no in border_cell.get_border_ports() {
+                let duplex_noc_port_channel: DuplexNocPortChannel = self.duplex_noc_port_channel_cell_port_map[&cell_no][border_port_no].clone();
+                self.listen_port(duplex_noc_port_channel.noc_to_port.clone(), duplex_noc_port_channel.noc_from_port.clone());
+            }
+        }
+        Ok(())
     }
 //	fn get_msg(&self, msg_type: MsgType, serialized_msg:String) -> Result<Box<Message>> {
 //		Ok(match msg_type {
@@ -160,21 +172,21 @@ impl Noc {
         allowed_trees.iter().all(|&tree| self.allowed_trees.contains(tree))
     }
     // SPAWN THREAD (listen_application_loop)
-    fn listen_application(&mut self, noc_from_application: NocFromApplication, noc_to_port: NocToPort) -> JoinHandle<()> {
+    fn listen_application(&mut self, noc_from_application: NocFromApplication) -> JoinHandle<()> { // This should eventually take noc_to_port: NocToPort
         let _f = "listen_application";
         let mut noc = self.clone();
         let child_trace_header = fork_trace_header();
         let thread_name = format!("{} listen_application_loop", self.get_name()); // NOC NOC
         thread::Builder::new().name(thread_name).spawn( move || {
             update_trace_header(child_trace_header);
-            let _ = noc.listen_application_loop(&noc_from_application, &noc_to_port).map_err(|e| write_err("Noc: application", &e));
-            if CONFIG.continue_on_error { noc.listen_application(noc_from_application, noc_to_port); }
+            let _ = noc.listen_application_loop(&noc_from_application).map_err(|e| write_err("Noc: application", &e));
+            if CONFIG.continue_on_error { noc.listen_application(noc_from_application); }
         }).expect("noc application thread failed")
     }
 
     // WORKER (NocFromApplication)
-    fn listen_application_loop(&mut self, noc_from_application: &NocFromApplication, _: &NocToPort)
-            -> Result<(), Error> {
+    fn listen_application_loop(&mut self, noc_from_application: &NocFromApplication)
+            -> Result<(), Error> { // This should eventually take noc_to_port: &NocToPort
         let _f = "listen_application_loop";
         {
             if CONFIG.trace_options.all || CONFIG.trace_options.noc {

@@ -1,6 +1,7 @@
 #[macro_use] extern crate failure;
 
-use std::{collections::{HashSet},
+use either::Either;
+use std::{collections::{HashMap, HashSet},
           fs::{OpenOptions},
 	  iter::FromIterator,
 };
@@ -9,7 +10,8 @@ use ec_fabrix::config::{CONFIG, PortQty};
 use ec_fabrix::ecnl::{ECNL_Session};
 use ec_fabrix::ecnl_port::{ECNL_Port};
 use ec_fabrix::nalcell::{NalCell};
-use ec_fabrix::simulated_border_port::{SimulatedBorderPort};
+use ec_fabrix::port::{PortSeed};
+use ec_fabrix::simulated_border_port::{SimulatedBorderPortFactory, SimulatedBorderPort};
 use ec_fabrix::utility::{CellConfig, PortNo};
 
 fn main() -> Result<(), Error> {
@@ -49,20 +51,23 @@ fn main() -> Result<(), Error> {
     };
     println!("num_phys_ports: {}", num_phys_ports_str);
     let num_phys_ports : PortQty = PortQty(num_phys_ports_str.trim().parse().unwrap());
-    let mut ecnl = ECNL_Session::new();
-    let num_ecnl_ports = ecnl.clone().num_ecnl_ports();
+    let mut ecnl_session = ECNL_Session::new();
+    let num_ecnl_ports = ecnl_session.clone().num_ecnl_ports();
     println!("Num ecnl ports: {:?} ", num_ecnl_ports);
     let border_port_list : Vec<PortNo> = (*num_ecnl_ports+1..*num_phys_ports+1)
-        .map(|i| PortNo(i))
+        .map(|port_num| PortNo(port_num))
 	.collect();
-    let (mut nal_cell, ca_join_handle) = NalCell::<ECNL_Port, SimulatedBorderPort>::new(
+    let port_seed_map : HashMap<PortNo, Either<PortSeed, _>> = (0..*num_ecnl_ports+1)
+        .map(|port_num| (PortNo(port_num), Either::Left(PortSeed::new())))
+	.collect();
+    let (mut nal_cell, ca_join_handle) = NalCell::<PortSeed, ECNL_Port, SimulatedBorderPortFactory, SimulatedBorderPort>::new(
         cell_name,
         num_phys_ports,
         &HashSet::from_iter(border_port_list),
         CellConfig::Large,
-        Some(ecnl.clone()),
+        port_seed_map,
     )?;
-    ecnl.listen_link_and_pe_loops(&mut nal_cell)?;
+    ecnl_session.listen_link_and_pe_loops(&mut nal_cell)?;
     match ca_join_handle.join() {
         Ok(()) => Ok(()),
         Err(e) => Err(MainError::Chain { func_name: _f, comment: format!("{:?}", e) }.into())

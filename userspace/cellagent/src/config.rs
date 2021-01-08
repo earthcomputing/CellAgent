@@ -9,6 +9,8 @@ use std::{fmt,
 use itertools::Itertools;
 use lazy_static::lazy_static;
 
+#[cfg(any(feature = "simulator"))]
+use crate::rack::{EdgeConnection};
 use crate::utility::{CellConfig, CellNo, Edge, PortNo, Quench, S};
 
 pub type MaskType = u16;
@@ -35,7 +37,8 @@ pub struct Config {
     pub min_num_border_cells: CellQty,
     pub quench: Quench,
     pub continue_on_error: bool,
-    pub auto_break: Option<Edge>,
+    #[cfg(any(feature = "simulator"))]
+    pub auto_break: Option<EdgeConnection>,
     pub output_dir_name: String,
     pub output_file_name: String,
     pub kafka_server: String,

@@ -1,13 +1,27 @@
 //use std::{sync::mpsc::channel};
 use crossbeam::crossbeam_channel::unbounded as channel;
+use std::{fmt, collections::HashMap};
 
 use crate::app_message_formats::{ApplicationFromNoc, ApplicationToNoc, NocFromApplication, NocToApplication};
-use crate::blueprint::{Blueprint};
+use crate::blueprint::{Blueprint, Cell};
 use crate::config::CONFIG;
-use crate::dal::add_to_trace;
-use crate::noc::{Noc};
+use crate::dal::{add_to_trace};
+use crate::noc::{DuplexNocPortChannel, Noc};
+use crate::port::BorderPortLike;
 use crate::rack::{Rack};
-use crate::utility::{S, TraceHeaderParams, TraceType};
+use crate::simulated_border_port::{NocToPort, NocFromPort, PortFromNoc, PortToNoc, DuplexPortNocChannel};
+use crate::utility::{CellNo, PortNo, S, TraceHeaderParams, TraceType};
+
+#[derive(Debug, Copy, Clone, Hash, Eq, PartialEq, Serialize, Deserialize)]
+pub struct CellBorderConnection {
+    pub cell_no: CellNo,
+    pub port_no: PortNo,
+}
+impl fmt::Display for CellBorderConnection {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "CC: (cell: {}, port: {})", *self.cell_no, *self.port_no)
+    }
+}
 
 #[derive(Debug)]
 pub struct Datacenter {
@@ -26,12 +40,87 @@ impl Datacenter {
                 add_to_trace(TraceType::Trace, trace_params, &trace, _f);
             }
         }
-        let (mut rack, _join_handles) = Rack::construct(&blueprint).context(DatacenterError::Chain { func_name: _f, comment: S("Rack")})?;
         let (application_to_noc, noc_from_application): (ApplicationToNoc, NocFromApplication) = channel();
         let (noc_to_application, application_from_noc): (NocToApplication, ApplicationFromNoc) = channel();
-        let mut noc = Noc::new(noc_to_application).context(DatacenterError::Chain { func_name: _f, comment: S("Noc::new")})?;
-        let (port_to_noc, port_from_noc) = noc.initialize(&blueprint, noc_from_application).context(DatacenterError::Chain { func_name: "initialize", comment: S("")})?;
-        rack.connect_to_noc(port_to_noc, port_from_noc).context(DatacenterError::Chain { func_name: _f, comment: S("Connect to NOC")})?;
+        let mut cell_border_connection_list = Vec::<CellBorderConnection>::new(); // This is not used, but analogous with edge case.
+        let mut duplex_noc_port_channel_cell_port_map = HashMap::<CellNo, HashMap<PortNo, DuplexNocPortChannel>>::new();
+        let mut duplex_port_noc_channel_cell_port_map = HashMap::<CellNo, HashMap::<PortNo, DuplexPortNocChannel>>::new();
+        let mut noc_border_port_map = HashMap::<CellNo, PortNo>::new();
+        for border_cell in blueprint.get_border_cells() {
+            let border_cell_no = border_cell.get_cell_no();
+            for border_port_no in border_cell.get_border_ports() {
+                if !(**border_port_no == 0) && (!duplex_port_noc_channel_cell_port_map.contains_key(&border_cell_no) || !duplex_port_noc_channel_cell_port_map[&border_cell_no].contains_key(&border_port_no)) {
+                    println! ("Connecting border cell {} to noc on port {}", border_cell_no, border_port_no);
+                    let (noc_to_port, port_from_noc): (NocToPort, PortFromNoc) = channel();
+                    let (port_to_noc, noc_from_port): (PortToNoc, NocFromPort) = channel();
+                    if duplex_port_noc_channel_cell_port_map.contains_key(&border_cell_no) {
+                        duplex_port_noc_channel_cell_port_map.get_mut(&border_cell_no).unwrap().insert(
+                            *border_port_no,
+                            DuplexPortNocChannel {
+                                port_from_noc: port_from_noc.clone(),
+                                port_to_noc: port_to_noc.clone(),
+                            },
+                        );
+                        duplex_noc_port_channel_cell_port_map.get_mut(&border_cell_no).unwrap().insert(
+                            *border_port_no,
+                            DuplexNocPortChannel {
+                                noc_from_port: noc_from_port.clone(),
+                                noc_to_port: noc_to_port.clone(),
+                            },
+                        );
+                    } else {
+                        let mut duplex_port_noc_channel_port_map = HashMap::<PortNo, DuplexPortNocChannel>::new();
+                        duplex_port_noc_channel_port_map.insert(
+                            *border_port_no,
+                            DuplexPortNocChannel {
+                                port_from_noc: port_from_noc.clone(),
+                                port_to_noc: port_to_noc.clone(),
+                            },
+                        );
+                        duplex_port_noc_channel_cell_port_map.insert(
+                            border_cell_no,
+                            duplex_port_noc_channel_port_map,
+                        );
+                        let mut duplex_noc_port_channel_port_map = HashMap::<PortNo, DuplexNocPortChannel>::new();
+                        duplex_noc_port_channel_port_map.insert(
+                            *border_port_no,
+                            DuplexNocPortChannel {
+                                noc_from_port: noc_from_port.clone(),
+                                noc_to_port: noc_to_port.clone(),
+                            },
+                        );
+                        duplex_noc_port_channel_cell_port_map.insert(
+                            border_cell_no,
+                            duplex_noc_port_channel_port_map,
+                        );
+                    }
+                    noc_border_port_map.insert(border_cell_no, *border_port_no);
+                    cell_border_connection_list.push(CellBorderConnection {
+                        cell_no: border_cell_no,
+                        port_no: *border_port_no,
+                    });
+                    break
+                }
+            }
+        }
+        let (mut rack, _join_handles) = Rack::construct(&blueprint, duplex_port_noc_channel_cell_port_map).context(DatacenterError::Chain { func_name: _f, comment: S("Rack")})?;
+        let (noc_border_cell_no, noc_border_cell) = rack.select_noc_border_cell()?;
+        {
+            let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "border_cell" };
+            let trace = json!({ "cell_id": {"name": "Rack"}, "cell_no": noc_border_cell_no});
+            add_to_trace(TraceType::Trace, trace_params, &trace, _f);
+        }
+        let noc_border_port_no = noc_border_port_map[&noc_border_cell_no];
+        if CONFIG.replay {
+            println!("Connecting NOC to border cell {} at port {} for replay", noc_border_cell_no, noc_border_port_no);
+        } else {
+            println!("Connecting NOC to border cell {} at port {}", noc_border_cell_no, noc_border_port_no);
+        }
+        let noc_border_port = noc_border_cell.get_port(&noc_border_port_no).right().expect("NOC should conect to a border port");
+        let mut noc = Noc::new(duplex_noc_port_channel_cell_port_map, noc_to_application).context(DatacenterError::Chain { func_name: _f, comment: S("Noc::new")})?;
+        noc.initialize(&blueprint, noc_from_application).context(DatacenterError::Chain { func_name: "initialize", comment: S("")})?;
+        println!("NOC created and initialized");
+        noc_border_port.listen_noc_and_ca(noc_border_cell.get_port_from_pe_or_ca(&noc_border_port_no).right().expect("NOC border port should connect to cell agent"))?;
         return Ok(Datacenter { rack, application_to_noc, application_from_noc});
     }
     pub fn get_rack(&self) -> &Rack { &self.rack }

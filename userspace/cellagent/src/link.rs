@@ -8,6 +8,12 @@ use crate::port::{PortStatus};
 use crate::utility::{S, TraceHeaderParams, TraceType};
 
 // TODO: There is no distinction between a broken link and a disconnected one.  We may want to revisit.
+#[derive(Clone, Debug)]
+pub struct DuplexLinkPortChannel {
+    pub link_from_port: LinkFromPort,
+    pub link_to_port: LinkToPort,
+}
+
 #[derive(Debug, Clone)]
 pub struct Link {
     id: LinkID,

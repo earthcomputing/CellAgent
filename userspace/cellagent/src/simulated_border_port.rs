@@ -1,12 +1,18 @@
 use crossbeam::crossbeam_channel as mpsc;
+use either::Either;
 
+use std::{
+    collections::{HashMap, },
+    marker::{PhantomData},
+};
+
+use crate::blueprint::{Blueprint};
 use crate::config::{CONFIG};
 use crate::dal::{add_to_trace};
 use crate::app_message_formats::{PortToCaMsg, PortToCa, APP};
-use crate::name::{Name};
-use crate::port::{BorderPortLike, BasePort, PortStatus};
-use crate::simulated_internal_port::{SimulatedInteriorPort};
-use crate::utility::{ByteArray, S, TraceHeaderParams, TraceType};
+use crate::name::{Name, PortID, CellID};
+use crate::port::{CommonPortLike, BorderPortLike, PortSeed, BasePort, BorderPortFactoryLike, PortStatus};
+use crate::utility::{CellNo, PortNo, PortNumber, ByteArray, S, TraceHeaderParams, TraceType};
 use crate::uuid_ec::{AitState};
 
 pub type PortToNoc = mpsc::Sender<PortToNocMsg>;
@@ -20,16 +26,57 @@ pub struct DuplexPortNocChannel {
 
 #[derive(Clone, Debug)]
 pub struct SimulatedBorderPort {
-    base_port: BasePort<SimulatedInteriorPort, SimulatedBorderPort>,
-    duplex_port_noc_channel: DuplexPortNocChannel,
+    base_port: BasePort,
+    is_connected: bool,
+    duplex_port_noc_channel: Option<DuplexPortNocChannel>,
 }
 
-impl SimulatedBorderPort {
-    pub fn new(base_port: BasePort<SimulatedInteriorPort, SimulatedBorderPort>, duplex_port_noc_channel: DuplexPortNocChannel) -> SimulatedBorderPort {
-        SimulatedBorderPort{ base_port, duplex_port_noc_channel}
+#[derive(Clone, Debug)]
+pub struct SimulatedBorderPortFactory {
+    port_seed: PortSeed,
+    blueprint: Blueprint,
+    duplex_port_noc_channel_cell_port_map: HashMap<CellNo, HashMap<PortNo, DuplexPortNocChannel>>,
+    cell_no: CellNo,
+    port_no: PortNo,
+}
+
+impl SimulatedBorderPortFactory {
+    pub fn new(port_seed: PortSeed, blueprint: Blueprint, duplex_port_noc_channel_cell_port_map: HashMap<CellNo, HashMap::<PortNo, DuplexPortNocChannel>>, cell_no: CellNo, port_no: PortNo, phantom: PhantomData<SimulatedBorderPort>) -> SimulatedBorderPortFactory {
+        SimulatedBorderPortFactory { port_seed, blueprint, duplex_port_noc_channel_cell_port_map, cell_no, port_no }
     }
+}
+
+impl BorderPortFactoryLike<SimulatedBorderPort> for SimulatedBorderPortFactory {
+    fn new_port(&self, cell_id: CellID, id: PortID, port_number: PortNumber, port_to_ca: PortToCa) -> Result<SimulatedBorderPort, Error> {
+        println!("Trying on border port no {} for cell {}", (*self).port_no, (*self).cell_no);
+        let ref duplex_port_noc_channel_port_map = (*self).duplex_port_noc_channel_cell_port_map[&(*self).cell_no];
+        Ok(SimulatedBorderPort{
+            base_port: BasePort::new(
+                cell_id,
+                port_number,
+                true,
+                Either::Right(port_to_ca),
+            )?,
+            is_connected: true,
+            duplex_port_noc_channel: if duplex_port_noc_channel_port_map.contains_key(&(*self).port_no) {
+                Some(duplex_port_noc_channel_port_map[&(*self).port_no].clone())
+            } else {
+                None
+            },
+        })
+    }
+    fn get_port_seed(&self) -> &PortSeed {
+        return &(*self).port_seed;
+    }
+    fn get_port_seed_mut(&mut self) -> &mut PortSeed {
+        return &mut (*self).port_seed;
+    }
+}
+
+
+impl SimulatedBorderPort {
     fn recv(&self) -> Result<NocToPortMsg, Error> {
-       Ok(self.duplex_port_noc_channel.port_from_noc.recv()?)
+       Ok(self.duplex_port_noc_channel.as_ref().unwrap().port_from_noc.recv()?)
     }
     fn direct_send(&self, bytes: &ByteArray) -> Result<(), Error> {
         let _f = "send_to_noc";
@@ -40,10 +87,21 @@ impl SimulatedBorderPort {
                 add_to_trace(TraceType::Trace, trace_params, &trace, _f);
             }
         }
-       Ok(self.duplex_port_noc_channel.port_to_noc.send(bytes.clone()).context(SimulatedBorderPortError::Chain {func_name: "new",comment: S("")})?)
+       Ok(self.duplex_port_noc_channel.as_ref().unwrap().port_to_noc.send(bytes.clone()).context(SimulatedBorderPortError::Chain {func_name: "new",comment: S("")})?)
     }
 }
 
+impl CommonPortLike for SimulatedBorderPort {
+    fn get_base_port(&self) -> &BasePort {
+        return &(*self).base_port;
+    }
+    fn get_base_port_mut(&mut self) -> &mut BasePort {
+        return &mut (*self).base_port;
+    }
+    fn get_whether_connected(&self) -> bool { return self.is_connected; }
+    fn set_connected(&mut self) -> () { self.is_connected = true; }
+    fn set_disconnected(&mut self) -> () { self.is_connected = false; }
+}
 impl BorderPortLike for SimulatedBorderPort {
     fn send(&self, bytes: &mut ByteArray) -> Result<(), Error> {
         let _f = "send";
@@ -52,7 +110,7 @@ impl BorderPortLike for SimulatedBorderPort {
     fn listen(&mut self, port_to_ca: PortToCa) -> Result<(), Error> {
         let _f = "listen";
         loop {
-            let msg = self.duplex_port_noc_channel.port_from_noc.recv()?;
+            let msg = self.duplex_port_noc_channel.as_ref().unwrap().port_from_noc.recv()?;
             {
                 if CONFIG.trace_options.all || CONFIG.trace_options.port {
                     let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "port_from_noc_app" };
