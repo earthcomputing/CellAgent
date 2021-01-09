@@ -1,3 +1,5 @@
+BASE := $(PWD)
+NR_CPU := $(shell nproc)
 
 # 4.4.0-47-generic - alice/bob
 # 4.4.0-134-generic - carol
@@ -25,15 +27,43 @@ ccflags-y += -Wno-unused-variable
 
 CFLAGS_EXTRA="-DENTL"
 
-default: build
 
+PATCHDIR := patch.d/$(EARTH_CUSTOM)
+PATCHNR = $(shell ls $(BASE)/patch.d/3.3.4 | sort -n -r | grep -o -E '[0-9]+' | head -1)
+
+default: build
+a:
+	echo $(PATCHNR)
+	echo $$(($(PATCHNR) + 1))
 # e1000e-3.3.4
 expand:
 	tar xf $(MEDIA)
 
-patch: expand patch-$(EARTH_CUSTOM).dif
-	patch -Np0 < patch-$(EARTH_CUSTOM).dif
+diff: clean
+	diff -r -u e1000e-$(EARTH_CUSTOM)/.src_copy e1000e-$(EARTH_CUSTOM)/src > \
+	patch.d/$(EARTH_CUSTOM)/$$(($(PATCHNR) + 1)) | true
+	patch -d e1000e-$(EARTH_CUSTOM)/.src_copy < $(BASE)/patch.d/$(EARTH_CUSTOM)/$$(($(PATCHNR) + 1))
+
+patch: expand
+	for f in `ls $(PATCHDIR) | sort`; do patch -Np0 < $(PATCHDIR)/$$f; done
 	cp src/* e1000e-$(EARTH_CUSTOM)/src/
+	cp -r e1000e-$(EARTH_CUSTOM)/src e1000e-$(EARTH_CUSTOM)/.src_copy
 
 build: patch
-	$(MAKE) CFLAGS_EXTRA="$(CFLAGS_EXTRA) $(ccflags-y)" -C e1000e-$(EARTH_CUSTOM)/src
+	$(MAKE) -j $(NR_CPU) CFLAGS_EXTRA="$(CFLAGS_EXTRA) $(ccflags-y)" -C e1000e-$(EARTH_CUSTOM)/src
+
+clean:
+	rm -f patch.d/$(EARTH_CUSTOM)/*.* | true 
+	rm -f e1000e-$(EARTH_CUSTOM)/src/*.ko | true
+	rm -f e1000e-$(EARTH_CUSTOM)/src/*.o | true
+	rm -f e1000e-$(EARTH_CUSTOM)/src/.*.mod* | true
+	rm -f e1000e-$(EARTH_CUSTOM)/src/.*.o | true
+	rm -f e1000e-$(EARTH_CUSTOM)/src/.*.cmd | true
+	rm -rf e1000e-$(EARTH_CUSTOM)/src/.tmp_versions | true
+	rm -f e1000e-$(EARTH_CUSTOM)/src/*odule* | true 
+	rm -f e1000e-$(EARTH_CUSTOM)/src/*.mod | true 
+	rm -f e1000e-$(EARTH_CUSTOM)/src/*.mod.* | true 
+	rm -f e1000e-$(EARTH_CUSTOM)/src/*.cmd | true 
+	rm -f e1000e-$(EARTH_CUSTOM)/src/*.orig | true 
+	rm -f e1000e-$(EARTH_CUSTOM)/src/*.rej | true 
+	
