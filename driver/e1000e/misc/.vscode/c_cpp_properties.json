@@ -1,0 +1,23 @@
+{
+    "configurations": [
+        {
+            "name": "Linux",
+            "includePath": [
+                "${workspaceFolder}/**",
+                "/usr/src/linux-headers-KERNELREL/include/**",
+                "/usr/src/linux-headers-KERNELREL/arch/x86/include/**",
+                "/usr/src/linux-headers-KERNELREL-generic/include/**",
+                "/usr/src/linux-headers-KERNELREL-generic/arch/x86/include/**"
+            ],
+            "defines": [
+                "__KERNEL__"
+            ],
+            "compileCommands": "compile_commands.json",
+            "compilerPath": "/usr/bin/gcc",
+            "cStandard": "gnu99",
+            "cppStandard": "c++17",
+            "intelliSenseMode": "gcc-x64"
+        }
+    ],
+    "version": 4
+}

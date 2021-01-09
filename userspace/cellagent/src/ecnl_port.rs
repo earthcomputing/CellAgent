@@ -152,7 +152,6 @@ impl ECNL_Port {
     	 unsafe {
              port_do_read_async(self, bdp);
 	     if ((*bdp).frame != null_mut() && (*bdp).len != 0) {
-	         sleep(Duration::from_millis(100));
 	         let packet: &Packet = &*((*bdp).frame);
                  println!("Received Packet: {}", packet.to_string().unwrap()); // Probably usually sufficient to print ec_msg_type.
 	         return Some(Ok((*packet).clone())); // Can't keep this clone!

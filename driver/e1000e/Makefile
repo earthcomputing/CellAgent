@@ -31,11 +31,8 @@ CFLAGS_EXTRA="-DENTL"
 PATCHDIR := patch.d/$(EARTH_CUSTOM)
 PATCHNR = $(shell ls $(BASE)/patch.d/3.3.4 | sort -n -r | grep -o -E '[0-9]+' | head -1)
 
-default: build
-a:
-	echo $(PATCHNR)
-	echo $$(($(PATCHNR) + 1))
-# e1000e-3.3.4
+default: build 
+
 expand:
 	tar xf $(MEDIA)
 
@@ -52,6 +49,24 @@ patch: expand
 build: patch
 	$(MAKE) -j $(NR_CPU) CFLAGS_EXTRA="$(CFLAGS_EXTRA) $(ccflags-y)" -C e1000e-$(EARTH_CUSTOM)/src
 
+rebuild:
+	$(MAKE) -j $(NR_CPU) CFLAGS_EXTRA="$(CFLAGS_EXTRA) $(ccflags-y)" -C e1000e-$(EARTH_CUSTOM)/src
+
+dev-deps:
+	sudo apt install linux-headers | true
+	sudo apt install linux-source | true
+	sudo apt install python-pip | true
+	pip install compiledb | true
+
+
+vs-compile-commands:
+	cd e1000e-$(EARTH_CUSTOM)/src && compiledb make -C ../../ rebuild
+
+vscode: vs-compile-commands
+	cat misc/.vscode/c_cpp_properties.json | sed s/KERNELREL/$(EARTH_CUSTOM)/ > misc/.vscode/c_cpp_properties.json
+	cp -r misc/.vscode e1000e-$(EARTH_CUSTOM)/src/
+	code e1000e-$(EARTH_CUSTOM)/src/
+
 clean:
 	rm -f patch.d/$(EARTH_CUSTOM)/*.* | true 
 	rm -f e1000e-$(EARTH_CUSTOM)/src/*.ko | true
@@ -66,4 +81,5 @@ clean:
 	rm -f e1000e-$(EARTH_CUSTOM)/src/*.cmd | true 
 	rm -f e1000e-$(EARTH_CUSTOM)/src/*.orig | true 
 	rm -f e1000e-$(EARTH_CUSTOM)/src/*.rej | true 
-	
+	rm -f e1000e-$(EARTH_CUSTOM)/src/compile_commands.json | true 
+	mv e1000e-$(EARTH_CUSTOM)/src/.vscode misc/.vscode
