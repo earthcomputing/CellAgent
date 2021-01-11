@@ -7,7 +7,7 @@ use crate::ec_message_formats::{LinkToPortPacket, PortToLinkPacket,
 use crate::name::{Name};
 use crate::packet::{Packet}; // Eventually use SimulatedPacket
 use crate::port::{Port, PortStatus};
-use crate::utility::{S, TraceHeader, TraceHeaderParams, TraceType};
+use crate::utility::{S, TraceHeaderParams, TraceType};
 use crate::uuid_ec::{AitState};
 
 pub type PortToLink = mpsc::Sender<PortToLinkPacket>;
@@ -67,6 +67,7 @@ impl SimulatedPort {
 
                             AitState::Tick => (), // TODO: Send AitD to packet engine
                             AitState::Entl |
+                            AitState::SnakeD |
                             AitState::Normal => {
                                 {
                                     if CONFIG.trace_options.all || CONFIG.trace_options.port {
@@ -118,24 +119,20 @@ impl SimulatedPort {
     }
     pub fn send(&self, mut packet: Packet) -> Result<(), Error> {
         let _f = "send";
-	        let ait_state = packet.get_ait_state();
-
-            {
+	    let ait_state = packet.get_ait_state();
 		match ait_state {
-	            AitState::AitD |
-                    AitState::Tick |
+	        AitState::AitD |
+            AitState::Tick |
 		    AitState::Tock |
 		    AitState::Tack |
-		    AitState::Teck => return Err(SimulatedPortError::Ait { func_name: _f, ait_state }.into()), // Not allowed here
-                
-		    AitState::Ait => {
-                        packet.next_ait_state()?;
-            	    },
-                    AitState::Entl | // Only needed for simulator, should be handled by port
-                    AitState::Normal => ()
-                }
+		    AitState::Teck => return Err(SimulatedPortError::Ait { func_name: _f, ait_state }.into()), // Not allowed here 
+		    AitState::Ait => { packet.next_ait_state()?; },
+            AitState::Entl | // Only needed for simulator, should be handled by port
+            AitState::SnakeD |
+            AitState::Normal => ()
+        }
 		self.direct_send(packet)
-            }    }
+    }
     fn recv(&self) -> Result<LinkToPortPacket, Error> {
        Ok(self.port_from_link.recv()?)
     }
