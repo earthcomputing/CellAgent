@@ -2,7 +2,7 @@
 use crossbeam::crossbeam_channel as mpsc;
 
 use crate::app_message::{SenderMsgSeqNo};
-use crate::app_message_formats::{ISAIT};
+use crate::app_message_formats::{ISAIT, SNAKE};
 use crate::name::{OriginatorID, TreeID};
 use crate::packet::{Packet};
 use crate::packet_engine::NumberOfPackets;
@@ -11,7 +11,7 @@ use crate::routing_table_entry::{RoutingTableEntry};
 use crate::utility::{ByteArray, Mask, PortNo};
 use crate::uuid_ec::Uuid;
 
-type CATOCM = (TreeID, ISAIT, Mask, SenderMsgSeqNo, ByteArray);
+type CATOCM = (TreeID, ISAIT, SNAKE, Mask, SenderMsgSeqNo, ByteArray);
 type REROUTE = (PortNo, PortNo, NumberOfPackets);
 type STATUS = (PortNo, bool, NumberOfPackets, PortStatus);
 type TUNNELPORT = (PortNo, ByteArray);
@@ -39,6 +39,7 @@ pub enum CmToPePacket {
     Entry(RoutingTableEntry),
     Packet((Mask, Packet)),
     Reroute(REROUTE),
+    SnakeD((PortNo, Packet))
 }
 pub type CmToPe = mpsc::Sender<CmToPePacket>;
 pub type PeFromCm = mpsc::Receiver<CmToPePacket>;
@@ -74,6 +75,7 @@ pub type PeFromPort = mpsc::Receiver<PortToPePacket>;
 pub enum PeToCmPacket {
     Status(STATUS),
     Packet((PortNo, Packet)),
+    Snake((PortNo, usize, Packet))
 }
 pub type PeToCm = mpsc::Sender<PeToCmPacket>;
 pub type CmFromPe = mpsc::Receiver<PeToCmPacket>;

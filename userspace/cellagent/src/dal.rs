@@ -10,7 +10,7 @@ use std::{cell::RefCell,
 use {
     actix_rt::{System, SystemRunner},
     actix_web::client::{ClientBuilder},
-    futures::{future::lazy},
+    futures::{Future, future::lazy},
     std::sync::atomic::Ordering
 };
 
@@ -108,7 +108,7 @@ pub fn get_cell_replay_lines(cell_name: &str) -> Result<Lines<BufReader<File>>, 
         S("/dev/null")
     };
     let cell_file_name = str::replace(&file_name, ":", "-");
-    let mut cell_file_handle = OpenOptions::new().read(true).open(cell_file_name.clone()).context(DalError::Replay { func_name: _f, file_name: cell_file_name, cell_name: S(cell_name) })?;
+    let cell_file_handle = OpenOptions::new().read(true).open(cell_file_name.clone()).context(DalError::Replay { func_name: _f, file_name: cell_file_name, cell_name: S(cell_name) })?;
     let reader = BufReader::new(cell_file_handle);
     Ok(reader.lines())
 }

@@ -3,21 +3,18 @@ use std::{fmt,
           thread::JoinHandle,
           sync::{atomic::AtomicBool, Arc, atomic::Ordering::SeqCst}};
 
-use either::{Either, Left, Right};
+use either::Either;
 
 use crate::app_message_formats::{PortToNoc, PortFromNoc, PortToCa, PortToCaMsg, PortFromCa};
-use crate::config::{CONFIG, PacketNo};
+use crate::config::CONFIG;
 use crate::dal::{add_to_trace, fork_trace_header, update_trace_header};
 use crate::simulated_port::{SimulatedPort};
 use crate::ec_message_formats::{PortToPe, PortFromPe};
-use crate::ecnl::{ECNL_Session};
-use crate::ecnl_port::{ECNL_Port};
 use crate::name::{Name, PortID, CellID};
 #[cfg(feature = "cell")]
 use crate::packet::{Packet, UniqueMsgId};
 use crate::utility::{ByteArray, PortNo, PortNumber, S, TraceHeader, TraceHeaderParams, TraceType,
                      write_err};
-use crate::uuid_ec::{Uuid, AitState};
 
 // TODO: There is no distinction between a broken link and a disconnected one.  We may want to revisit.
 #[derive(Debug, Copy, Clone, Serialize, Deserialize)]
@@ -33,7 +30,9 @@ impl fmt::Display for PortStatus {
         }
     }
 }
-
+#[allow(non_camel_case_types)]
+#[cfg(not(feature = "cell"))]
+type ECNL_Port = usize;
 #[derive(Debug, Clone)]
 pub struct Port {
     cell_id: CellID, // Used in trace records
@@ -184,7 +183,7 @@ impl Port {
             if CONFIG.continue_on_error { }
         }).expect("thread failed");
         let port = self.clone();
-        let child_trace_header = fork_trace_header();
+        let child_trace_header = fork_trace_header(); 
         let thread_name = format!("Port {} listen_pe", self.get_id().get_name());
         thread::Builder::new().name(thread_name).spawn( move || {
             update_trace_header(child_trace_header);

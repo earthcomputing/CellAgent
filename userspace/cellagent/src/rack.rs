@@ -1,4 +1,4 @@
-use either::{Either, Left, Right};
+use either::Either;
 use multi_mut::HashMapMultiMut;
 use std::{fmt, fmt::Write,
           collections::{HashMap, HashSet},
@@ -143,7 +143,7 @@ impl Rack {
         let _f = "connect_to_noc";
         let (cell_no, cell) = if CONFIG.replay {
             let mut trace_lines = get_cell_replay_lines("Rack").context(RackError::Chain { func_name: _f, comment: S("Rack") })?;
-            let mut record = trace_lines.next().transpose()?.expect(&format!("First record for rack must be there"));
+            let record = trace_lines.next().transpose()?.expect(&format!("First record for rack must be there"));
             let trace_format = process_trace_record(record)?;
             match trace_format {
                 TraceFormat::BorderCell(cell_no,) => {
@@ -158,7 +158,7 @@ impl Rack {
         } else {
             self.cells
                 .iter_mut()
-                .find(|(cell_no, nalcell)| nalcell.is_border())
+                .find(|(_, nalcell)| nalcell.is_border())
                 .map(|(cell_no, cell)| (*cell_no, cell))
                 .ok_or::<Error>(RackError::Boundary { func_name: _f }.into())?
         };

@@ -21,9 +21,9 @@ pub struct VirtualMachine {
     vm_to_containers: Vec<VmToContainer>,
 }
 impl VirtualMachine {
-    pub fn new(id: &VmID, vm_to_ca: VmToCa, allowed_trees_ref: &[AllowedTree]) -> VirtualMachine {
+    pub fn new(id: VmID, vm_to_ca: VmToCa, allowed_trees_ref: &[AllowedTree]) -> VirtualMachine {
         //println!("Create VM {}", id);
-        VirtualMachine { id: id.clone(), vm_to_ca, allowed_trees: allowed_trees_ref.to_owned(),
+        VirtualMachine { id: id, vm_to_ca, allowed_trees: allowed_trees_ref.to_owned(),
             vm_to_containers: Vec::new() }
     }
     pub fn initialize(&mut self, up_tree_name: &str, vm_from_ca: VmFromCa, allowed_trees: &HashSet<AllowedTree>,

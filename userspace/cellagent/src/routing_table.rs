@@ -38,7 +38,7 @@ impl RoutingTable {
 impl fmt::Display for RoutingTable {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let mut s = format!("\nRouting Table");
-        write!(s, "\n Tree UUID  In Use Send? Parent Mask ")?;
+        write!(s, "\n Tree UUID       In Use Send? Parent Mask ")?;
         for key in &self.order {
             let entry = self.entries.get(key);
             if entry.is_some() { write!(s, "\n{}", entry.unwrap())?; }

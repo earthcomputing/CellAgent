@@ -3,6 +3,7 @@ use crossbeam::crossbeam_channel::unbounded as channel;
 
 use crate::app_message_formats::{ApplicationFromNoc, ApplicationToNoc, NocFromApplication, NocToApplication};
 use crate::blueprint::{Blueprint};
+use crate::config::CONFIG;
 use crate::dal::add_to_trace;
 use crate::noc::{Noc};
 use crate::rack::{Rack};
@@ -21,7 +22,7 @@ impl Datacenter {
         {// Reset web server state when restarting datacenter
             { 
                 let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "reset" };
-                let trace = json!({ "blueprint": blueprint});
+                let trace = json!({ "cell_id": {"name": "Datacenter"}, "blueprint": blueprint, "config": *CONFIG});
                 let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
             }
         }

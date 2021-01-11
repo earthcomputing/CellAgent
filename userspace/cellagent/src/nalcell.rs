@@ -1,6 +1,3 @@
-#[cfg(feature = "cell")]
-extern crate libc;
-
 use std::{
     fmt, fmt::Write,
     collections::{HashMap, HashSet},
@@ -10,24 +7,27 @@ use std::{
 };
 use crossbeam::crossbeam_channel::unbounded as channel;
 use either::Either;
-use serde_json::Value;
 
-use crate::app_message::AppMessage;
 use crate::app_message_formats::{CaToPort, PortFromCa, PortToCa, CaFromPort};
 use crate::cellagent::{CellAgent};
 use crate::config::{CONFIG, PortQty};
 use crate::dal::{add_to_trace, get_cell_replay_lines};
 use crate::ec_message_formats::{PortToPe, PeFromPort, PeToPort, PortFromPe,
                                 CmToCa, CaFromCm, CaToCm, CmFromCa, CaToCmBytes, CmToCaBytes,
-                                PeToCm, CmFromPe, CmToPe, PeFromCm};
-use crate::ecnl::{ECNL_Session};
-use crate::name::{Name, CellID};
-use crate::port::{Port};
+                                PeToCm, CmFromPe, CmToPe, PeFromCm}; 
+#[cfg(feature = "cell")]
+use crate::ecnl::ECNL_Session;
+use crate::name::CellID;
+use crate::port::Port;
 use crate::replay::{TraceFormat, process_trace_record};
-use crate::utility::{ByteArray, CellConfig, CellType, PortNo, S,
-                     TraceHeader, TraceHeaderParams, TraceType};
-use crate::vm::VirtualMachine;
+use crate::utility::{CellConfig, CellType, PortNo, S,
+                     TraceHeaderParams, TraceType};
+#[cfg(feature = "cell")]
+use crate::utility::TraceHeader;
 
+#[cfg(not(feature = "cell"))]
+#[allow(non_camel_case_types)]
+type ECNL_Session = usize;
 #[derive(Debug)]
 pub struct NalCell {
     id: CellID,
@@ -49,7 +49,7 @@ impl NalCell {
         }
         let mut trace_lines = get_cell_replay_lines(name).context(NalcellError::Chain { func_name: _f, comment: S(name) })?;
         let (cell_id, tree_ids) = if CONFIG.replay {
-            let mut record = trace_lines.next().transpose()?.expect(&format!("First record for cell {} must be there", name));
+            let record = trace_lines.next().transpose()?.expect(&format!("First record for cell {} must be there", name));
             let trace_format = process_trace_record(record)?;
             match trace_format {
                 TraceFormat::CaNewFormat(cell_id, my_tree_id, control_tree_id, connected_tree_id) =>
@@ -85,6 +85,7 @@ impl NalCell {
         }
         let cell_type = if border_port_nos.is_empty() { CellType::Interior } else { CellType::Border };
         for i in 0..=*num_phys_ports {
+            #[cfg(feature = "cell")]
             let ecnl_clone = ecnl.clone();
             let is_border_port = border_port_nos.contains(&PortNo(i));
             let is_connected;
@@ -95,27 +96,22 @@ impl NalCell {
                 ports_from_ca.insert(PortNo(i), port_from_ca);
                 Either::Right(port_to_ca.clone())
             } else {
-                if i == 0 {
-                    is_connected = true;
+                is_connected = if i == 0 {
+                    true
                 } else {
+                    #[cfg(not(feature = "cell"))] {
+                        false
+                    }
+                    #[cfg(feature = "cell")]
                     match ecnl_clone {
                         Some(ecnl_session) => {
-                            #[cfg(feature = "cell")] {
-                                is_connected = ecnl_session.get_port(i-1).is_connected()
-                            }
-                            // To keep compiler happy
-                            #[cfg(feature = "simulator")] {
-                                is_connected = false;
-                            }
-                            #[cfg(feature = "noc")] {
-                                is_connected = false;
-                            }
+                                ecnl_session.get_port(i-1).is_connected()
                         }
                         None => {
-                            is_connected = false;
+                            false
                         }
                     }
-                }
+                };
                 let (pe_to_port, port_from_pe): (PeToPort, PortFromPe) = channel();
                 pe_to_ports.insert(PortNo(i), pe_to_port);
                 ports_from_pe.insert(PortNo(i), port_from_pe);

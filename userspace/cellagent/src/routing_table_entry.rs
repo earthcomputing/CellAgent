@@ -73,8 +73,8 @@ impl Default for RoutingTableEntry { // Need may_sent = true
 impl fmt::Display for RoutingTableEntry {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let mut uuid = self.tree_uuid.to_string();
-        uuid.truncate(8);
-        let mut s = format!(" {:8?}", uuid);
+        uuid.truncate(13);
+        let mut s = format!(" {:13?}", uuid);
         if self.inuse { write!(s, "  Yes  ")?; }
         else          { write!(s, "  No   ")?; }
         if self.may_send { write!(s, "  Yes ")?; }

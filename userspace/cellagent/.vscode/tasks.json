@@ -2,8 +2,8 @@
     "version": "2.0.0",
     "command": "~/.cargo/bin/cargo",
     "tasks": [
-        {
-            "label": "cargo run",
+       {
+            "label": "simulator run",
             "type": "shell",
             "command": "cargo",
             "args": [
@@ -11,7 +11,7 @@
                 "--bin",
                 "simulator",
                 "--features",
-                "simulator",
+                "simulator, webserver",
                 "--",
                 "${workspaceFolder}/configs/10cell_config.json"
             ],
@@ -19,10 +19,17 @@
                 "kind": "build",
                 "isDefault": true
             },
+            "options": {
+                "env": {
+                    "SERVER_URL":"127.0.0.1:8088", 
+                    "HTML": "html/index.html",
+                    "RA_LOG": "info"
+                }
+            },
             "problemMatcher": []
         },
         {
-            "label": "cargo build",
+            "label": "simulator build",
             "type": "shell",
             "command": "cargo",
             "args": [
@@ -30,10 +37,82 @@
                 "--bin",
                 "simulator",
                 "--features",
-                "simulator"
+                "simulator, webserver"
             ],
             "group": "build",
             "problemMatcher": []
         },
-    ]
+        {
+            "label": "simulator check",
+            "type": "shell",
+            "command": "cargo",
+            "args": [
+                "check",
+                "--bin",
+                "simulator",
+                "--features",
+                "simulator,webserver"
+            ],
+            "group": "build",
+            "problemMatcher": "$rustc-watch",
+            "isBackground": true
+        },
+        {
+            "label": "simulator clippy",
+            "type": "shell",
+            "command": "cargo",
+            "args": [
+                "clippy",
+                "--bin",
+                "simulator",
+                "--features",
+                "simulator,webserver"
+            ],
+            "group": "build",
+            "problemMatcher": "$rustc-watch",
+            "isBackground": true
+        },
+        {
+            "label": "Watch",
+            "group": "build",
+            "type": "shell",
+            "command": "cargo check",
+            "problemMatcher": "$rustc-watch",
+            "isBackground": true
+        },
+        {
+            "label": "cell check",
+            "type": "shell",
+            "command": "cargo",
+            "args": [
+                "check",
+                "--bin",
+                "cell",
+                "--features",
+                "cell"
+            ],
+            "group": "build",
+            "options": {
+                "env": {"CELL_AGENT_DIR":"/tmp"}
+            },
+            "problemMatcher": []
+        },
+        {
+            "label": "cell run",
+            "type": "shell",
+            "command": "cargo",
+            "args": [
+                "run",
+                "--bin",
+                "cell",
+                "--features",
+                "cell"
+            ],
+            "group": "build",
+            "options": {
+                "env": {"CELL_AGENT_DIR":"/tmp"}
+            },
+            "problemMatcher": []
+        },
+     ]
 }

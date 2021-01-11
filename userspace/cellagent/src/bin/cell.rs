@@ -13,7 +13,6 @@ use ec_fabrix::ecnl::{ECNL_Session};
 use ec_fabrix::nalcell::{NalCell};
 use ec_fabrix::utility::{CellConfig, PortNo};
 
-
 fn main() -> Result<(), Error> {
     let _f = "main";
     println!("Multicell Routing: Output to file {} (set in config.rs)", CONFIG.output_file_name);
@@ -33,7 +32,7 @@ fn main() -> Result<(), Error> {
         use std::process::*;
         use std::io::*;
         use std::os::unix::io::{AsRawFd, FromRawFd};
-        unsafe {
+        unsafe {  // AHK: I don't think this block needs unsave
             let grep_cmd = Command::new("grep")
                 .arg("Ethernet")
                 .stdin(Stdio::from_raw_fd(lspci_cmd.stdout.unwrap().as_raw_fd()))

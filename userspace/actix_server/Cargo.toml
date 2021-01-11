@@ -4,6 +4,12 @@ version = "0.1.0"
 authors = ["alanhkarp <alanhkarp@gmail.com>"]
 edition = "2018"
 
+# I have no idea why I need these features,
+# but the rust-analyzer complains if I don't.
+[features]
+simulator = []
+webserver = []
+
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]

@@ -3,7 +3,7 @@ use crossbeam::crossbeam_channel as mpsc;
 
 use crate::port::PortStatus;
 use crate::utility::{ByteArray, PortNo};
-
+pub type SNAKE = bool;
 pub type ISAIT = bool;
 pub type APP = ByteArray;
 // Port to Noc World

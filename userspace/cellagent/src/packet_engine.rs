@@ -1,9 +1,8 @@
-use std::{fmt, fmt::Write,
-          collections::{HashMap, HashSet, VecDeque},
-          sync::{Arc, Mutex},
-          thread,
-          thread::JoinHandle,
-          };
+use std::{
+    collections::{HashMap, HashSet, VecDeque}, 
+    fmt, fmt::Write, str, 
+    sync::{Arc, Mutex}, 
+    thread, thread::JoinHandle};
 
 use crate::config::{CONFIG};
 use crate::dal::{add_to_trace, fork_trace_header, update_trace_header};
@@ -12,7 +11,7 @@ use crate::ec_message_formats::{PeFromCm, PeToCm,
                                 PeToPort, PeFromPort, PortToPePacket,
                                 CmToPePacket, PeToCmPacket};
 use crate::name::{Name, CellID, TreeID};
-use crate::packet::Packet;
+use crate::packet::{Packet};
 use crate::port::PortStatus;
 use crate::routing_table::RoutingTable;
 use crate::routing_table_entry::{RoutingTableEntry};
@@ -26,7 +25,8 @@ const MAX_SLOTS: usize = 10; //MAX_NUM_PHYS_PORTS_PER_CELL.0 as usize + 1;
 
 type BoolArray = [bool; MAX_SLOTS];
 type UsizeArray = [usize; MAX_SLOTS];
-type PacketArray = Vec<VecDeque<Packet>>;
+type Buffer = VecDeque<(bool, PortNo, Packet)>;
+type PacketArray = Vec<Buffer>;
 type Reroute = [PortNo; MAX_SLOTS];
 
 #[derive(Debug, Clone)]
@@ -40,7 +40,7 @@ pub struct PacketEngine {
     no_sent_packets: UsizeArray, // Number of packets sent since last packet received
     sent_packets: PacketArray, // Packets that may need to be resent
     out_buffers: PacketArray,   // Packets waiting to go on the out port
-    in_buffer: PacketArray,    // Packets on the in port waiting to into out_buf on the out port
+    in_buffer: Vec<Buffer>,    // Packets on the in port waiting to into out_buf on the out port
     port_got_event: BoolArray,
     reroute: Reroute,
     pe_to_cm: PeToCm,
@@ -54,8 +54,6 @@ impl PacketEngine {
                border_port_nos: &HashSet<PortNo>) -> PacketEngine {
         let routing_table = RoutingTable::new(cell_id);
         let routing_table_mutex = Arc::new(Mutex::new(routing_table.clone()));
-        let mut array = vec![];
-        for _ in 0..MAX_SLOTS { array.push(VecDeque::new()); }
         let count = [0; MAX_SLOTS];
         PacketEngine {
             cell_id,
@@ -65,9 +63,9 @@ impl PacketEngine {
             border_port_nos: border_port_nos.clone(),
             no_seen_packets: count,
             no_sent_packets: count,
-            sent_packets: array.clone(),
-            out_buffers: array.clone(),
-            in_buffer: array,
+            sent_packets: vec![Default::default(); MAX_SLOTS], // Slots need to be allocated ahead of time
+            out_buffers: vec![Default::default(); MAX_SLOTS],
+            in_buffer: vec![Default::default(); MAX_SLOTS],
             port_got_event: [false; MAX_SLOTS],
             reroute: [PortNo(0); MAX_SLOTS],
             pe_to_cm,
@@ -123,34 +121,27 @@ impl PacketEngine {
     fn set_may_send(&mut self, port_no: PortNo) {
         self.port_got_event[port_no.as_usize()] = true;
     }
-    fn _get_outbuf(&self, port_no: PortNo) -> VecDeque<Packet> {
-        self.out_buffers.get(port_no.as_usize()).unwrap().clone()
+    fn get_outbuf(&self, port_no: PortNo) -> &Buffer {
+        self.out_buffers.get(port_no.as_usize()).expect("PacketEngine: get_outbuf must succeed")
+    }
+    fn get_outbuf_mut(&mut self, port_no: PortNo) -> &mut Buffer {
+        self.out_buffers.get_mut(port_no.as_usize()).expect("PacketEngine: get_outbuf must succeed")
     }
     fn get_size(array: &PacketArray, port_no: PortNo) -> usize {
-        (*array)[port_no.as_usize()].len()
+        array[port_no.as_usize()].len()
     }
     fn get_outbuf_size(&self, port_no: PortNo) -> usize {
         PacketEngine::get_size(&self.out_buffers, port_no)
     }
-    fn _get_inbuf_size(&self, port_no: PortNo) -> usize {
-        PacketEngine::get_size(&self.in_buffer, port_no)
-    }
-    fn _get_sent_size(&self, port_no: PortNo) -> usize {
-        PacketEngine::get_size(&self.sent_packets, port_no)
-    }
     fn get_outbuf_first_type(&self, port_no: PortNo) -> Option<MsgType> {
-        (*self.out_buffers)
-            .get(port_no.as_usize())
-            .unwrap()
+        self.get_outbuf(port_no)
             .get(0)
-            .map(|packet| MsgType::msg_type(packet))
+            .map(|(_, _, packet)| MsgType::msg_type(packet))
     }
     fn get_outbuf_first_ait_state(&self, port_no: PortNo) -> Option<AitState> {
-        (*self.out_buffers)
-            .get(port_no.as_usize())
-            .unwrap()
+        self.get_outbuf(port_no)
             .get(0)
-            .map(|packet| packet.get_ait_state())
+            .map(|(_, _, packet)| packet.get_ait_state())
     }
     fn add_to_packet_count(packet_count: &mut UsizeArray, port_no: PortNo) {
          if packet_count.len() == 1 { // Replace 1 with PACKET_PIPELINE_SIZE when adding pipelining
@@ -171,89 +162,59 @@ impl PacketEngine {
     fn add_seen_packet_count(&mut self, port_no: PortNo) {
         PacketEngine::add_to_packet_count(&mut self.no_seen_packets, port_no);
     }
-    fn _clear_seen_packet_count(&mut self, port_no: PortNo) {
+    fn clear_seen_packet_count(&mut self, port_no: PortNo) {
         self.no_seen_packets[port_no.as_usize()] = 0;
     }
     fn add_sent_packet(&mut self, port_no: PortNo, packet: Packet) {
-        PacketEngine::add_packet_to_back(&mut self.sent_packets, port_no, packet);
+        let sent_packets = self.sent_packets.get_mut(port_no.as_usize()).expect("PacketEngine: sent_packets must be set");
+        sent_packets.push_back((true, port_no, packet));
         PacketEngine::add_to_packet_count(&mut self.no_sent_packets, port_no);
     }
     fn clear_sent_packets(&mut self, port_no: PortNo) {
-        self.no_seen_packets[port_no.as_usize()] = 0;
+        self.sent_packets.get_mut(*port_no as usize).expect("PacketEngine: sent_packets entry must be set").clear();
+        self.clear_seen_packet_count(port_no);
     }
-    fn pop_first(array: &mut PacketArray, port_no: PortNo) -> Option<Packet> {
-        let item = array.get_mut(port_no.as_usize()).unwrap(); // Safe since vector always has MAX_NUM_PHYS_PORTS_PER_CELL entries
-        item.pop_front()
+    fn pop_first_outbuf(&mut self, port_no: PortNo) -> Option<(bool, PortNo, Packet)> {
+        self.get_outbuf_mut(port_no).pop_front()
     }
-    fn _pop_first_outbuf(&mut self, port_no: PortNo) -> Option<Packet> {
-        PacketEngine::pop_first(&mut self.out_buffers, port_no)
-    }
-    fn _pop_first_inbuf(&mut self, port_no: PortNo) -> Option<Packet> {
-        PacketEngine::pop_first(&mut self.in_buffer, port_no)
-    }
-    fn _pop_first_sent(&mut self, port_no: PortNo) -> Option<Packet> {
-        PacketEngine::pop_first(&mut self.sent_packets, port_no)
-    }
-    fn add_packet(to_end: bool, array: &mut PacketArray, port_no: PortNo, packet: Packet) {
-        let item = array.get_mut(port_no.as_usize()).unwrap();
-        if to_end { item.push_back(packet); } else { item.push_front(packet); }
-    }
-    fn add_packet_to_front(array: &mut PacketArray, port_no: PortNo, packet: Packet) {
-        PacketEngine::add_packet(false, array, port_no, packet);
-    }
-    fn add_packet_to_back(array: &mut PacketArray, port_no: PortNo, packet: Packet) {
-        PacketEngine::add_packet(true, array, port_no, packet);
-    }
-    #[allow(dead_code)]
-    fn add_to_out_buffer_front(&mut self, port_no: PortNo, packet: Packet) {
-        let _f = "add_to_out_buffer_front";
-        PacketEngine::add_packet_to_front(&mut self.out_buffers, port_no, packet);
-    }
-    fn add_to_out_buffer_back(&mut self, port_no: PortNo, packet: Packet) {
+    fn add_to_out_buffer_back(&mut self, recv_port_no: PortNo, port_no: PortNo, packet: Packet) -> bool {
         let _f = "add_to_out_buffer_back";
-        PacketEngine::add_packet_to_back(&mut self.out_buffers, port_no, packet);
-    }
-    fn _add_to_in_buffer_back(&mut self, port_no: PortNo, packet: Packet) {
-        PacketEngine::add_packet_to_back(&mut self.in_buffer, port_no, packet);
-    }
-    fn _add_to_sent_back(&mut self, port_no: PortNo, packet: Packet) {
-        PacketEngine::add_packet_to_back(&mut self.sent_packets, port_no, packet);
+        // If the packet was put into the first half of the buffer, then the pong was sent.  We use true for
+        // pong_sent to denote this case.  If the packet was put into the second half of the buffer, the pong
+        // was not sent.  In that case, we remember the recv_port_no and use it to send the pong when the packet
+        // reaches the first half of the buffer.  We then set pong_sent to true.
+        let outbuf = self.get_outbuf_mut(port_no);
+        if outbuf.len() < MAX_SLOTS {
+            outbuf.push_back((false, recv_port_no, packet));
+            true
+        } else {
+            outbuf.push_back((true, recv_port_no, packet));
+            false
+        }
     }
     // SPAWN THREAD (listen_cm_loop)
     fn listen_cm(&mut self, msg: CmToPePacket) -> Result<(), Error> {
         let _f = "listen_cm";
-        {
-            if CONFIG.trace_options.all || CONFIG.trace_options.pe_cm {
-                match &msg {
-                    CmToPePacket::Packet((user_mask, packet)) => {
-                        let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "pe_from_cm_packet" };
-                        let trace = json!({ "cell_id": self.cell_id, "user_mask": user_mask, "packet": packet.to_string()? });
-                        let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
-                    },
-                    CmToPePacket::Delete(uuid) => {
-                        let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "pe_from_cm_entry" };
-                        let trace = json!({ "cell_id": &self.cell_id, "uuid": uuid });
-                        let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
-                    },
-                    CmToPePacket::Entry(entry) => {
-                        let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "pe_from_cm_entry" };
-                        let trace = json!({ "cell_id": &self.cell_id, "entry": entry });
-                        let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
-                    },
-                    CmToPePacket::Reroute((broken_port_no, new_parent, no_packets)) => {
+        match msg {
+            // control plane from CellAgent
+            CmToPePacket::Reroute((broken_port_no, new_parent, no_packets)) => {
+                {
+                    if CONFIG.trace_options.all || CONFIG.trace_options.pe_cm {
                         let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "pe_from_cm_reroute" };
                         let trace = json!({ "cell_id": &self.cell_id, "broken_port": broken_port_no, "new_parent": new_parent, "no_packets": no_packets });
                         let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
                     }
                 }
-            }
-        }
-        match msg {
-            // control plane from CellAgent
-            CmToPePacket::Reroute((broken_port_no, new_parent, no_packets)) => {
                 self.reroute_packets(broken_port_no, new_parent, no_packets);
             },
             CmToPePacket::Delete(uuid) => {
+                {
+                    if CONFIG.trace_options.all || CONFIG.trace_options.pe_cm {
+                        let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "pe_from_cm_entry" };
+                        let trace = json!({ "cell_id": &self.cell_id, "uuid": uuid });
+                        let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
+                    }
+                }
                 {
                     if CONFIG.debug_options.all || CONFIG.debug_options.pe_process_pkt {
                         let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "pe_delete_entry_dbg" };
@@ -265,14 +226,37 @@ impl PacketEngine {
                 (*self.routing_table_mutex.lock().unwrap()) = self.routing_table.clone();
             }
             CmToPePacket::Entry(entry) => {
+                {
+                    if CONFIG.trace_options.all || CONFIG.trace_options.pe_cm {
+                        let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "pe_from_cm_entry" };
+                        let trace = json!({ "cell_id": &self.cell_id, "entry": entry });
+                        let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
+                    }
+                }
                 self.routing_table.set_entry(entry);
                 (*self.routing_table_mutex.lock().unwrap()) = self.routing_table.clone();
-            },
-        
+            },       
             // route packet, xmit to neighbor(s) or up to CModel
             CmToPePacket::Packet((user_mask, packet)) => {
-                self.route_cm_packet(user_mask, packet)?;
-            }
+                {
+                    if CONFIG.trace_options.all || CONFIG.trace_options.pe_cm {
+                        let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "pe_from_cm_packet" };
+                        let trace = json!({ "cell_id": self.cell_id, "user_mask": user_mask, "packet": packet.to_string()? });
+                        let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
+                    }
+                }
+                self.process_packet_from_cm(user_mask, packet)?;
+            },
+            CmToPePacket::SnakeD((ack_port_no, packet)) => {
+                {
+                    if CONFIG.trace_options.all || CONFIG.trace_options.pe_cm {
+                        let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "pe_from_cm_snaked" };
+                        let trace = json!({ "cell_id": &self.cell_id, "ack_port_no": ack_port_no, "packet": packet.to_string()? });
+                        let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
+                    }
+                }
+                self.send_if_room(PortNo(0), ack_port_no, &packet)?;
+             }
         };
         Ok(())
     }
@@ -280,47 +264,45 @@ impl PacketEngine {
     // TODO: One thread for all ports; should be a different thread for each port
     fn listen_port(&mut self, msg: PortToPePacket) -> Result<(), Error> {
         let _f = "listen_port";
-        {
-            if CONFIG.trace_options.all || CONFIG.trace_options.pe_port {
-                match &msg {
-                    PortToPePacket::Packet((port_no, packet)) => {
-                        let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "pe_from_port_packet" };
-                        let trace = json!({ "cell_id": self.cell_id, "port_no": port_no, "packet": packet.to_string()? });
-                        let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
-                    },
-                    PortToPePacket::Status((port_no, is_border, port_status)) => {
+        match msg {
+            // deliver to CModel
+            PortToPePacket::Status((port_no, is_border, port_status)) => {
+                {
+                    if CONFIG.trace_options.all || CONFIG.trace_options.pe_port {
                         let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "pe_from_port_status" };
                         let trace = json!({ "cell_id": &self.cell_id,  "port": port_no, "is_border": is_border, "status": port_status});
                         let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
                     }
-                };
-            }
-        }
-        match msg {
-            // deliver to CModel
-            PortToPePacket::Status((port_no, is_border, status)) => {
+                }
                 let number_of_packets = NumberOfPackets {
                     sent: self.get_no_sent_packets(port_no),
                     recd: self.get_no_seen_packets(port_no)
                 };
-                match status {
+                match port_status {
                     PortStatus::Connected => self.set_may_send(port_no),
                     PortStatus::Disconnected => self.set_may_not_send(port_no)
                 }
                 {
                     if CONFIG.trace_options.all | CONFIG.trace_options.pe {
                         let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "pe_to_cm_status" };
-                        let trace = json!({ "cell_id": &self.cell_id, "port": port_no, "is_border": is_border, "no_packets": number_of_packets, "status": status });
+                        let trace = json!({ "cell_id": &self.cell_id, "port": port_no, "is_border": is_border, "no_packets": number_of_packets, "status": port_status });
                         let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
                     }
                 }
                 if !CONFIG.replay {
-                    self.pe_to_cm.send(PeToCmPacket::Status((port_no, is_border, number_of_packets, status))).context(PacketEngineError::Chain { func_name: "listen_port", comment: S("send status to ca ") + &self.cell_id.get_name() })?
+                    self.pe_to_cm.send(PeToCmPacket::Status((port_no, is_border, number_of_packets, port_status))).context(PacketEngineError::Chain { func_name: "listen_port", comment: S("send status to ca ") + &self.cell_id.get_name() })?
                 }
             },
             
             // recv from neighbor
             PortToPePacket::Packet((port_no, packet)) => {
+                {
+                    if CONFIG.trace_options.all || CONFIG.trace_options.pe_port {
+                        let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "pe_from_port_packet" };
+                        let trace = json!({ "cell_id": self.cell_id, "port_no": port_no, "packet": packet.to_string()? });
+                        let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
+                    }
+                }
                 self.process_packet_from_port(port_no, packet).context(PacketEngineError::Chain { func_name: "listen_port", comment: S("process_packet ") + &self.cell_id.get_name() })?
             }
         };
@@ -335,13 +317,14 @@ impl PacketEngine {
         let no_her_seen_packets = no_packets.get_number_seen();
         let no_resend = no_my_sent_packets - no_her_seen_packets;
         let mut remaining_sent = sent_buf.split_off(no_resend);
-        let broken_outbuf = &mut self.out_buffers[broken_port_no.as_usize()].clone();
-        let new_parent_outbuf = &mut self.out_buffers[new_parent.as_usize()];
+        let broken_outbuf = &mut self.get_outbuf_mut(broken_port_no).clone();
+        let new_parent_outbuf = &mut self.get_outbuf_mut(new_parent);
         new_parent_outbuf.append(&mut remaining_sent);
-        new_parent_outbuf.append(broken_outbuf);
+        new_parent_outbuf.append(broken_outbuf); 
+        self.get_outbuf_mut(broken_port_no).clear(); // Because I had to clone the buffer
     }
-    fn route_cm_packet(&mut self, user_mask: Mask, packet: Packet) -> Result<(), Error> {
-        let _f = "route_cm_packet";
+    fn process_packet_from_cm(&mut self, user_mask: Mask, packet: Packet) -> Result<(), Error> {
+        let _f = "process_packet_from_cm";
         let uuid = packet.get_tree_uuid().for_lookup();  // Strip AIT info for lookup
         let entry = self.routing_table.get_entry(uuid).context(PacketEngineError::Chain { func_name: _f, comment: S(self.cell_id.get_name()) })?;
         match packet.get_ait_state() {
@@ -351,24 +334,23 @@ impl PacketEngine {
             AitState::Tock |
             AitState::Tack |
             AitState::Teck => return Err(PacketEngineError::Ait { func_name: _f, ait_state: packet.get_ait_state() }.into()), // Not allowed here
-
+            AitState::SnakeD => {}, // Handled in listen_cm()
             AitState::Normal |
             AitState::Ait => {
                 { // Debug block
-                    let msg_type = MsgType::msg_type(&packet);
-                    let uuid = packet.get_uuid();
-                    let ait_state = packet.get_ait_state();
-                    {
-                        if CONFIG.trace_options.all || CONFIG.trace_options.pe_cm {
-                            let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "pe_packet_from_cm" };
-                            let trace = json!({ "cell_id": self.cell_id, "uuid": uuid, "ait_state": ait_state, "packet": packet.to_string()? });
-                            let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
-                        }
-                        if CONFIG.debug_options.pe_pkt_recv {
-                            match msg_type {
-                                MsgType::Manifest => println!("PacketEngine {}: {} got from cm {} {}", self.cell_id, _f, msg_type, user_mask),
-                                _ => (),
-                            }
+                    if CONFIG.trace_options.all || CONFIG.trace_options.pe_cm {
+                        let uuid = packet.get_uuid();
+                        let ait_state = packet.get_ait_state();
+                        let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "pe_packet_from_cm" };
+                        let trace = json!({ "cell_id": self.cell_id, "uuid": uuid, "ait_state": ait_state, 
+                            "packet": packet.to_string()? });
+                        let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
+                    }
+                    if CONFIG.debug_options.pe_pkt_recv {
+                        let msg_type = MsgType::msg_type(&packet);
+                        match msg_type {
+                            MsgType::Manifest => println!("PacketEngine {}: {} got from cm {} {}", self.cell_id, _f, msg_type, user_mask),
+                            _ => (),
                         }
                     }
                 }
@@ -391,12 +373,11 @@ impl PacketEngine {
         if reroute_port_no == PortNo(0) {
             reroute_port_no = port_no;
         } else {
-            let broken_outbuf = &mut self.out_buffers[port_no.as_usize()];
+            let broken_outbuf = &mut self.get_outbuf_mut(port_no).clone();
             if broken_outbuf.len() > 0 {
-                // Only clone if there are packets in the broken out buffer
-                let broken_outbuf = &mut self.out_buffers[port_no.as_usize()].clone();
-                let reroute_outbuf = &mut self.out_buffers[reroute_port_no.as_usize()];
+                let reroute_outbuf = self.get_outbuf_mut(reroute_port_no);
                 reroute_outbuf.append(broken_outbuf);
+                self.get_outbuf_mut(port_no).clear();
             }
         }
         if port_no == PortNo(0) {
@@ -409,25 +390,40 @@ impl PacketEngine {
         Ok(())
     }
     fn send_packet_flow_control(&mut self, port_no: PortNo) -> Result<(), Error> {
-        let _f = "send_packet";
-        if self.may_send(port_no) {
-            if let Some(packet) = self._pop_first_outbuf(port_no) {
-                self.set_may_not_send(port_no);
-                {
-                    if CONFIG.debug_options.all || CONFIG.debug_options.flow_control {
-                        let msg_type = MsgType::msg_type(&packet);
-                        match packet.get_ait_state() {
-                            AitState::Normal => println!("PacketEngine {}: port {} {} outbuf size {} {} {}", self.cell_id, *port_no, _f, self.get_outbuf_size(port_no), msg_type, packet.get_ait_state()),
-                            _ => ()
+        let _f = "send_packet_flow_control";
+        let cell_id = self.cell_id;
+        let outbuf_size = self.get_outbuf_size(port_no);
+        let may_send = self.may_send(port_no);
+        if may_send {
+            let first = self.pop_first_outbuf(port_no);
+            if let Some((_, _, packet)) = first {
+                let outbuf = self.get_outbuf_mut(port_no);
+                let last_item = outbuf.get(MAX_SLOTS as usize);
+                if let Some((pong_sent, recv_port_no, last_packet)) = last_item {
+                    {
+                        if CONFIG.debug_options.all || CONFIG.debug_options.flow_control {
+                            let msg_type = MsgType::msg_type(&packet);
+                            match packet.get_ait_state() {
+                                AitState::Normal => println!("PacketEngine {}: port {} {} outbuf size {} {} {}", cell_id, *port_no, _f, outbuf_size, msg_type, packet.get_ait_state()),
+                                _ => ()
+                            }
                         }
                     }
-                }
+                    if !pong_sent {
+                        let recv_port_no = *recv_port_no; // Needed to avoid https://github.com/rust-lang/rust/issues/59159>
+                        outbuf[MAX_SLOTS as usize] = (true, recv_port_no, last_packet.clone());
+                        self.send_next_packet_or_entl(recv_port_no)?;
+                    }
+                 }
+                self.set_may_not_send(port_no);
                 match packet.get_ait_state() {
                     AitState::Entl => self.set_may_send(port_no),
                     _              => self.set_may_not_send(port_no)
                 }
                 self.send_packet(port_no, &packet)?;
                 self.add_sent_packet(port_no, packet);
+            } else {
+                // Buffer is empty because simulator doesn't send ENTL in response to ENTL
             }
         } else { // Debug only
             {
@@ -448,7 +444,8 @@ impl PacketEngine {
         let _f = "send_next_packet_or_entl";
         // TOCTTOU race here, but the only cost is sending an extra ENTL packet
         if self.get_outbuf_size(port_no) == 0 {
-            self.add_to_out_buffer_back(port_no, Packet::make_entl_packet());
+            // ENTL packets have no recv_port_no, so use 0 instead
+            self.add_to_out_buffer_back(PortNo(0), port_no, Packet::make_entl_packet());
         }
         self.send_packet_flow_control(port_no)
     }
@@ -480,7 +477,19 @@ impl PacketEngine {
                 self.send_next_packet_or_entl(port_no)?; // Don't lock up the port on an error
                 return Err(PacketEngineError::Ait { func_name: _f, ait_state: packet.get_ait_state() }.into())
             },
-            AitState::Entl => self.send_packet_flow_control(port_no)?,
+            AitState::Entl => {
+                self.send_packet_flow_control(port_no)? // send_next_packet_or_entl() does ping pong which spins the CPU in the simulator
+            },
+            AitState::SnakeD => {
+                {
+                    if CONFIG.trace_options.all | CONFIG.trace_options.pe {
+                        let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "pe_to_cm_packet_snaked" };
+                        let trace = json!({ "cell_id": &self.cell_id, "port": port_no, "packet": packet.to_string()? });
+                        let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
+                    }
+                }
+                self.pe_to_cm.send(PeToCmPacket::Packet((port_no, packet)))?;
+            },
             AitState::Ait  => {
                 {
                     if CONFIG.trace_options.all | CONFIG.trace_options.pe {
@@ -530,15 +539,10 @@ impl PacketEngine {
                     }
                 }
                 if entry.is_in_use() {
-                    if entry.get_uuid() == uuid {
-                        // Put packets on the right port's queue
-                        let mask = entry.get_mask();
-                        self.forward(port_no, entry, mask, &packet).context(PacketEngineError::Chain { func_name: "process_packet", comment: S("forward ") + &self.cell_id.get_name() })?;
-                    } else {
-                        let msg_type = MsgType::msg_type(&packet);
-                        return Err(PacketEngineError::Uuid { cell_id: self.cell_id, func_name: _f, msg_type, packet_uuid: packet.get_tree_uuid(), table_uuid: entry.get_uuid() }.into());
-                    }
-                    // Send the packet at the head of the port's queue
+                    // Put packets on the right port's queue
+                    let mask = entry.get_mask();
+                    self.forward(port_no, entry, mask, &packet).context(PacketEngineError::Chain { func_name: "process_packet", comment: S("forward ") + &self.cell_id.get_name() })?;
+                    // Send the packet at the head of this port's queue
                     self.send_next_packet_or_entl(port_no)?;
                 }
             }
@@ -552,12 +556,14 @@ impl PacketEngine {
         {
             if CONFIG.trace_options.all | CONFIG.trace_options.pe {
                 let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "pe_forward" };
-                let trace = json!({ "cell_id": &self.cell_id, "port": recv_port_no, "user_mask": user_mask, "entry_mask": entry.get_mask(), "packet": packet.to_string()? });
+                let trace = json!({ "cell_id": &self.cell_id, "port": recv_port_no, "user_mask": user_mask, 
+                    "entry_mask": entry.get_mask(), "packet": packet.to_string()? });
                 let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
             }
         }
-        if packet.get_tree_uuid().for_lookup() == self.connected_tree_uuid {
-           // Send with CA flow control (currently none)
+        let count = if packet.get_tree_uuid().for_lookup() == self.connected_tree_uuid {
+            // No snake for hop-by-hop messages
+            // Send with CA flow control (currently none)
             let mask = user_mask.and(entry.get_mask());
             let port_nos = mask.get_port_nos();
             {
@@ -569,9 +575,13 @@ impl PacketEngine {
                     let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
                 }
             }
-            for port_no in port_nos.into_iter() {
-                self.send_packet(port_no, packet_ref)?;
+            let mut count = 0;
+            for &port_no in port_nos.iter() {
+                if port_no != PortNo(0) { count = count + 1 ;}
+                // Should add_to_buffer_front, but that may confuse my "when to send pong" algorithm
+                self.send_packet(port_no, packet_ref)?;  // Control message so just send
             }
+            count
         } else {
             if recv_port_no != entry.get_parent() {
                 // Send to root if recv port is not parent
@@ -591,7 +601,7 @@ impl PacketEngine {
                                 _ => {
                                     let uuid = packet.get_uuid();
                                     {
-                                        let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "pe_to_cm_rootward" };
+                                        let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "pe_to_cm_rootward_dbg" };
                                         let trace = json!({ "cell_id": self.cell_id, "uuid": &uuid, "msg_type": &msg_type, "parent_port": &parent });
                                         let _ = add_to_trace(TraceType::Debug, trace_params, &trace, _f);
                                     }
@@ -601,7 +611,8 @@ impl PacketEngine {
                             }
                         }
                     }
-                    self.pe_to_cm.send(PeToCmPacket::Packet((recv_port_no, packet)))?;
+                    self.pe_to_cm.send(PeToCmPacket::Packet((recv_port_no, packet.clone())))?;
+                    0
                 } else {
                     // Forward rootward
                     {
@@ -611,13 +622,14 @@ impl PacketEngine {
                             let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
                         }
                     }
-                    self.add_to_out_buffer_back(parent, packet);
-                    self.send_next_packet_or_entl(entry.get_parent())?;
+                    self.send_if_room(recv_port_no, parent, &packet)?;
+                    1
                 }
             } else {
                 // Send leafward if recv port is parent
                 let mask = user_mask.and(entry.get_mask());
                 let port_nos = mask.get_port_nos();
+                let mut count = 0;
                 // Only side effects so use explicit loop instead of map
                 for port_no in port_nos.iter().cloned() {
                     if *port_no == 0 {
@@ -625,17 +637,18 @@ impl PacketEngine {
                         {
                             if CONFIG.trace_options.all | CONFIG.trace_options.pe {
                                 let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "pe_to_cm_leafward_uptree" };
-                                let trace = json!({ "cell_id": &self.cell_id, "port": recv_port_no, "packet": packet.to_string()? });
+                                let trace = json!({ "cell_id": &self.cell_id, "port": recv_port_no, "packet": packet_ref.to_string()? });
                                 let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
                             }
                         }
                         self.pe_to_cm.send(PeToCmPacket::Packet((recv_port_no, packet.clone()))).context(PacketEngineError::Chain { func_name: _f, comment: S("leafcast packet to ca ") + &self.cell_id.get_name() })?;
                     } else {
+                        count = count + 1;  // Only count ports other than 0
                         // forward to neighbor
                         {
                             if CONFIG.trace_options.all | CONFIG.trace_options.pe {
                                 let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "pe_to_port_leafward" };
-                                let trace = json!({ "cell_id": &self.cell_id, "port": recv_port_no, "packet": packet.to_string()? });
+                                let trace = json!({ "cell_id": &self.cell_id, "recv_port_no": recv_port_no, "port_no": port_no, "packet": packet.to_string()? });
                                 let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
                             }
                             if CONFIG.debug_options.all || CONFIG.debug_options.flow_control {
@@ -646,11 +659,30 @@ impl PacketEngine {
                                 }
                             }
                         }
-                        self.add_to_out_buffer_back(port_no, packet.clone());
-                        self.send_next_packet_or_entl(port_no)?;
+                        self.send_if_room(recv_port_no, port_no, &packet)?;
                     }
                 }
+                count
             }
+        };
+        if packet.is_snake() {
+            {
+                if CONFIG.trace_options.all | CONFIG.trace_options.pe {
+                    let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "pe_to_cm_snake" };
+                    let trace = json!({ "cell_id": &self.cell_id, "recv_port_no": recv_port_no, "count": count, "is_snake": true, "packet": packet_ref.to_string()? });
+                    let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
+                }
+            }
+            self.pe_to_cm.send(PeToCmPacket::Snake((recv_port_no, count, packet)))?; 
+        }
+        Ok(())
+    }
+    // Send reply if there is room for my packet in the buffer of the out port
+    fn send_if_room(&mut self, recv_port_no: PortNo, port_no: PortNo, packet: &Packet) ->
+            Result<(), Error> {
+        let has_room = self.add_to_out_buffer_back(recv_port_no, port_no, packet.clone());
+        if has_room {  // Send pong if packet went into first half of outbuf
+            self.send_next_packet_or_entl(port_no)?;
         }
         Ok(())
     }

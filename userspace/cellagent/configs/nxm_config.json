@@ -25,6 +25,7 @@
         "pe_port":false,
         "port":false,
         "replay": true,
+        "snake": true,
         "svc":false,
         "visualize": true,
         "vm":false

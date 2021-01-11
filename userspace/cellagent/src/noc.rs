@@ -141,7 +141,7 @@ impl Noc {
                 self.noc_agent_deploy_tree(&agent_deploy, tree_name, noc_to_port)?;
                 self.small_tree(&three_hop, &tree_name, 3, noc_to_port).context(NocError::Chain { func_name: "create_noc", comment: S("noc master tree") })?;
             },
-            Some(base) => {
+            Some(_base) => {
                 if self.allowed_trees.contains(&three_hop) && *tree_name == three_hop {
                     self.small_tree(&two_hop, &three_hop, 2, noc_to_port).context(NocError::Chain { func_name: "create_noc", comment: S("noc master tree") })?;
                 }
@@ -209,7 +209,7 @@ impl Noc {
         let manifest = Manifest::new("NocMaster", CellConfig::Large, &master_deploy, &allowed_trees,
                                      vec![&vm_spec], vec![&up_tree]).context(NocError::Chain { func_name: _f, comment: S("NocMaster")})?;
         let allowed_trees= manifest.get_allowed_trees();
-        let deploy_msg = AppManifestMsg::new("Noc", false,
+        let deploy_msg = AppManifestMsg::new("Noc", false, false,
                                              &master_deploy, &manifest,
                                              &allowed_trees);
         println!("Noc: deploy {} on tree {}", manifest.get_id(), master_deploy);
@@ -226,19 +226,12 @@ impl Noc {
                                   &allowed_trees, vec![&service], vec![&up_tree]).context(NocError::Chain { func_name: _f, comment: S("NocAgent")})?;
         let manifest = Manifest::new("NocAgent", CellConfig::Large, agent_deploy, &allowed_trees,
                                      vec![&vm_spec], vec![&up_tree]).context(NocError::Chain { func_name: "create_noc", comment: S("NocAgent")})?;
-        let deploy_msg = AppManifestMsg::new("Noc", false,
+        let deploy_msg = AppManifestMsg::new("Noc", false, false,
                                              &agent_deploy, &manifest,
                                              &allowed_trees);
         println!("Noc: deploy {} on tree {}", manifest.get_id(), agent_deploy);
         self.send_msg(&deploy_msg, noc_to_port)?;
         Ok(())
-    }
-    fn stack_trees(&mut self, base_tree_name: &AllowedTree, noc_to_port: &NocToPort) -> Result<usize, Error> {
-        let noc_master_agent = AllowedTree::new(NOC_CONTROL_TREE_NAME);
-        let noc_agent_master = AllowedTree::new(NOC_LISTEN_TREE_NAME);
-        self.noc_master_agent_tree(&noc_master_agent, base_tree_name, noc_to_port).context(NocError::Chain { func_name: "create_noc", comment: S("noc master tree")})?;
-        self.noc_agent_master_tree(&noc_agent_master, base_tree_name, noc_to_port).context(NocError::Chain { func_name: "create_noc", comment: S("noc agent tree")})?;
-        Ok(5)
     }
     fn small_tree(&mut self, new_tree_name: &AllowedTree, parent_tree_name: &AllowedTree,
                   hops: usize, noc_to_port: &NocToPort) -> Result<(), Error> {
@@ -251,7 +244,7 @@ impl Noc {
         eqns.insert(GvmEqn::Xtnd(hops_term));
         eqns.insert(GvmEqn::Save("true"));
         let gvm_eqn = GvmEquation::new(&eqns, &[GvmVariable::new(GvmVariableType::PathLength, "hops")]);
-        let stack_tree_msg = AppStackTreeMsg::new("Noc",
+        let stack_tree_msg = AppStackTreeMsg::new("Noc", false, false,
                                                   &new_tree_name, &parent_tree_name,
                                                   AppMsgDirection::Leafward, &gvm_eqn);
         {
@@ -274,7 +267,7 @@ impl Noc {
         eqns.insert(GvmEqn::Xtnd("false"));
         eqns.insert(GvmEqn::Save("false"));
         let gvm_eqn = GvmEquation::new(&eqns, &[GvmVariable::new(GvmVariableType::PathLength, "hops")]);
-        let stack_tree_msg = AppStackTreeMsg::new("Noc",
+        let stack_tree_msg = AppStackTreeMsg::new("Noc", false, false,
                       noc_master_deploy, parent_tree_name,
                                                   AppMsgDirection::Leafward, &gvm_eqn);
         println!("Noc: stack {} on tree {}", NOC_MASTER_DEPLOY_TREE_NAME, parent_tree_name);
@@ -291,7 +284,7 @@ impl Noc {
         eqns.insert(GvmEqn::Xtnd("true"));
         eqns.insert(GvmEqn::Save("true"));
         let gvm_eqn = GvmEquation::new(&eqns, &[GvmVariable::new(GvmVariableType::PathLength, "hops")]);
-        let stack_tree_msg = AppStackTreeMsg::new("Noc",
+        let stack_tree_msg = AppStackTreeMsg::new("Noc", false, false,
                                                   noc_agent_deploy, parent_tree_name,
                                                   AppMsgDirection::Leafward, &gvm_eqn);
         println!("Noc: stack {} on tree {}", NOC_AGENT_DEPLOY_TREE_NAME, parent_tree_name);
@@ -307,7 +300,7 @@ impl Noc {
         eqns.insert(GvmEqn::Xtnd("true"));
         eqns.insert(GvmEqn::Save("true"));
         let gvm_eqn = GvmEquation::new(&eqns, &[GvmVariable::new(GvmVariableType::PathLength, "hops")]);
-        let stack_tree_msg = AppStackTreeMsg::new("Noc",
+        let stack_tree_msg = AppStackTreeMsg::new("Noc", false, false, 
                    noc_master_agent, parent_tree_name,
                                  AppMsgDirection::Leafward, &gvm_eqn);
         println!("Noc: stack {} on tree {}", NOC_CONTROL_TREE_NAME, parent_tree_name);
@@ -324,7 +317,7 @@ impl Noc {
         eqns.insert(GvmEqn::Xtnd("true"));
         eqns.insert(GvmEqn::Save("true"));
         let gvm_eqn = GvmEquation::new(&eqns, &[GvmVariable::new(GvmVariableType::PathLength, "hops")]);
-        let stack_tree_msg = AppStackTreeMsg::new("Noc",
+        let stack_tree_msg = AppStackTreeMsg::new("Noc", false, false,
                                                   noc_agent_master, parent_tree_name,
                                                   AppMsgDirection::Leafward, &gvm_eqn);
         println!("Noc: stack {} on tree {}", NOC_LISTEN_TREE_NAME, parent_tree_name);
