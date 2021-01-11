@@ -8,6 +8,8 @@ use either::Either;
 use crate::app_message_formats::{PortToNoc, PortFromNoc, PortToCa, PortToCaMsg, PortFromCa};
 use crate::config::CONFIG;
 use crate::dal::{add_to_trace, fork_trace_header, update_trace_header};
+#[cfg(feature = "cell")]
+use crate::ecnl_port::ECNL_Port;
 use crate::simulated_port::{SimulatedPort};
 use crate::ec_message_formats::{PortToPe, PortFromPe};
 use crate::name::{Name, PortID, CellID};
