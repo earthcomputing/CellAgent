@@ -87,7 +87,7 @@ impl VirtualMachine {
             if CONFIG.trace_options.all || CONFIG.trace_options.vm {
                 let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "worker" };
                 let trace = json!({ "id": self.id, "thread_name": thread::current().name(), "thread_id": TraceHeader::parse(thread::current().id()) });
-                let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
+                add_to_trace(TraceType::Trace, trace_params, &trace, _f);
             }
         }
         loop {
@@ -97,10 +97,10 @@ impl VirtualMachine {
                     let msg: Box<dyn AppMessage> = serde_json::from_str(&bytes.to_string()?)?;
                     let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "vm_from_ca" };
                     let trace = json!({ "id": self.id, "msg": msg.to_string() });
-                    let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
+                    add_to_trace(TraceType::Trace, trace_params, &trace, _f);
                     let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "vm_to_container" };
                     let trace = json!({ "id": self.id, "msg": msg.to_string() });
-                    let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
+                    add_to_trace(TraceType::Trace, trace_params, &trace, _f);
                 }
             }
             //println!("VM {} send to {} containers msg from ca: {}", self.id,  self.vm_to_containers.len(), msg);
@@ -118,7 +118,7 @@ impl VirtualMachine {
             if CONFIG.trace_options.all || CONFIG.trace_options.vm {
                 let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "worker" };
                 let trace = json!({ "id": self.id, "thread_name": thread::current().name(), "thread_id": TraceHeader::parse(thread::current().id()) });
-                let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
+                add_to_trace(TraceType::Trace, trace_params, &trace, _f);
             }
         }
         loop {
@@ -128,10 +128,10 @@ impl VirtualMachine {
                     let msg: Box<dyn AppMessage> = serde_json::from_str(&bytes.to_string()?)?;
                     let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "vm_from_container" };
                     let trace = json!({ "id": self.id, "msg": msg.to_string() });
-                    let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
+                    add_to_trace(TraceType::Trace, trace_params, &trace, _f);
                     let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "vm_to_ca" };
                     let trace = json!({ "id": self.id, "msg": msg.to_string() });
-                    let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
+                    add_to_trace(TraceType::Trace, trace_params, &trace, _f);
                 }
             }
             //println!("VM {} got from container {} msg {} {} {} {}", self.id, container_id, msg.0, msg.1, msg.2, msg.3);

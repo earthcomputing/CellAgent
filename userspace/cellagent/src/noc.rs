@@ -41,7 +41,7 @@ impl Noc {
                 let (rows, cols) = get_geometry(blueprint.get_ncells());
                 let trace_params = &TraceHeaderParams { module: "src/main.rs", line_no: line!(), function: "MAIN", format: "trace_schema" };
                 let trace = json!({ "schema_version": SCHEMA_VERSION, "ncells": blueprint.get_ncells(), "rows": rows, "cols": cols });
-                let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
+                add_to_trace(TraceType::Trace, trace_params, &trace, _f);
             }
         }
         let (noc_to_port, port_from_noc): (NocToPort, NocFromPort) = channel();
@@ -80,7 +80,7 @@ impl Noc {
             if CONFIG.trace_options.all || CONFIG.trace_options.noc {
                 let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "worker" };
                 let trace = json!({ "id": self.get_name(), "thread_name": thread::current().name(), "thread_id": TraceHeader::parse(thread::current().id()) });
-                let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
+                add_to_trace(TraceType::Trace, trace_params, &trace, _f);
             }
         }
         loop {
@@ -91,7 +91,7 @@ impl Noc {
                 if CONFIG.trace_options.all || CONFIG.trace_options.noc {
                     let trace_params = &TraceHeaderParams { module: "src/noc.rs", line_no: line!(), function: _f, format: "noc_from_port" };
                     let trace = json!({ "id": self.get_name(), "app_msg": app_msg });
-                    let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
+                    add_to_trace(TraceType::Trace, trace_params, &trace, _f);
                 }
             }
             app_msg.process_noc(self, noc_to_port)?;
@@ -119,7 +119,7 @@ impl Noc {
             if CONFIG.trace_options.all || CONFIG.trace_options.noc {
                 let trace_params = &TraceHeaderParams { module: "src/noc.rs", line_no: line!(), function: _f, format: "app_process_tree_name" };
                 let trace = json!({ "id": self.get_name(), "app_msg": msg });
-                let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
+                add_to_trace(TraceType::Trace, trace_params, &trace, _f);
             }
         }
     // Handle duplicate notifications
@@ -179,7 +179,7 @@ impl Noc {
             if CONFIG.trace_options.all || CONFIG.trace_options.noc {
                 let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "worker" };
                 let trace = json!({ "id": self.get_name(), "thread_name": thread::current().name(), "thread_id": TraceHeader::parse(thread::current().id()) });
-                let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
+                add_to_trace(TraceType::Trace, trace_params, &trace, _f);
             }
         }
         loop {
@@ -188,7 +188,7 @@ impl Noc {
                 if CONFIG.trace_options.all || CONFIG.trace_options.noc {
                     let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "noc_from_application" };
                     let trace = json!({ "id": self.get_name(), "thread_name": thread::current().name(), "thread_id": TraceHeader::parse(thread::current().id()), "input": input });
-                    let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
+                    add_to_trace(TraceType::Trace, trace_params, &trace, _f);
                 }
             }
             println!("Noc: {}", input);
@@ -251,7 +251,7 @@ impl Noc {
             if CONFIG.trace_options.all || CONFIG.trace_options.svc {
                 let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "3hop_to_vm" };
                 let trace = json!({ "NocMaster": self.get_name(), "app_msg": stack_tree_msg });
-                let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
+                add_to_trace(TraceType::Trace, trace_params, &trace, _f);
             }
         }
         println!("Noc: stack {} on tree {}", new_tree_name, parent_tree_name);
@@ -330,7 +330,7 @@ impl Noc {
             if CONFIG.trace_options.all || CONFIG.trace_options.noc {
                 let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "noc_to_port" };
                 let trace = json!({ "app_msg": msg });
-                let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
+                add_to_trace(TraceType::Trace, trace_params, &trace, _f);
             }
         }
         let serialized = serde_json::to_string(msg as &dyn AppMessage)?;

@@ -74,7 +74,7 @@ impl NocMaster {
             if CONFIG.trace_options.all || CONFIG.trace_options.svc {
                 let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "NocMaster_to_vm" };
                 let trace = json!({ "NocMaster": self.get_name(), "app_msg": app_msg });
-                let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
+                add_to_trace(TraceType::Trace, trace_params, &trace, _f);
             }
         }
         self.container_to_vm.send(bytes)?;
@@ -101,7 +101,7 @@ impl NocMaster {
             if CONFIG.trace_options.all || CONFIG.trace_options.svc {
                 let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "worker" };
                 let trace = json!({ "NocMaster": self.get_name(), "thread_name": thread::current().name(), "thread_id": TraceHeader::parse(thread::current().id()) });
-                let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
+                add_to_trace(TraceType::Trace, trace_params, &trace, _f);
             }
         }
         let mut first = true; // Stack
@@ -113,7 +113,7 @@ impl NocMaster {
                 if CONFIG.trace_options.all || CONFIG.trace_options.svc {
                     let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "NocMaster_from_vm" };
                     let trace = json!({ "NocMaster": self.get_name(), "app_msg": app_msg });
-                    let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
+                    add_to_trace(TraceType::Trace, trace_params, &trace, _f);
                 }
             }
             let body = app_msg.get_payload();
@@ -134,7 +134,7 @@ impl NocMaster {
                         if CONFIG.trace_options.all || CONFIG.trace_options.svc {
                             let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "NocAgent_to_vm" };
                             let trace = json!({ "NocMaster": self.get_name(), "app_msg": delete_msg });
-                            let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
+                            add_to_trace(TraceType::Trace, trace_params, &trace, _f);
                         }
                     }
                     self.container_to_vm.send(bytes)?;
@@ -198,7 +198,7 @@ impl NocAgent {
             if CONFIG.trace_options.all || CONFIG.trace_options.svc {
                 let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "worker" };
                 let trace = json!({ "NocAgent": self.get_name(), "thread_name": thread::current().name(), "thread_id": TraceHeader::parse(thread::current().id()) });
-                let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
+                add_to_trace(TraceType::Trace, trace_params, &trace, _f);
             }
         }
         loop {
@@ -209,7 +209,7 @@ impl NocAgent {
                 if CONFIG.trace_options.all || CONFIG.trace_options.svc {
                     let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "NocAgent_from_vm" };
                     let trace = json!({ "NocAgent": self.get_name(), "app_msg": app_msg });
-                    let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
+                    add_to_trace(TraceType::Trace, trace_params, &trace, _f);
                 }
             }
             let body = app_msg.get_payload();
@@ -226,7 +226,7 @@ impl NocAgent {
                 if CONFIG.trace_options.all || CONFIG.trace_options.svc {
                     let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "NocAgent_to_vm" };
                     let trace = json!({ "NocAgent": self.get_name(), "app_msg": reply });
-                    let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
+                    add_to_trace(TraceType::Trace, trace_params, &trace, _f);
                 }
             }
             self.container_to_vm.send(bytes)?;
