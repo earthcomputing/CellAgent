@@ -23,7 +23,7 @@ impl Datacenter {
             { 
                 let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "reset" };
                 let trace = json!({ "cell_id": {"name": "Datacenter"}, "blueprint": blueprint, "config": *CONFIG});
-                let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
+                add_to_trace(TraceType::Trace, trace_params, &trace, _f);
             }
         }
         let (mut rack, _join_handles) = Rack::construct(&blueprint).context(DatacenterError::Chain { func_name: _f, comment: S("Rack")})?;

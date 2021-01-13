@@ -54,7 +54,7 @@ impl Rack {
                     let cell_id = nal_cell.get_id();
                     let trace = json!({ "cell_id": cell_id, "cell_number": cell_no,
                             "border_ports": border_ports, "location":  CONFIG.geometry.get(*cell_no)});
-                    let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
+                    add_to_trace(TraceType::Trace, trace_params, &trace, _f);
                 }
             }
             self.cells.insert(cell_no, nal_cell);
@@ -79,7 +79,7 @@ impl Rack {
                     let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "interior_cell_start" };
                     let cell_id = nal_cell.get_id();
                     let trace = json!({ "cell_id": cell_id, "cell_number": cell_no, "location": CONFIG.geometry.get(*cell_no as usize) });
-                    let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
+                    add_to_trace(TraceType::Trace, trace_params, &trace, _f);
                 }
             }
             self.cells.insert(cell_no, nal_cell);
@@ -106,7 +106,7 @@ impl Rack {
                 if CONFIG.trace_options.all || CONFIG.trace_options.dc {
                     let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "connect_link" };
                     let trace = json!({ "left_cell": left_cell_id, "rite_cell": rite_cell_id, "left_port": left_port.get_port_no(), "rite_port": rite_port.get_port_no(), "link_id": link.get_id() });
-                    let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
+                    add_to_trace(TraceType::Trace, trace_params, &trace, _f);
                 }
             }
             let mut link_clone = link.clone();
@@ -166,7 +166,7 @@ impl Rack {
             { 
                 let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "border_cell" };
                 let trace = json!({ "cell_id": {"name": "Rack"}, "cell_no": cell_no});
-                let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
+                add_to_trace(TraceType::Trace, trace_params, &trace, _f);
             }
         }
        let (port, port_from_ca) = cell.get_free_boundary_port_mut()?;

@@ -70,7 +70,7 @@ impl Port {
             if CONFIG.trace_options.all || CONFIG.trace_options.port {
                 let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "port_to_pe_status" };
                 let trace = json!({ "cell_id": self.cell_id, "id": self.get_id().get_name(), "status": PortStatus::Connected });
-                let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
+                add_to_trace(TraceType::Trace, trace_params, &trace, _f);
             }
         }
         let port_to_ca = self.port_to_pe_or_ca.clone().right().expect("Port to Ca sender must be set");
@@ -101,7 +101,7 @@ impl Port {
             if CONFIG.trace_options.all || CONFIG.trace_options.port {
                 let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "worker" };
                 let trace = json!({ "cell_id": self.cell_id, "id": self.get_id().get_name(), "thread_name": thread::current().name(), "thread_id": TraceHeader::parse(thread::current().id()) });
-                let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
+                add_to_trace(TraceType::Trace, trace_params, &trace, _f);
             }
         }
         loop {
@@ -110,14 +110,14 @@ impl Port {
                 if CONFIG.trace_options.all || CONFIG.trace_options.port {
                     let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "port_from_noc_app" };
                     let trace = json!({ "cell_id": self.cell_id,"id": self.get_id().get_name(), "msg": msg });
-                    let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
+                    add_to_trace(TraceType::Trace, trace_params, &trace, _f);
                 }
             }
             {
                 if CONFIG.trace_options.all || CONFIG.trace_options.port {
                     let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "port_to_pe_app" };
                     let trace = json!({ "cell_id": self.cell_id, "id": self.get_id().get_name(), "msg": msg });
-                    let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
+                    add_to_trace(TraceType::Trace, trace_params, &trace, _f);
                 }
             }
             let port_to_ca = self.port_to_pe_or_ca.clone().right().expect("Port to Ca sender must be set");
@@ -146,7 +146,7 @@ impl Port {
             if CONFIG.trace_options.all || CONFIG.trace_options.port {
                 let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "worker" };
                 let trace = json!({ "cell_id": self.cell_id, "id": self.get_id().get_name(), "thread_name": thread::current().name(), "thread_id": TraceHeader::parse(thread::current().id()) });
-                let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
+                add_to_trace(TraceType::Trace, trace_params, &trace, _f);
             }
         }
         loop {
@@ -155,7 +155,7 @@ impl Port {
                 if CONFIG.trace_options.all || CONFIG.trace_options.port {
                     let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "port_from_ca" };
                     let trace = json!({ "cell_id": self.cell_id, "id": self.get_id().get_name(), "bytes": bytes.to_string()? });
-                    let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
+                    add_to_trace(TraceType::Trace, trace_params, &trace, _f);
                 }
             }
             self.send_to_noc(&port_to_noc, bytes)?;
@@ -201,7 +201,7 @@ impl Port {
             if CONFIG.trace_options.all || CONFIG.trace_options.port {
                 let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "worker" };
                 let trace = json!({ "cell_id": self.cell_id, "id": self.get_id().get_name(), "thread_name": thread::current().name(), "thread_id": TraceHeader::parse(thread::current().id()) });
-                let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
+                add_to_trace(TraceType::Trace, trace_params, &trace, _f);
             }
         }
         let port_to_pe = self.port_to_pe_or_ca.clone().left().expect("Port: Sender to Pe must be set");
@@ -221,7 +221,7 @@ impl Port {
             if CONFIG.trace_options.all || CONFIG.trace_options.port {
                 let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "worker" };
                 let trace = json!({ "cell_id": self.cell_id, "id": self.get_id().get_name(), "thread_name": thread::current().name(), "thread_id": TraceHeader::parse(thread::current().id()) });
-                let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
+                add_to_trace(TraceType::Trace, trace_params, &trace, _f);
             }
         }
         loop {
@@ -231,7 +231,7 @@ impl Port {
                 if CONFIG.trace_options.all || CONFIG.trace_options.port {
                     let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "port_from_pe" };
                     let trace = json!({ "cell_id": self.cell_id, "id": self.get_id().get_name(), "packet":packet.to_string()? });
-                    let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
+                    add_to_trace(TraceType::Trace, trace_params, &trace, _f);
                 }
             }
             {
@@ -239,7 +239,7 @@ impl Port {
                     let ait_state = packet.get_ait_state();
                     let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "port_to_link" };
                     let trace = json!({ "cell_id": self.cell_id, "id": self.get_id().get_name(), "ait_state": ait_state, "packet": packet.to_string()? });
-                    let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
+                    add_to_trace(TraceType::Trace, trace_params, &trace, _f);
                 }
             }
             #[cfg(any(feature = "noc", feature = "simulator"))]
@@ -256,7 +256,7 @@ impl Port {
             if CONFIG.trace_options.all | CONFIG.trace_options.port {
                 let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "port_to_noc" };
                 let trace = json!({ "cell_id": self.cell_id, "id": self.get_id().get_name(), "bytes": bytes.to_string()? });
-                let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
+                add_to_trace(TraceType::Trace, trace_params, &trace, _f);
             }
         }
         port_to_noc.send(bytes)?;

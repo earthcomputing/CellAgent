@@ -34,12 +34,12 @@ impl SimulatedPort {
                             LinkToPortPacket::Packet(packet) => {
                                 let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "port_from_link_packet" };
                                 let trace = json!({ "cell_id": port.get_cell_id(), "id": port.get_id().get_name(), "packet":packet.to_string()? });
-                                let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
+                                add_to_trace(TraceType::Trace, trace_params, &trace, _f);
                             },
                             LinkToPortPacket::Status(status) => {
                                 let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "port_from_link_status" };
                                 let trace = json!({ "cell_id": port.get_cell_id(), "id": port.get_id().get_name(), "status": status, "msg": msg});
-                                let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
+                                add_to_trace(TraceType::Trace, trace_params, &trace, _f);
                             },
 			            }
                     }
@@ -54,7 +54,7 @@ impl SimulatedPort {
                             if CONFIG.trace_options.all || CONFIG.trace_options.port {
 				                let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "port_to_pe_status" };
 				                let trace = json!({ "cell_id": port.get_cell_id(), "id": port.get_id().get_name(), "status": status });
-				                let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
+				                add_to_trace(TraceType::Trace, trace_params, &trace, _f);
                             }
 			            }
 			            port_to_pe.send(PortToPePacket::Status((port.get_port_no(), port.is_border(), status))).context(SimulatedPortError::Chain { func_name: _f, comment: S(port.get_id().get_name()) + " send status to pe"})?;
@@ -73,7 +73,7 @@ impl SimulatedPort {
                                     if CONFIG.trace_options.all || CONFIG.trace_options.port {
                                         let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "port_to_pe_packet" };
                                         let trace = json!({ "cell_id": port.get_cell_id(), "id": port.get_id().get_name(), "packet":packet.to_string()? });
-                                        let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
+                                        add_to_trace(TraceType::Trace, trace_params, &trace, _f);
                                     }
                                 }
                                 port_to_pe.send(PortToPePacket::Packet((port.get_port_no(), packet)))?;
@@ -86,7 +86,7 @@ impl SimulatedPort {
                                         let ait_state = packet.get_ait_state();
                                         let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "port_to_link" };
                                         let trace = json!({ "cell_id": port.get_cell_id(), "id": port.get_id().get_name(), "ait_state": ait_state, "packet":packet.to_string()? });
-                                        let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
+                                        add_to_trace(TraceType::Trace, trace_params, &trace, _f);
                                     }
                                 }
                                 self.direct_send(packet.clone())?;
@@ -98,7 +98,7 @@ impl SimulatedPort {
                                         let ait_state = packet.get_ait_state();
                                         let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "port_to_link" };
                                         let trace = json!({ "cell_id": port.get_cell_id(), "id": port.get_id().get_name(), "ait_state": ait_state, "packet":packet.to_string()? });
-                                        let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
+                                        add_to_trace(TraceType::Trace, trace_params, &trace, _f);
                                     }
                                 }
                                 self.direct_send(packet.clone())?;
@@ -107,7 +107,7 @@ impl SimulatedPort {
                                     if CONFIG.trace_options.all || CONFIG.trace_options.port {
                                         let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "port_to_pe_packet" };
                                         let trace = json!({ "cell_id": port.get_cell_id(), "id": port.get_id().get_name(), "packet":packet.to_string()? });
-                                        let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
+                                        add_to_trace(TraceType::Trace, trace_params, &trace, _f);
                                     }
                                 }
                                 port_to_pe.send(PortToPePacket::Packet((port.get_port_no(), packet)))?;
