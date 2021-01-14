@@ -171,8 +171,8 @@ impl CellAgent {
         let thread_name = format!("CellAgent {}", self.get_cell_id());
         thread::Builder::new().name(thread_name).spawn(move || {
             update_trace_header(child_trace_header);
-            let _ = ca.initialize(ca_from_cm, ca_from_ports).map_err(|e| write_err("nalcell", &e));
-            if CONFIG.continue_on_error {} // Don't automatically restart cell agent if it crashes
+            let _ = ca.initialize(ca_from_cm.clone(), ca_from_ports.clone()).map_err(|e| write_err("cellagent", &e));
+            if CONFIG.continue_on_error { ca.start(ca_from_cm, ca_from_ports); }
         }).expect("cellagent thread failed")
     }
 
@@ -710,7 +710,7 @@ impl CellAgent {
             update_trace_header(child_trace_header);
             let _ = ca.listen_uptree_loop(originator_id, vm_id, &ca_from_vm).map_err(|e| write_err("cellagent", &e));
             if CONFIG.continue_on_error { ca.listen_uptree(originator_id, vm_id, trees, ca_from_vm); }
-        }).expect("thread failed");
+        }).expect("listen uptree thread failed");
     }
 
     // WORKER (CaFromVm)
@@ -843,8 +843,8 @@ impl CellAgent {
         thread::Builder::new().name(thread_name).spawn(move || {
             update_trace_header(child_trace_header);
             let _ = ca.listen_border_port_loop(&ca_from_ports).map_err(|e| write_err("cellagent", &e));
-            if CONFIG.continue_on_error { let _ = ca.listen_port(ca_from_ports); }
-        }).expect("cellagent port thread failed")
+            if CONFIG.continue_on_error { ca.listen_port(ca_from_ports); }
+        }).expect("cellagent listen port thread failed")
     }
     fn listen_border_port_loop(&mut self, ca_from_port: &CaFromPort) -> Result<(), Error> {
         let _f = "listen_border_port_loop";
@@ -898,8 +898,8 @@ impl CellAgent {
         thread::Builder::new().name(thread_name).spawn(move || {
             update_trace_header(child_trace_header);
             let _ = ca.listen_cm_loop(&ca_from_cm).map_err(|e| write_err("cellagent", &e));
-            if CONFIG.continue_on_error { let _ = ca.listen_cm(ca_from_cm); }
-        }).expect("cellagent cmodel thread failed")
+            if CONFIG.continue_on_error { ca.listen_cm(ca_from_cm); }
+        }).expect("cellagent listen cm thread failed")
     }
 
     // WORKER (CaFromCm)

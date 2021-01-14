@@ -41,16 +41,16 @@ impl VirtualMachine {
             container.initialize(up_tree_id, container_from_vm).context(VmError::Chain { func_name: "initialize", comment: S(self.id.get_name())})?;
             self.vm_to_containers.push(vm_to_container);
             // Next line must be inside loop or vm_to_container goes out of scope in listen_container
-            self.listen_container(container_id, vm_from_container, self.vm_to_ca.clone()).context(VmError::Chain { func_name: "initialize", comment: S(self.id.get_name()) + " listen_container"})?;
+            self.listen_container(container_id, vm_from_container, self.vm_to_ca.clone());
         }
         //println!("VM {}: {} containers", self.id, self.vm_to_containers.len());
-        self.listen_ca(vm_from_ca).context(VmError::Chain { func_name: "initialize", comment: S(self.id.get_name()) + " listen_ca"})?;
+        self.listen_ca(vm_from_ca);
         Ok(())
     }
     pub fn _get_id(&self) -> &VmID { &self.id }
 
     // SPAWN THREAD (listen_ca_loop)
-    fn listen_ca(&self, vm_from_ca: VmFromCa) -> Result<(), Error> {
+    fn listen_ca(&self, vm_from_ca: VmFromCa) {
         let _f = "listen_ca";
         //println!("VM {}: listening to Ca", self.id);
         let vm = self.clone();
@@ -59,14 +59,13 @@ impl VirtualMachine {
         thread::Builder::new().name(thread_name).spawn( move || {
             update_trace_header(child_trace_header);
             let _ = vm.listen_ca_loop(&vm_from_ca).map_err(|e| write_err("vm", &e));
-            if CONFIG.continue_on_error { let _ = vm.listen_ca(vm_from_ca); }
-        })?;
-        Ok(())
+            if CONFIG.continue_on_error { vm.listen_ca(vm_from_ca); }
+        }).expect("VM listen_ca thread failed");
     }
 
     // SPAWN THREAD (listen_container_loop)
     fn listen_container(&self, container_id: ContainerID, vm_from_container: VmFromContainer,
-            vm_to_ca: VmToCa) -> Result<(), Error> {
+            vm_to_ca: VmToCa) {
         let _f = "listen_container";
         //println!("VM {}: listening to container {}", self.id, container_id);
         let vm = self.clone();
@@ -75,9 +74,8 @@ impl VirtualMachine {
         thread::Builder::new().name(thread_name).spawn( move || {
             update_trace_header(child_trace_header);
             let _ = vm.listen_container_loop(container_id, &vm_from_container, &vm_to_ca).map_err(|e| write_err("vm", &e));
-            if CONFIG.continue_on_error { let _ = vm.listen_container(container_id, vm_from_container, vm_to_ca); }
-        })?;
-        Ok(())
+            if CONFIG.continue_on_error { vm.listen_container(container_id, vm_from_container, vm_to_ca); }
+        }).expect("VM listen_container thread failed");
     }
 
     // WORKER (VmFromCa)

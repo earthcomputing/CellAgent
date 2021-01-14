@@ -63,7 +63,7 @@ impl NocMaster {
     pub fn initialize(&self, _up_tree_id: UptreeID, container_from_vm: ContainerFromVm) -> Result<(), Error> {
         let _f = "initialize";
         println!("Service {} running NocMaster", self.container_id);
-        self.listen_vm(container_from_vm)?;
+        self.listen_vm(container_from_vm);
         let base_tree = AllowedTree::new(NOC_CONTROL_TREE_NAME);
         let body = "Hello From Master";
         let app_msg = AppInterapplicationMsg::new(&self.get_name(),
@@ -81,7 +81,7 @@ impl NocMaster {
         Ok(())
     }
     // SPAWN THREAD (listen_vm_loop)
-    fn listen_vm(&self, container_from_vm: ContainerFromVm) -> Result<(), Error> {
+    fn listen_vm(&self, container_from_vm: ContainerFromVm) {
         let _f = "listen_vm";
         //println!("Service {} on {}: listening to VM", self.name, self.container_id);
         let master = self.clone();
@@ -90,9 +90,8 @@ impl NocMaster {
         thread::Builder::new().name(thread_name).spawn( move || {
             update_trace_header(child_trace_header);
             let _ = master.listen_vm_loop(&container_from_vm).map_err(|e| write_err("service", &e));
-            if CONFIG.continue_on_error { let _ = master.listen_vm(container_from_vm); }
-        })?;
-        Ok(())
+            if CONFIG.continue_on_error { master.listen_vm(container_from_vm); }
+        }).expect("Service listen_vm thread failed");
     }
     // WORKER (ContainerFromVm)
     fn listen_vm_loop(&self, container_from_vm: &ContainerFromVm) -> Result<(), Error> {
@@ -173,11 +172,12 @@ impl NocAgent {
     pub fn initialize(&self, _up_tree_id: UptreeID, container_from_vm: ContainerFromVm) -> Result<(), Error> {
         let _f = "initialize";
         println!("Service {} running NocAgent", self.container_id);
-        self.listen_vm(container_from_vm)
+        self.listen_vm(container_from_vm);
+        Ok(())  // Needed to be consistent with NocMaster initialize
     }
     pub fn _get_id(&self) -> &ContainerID { &self.container_id }
     // SPAWN THREAD (listen_vm_loop)
-    fn listen_vm(&self, container_from_vm: ContainerFromVm) -> Result<(), Error> {
+    fn listen_vm(&self, container_from_vm: ContainerFromVm) {
         let _f = "listen_vm";
         //println!("Service {} on {}: listening to VM", self.name, self.container_id);
         let agent = self.clone();
@@ -186,9 +186,8 @@ impl NocAgent {
         thread::Builder::new().name(thread_name).spawn( move || {
             update_trace_header(child_trace_header);
             let _ = agent.listen_vm_loop(&container_from_vm).map_err(|e| write_err("service", &e));
-            if CONFIG.continue_on_error { let _ = agent.listen_vm(container_from_vm); }
-        })?;
-        Ok(())
+            if CONFIG.continue_on_error { agent.listen_vm(container_from_vm); }
+        }).expect("Service listen_vm thread failed");
     }
 
     // WORKER (ContainerFromVm)

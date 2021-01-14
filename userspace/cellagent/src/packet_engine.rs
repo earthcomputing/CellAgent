@@ -88,8 +88,8 @@ impl PacketEngine {
         let thread_name = format!("PacketEngine {}", self.get_cell_id());
         thread::Builder::new().name(thread_name).spawn( move || {
             update_trace_header(child_trace_header);
-            let _ = pe.initialize(pe_from_cm, pe_from_ports).map_err(|e| write_err("nalcell", &e));
-            if CONFIG.continue_on_error { } // Don't automatically restart packet engine if it crashes
+            let _ = pe.initialize(pe_from_cm.clone(), pe_from_ports.clone()).map_err(|e| write_err("nalcell", &e));
+            if CONFIG.continue_on_error { pe.start(pe_from_cm, pe_from_ports); } 
         }).expect("thread failed")
     }
 
