@@ -40,7 +40,7 @@ opt-level = 0
 lto = true
 
 [dependencies]
-actix-web = "1.0.5"
+actix-web = "2.0.0"
 actix-rt = "0.2.4"
 arrayvec = {version = "0.4.11", features = ["serde-1"]}
 backtrace = "0.3" # used in dumpstack.rs
@@ -58,7 +58,7 @@ eval = "^0.4.1" # Abandoned
 #evalexpr = "5" # A more comprehensive eval
 failure = "0.1.5"
 failure_derive = "0.1.0"
-futures = "0.1.23" # used in dal.rs
+futures = "0.3.1" # used in dal.rs
 #im = "13.0.0" # Fast cloneable collections
 #indexmap = "1.0.1" # HashMap and HashSet that preserve order
 #internment = "0.3.6"

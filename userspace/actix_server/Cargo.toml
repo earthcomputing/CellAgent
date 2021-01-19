@@ -14,7 +14,8 @@ webserver = []
 
 [dependencies]
 actix-files = "0.1.4"
-actix-web = "1.0.5"
+actix-web = "2.0"
+actix-rt = "1.0"
 failure = "0.1.5"
 serde = { version = "1.0.27", features = ["rc"] }
 serde_derive = "1.0.27"

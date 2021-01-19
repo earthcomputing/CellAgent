@@ -46,8 +46,8 @@ impl Noc {
         }
         let (noc_to_port, port_from_noc): (NocToPort, NocFromPort) = channel();
         let (port_to_noc, noc_from_port): (PortToNoc, PortFromNoc) = channel();
-        self.listen_application(noc_from_application, noc_to_port.clone())?;
-        self.listen_port(noc_to_port, noc_from_port)?;
+        self.listen_application(noc_from_application, noc_to_port.clone());
+        self.listen_port(noc_to_port, noc_from_port);
         Ok((port_to_noc, port_from_noc))
     }
 //	fn get_msg(&self, msg_type: MsgType, serialized_msg:String) -> Result<Box<Message>> {
@@ -58,18 +58,16 @@ impl Noc {
     pub fn get_name(&self) -> &str { "NOC" }
 
     // SPAWN THREAD (listen_port_loop)
-    fn listen_port(&mut self, noc_to_port: NocToPort, noc_from_port: NocFromPort)
-            -> Result<JoinHandle<()>, Error> {
+    fn listen_port(&mut self, noc_to_port: NocToPort, noc_from_port: NocFromPort) -> JoinHandle<()> {
         let _f = "listen_port";
         let mut noc = self.clone();
         let child_trace_header = fork_trace_header();
-        let thread_name = format!("{} listen_port_loop", self.get_name()); // NOC NOC
-        let join_port = thread::Builder::new().name(thread_name).spawn( move || {
+        let thread_name = format!("{} listen_port", self.get_name()); // NOC NOC
+        thread::Builder::new().name(thread_name).spawn( move || {
             update_trace_header(child_trace_header);
-            let _ = noc.listen_port_loop(&noc_to_port, &noc_from_port).map_err(|e| write_err("port", &e));
-            if CONFIG.continue_on_error { let _ = noc.listen_port(noc_to_port, noc_from_port); }
-        });
-        Ok(join_port?)
+            let _ = noc.listen_port_loop(&noc_to_port, &noc_from_port).map_err(|e| write_err("Noc: port", &e));
+            if CONFIG.continue_on_error { noc.listen_port(noc_to_port, noc_from_port); }
+        }).expect("noc listen port failed")
     }
 
     // WORKER (NocToPort)
@@ -158,17 +156,16 @@ impl Noc {
         allowed_trees.iter().all(|&tree| self.allowed_trees.contains(tree))
     }
     // SPAWN THREAD (listen_application_loop)
-    fn listen_application(&mut self, noc_from_application: NocFromApplication, noc_to_port: NocToPort)
-            -> Result<JoinHandle<()>,Error> {
+    fn listen_application(&mut self, noc_from_application: NocFromApplication, noc_to_port: NocToPort) -> JoinHandle<()> {
+        let _f = "listen_application";
         let mut noc = self.clone();
         let child_trace_header = fork_trace_header();
         let thread_name = format!("{} listen_application_loop", self.get_name()); // NOC NOC
-        let join_application = thread::Builder::new().name(thread_name).spawn( move || {
+        thread::Builder::new().name(thread_name).spawn( move || {
             update_trace_header(child_trace_header);
-            let _ = noc.listen_application_loop(&noc_from_application, &noc_to_port).map_err(|e| write_err("application", &e));
-            if CONFIG.continue_on_error { }
-        });
-        Ok(join_application?)
+            let _ = noc.listen_application_loop(&noc_from_application, &noc_to_port).map_err(|e| write_err("Noc: application", &e));
+            if CONFIG.continue_on_error { noc.listen_application(noc_from_application, noc_to_port); }
+        }).expect("noc application thread failed")
     }
 
     // WORKER (NocFromApplication)

@@ -16,7 +16,7 @@ use crate::name::{Name, CellID, TreeID};
 use crate::packet_engine::{PacketEngine};
 use crate::packet::{Packet, PacketAssembler, PacketAssemblers, Packetizer, PacketUniquifier};
 use crate::snake::Snake;
-use crate::utility::{ByteArray, PortNo, S, TraceHeader, TraceHeaderParams, TraceType};
+use crate::utility::{ByteArray, PortNo, S, TraceHeader, TraceHeaderParams, TraceType, write_err};
 use crate::uuid_ec::AitState;
 
 #[derive(Debug, Clone)]
@@ -62,13 +62,8 @@ impl Cmodel {
         let thread_name = format!("Cmodel {}", self.get_name());
         thread::Builder::new().name(thread_name).spawn( move || {
             update_trace_header(child_trace_header);
-            match cm.initialize(cm_from_ca, cm_from_pe) {
-                Ok(_) => (),
-                Err(e) => {
-                    println!("Cmodel {}: {} error {}", cm.cell_id, _f, e);
-                }
-            }
-            if CONFIG.continue_on_error { } // Don't automatically restart cmodel if it crashes
+            let _ = cm.initialize(cm_from_ca.clone(), cm_from_pe.clone()).map_err(|e| write_err("cmodel", &e));
+            if CONFIG.continue_on_error { cm.start(cm_from_ca, cm_from_pe); } 
         }).expect("cmodel thread failed")
     }
 

@@ -10,7 +10,7 @@ use std::{cell::RefCell,
 use {
     actix_rt::{System, SystemRunner},
     actix_web::client::{ClientBuilder},
-    futures::{Future, future::lazy},
+    futures::executor::block_on,
     std::sync::atomic::Ordering
 };
 
@@ -117,7 +117,7 @@ pub fn get_cell_replay_lines(cell_name: &str) -> Result<Lines<BufReader<File>>, 
     let reader = BufReader::new(cell_file_handle);
     Ok(reader.lines())
 }
-#[cfg(feature="webserver")]
+#[cfg(feature = "webserver")]
 fn trace_it(trace_record: &TraceRecord<'_>) -> Result<(), Error> {
     let _f = "trace_it";
     if SERVER_ERROR.load(Ordering::SeqCst) { return Ok(()); }
@@ -127,32 +127,28 @@ fn trace_it(trace_record: &TraceRecord<'_>) -> Result<(), Error> {
     let server_url_clone = server_url.clone(); // So I can print as part of en error response
     let value = serde_json::to_value(trace_record)?;
     SKIP.with(|skip| {
-        let mut s = skip.borrow_mut();
-        if !s.contains(format) {
-            let client_builder = ClientBuilder::new();
-            let client = client_builder.disable_timeout().finish();
-            let _ = SYSTEM.with(|sys| {
-                let mut system = sys.borrow_mut();
-                system.block_on(lazy(|| {
-                    client.post(server_url)
-                        .header("User-Agent", "Actix-web")
-                        .send_json(&value)
-                        .map_err(|e| {
-                            println!("\nError from server: url {} {:?}\n", server_url_clone, e);
-                            SERVER_ERROR.swap(true, Ordering::SeqCst);
-                        })
-                        .and_then(|response| {
-                            if !response.status().is_success() {
-                                if response.status() != 404 {
-                                    println!("Error {}: {:?}", server_url_clone, response);
-                                }
+        block_on(
+            async {
+                let mut s = skip.borrow_mut();
+                if !s.contains(format) {
+                    let client_builder = ClientBuilder::new();
+                    let client = client_builder.disable_timeout().finish();
+                    if let Ok(response) = 
+                        client
+                            .post(server_url)
+                            .send_json(&value)
+                            .await
+                    {
+                        if !response.status().is_success() {
+                            if response.status() != 404 {
+                                println!("Error {}: {:?}", server_url_clone, response);
+                            }
                                 s.insert(format.to_owned());
                             }
-                            Ok(())
-                        })
-                }))
-            });
-        }
+                    };
+                }
+            }
+        );
     });
     Ok(())
 }
