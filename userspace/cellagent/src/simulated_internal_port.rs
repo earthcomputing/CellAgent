@@ -17,25 +17,29 @@ pub type PortToLink = mpsc::Sender<PortToLinkPacket>;
 pub type PortFromLink = mpsc::Receiver<LinkToPortPacket>;
 
 #[derive(Clone, Debug)]
+pub struct DuplexPortLinkChannel {
+    pub port_from_link: PortFromLink,
+    pub port_to_link: PortToLink,
+}
+
+#[derive(Clone, Debug)]
 pub struct SimulatedInteriorPort {
     port: PortData<SimulatedInteriorPort, SimulatedBorderPort>,
     failover_info: FailoverInfo,
-    port_to_link: PortToLink,
-    port_from_link: PortFromLink,
+    duplex_port_link_channel: DuplexPortLinkChannel,
 }
 impl SimulatedInteriorPort {
-    pub fn new(port: PortData<SimulatedInteriorPort, SimulatedBorderPort>, port_to_link: PortToLink, port_from_link: PortFromLink) -> Result<SimulatedInteriorPort, Error> {
+    pub fn new(port: PortData<SimulatedInteriorPort, SimulatedBorderPort>, duplex_port_link_channel: DuplexPortLinkChannel) -> Result<SimulatedInteriorPort, Error> {
         let port_id = port.get_id();
         Ok( SimulatedInteriorPort {
             port,
-            port_to_link,
-            port_from_link,
+            duplex_port_link_channel,            
             failover_info: FailoverInfo::new(port_id),
         })
     }
     fn recv(&mut self) -> Result<LinkToPortPacket, Error> {
         let _f = "recv";
-        let link_to_port_packet = self.port_from_link.recv()?;
+        let link_to_port_packet = self.duplex_port_link_channel.port_from_link.recv()?;
         {
             if CONFIG.trace_options.all || CONFIG.trace_options.port {
 		let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "simulated_port_receive" };
@@ -56,7 +60,7 @@ impl SimulatedInteriorPort {
             }
 	}
         self.failover_info.save_packet(&packet);
-        Ok(self.port_to_link.send(*packet).context(SimulatedInteriorPortError::Chain {func_name: "new",comment: S("")})?)
+        Ok(self.duplex_port_link_channel.port_to_link.send(*packet).context(SimulatedInteriorPortError::Chain {func_name: "new",comment: S("")})?)
     }
 }
 

@@ -13,18 +13,23 @@ pub type PortToNoc = mpsc::Sender<PortToNocMsg>;
 pub type PortFromNoc = mpsc::Receiver<NocToPortMsg>;
 
 #[derive(Clone, Debug)]
+pub struct DuplexPortNocChannel {
+    pub port_from_noc: PortFromNoc,
+    pub port_to_noc: PortToNoc,
+}
+
+#[derive(Clone, Debug)]
 pub struct SimulatedBorderPort {
-  port: PortData<SimulatedInteriorPort, SimulatedBorderPort>,
-  port_to_noc: PortToNoc,
-  port_from_noc: PortFromNoc,
+    port: PortData<SimulatedInteriorPort, SimulatedBorderPort>,
+    duplex_port_noc_channel: DuplexPortNocChannel,
 }
 
 impl SimulatedBorderPort {
-    pub fn new(port: PortData<SimulatedInteriorPort, SimulatedBorderPort>, port_to_noc: PortToNoc, port_from_noc: PortFromNoc) -> SimulatedBorderPort {
-        SimulatedBorderPort{ port, port_to_noc, port_from_noc}
+    pub fn new(port: PortData<SimulatedInteriorPort, SimulatedBorderPort>, duplex_port_noc_channel: DuplexPortNocChannel) -> SimulatedBorderPort {
+        SimulatedBorderPort{ port, duplex_port_noc_channel}
     }
     fn recv(&self) -> Result<NocToPortMsg, Error> {
-       Ok(self.port_from_noc.recv()?)
+       Ok(self.duplex_port_noc_channel.port_from_noc.recv()?)
     }
     fn direct_send(&self, bytes: &ByteArray) -> Result<(), Error> {
         let _f = "send_to_noc";
@@ -35,7 +40,7 @@ impl SimulatedBorderPort {
                 add_to_trace(TraceType::Trace, trace_params, &trace, _f);
             }
         }
-       Ok(self.port_to_noc.send(bytes.clone()).context(SimulatedBorderPortError::Chain {func_name: "new",comment: S("")})?)
+       Ok(self.duplex_port_noc_channel.port_to_noc.send(bytes.clone()).context(SimulatedBorderPortError::Chain {func_name: "new",comment: S("")})?)
     }
 }
 
@@ -47,7 +52,7 @@ impl BorderPortLike for SimulatedBorderPort {
     fn listen(&mut self, port_to_ca: PortToCa) -> Result<(), Error> {
         let _f = "listen";
         loop {
-            let msg = self.port_from_noc.recv()?;
+            let msg = self.duplex_port_noc_channel.port_from_noc.recv()?;
             {
                 if CONFIG.trace_options.all || CONFIG.trace_options.port {
                     let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "port_from_noc_app" };
