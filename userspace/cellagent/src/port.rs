@@ -173,16 +173,16 @@ impl<InteriorPortType: 'static + Clone + InteriorPortLike, BorderPortType: 'stat
         let thread_name = format!("Port {} listen_link", self.get_id().get_name());
         thread::Builder::new().name(thread_name).spawn( move || {
             update_trace_header(child_trace_header);
-            let _ = port.listen_link_loop(simulated_port_or_ecnl_port_clone).map_err(|e| write_err("port", &e));
-            if CONFIG.continue_on_error { }
+            let _ = port.listen_link_loop(simulated_port_or_ecnl_port_clone.clone()).map_err(|e| write_err("port", &e));
+            if CONFIG.continue_on_error { port.listen_link_loop(simulated_port_or_ecnl_port_clone).map_err(|e| write_err("port", &e)).ok();  }
         }).expect("thread failed");
         let port = self.clone();
         let child_trace_header = fork_trace_header(); 
         let thread_name = format!("Port {} listen_pe", self.get_id().get_name());
         thread::Builder::new().name(thread_name).spawn( move || {
             update_trace_header(child_trace_header);
-            let _ = port.listen_pe_loop(simulated_port_or_ecnl_port, &port_from_pe).map_err(|e| write_err("port", &e));
-            if CONFIG.continue_on_error { }
+            let _ = port.listen_pe_loop(simulated_port_or_ecnl_port.clone(), &port_from_pe.clone()).map_err(|e| write_err("port", &e));
+            if CONFIG.continue_on_error { port.listen_pe_loop(simulated_port_or_ecnl_port, &port_from_pe).map_err(|e| write_err("port", &e)).ok(); }
         }).expect("thread failed");
     }
 
