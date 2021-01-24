@@ -79,9 +79,9 @@ impl<InteriorPortType: 'static + Clone + InteriorPortLike, BorderPortType: 'stat
     pub fn set_connected(&mut self) { self.is_connected = true; }
     pub fn set_disconnected(&mut self) { self.is_connected = false; }
     pub fn is_border(&self) -> bool { self.is_border }
-    pub fn noc_channel(&self, simulated_border_port: BorderPortType,
+    pub fn listen_noc_and_ca(&self, simulated_border_port: BorderPortType,
             port_from_ca: PortFromCa) -> Result<JoinHandle<()>, Error> {
-        let _f = "noc_channel";
+        let _f = "listen_noc_and_ca";
         let status = PortToCaMsg::Status(self.get_port_no(), PortStatus::Connected);
         {
             if CONFIG.trace_options.all || CONFIG.trace_options.port {
@@ -164,9 +164,9 @@ impl<InteriorPortType: 'static + Clone + InteriorPortLike, BorderPortType: 'stat
     }
 
     // SPAWN THREAD (listen_link, listen_pe)
-    pub fn link_channel(&self, simulated_port_or_ecnl_port: InteriorPortType,
+    pub fn listen_link_and_pe(&self, simulated_port_or_ecnl_port: InteriorPortType,
                         port_from_pe: PortFromPe) {
-        let _f = "link_channel";
+        let _f = "listen_link_and_pe_loops";
         let mut port = self.clone();
         let child_trace_header = fork_trace_header();
         let simulated_port_or_ecnl_port_clone = simulated_port_or_ecnl_port.clone();

@@ -108,7 +108,7 @@ impl ECNL_Session {
         #[cfg(any(feature = "noc", feature = "simulator"))]
         return "Simulated Module".to_string();
     }
-    pub fn link_channels(&mut self, nalcell: &mut NalCell<ECNL_Port, SimulatedBorderPort>) -> Result<(), Error> {
+    pub fn listen_link_and_pe_loops(&mut self, nalcell: &mut NalCell<ECNL_Port, SimulatedBorderPort>) -> Result<(), Error> {
         let _f = "link_ecnl_channels";
         {
             if CONFIG.trace_options.all || CONFIG.trace_options.ca {
@@ -121,7 +121,7 @@ impl ECNL_Session {
         for port_id in 0..=*(self.num_ecnl_ports())-1 {
             let port = nalcell.get_ports()[port_id as usize].clone();
             let ecnl_port: ECNL_Port = ECNL_Port::new(port_id as u8, port.clone());
-            port.link_channel(ecnl_port.clone(), nalcell.get_port_from_pe(&PortNo(port_id as u8)));
+            port.listen_link_and_pe(ecnl_port.clone(), nalcell.get_port_from_pe(&PortNo(port_id as u8)));
             self.push_port(ecnl_port);
         }
         #[cfg(feature="cell")]

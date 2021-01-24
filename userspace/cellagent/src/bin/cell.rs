@@ -65,7 +65,7 @@ fn main() -> Result<(), Error> {
         CellConfig::Large,
         Some(ecnl.clone()),
     )?;
-    ecnl.link_channels(&mut nal_cell)?;
+    ecnl.listen_link_and_pe_loops(&mut nal_cell)?;
     match ca_join_handle.join() {
         Ok(()) => Ok(()),
         Err(e) => Err(MainError::Chain { func_name: _f, comment: format!("{:?}", e) }.into())
