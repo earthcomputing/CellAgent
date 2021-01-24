@@ -18,7 +18,7 @@ use crate::ec_message_formats::{PortToPe, PeFromPort, PeToPort, PortFromPe,
 #[cfg(feature = "cell")]
 use crate::ecnl::ECNL_Session;
 use crate::name::CellID;
-use crate::port::{InteriorPortLike, BorderPortLike, PortData};
+use crate::port::{InteriorPortLike, BorderPortLike, BasePort};
 use crate::replay::{TraceFormat, process_trace_record};
 use crate::utility::{CellConfig, CellType, PortNo, S,
                      TraceHeaderParams, TraceType};
@@ -31,7 +31,7 @@ pub struct NalCell<InteriorPortType: 'static + Clone + InteriorPortLike, BorderP
     id: CellID,
     cell_type: CellType,
     config: CellConfig,
-    ports: Box<[PortData<InteriorPortType, BorderPortType>]>,
+    ports: Box<[BasePort<InteriorPortType, BorderPortType>]>,
     cell_agent: CellAgent,
     ports_from_pe: HashMap<PortNo, PortFromPe>,
     ports_from_ca: HashMap<PortNo, PortFromCa>,
@@ -118,10 +118,10 @@ impl<InteriorPortType: 'static + Clone + InteriorPortLike, BorderPortType: 'stat
                 Either::Left(port_to_pe.clone())
             };
             let port_number = PortNo(i).make_port_number(num_phys_ports).context(NalcellError::Chain { func_name: "new", comment: S("port number") })?;
-            let port = PortData::<InteriorPortType, BorderPortType>::new(cell_id, port_number, is_border_port, is_connected, port_to_pe_or_ca).context(NalcellError::Chain { func_name: "new", comment: S("port") })?;
+            let port = BasePort::<InteriorPortType, BorderPortType>::new(cell_id, port_number, is_border_port, is_connected, port_to_pe_or_ca).context(NalcellError::Chain { func_name: "new", comment: S("port") })?;
             ports.push(port);
         }
-        let boxed_ports: Box<[PortData<InteriorPortType, BorderPortType>]> = ports.into_boxed_slice();
+        let boxed_ports: Box<[BasePort<InteriorPortType, BorderPortType>]> = ports.into_boxed_slice();
         let (cm_to_ca, ca_from_cm): (CmToCa, CaFromCm) = channel();
         let (ca_to_cm, cm_from_ca): (CaToCm, CmFromCa) = channel();
         let (pe_to_cm, cm_from_pe): (PeToCm, CmFromPe) = channel();
@@ -176,7 +176,7 @@ impl<InteriorPortType: 'static + Clone + InteriorPortLike, BorderPortType: 'stat
     fn _get_name(&self) -> String { self.id.get_name() }                     // Used only in tests
     fn _get_num_ports(&self) -> PortQty { PortQty(self.ports.len() as u8) }  // Used only in tests
     pub fn get_cell_agent(&self) -> &CellAgent { &self.cell_agent }
-    pub fn get_ports(&self) -> &Box<[PortData<InteriorPortType, BorderPortType>]> { &self.ports }
+    pub fn get_ports(&self) -> &Box<[BasePort<InteriorPortType, BorderPortType>]> { &self.ports }
     pub fn get_port_from_ca(&self, port_no: &PortNo) -> PortFromCa {
         return self.ports_from_ca[port_no].clone();
     }
@@ -195,7 +195,7 @@ impl<InteriorPortType: 'static + Clone + InteriorPortLike, BorderPortType: 'stat
             CellType::Interior => false,
         }
     }
-    pub fn get_free_ec_port_mut(&mut self) -> Result<(&mut PortData<InteriorPortType, BorderPortType>, PortFromPe), Error> {
+    pub fn get_free_ec_port_mut(&mut self) -> Result<(&mut BasePort<InteriorPortType, BorderPortType>, PortFromPe), Error> {
         let _f = "get_free_ec_port_mut";
         let cell_id = self.id;
         let port = self.ports
@@ -210,7 +210,7 @@ impl<InteriorPortType: 'static + Clone + InteriorPortLike, BorderPortType: 'stat
             .ok_or::<Error>(NalcellError::Channel { port_no: port.get_port_no(), func_name: _f }.into())?;
         Ok((port, recvr))
     }
-    pub fn get_free_boundary_port_mut(&mut self) -> Result<(&mut PortData<InteriorPortType, BorderPortType>, PortFromCa), Error> {
+    pub fn get_free_boundary_port_mut(&mut self) -> Result<(&mut BasePort<InteriorPortType, BorderPortType>, PortFromCa), Error> {
         let _f = "get_free_boundary_port_mut";
         let cell_id = self.id;
         let port = self.ports

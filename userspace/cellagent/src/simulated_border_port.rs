@@ -4,7 +4,7 @@ use crate::config::{CONFIG};
 use crate::dal::{add_to_trace};
 use crate::app_message_formats::{PortToCaMsg, PortToCa, APP};
 use crate::name::{Name};
-use crate::port::{BorderPortLike, PortData, PortStatus};
+use crate::port::{BorderPortLike, BasePort, PortStatus};
 use crate::simulated_internal_port::{SimulatedInteriorPort};
 use crate::utility::{ByteArray, S, TraceHeaderParams, TraceType};
 use crate::uuid_ec::{AitState};
@@ -20,13 +20,13 @@ pub struct DuplexPortNocChannel {
 
 #[derive(Clone, Debug)]
 pub struct SimulatedBorderPort {
-    port: PortData<SimulatedInteriorPort, SimulatedBorderPort>,
+    base_port: BasePort<SimulatedInteriorPort, SimulatedBorderPort>,
     duplex_port_noc_channel: DuplexPortNocChannel,
 }
 
 impl SimulatedBorderPort {
-    pub fn new(port: PortData<SimulatedInteriorPort, SimulatedBorderPort>, duplex_port_noc_channel: DuplexPortNocChannel) -> SimulatedBorderPort {
-        SimulatedBorderPort{ port, duplex_port_noc_channel}
+    pub fn new(base_port: BasePort<SimulatedInteriorPort, SimulatedBorderPort>, duplex_port_noc_channel: DuplexPortNocChannel) -> SimulatedBorderPort {
+        SimulatedBorderPort{ base_port, duplex_port_noc_channel}
     }
     fn recv(&self) -> Result<NocToPortMsg, Error> {
        Ok(self.duplex_port_noc_channel.port_from_noc.recv()?)
@@ -36,7 +36,7 @@ impl SimulatedBorderPort {
         {
             if CONFIG.trace_options.all | CONFIG.trace_options.port {
                 let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "port_to_noc" };
-                let trace = json!({ "cell_id": self.port.get_cell_id(), "id": self.port.get_id().get_name(), "bytes": bytes.stringify()? });
+                let trace = json!({ "cell_id": self.base_port.get_cell_id(), "id": self.base_port.get_id().get_name(), "bytes": bytes.stringify()? });
                 add_to_trace(TraceType::Trace, trace_params, &trace, _f);
             }
         }
@@ -56,18 +56,18 @@ impl BorderPortLike for SimulatedBorderPort {
             {
                 if CONFIG.trace_options.all || CONFIG.trace_options.port {
                     let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "port_from_noc_app" };
-                    let trace = json!({ "cell_id": self.port.get_cell_id(),"id": self.port.get_id().get_name(), "msg": msg });
+                    let trace = json!({ "cell_id": self.base_port.get_cell_id(),"id": self.base_port.get_id().get_name(), "msg": msg });
                     add_to_trace(TraceType::Trace, trace_params, &trace, _f);
                 }
             }
             {
                 if CONFIG.trace_options.all || CONFIG.trace_options.port {
                     let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "port_to_pe_app" };
-                    let trace = json!({ "cell_id": self.port.get_cell_id(), "id": self.port.get_id().get_name(), "msg": msg });
+                    let trace = json!({ "cell_id": self.base_port.get_cell_id(), "id": self.base_port.get_id().get_name(), "msg": msg });
                     add_to_trace(TraceType::Trace, trace_params, &trace, _f);
                 }
             }
-            port_to_ca.send(PortToCaMsg::AppMsg(self.port.get_port_no(), msg)).context(SimulatedBorderPortError::Chain { func_name: "listen_noc_for_pe", comment: S(self.port.get_id().get_name()) + " send app msg to pe"})?;
+            port_to_ca.send(PortToCaMsg::AppMsg(self.base_port.get_port_no(), msg)).context(SimulatedBorderPortError::Chain { func_name: "listen_noc_for_pe", comment: S(self.base_port.get_id().get_name()) + " send app msg to pe"})?;
         }
     }
 }

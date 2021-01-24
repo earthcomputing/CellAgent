@@ -50,7 +50,7 @@ pub struct InteriorPortObject<InteriorPortType: InteriorPortLike> {
 }
 
 #[derive(Debug, Clone)]
-pub struct PortData<InteriorPortType: Clone + InteriorPortLike, BorderPortType: Clone + BorderPortLike> {
+pub struct BasePort<InteriorPortType: Clone + InteriorPortLike, BorderPortType: Clone + BorderPortLike> {
     cell_id: CellID, // Used in trace records
     id: PortID,
     port_number: PortNumber,
@@ -60,11 +60,11 @@ pub struct PortData<InteriorPortType: Clone + InteriorPortLike, BorderPortType: 
     interior_phantom: PhantomData<InteriorPortType>,
     border_phantom: PhantomData<BorderPortType>,
 }
-impl<InteriorPortType: 'static + Clone + InteriorPortLike, BorderPortType: 'static + Clone + BorderPortLike> PortData<InteriorPortType, BorderPortType> {
+impl<InteriorPortType: 'static + Clone + InteriorPortLike, BorderPortType: 'static + Clone + BorderPortLike> BasePort<InteriorPortType, BorderPortType> {
     pub fn new(cell_id: CellID, port_number: PortNumber, is_border: bool, is_connected: bool,
-               port_to_pe_or_ca: Either<PortToPe, PortToCa>) -> Result<PortData<InteriorPortType, BorderPortType>, Error> {
+               port_to_pe_or_ca: Either<PortToPe, PortToCa>) -> Result<BasePort<InteriorPortType, BorderPortType>, Error> {
         let port_id = PortID::new(cell_id, port_number).context(PortError::Chain { func_name: "new", comment: S(cell_id.get_name()) + &S(*port_number.get_port_no())})?;
-        Ok(PortData { cell_id, id: port_id, port_number, is_border,
+        Ok(BasePort { cell_id, id: port_id, port_number, is_border,
                       is_connected,
                       port_to_pe_or_ca,
                       interior_phantom: PhantomData::<InteriorPortType>,
@@ -235,10 +235,10 @@ impl<InteriorPortType: 'static + Clone + InteriorPortLike, BorderPortType: 'stat
         }
     }
 }
-impl<InteriorPortType: 'static + Clone + InteriorPortLike, BorderPortType: 'static + Clone + BorderPortLike> fmt::Display for PortData<InteriorPortType, BorderPortType> {
+impl<InteriorPortType: 'static + Clone + InteriorPortLike, BorderPortType: 'static + Clone + BorderPortLike> fmt::Display for BasePort<InteriorPortType, BorderPortType> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let is_connected = self.is_connected();
-        let mut s = format!("Port {} {}", self.port_number, self.id);
+        let mut s = format!("BasePort {} {}", self.port_number, self.id);
         if self.is_border { s = s + " is boundary  port,"; }
         else              { s = s + " is ECLP port,"; }
         if is_connected   { s = s + " is connected"; }

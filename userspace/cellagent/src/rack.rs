@@ -16,7 +16,7 @@ use crate::ec_message_formats::{PortFromPe};
 use crate::link::{Link};
 use crate::nalcell::{NalCell};
 use crate::name::{CellID, LinkID};
-use crate::port::{PortData};
+use crate::port::{BasePort};
 use crate::replay::{process_trace_record, TraceFormat};
 use crate::simulated_border_port::{NocFromPort, NocToPort, PortFromNoc, PortToNoc, SimulatedBorderPort, DuplexPortNocChannel};
 use crate::simulated_internal_port::{LinkFromPort, LinkToPort, PortFromLink, PortToLink, SimulatedInteriorPort, DuplexPortLinkChannel};
@@ -93,21 +93,21 @@ impl Rack {
                 .get_pair_mut(&edge.0, &edge.1)
                 .unwrap();
             let left_cell_id: CellID = left_cell.get_id(); // For Trace
-            let (left_port, left_from_pe): (&mut PortData<SimulatedInteriorPort, SimulatedBorderPort>, PortFromPe) = left_cell.get_free_ec_port_mut()?;
+            let (left_base_port, left_from_pe): (&mut BasePort<SimulatedInteriorPort, SimulatedBorderPort>, PortFromPe) = left_cell.get_free_ec_port_mut()?;
             let rite_cell_id: CellID = rite_cell.get_id(); // For Trace
-            let (rite_port, rite_from_pe): (&mut PortData<SimulatedInteriorPort, SimulatedBorderPort>, PortFromPe) = rite_cell.get_free_ec_port_mut()?;
+            let (rite_base_port, rite_from_pe): (&mut BasePort<SimulatedInteriorPort, SimulatedBorderPort>, PortFromPe) = rite_cell.get_free_ec_port_mut()?;
             let (link_to_left, left_from_link): (LinkToPort, PortFromLink) = channel();
             let (left_to_link, link_from_left): (PortToLink, LinkFromPort) = channel();
             let (link_to_rite, rite_from_link): (LinkToPort, PortFromLink) = channel();
             let (rite_to_link, link_from_rite): (PortToLink, LinkFromPort) = channel();
-            left_port.listen_link_and_pe(SimulatedInteriorPort::new(left_port.clone(), DuplexPortLinkChannel {port_to_link: left_to_link, port_from_link: left_from_link})?, left_from_pe);
-            rite_port.listen_link_and_pe(SimulatedInteriorPort::new(rite_port.clone(), DuplexPortLinkChannel {port_to_link: rite_to_link, port_from_link: rite_from_link})?, rite_from_pe);
-            let link = Link::new(left_port.get_id(), rite_port.get_id(),
-                                           link_to_left, link_to_rite)?;
+            left_base_port.listen_link_and_pe(SimulatedInteriorPort::new(left_base_port.clone(), DuplexPortLinkChannel {port_to_link: left_to_link, port_from_link: left_from_link})?, left_from_pe);
+            rite_base_port.listen_link_and_pe(SimulatedInteriorPort::new(rite_base_port.clone(), DuplexPortLinkChannel {port_to_link: rite_to_link, port_from_link: rite_from_link})?, rite_from_pe);
+            let link = Link::new(left_base_port.get_id(), rite_base_port.get_id(),
+                                 link_to_left, link_to_rite)?;
             {
                 if CONFIG.trace_options.all || CONFIG.trace_options.dc {
                     let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "connect_link" };
-                    let trace = json!({ "left_cell": left_cell_id, "rite_cell": rite_cell_id, "left_port": left_port.get_port_no(), "rite_port": rite_port.get_port_no(), "link_id": link.get_id() });
+                    let trace = json!({ "left_cell": left_cell_id, "rite_cell": rite_cell_id, "left_base_port": left_base_port.get_port_no(), "rite_base_port": rite_base_port.get_port_no(), "link_id": link.get_id() });
                     add_to_trace(TraceType::Trace, trace_params, &trace, _f);
                 }
             }

@@ -16,7 +16,7 @@ use crate::app_message_formats::{PortToCa};
 use crate::ec_message_formats::{PortToPePacket, PortToPe};
 use crate::name::{CellID};
 use crate::packet::{Packet};
-use crate::port::{InteriorPortLike, PortData, PortStatus};
+use crate::port::{InteriorPortLike, BasePort, PortStatus};
 use crate::simulated_border_port::{SimulatedBorderPort};
 use crate::utility::{PortNo, PortNumber};
 
@@ -71,7 +71,7 @@ pub struct ECNL_Port_Sub {
 
 #[derive(Debug, Clone)]
 pub struct ECNL_Port {
-    port: PortData<ECNL_Port, SimulatedBorderPort>,
+    base_port: BasePort<ECNL_Port, SimulatedBorderPort>,
     pub ecnl_port_sub_ptr: *mut ECNL_Port_Sub,
 }
 
@@ -99,12 +99,12 @@ impl InBufferDesc {
 #[cfg(feature="cell")]
 #[link(name = ":ecnl_proto.o")]
 impl ECNL_Port {
-     pub fn new(port_id: u8, port: PortData<ECNL_Port, SimulatedBorderPort>) -> ECNL_Port {
+     pub fn new(port_id: u8, base_port: BasePort<ECNL_Port, SimulatedBorderPort>) -> ECNL_Port {
      	  unsafe {
               let ecnl_port_sub_ptr: *mut ECNL_Port_Sub = port_create(port_id);
               let ecnl_port = ECNL_Port {
-                  port,
-                  ecnl_port_sub_ptr: ecnl_port_sub_ptr,
+                  base_port,
+                  ecnl_port_sub_ptr,
               };
               println!("Created ECNL port #{}, {} as {}", port_id, ecnl_port.get_port_name(), (*ecnl_port_sub_ptr).port_id);
               return ecnl_port;
@@ -171,13 +171,13 @@ impl InteriorPortLike for ECNL_Port {
                          let mut port_status_name: &str;
                          if (event.event_up_down != 0) {
                              port_status_name = "up";
-                             self.port.set_connected();
+                             self.base_port.set_connected();
                          } else {
                              port_status_name = "down";
-                             self.port.set_disconnected();
+                             self.base_port.set_disconnected();
                          }
 			 println!("Port {} is {}", ecnl_port_sub.port_id, port_status_name);
-			port_to_pe.send(PortToPePacket::Status((PortNo(ecnl_port_sub.port_id), self.port.is_border(), if (event.event_up_down != 0) {PortStatus::Connected} else {PortStatus::Disconnected}))).unwrap();
+			port_to_pe.send(PortToPePacket::Status((PortNo(ecnl_port_sub.port_id), self.base_port.is_border(), if (event.event_up_down != 0) {PortStatus::Connected} else {PortStatus::Disconnected}))).unwrap();
 		    }
 		    cmd_id if (cmd_id == NL_ECND_Commands::NL_ECNL_CMD_SIGNAL_AIT_MESSAGE as c_int) => {
                         println!("AIT Message Signal Received...");
