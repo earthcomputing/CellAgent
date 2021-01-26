@@ -1,10 +1,8 @@
 #[macro_use] extern crate failure;
 
 use std::{collections::{HashSet},
-          fmt,
-          fs::{File, OpenOptions},
+          fs::{OpenOptions},
 	  iter::FromIterator,
-          process::{Command, Stdio},
 };
 
 use ec_fabrix::config::{CONFIG, PortQty};
@@ -23,7 +21,7 @@ fn main() -> Result<(), Error> {
         .truncate(true)
 	.open(&CONFIG.output_file_name);
     let cell_name = "Carol"; /* if needed, can read cell name from config file */
-    let mut wc_cmd_outer;
+    let wc_cmd_outer;
     let num_phys_ports_str = {
         let lspci_cmd = Command::new("lspci")
             .stdin(Stdio::null())
@@ -31,7 +29,6 @@ fn main() -> Result<(), Error> {
             .spawn()
             .expect("lspci failed in identifying ethernet ports");
         use std::process::*;
-        use std::io::*;
         use std::os::unix::io::{AsRawFd, FromRawFd};
         unsafe {  // AHK: I don't think this block needs unsave
             let grep_cmd = Command::new("grep")
