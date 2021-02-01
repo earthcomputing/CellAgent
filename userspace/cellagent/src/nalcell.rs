@@ -84,19 +84,19 @@ impl<InteriorPortType: 'static + Clone + InteriorPortLike, BorderPortType: 'stat
             }
         }
         let cell_type = if border_port_nos.is_empty() { CellType::Interior } else { CellType::Border };
-        for i in 0..=*num_phys_ports {
+        for port_num in 0..=*num_phys_ports {
             #[cfg(feature = "cell")]
             let ecnl_clone = ecnl.clone();
-            let is_border_port = border_port_nos.contains(&PortNo(i));
+            let is_border_port = border_port_nos.contains(&PortNo(port_num));
             let is_connected;
             let port_to_pe_or_ca = if is_border_port {
                 is_connected = false;
                 let (ca_to_port, port_from_ca): (CaToPort, PortFromCa) = channel();
-                ca_to_ports.insert(PortNo(i), ca_to_port);
-                ports_from_ca.insert(PortNo(i), port_from_ca);
+                ca_to_ports.insert(PortNo(port_num), ca_to_port);
+                ports_from_ca.insert(PortNo(port_num), port_from_ca);
                 Either::Right(port_to_ca.clone())
             } else {
-                is_connected = if i == 0 {
+                is_connected = if port_num == 0 {
                     true
                 } else {
                     #[cfg(not(feature = "cell"))] {
@@ -105,7 +105,7 @@ impl<InteriorPortType: 'static + Clone + InteriorPortLike, BorderPortType: 'stat
                     #[cfg(feature = "cell")]
                     match ecnl_clone {
                         Some(ecnl_session) => {
-                                ecnl_session.get_port(i-1).is_connected()
+                                ecnl_session.get_port(port_num-1).is_connected()
                         }
                         None => {
                             false
@@ -113,11 +113,11 @@ impl<InteriorPortType: 'static + Clone + InteriorPortLike, BorderPortType: 'stat
                     }
                 };
                 let (pe_to_port, port_from_pe): (PeToPort, PortFromPe) = channel();
-                pe_to_ports.insert(PortNo(i), pe_to_port);
-                ports_from_pe.insert(PortNo(i), port_from_pe);
+                pe_to_ports.insert(PortNo(port_num), pe_to_port);
+                ports_from_pe.insert(PortNo(port_num), port_from_pe);
                 Either::Left(port_to_pe.clone())
             };
-            let port_number = PortNo(i).make_port_number(num_phys_ports).context(NalcellError::Chain { func_name: "new", comment: S("port number") })?;
+            let port_number = PortNo(port_num).make_port_number(num_phys_ports).context(NalcellError::Chain { func_name: "new", comment: S("port number") })?;
             let port = BasePort::<InteriorPortType, BorderPortType>::new(cell_id, port_number, is_border_port, is_connected, port_to_pe_or_ca).context(NalcellError::Chain { func_name: "new", comment: S("port") })?;
             ports.push(port);
         }
