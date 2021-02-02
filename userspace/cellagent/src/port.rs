@@ -5,12 +5,13 @@ use std::{fmt,
 
 use either::Either;
 
-use crate::app_message_formats::{PortToNoc, PortFromNoc, PortToCa, PortToCaMsg, PortFromCa};
+use crate::app_message_formats::{PortToCa, PortToCaMsg, PortFromCa};
 use crate::config::CONFIG;
 use crate::dal::{add_to_trace, fork_trace_header, update_trace_header};
 #[cfg(feature = "cell")]
 use crate::ecnl_port::ECNL_Port;
-use crate::simulated_port::{SimulatedPort};
+use crate::simulated_border_port::{SimulatedBorderPort};
+use crate::simulated_internal_port::{SimulatedInternalPort};
 use crate::ec_message_formats::{PortToPe, PortFromPe};
 use crate::name::{Name, PortID, CellID};
 #[cfg(feature = "cell")]
@@ -61,7 +62,7 @@ impl Port {
     pub fn set_connected(&mut self) { self.is_connected = true; }
     pub fn set_disconnected(&mut self) { self.is_connected = false; }
     pub fn is_border(&self) -> bool { self.is_border }
-    pub fn noc_channel(&self, port_to_noc: PortToNoc, port_from_noc: PortFromNoc,
+    pub fn noc_channel(&self, simulated_border_port: SimulatedBorderPort,
             port_from_ca: PortFromCa) -> Result<JoinHandle<()>, Error> {
         let _f = "noc_channel";
         let status = PortToCaMsg::Status(self.get_port_no(), PortStatus::Connected);
@@ -74,27 +75,29 @@ impl Port {
         }
         let port_to_ca = self.port_to_pe_or_ca.clone().right().expect("Port to Ca sender must be set");
         port_to_ca.send(status).context(PortError::Chain { func_name: "noc_channel", comment: S(self.id.get_name()) + " send to pe"})?;
-        self.listen_noc(port_from_noc)?;
-        let join_handle = self.listen_ca(port_to_noc, port_from_ca)?;
+        self.listen_noc(simulated_border_port.clone(), port_to_ca)?;
+        let join_handle = self.listen_ca(simulated_border_port, port_from_ca)?;
         Ok(join_handle)
     }
 
     // SPAWN THREAD (listen_noc_for_pe_loop)
-    fn listen_noc(&self, port_from_noc: PortFromNoc) -> Result<(), Error> {
+    fn listen_noc(&self, simulated_border_port: SimulatedBorderPort, port_to_ca: PortToCa) -> Result<(), Error> {
         let _f = "listen_noc";
         let port = self.clone();
         let child_trace_header = fork_trace_header();
         let thread_name = format!("Port {} {}", self.get_id().get_name(), _f);
+        let simulated_border_port_clone = simulated_border_port.clone();
+        let port_to_ca_clone = port_to_ca.clone();
         thread::Builder::new().name(thread_name).spawn( move || {
             update_trace_header(child_trace_header);
-            let _ = port.listen_noc_loop(&port_from_noc).map_err(|e| write_err("port", &e));
-            if CONFIG.continue_on_error { let _ = port.listen_noc(port_from_noc); }
+            let _ = port.listen_noc_loop(simulated_border_port, port_to_ca).map_err(|e| write_err("port", &e));
+            if CONFIG.continue_on_error { let _ = port.listen_noc(simulated_border_port_clone, port_to_ca_clone); }
         })?;
         Ok(())
     }
 
     // WORKER (PortFromNoc)
-    fn listen_noc_loop(&self, port_from_noc: &PortFromNoc) -> Result<(), Error> {
+    fn listen_noc_loop(&self, simulated_border_port: SimulatedBorderPort, port_to_ca: PortToCa) -> Result<(), Error> {
         let _f = "listen_noc_loop";
         {
             if CONFIG.trace_options.all || CONFIG.trace_options.port {
@@ -103,43 +106,25 @@ impl Port {
                 add_to_trace(TraceType::Trace, trace_params, &trace, _f);
             }
         }
-        loop {
-            let msg = port_from_noc.recv()?;
-            {
-                if CONFIG.trace_options.all || CONFIG.trace_options.port {
-                    let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "port_from_noc_app" };
-                    let trace = json!({ "cell_id": self.cell_id,"id": self.get_id().get_name(), "msg": msg });
-                    add_to_trace(TraceType::Trace, trace_params, &trace, _f);
-                }
-            }
-            {
-                if CONFIG.trace_options.all || CONFIG.trace_options.port {
-                    let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "port_to_pe_app" };
-                    let trace = json!({ "cell_id": self.cell_id, "id": self.get_id().get_name(), "msg": msg });
-                    add_to_trace(TraceType::Trace, trace_params, &trace, _f);
-                }
-            }
-            let port_to_ca = self.port_to_pe_or_ca.clone().right().expect("Port to Ca sender must be set");
-            port_to_ca.send(PortToCaMsg::AppMsg(self.port_number.get_port_no(), msg)).context(PortError::Chain { func_name: "listen_noc_for_pe", comment: S(self.id.get_name()) + " send app msg to pe"})?;
-        }
+        return simulated_border_port.clone().listen(port_to_ca);
     }
 
     // SPAWN THREAD (listen_ca_loop)
-    fn listen_ca(&self, port_to_noc: PortToNoc, port_from_ca: PortFromCa) -> Result<JoinHandle<()>, Error> {
+    fn listen_ca(&self, simulated_border_port: SimulatedBorderPort, port_from_ca: PortFromCa) -> Result<JoinHandle<()>, Error> {
         let _f = "listen_ca";
         let port = self.clone();
         let child_trace_header = fork_trace_header();
         let thread_name = format!("Port {} {}", self.get_id().get_name(), _f);
         let join_handle = thread::Builder::new().name(thread_name).spawn( move || {
             update_trace_header(child_trace_header);
-            let _ = port.listen_ca_loop(port_to_noc.clone(), &port_from_ca).map_err(|e| write_err("port", &e));
-            if CONFIG.continue_on_error { let _ = port.listen_ca(port_to_noc, port_from_ca); }
+            let _ = port.listen_ca_loop(&simulated_border_port.clone(), &port_from_ca.clone()).map_err(|e| write_err("port", &e));
+            if CONFIG.continue_on_error { let _ = port.listen_ca(simulated_border_port.clone(), port_from_ca.clone()); }
         })?;
         Ok(join_handle)
     }
 
     // WORKER (PortFromPe)
-    fn listen_ca_loop(&self, port_to_noc: PortToNoc, port_from_ca: &PortFromCa) -> Result<(), Error> {
+    fn listen_ca_loop(&self, simulated_border_port: &SimulatedBorderPort, port_from_ca: &PortFromCa) -> Result<(), Error> {
         let _f = "listen_ca_loop";
         {
             if CONFIG.trace_options.all || CONFIG.trace_options.port {
@@ -149,7 +134,7 @@ impl Port {
             }
         }
         loop {
-            let bytes = port_from_ca.recv().context(PortError::Chain { func_name: _f, comment: S(self.id.get_name()) + " recv from ca"})?;
+            let mut bytes = port_from_ca.recv().context(PortError::Chain { func_name: _f, comment: S(self.id.get_name()) + " recv from ca"})?;
             {
                 if CONFIG.trace_options.all || CONFIG.trace_options.port {
                     let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "port_from_ca" };
@@ -157,12 +142,12 @@ impl Port {
                     add_to_trace(TraceType::Trace, trace_params, &trace, _f);
                 }
             }
-            self.send_to_noc(&port_to_noc, bytes)?;
+            simulated_border_port.send(&mut bytes)?;
         }
     }
 
     // SPAWN THREAD (listen_link, listen_pe)
-    pub fn link_channel(&self, simulated_port_or_ecnl_port: Either<SimulatedPort, ECNL_Port>,
+    pub fn link_channel(&self, simulated_port_or_ecnl_port: Either<SimulatedInternalPort, ECNL_Port>,
                         port_from_pe: PortFromPe) {
         let _f = "link_channel";
         let mut port = self.clone();
@@ -194,7 +179,7 @@ impl Port {
     }
 
     // WORKER (PortFromLink)
-    fn listen_link_loop(&mut self, simulated_port_or_ecnl_port: Either<SimulatedPort, ECNL_Port>) -> Result<(), Error> {
+    fn listen_link_loop(&mut self, simulated_port_or_ecnl_port: Either<SimulatedInternalPort, ECNL_Port>) -> Result<(), Error> {
         let _f = "listen_link_loop";
         {
             if CONFIG.trace_options.all || CONFIG.trace_options.port {
@@ -222,7 +207,7 @@ impl Port {
         return Ok(()) // For now, needs to be fleshed out!
     }
     // WORKER (PortFromPe)
-    fn listen_pe_loop(&self, simulated_port_or_ecnl_port: &Either<SimulatedPort, ECNL_Port>, port_from_pe: &PortFromPe) -> Result<(), Error> {
+    fn listen_pe_loop(&self, simulated_port_or_ecnl_port: &Either<SimulatedInternalPort, ECNL_Port>, port_from_pe: &PortFromPe) -> Result<(), Error> {
         let _f = "listen_pe_loop";
         {
             if CONFIG.trace_options.all || CONFIG.trace_options.port {
@@ -256,18 +241,6 @@ impl Port {
                 simulated_port_or_ecnl_port.clone().right().expect("ecnl port in cell").send(&mut packet)?;
             }
         }
-    }
-    fn send_to_noc(&self, port_to_noc: &PortToNoc, bytes: ByteArray) -> Result<(), Error> {
-        let _f = "send_to_noc";
-        {
-            if CONFIG.trace_options.all | CONFIG.trace_options.port {
-                let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "port_to_noc" };
-                let trace = json!({ "cell_id": self.cell_id, "id": self.get_id().get_name(), "bytes": bytes.stringify()? });
-                add_to_trace(TraceType::Trace, trace_params, &trace, _f);
-            }
-        }
-        port_to_noc.send(bytes)?;
-        Ok(())
     }
 }
 impl fmt::Display for Port { 

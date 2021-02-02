@@ -8,14 +8,8 @@ pub type ISAIT = bool;
 pub type APP = ByteArray;
 // Port to Noc World
 pub type PortToNocMsg = APP;
-pub type PortToNoc = mpsc::Sender<PortToNocMsg>;
 pub type NocFromPort = mpsc::Receiver<PortToNocMsg>;
 //pub type PortNocError = mpsc::SendError<PortToNocMsg>;
-// Noc to Port
-pub type NocToPortMsg = APP;
-pub type NocToPort = mpsc::Sender<NocToPortMsg>;
-pub type PortFromNoc = mpsc::Receiver<NocToPortMsg>;
-//pub type NocPortError = mpsc::SendError<NocToPortMsg>;
 // Application to Noc
 pub type ApplicationNocMsg = String;
 pub type ApplicationToNoc = mpsc::Sender<ApplicationNocMsg>;

@@ -2,7 +2,7 @@ use std::{fmt};
 
 use crate::config::{CONFIG};
 use crate::dal::{add_to_trace};
-use crate::simulated_port::{LinkFromPort, LinkToPort, LinkToPortPacket};
+use crate::simulated_internal_port::{LinkFromPort, LinkToPort, LinkToPortPacket};
 use crate::name::{Name, LinkID, PortID};
 use crate::port::{PortStatus};
 use crate::utility::{S, TraceHeaderParams, TraceType};

@@ -7,18 +7,18 @@ use std::{fmt, fmt::Write,
           thread, thread::{JoinHandle}};
 use crossbeam::crossbeam_channel::unbounded as channel;
 
-use crate::app_message_formats::{PortToNoc, PortFromNoc};
+use crate::app_message_formats::{PortFromCa};
 use crate::blueprint::{Blueprint, Cell, };
 use crate::config::{CONFIG, CellQty, LinkQty};
 use crate::dal::{add_to_trace, fork_trace_header, get_cell_replay_lines, update_trace_header};
-use crate::simulated_port::{LinkFromPort, LinkToPort};
 use crate::ec_message_formats::{PortFromPe};
 use crate::link::{Link};
 use crate::nalcell::{NalCell};
 use crate::name::{CellID, LinkID};
 use crate::port::{Port};
 use crate::replay::{process_trace_record, TraceFormat};
-use crate::simulated_port::{PortFromLink, PortToLink, SimulatedPort};
+use crate::simulated_border_port::{NocFromPort, NocToPort, PortFromNoc, PortToNoc, SimulatedBorderPort};
+use crate::simulated_internal_port::{LinkFromPort, LinkToPort, PortFromLink, PortToLink, SimulatedInternalPort};
 use crate::utility::{CellNo, CellConfig, Edge, S, TraceHeaderParams, TraceType};
 
 #[derive(Debug, Default)]
@@ -99,8 +99,8 @@ impl Rack {
             let (left_to_link, link_from_left): (PortToLink, LinkFromPort) = channel();
             let (link_to_rite, rite_from_link): (LinkToPort, PortFromLink) = channel();
             let (rite_to_link, link_from_rite): (PortToLink, LinkFromPort) = channel();
-            left_port.link_channel(Either::Left(SimulatedPort::new(left_port.clone(), left_to_link, left_from_link)), left_from_pe);
-            rite_port.link_channel(Either::Left(SimulatedPort::new(rite_port.clone(), rite_to_link, rite_from_link)), rite_from_pe);
+            left_port.link_channel(Either::Left(SimulatedInternalPort::new(left_port.clone(), left_to_link, left_from_link)), left_from_pe);
+            rite_port.link_channel(Either::Left(SimulatedInternalPort::new(rite_port.clone(), rite_to_link, rite_from_link)), rite_from_pe);
             let link = Link::new(left_port.get_id(), rite_port.get_id(),
                                            link_to_left, link_to_rite)?;
             {
@@ -171,7 +171,7 @@ impl Rack {
             }
         }
        let (port, port_from_ca) = cell.get_free_boundary_port_mut()?;
-        port.noc_channel(port_to_noc, port_from_noc, port_from_ca)?;
+        port.noc_channel(SimulatedBorderPort::new(port.clone(), port_to_noc, port_from_noc), port_from_ca)?;
         if CONFIG.replay {
             println!("Connecting NOC to border cell {} for replay", cell.get_id());
         } else {

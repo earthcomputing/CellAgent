@@ -15,22 +15,22 @@ pub type PortToLink = mpsc::Sender<PortToLinkPacket>;
 pub type PortFromLink = mpsc::Receiver<LinkToPortPacket>;
 
 #[derive(Clone)]
-pub struct SimulatedPort {
+pub struct SimulatedInternalPort {
     port: Port,
     failover_info: FailoverInfo,
     port_to_link: PortToLink,
     port_from_link: PortFromLink,
 }
-impl SimulatedPort {
-    pub fn new(port: Port, port_to_link: PortToLink, port_from_link: PortFromLink) -> SimulatedPort {
+impl SimulatedInternalPort {
+    pub fn new(port: Port, port_to_link: PortToLink, port_from_link: PortFromLink) -> SimulatedInternalPort {
         let port_id = port.get_id();
-      	SimulatedPort{ port, port_to_link, port_from_link, failover_info: FailoverInfo::new(port_id) }
+      	SimulatedInternalPort{ port, port_to_link, port_from_link, failover_info: FailoverInfo::new(port_id) }
     }
     pub fn listen(&mut self, port_to_pe: PortToPe) -> Result<(), Error> {
         let _f = "listen";
         let mut msg: LinkToPortPacket;
             loop {
-                msg = self.recv().context(SimulatedPortError::Chain { func_name: _f, comment: S(self.port.get_id().get_name()) + " recv from link"})?;
+                msg = self.recv().context(SimulatedInternalPortError::Chain { func_name: _f, comment: S(self.port.get_id().get_name()) + " recv from link"})?;
 		        {
                     if CONFIG.trace_options.all || CONFIG.trace_options.port {
                         match &msg {
@@ -60,13 +60,13 @@ impl SimulatedPort {
 				                add_to_trace(TraceType::Trace, trace_params, &trace, _f);
                             }
 			            }
-			            port_to_pe.send(PortToPePacket::Status((self.port.get_port_no(), self.port.is_border(), status))).context(SimulatedPortError::Chain { func_name: _f, comment: S(self.port.get_id().get_name()) + " send status to pe"})?;
+			            port_to_pe.send(PortToPePacket::Status((self.port.get_port_no(), self.port.is_border(), status))).context(SimulatedInternalPortError::Chain { func_name: _f, comment: S(self.port.get_id().get_name()) + " send status to pe"})?;
                     }
                     LinkToPortPacket::Packet(mut packet) => {
 			            let ait_state = packet.get_ait_state();
 			            match ait_state {
                             AitState::AitD |
-                            AitState::Ait => return Err(SimulatedPortError::Ait { func_name: _f, port_id: self.port.get_id(), ait_state }.into()),
+                            AitState::Ait => return Err(SimulatedInternalPortError::Ait { func_name: _f, port_id: self.port.get_id(), ait_state }.into()),
 
                             AitState::Tick => (), // TODO: Send AitD to packet engine
                             AitState::Entl |
@@ -128,7 +128,7 @@ impl SimulatedPort {
             AitState::Tick |
 		    AitState::Tock |
 		    AitState::Tack |
-		    AitState::Teck => return Err(SimulatedPortError::Ait { func_name: _f, port_id: self.port.get_id(), ait_state }.into()), // Not allowed here 
+		    AitState::Teck => return Err(SimulatedInternalPortError::Ait { func_name: _f, port_id: self.port.get_id(), ait_state }.into()), // Not allowed here 
 		    AitState::Ait => { packet.next_ait_state()?; },
             AitState::Entl | // Only needed for simulator, should be handled by port
             AitState::SnakeD |
@@ -143,7 +143,7 @@ impl SimulatedPort {
     }
     fn direct_send(&mut self, packet: &Packet) -> Result<(), Error> {
         self.failover_info.save_packet(&packet);
-        Ok(self.port_to_link.send(packet.clone()).context(SimulatedPortError::Chain {func_name: "new",comment: S("")})?)
+        Ok(self.port_to_link.send(packet.clone()).context(SimulatedInternalPortError::Chain {func_name: "new",comment: S("")})?)
     }
 }
 
@@ -196,9 +196,9 @@ impl fmt::Display for FailoverInfo {
 // Errors
 use failure::{Error, ResultExt};
 #[derive(Debug, Fail)]
-pub enum SimulatedPortError {
-    #[fail(display = "SimulatedPortError::Chain {} {}", func_name, comment)]
+pub enum SimulatedInternalPortError {
+    #[fail(display = "SimulatedInternalPortError::Chain {} {}", func_name, comment)]
     Chain { func_name: &'static str, comment: String },
-    #[fail(display = "SimulatedPortError::Ait {} {} is not allowed here on port {}", func_name, port_id, ait_state)]
+    #[fail(display = "SimulatedInternalPortError::Ait {} {} is not allowed here on port {}", func_name, port_id, ait_state)]
     Ait { func_name: &'static str, port_id: PortID, ait_state: AitState },
 }
