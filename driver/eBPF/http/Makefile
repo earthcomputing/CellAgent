@@ -30,8 +30,8 @@ hello_fcgi: hello_fcgi.c
 #	cc $(CFLAGS) -o hello_fcgi hello_fcgi.c /usr/local/lib/libfcgi.a
 
 ebpf_fcgi: ebpf_fcgi.c
-	cc $(CFLAGS) -o ebpf_fcgi ebpf_fcgi.c -lfcgi -lbpf
-#	cc $(CFLAGS) -DIF_NAME='"eth1"' -o ebpf_fcgi ebpf_fcgi.c -lfcgi -lbpf
+#	cc $(CFLAGS) -o ebpf_fcgi ebpf_fcgi.c -lfcgi -lbpf
+	cc $(CFLAGS) -DIF_NAME='"enp7s0"' -o ebpf_fcgi ebpf_fcgi.c -lfcgi -lbpf
 
 ebpf_test: ebpf_fcgi.c
 	cc $(CFLAGS) -DTEST_MAIN -o ebpf_test ebpf_fcgi.c -lfcgi -lbpf
