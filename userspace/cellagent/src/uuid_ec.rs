@@ -23,7 +23,7 @@ const PORT_NO_BYTE: usize = 1;
 
 type Bytes = [u8; 16];
 #[repr(C)]
-#[derive(Copy, Clone, Default, Hash, Eq, Serialize, Deserialize)]
+#[derive(Copy, Clone, Default, Hash, Eq, PartialOrd, Serialize, Deserialize)]
 pub struct Uuid {
     uuid: uuid::Uuid
 }
@@ -38,7 +38,8 @@ impl Uuid {
         uuid.make_ait_send();
         uuid
     }
-    fn get_bytes(&self) -> Bytes { *self.uuid.as_bytes() }
+    pub fn is_default(&self) -> bool { *self == Uuid::default() }
+    pub fn get_bytes(&self) -> Bytes { *self.uuid.as_bytes() }
     fn set_bytes(&mut self, bytes: Bytes) { self.uuid = uuid::Uuid::from_bytes(bytes); }
     fn mask_ait_byte(&self) -> Bytes {
         let mut bytes = self.clone().get_bytes();
@@ -134,6 +135,10 @@ impl Uuid {
     pub fn make_ait_reply(&mut self) -> AitState {
         self.set_code(AITD);
         AitState::AitD
+    }
+    pub fn make_tick(&mut self) -> AitState {
+        self.set_code(TICK);
+        AitState::Tick
     }
     pub fn make_tock(&mut self) -> AitState {
         self.set_code(TOCK);

@@ -12,11 +12,11 @@ use serde;
 use serde_json;
 use serde::ser::{Serialize, SerializeStruct};
 
-use crate::app_message::SenderMsgSeqNo;
+use crate::{app_message::SenderMsgSeqNo};
 use crate::config::{PACKET_MIN, PACKET_MAX, PACKET_PADDING, PAYLOAD_DEFAULT_ELEMENT, PacketNo};
 use crate::ec_message::{Message};
-use crate::name::{PortTreeID, Name};
-use crate::utility::{ByteArray, S, Stack};
+//use crate::name::{PortTreeID, Name};
+use crate::utility::{ByteArray, S};//, Stack};
 use crate::uuid_ec::{Uuid, AitState};
  
 //const LARGEST_MSG: usize = std::u32::MAX as usize;
@@ -26,7 +26,7 @@ const PAYLOAD_MAX: usize = PACKET_MAX - NON_PAYLOAD_SIZE;
 
 pub type PacketAssemblers = HashMap<UniqueMsgId, PacketAssembler>;
 
-#[derive(Debug, Copy, Clone, Hash, Eq, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Copy, Clone, Default, Hash, Eq, PartialEq, Serialize, Deserialize)]
 pub struct UniqueMsgId(pub u64);
 impl UniqueMsgId { fn new() -> UniqueMsgId { UniqueMsgId(rand::random()) } }
 impl Deref for UniqueMsgId { type Target = u64; fn deref(&self) -> &Self::Target { &self.0 } }
@@ -38,7 +38,7 @@ impl fmt::Display for UniqueMsgId {
 }
 static PACKET_COUNT: AtomicUsize = AtomicUsize::new(0);
 #[repr(C)]
-#[derive(Debug, Clone, Serialize)]
+#[derive(Copy, Clone, Debug, Default, Eq, PartialEq, Serialize)]
 pub struct Packet {
     // Changes here must be reflected in the calculations of PAYLOAD_MIN and PAYLOAD_MAX in packet.rs
     header: PacketHeader,
@@ -53,20 +53,25 @@ impl Packet {
         let payload = Payload::new(unique_msg_id, size, is_last_packet, data_bytes);
         Packet { header, payload, packet_count: Packet::get_next_count(), sender_msg_seq_no: seq_no }
     }
-    pub fn make_entl_packet() -> Packet {
-        let mut uuid = Uuid::new();
+    pub fn new_entl_packet(mut uuid: Uuid) -> Packet {
         uuid.make_entl();
         Packet::new(UniqueMsgId::new(), &uuid, PacketNo(1),
                     false, SenderMsgSeqNo(0), vec![])
     }
-    pub fn make_snaked_packet() -> Packet {
+    pub fn new_ping_packet() -> Packet {
+        let uuid = Uuid::default();
+        let mut packet = Packet::new_entl_packet(uuid);
+        packet.make_packet_tick();
+        packet
+    }
+    pub fn make_packet_snaked() -> Packet {
         let mut uuid = Uuid::new();
         uuid.make_snaked();
         Packet::new(UniqueMsgId::new(), &uuid, PacketNo(1),
                         false, SenderMsgSeqNo(0), vec![])
     }
-    pub fn make_snake_ack(uniquifier: PacketUniquifier) -> Result<Packet, Error> {
-        let mut packet = Packet::make_snaked_packet();
+    pub fn make_snake_ack_packet(uniquifier: PacketUniquifier) -> Result<Packet, Error> {
+        let mut packet = Packet::make_packet_snaked();
         let serialized = serde_json::to_string(&uniquifier)?;
         let bytes = ByteArray::new(&serialized);
         packet.payload.set_bytes(bytes);
@@ -81,7 +86,7 @@ impl Packet {
     pub fn get_uuid(&self) -> Uuid { self.header.get_uuid() }
     
     // Used for trace records
-    pub fn to_string(&self) -> Result<String, Error> {
+    pub fn stringify(&self) -> Result<String, Error> {
         let bytes = self.get_bytes();
         let is_last = self.payload.is_last;
         let len = if is_last {
@@ -91,7 +96,7 @@ impl Packet {
         };
         let string = format!("is_last: {}, length: {}, unique_msg_id: {}, tree_id: {}, is_snake: {}, msg: {}", 
             is_last, *len, self.payload.unique_msg_id, self.header.uuid, self.is_snake(), 
-            ByteArray::new_from_bytes(&bytes).to_string()?);
+            ByteArray::new_from_bytes(&bytes).stringify()?);
         let default_as_char = PAYLOAD_DEFAULT_ELEMENT as char;
         Ok(string.replace(default_as_char, ""))
     }
@@ -111,15 +116,16 @@ impl Packet {
     // pub fn get_payload_size(&self) -> usize { self.payload.get_no_bytes() }
 
     // UUID Magic
-    pub fn make_ait_send(&mut self) { self.header.make_ait_send() }
-    pub fn make_ait_reply(&mut self) { self.header.make_ait_reply() }
-    pub fn make_tock(&mut self) { self.header.make_tock() }
+    pub fn make_packet_ait_send(&mut self) { self.header.make_ait_send() }
+    pub fn make_packet_ait_reply(&mut self) { self.header.make_ait_reply() }
+    pub fn make_packet_tick(&mut self) { self.header.make_tick() }
+    pub fn make_packet_tock(&mut self) { self.header.make_tock() }
     pub fn is_ait(&self) -> bool { self.is_ait_recv() || self.is_ait_recv() }
     pub fn is_ait_send(&self) -> bool { self.header.get_uuid().is_ait_send() }
     pub fn is_ait_recv(&self) -> bool { self.header.get_uuid().is_ait_recv() }
     pub fn is_snake(&self) -> bool { self.header.get_uuid().is_snake() }
     pub fn is_snaked(&self) -> bool { self.header.get_uuid().is_snaked() }
-    pub fn _is_entl(&self) -> bool { self.header.get_uuid()._is_entl() }
+    pub fn is_entl(&self) -> bool { self.header.is_entl() }
     pub fn get_ait_state(&self) -> AitState { self.get_tree_uuid().get_ait_state() }
     pub fn time_reverse(&mut self) { self.header.get_uuid().time_reverse(); }
     pub fn next_ait_state(&mut self) -> Result<AitState, Error> {
@@ -129,18 +135,18 @@ impl Packet {
         Ok(uuid.get_ait_state())
     }
     // Wrapping and unwrapping following failover
-    pub fn _wrap(&mut self, rw_port_tree_id: PortTreeID) {
-        self.payload.wrapped_header._push(self.header);
-        self.header = PacketHeader::new(&rw_port_tree_id.get_uuid());
-    }
-    pub fn _unwrap(&mut self) -> bool {
-        if let Some(wrapped_header) = self.payload.wrapped_header._pop(){
-            self.header = wrapped_header;
-            true
-        } else {
-            false
-        }
-    }
+//    pub fn _wrap(&mut self, rw_port_tree_id: PortTreeID) {
+//        self.payload.wrapped_header._push(self.header);
+//        self.header = PacketHeader::new(&rw_port_tree_id.get_uuid());
+//    }
+//    pub fn _unwrap(&mut self) -> bool {
+//        if let Some(wrapped_header) = self.payload.wrapped_header._pop(){
+//            self.header = wrapped_header;
+//            true
+//        } else {
+//            false
+//        }
+//    }
 }
 impl fmt::Display for Packet {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -160,7 +166,7 @@ impl fmt::Display for Packet {
 }
 
 #[repr(C)]
-#[derive(Debug, Copy, Clone, Serialize)]
+#[derive(Debug, Copy, Clone, Default, Eq, PartialEq, Serialize)]
 pub struct PacketHeader {
     uuid: Uuid,     // Tree identifier 16 bytes
 }
@@ -171,7 +177,12 @@ impl PacketHeader {
     fn get_uuid(&self) -> Uuid { self.uuid }
     fn make_ait_send(&mut self) { self.uuid.make_ait_send(); }
     fn make_ait_reply(&mut self) { self.uuid.make_ait_reply(); }
+    fn make_tick(&mut self) { self.uuid.make_tick(); }
     fn make_tock(&mut self) { self.uuid.make_tock(); }
+    pub fn is_entl(&self) -> bool {
+        let uuid_lookup = self.uuid.for_lookup();
+        uuid_lookup.is_default()       
+    }
 }
 impl fmt::Display for PacketHeader { 
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -183,14 +194,14 @@ impl fmt::Display for PacketHeader {
 }
 
 #[repr(C)]
-#[derive(Clone)]
+#[derive(Copy, Clone, Eq, PartialEq)]
 pub struct Payload {
     unique_msg_id: UniqueMsgId,  // Unique identifier of this message
     size: PacketNo, // Number of packets remaining in message if not last packet
                     // Number of bytes in last packet if last packet, 0 => Error
     is_last: bool,
     bytes: [u8; PAYLOAD_MAX],
-    wrapped_header: Stack<PacketHeader>,
+    //wrapped_header: Stack<PacketHeader>,
 }
 impl Payload {
     pub fn new(unique_msg_id: UniqueMsgId, size: PacketNo,
@@ -199,7 +210,7 @@ impl Payload {
         // Next line recommended by clippy, but I think the loop is clearer
         //bytes[..min(data_bytes.len(), PAYLOAD_MAX)].clone_from_slice(&data_bytes[..min(data_bytes.len(), PAYLOAD_MAX)]);
         for i in 0..min(data_bytes.len(), PAYLOAD_MAX) { bytes[i] = data_bytes[i]; }
-        Payload { unique_msg_id, size, is_last, bytes, wrapped_header: Stack::new() }
+        Payload { unique_msg_id, size, is_last, bytes, /*wrapped_header: Stack::new()*/ }
     }
     fn get_bytes(&self) -> Vec<u8> { self.bytes.iter().cloned().collect() }
     fn set_bytes(&mut self, bytes: ByteArray) { 
@@ -209,7 +220,13 @@ impl Payload {
     fn get_unique_msg_id(&self) -> UniqueMsgId { self.unique_msg_id }
     fn get_size(&self) -> PacketNo { self.size }
     fn is_last_packet(&self) -> bool { self.is_last }
-    fn _get_wrapped_header(&self) -> &Stack<PacketHeader> { &self.wrapped_header }
+ //   fn _get_wrapped_header(&self) -> &Stack<PacketHeader> { &self.wrapped_header }
+}
+impl Default for Payload {
+    fn default() -> Self {
+        Payload { bytes: [0; PAYLOAD_MAX], is_last: false, size: Default::default(),
+            /*wrapped_header: Default::default(),*/ unique_msg_id: Default::default() }
+    }
 }
 impl fmt::Display for Payload {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -217,10 +234,10 @@ impl fmt::Display for Payload {
         if self.is_last_packet() { s = s + ", Last packet"; }
         else                     { s = s + ", Not last packet"; }
         s = s + &format!(", Size {}", *self.size);
-        s = s + &format!(", Wrapped headers: ");
-        for w in self.wrapped_header.iter() {
-            s = s + &format!("{}", w);
-        }
+//        s = s + &format!(", Wrapped headers: ");
+//        for w in self.wrapped_header.iter() {
+//            s = s + &format!("{}", w);
+//        }
         s = s + &format!("{:?}", &self.bytes[0..10]);
         write!(f, "{}", s)
     }

@@ -1,7 +1,8 @@
 use std::{fmt,
           thread,
           thread::JoinHandle,
-          sync::{atomic::AtomicBool, Arc, atomic::Ordering::SeqCst}};
+          sync::{Arc}
+        };
 
 use either::Either;
 
@@ -11,10 +12,10 @@ use crate::dal::{add_to_trace, fork_trace_header, update_trace_header};
 #[cfg(feature = "cell")]
 use crate::ecnl_port::ECNL_Port;
 use crate::simulated_port::{SimulatedPort};
-use crate::ec_message_formats::{PortToPe, PortFromPe};
+use crate::ec_message_formats::{PortToPe, PortFromPe, PortFromPeSync};
 use crate::name::{Name, PortID, CellID};
 #[cfg(feature = "cell")]
-use crate::packet::{Packet, UniqueMsgId};
+use crate::packet::{UniqueMsgId};
 use crate::utility::{ByteArray, PortNo, PortNumber, S, TraceHeader, TraceHeaderParams, TraceType,
                      write_err};
 
@@ -41,16 +42,17 @@ pub struct Port {
     id: PortID,
     port_number: PortNumber,
     is_border: bool,
-    is_connected: Arc<AtomicBool>,
+    is_connected: bool,
     port_to_pe_or_ca: Either<PortToPe, PortToCa>,
+    port_from_pe_sync: PortFromPeSync
 }
 impl Port {
     pub fn new(cell_id: CellID, port_number: PortNumber, is_border: bool, is_connected: bool,
-               port_to_pe_or_ca: Either<PortToPe, PortToCa>) -> Result<Port, Error> {
+               port_to_pe_or_ca: Either<PortToPe, PortToCa>, port_from_pe_sync: PortFromPeSync) -> Result<Port, Error> {
         let port_id = PortID::new(cell_id, port_number).context(PortError::Chain { func_name: "new", comment: S(cell_id.get_name()) + &S(*port_number.get_port_no())})?;
         Ok(Port{ cell_id, id: port_id, port_number, is_border,
-            is_connected: Arc::new(AtomicBool::new(is_connected)),
-            port_to_pe_or_ca
+            is_connected, //:Arc::new(AtomicBool::new(is_connected)),
+            port_to_pe_or_ca, port_from_pe_sync
         })
     }
     pub fn get_id(&self) -> PortID { self.id }
@@ -58,9 +60,9 @@ impl Port {
     pub fn get_port_no(&self) -> PortNo { self.port_number.get_port_no() }
 //  pub fn get_port_number(&self) -> PortNumber { self.port_number }
 //  pub fn get_is_connected(&self) -> Arc<AtomicBool> { self.is_connected.clone() }
-    pub fn is_connected(&self) -> bool { self.is_connected.load(SeqCst) }
-    pub fn set_connected(&mut self) { self.is_connected.store(true, SeqCst); }
-    pub fn set_disconnected(&mut self) { self.is_connected.store(false, SeqCst); }
+    pub fn is_connected(&self) -> bool { self.is_connected }//.load(SeqCst) }
+    pub fn set_connected(&mut self) { self.is_connected = true; }//.is_connected.store(true, SeqCst); }
+    pub fn set_disconnected(&mut self) { self.is_connected = false; }//self.is_connected.store(false, SeqCst); }
     pub fn is_border(&self) -> bool { self.is_border }
     pub fn noc_channel(&self, port_to_noc: PortToNoc, port_from_noc: PortFromNoc,
             port_from_ca: PortFromCa) -> Result<JoinHandle<()>, Error> {
@@ -109,14 +111,14 @@ impl Port {
             {
                 if CONFIG.trace_options.all || CONFIG.trace_options.port {
                     let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "port_from_noc_app" };
-                    let trace = json!({ "cell_id": self.cell_id,"id": self.get_id().get_name(), "msg": msg });
+                    let trace = json!({ "cell_id": self.cell_id,"id": self.get_id().get_name(), "msg": msg.stringify()? });
                     add_to_trace(TraceType::Trace, trace_params, &trace, _f);
                 }
             }
             {
                 if CONFIG.trace_options.all || CONFIG.trace_options.port {
                     let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "port_to_pe_app" };
-                    let trace = json!({ "cell_id": self.cell_id, "id": self.get_id().get_name(), "msg": msg });
+                    let trace = json!({ "cell_id": self.cell_id, "id": self.get_id().get_name(), "msg": msg.stringify()? });
                     add_to_trace(TraceType::Trace, trace_params, &trace, _f);
                 }
             }
@@ -154,7 +156,7 @@ impl Port {
             {
                 if CONFIG.trace_options.all || CONFIG.trace_options.port {
                     let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "port_from_ca" };
-                    let trace = json!({ "cell_id": self.cell_id, "id": self.get_id().get_name(), "bytes": bytes.to_string()? });
+                    let trace = json!({ "cell_id": self.cell_id, "id": self.get_id().get_name(), "bytes": bytes.stringify()? });
                     add_to_trace(TraceType::Trace, trace_params, &trace, _f);
                 }
             }
@@ -205,11 +207,16 @@ impl Port {
             }
         }
         let port_to_pe = self.port_to_pe_or_ca.clone().left().expect("Port: Sender to Pe must be set");
+        let port_from_pe_sync = self.port_from_pe_sync.clone();
         #[cfg(any(feature = "noc", feature = "simulator"))] {
-            return simulated_port_or_ecnl_port.clone().left().expect("ecnl in simulator").listen(self, port_to_pe);
+            simulated_port_or_ecnl_port
+            .clone()
+            .left()
+            .expect("ecnl in simulator")
+            .listen_link(self, &port_to_pe, &port_from_pe_sync)
         }
         #[cfg(feature = "cell")] {
-            return simulated_port_or_ecnl_port.clone().right().expect("port_link_channel in cell").listen(self, port_to_pe);
+            simulated_port_or_ecnl_port.clone().right().expect("port_link_channel in cell").listen(self, port_to_pe)
 	}
         #[cfg(feature = "noc")]
         return Ok(()) // For now, needs to be fleshed out!
@@ -230,7 +237,7 @@ impl Port {
             {
                 if CONFIG.trace_options.all || CONFIG.trace_options.port {
                     let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "port_from_pe" };
-                    let trace = json!({ "cell_id": self.cell_id, "id": self.get_id().get_name(), "packet":packet.to_string()? });
+                    let trace = json!({ "cell_id": self.cell_id, "id": self.get_id().get_name(), "packet":packet.stringify()? });
                     add_to_trace(TraceType::Trace, trace_params, &trace, _f);
                 }
             }
@@ -238,15 +245,17 @@ impl Port {
                 if CONFIG.trace_options.all | CONFIG.trace_options.port {
                     let ait_state = packet.get_ait_state();
                     let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "port_to_link" };
-                    let trace = json!({ "cell_id": self.cell_id, "id": self.get_id().get_name(), "ait_state": ait_state, "packet": packet.to_string()? });
+                    let trace = json!({ "cell_id": self.cell_id, "id": self.get_id().get_name(), "ait_state": ait_state, "packet": packet.stringify()? });
                     add_to_trace(TraceType::Trace, trace_params, &trace, _f);
                 }
             }
             #[cfg(any(feature = "noc", feature = "simulator"))]
-		simulated_port_or_ecnl_port.clone().left().expect("ecnl port in simulator").send(packet)?;
+            {
+                simulated_port_or_ecnl_port.clone().left().expect("simulated port in simulator").send(self.id, packet)?;
+            }
             #[cfg(feature = "cell")]
             {
-                simulated_port_or_ecnl_port.clone().right().expect("simulated port in cell").send(&packet)?;
+                simulated_port_or_ecnl_port.clone().right().expect("ecnl port in cell").send(&packet)?;
             }
         }
     }
@@ -255,7 +264,7 @@ impl Port {
         {
             if CONFIG.trace_options.all | CONFIG.trace_options.port {
                 let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "port_to_noc" };
-                let trace = json!({ "cell_id": self.cell_id, "id": self.get_id().get_name(), "bytes": bytes.to_string()? });
+                let trace = json!({ "cell_id": self.cell_id, "id": self.get_id().get_name(), "bytes": bytes.stringify()? });
                 add_to_trace(TraceType::Trace, trace_params, &trace, _f);
             }
         }

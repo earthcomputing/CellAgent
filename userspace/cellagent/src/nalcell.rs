@@ -13,6 +13,7 @@ use crate::cellagent::{CellAgent};
 use crate::config::{CONFIG, PortQty};
 use crate::dal::{add_to_trace, get_cell_replay_lines};
 use crate::ec_message_formats::{PortToPe, PeFromPort, PeToPort, PortFromPe,
+                                PeToPortSync, PortFromPeSync,
                                 CmToCa, CaFromCm, CaToCm, CmFromCa, CaToCmBytes, CmToCaBytes,
                                 PeToCm, CmFromPe, CmToPe, PeFromCm}; 
 #[cfg(feature = "cell")]
@@ -76,6 +77,7 @@ impl NalCell {
         let mut ports_from_pe = HashMap::new(); // So I can remove the item
         let mut ca_to_ports = HashMap::new();
         let mut ports_from_ca = HashMap::new();
+        let mut pe_to_ports_sync = HashMap::new();
         {
             if CONFIG.trace_options.all || CONFIG.trace_options.nal {
                 let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "nalcell_port_setup" };
@@ -117,8 +119,10 @@ impl NalCell {
                 ports_from_pe.insert(PortNo(i), port_from_pe);
                 Either::Left(port_to_pe.clone())
             };
+            let (pe_to_port_sync, port_from_pe_sync): (PeToPortSync, PortFromPeSync) = channel();
+            pe_to_ports_sync.insert(PortNo(i), pe_to_port_sync);
             let port_number = PortNo(i).make_port_number(num_phys_ports).context(NalcellError::Chain { func_name: "new", comment: S("port number") })?;
-            let port = Port::new(cell_id, port_number, is_border_port, is_connected, port_to_pe_or_ca).context(NalcellError::Chain { func_name: "new", comment: S("port") })?;
+            let port = Port::new(cell_id, port_number, is_border_port, is_connected, port_to_pe_or_ca, port_from_pe_sync).context(NalcellError::Chain { func_name: "new", comment: S("port") })?;
             ports.push(port);
         }
         let boxed_ports: Box<[Port]> = ports.into_boxed_slice();
@@ -128,7 +132,7 @@ impl NalCell {
         let (cm_to_pe, pe_from_cm): (CmToPe, PeFromCm) = channel();
         let (cell_agent, _cm_join_handle) = CellAgent::new(cell_id, tree_ids, cell_type, config,
                  num_phys_ports, ca_to_ports.clone(), cm_to_ca.clone(),
-                  pe_from_ports, pe_to_ports,
+                  pe_from_ports, pe_to_ports, pe_to_ports_sync,
                   border_port_nos,
                   ca_to_cm.clone(), cm_from_ca, pe_to_cm.clone(),
                             cm_from_pe, cm_to_pe.clone(), pe_from_cm).context(NalcellError::Chain { func_name: "new", comment: S("cell agent create") })?;

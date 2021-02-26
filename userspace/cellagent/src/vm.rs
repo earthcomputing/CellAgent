@@ -92,7 +92,7 @@ impl VirtualMachine {
             let bytes = vm_from_ca.recv().context("listen_ca_loop").context(VmError::Chain { func_name: "listen_ca_loop", comment: S(self.id.get_name()) })?;
             {
                 if CONFIG.trace_options.all || CONFIG.trace_options.vm {
-                    let msg: Box<dyn AppMessage> = serde_json::from_str(&bytes.to_string()?)?;
+                    let msg: Box<dyn AppMessage> = serde_json::from_str(&bytes.stringify()?)?;
                     let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "vm_from_ca" };
                     let trace = json!({ "id": self.id, "msg": msg.to_string() });
                     add_to_trace(TraceType::Trace, trace_params, &trace, _f);
@@ -123,7 +123,7 @@ impl VirtualMachine {
             let bytes = vm_from_container.recv().context("listen_container_loop").context(VmError::Chain { func_name: "listen_container_loop", comment: S(self.id.get_name()) + " recv from container"})?;
             {
                 if CONFIG.trace_options.all || CONFIG.trace_options.vm {
-                    let msg: Box<dyn AppMessage> = serde_json::from_str(&bytes.to_string()?)?;
+                    let msg: Box<dyn AppMessage> = serde_json::from_str(&bytes.stringify()?)?;
                     let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "vm_from_container" };
                     let trace = json!({ "id": self.id, "msg": msg.to_string() });
                     add_to_trace(TraceType::Trace, trace_params, &trace, _f);

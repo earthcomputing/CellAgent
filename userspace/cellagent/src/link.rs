@@ -42,13 +42,14 @@ impl Link {
                     {
                         if CONFIG.trace_options.all || CONFIG.trace_options.link {
                             let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "link_from_left_port" };
-                            let trace = json!({ "id": &self.get_id(), "packet":packet.to_string()? });
+                            let trace = json!({ "id": &self.get_id(), "packet":packet.stringify()? });
                             add_to_trace(TraceType::Trace, trace_params, &trace, _f);
                             let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "link_to_rite_port" };
-                            let trace = json!({ "id": &self.get_id(), "packet":packet.to_string()? });
+                            let trace = json!({ "id": &self.get_id(), "packet":packet.stringify()? });
                             add_to_trace(TraceType::Trace, trace_params, &trace, _f);
                         }
                     }
+                    Link::transit_delay();
                     self.link_to_rite.send(LinkToPortPacket::Packet(packet)).context(LinkError::Chain { func_name: _f, comment: S(self.id.clone()) + " send to rite"})?;
                 },
                 recv(link_from_rite) -> recvd => {
@@ -56,17 +57,21 @@ impl Link {
                     {
                         if CONFIG.trace_options.all || CONFIG.trace_options.link {
                             let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "link_from_rite_port" };
-                            let trace = json!({ "id": &self.get_id(), "packet":packet.to_string()? });
+                            let trace = json!({ "id": &self.get_id(), "packet":packet.stringify()? });
                             add_to_trace(TraceType::Trace, trace_params, &trace, _f);
                             let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "link_to_left_port" };
-                            let trace = json!({ "id": &self.get_id(), "packet":packet.to_string()? });
+                            let trace = json!({ "id": &self.get_id(), "packet":packet.stringify()? });
                             add_to_trace(TraceType::Trace, trace_params, &trace, _f);
                         }
                     }
+                    Link::transit_delay();
                     self.link_to_left.send(LinkToPortPacket::Packet(packet)).context(LinkError::Chain { func_name: _f, comment: S(self.id.clone()) + " send to left"})?;
                 }
             }
         }
+    }
+    fn transit_delay() {
+        std::thread::sleep(std::time::Duration::from_millis(5));
     }
     pub fn break_link(&mut self) -> Result<(), Error> {
         let _f = "break_link";
