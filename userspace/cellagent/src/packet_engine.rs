@@ -241,7 +241,7 @@ impl PacketEngine {
                 {
                     if CONFIG.trace_options.all || CONFIG.trace_options.pe_cm {
                         let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "pe_from_cm_packet" };
-                        let trace = json!({ "cell_id": self.cell_id, "user_mask": user_mask, "packet": packet.to_string()? });
+                        let trace = json!({ "cell_id": self.cell_id, "user_mask": user_mask, "packet": packet.stringify()? });
                         add_to_trace(TraceType::Trace, trace_params, &trace, _f);
                     }
                 }
@@ -251,7 +251,7 @@ impl PacketEngine {
                 {
                     if CONFIG.trace_options.all || CONFIG.trace_options.pe_cm {
                         let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "pe_from_cm_snaked" };
-                        let trace = json!({ "cell_id": &self.cell_id, "ack_port_no": ack_port_no, "packet": packet.to_string()? });
+                        let trace = json!({ "cell_id": &self.cell_id, "ack_port_no": ack_port_no, "packet": packet.stringify()? });
                         add_to_trace(TraceType::Trace, trace_params, &trace, _f);
                     }
                 }
@@ -299,7 +299,7 @@ impl PacketEngine {
                 {
                     if CONFIG.trace_options.all || CONFIG.trace_options.pe_port {
                         let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "pe_from_port_packet" };
-                        let trace = json!({ "cell_id": self.cell_id, "port_no": port_no, "packet": packet.to_string()? });
+                        let trace = json!({ "cell_id": self.cell_id, "port_no": port_no, "packet": packet.stringify()? });
                         add_to_trace(TraceType::Trace, trace_params, &trace, _f);
                     }
                 }
@@ -343,7 +343,7 @@ impl PacketEngine {
                         let ait_state = packet.get_ait_state();
                         let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "pe_packet_from_cm" };
                         let trace = json!({ "cell_id": self.cell_id, "uuid": uuid, "ait_state": ait_state, 
-                            "packet": packet.to_string()? });
+                            "packet": packet.stringify()? });
                         add_to_trace(TraceType::Trace, trace_params, &trace, _f);
                     }
                     if CONFIG.debug_options.pe_pkt_recv {
@@ -366,7 +366,7 @@ impl PacketEngine {
         {
             if CONFIG.trace_options.all || CONFIG.trace_options.pe_port {
                 let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "pe_to_port_packet" };
-                let trace = json!({ "cell_id": self.cell_id, "port_no": port_no, "reroute_port_no": reroute_port_no, "packet": packet.to_string()? });
+                let trace = json!({ "cell_id": self.cell_id, "port_no": port_no, "reroute_port_no": reroute_port_no, "packet": packet.stringify()? });
                 add_to_trace(TraceType::Trace, trace_params, &trace, _f);
             }
         }
@@ -484,7 +484,7 @@ impl PacketEngine {
                 {
                     if CONFIG.trace_options.all | CONFIG.trace_options.pe {
                         let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "pe_to_cm_packet_snaked" };
-                        let trace = json!({ "cell_id": &self.cell_id, "port": port_no, "packet": packet.to_string()? });
+                        let trace = json!({ "cell_id": &self.cell_id, "port": port_no, "packet": packet.stringify()? });
                         add_to_trace(TraceType::Trace, trace_params, &trace, _f);
                     }
                 }
@@ -494,7 +494,7 @@ impl PacketEngine {
                 {
                     if CONFIG.trace_options.all | CONFIG.trace_options.pe {
                         let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "pe_to_cm_packet" };
-                        let trace = json!({ "cell_id": &self.cell_id, "port": port_no, "packet": packet.to_string()? });
+                        let trace = json!({ "cell_id": &self.cell_id, "port": port_no, "packet": packet.stringify()? });
                         add_to_trace(TraceType::Trace, trace_params, &trace, _f);
                     }
                 }
@@ -557,7 +557,7 @@ impl PacketEngine {
             if CONFIG.trace_options.all | CONFIG.trace_options.pe {
                 let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "pe_forward" };
                 let trace = json!({ "cell_id": &self.cell_id, "port": recv_port_no, "user_mask": user_mask, 
-                    "entry_mask": entry.get_mask(), "packet": packet.to_string()? });
+                    "entry_mask": entry.get_mask(), "packet": packet.stringify()? });
                 add_to_trace(TraceType::Trace, trace_params, &trace, _f);
             }
         }
@@ -571,7 +571,7 @@ impl PacketEngine {
                     let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "pe_forward_connected_tree" };
                     let trace = json!({ "cell_id": &self.cell_id, "port": recv_port_no,
                         "user_mask": user_mask, "entry_mask": entry.get_mask(), "port_nos": port_nos,
-                        "packet": packet.to_string()? });
+                        "packet": packet.stringify()? });
                     add_to_trace(TraceType::Trace, trace_params, &trace, _f);
                 }
             }
@@ -591,7 +591,7 @@ impl PacketEngine {
                     {
                         if CONFIG.trace_options.all | CONFIG.trace_options.pe {
                             let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "pe_to_cm_rootward" };
-                            let trace = json!({ "cell_id": &self.cell_id, "port": recv_port_no, "packet": packet.to_string()? });
+                            let trace = json!({ "cell_id": &self.cell_id, "port": recv_port_no, "packet": packet.stringify()? });
                             add_to_trace(TraceType::Trace, trace_params, &trace, _f);
                         }
                         if CONFIG.debug_options.all || CONFIG.debug_options.pe_pkt_send {
@@ -618,7 +618,7 @@ impl PacketEngine {
                     {
                         if CONFIG.trace_options.all | CONFIG.trace_options.pe {
                             let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "pe_to_ports_rootward" };
-                            let trace = json!({ "cell_id": &self.cell_id, "port": recv_port_no, "packet": packet.to_string()? });
+                            let trace = json!({ "cell_id": &self.cell_id, "port": recv_port_no, "packet": packet.stringify()? });
                             add_to_trace(TraceType::Trace, trace_params, &trace, _f);
                         }
                     }
@@ -637,7 +637,7 @@ impl PacketEngine {
                         {
                             if CONFIG.trace_options.all | CONFIG.trace_options.pe {
                                 let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "pe_to_cm_leafward_uptree" };
-                                let trace = json!({ "cell_id": &self.cell_id, "port": recv_port_no, "packet": packet_ref.to_string()? });
+                                let trace = json!({ "cell_id": &self.cell_id, "port": recv_port_no, "packet": packet_ref.stringify()? });
                                 add_to_trace(TraceType::Trace, trace_params, &trace, _f);
                             }
                         }
@@ -648,7 +648,7 @@ impl PacketEngine {
                         {
                             if CONFIG.trace_options.all | CONFIG.trace_options.pe {
                                 let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "pe_to_port_leafward" };
-                                let trace = json!({ "cell_id": &self.cell_id, "recv_port_no": recv_port_no, "port_no": port_no, "packet": packet.to_string()? });
+                                let trace = json!({ "cell_id": &self.cell_id, "recv_port_no": recv_port_no, "port_no": port_no, "packet": packet.stringify()? });
                                 add_to_trace(TraceType::Trace, trace_params, &trace, _f);
                             }
                             if CONFIG.debug_options.all || CONFIG.debug_options.flow_control {
@@ -669,7 +669,7 @@ impl PacketEngine {
             {
                 if CONFIG.trace_options.all | CONFIG.trace_options.pe {
                     let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "pe_to_cm_snake" };
-                    let trace = json!({ "cell_id": &self.cell_id, "recv_port_no": recv_port_no, "count": count, "is_snake": true, "packet": packet_ref.to_string()? });
+                    let trace = json!({ "cell_id": &self.cell_id, "recv_port_no": recv_port_no, "count": count, "is_snake": true, "packet": packet_ref.stringify()? });
                     add_to_trace(TraceType::Trace, trace_params, &trace, _f);
                 }
             }

@@ -176,7 +176,7 @@ impl Cmodel {
                         if CONFIG.trace_options.all || CONFIG.trace_options.cm {
                             let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "cm_to_pe_packet" };
                             let trace = json!({ "cell_id": &self.cell_id, "user_mask": user_mask, "is_ait": is_ait, "is_snake": is_snake,
-                                "packet": packet.to_string()? });
+                                "packet": packet.stringify()? });
                             add_to_trace(TraceType::Trace, trace_params, &trace, _f);
                         }
                     }
@@ -210,13 +210,13 @@ impl Cmodel {
                 {
                     if CONFIG.trace_options.all || CONFIG.trace_options.cm {
                         let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "cm_from_pe_packet" };
-                        let trace = json!({ "cell_id": self.cell_id, "packet": packet.to_string()? });
+                        let trace = json!({ "cell_id": self.cell_id, "packet": packet.stringify()? });
                         add_to_trace(TraceType::Trace, trace_params, &trace, _f);
                     }
                 }
                 if packet.get_ait_state() == AitState::SnakeD {
                     let bytes = packet.get_bytes();
-                    let serialized = ByteArray::new_from_bytes(&bytes).to_string()?;
+                    let serialized = ByteArray::new_from_bytes(&bytes).stringify()?;
                     let uniquifier: PacketUniquifier = serde_json::from_str(&serialized)?;
                     let snakes_len = self.snakes.len();  // Keep borrow checker happy
                     match self.snakes.entry(uniquifier) {
@@ -302,7 +302,7 @@ packets: Vec<Packet>,
                 if CONFIG.trace_options.all || CONFIG.trace_options.cm {
                     let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "cm_to_ca_bytes_last" };
                     let trace = json!({ "cell_id": &self.cell_id, "port": port_no, 
-                        "is_ait": is_ait, "tree_uuid": uuid, "bytes": bytes.to_string()? });
+                        "is_ait": is_ait, "tree_uuid": uuid, "bytes": bytes.stringify()? });
                     add_to_trace(TraceType::Debug, trace_params, &trace, _f); // sender side, dup
                 }
             }

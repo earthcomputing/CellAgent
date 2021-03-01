@@ -31,7 +31,7 @@ pub enum AppMsgType { // Make sure these match the struct names
 impl AppMsgType {
     pub fn app_msg_from_bytes(bytes: &ByteArray) -> Result<Box<dyn AppMessage>, Error> {
         let _f = "app_msg_from_bytes";
-        let serialized = bytes.to_string()?;
+        let serialized = bytes.stringify()?;
         let msg = serde_json::from_str(&serialized)?;
         Ok(msg)
     }
@@ -177,7 +177,7 @@ impl AppInterapplicationMsgPayload {
 impl AppMsgPayload for AppInterapplicationMsgPayload {}
 impl fmt::Display for AppInterapplicationMsgPayload {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let body = self.body.to_string().expect("Error converting bytes to string in AppInterapplicationMsg fmt::Display");
+        let body = self.body.stringify().expect("Error converting bytes to string in AppInterapplicationMsg fmt::Display");
         write!(f, "{}", body)
     }
 }

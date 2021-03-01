@@ -81,7 +81,7 @@ impl Packet {
     pub fn get_uuid(&self) -> Uuid { self.header.get_uuid() }
     
     // Used for trace records
-    pub fn to_string(&self) -> Result<String, Error> {
+    pub fn stringify(&self) -> Result<String, Error> {
         let bytes = self.get_bytes();
         let is_last = self.payload.is_last;
         let len = if is_last {
@@ -91,7 +91,7 @@ impl Packet {
         };
         let string = format!("is_last: {}, length: {}, unique_msg_id: {}, tree_id: {}, is_snake: {}, msg: {}", 
             is_last, *len, self.payload.unique_msg_id, self.header.uuid, self.is_snake(), 
-            ByteArray::new_from_bytes(&bytes).to_string()?);
+            ByteArray::new_from_bytes(&bytes).stringify()?);
         let default_as_char = PAYLOAD_DEFAULT_ELEMENT as char;
         Ok(string.replace(default_as_char, ""))
     }

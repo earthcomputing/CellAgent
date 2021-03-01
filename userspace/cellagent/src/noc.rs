@@ -83,7 +83,7 @@ impl Noc {
         }
         loop {
             let bytes = noc_from_port.recv().context(NocError::Chain { func_name: _f, comment: S("")})?;
-            let serialized = bytes.to_string()?;
+            let serialized = bytes.stringify()?;
             let app_msg: Box<dyn AppMessage> = serde_json::from_str(&serialized).context(NocError::Chain { func_name: _f, comment: S("") })?;
             {
                 if CONFIG.trace_options.all || CONFIG.trace_options.noc {
