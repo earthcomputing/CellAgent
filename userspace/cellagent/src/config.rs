@@ -22,7 +22,7 @@ pub const CONTROL_TREE_NAME: & str = "Control";
 pub const CONNECTED_PORTS_TREE_NAME: & str = "Connected";
 pub const BASE_TREE_NAME: & str = "Base";
 pub const PAYLOAD_DEFAULT_ELEMENT: u8 = 0;
-pub const PACKET_MIN: usize = 72;   // Must be at least NON_PAYLOAD_SIZE.  Can't be in Config because I use it as a const in packet.rs
+pub const PACKET_MIN: usize = 72;  // Must be at least NON_PAYLOAD_SIZE.  Can't be in Config because I use it as a const in packet.rs
 pub const PACKET_MAX: usize = 256; // Can't be in Config because I use it as a const in packet.rs
 pub const PACKET_PADDING: usize = 40; // Can't be in Config because I use it as a const in packet.rs
 

@@ -305,12 +305,12 @@ impl CellAgent {
                     .cloned()
                     .collect();
                 let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "ca_discover_ack_done" };
-                let trace = json!({ "cell_id": &self.cell_id, "tree_id": tree_id, "kind": "Prepared",
+                let trace = json!({ "cell_id": &self.cell_id, "tree_id": tree_id, "kind": "DiscoverAck",
                     "neighbors_seen_on_tree": self.neighbor_names_from_port_nos(&seen_neighbors) });
                 add_to_trace(TraceType::Debug, trace_params, &trace, _f);
             }
         }
-        self.enough_ports(tree_id, no_seen_ports, "DiscoverDAck")
+        self.enough_ports(tree_id, no_seen_ports, "DiscoverAckD")
      }
     fn discoverd_done(&mut self, tree_id: TreeID, kind: &str) -> bool { // kind for debugging
         let _f = "discoverd_done";

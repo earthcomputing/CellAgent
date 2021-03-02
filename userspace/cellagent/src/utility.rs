@@ -130,7 +130,7 @@ impl fmt::Display for Path {
     fn fmt(&self, f:&mut fmt::Formatter<'_>) -> fmt::Result { write!(f, "{}", self.port_number) }
 }
 // I could just use Vec, but this way I'm sure I don't do anything other than push, pop, and len
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct Stack<T: Sized> {
     elements: Vec<T>
 }

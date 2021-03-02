@@ -146,7 +146,7 @@ impl Noc {
                 if self.has_allowed_trees(&deploy_trees) && !self.deploy_done {
                     self.deploy_done = true;
                     self.deploy_master(&master_deploy, noc_to_port)?;
-                    self.deploy_agent(tree_name, noc_to_port)?;
+                    self.deploy_agent(&agent_deploy, noc_to_port)?;
                 }
             }
         }

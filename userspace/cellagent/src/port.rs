@@ -1,7 +1,8 @@
 use std::{fmt,
           thread,
           thread::JoinHandle,
-          sync::{atomic::AtomicBool, Arc, atomic::Ordering::SeqCst}};
+          sync::{Arc}
+        };
 
 use either::Either;
 
@@ -41,7 +42,7 @@ pub struct Port {
     id: PortID,
     port_number: PortNumber,
     is_border: bool,
-    is_connected: Arc<AtomicBool>,
+    is_connected: bool,
     port_to_pe_or_ca: Either<PortToPe, PortToCa>,
 }
 impl Port {
@@ -49,7 +50,7 @@ impl Port {
                port_to_pe_or_ca: Either<PortToPe, PortToCa>) -> Result<Port, Error> {
         let port_id = PortID::new(cell_id, port_number).context(PortError::Chain { func_name: "new", comment: S(cell_id.get_name()) + &S(*port_number.get_port_no())})?;
         Ok(Port{ cell_id, id: port_id, port_number, is_border,
-            is_connected: Arc::new(AtomicBool::new(is_connected)),
+            is_connected,
             port_to_pe_or_ca
         })
     }
@@ -58,9 +59,9 @@ impl Port {
     pub fn get_port_no(&self) -> PortNo { self.port_number.get_port_no() }
 //  pub fn get_port_number(&self) -> PortNumber { self.port_number }
 //  pub fn get_is_connected(&self) -> Arc<AtomicBool> { self.is_connected.clone() }
-    pub fn is_connected(&self) -> bool { self.is_connected.load(SeqCst) }
-    pub fn set_connected(&mut self) { self.is_connected.store(true, SeqCst); }
-    pub fn set_disconnected(&mut self) { self.is_connected.store(false, SeqCst); }
+    pub fn is_connected(&self) -> bool { self.is_connected }
+    pub fn set_connected(&mut self) { self.is_connected = true; }
+    pub fn set_disconnected(&mut self) { self.is_connected = false; }
     pub fn is_border(&self) -> bool { self.is_border }
     pub fn noc_channel(&self, port_to_noc: PortToNoc, port_from_noc: PortFromNoc,
             port_from_ca: PortFromCa) -> Result<JoinHandle<()>, Error> {
@@ -206,7 +207,11 @@ impl Port {
         }
         let port_to_pe = self.port_to_pe_or_ca.clone().left().expect("Port: Sender to Pe must be set");
         #[cfg(any(feature = "noc", feature = "simulator"))] {
-            return simulated_port_or_ecnl_port.clone().left().expect("ecnl in simulator").listen(self, port_to_pe);
+            simulated_port_or_ecnl_port
+                .clone()
+                .left()
+                .expect("ecnl in simulator")
+                .listen(self, port_to_pe)
         }
         #[cfg(feature = "cell")] {
             return simulated_port_or_ecnl_port.clone().right().expect("port_link_channel in cell").listen(self, port_to_pe);
@@ -243,10 +248,10 @@ impl Port {
                 }
             }
             #[cfg(any(feature = "noc", feature = "simulator"))]
-		simulated_port_or_ecnl_port.clone().left().expect("ecnl port in simulator").send(packet)?;
+		simulated_port_or_ecnl_port.clone().left().expect("simulated port in simulator").send(packet)?;
             #[cfg(feature = "cell")]
             {
-                simulated_port_or_ecnl_port.clone().right().expect("simulated port in cell").send(&packet)?;
+                simulated_port_or_ecnl_port.clone().right().expect("ecnl port in cell").send(&packet)?;
             }
         }
     }

@@ -235,7 +235,7 @@ impl Cmodel {
                                 let snake = self.snakes.remove(&uniquifier).expect("Know value is set from match");
                                 let ack_port_no = snake.get_ack_port_no();
                                 if ack_port_no != PortNo(0) {
-                                    let snaked_packet = Packet::make_snake_ack(uniquifier)?;
+                                    let snaked_packet = Packet::make_snake_ack_packet(uniquifier)?;
                                     self.cm_to_pe.send(CmToPePacket::SnakeD((ack_port_no, snaked_packet)))?;
                                 }
                             }
@@ -253,7 +253,7 @@ impl Cmodel {
                        return Err(CmodelError::Snake { func_name: _f, old_value: uniquifier }.into() )
                     }
                 } else {
-                    let snaked_packet = Packet::make_snake_ack(uniquifier)?;
+                    let snaked_packet = Packet::make_snake_ack_packet(uniquifier)?;
                     self.cm_to_pe.send(CmToPePacket::SnakeD((ack_port_no, snaked_packet)))?;
                 }
                 {
@@ -284,7 +284,9 @@ packets: Vec<Packet>,
     fn process_packet(&mut self, port_no: PortNo, packet: Packet) -> Result<(), Error> {
         let _f = "process_packet";
         let sender_msg_seq_no = packet.get_unique_msg_id();
-        let packet_assembler = self.packet_assemblers.entry(sender_msg_seq_no).or_insert(PacketAssembler::new(sender_msg_seq_no)); // autovivification
+        let packet_assembler = self.packet_assemblers
+            .entry(sender_msg_seq_no)
+            .or_insert(PacketAssembler::new(sender_msg_seq_no)); // autovivification
         let (last_packet, packets) = packet_assembler.add(packet.clone()); // Need clone only because of trace
         let is_ait = packets[0].is_ait();
         let uuid = packet.get_tree_uuid();
@@ -323,6 +325,7 @@ packets: Vec<Packet>,
             if !CONFIG.replay {
                 self.cm_to_ca.send(msg)?;
             }
+            self.packet_assemblers.remove(&sender_msg_seq_no);
         }
         Ok(())
     }

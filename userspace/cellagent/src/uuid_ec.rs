@@ -23,7 +23,7 @@ const PORT_NO_BYTE: usize = 1;
 
 type Bytes = [u8; 16];
 #[repr(C)]
-#[derive(Copy, Clone, Default, Hash, Eq, Serialize, Deserialize)]
+#[derive(Copy, Clone, Default, Hash, Eq, PartialOrd, Serialize, Deserialize)]
 pub struct Uuid {
     uuid: uuid::Uuid
 }

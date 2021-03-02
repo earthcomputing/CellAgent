@@ -13,7 +13,7 @@ use crate::uptree_spec::{AllowedTree, Manifest};
 use crate::utility::{ByteArray, S};
 
 // This is currently at the cell level, but could be placed at the up-tree level.
-#[derive(Debug, Copy, Clone, Hash, Eq, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Copy, Clone, Default, Hash, Eq, PartialEq, Serialize, Deserialize)]
 pub struct SenderMsgSeqNo(pub u64);
 impl Deref for SenderMsgSeqNo { type Target = u64; fn deref(&self) -> &Self::Target { &self.0 } }
 static MESSAGE_COUNT: AtomicU64 = AtomicU64::new(0);
