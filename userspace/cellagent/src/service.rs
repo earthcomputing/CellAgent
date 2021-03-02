@@ -106,7 +106,7 @@ impl NocMaster {
         let mut first = true; // Stack
         loop {
             let bytes = container_from_vm.recv().context(ServiceError::Chain { func_name: _f, comment: S("NocMaster from vm")})?;
-            let serialized = bytes.to_string()?;
+            let serialized = bytes.stringify()?;
             let app_msg: Box<dyn AppMessage> = serde_json::from_str(&serialized).context(ServiceError::Chain { func_name: _f, comment: S("NocMaster from vm")})?;
             {
                 if CONFIG.trace_options.all || CONFIG.trace_options.svc {
@@ -202,7 +202,7 @@ impl NocAgent {
         }
         loop {
             let bytes = container_from_vm.recv().context(ServiceError::Chain { func_name: _f, comment: S("NocAgent recv from vm") })?;
-            let serialized = bytes.to_string()?;
+            let serialized = bytes.stringify()?;
             let app_msg: Box<dyn AppMessage> = serde_json::from_str(&serialized).context(ServiceError::Chain { func_name: _f, comment: S("NocAgent from vm") })?;
             {
                 if CONFIG.trace_options.all || CONFIG.trace_options.svc {

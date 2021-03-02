@@ -176,7 +176,7 @@ impl Cmodel {
                         if CONFIG.trace_options.all || CONFIG.trace_options.cm {
                             let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "cm_to_pe_packet" };
                             let trace = json!({ "cell_id": &self.cell_id, "user_mask": user_mask, "is_ait": is_ait, "is_snake": is_snake,
-                                "packet": packet.to_string()? });
+                                "packet": packet.stringify()? });
                             add_to_trace(TraceType::Trace, trace_params, &trace, _f);
                         }
                     }
@@ -210,13 +210,13 @@ impl Cmodel {
                 {
                     if CONFIG.trace_options.all || CONFIG.trace_options.cm {
                         let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "cm_from_pe_packet" };
-                        let trace = json!({ "cell_id": self.cell_id, "packet": packet.to_string()? });
+                        let trace = json!({ "cell_id": self.cell_id, "packet": packet.stringify()? });
                         add_to_trace(TraceType::Trace, trace_params, &trace, _f);
                     }
                 }
                 if packet.get_ait_state() == AitState::SnakeD {
                     let bytes = packet.get_bytes();
-                    let serialized = ByteArray::new_from_bytes(&bytes).to_string()?;
+                    let serialized = ByteArray::new_from_bytes(&bytes).stringify()?;
                     let uniquifier: PacketUniquifier = serde_json::from_str(&serialized)?;
                     let snakes_len = self.snakes.len();  // Keep borrow checker happy
                     match self.snakes.entry(uniquifier) {
@@ -235,7 +235,7 @@ impl Cmodel {
                                 let snake = self.snakes.remove(&uniquifier).expect("Know value is set from match");
                                 let ack_port_no = snake.get_ack_port_no();
                                 if ack_port_no != PortNo(0) {
-                                    let snaked_packet = Packet::make_snake_ack(uniquifier)?;
+                                    let snaked_packet = Packet::make_snake_ack_packet(uniquifier)?;
                                     self.cm_to_pe.send(CmToPePacket::SnakeD((ack_port_no, snaked_packet)))?;
                                 }
                             }
@@ -253,7 +253,7 @@ impl Cmodel {
                        return Err(CmodelError::Snake { func_name: _f, old_value: uniquifier }.into() )
                     }
                 } else {
-                    let snaked_packet = Packet::make_snake_ack(uniquifier)?;
+                    let snaked_packet = Packet::make_snake_ack_packet(uniquifier)?;
                     self.cm_to_pe.send(CmToPePacket::SnakeD((ack_port_no, snaked_packet)))?;
                 }
                 {
@@ -284,7 +284,9 @@ packets: Vec<Packet>,
     fn process_packet(&mut self, port_no: PortNo, packet: Packet) -> Result<(), Error> {
         let _f = "process_packet";
         let sender_msg_seq_no = packet.get_unique_msg_id();
-        let packet_assembler = self.packet_assemblers.entry(sender_msg_seq_no).or_insert(PacketAssembler::new(sender_msg_seq_no)); // autovivification
+        let packet_assembler = self.packet_assemblers
+            .entry(sender_msg_seq_no)
+            .or_insert(PacketAssembler::new(sender_msg_seq_no)); // autovivification
         let (last_packet, packets) = packet_assembler.add(packet.clone()); // Need clone only because of trace
         let is_ait = packets[0].is_ait();
         let uuid = packet.get_tree_uuid();
@@ -302,7 +304,7 @@ packets: Vec<Packet>,
                 if CONFIG.trace_options.all || CONFIG.trace_options.cm {
                     let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "cm_to_ca_bytes_last" };
                     let trace = json!({ "cell_id": &self.cell_id, "port": port_no, 
-                        "is_ait": is_ait, "tree_uuid": uuid, "bytes": bytes.to_string()? });
+                        "is_ait": is_ait, "tree_uuid": uuid, "bytes": bytes.stringify()? });
                     add_to_trace(TraceType::Debug, trace_params, &trace, _f); // sender side, dup
                 }
             }
@@ -323,6 +325,7 @@ packets: Vec<Packet>,
             if !CONFIG.replay {
                 self.cm_to_ca.send(msg)?;
             }
+            self.packet_assemblers.remove(&sender_msg_seq_no);
         }
         Ok(())
     }

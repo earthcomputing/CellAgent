@@ -21,6 +21,8 @@ pub type MsgTreeMap = HashMap<String, TreeID>; // Must be String for serializati
 pub enum MsgType {
     Entl,        // Needed for the msg_type hack, otherwise panic
     DeleteTree,
+    DiscoverAck,
+    DiscoverAckD,
     Discover,
     DiscoverD,
     Failover,
@@ -28,8 +30,6 @@ pub enum MsgType {
     Hello,
     Interapplication,
     Manifest,
-    Prepare,
-    PrepareD,
     StackTree,
     StackTreeD,
     TreeName
@@ -40,13 +40,13 @@ impl MsgType {
         let _f = "get_msg";
         let bytes = Packetizer::unpacketize(packets).context(MessageError::Chain { func_name: _f, comment: S("unpacketize")})?;
         //println!("Message get_msg: serialized {}, packets {:?}", serialized, packets);
-        let serialized = bytes.to_string()?;
+        let serialized = bytes.stringify()?;
         let msg = serde_json::from_str(&serialized)?;
         Ok(msg)
     }
     pub fn msg_from_bytes(bytes: &ByteArray) -> Result<Box<dyn Message>, Error> {
         let _f = "msg_from_bytes";
-        let serialized = bytes.to_string()?;
+        let serialized = bytes.stringify()?;
         let msg = serde_json::from_str(&serialized)?;
         Ok(msg)
     }
@@ -58,14 +58,14 @@ impl MsgType {
     pub fn msg_type(packet: &Packet) -> MsgType {
         if      MsgType::is_type(packet, MsgType::Interapplication) { MsgType::Interapplication }
         else if MsgType::is_type(packet, MsgType::DeleteTree)  { MsgType::DeleteTree }
+        else if MsgType::is_type(packet, MsgType::DiscoverAck) { MsgType::DiscoverAck }
+        else if MsgType::is_type(packet, MsgType::DiscoverAckD){ MsgType::DiscoverAckD }
         else if MsgType::is_type(packet, MsgType::Discover)    { MsgType::Discover }
         else if MsgType::is_type(packet, MsgType::DiscoverD)   { MsgType::DiscoverD }
         else if MsgType::is_type(packet, MsgType::Failover)    { MsgType::Failover }
         else if MsgType::is_type(packet, MsgType::FailoverD)   { MsgType::FailoverD }
         else if MsgType::is_type(packet, MsgType::Hello)       { MsgType::Hello }
         else if MsgType::is_type(packet, MsgType::Manifest)    { MsgType::Manifest }
-        else if MsgType::is_type(packet, MsgType::Prepare)     { MsgType::Prepare }
-        else if MsgType::is_type(packet, MsgType::PrepareD)    { MsgType::PrepareD }
         else if MsgType::is_type(packet, MsgType::StackTree)   { MsgType::StackTree }
         else if MsgType::is_type(packet, MsgType::StackTreeD)  { MsgType::StackTreeD }
         else if MsgType::is_type(packet, MsgType::TreeName)    { MsgType::TreeName }
@@ -77,6 +77,8 @@ impl fmt::Display for MsgType {
         let s = match *self {
             MsgType::Entl              => "Entl",
             MsgType::DeleteTree        => "DeleteTree",
+            MsgType::DiscoverAck       => "DiscoverAck",
+            MsgType::DiscoverAckD      => "DiscoverAckD",
             MsgType::Discover          => "Discover",
             MsgType::DiscoverD         => "DiscoverD",
             MsgType::Failover          => "Failover",
@@ -84,8 +86,6 @@ impl fmt::Display for MsgType {
             MsgType::Hello             => "Hello",
             MsgType::Interapplication  => "Interapplication",
             MsgType::Manifest          => "Manifest",
-            MsgType::Prepare           => "Prepare",
-            MsgType::PrepareD          => "PrepareD",
             MsgType::StackTree         => "StackTree",
             MsgType::StackTreeD        => "StackTreeD",
             MsgType::TreeName          => "TreeName",
@@ -570,10 +570,10 @@ pub struct DiscoverAckDMsg {
 impl DiscoverAckDMsg {
     pub fn new(in_reply_to: SenderMsgSeqNo, sending_cell_id: CellID, originator_id: OriginatorID, port_tree_id: PortTreeID) -> DiscoverAckDMsg {
         // Note that direction is leafward so we can use the connected ports tree
-        // If we send rootward, then the first recipient forwards the Prepare
+        // If we send rootward, then the first recipient forwards the DiscoverAckD
         let header = MsgHeader::new(sending_cell_id, originator_id,
                                     true, false, HashMap::new(),
-                                    MsgType::Prepare, MsgDirection::Leafward);
+                                    MsgType::DiscoverAckD, MsgDirection::Leafward);
         let payload = DiscoverAckDPayload::new(in_reply_to, port_tree_id);
         DiscoverAckDMsg { header, payload }
     }
@@ -620,10 +620,10 @@ pub struct DiscoverAckMsg {
 impl DiscoverAckMsg {
     pub fn new(in_reply_to: SenderMsgSeqNo, sending_cell_id: CellID, originator_id: OriginatorID, port_tree_id: PortTreeID) -> DiscoverAckMsg {
         // Note that direction is leafward so we can use the connected ports tree
-        // If we send rootward, then the first recipient forwards the PrepareD
+        // If we send rootward, then the first recipient forwards the DiscoverAck
         let header = MsgHeader::new(sending_cell_id, originator_id,
                                     true, false, HashMap::new(),
-                                    MsgType::PrepareD, MsgDirection::Leafward);
+                                    MsgType::DiscoverAck, MsgDirection::Leafward);
         let payload = DiscoverAckPayload::new(in_reply_to, port_tree_id);
         DiscoverAckMsg { header, payload }
     }

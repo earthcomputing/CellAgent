@@ -130,7 +130,7 @@ impl fmt::Display for Path {
     fn fmt(&self, f:&mut fmt::Formatter<'_>) -> fmt::Result { write!(f, "{}", self.port_number) }
 }
 // I could just use Vec, but this way I'm sure I don't do anything other than push, pop, and len
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct Stack<T: Sized> {
     elements: Vec<T>
 }
@@ -310,7 +310,7 @@ impl ByteArray {
     }
     pub fn get_bytes(&self) -> &Vec<u8> { &self.bytes }
     pub fn len(&self) -> usize { self.bytes.len() }
-    pub fn to_string(&self) -> Result<String, Error> {
+    pub fn stringify(&self) -> Result<String, Error> {
         let string = std::str::from_utf8(&self.bytes)?;
         let default_as_char = PAYLOAD_DEFAULT_ELEMENT as char;
         Ok(string.replace(default_as_char, ""))

@@ -1,5 +1,6 @@
 #![warn(bare_trait_objects)]
 #![deny(unused_must_use)]
+#![deny(bindings_with_variant_name)]
 //#![allow(dead_code)]
 //#![allow(unused_variables)]
 //#![allow(unused_imports)]
