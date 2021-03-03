@@ -57,7 +57,7 @@ pub fn process_trace_record(mut record: String) -> Result<TraceFormat, Error> {
                     return Err(e.into());
                 }
             };
-            TraceFormat::CaFromCmBytesMsg(m2a.port, m2a.is_ait, m2a.uuid, m2a.bytes)
+            TraceFormat::CaFromCmBytesMsg(m2a.port, m2a.is_ait, m2a.tree_uuid, m2a.bytes)
         }
         "ca_from_cm_status" => {
             let m2a: CaFromCmBytesStatus = match serde_json::from_value(trace.body) {
@@ -143,7 +143,7 @@ struct TraceRecordCaFromCmBytesMsg {
 struct CaFromCmBytesMsg {
     is_ait: bool,
     port: PortNo,
-    uuid: Uuid,
+    tree_uuid: Uuid,
     bytes: ByteArray
 }
 impl fmt::Display for CaFromCmBytesMsg {
@@ -151,7 +151,7 @@ impl fmt::Display for CaFromCmBytesMsg {
         let mut s = "CaFromCmBytes".to_string();
         write!(s, "is_ait {} ", self.is_ait)?;
         write!(s, "port_no {}", self.port)?;
-        write!(s, "tree_uuid {}", self.uuid)?;
+        write!(s, "tree_uuid {}", self.tree_uuid)?;
         let msg = serde_json::to_string(&self.bytes).expect("Replay: serde problem");
         write!(s, "msg {}", msg)?;
         write!(f, "{}", s)

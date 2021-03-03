@@ -283,18 +283,18 @@ packets: Vec<Packet>,
 
     fn process_packet(&mut self, port_no: PortNo, packet: Packet) -> Result<(), Error> {
         let _f = "process_packet";
-        let sender_msg_seq_no = packet.get_unique_msg_id();
+        let unique_msg_id = packet.get_unique_msg_id();
         let packet_assembler = self.packet_assemblers
-            .entry(sender_msg_seq_no)
-            .or_insert(PacketAssembler::new(sender_msg_seq_no)); // autovivification
+            .entry(unique_msg_id)
+            .or_insert(PacketAssembler::new(unique_msg_id)); // autovivification
         let (last_packet, packets) = packet_assembler.add(packet.clone()); // Need clone only because of trace
         let is_ait = packets[0].is_ait();
         let uuid = packet.get_tree_uuid();
         {
             if CONFIG.trace_options.all || CONFIG.trace_options.cm {
-                let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "cm_to_ca_bytes" };
+                let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "cm_packet_assembly" };
                 let trace = json!({ "cell_id": &self.cell_id, "port": port_no, 
-                    "is_ait": is_ait, "tree_uuid": uuid, "last_packet": last_packet });
+                    "is_ait": is_ait, "tree_uuid": uuid, "last_packet": last_packet, "packet": packet.stringify()? });
                 add_to_trace(TraceType::Debug, trace_params, &trace, _f); // sender side, dup
             }
         }
@@ -302,7 +302,7 @@ packets: Vec<Packet>,
             let bytes = Packetizer::unpacketize(&packets).context(CmodelError::Chain { func_name: _f, comment: S("") })?;
             {
                 if CONFIG.trace_options.all || CONFIG.trace_options.cm {
-                    let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "cm_to_ca_bytes_last" };
+                    let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "cm_to_ca_bytes" };
                     let trace = json!({ "cell_id": &self.cell_id, "port": port_no, 
                         "is_ait": is_ait, "tree_uuid": uuid, "bytes": bytes.stringify()? });
                     add_to_trace(TraceType::Debug, trace_params, &trace, _f); // sender side, dup
@@ -325,7 +325,7 @@ packets: Vec<Packet>,
             if !CONFIG.replay {
                 self.cm_to_ca.send(msg)?;
             }
-            self.packet_assemblers.remove(&sender_msg_seq_no);
+            self.packet_assemblers.remove(&unique_msg_id);
         }
         Ok(())
     }
