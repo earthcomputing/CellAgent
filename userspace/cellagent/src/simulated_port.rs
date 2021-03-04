@@ -148,32 +148,24 @@ impl SimulatedPort {
     }
 }
 
-// The methods save_packet and clear_saved_packet should alternate.  However,
-// the simulator doesn't continually exchange ENTL packets, so it might send
-// or receive two packets in a row.  A version of these methods for physical
-// ports should check that self.recd is true in save_packet and false in
-// clear_saved_packet.
 #[derive(Debug, Copy, Clone, Serialize)]
 pub struct FailoverInfo {
     port_id: PortID,
-    recd: bool,
     packet_opt: Option<Packet>
 }
 impl FailoverInfo {
     pub fn new(port_id: PortID) -> FailoverInfo { 
-        FailoverInfo { port_id, recd: false, packet_opt: Default::default() }
+        FailoverInfo { port_id, packet_opt: Default::default() }
     }
     pub fn if_sent(&self) -> bool { self.packet_opt.is_some() }
-    pub fn if_recd(&self) -> bool { self.recd }
+    pub fn if_recd(&self) -> bool { self.packet_opt.is_none() }
     pub fn get_saved_packet(&self) -> Option<Packet> { self.packet_opt }
     // Call on every data packet send
     fn save_packet(&mut self, packet: &Packet) {
-        self.recd = false;
         self.packet_opt = Some(packet.clone());
     }
     // Call on every data packet receive
     fn clear_saved_packet(&mut self) {
-        self.recd = true;
         self.packet_opt = None;
     }
 }
@@ -183,7 +175,7 @@ impl fmt::Display for FailoverInfo {
             Some(p) => p.stringify().expect("Failover Display: Stringify packet must succeed"),
             None => "None".to_string()
         };
-        write!(_f, "PortID {} Sent {}, Recd {}, Packet {:?}", self.port_id, self.if_sent(), self.recd, packet_out)
+        write!(_f, "PortID {} Sent {}, Recd {}, Packet {:?}", self.port_id, self.if_sent(), self.if_recd(), packet_out)
     }
 }
 // Errors
