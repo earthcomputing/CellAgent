@@ -98,8 +98,8 @@ impl Rack {
             let (left_to_link, link_from_left): (PortToLink, LinkFromPort) = channel();
             let (link_to_rite, rite_from_link): (LinkToPort, PortFromLink) = channel();
             let (rite_to_link, link_from_rite): (PortToLink, LinkFromPort) = channel();
-            left_port.link_channel(Either::Left(SimulatedPort::new(left_to_link, left_from_link)), left_from_pe);
-            rite_port.link_channel(Either::Left(SimulatedPort::new(rite_to_link, rite_from_link)), rite_from_pe);
+            left_port.link_channel(Either::Left(SimulatedPort::new(left_port.get_id(), left_to_link, left_from_link)), left_from_pe);
+            rite_port.link_channel(Either::Left(SimulatedPort::new(rite_port.get_id(), rite_to_link, rite_from_link)), rite_from_pe);
             let link = Link::new(left_port.get_id(), rite_port.get_id(),
                                            link_to_left, link_to_rite)?;
             {
