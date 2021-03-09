@@ -9,21 +9,22 @@ use crate::app_message_formats::{VmToCa, VmFromCa,
 use crate::config::{CONFIG};
 use crate::container::{Container};
 use crate::dal::{add_to_trace, fork_trace_header, update_trace_header};
-use crate::name::{Name, ContainerID, UptreeID, VmID};
+use crate::name::{Name, CellID, ContainerID, UptreeID, VmID}; // CellID for tracing purposes
 use crate::uptree_spec::{AllowedTree, ContainerSpec};
 use crate::utility::{S, write_err, TraceHeader, TraceHeaderParams, TraceType};
 
 #[derive(Debug, Clone)]
 pub struct VirtualMachine {
+    cell_id: CellID,
     id: VmID,
     vm_to_ca: VmToCa,
     allowed_trees: Vec<AllowedTree>,
     vm_to_containers: Vec<VmToContainer>,
 }
 impl VirtualMachine {
-    pub fn new(id: VmID, vm_to_ca: VmToCa, allowed_trees_ref: &[AllowedTree]) -> VirtualMachine {
+    pub fn new(cell_id: CellID, id: VmID, vm_to_ca: VmToCa, allowed_trees_ref: &[AllowedTree]) -> VirtualMachine {
         //println!("Create VM {}", id);
-        VirtualMachine { id: id, vm_to_ca, allowed_trees: allowed_trees_ref.to_owned(),
+        VirtualMachine { cell_id, id, vm_to_ca, allowed_trees: allowed_trees_ref.to_owned(),
             vm_to_containers: Vec::new() }
     }
     pub fn initialize(&mut self, up_tree_name: &str, vm_from_ca: VmFromCa, allowed_trees: &HashSet<AllowedTree>,
@@ -36,7 +37,7 @@ impl VirtualMachine {
             let name = format!("Container:{}+{}", self.id, container_specs.len() + 1);
             let container_id = ContainerID::new(&name).context(VmError::Chain { func_name: "initialize", comment: S(self.id.get_name())})?;
             let service_name = container_spec.get_image();
-            let container = Container::new(container_id, service_name.as_str(), allowed_trees,
+            let container = Container::new(self.cell_id, container_id, service_name.as_str(), allowed_trees,
                  container_to_vm).context(VmError::Chain { func_name: "initialize", comment: S("")})?;
             container.initialize(up_tree_id, container_from_vm).context(VmError::Chain { func_name: "initialize", comment: S(self.id.get_name())})?;
             self.vm_to_containers.push(vm_to_container);
@@ -84,7 +85,7 @@ impl VirtualMachine {
         {
             if CONFIG.trace_options.all || CONFIG.trace_options.vm {
                 let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "worker" };
-                let trace = json!({ "id": self.id, "thread_name": thread::current().name(), "thread_id": TraceHeader::parse(thread::current().id()) });
+                let trace = json!({ "cell_id": self.cell_id, "id": self.id, "thread_name": thread::current().name(), "thread_id": TraceHeader::parse(thread::current().id()) });
                 add_to_trace(TraceType::Trace, trace_params, &trace, _f);
             }
         }
@@ -94,10 +95,10 @@ impl VirtualMachine {
                 if CONFIG.trace_options.all || CONFIG.trace_options.vm {
                     let msg: Box<dyn AppMessage> = serde_json::from_str(&bytes.stringify()?)?;
                     let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "vm_from_ca" };
-                    let trace = json!({ "id": self.id, "msg": msg.to_string() });
+                    let trace = json!({ "cell_id": self.cell_id, "id": self.id, "msg": msg.to_string() });
                     add_to_trace(TraceType::Trace, trace_params, &trace, _f);
                     let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "vm_to_container" };
-                    let trace = json!({ "id": self.id, "msg": msg.to_string() });
+                    let trace = json!({ "cell_id": self.cell_id, "id": self.id, "msg": msg.to_string() });
                     add_to_trace(TraceType::Trace, trace_params, &trace, _f);
                 }
             }
@@ -115,7 +116,7 @@ impl VirtualMachine {
         {
             if CONFIG.trace_options.all || CONFIG.trace_options.vm {
                 let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "worker" };
-                let trace = json!({ "id": self.id, "thread_name": thread::current().name(), "thread_id": TraceHeader::parse(thread::current().id()) });
+                let trace = json!({ "cell_id": self.cell_id, "id": self.id, "thread_name": thread::current().name(), "thread_id": TraceHeader::parse(thread::current().id()) });
                 add_to_trace(TraceType::Trace, trace_params, &trace, _f);
             }
         }
@@ -125,10 +126,10 @@ impl VirtualMachine {
                 if CONFIG.trace_options.all || CONFIG.trace_options.vm {
                     let msg: Box<dyn AppMessage> = serde_json::from_str(&bytes.stringify()?)?;
                     let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "vm_from_container" };
-                    let trace = json!({ "id": self.id, "msg": msg.to_string() });
+                    let trace = json!({ "cell_id": self.cell_id, "id": self.id, "msg": msg });
                     add_to_trace(TraceType::Trace, trace_params, &trace, _f);
                     let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "vm_to_ca" };
-                    let trace = json!({ "id": self.id, "msg": msg.to_string() });
+                    let trace = json!({ "cell_id": self.cell_id, "id": self.id, "msg": msg });
                     add_to_trace(TraceType::Trace, trace_params, &trace, _f);
                 }
             }

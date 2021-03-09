@@ -285,9 +285,7 @@ impl PacketEngine {
                         add_to_trace(TraceType::Trace, trace_params, &trace, _f);
                     }
                 }
-                if !CONFIG.replay {
-                    self.pe_to_cm.send(PeToCmPacket::Status((port_no, is_border, number_of_packets, port_status))).context(PacketEngineError::Chain { func_name: "listen_port", comment: S("send status to ca ") + &self.cell_id.get_name() })?
-                }
+                self.pe_to_cm.send(PeToCmPacket::Status((port_no, is_border, number_of_packets, port_status))).context(PacketEngineError::Chain { func_name: "listen_port", comment: S("send status to ca ") + &self.cell_id.get_name() })?
             },
             
             // recv from neighbor

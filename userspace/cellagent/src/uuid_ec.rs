@@ -6,7 +6,7 @@ use uuid;
 use crate::utility::{PortNo, PortNumber};
 // First 4 bits for flags, such as Snake and time direction
 const NORMAL:   u8 = 0b0000_0000;  // Used for all Name UUIDs, including TreeIDs and for normal packets
-const ENTL:     u8 = 0b0000_1111;  // Used just to generate a recv event for simulator only
+const ENTL:     u8 = 0b0000_1111;  // Used to break symmetry when a link starts
 const SNAKED:   u8 = 0b0000_1110;  // Snake ack
 const AITD:     u8 = 0b0000_1011;  // AIT packet delivered or not (ACK/NACK depending on time reversal)
 const AIT:      u8 = 0b0000_1001;  // Sent AIT packet
