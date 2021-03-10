@@ -667,7 +667,7 @@ impl CellAgent {
             let up_tree_name = vm_spec.get_id();
             let mut allowed_trees = HashSet::new();
             allowed_trees.insert(AllowedTree::new(CONTROL_TREE_NAME));
-            let mut vm = VirtualMachine::new(vm_id, vm_to_ca, vm_allowed_trees);
+            let mut vm = VirtualMachine::new(self.cell_id, vm_id, vm_to_ca, vm_allowed_trees);
             for vm_allowed_tree in vm_allowed_trees {
                 tree_name_map
                     .get_by_right(vm_allowed_tree)
@@ -726,18 +726,16 @@ impl CellAgent {
         }
         loop {
             let bytes = ca_from_vm.recv().context(CellagentError::Chain { func_name: _f, comment: S("") })?;
-            let serialized = bytes.stringify()?;
-            let app_msg: Box<dyn AppMessage> = serde_json::from_str(&serialized).context(CellagentError::Chain { func_name: _f, comment: S("uptree") })?;
             {
                 if CONFIG.trace_options.all || CONFIG.trace_options.ca {
+                    let serialized = bytes.stringify()?;
+                    let app_msg: Box<dyn AppMessage> = serde_json::from_str(&serialized).context(CellagentError::Chain { func_name: _f, comment: S("uptree") })?;
                     let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "ca_from_vm_app" };
                     let trace = json!({ "cell_id": &self.cell_id, "app_msg": app_msg });
                     add_to_trace(TraceType::Trace, trace_params, &trace, _f);
                 }
             }
-            if !CONFIG.replay {
-                self.ca_to_cm[0].send(CaToCmBytes::TunnelUp((originator_id, bytes)))?;
-            }
+            self.ca_to_cm[0].send(CaToCmBytes::TunnelUp((originator_id, bytes)))?;
         }
     }
     /*
@@ -828,9 +826,7 @@ impl CellAgent {
             let trace = json!({ "cell_id": &self.cell_id, "entry": entry });
             add_to_trace(TraceType::Trace, trace_params, &trace, _f);
         }
-        if !CONFIG.replay {
-            self.ca_to_cm[0].send(CaToCmBytes::Entry(*entry)).context(CellagentError::Chain { func_name: _f, comment: S("") })?;
-        }
+        self.ca_to_cm[0].send(CaToCmBytes::Entry(*entry)).context(CellagentError::Chain { func_name: _f, comment: S("") })?;
         Ok(())
     }
 
@@ -876,15 +872,11 @@ impl CellAgent {
             }
             match msg {
                 PortToCaMsg::AppMsg(port_no, bytes) => {
-                    if !CONFIG.replay {
-                        self.ca_to_cm[0].send(CaToCmBytes::TunnelPort((port_no, bytes)))?;
-                    }
+                    self.ca_to_cm[0].send(CaToCmBytes::TunnelPort((port_no, bytes)))?;
                 }
                 PortToCaMsg::Status(port_no, port_status) => {
                     let is_border = true;
-                    if !CONFIG.replay {
-                        self.ca_to_cm[0].send(CaToCmBytes::Status((port_no, is_border, NumberOfPackets::new(), port_status)))?;
-                    }
+                    self.ca_to_cm[0].send(CaToCmBytes::Status((port_no, is_border, NumberOfPackets::new(), port_status)))?;
                 }
             }
         }
@@ -973,6 +965,7 @@ impl CellAgent {
                     msg.process_ca(self, port_no, msg_tree_id, is_ait).context(CellagentError::Chain { func_name: _f, comment: S(self.cell_id) })?;
                 },
                 CmToCaBytes::TunnelPort((port_no, bytes)) => {
+                    if !CONFIG.replay {
                     let port_number = port_no.make_port_number(self.no_ports).context(CellagentError::Chain { func_name: _f, comment: S(self.cell_id) + " PortNumber" })?;
                     let originator_id = self.border_port_tree_id_map
                         .get(&port_number)
@@ -986,13 +979,16 @@ impl CellAgent {
                     let app_msg: Box<dyn AppMessage> = serde_json::from_str(&serialized).context(CellagentError::Chain { func_name: _f, comment: S("cm_loop_tunnel_port") })?;
                     app_msg.process_ca(self, originator_id)?;
                 }
+                }
                 CmToCaBytes::TunnelUp((originator_id, bytes)) => {
-                    if !self.tree_name_map.lock().unwrap().contains_key(&originator_id) {
-                        return Err(CellagentError::TreeNameMap { func_name: _f, cell_id: self.cell_id, originator_id }.into());
+                    if !CONFIG.replay {
+                        if !self.tree_name_map.lock().unwrap().contains_key(&originator_id) {
+                            return Err(CellagentError::TreeNameMap { func_name: _f, cell_id: self.cell_id, originator_id }.into());
+                        }
+                        let serialized = bytes.stringify()?;
+                        let app_msg: Box<dyn AppMessage> = serde_json::from_str(&serialized).context(CellagentError::Chain { func_name: _f, comment: S("cm_loop_tunnel_up") })?;
+                        app_msg.process_ca(self, originator_id)?;
                     }
-                    let serialized = bytes.stringify()?;
-                    let app_msg: Box<dyn AppMessage> = serde_json::from_str(&serialized).context(CellagentError::Chain { func_name: _f, comment: S("cm_loop_tunnel_up") })?;
-                    app_msg.process_ca(self, originator_id)?;
                 }
             }
         }
@@ -1387,19 +1383,17 @@ impl CellAgent {
         }
         // Send my DiscoverMsg and DiscoverDMsg
         let clone = self.clone();
-        if !CONFIG.replay {
-            thread::spawn(move || -> Result<(), Error> {
-                crate::utility::sleep(CONFIG.race_sleep);
-                let discover_msg = DiscoverMsg::new(clone.cell_id, originator_id,
-                                                    my_port_tree_id, PathLength(CellQty(1)),
-                                                    Path::new(port_number));
-                let discoverd_msg = DiscoverDMsg::new(in_reply_to, clone.cell_id,
-                                                      originator_id, my_port_tree_id, path, DiscoverDType::NonParent);
-                clone.send_msg(line!(), clone.connected_tree_id, discover_msg, user_mask)?;
-                clone.send_msg(line!(), clone.connected_tree_id, discoverd_msg, user_mask)?;
-                Ok(())
-            });
-        }
+        thread::spawn(move || -> Result<(), Error> {
+            crate::utility::sleep(CONFIG.race_sleep);
+            let discover_msg = DiscoverMsg::new(clone.cell_id, originator_id,
+                                                my_port_tree_id, PathLength(CellQty(1)),
+                                                Path::new(port_number));
+            let discoverd_msg = DiscoverDMsg::new(in_reply_to, clone.cell_id,
+                                                    originator_id, my_port_tree_id, path, DiscoverDType::NonParent);
+            clone.send_msg(line!(), clone.connected_tree_id, discover_msg, user_mask)?;
+            clone.send_msg(line!(), clone.connected_tree_id, discoverd_msg, user_mask)?;
+            Ok(())
+        });
         for (_tree_id, discoverd_msg) in &self.saved_discoverd {
             self.send_msg(line!(), self.connected_tree_id, discoverd_msg.clone(), user_mask)?;
         }
@@ -1663,10 +1657,8 @@ impl CellAgent {
                 add_to_trace(TraceType::Trace, trace_params, &trace, _f);
             }
         }
-        if !CONFIG.replay {
-            let ca_to_port = self.ca_to_ports.get(&port_no).expect("cellagent.rs send_tree_name_msg: send port must be set");
-            ca_to_port.send(bytes)?;
-        }
+        let ca_to_port = self.ca_to_ports.get(&port_no).expect("cellagent.rs send_tree_name_msg: send port must be set");
+        ca_to_port.send(bytes)?;
         Ok(())
     }
     fn find_new_parent(&mut self, header: &MsgHeader, payload: &FailoverMsgPayload, port_no: PortNo)
@@ -2014,9 +2006,7 @@ impl CellAgent {
             }
         }
         let msg = CaToCmBytes::Bytes((tree_id, is_ait, is_snake, user_mask, seq_no, bytes));
-        if !CONFIG.replay {
-            self.ca_to_cm[0].send(msg)?;
-        }
+        self.ca_to_cm[0].send(msg)?;
         Ok(())
    }
     // For debugging only

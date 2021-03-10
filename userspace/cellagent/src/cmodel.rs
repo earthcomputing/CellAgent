@@ -133,30 +133,39 @@ impl Cmodel {
                 }
                 self.cm_to_pe.send(CmToPePacket::Entry(entry))?;
             },
-            CaToCmBytes::Status(status_msg) => {
-                self.cm_to_ca.send(CmToCaBytes::Status(status_msg))?;
+            CaToCmBytes::Status((port_no, is_border, no_packets, status)) => {
+                {
+                    if CONFIG.trace_options.all || CONFIG.trace_options.cm {
+                        let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "cm_from_ca_status" };
+                        let trace = json!({ "cell_id": &self.cell_id, "port_no": port_no, "is_border": is_border, "status": status });
+                        add_to_trace(TraceType::Trace, trace_params, &trace, _f);
+                    }
+                }
+                self.cm_to_ca.send(CmToCaBytes::Status((port_no, is_border, no_packets, status)))?;
             }
             CaToCmBytes::TunnelPort(tunnel_msg) => {
+                {
+                    if CONFIG.trace_options.all || CONFIG.trace_options.cm {
+                        let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "cm_from_ca_tunnel_port" };
+                        let trace = json!({ "cell_id": &self.cell_id, "tunnel_msg": tunnel_msg.1.stringify()? });
+                        add_to_trace(TraceType::Trace, trace_params, &trace, _f);
+                    }
+                }
                 self.cm_to_ca.send(CmToCaBytes::TunnelPort(tunnel_msg))?;
             }
             CaToCmBytes::TunnelUp(tunnel_msg) => {
+                {
+                    if CONFIG.trace_options.all || CONFIG.trace_options.cm {
+                        let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "cm_from_ca_tunnel_up" };
+                        let trace = json!({ "cell_id": &self.cell_id, "tunnel_msg": tunnel_msg.1.stringify()? });
+                        add_to_trace(TraceType::Trace, trace_params, &trace, _f);
+                    }
+                }
                 self.cm_to_ca.send(CmToCaBytes::TunnelUp(tunnel_msg))?;
             }
         
             // packetize
             CaToCmBytes::Bytes((tree_id, is_ait, is_snake, user_mask, seq_no, bytes)) => {
-                {
-                    if CONFIG.debug_options.all || CONFIG.debug_options.cm_from_ca {
-                        let dpi_msg = MsgType::msg_from_bytes(&bytes)?;
-                        let dpi_msg_type = dpi_msg.get_msg_type();
-                        match dpi_msg_type {
-                            MsgType::Discover => (),
-                            _ => {
-                                println!("Cmodel {}: {} received {}", self.cell_id, _f, dpi_msg);
-                            }
-                        }
-                    }
-                }
                 // xmit msg
                 let mut uuid = tree_id.get_uuid();
                 if is_ait { uuid.make_ait_send(); }

@@ -11,6 +11,7 @@ use crate::app_message_formats::{NocToPort, NocFromPort, PortToNoc, PortFromNoc,
 use crate::blueprint::{Blueprint};
 use crate::config::{CONFIG, SCHEMA_VERSION};
 use crate::dal::{add_to_trace, fork_trace_header, update_trace_header};
+use crate::name::{CellID};  // CellID used for trace records
 use crate::gvm_equation::{GvmEquation, GvmEqn, GvmVariable, GvmVariableType};
 use crate::uptree_spec::{AllowedTree, ContainerSpec, Manifest, UpTreeSpec, VmSpec};
 use crate::utility::{ByteArray, CellConfig, S, TraceHeader, TraceHeaderParams, TraceType,
@@ -23,6 +24,7 @@ pub const NOC_LISTEN_TREE_NAME:    &str = "NocAgentMaster";
 
 #[derive(Debug, Clone)]
 pub struct Noc {
+    cell_id: CellID,
     base_tree: Option<AllowedTree>,
     allowed_trees: HashSet<AllowedTree>,
     deploy_done: bool,
@@ -30,7 +32,8 @@ pub struct Noc {
 }
 impl Noc {
     pub fn new(noc_to_application: NocToApplication) -> Result<Noc, Error> {
-        Ok(Noc { base_tree: None, allowed_trees: HashSet::new(), deploy_done: false, noc_to_application })
+        let cell_id = CellID::new("Noc")?;
+        Ok(Noc { cell_id, base_tree: None, allowed_trees: HashSet::new(), deploy_done: false, noc_to_application })
     }
     pub fn initialize(&mut self, blueprint: &Blueprint, noc_from_application: NocFromApplication)
             -> Result<(PortToNoc, PortFromNoc), Error> {
@@ -77,7 +80,7 @@ impl Noc {
         {
             if CONFIG.trace_options.all || CONFIG.trace_options.noc {
                 let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "worker" };
-                let trace = json!({ "id": self.get_name(), "thread_name": thread::current().name(), "thread_id": TraceHeader::parse(thread::current().id()) });
+                let trace = json!({ "cell_id": self.cell_id, "thread_name": thread::current().name(), "thread_id": TraceHeader::parse(thread::current().id()) });
                 add_to_trace(TraceType::Trace, trace_params, &trace, _f);
             }
         }
@@ -88,7 +91,7 @@ impl Noc {
             {
                 if CONFIG.trace_options.all || CONFIG.trace_options.noc {
                     let trace_params = &TraceHeaderParams { module: "src/noc.rs", line_no: line!(), function: _f, format: "noc_from_port" };
-                    let trace = json!({ "id": self.get_name(), "app_msg": app_msg });
+                    let trace = json!({ "cell_id": self.cell_id, "app_msg": app_msg });
                     add_to_trace(TraceType::Trace, trace_params, &trace, _f);
                 }
             }
@@ -115,8 +118,8 @@ impl Noc {
         let tree_name = msg.get_tree_name();
         {
             if CONFIG.trace_options.all || CONFIG.trace_options.noc {
-                let trace_params = &TraceHeaderParams { module: "src/noc.rs", line_no: line!(), function: _f, format: "app_process_tree_name" };
-                let trace = json!({ "id": self.get_name(), "app_msg": msg });
+                let trace_params = &TraceHeaderParams { module: "src/noc.rs", line_no: line!(), function: _f, format: "app_process_tree_name_msg" };
+                let trace = json!({ "cell_id": self.cell_id, "app_msg": msg });
                 add_to_trace(TraceType::Trace, trace_params, &trace, _f);
             }
         }
@@ -175,7 +178,7 @@ impl Noc {
         {
             if CONFIG.trace_options.all || CONFIG.trace_options.noc {
                 let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "worker" };
-                let trace = json!({ "id": self.get_name(), "thread_name": thread::current().name(), "thread_id": TraceHeader::parse(thread::current().id()) });
+                let trace = json!({ "cell_id": self.cell_id, "thread_name": thread::current().name(), "thread_id": TraceHeader::parse(thread::current().id()) });
                 add_to_trace(TraceType::Trace, trace_params, &trace, _f);
             }
         }
@@ -184,7 +187,7 @@ impl Noc {
             {
                 if CONFIG.trace_options.all || CONFIG.trace_options.noc {
                     let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "noc_from_application" };
-                    let trace = json!({ "id": self.get_name(), "thread_name": thread::current().name(), "thread_id": TraceHeader::parse(thread::current().id()), "input": input });
+                    let trace = json!({ "cell_id": self.cell_id, "thread_name": thread::current().name(), "thread_id": TraceHeader::parse(thread::current().id()), "input": input });
                     add_to_trace(TraceType::Trace, trace_params, &trace, _f);
                 }
             }
@@ -247,7 +250,7 @@ impl Noc {
         {
             if CONFIG.trace_options.all || CONFIG.trace_options.svc {
                 let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "3hop_to_vm" };
-                let trace = json!({ "NocMaster": self.get_name(), "app_msg": stack_tree_msg });
+                let trace = json!({ "cell_id": self.cell_id, "NocMaster": self.get_name(), "app_msg": stack_tree_msg });
                 add_to_trace(TraceType::Trace, trace_params, &trace, _f);
             }
         }
@@ -326,7 +329,7 @@ impl Noc {
         {
             if CONFIG.trace_options.all || CONFIG.trace_options.noc {
                 let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "noc_to_port" };
-                let trace = json!({ "app_msg": msg });
+                let trace = json!({"cell_id": self.cell_id, "app_msg": msg });
                 add_to_trace(TraceType::Trace, trace_params, &trace, _f);
             }
         }

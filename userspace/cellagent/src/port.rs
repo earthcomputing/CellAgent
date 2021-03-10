@@ -248,7 +248,7 @@ impl Port {
                 }
             }
             #[cfg(any(feature = "noc", feature = "simulator"))]
-		simulated_port_or_ecnl_port.clone().left().expect("simulated port in simulator").send(packet)?;
+		    simulated_port_or_ecnl_port.clone().left().expect("simulated port in simulator").send(packet)?;
             #[cfg(feature = "cell")]
             {
                 simulated_port_or_ecnl_port.clone().right().expect("ecnl port in cell").send(&packet)?;
