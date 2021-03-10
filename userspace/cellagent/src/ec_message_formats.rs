@@ -45,8 +45,8 @@ pub type PeFromCm = mpsc::Receiver<CmToPePacket>;
 //pub type CmPeError = mpsc::SendError<CmToPePacket>;
 // PacketEngine to Port
 pub type PeToPortPacketOld = Packet;
-pub type PeToPort = mpsc::Sender<PeToPortPacketOld>;
-pub type PortFromPe = mpsc::Receiver<PeToPortPacketOld>;
+pub type PeToPortOld = mpsc::Sender<PeToPortPacketOld>;
+pub type PortFromPeOld = mpsc::Receiver<PeToPortPacketOld>;
 #[derive(Debug, Clone, Serialize)]
 pub enum PeToPortPacket {
     Activity(ActivityData),
@@ -67,8 +67,8 @@ pub enum PortToPePacketOld {
     Status((PortNo, bool, PortStatus)), // bool = is_border
     Packet((PortNo, Packet))
 }
-pub type PortToPe = mpsc::Sender<PortToPePacketOld>;
-pub type PeFromPort = mpsc::Receiver<PortToPePacketOld>;
+pub type PortToPeOld = mpsc::Sender<PortToPePacketOld>;
+pub type PeFromPortOld = mpsc::Receiver<PortToPePacketOld>;
 //pub type PortPeError = mpsc::SendError<PortToPePacket>;
 // PacketEngine to Cmodel
 #[derive(Debug, Clone, Serialize)]

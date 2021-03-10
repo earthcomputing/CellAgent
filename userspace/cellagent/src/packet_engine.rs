@@ -8,7 +8,7 @@ use crate::config::{CONFIG};
 use crate::dal::{add_to_trace, fork_trace_header, update_trace_header};
 use crate::ec_message::{MsgType};
 use crate::ec_message_formats::{PeFromCm, PeToCm,
-                                PeToPort, PeFromPort, PortToPePacketOld,
+                                PeToPortOld, PeFromPortOld, PortToPePacketOld,
                                 CmToPePacket, PeToCmPacket};
 use crate::name::{Name, CellID, TreeID};
 use crate::packet::{Packet};
@@ -44,13 +44,13 @@ pub struct PacketEngine {
     port_got_event: BoolArray,
     reroute: Reroute,
     pe_to_cm: PeToCm,
-    pe_to_ports: HashMap<PortNo, PeToPort>,
+    pe_to_ports_old: HashMap<PortNo, PeToPortOld>,
 }
 
 impl PacketEngine {
     // NEW
     pub fn new(cell_id: CellID, connected_tree_id: TreeID, pe_to_cm: PeToCm,
-               pe_to_ports: HashMap<PortNo, PeToPort>,
+               pe_to_ports_old: HashMap<PortNo, PeToPortOld>,
                border_port_nos: &HashSet<PortNo>) -> PacketEngine {
         let routing_table = RoutingTable::new(cell_id);
         let routing_table_mutex = Arc::new(Mutex::new(routing_table.clone()));
@@ -69,12 +69,12 @@ impl PacketEngine {
             port_got_event: [false; MAX_SLOTS],
             reroute: [PortNo(0); MAX_SLOTS],
             pe_to_cm,
-            pe_to_ports,
+            pe_to_ports_old,
         }
     }
     
     // SPAWN THREAD (pe.initialize)
-    pub fn start(&self, pe_from_cm: PeFromCm, pe_from_ports: PeFromPort) -> JoinHandle<()> {
+    pub fn start(&self, pe_from_cm: PeFromCm, pe_from_ports_old: PeFromPortOld) -> JoinHandle<()> {
         let _f = "start_packet_engine";
         {
             if CONFIG.trace_options.all || CONFIG.trace_options.pe {
@@ -88,14 +88,14 @@ impl PacketEngine {
         let thread_name = format!("PacketEngine {}", self.get_cell_id());
         thread::Builder::new().name(thread_name).spawn( move || {
             update_trace_header(child_trace_header);
-            let _ = pe.initialize(pe_from_cm.clone(), pe_from_ports.clone()).map_err(|e| write_err("Called by nalcell", &e));
-            if CONFIG.continue_on_error { pe.start(pe_from_cm, pe_from_ports); } 
+            let _ = pe.initialize(pe_from_cm.clone(), pe_from_ports_old.clone()).map_err(|e| write_err("Called by nalcell", &e));
+            if CONFIG.continue_on_error { pe.start(pe_from_cm, pe_from_ports_old); } 
         }).expect("thread failed")
     }
 
     // INIT (PeFromCm PeFromPort)
     // WORKER (PacketEngine)
-    pub fn initialize(&mut self, pe_from_cm: PeFromCm, pe_from_ports: PeFromPort) -> Result<(), Error> {
+    pub fn initialize(&mut self, pe_from_cm: PeFromCm, pe_from_ports_old: PeFromPortOld) -> Result<(), Error> {
         let _f = "initialize";
         loop {
             select! {
@@ -103,7 +103,7 @@ impl PacketEngine {
                     let msg = recvd.context(PacketEngineError::Chain { func_name: _f, comment: S("pe from cm") })?;
                     self.listen_cm(msg).context(PacketEngineError::Chain { func_name: _f, comment: S("listen cm") })?;
                 },
-                recv(pe_from_ports) -> recvd => {
+                recv(pe_from_ports_old) -> recvd => {
                     let msg = recvd.context(PacketEngineError::Chain { func_name: _f, comment: S("pe from port") })?;
                     self.listen_port(msg).context(PacketEngineError::Chain { func_name: _f, comment: S("listen port") })?;
                 }
@@ -258,9 +258,9 @@ impl PacketEngine {
     }
     // SPAWN THREAD (listen_port)
     // TODO: One thread for all ports; should be a different thread for each port
-    fn listen_port(&mut self, msg: PortToPePacketOld) -> Result<(), Error> {
+    fn listen_port(&mut self, msg_old: PortToPePacketOld) -> Result<(), Error> {
         let _f = "listen_port";
-        match msg {
+        match msg_old {
             // deliver to CModel
             PortToPePacketOld::Status((port_no, is_border, port_status)) => {
                 {
@@ -377,7 +377,7 @@ impl PacketEngine {
         if recv_port_no == PortNo(0) {
             self.pe_to_cm.send(PeToCmPacket::Packet((recv_port_no, packet.clone())))?;
         } else {
-            self.pe_to_ports.get(&reroute_port_no)
+            self.pe_to_ports_old.get(&reroute_port_no)
                 .ok_or::<Error>(PacketEngineError::Sender { cell_id: self.cell_id, func_name: _f, port_no: *reroute_port_no }.into())?
                 .send(packet.clone())?;
         }
@@ -574,7 +574,7 @@ impl PacketEngine {
                 if port_no == PortNo(0) { 
                     self.pe_to_cm.send(PeToCmPacket::Packet((recv_port_no, packet.clone())))?;
                 } else {
-                    let pe_to_port = self.pe_to_ports.get(&port_no).expect("PacketEngine forward pe_to_port must be defined");
+                    let pe_to_port = self.pe_to_ports_old.get(&port_no).expect("PacketEngine forward pe_to_port must be defined");
                     pe_to_port.send(packet.clone())?;  // Control message so just send
                 }
             }

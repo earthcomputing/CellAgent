@@ -11,7 +11,7 @@ use crossbeam::crossbeam_channel as mpsc;
 use crate::app_message_formats::{PortToCa, PortToCaMsg, PortFromCa};
 use crate::config::CONFIG;
 use crate::dal::{add_to_trace, fork_trace_header, update_trace_header};
-use crate::ec_message_formats::{PortToPe, PortFromPe};
+use crate::ec_message_formats::{PortToPeOld, PortFromPeOld};
 use crate::name::{Name, CellID, PortID};
 use crate::packet::{Packet, UniqueMsgId};
 use crate::utility::{ByteArray, PortNo, PortNumber, S, TraceHeader, TraceHeaderParams, TraceType,
@@ -19,8 +19,8 @@ use crate::utility::{ByteArray, PortNo, PortNumber, S, TraceHeader, TraceHeaderP
 
 #[derive(Clone, Debug)]
 pub struct DuplexPortPeChannel {
-    pub port_from_pe: PortFromPe,
-    pub port_to_pe: PortToPe,
+    pub port_from_pe_old: PortFromPeOld,
+    pub port_to_pe_old: PortToPeOld,
 }
 
 #[derive(Clone, Debug)]
@@ -82,11 +82,11 @@ pub trait InteriorPortLike: 'static + Clone + Sync + Send + CommonPortLike {
 
     // THESE COULD BE PROTECTED
     fn send(self: &mut Self, packet: &mut Packet) -> Result<(), Error>;
-    fn listen_and_forward_to(self: &mut Self, port_to_pe: PortToPe) -> Result<(), Error>;
+    fn listen_and_forward_to(self: &mut Self, port_to_pe_old: PortToPeOld) -> Result<(), Error>;
 
     // THESE COULD BE PRIVATE
     fn listen(self: &mut Self) -> Result<(), Error> {
-        self.listen_and_forward_to(self.get_duplex_port_pe_channel().port_to_pe)
+        self.listen_and_forward_to(self.get_duplex_port_pe_channel().port_to_pe_old)
     }
     fn get_duplex_port_pe_channel(&self) -> DuplexPortPeChannel {
         return if let DuplexPortPeOrCaChannel::Interior(duplex_port_pe_channel) = self.get_base_port().get_duplex_port_pe_or_ca_channel() {duplex_port_pe_channel} else {panic!("Expected an interior port")};
@@ -118,7 +118,7 @@ pub trait InteriorPortLike: 'static + Clone + Sync + Send + CommonPortLike {
         }
         loop {
             //println!("Port {}: waiting for packet from pe", id);
-            let mut packet = self.get_duplex_port_pe_channel().port_from_pe.recv().context(PortError::Chain { func_name: _f, comment: S(self.get_id().get_name()) + " port_from_pe"})?;
+            let mut packet = self.get_duplex_port_pe_channel().port_from_pe_old.recv().context(PortError::Chain { func_name: _f, comment: S(self.get_id().get_name()) + " port_from_pe"})?;
             {
                 if CONFIG.trace_options.all || CONFIG.trace_options.port {
                     let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "port_from_pe" };

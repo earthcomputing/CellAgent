@@ -12,7 +12,7 @@ use crate::app_message_formats::{PortFromCa};
 use crate::blueprint::{Blueprint, Cell, };
 use crate::config::{CONFIG, CellQty, LinkQty};
 use crate::dal::{add_to_trace, fork_trace_header, get_cell_replay_lines, update_trace_header};
-use crate::ec_message_formats::{PortFromPe};
+use crate::ec_message_formats::{PortFromPeOld};
 use crate::link::{Link, DuplexLinkPortChannel, LinkFromPorts, LinkToPorts };
 use crate::nalcell::{NalCell};
 use crate::name::{CellID, LinkID};
