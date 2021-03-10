@@ -8,7 +8,7 @@ use crate::config::{CONFIG};
 use crate::dal::{add_to_trace, fork_trace_header, update_trace_header};
 use crate::ec_message::{MsgType};
 use crate::ec_message_formats::{PeFromCm, PeToCm,
-                                PeToPort, PeFromPort, PortToPePacket,
+                                PeToPort, PeFromPort, PortToPePacketOld,
                                 CmToPePacket, PeToCmPacket};
 use crate::name::{Name, CellID, TreeID};
 use crate::packet::{Packet};
@@ -258,11 +258,11 @@ impl PacketEngine {
     }
     // SPAWN THREAD (listen_port)
     // TODO: One thread for all ports; should be a different thread for each port
-    fn listen_port(&mut self, msg: PortToPePacket) -> Result<(), Error> {
+    fn listen_port(&mut self, msg: PortToPePacketOld) -> Result<(), Error> {
         let _f = "listen_port";
         match msg {
             // deliver to CModel
-            PortToPePacket::Status((port_no, is_border, port_status)) => {
+            PortToPePacketOld::Status((port_no, is_border, port_status)) => {
                 {
                     if CONFIG.trace_options.all || CONFIG.trace_options.pe_port {
                         let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "pe_from_port_status" };
@@ -289,7 +289,7 @@ impl PacketEngine {
             },
             
             // recv from neighbor
-            PortToPePacket::Packet((port_no, packet)) => {
+            PortToPePacketOld::Packet((port_no, packet)) => {
                 {
                     if CONFIG.trace_options.all || CONFIG.trace_options.pe_port {
                         let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "pe_from_port_packet" };

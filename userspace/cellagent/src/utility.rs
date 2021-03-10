@@ -13,6 +13,7 @@ use time;
 
 use crate::config::{CONFIG, PAYLOAD_DEFAULT_ELEMENT, REPO,
                     CellQty, MASK_MAX, MaskValue, PortQty};
+use crate::name::{Name, TreeID};
 use crate::uuid_ec::Uuid;
 
 pub const BASE_TENANT_MASK: Mask = Mask { mask: MaskValue(MASK_MAX) };     // All ports
@@ -347,6 +348,49 @@ impl fmt::Display for Edge {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "E: ({}, {})", *self.0, *self.1)
     }
+}
+#[derive(Debug, Clone, Copy, Default, Eq, PartialEq, Serialize, Deserialize)]
+pub struct ActivityData {
+    data: usize,
+}
+impl ActivityData {
+    pub fn update(&mut self, new_data: ActivityData) {
+        self.data = self.data + new_data.data;
+    }
+    pub fn is_changed(&self, other: ActivityData) -> bool {
+        self.data != other.data
+    }
+}
+impl fmt::Display for ActivityData {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "Activity {}", self.data)
+    }
+}
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum OutbufType {
+    Control, Message, HeadOfLine(HolSelector)
+}
+impl fmt::Display for OutbufType {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let string = match self {
+            OutbufType::Control => "Control".to_owned(),
+            OutbufType::Message => "Message".to_owned(),
+            OutbufType::HeadOfLine(selector) => selector.stringify()
+        };
+        write!(f, "Outbuf type: {}", string)
+    }
+}
+// Specifies which head of line buffer to use based on the selector
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct HolSelector {
+    selector: TreeID
+}
+impl HolSelector {
+    pub fn new(tree_id: TreeID) -> HolSelector {
+        // I haven't decided on what that is yet, but it might be a Bloom filter of tree IDs
+        HolSelector { selector: tree_id }
+    }
+    fn stringify(&self) -> String { self.selector.get_name() }
 }
 
 // Utility functions

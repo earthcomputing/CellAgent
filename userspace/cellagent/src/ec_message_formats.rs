@@ -8,7 +8,7 @@ use crate::packet::{Packet};
 use crate::packet_engine::NumberOfPackets;
 use crate::port::{PortStatus};
 use crate::routing_table_entry::{RoutingTableEntry};
-use crate::utility::{ByteArray, Mask, PortNo};
+use crate::utility::{ActivityData, ByteArray, Mask, PortNo, OutbufType};
 use crate::uuid_ec::Uuid;
 
 type CATOCM = (TreeID, ISAIT, SNAKE, Mask, SenderMsgSeqNo, ByteArray);
@@ -44,18 +44,31 @@ pub type CmToPe = mpsc::Sender<CmToPePacket>;
 pub type PeFromCm = mpsc::Receiver<CmToPePacket>;
 //pub type CmPeError = mpsc::SendError<CmToPePacket>;
 // PacketEngine to Port
-pub type PeToPortPacket = Packet;
-pub type PeToPort = mpsc::Sender<PeToPortPacket>;
-pub type PortFromPe = mpsc::Receiver<PeToPortPacket>;
+pub type PeToPortPacketOld = Packet;
+pub type PeToPort = mpsc::Sender<PeToPortPacketOld>;
+pub type PortFromPe = mpsc::Receiver<PeToPortPacketOld>;
+#[derive(Debug, Clone, Serialize)]
+pub enum PeToPortPacket {
+    Activity(ActivityData),
+    Packet((OutbufType, Packet)),
+    Ready
+}
 //pub type PePortError = mpsc::SendError<PeToPortPacket>;
 // Port to PacketEngine
 #[derive(Debug, Clone, Serialize)]
 pub enum PortToPePacket {
-    Status((PortNo, bool, PortStatus)),
+    Activity((PortNo, ActivityData)),
+    Increment((PortNo, OutbufType)),
+    Packet((PortNo, Packet)),
+    Status((PortNo, bool, PortStatus)) // bool = is_border
+}
+#[derive(Debug, Clone, Serialize)]
+pub enum PortToPePacketOld {
+    Status((PortNo, bool, PortStatus)), // bool = is_border
     Packet((PortNo, Packet))
 }
-pub type PortToPe = mpsc::Sender<PortToPePacket>;
-pub type PeFromPort = mpsc::Receiver<PortToPePacket>;
+pub type PortToPe = mpsc::Sender<PortToPePacketOld>;
+pub type PeFromPort = mpsc::Receiver<PortToPePacketOld>;
 //pub type PortPeError = mpsc::SendError<PortToPePacket>;
 // PacketEngine to Cmodel
 #[derive(Debug, Clone, Serialize)]

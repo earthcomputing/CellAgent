@@ -13,7 +13,7 @@ use std::{
 use crossbeam::crossbeam_channel as mpsc;
 
 use crate::app_message_formats::{PortToCa};
-use crate::ec_message_formats::{PortToPePacket, PortToPe};
+use crate::ec_message_formats::{PortToPePacketOld, PortToPe};
 use crate::name::{PortID, CellID};
 use crate::packet::{Packet};
 use crate::port::{CommonPortLike, InteriorPortLike, BasePort, InteriorPortFactoryLike, PortStatus, PortSeed, DuplexPortPeOrCaChannel, DuplexPortPeChannel};
@@ -214,7 +214,7 @@ impl InteriorPortLike for ECNL_Port {
                              self.set_disconnected();
                          }
 			 println!("Port {} is {}", ecnl_port_sub.port_id, port_status_name);
-			port_to_pe.send(PortToPePacket::Status((PortNo(ecnl_port_sub.port_id), self.base_port.is_border(), if (event.event_up_down != 0) {PortStatus::Connected} else {PortStatus::Disconnected}))).unwrap();
+			port_to_pe.send(PortToPePacketOld::Status((PortNo(ecnl_port_sub.port_id), self.base_port.is_border(), if (event.event_up_down != 0) {PortStatus::Connected} else {PortStatus::Disconnected}))).unwrap();
 		    }
 		    cmd_id if (cmd_id == NL_ECND_Commands::NL_ECNL_CMD_SIGNAL_AIT_MESSAGE as c_int) => {
                         println!("AIT Message Signal Received...");
@@ -223,7 +223,7 @@ impl InteriorPortLike for ECNL_Port {
 			    let possible_packet_or_err: Option<Result<Packet, Error>> = self.retrieve(&mut bd);
 			    match possible_packet_or_err {
 		                Some(packet_or_err) => {
-				    port_to_pe.send(PortToPePacket::Packet((PortNo(ecnl_port_sub.port_id), packet_or_err?))).unwrap();
+				    port_to_pe.send(PortToPePacketOld::Packet((PortNo(ecnl_port_sub.port_id), packet_or_err?))).unwrap();
 				    first = false;
 				},
 				None => {

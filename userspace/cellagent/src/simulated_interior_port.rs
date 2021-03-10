@@ -11,7 +11,7 @@ use crate::app_message_formats::{PortToCa};
 use crate::blueprint::{Blueprint, };
 use crate::config::{CONFIG};
 use crate::dal::{add_to_trace};
-use crate::ec_message_formats::{PortToPePacket, PortToPe};
+use crate::ec_message_formats::{PortToPePacketOld, PortToPe};
 use crate::link::{Link};
 use crate::name::{Name, CellID, PortID};
 use crate::packet::{Packet}; // Eventually use SimulatedPacket
@@ -135,7 +135,7 @@ impl InteriorPortLike for SimulatedInteriorPort {
 				add_to_trace(TraceType::Trace, trace_params, &trace, _f);
                             }
 			}
-			port_to_pe.send(PortToPePacket::Status((self.base_port.get_port_no(), self.base_port.is_border(), status))).context(SimulatedInteriorPortError::Chain { func_name: _f, comment: S(self.base_port.get_id().get_name()) + " send status to pe"})?;
+			port_to_pe.send(PortToPePacketOld::Status((self.base_port.get_port_no(), self.base_port.is_border(), status))).context(SimulatedInteriorPortError::Chain { func_name: _f, comment: S(self.base_port.get_id().get_name()) + " send status to pe"})?;
                     }
                     LinkToPortPacket::Packet(mut packet) => {
 			let ait_state = packet.get_ait_state();
@@ -154,7 +154,7 @@ impl InteriorPortLike for SimulatedInteriorPort {
                                         add_to_trace(TraceType::Trace, trace_params, &trace, _f);
                                     }
                                 }
-                                port_to_pe.send(PortToPePacket::Packet((self.base_port.get_port_no(), packet)))?;
+                                port_to_pe.send(PortToPePacketOld::Packet((self.base_port.get_port_no(), packet)))?;
                             },
                             AitState::Teck |
                             AitState::Tack => {
@@ -188,7 +188,7 @@ impl InteriorPortLike for SimulatedInteriorPort {
                                         add_to_trace(TraceType::Trace, trace_params, &trace, _f);
                                     }
                                 }
-                                port_to_pe.send(PortToPePacket::Packet((self.base_port.get_port_no(), packet)))?;
+                                port_to_pe.send(PortToPePacketOld::Packet((self.base_port.get_port_no(), packet)))?;
                             },
 			            }
                     }
