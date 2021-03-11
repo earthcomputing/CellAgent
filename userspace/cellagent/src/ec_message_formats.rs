@@ -53,6 +53,8 @@ pub enum PeToPortPacket {
     Packet((OutbufType, Packet)),
     Ready
 }
+pub type PeToPort = mpsc::Sender<PeToPortPacket>;
+pub type PortFromPe = mpsc::Receiver<PeToPortPacket>;
 //pub type PePortError = mpsc::SendError<PeToPortPacket>;
 // Port to PacketEngine
 #[derive(Debug, Clone, Serialize)]
@@ -62,6 +64,8 @@ pub enum PortToPePacket {
     Packet((PortNo, Packet)),
     Status((PortNo, bool, PortStatus)) // bool = is_border
 }
+pub type PortToPe = mpsc::Sender<PortToPePacket>;
+pub type PeFromPort = mpsc::Receiver<PortToPePacket>;
 #[derive(Debug, Clone, Serialize)]
 pub enum PortToPePacketOld {
     Status((PortNo, bool, PortStatus)), // bool = is_border
