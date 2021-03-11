@@ -116,17 +116,11 @@ impl<InteriorPortFactoryType: InteriorPortFactoryLike<InteriorPortType>, Interio
                 Either::Left(port_to_pe) => {
                     let interior_port_factory = port_factory_clone.left().expect("Nalcell: interior port_to_pe_or_ca doesn't match border port_factory");
                     let sub_port = interior_port_factory.new_port(cell_id, port_id, port_number, port_to_pe)?;
-//                  if base_port.is_connected() {
-//                      base_port.listen_link_and_pe(sub_port.clone(), ports_from_pe[&PortNo(port_num as u8)].clone());
-//                  }
                     ports.push(Either::Left(sub_port));
                 },
                 Either::Right(port_to_ca) => {
                     let border_port_factory = port_factory_clone.right().expect("Nalcell: border port_to_pe_or_ca doesn't match interior port_factory");
                     let sub_port = border_port_factory.new_port(cell_id, port_id, port_number, port_to_ca)?;
-//                  if base_port.is_connected() {
-//                      base_port.listen_noc_and_ca(sub_port.clone(), ports_from_ca[&PortNo(port_num as u8)].clone())?;
-//                  }
                     ports.push(Either::Right(sub_port));
                 },
             }

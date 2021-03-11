@@ -13,7 +13,7 @@ use crate::blueprint::{Blueprint, Cell, };
 use crate::config::{CONFIG, CellQty, LinkQty};
 use crate::dal::{add_to_trace, fork_trace_header, get_cell_replay_lines, update_trace_header};
 use crate::ec_message_formats::{PortFromPe};
-use crate::link::{Link, DuplexLinkPortChannel};
+use crate::link::{Link, DuplexLinkPortChannel, LinkFromPorts, LinkToPorts };
 use crate::nalcell::{NalCell};
 use crate::name::{CellID, LinkID};
 use crate::port::{PortSeed, CommonPortLike, InteriorPortLike, BorderPortLike};
@@ -299,8 +299,10 @@ impl Rack {
             let link = Link::new(
                 left_port_clone.get_id(),
                 rite_port_clone.get_id(),
-                duplex_link_end_channel_map[&edge_connection.left].link_to_port.clone(),
-                duplex_link_end_channel_map[&edge_connection.rite].link_to_port.clone(),
+                LinkToPorts {
+                    left: duplex_link_end_channel_map[&edge_connection.left].link_to_port.clone(),
+                    rite: duplex_link_end_channel_map[&edge_connection.rite].link_to_port.clone(),
+                }
             )?;
             println!("Created link for edge connection {}", edge_connection);
             {
@@ -317,7 +319,10 @@ impl Rack {
             let link_from_rite = duplex_link_end_channel_map[&edge_connection.rite].link_from_port.clone();
             let join_handle = thread::Builder::new().name(thread_name).spawn( move || {
                 update_trace_header(child_trace_header);
-                let _ = link_clone.listen(link_from_left, link_from_rite);
+                let _ = link_clone.listen(LinkFromPorts {
+                    left: link_from_left,
+                    rite: link_from_rite,
+                });
             })?;
             //let mut handle_pair = link.start_threads(link_to_left, link_from_left, link_to_rite, link_from_rite)?;
             link_handles.append(&mut vec![join_handle]);
