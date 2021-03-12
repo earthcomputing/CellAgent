@@ -349,7 +349,7 @@ impl fmt::Display for Edge {
         write!(f, "E: ({}, {})", *self.0, *self.1)
     }
 }
-#[derive(Debug, Clone, Copy, Default, Eq, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Serialize, Deserialize)]
 pub struct ActivityData {
     data: usize,
 }
@@ -359,6 +359,14 @@ impl ActivityData {
     }
     pub fn is_changed(&self, other: ActivityData) -> bool {
         self.data != other.data
+    }
+    pub fn increment(&mut self) {
+        self.update(Default::default());
+    }
+}
+impl Default for ActivityData { // Used to initialize and to increment
+    fn default() -> Self {
+        ActivityData { data: 1 }
     }
 }
 impl fmt::Display for ActivityData {

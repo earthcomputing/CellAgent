@@ -257,10 +257,53 @@ impl PacketEngine {
         Ok(())
     }
     // SPAWN THREAD (listen_port)
-    // TODO: One thread for all ports; should be a different thread for each port
-    fn listen_port_old(&mut self, msg: PortToPePacketOld) -> Result<(), Error> {
+    fn listen_port(&mut self, msg: PortToPePacket) -> Result<(), Error> {
         let _f = "listen_port";
         match msg {
+            PortToPePacket::Activity((port_no, data)) => {
+                {
+                    if CONFIG.trace_options.all || CONFIG.trace_options.pe_port {
+                        let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "pe_from_port_activity" };
+                        let trace = json!({ "cell_id": self.cell_id, "port_no": port_no, "activity data": data });
+                        add_to_trace(TraceType::Trace, trace_params, &trace, _f);
+                    }
+                }
+            },
+            PortToPePacket::Increment((port_no, outbuf)) => {
+                {
+                    if CONFIG.trace_options.all || CONFIG.trace_options.pe_port {
+                        let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "pe_from_port_increment" };
+                        let trace = json!({ "cell_id": self.cell_id, "port_no": port_no, "outbuf": outbuf });
+                        add_to_trace(TraceType::Trace, trace_params, &trace, _f);
+                    }
+                }
+
+            },
+            PortToPePacket::Packet((port_no, packet)) => {
+                {
+                    if CONFIG.trace_options.all || CONFIG.trace_options.pe_port {
+                        let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "pe_from_port_packet" };
+                        let trace = json!({ "cell_id": self.cell_id, "port_no": port_no, "packet": packet.stringify()? });
+                        add_to_trace(TraceType::Trace, trace_params, &trace, _f);
+                    }
+                }
+            },
+            PortToPePacket::Status((port_no, is_border, status)) => {
+                {
+                    if CONFIG.trace_options.all || CONFIG.trace_options.pe_port {
+                        let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "pe_from_port_status" };
+                        let trace = json!({ "cell_id": &self.cell_id,  "port": port_no, "is_border": is_border, "status": status});
+                        add_to_trace(TraceType::Trace, trace_params, &trace, _f);
+                    }
+                }
+            }
+        }
+        Ok(())
+    }
+    // TODO: One thread for all ports; should be a different thread for each port
+    fn listen_port_old(&mut self, msg_old: PortToPePacketOld) -> Result<(), Error> {
+        let _f = "listen_port_old";
+        match msg_old {
             // deliver to CModel
             PortToPePacketOld::Status((port_no, is_border, port_status)) => {
                 {
