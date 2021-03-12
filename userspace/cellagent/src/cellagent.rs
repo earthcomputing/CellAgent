@@ -31,7 +31,9 @@ use crate::ec_message::{Message, MsgHeader, MsgTreeMap, MsgType,
                         TreeNameMsg};
 use crate::ec_message_formats::{CaToCm, CaFromCm, CmToCa, CmFromCa, PeToCm, CmFromPe,
                                 CmToPe, PeFromCm,
-                                CaToCmBytes, CmToCaBytes, PeToPortOld, PeFromPortOld};
+                                CaToCmBytes, CmToCaBytes, 
+                                PeToPort, PeFromPort,
+                                PeToPortOld, PeFromPortOld};
 use crate::gvm_equation::{GvmEquation, GvmEqn};
 use crate::name::{Name, CellID, OriginatorID, PortTreeID, TreeID, UptreeID, VmID};
 use crate::packet_engine::NumberOfPackets;
@@ -111,8 +113,9 @@ pub struct CellAgent {
 impl CellAgent {
     pub fn new(cell_id: CellID, tree_ids: Option<(TreeID, TreeID, TreeID)>, cell_type: CellType,
                config: CellConfig, no_ports: PortQty,
-               ca_to_ports: HashMap<PortNo, CaToPort>, cm_to_ca: CmToCa, pe_from_ports: PeFromPortOld ,
-               pe_to_ports: HashMap<PortNo, PeToPortOld>,
+               ca_to_ports: HashMap<PortNo, CaToPort>, cm_to_ca: CmToCa, 
+               pe_from_ports: PeFromPort, pe_to_ports: HashMap<PortNo, PeToPort>,
+               pe_from_ports_old: PeFromPortOld, pe_to_ports_old: HashMap<PortNo, PeToPortOld>,
                border_port_nos: &HashSet<PortNo>,
                ca_to_cm: CaToCm, cm_from_ca: CmFromCa, pe_to_cm: PeToCm, cm_from_pe: CmFromPe,
                cm_to_pe: CmToPe, pe_from_cm: PeFromCm)
@@ -144,9 +147,10 @@ impl CellAgent {
         (1..=(*CONFIG.max_num_phys_ports_per_cell).into())
             .for_each(|_| no_packets.push(NumberOfPackets::new()));
         let my_entry = RoutingTableEntry::default().add_child(PortNumber::default());
-        let (cmodel, _pe_join_handle) = Cmodel::new(cell_id, connected_tree_id, pe_to_cm,
-                                                    cm_to_ca, pe_from_ports, pe_to_ports, border_port_nos,
-                                                    cm_to_pe, pe_from_cm);
+        let (cmodel, _pe_join_handle) = Cmodel::new(cell_id, connected_tree_id, pe_to_cm, cm_to_ca,
+                                                    pe_from_ports, pe_to_ports, 
+                                                    pe_from_ports_old, pe_to_ports_old, 
+                                                    border_port_nos, cm_to_pe, pe_from_cm);
         let cm_join_handle = cmodel.start(cm_from_ca, cm_from_pe);
         Ok((CellAgent {
             cell_id, my_tree_id, cell_type, config, no_ports,

@@ -10,7 +10,9 @@ use failure::{Error, ResultExt};
 use crate::config::{CONFIG};
 use crate::dal::{add_to_trace, fork_trace_header, update_trace_header};
 use crate::ec_message::MsgType;
-use crate::ec_message_formats::{CaToCmBytes, CmToCa, CmFromCa, CmToPe, CmFromPe, PeToCm, PeFromCm, PeToPortOld, PeFromPortOld, 
+use crate::ec_message_formats::{CaToCmBytes, CmToCa, CmFromCa, CmToPe, CmFromPe, PeToCm, PeFromCm, 
+                                PeToPort, PeFromPort,
+                                PeToPortOld, PeFromPortOld, 
                                 PeToCmPacket, CmToPePacket, CmToCaBytes};
 use crate::name::{Name, CellID, TreeID};
 use crate::packet_engine::{PacketEngine};
@@ -33,12 +35,13 @@ impl Cmodel {
     pub fn get_cell_id(&self) -> &CellID { &self.cell_id }
     // NEW
     pub fn new(cell_id: CellID, connected_tree_id: TreeID, pe_to_cm: PeToCm, cm_to_ca: CmToCa,
+               pe_from_ports: PeFromPort, pe_to_ports: HashMap<PortNo, PeToPort>,
                pe_from_ports_old: PeFromPortOld, pe_to_ports_old: HashMap<PortNo, PeToPortOld>,
                border_port_nos: &HashSet<PortNo>, 
                cm_to_pe: CmToPe, pe_from_cm: PeFromCm) -> (Cmodel, JoinHandle<()>) {
         let packet_engine = PacketEngine::new(cell_id, connected_tree_id,
-                                              pe_to_cm, pe_to_ports_old, &border_port_nos);
-        let pe_join_handle = packet_engine.start(pe_from_cm, pe_from_ports_old);
+                                              pe_to_cm, pe_to_ports, pe_to_ports_old, &border_port_nos);
+        let pe_join_handle = packet_engine.start(pe_from_cm, pe_from_ports, pe_from_ports_old);
         (Cmodel { cell_id,
                   packet_engine,
                   packet_assemblers: PacketAssemblers::new(),

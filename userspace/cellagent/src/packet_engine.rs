@@ -1,13 +1,10 @@
-use std::{
-    collections::{HashMap, HashSet, VecDeque}, 
-    fmt, fmt::Write, str, 
-    sync::{Arc, Mutex}, 
-    thread, thread::JoinHandle};
+use std::{collections::{HashMap, HashSet, VecDeque}, fmt, fmt::Write, hash::Hash, str, sync::{Arc, Mutex}, thread, thread::JoinHandle};
 
 use crate::config::{CONFIG};
 use crate::dal::{add_to_trace, fork_trace_header, update_trace_header};
 use crate::ec_message::{MsgType};
 use crate::ec_message_formats::{PeFromCm, PeToCm,
+                                PeToPort, PeFromPort, PortToPePacket,
                                 PeToPortOld, PeFromPortOld, PortToPePacketOld,
                                 CmToPePacket, PeToCmPacket};
 use crate::name::{Name, CellID, TreeID};
@@ -44,12 +41,14 @@ pub struct PacketEngine {
     port_got_event: BoolArray,
     reroute: Reroute,
     pe_to_cm: PeToCm,
+    pe_to_ports: HashMap<PortNo, PeToPort>,
     pe_to_ports_old: HashMap<PortNo, PeToPortOld>,
 }
 
 impl PacketEngine {
     // NEW
     pub fn new(cell_id: CellID, connected_tree_id: TreeID, pe_to_cm: PeToCm,
+               pe_to_ports: HashMap<PortNo, PeToPort>,
                pe_to_ports_old: HashMap<PortNo, PeToPortOld>,
                border_port_nos: &HashSet<PortNo>) -> PacketEngine {
         let routing_table = RoutingTable::new(cell_id);
@@ -69,12 +68,13 @@ impl PacketEngine {
             port_got_event: [false; MAX_SLOTS],
             reroute: [PortNo(0); MAX_SLOTS],
             pe_to_cm,
+            pe_to_ports,
             pe_to_ports_old,
         }
     }
     
     // SPAWN THREAD (pe.initialize)
-    pub fn start(&self, pe_from_cm: PeFromCm, pe_from_ports_old: PeFromPortOld) -> JoinHandle<()> {
+    pub fn start(&self, pe_from_cm: PeFromCm, pe_from_ports: PeFromPort, pe_from_ports_old: PeFromPortOld) -> JoinHandle<()> {
         let _f = "start_packet_engine";
         {
             if CONFIG.trace_options.all || CONFIG.trace_options.pe {
@@ -88,14 +88,14 @@ impl PacketEngine {
         let thread_name = format!("PacketEngine {}", self.get_cell_id());
         thread::Builder::new().name(thread_name).spawn( move || {
             update_trace_header(child_trace_header);
-            let _ = pe.initialize(pe_from_cm.clone(), pe_from_ports_old.clone()).map_err(|e| write_err("Called by nalcell", &e));
-            if CONFIG.continue_on_error { pe.start(pe_from_cm, pe_from_ports_old); } 
+            let _ = pe.initialize(pe_from_cm.clone(), pe_from_ports.clone(), pe_from_ports_old.clone()).map_err(|e| write_err("Called by nalcell", &e));
+            if CONFIG.continue_on_error { pe.start(pe_from_cm, pe_from_ports, pe_from_ports_old); } 
         }).expect("thread failed")
     }
 
     // INIT (PeFromCm PeFromPort)
     // WORKER (PacketEngine)
-    pub fn initialize(&mut self, pe_from_cm: PeFromCm, pe_from_ports_old: PeFromPortOld) -> Result<(), Error> {
+    pub fn initialize(&mut self, pe_from_cm: PeFromCm, pe_from_ports: PeFromPort, pe_from_ports_old: PeFromPortOld) -> Result<(), Error> {
         let _f = "initialize";
         loop {
             select! {
@@ -105,7 +105,7 @@ impl PacketEngine {
                 },
                 recv(pe_from_ports_old) -> recvd => {
                     let msg = recvd.context(PacketEngineError::Chain { func_name: _f, comment: S("pe from port") })?;
-                    self.listen_port(msg).context(PacketEngineError::Chain { func_name: _f, comment: S("listen port") })?;
+                    self.listen_port_old(msg).context(PacketEngineError::Chain { func_name: _f, comment: S("listen port") })?;
                 }
             }
         }
@@ -258,9 +258,9 @@ impl PacketEngine {
     }
     // SPAWN THREAD (listen_port)
     // TODO: One thread for all ports; should be a different thread for each port
-    fn listen_port(&mut self, msg_old: PortToPePacketOld) -> Result<(), Error> {
+    fn listen_port_old(&mut self, msg: PortToPePacketOld) -> Result<(), Error> {
         let _f = "listen_port";
-        match msg_old {
+        match msg {
             // deliver to CModel
             PortToPePacketOld::Status((port_no, is_border, port_status)) => {
                 {

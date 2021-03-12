@@ -11,7 +11,7 @@ use crossbeam::crossbeam_channel as mpsc;
 use crate::app_message_formats::{PortToCa, PortToCaMsg, PortFromCa};
 use crate::config::CONFIG;
 use crate::dal::{add_to_trace, fork_trace_header, update_trace_header};
-use crate::ec_message_formats::{PortToPeOld, PortFromPeOld};
+use crate::ec_message_formats::{PortToPe, PortFromPe, PortToPeOld, PortFromPeOld};
 use crate::name::{Name, CellID, PortID};
 use crate::packet::{Packet, UniqueMsgId};
 use crate::utility::{ByteArray, PortNo, PortNumber, S, TraceHeader, TraceHeaderParams, TraceType,
@@ -19,7 +19,9 @@ use crate::utility::{ByteArray, PortNo, PortNumber, S, TraceHeader, TraceHeaderP
 
 #[derive(Clone, Debug)]
 pub struct DuplexPortPeChannel {
+    pub port_from_pe: PortFromPe,
     pub port_from_pe_old: PortFromPeOld,
+    pub port_to_pe: PortToPe,
     pub port_to_pe_old: PortToPeOld,
 }
 
