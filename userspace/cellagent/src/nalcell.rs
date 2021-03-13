@@ -116,12 +116,12 @@ impl<InteriorPortFactoryType: InteriorPortFactoryLike<InteriorPortType>, Interio
             match port_to_pe_or_ca {
                 Either::Left(port_to_pe) => {
                     let interior_port_factory = port_factory_clone.left().expect("Nalcell: interior port_to_pe_or_ca doesn't match border port_factory");
-                    let sub_port = interior_port_factory.new_port(cell_id, port_id, port_number, port_to_pe)?;
+                    let sub_port = interior_port_factory.new_port(cell_id, port_id, name, port_number, port_to_pe)?;
                     ports.push(Either::Left(sub_port));
                 },
                 Either::Right(port_to_ca) => {
                     let border_port_factory = port_factory_clone.right().expect("Nalcell: border port_to_pe_or_ca doesn't match interior port_factory");
-                    let sub_port = border_port_factory.new_port(cell_id, port_id, port_number, port_to_ca)?;
+                    let sub_port = border_port_factory.new_port(cell_id, port_id, name, port_number, port_to_ca)?;
                     ports.push(Either::Right(sub_port));
                 },
             }

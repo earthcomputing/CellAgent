@@ -34,22 +34,23 @@ pub struct SimulatedBorderPort {
 #[derive(Clone, Debug)]
 pub struct SimulatedBorderPortFactory {
     port_seed: PortSeed,
+    cell_no_map: HashMap<String, CellNo>,
     blueprint: Blueprint,
     duplex_port_noc_channel_cell_port_map: HashMap<CellNo, HashMap<PortNo, DuplexPortNocChannel>>,
-    cell_no: CellNo,
 }
 
 impl SimulatedBorderPortFactory {
-    pub fn new(port_seed: PortSeed, blueprint: Blueprint, duplex_port_noc_channel_cell_port_map: HashMap<CellNo, HashMap::<PortNo, DuplexPortNocChannel>>, cell_no: CellNo, phantom: PhantomData<SimulatedBorderPort>) -> SimulatedBorderPortFactory {
-        SimulatedBorderPortFactory { port_seed, blueprint, duplex_port_noc_channel_cell_port_map, cell_no }
+    pub fn new(port_seed: PortSeed, cell_no_map: HashMap<String, CellNo>, blueprint: Blueprint, duplex_port_noc_channel_cell_port_map: HashMap<CellNo, HashMap::<PortNo, DuplexPortNocChannel>>, phantom: PhantomData<SimulatedBorderPort>) -> SimulatedBorderPortFactory {
+        SimulatedBorderPortFactory { port_seed, cell_no_map, blueprint, duplex_port_noc_channel_cell_port_map }
     }
 }
 
 impl BorderPortFactoryLike<SimulatedBorderPort> for SimulatedBorderPortFactory {
-    fn new_port(&self, cell_id: CellID, id: PortID, port_number: PortNumber, port_to_ca: PortToCa) -> Result<SimulatedBorderPort, Error> {
+    fn new_port(&self, cell_id: CellID, id: PortID, cell_name: &str, port_number: PortNumber, port_to_ca: PortToCa) -> Result<SimulatedBorderPort, Error> {
+        let cell_no = self.cell_no_map[cell_name];
         let port_no = port_number.get_port_no();
-        println!("Trying on border port no {} for cell {}", port_no, (*self).cell_no);
-        let ref duplex_port_noc_channel_port_map = (*self).duplex_port_noc_channel_cell_port_map[&(*self).cell_no];
+        println!("Trying on border port no {} for cell {}", port_no, cell_no);
+        let ref duplex_port_noc_channel_port_map = (*self).duplex_port_noc_channel_cell_port_map[&cell_no];
         Ok(SimulatedBorderPort{
             base_port: BasePort::new(
                 cell_id,

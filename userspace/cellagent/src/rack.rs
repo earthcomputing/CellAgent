@@ -180,23 +180,30 @@ impl Rack {
                 },
             );
         }
+        let mut cell_no_map = HashMap::<String, CellNo>::new();
+        for border_cell in blueprint.get_border_cells() {
+            cell_no_map.insert(border_cell.get_name(), border_cell.get_cell_no());
+        }
+        for interior_cell in blueprint.get_interior_cells() {
+            cell_no_map.insert(interior_cell.get_name(), interior_cell.get_cell_no());
+        }
         for border_cell in blueprint.get_border_cells() {
             let cell_no = border_cell.get_cell_no();
             println! ("Constructing border port factory for border cell {}", cell_no);
             let simulated_border_port_factory: SimulatedBorderPortFactory = SimulatedBorderPortFactory::new(
-                    PortSeed::new(),
-                    blueprint.clone(),
-                    duplex_port_noc_channel_cell_port_map.clone(),
-                    cell_no,
-                    PhantomData,
+                PortSeed::new(),
+                cell_no_map.clone(),
+                blueprint.clone(),
+                duplex_port_noc_channel_cell_port_map.clone(),
+                PhantomData,
             );
             println! ("Constructing interior port factory for border cell {}", cell_no);
             let simulated_interior_port_factory: SimulatedInteriorPortFactory = SimulatedInteriorPortFactory::new(
-                        PortSeed::new(),
-                        blueprint.clone(),
-                        duplex_port_link_channel_cell_port_map.clone(),
-                        cell_no,
-                        PhantomData,
+                PortSeed::new(),
+                cell_no_map.clone(),
+                blueprint.clone(),
+                duplex_port_link_channel_cell_port_map.clone(),
+                PhantomData,
             );
             let border_ports = border_cell.get_border_ports();
             let (nal_cell, _join_handle) = match NalCell::<SimulatedInteriorPortFactory, SimulatedInteriorPort, SimulatedBorderPortFactory, SimulatedBorderPort>::new(
@@ -229,11 +236,10 @@ impl Rack {
             let cell_no = interior_cell.get_cell_no();
             println! ("Constructing interior port factory for interior cell {}", cell_no);
             let simulated_interior_port_factory: SimulatedInteriorPortFactory = SimulatedInteriorPortFactory::new(
-                PortSeed::new(
-                ),
+                PortSeed::new(),
+                cell_no_map.clone(),
                 blueprint.clone(),
                 duplex_port_link_channel_cell_port_map.clone(),
-                cell_no,
                 PhantomData,
             );
             let (nal_cell, _join_handle) = match NalCell::<SimulatedInteriorPortFactory, SimulatedInteriorPort, SimulatedBorderPortFactory, SimulatedBorderPort>::new(
