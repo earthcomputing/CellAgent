@@ -246,13 +246,13 @@ impl fmt::Display for BasePort {
 }
 
 pub trait InteriorPortFactoryLike<InteriorPortType: InteriorPortLike>: Clone {
-    fn new_port(&self, cell_id: CellID, id: PortID, cell_name: &str, port_number: PortNumber, port_to_pe: PortToPe) -> Result<InteriorPortType, Error>;
+    fn new_port(&self, cell_id: CellID, id: PortID, port_number: PortNumber, port_to_pe: PortToPe) -> Result<InteriorPortType, Error>;
     fn get_port_seed(&self) -> &PortSeed;
     fn get_port_seed_mut(&mut self) -> &mut PortSeed;
 }
 
 pub trait BorderPortFactoryLike<BorderPortType: BorderPortLike>: Clone {
-    fn new_port(&self, cell_id: CellID, id: PortID, cell_name: &str, port_number: PortNumber, port_to_ca: PortToCa) -> Result<BorderPortType, Error>;
+    fn new_port(&self, cell_id: CellID, id: PortID, port_number: PortNumber, port_to_ca: PortToCa) -> Result<BorderPortType, Error>;
     fn get_port_seed(&self) -> &PortSeed;
     fn get_port_seed_mut(&mut self) -> &mut PortSeed;
 }

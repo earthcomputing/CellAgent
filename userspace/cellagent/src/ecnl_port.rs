@@ -98,7 +98,7 @@ impl InBufferDesc {
 
 #[cfg(feature="cell")]
 impl InteriorPortFactoryLike<ECNL_Port> for PortSeed {
-    fn new_port(&self, cell_id: CellID, id: PortID, cell_name: &str, port_number: PortNumber, port_to_pe: PortToPe) -> Result<ECNL_Port, Error> {
+    fn new_port(&self, cell_id: CellID, id: PortID, port_number: PortNumber, port_to_pe: PortToPe) -> Result<ECNL_Port, Error> {
 	unsafe {
             let base_port = BasePort::new(
                 cell_id,
