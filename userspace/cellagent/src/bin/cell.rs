@@ -1,7 +1,6 @@
 #[macro_use] extern crate failure;
 
-use either::Either;
-use std::{collections::{HashMap, HashSet},
+use std::{collections::{HashSet},
           fs::{OpenOptions},
 	  iter::FromIterator,
 };
@@ -57,15 +56,13 @@ fn main() -> Result<(), Error> {
     let border_port_list : Vec<PortNo> = (*num_ecnl_ports+1..*num_phys_ports+1)
         .map(|port_num| PortNo(port_num))
 	.collect();
-    let port_seed_map : HashMap<PortNo, Either<PortSeed, _>> = (0..*num_ecnl_ports+1)
-        .map(|port_num| (PortNo(port_num), Either::Left(PortSeed::new())))
-	.collect();
     let (mut nal_cell, ca_join_handle) = NalCell::<PortSeed, ECNL_Port, SimulatedBorderPortFactory, SimulatedBorderPort>::new(
         cell_name,
         num_phys_ports,
         &HashSet::from_iter(border_port_list),
         CellConfig::Large,
-        port_seed_map,
+        PortSeed::new(),
+        None,
     )?;
     ecnl_session.listen_link_and_pe_loops(&mut nal_cell)?;
     match ca_join_handle.join() {

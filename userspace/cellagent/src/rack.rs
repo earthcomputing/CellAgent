@@ -182,38 +182,30 @@ impl Rack {
         }
         for border_cell in blueprint.get_border_cells() {
             let cell_no = border_cell.get_cell_no();
-            let border_ports = border_cell.get_border_ports();
-            println! ("Constructing port factories for border cell {}", cell_no);
-            let mut simulated_port_factories = HashMap::<PortNo, Either<SimulatedInteriorPortFactory, SimulatedBorderPortFactory>>::new();
-            for border_port_no in border_ports {
-                println!("Creating border port factory for port no {} for border cell {}", border_port_no, cell_no);
-                simulated_port_factories.insert(*border_port_no, Either::Right(SimulatedBorderPortFactory::new(
+            println! ("Constructing border port factory for border cell {}", cell_no);
+            let simulated_border_port_factory: SimulatedBorderPortFactory = SimulatedBorderPortFactory::new(
                     PortSeed::new(),
                     blueprint.clone(),
                     duplex_port_noc_channel_cell_port_map.clone(),
                     cell_no,
                     PhantomData,
-                )));
-            }
-            for interior_port_no in border_cell.get_interior_ports() {
-                println!("Creating interior port factory for port no {} for border cell {}", interior_port_no, cell_no);
-                simulated_port_factories.insert(
-                    *interior_port_no,
-                    Either::Left(SimulatedInteriorPortFactory::new(
+            );
+            println! ("Constructing interior port factory for border cell {}", cell_no);
+            let simulated_interior_port_factory: SimulatedInteriorPortFactory = SimulatedInteriorPortFactory::new(
                         PortSeed::new(),
                         blueprint.clone(),
                         duplex_port_link_channel_cell_port_map.clone(),
                         cell_no,
                         PhantomData,
-                    )),
-                );
-            }
+            );
+            let border_ports = border_cell.get_border_ports();
             let (nal_cell, _join_handle) = match NalCell::<SimulatedInteriorPortFactory, SimulatedInteriorPort, SimulatedBorderPortFactory, SimulatedBorderPort>::new(
                 &border_cell.get_name(),
                 border_cell.get_num_phys_ports(),
                 &HashSet::from_iter(border_ports.clone()),
                 CellConfig::Large,
-                simulated_port_factories,
+                simulated_interior_port_factory,
+                Some(simulated_border_port_factory),
             ) {
                 Ok(t) => t,
                 Err(e) => {
@@ -235,28 +227,22 @@ impl Rack {
         }
         for interior_cell in blueprint.get_interior_cells() {
             let cell_no = interior_cell.get_cell_no();
-            println! ("Connecting interior cell {}", cell_no);
-            let mut simulated_port_factories = HashMap::<PortNo, Either<SimulatedInteriorPortFactory, SimulatedBorderPortFactory>>::new();
-            for interior_port_no in interior_cell.get_interior_ports() {
-                println!("Creating interior port factory for port no {} for interior cell {}", interior_port_no, cell_no);
-                simulated_port_factories.insert(
-                    *interior_port_no,
-                    Either::Left(SimulatedInteriorPortFactory::new(
-                        PortSeed::new(
-                        ),
-                        blueprint.clone(),
-                        duplex_port_link_channel_cell_port_map.clone(),
-                        cell_no,
-                        PhantomData,
-                    )),
-                );
-            }
+            println! ("Constructing interior port factory for interior cell {}", cell_no);
+            let simulated_interior_port_factory: SimulatedInteriorPortFactory = SimulatedInteriorPortFactory::new(
+                PortSeed::new(
+                ),
+                blueprint.clone(),
+                duplex_port_link_channel_cell_port_map.clone(),
+                cell_no,
+                PhantomData,
+            );
             let (nal_cell, _join_handle) = match NalCell::<SimulatedInteriorPortFactory, SimulatedInteriorPort, SimulatedBorderPortFactory, SimulatedBorderPort>::new(
                 &interior_cell.get_name(),
                 interior_cell.get_num_phys_ports(),
                 &HashSet::new(),
                 CellConfig::Large,
-                simulated_port_factories,
+                simulated_interior_port_factory,
+                None,
             )
             {
                 Ok(t) => t,

@@ -39,7 +39,7 @@ pub struct NalCell<InteriorPortFactoryType: InteriorPortFactoryLike<InteriorPort
 }
 
 impl<InteriorPortFactoryType: InteriorPortFactoryLike<InteriorPortType>, InteriorPortType: 'static + Clone + InteriorPortLike, BorderPortFactoryType: BorderPortFactoryLike<BorderPortType>, BorderPortType: 'static + Clone + BorderPortLike> NalCell::<InteriorPortFactoryType, InteriorPortType, BorderPortFactoryType, BorderPortType> {
-    pub fn new(name: &str, num_phys_ports: PortQty, border_port_nos: &HashSet<PortNo>, config: CellConfig, port_factories: HashMap<PortNo, Either<InteriorPortFactoryType, BorderPortFactoryType>>)
+    pub fn new(name: &str, num_phys_ports: PortQty, border_port_nos: &HashSet<PortNo>, config: CellConfig, interior_port_factory: InteriorPortFactoryType, border_port_factory: Option<BorderPortFactoryType>)
             -> Result<(NalCell<InteriorPortFactoryType, InteriorPortType, BorderPortFactoryType, BorderPortType>, JoinHandle<()>), Error> {
         let _f = "new";
         if *num_phys_ports > *CONFIG.max_num_phys_ports_per_cell {
@@ -98,9 +98,10 @@ impl<InteriorPortFactoryType: InteriorPortFactoryLike<InteriorPortType>, Interio
                 Either::Left(port_to_pe.clone())
             };
             let port_number = PortNo(port_num).make_port_number(num_phys_ports).context(NalcellError::Chain { func_name: "new", comment: S("port number") })?;
-            let ref port_factory = match &port_factories[&port_no] {
-                Either::Left(interior_port_factory) => Either::Left(interior_port_factory.clone()),
-                Either::Right(border_port_factory) => Either::Right(border_port_factory.clone()),
+            let ref port_factory = if is_border_port {
+                Either::Right(border_port_factory.clone().unwrap())
+            } else {
+                Either::Left(interior_port_factory.clone())
             };
             // THIS IS ALSO GENERATED IN BasePort::new !!
             let port_id = PortID::new(cell_id, port_number).context(NalcellError::Chain { func_name: "new", comment: S(cell_id.get_name()) + &S(*port_number.get_port_no())})?;
