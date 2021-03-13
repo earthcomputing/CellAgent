@@ -43,18 +43,18 @@ pub struct SimulatedInteriorPortFactory {
     blueprint: Blueprint,
     duplex_port_link_channel_cell_port_map: HashMap<CellNo, HashMap<PortNo, DuplexPortLinkChannel>>,
     cell_no: CellNo,
-    port_no: PortNo,
 }
 
 impl SimulatedInteriorPortFactory {
-    pub fn new(port_seed: PortSeed, blueprint: Blueprint, duplex_port_link_channel_cell_port_map: HashMap<CellNo, HashMap<PortNo, DuplexPortLinkChannel>>, cell_no: CellNo, port_no: PortNo, phantom: PhantomData<SimulatedInteriorPort>) -> SimulatedInteriorPortFactory {
-        SimulatedInteriorPortFactory { port_seed, blueprint, duplex_port_link_channel_cell_port_map, cell_no, port_no }
+    pub fn new(port_seed: PortSeed, blueprint: Blueprint, duplex_port_link_channel_cell_port_map: HashMap<CellNo, HashMap<PortNo, DuplexPortLinkChannel>>, cell_no: CellNo, phantom: PhantomData<SimulatedInteriorPort>) -> SimulatedInteriorPortFactory {
+        SimulatedInteriorPortFactory { port_seed, blueprint, duplex_port_link_channel_cell_port_map, cell_no }
     }
 }
 
 impl InteriorPortFactoryLike<SimulatedInteriorPort> for SimulatedInteriorPortFactory {
     fn new_port(&self, cell_id: CellID, port_id: PortID, port_number: PortNumber, port_to_pe: PortToPe) -> Result<SimulatedInteriorPort, Error> {
-        println!("Trying on interior port no {} for cell {}", (*self).port_no, (*self).cell_no);
+        let port_no = port_number.get_port_no();
+        println!("Trying on interior port no {} for cell {}", port_no, (*self).cell_no);
         let ref duplex_port_link_channel_port_map = (*self).duplex_port_link_channel_cell_port_map[&(*self).cell_no];
         Ok( SimulatedInteriorPort {
             base_port: BasePort::new(
@@ -63,9 +63,9 @@ impl InteriorPortFactoryLike<SimulatedInteriorPort> for SimulatedInteriorPortFac
                 false,
                 Either::Left(port_to_pe),
             )?,
-            is_connected: duplex_port_link_channel_port_map.contains_key(&(*self).port_no),
-            duplex_port_link_channel: if duplex_port_link_channel_port_map.contains_key(&(*self).port_no) {
-                Some(duplex_port_link_channel_port_map[&(*self).port_no].clone())
+            is_connected: duplex_port_link_channel_port_map.contains_key(&port_no),
+            duplex_port_link_channel: if duplex_port_link_channel_port_map.contains_key(&port_no) {
+                Some(duplex_port_link_channel_port_map[&port_no].clone())
             } else {
                 None
             },

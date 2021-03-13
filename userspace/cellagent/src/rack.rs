@@ -192,7 +192,6 @@ impl Rack {
                     blueprint.clone(),
                     duplex_port_noc_channel_cell_port_map.clone(),
                     cell_no,
-                    *border_port_no,
                     PhantomData,
                 )));
             }
@@ -205,7 +204,6 @@ impl Rack {
                         blueprint.clone(),
                         duplex_port_link_channel_cell_port_map.clone(),
                         cell_no,
-                        *interior_port_no,
                         PhantomData,
                     )),
                 );
@@ -249,7 +247,6 @@ impl Rack {
                         blueprint.clone(),
                         duplex_port_link_channel_cell_port_map.clone(),
                         cell_no,
-                        *interior_port_no,
                         PhantomData,
                     )),
                 );

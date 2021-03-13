@@ -37,18 +37,18 @@ pub struct SimulatedBorderPortFactory {
     blueprint: Blueprint,
     duplex_port_noc_channel_cell_port_map: HashMap<CellNo, HashMap<PortNo, DuplexPortNocChannel>>,
     cell_no: CellNo,
-    port_no: PortNo,
 }
 
 impl SimulatedBorderPortFactory {
-    pub fn new(port_seed: PortSeed, blueprint: Blueprint, duplex_port_noc_channel_cell_port_map: HashMap<CellNo, HashMap::<PortNo, DuplexPortNocChannel>>, cell_no: CellNo, port_no: PortNo, phantom: PhantomData<SimulatedBorderPort>) -> SimulatedBorderPortFactory {
-        SimulatedBorderPortFactory { port_seed, blueprint, duplex_port_noc_channel_cell_port_map, cell_no, port_no }
+    pub fn new(port_seed: PortSeed, blueprint: Blueprint, duplex_port_noc_channel_cell_port_map: HashMap<CellNo, HashMap::<PortNo, DuplexPortNocChannel>>, cell_no: CellNo, phantom: PhantomData<SimulatedBorderPort>) -> SimulatedBorderPortFactory {
+        SimulatedBorderPortFactory { port_seed, blueprint, duplex_port_noc_channel_cell_port_map, cell_no }
     }
 }
 
 impl BorderPortFactoryLike<SimulatedBorderPort> for SimulatedBorderPortFactory {
     fn new_port(&self, cell_id: CellID, id: PortID, port_number: PortNumber, port_to_ca: PortToCa) -> Result<SimulatedBorderPort, Error> {
-        println!("Trying on border port no {} for cell {}", (*self).port_no, (*self).cell_no);
+        let port_no = port_number.get_port_no();
+        println!("Trying on border port no {} for cell {}", port_no, (*self).cell_no);
         let ref duplex_port_noc_channel_port_map = (*self).duplex_port_noc_channel_cell_port_map[&(*self).cell_no];
         Ok(SimulatedBorderPort{
             base_port: BasePort::new(
@@ -58,8 +58,8 @@ impl BorderPortFactoryLike<SimulatedBorderPort> for SimulatedBorderPortFactory {
                 Either::Right(port_to_ca),
             )?,
             is_connected: true,
-            duplex_port_noc_channel: if duplex_port_noc_channel_port_map.contains_key(&(*self).port_no) {
-                Some(duplex_port_noc_channel_port_map[&(*self).port_no].clone())
+            duplex_port_noc_channel: if duplex_port_noc_channel_port_map.contains_key(&port_no) {
+                Some(duplex_port_noc_channel_port_map[&port_no].clone())
             } else {
                 None
             },
