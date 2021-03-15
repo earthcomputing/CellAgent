@@ -1,7 +1,7 @@
 //use std::sync::mpsc;
 use crossbeam::crossbeam_channel as mpsc;
 
-use crate::port::PortStatus;
+use crate::port::PortStatusOld;
 use crate::utility::{ByteArray, PortNo};
 pub type SNAKE = bool;
 pub type ISAIT = bool;
@@ -18,7 +18,7 @@ pub type NocToApplicationMsg = String;
 //pub type NocApplicationError = mpsc::SendError<NocToApplicationMsg>;
 // Boundary Port to Ca
 #[derive(Debug, Clone, Serialize)]
-pub enum PortToCaMsg { Status(PortNo, PortStatus), AppMsg(PortNo, APP) }
+pub enum PortToCaMsg { Status(PortNo, PortStatusOld), AppMsg(PortNo, APP) }
 pub type PortToCa = mpsc::Sender<PortToCaMsg>;
 pub type CaFromPort = mpsc::Receiver<PortToCaMsg>;
 //pub type PortCaError = mpsc::SendError<PortToCaMsg>;

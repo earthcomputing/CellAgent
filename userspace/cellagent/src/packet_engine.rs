@@ -10,7 +10,7 @@ use crate::ec_message_formats::{PeFromCm, PeToCm,
                                 CmToPePacket};
 use crate::name::{Name, CellID, TreeID};
 use crate::packet::{Packet};
-use crate::port::PortStatus;
+use crate::port::{PortStatus, PortStatusOld};
 use crate::routing_table::RoutingTable;
 use crate::routing_table_entry::{RoutingTableEntry};
 use crate::utility::{ActivityData, Mask, PortNo, S, TraceHeaderParams, TraceType, write_err };
@@ -304,7 +304,9 @@ impl PacketEngine {
                 }
                 match status {
                     PortStatus::Connected => self.set_may_send(port_no),
-                    PortStatus::Disconnected => self.set_may_not_send(port_no)
+                    PortStatus::Disconnected(_failover_info) => {
+                        self.set_may_not_send(port_no);
+                    }
                 }
                 //self.pe_to_cm.send(PeToCmPacket::Status((port_no, is_border, status, packet_opt))).context(PacketEngineError::Chain { func_name: "listen_port", comment: S("send status to ca ") + &self.cell_id.get_name() })?
             }
@@ -329,8 +331,8 @@ impl PacketEngine {
                     recd: self.get_no_seen_packets(port_no)
                 };
                 match port_status {
-                    PortStatus::Connected => self.set_may_send(port_no),
-                    PortStatus::Disconnected => self.set_may_not_send(port_no)
+                    PortStatusOld::Connected => self.set_may_send(port_no),
+                    PortStatusOld::Disconnected => self.set_may_not_send(port_no)
                 }
                 {
                     if CONFIG.trace_options.all | CONFIG.trace_options.pe {

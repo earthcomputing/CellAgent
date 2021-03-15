@@ -32,16 +32,29 @@ pub struct DuplexPortCaChannel {
 }
 
 // TODO: There is no distinction between a broken link and a disconnected one.  We may want to revisit.
-#[derive(Debug, Copy, Clone, Serialize, Deserialize)]
+#[derive(Debug, Copy, Clone, Serialize)]
 pub enum PortStatus {
     Connected,
-    Disconnected,
+    Disconnected(FailoverInfo),
 }
 impl fmt::Display for PortStatus {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             PortStatus::Connected    => write!(f, "Connected"),
-            PortStatus::Disconnected => write!(f, "Disconnected")
+            PortStatus::Disconnected(info) => write!(f, "Disconnected: FailoverInfo {}", info)
+        }
+    }
+}
+#[derive(Debug, Copy, Clone, Serialize, Deserialize)]
+pub enum PortStatusOld {
+    Connected,
+    Disconnected,
+}
+impl fmt::Display for PortStatusOld {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            PortStatusOld::Connected    => write!(f, "Connected"),
+            PortStatusOld::Disconnected => write!(f, "Disconnected")
         }
     }
 }
@@ -144,7 +157,7 @@ pub trait InteriorPortLike: 'static + Clone + Sync + Send + CommonPortLike {
 pub trait BorderPortLike: 'static + Clone + Sync + Send + CommonPortLike {
     fn listen_noc_and_ca(&self) -> Result<JoinHandle<()>, Error> {
         let _f = "listen_noc_and_ca";
-        let status = PortToCaMsg::Status(self.get_port_no(), PortStatus::Connected);
+        let status = PortToCaMsg::Status(self.get_port_no(), PortStatusOld::Connected);
         {
             if CONFIG.trace_options.all || CONFIG.trace_options.port {
                 let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "port_to_pe_status" };

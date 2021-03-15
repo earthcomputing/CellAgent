@@ -37,7 +37,7 @@ use crate::ec_message_formats::{CaToCm, CaFromCm, CmToCa, CmFromCa, PeToCm, CmFr
 use crate::gvm_equation::{GvmEquation, GvmEqn};
 use crate::name::{Name, CellID, OriginatorID, PortTreeID, TreeID, UptreeID, VmID};
 use crate::packet_engine::NumberOfPackets;
-use crate::port::{PortStatus};
+use crate::port::{PortStatusOld};
 use crate::port_tree::PortTree;
 use crate::routing_table_entry::{RoutingTableEntry};
 use crate::traph::{PortState, Traph};
@@ -947,8 +947,8 @@ impl CellAgent {
             }
             match msg {
                 CmToCaBytes::Status((port_no, is_border, number_of_packets, status)) => match status {
-                    PortStatus::Connected => self.port_connected(port_no, is_border).context(CellagentError::Chain { func_name: _f, comment: S(self.cell_id) + " port_connected" })?,
-                    PortStatus::Disconnected => self.port_disconnected(port_no, number_of_packets).context(CellagentError::Chain { func_name: _f, comment: S(self.cell_id) + " port_disconnected" })?
+                    PortStatusOld::Connected => self.port_connected(port_no, is_border).context(CellagentError::Chain { func_name: _f, comment: S(self.cell_id) + " port_connected" })?,
+                    PortStatusOld::Disconnected => self.port_disconnected(port_no, number_of_packets).context(CellagentError::Chain { func_name: _f, comment: S(self.cell_id) + " port_disconnected" })?
                 },
                 CmToCaBytes::Bytes((port_no, is_ait, uuid, bytes)) => {
                     // The index may be pointing to the control tree because the other cell didn't get the StackTree or StackTreeD message in time

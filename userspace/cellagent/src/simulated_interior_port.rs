@@ -15,7 +15,7 @@ use crate::ec_message_formats::{PortToPePacketOld, PortToPeOld};
 use crate::link::{Link};
 use crate::name::{Name, CellID, PortID};
 use crate::packet::{Packet}; // Eventually use SimulatedPacket
-use crate::port::{CommonPortLike, InteriorPortLike, PortSeed, BasePort, InteriorPortFactoryLike, PortStatus, DuplexPortPeOrCaChannel, DuplexPortPeChannel};
+use crate::port::{CommonPortLike, InteriorPortLike, PortSeed, BasePort, InteriorPortFactoryLike, PortStatusOld, DuplexPortPeOrCaChannel, DuplexPortPeChannel};
 use crate::utility::{CellNo, PortNo, PortNumber, Edge, S, TraceHeaderParams, TraceType};
 use crate::uuid_ec::{AitState};
 
@@ -130,8 +130,8 @@ impl InteriorPortLike for SimulatedInteriorPort {
 		match msg {
                     LinkToPortPacket::Status(status) => {
 			match status {
-                            PortStatus::Connected => self.set_connected(),
-                            PortStatus::Disconnected => self.set_disconnected()
+                            PortStatusOld::Connected => self.set_connected(),
+                            PortStatusOld::Disconnected => self.set_disconnected()
 			};
 			{
                             if CONFIG.trace_options.all || CONFIG.trace_options.port {
@@ -249,7 +249,7 @@ impl InteriorPortFactoryLike<SimulatedInteriorPort> for SimulatedInteriorPortFac
 pub type PACKET = Packet;
 #[derive(Debug, Clone, Serialize)]
 pub enum LinkToPortPacket {
-    Status(PortStatus),
+    Status(PortStatusOld),
     Packet(PACKET),
 }
 pub type LinkToPort = mpsc::Sender<LinkToPortPacket>;

@@ -6,14 +6,16 @@ use crate::app_message_formats::{ISAIT, SNAKE};
 use crate::name::{OriginatorID, TreeID};
 use crate::packet::{Packet};
 use crate::packet_engine::NumberOfPackets;
-use crate::port::{PortStatus};
+use crate::port::{PortStatus, PortStatusOld};
 use crate::routing_table_entry::{RoutingTableEntry};
 use crate::utility::{ActivityData, ByteArray, Mask, PortNo, OutbufType};
 use crate::uuid_ec::Uuid;
 
 type CATOCM = (TreeID, ISAIT, SNAKE, Mask, SenderMsgSeqNo, ByteArray);
+type PACKET = Packet;
 type REROUTE = (PortNo, PortNo, NumberOfPackets);
-type STATUS = (PortNo, bool, NumberOfPackets, PortStatus);
+type STATUS = (PortNo, bool, PortStatus); // bool = is_border
+type STATUSOLD = (PortNo, bool, NumberOfPackets, PortStatusOld); // bool = is_border
 type TUNNELPORT = (PortNo, ByteArray);
 type TUNNELUP = (OriginatorID, ByteArray);
 //pub type PePeError = mpsc::SendError<PeToPePacket>;
@@ -24,7 +26,7 @@ pub enum CaToCmBytes {
     Delete(Uuid),
     Entry(RoutingTableEntry),
     Reroute(REROUTE),
-    Status(STATUS),
+    Status(STATUSOLD),
     TunnelPort(TUNNELPORT),
     TunnelUp(TUNNELUP),
 }
@@ -56,19 +58,31 @@ pub enum PeToPortPacket {
 pub type PeToPort = mpsc::Sender<PeToPortPacket>;
 pub type PortFromPe = mpsc::Receiver<PeToPortPacket>;
 //pub type PePortError = mpsc::SendError<PeToPortPacket>;
+// PacketEngine to Port, Port to Link
+pub type PortToLinkPacket = PACKET;
+pub type LinkFromPort = mpsc::Receiver<PortToLinkPacket>;
+//pub type PortLinkError = mpsc::SendError<PortToLinkPacket>;
+// Link to Port
+#[derive(Debug, Clone, Serialize)]
+pub enum LinkToPortPacket {
+    Status(PortStatusOld),
+    Packet(PACKET),
+}
+pub type LinkToPort = mpsc::Sender<LinkToPortPacket>;
+//pub type LinkPortError = mpsc::SendError<LinkToPortPacket>;
 // Port to PacketEngine
 #[derive(Debug, Clone, Serialize)]
 pub enum PortToPePacket {
     Activity((PortNo, ActivityData)),
     Increment((PortNo, OutbufType)),
     Packet((PortNo, Packet)),
-    Status((PortNo, bool, PortStatus)) // bool = is_border
+    Status(STATUS)
 }
 pub type PortToPe = mpsc::Sender<PortToPePacket>;
 pub type PeFromPort = mpsc::Receiver<PortToPePacket>;
 #[derive(Debug, Clone, Serialize)]
 pub enum PortToPePacketOld {
-    Status((PortNo, bool, PortStatus)), // bool = is_border
+    Status((PortNo, bool, PortStatusOld)), // bool = is_border
     Packet((PortNo, Packet))
 }
 pub type PortToPeOld = mpsc::Sender<PortToPePacketOld>;
@@ -77,7 +91,7 @@ pub type PeFromPortOld = mpsc::Receiver<PortToPePacketOld>;
 // PacketEngine to Cmodel
 #[derive(Debug, Clone, Serialize)]
 pub enum PeToCmPacket {
-    Status(STATUS),
+    Status(STATUSOLD),
     Packet((PortNo, Packet)),
     Snake((PortNo, usize, Packet))
 }
@@ -87,7 +101,7 @@ pub type CmFromPe = mpsc::Receiver<PeToCmPacket>;
 // Cmodel to CellAgent
 #[derive(Debug, Clone, Serialize)]
 pub enum CmToCaBytes {
-    Status(STATUS),
+    Status(STATUSOLD),
     Bytes((PortNo, bool, Uuid, ByteArray)),
     TunnelPort(TUNNELPORT),
     TunnelUp(TUNNELUP),
