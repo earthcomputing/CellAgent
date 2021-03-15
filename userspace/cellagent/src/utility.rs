@@ -354,14 +354,14 @@ pub struct ActivityData {
     data: usize,
 }
 impl ActivityData {
-    pub fn update(&mut self, new_data: ActivityData) {
+    pub fn update(&mut self, new_data: &ActivityData) {
         self.data = self.data + new_data.data;
     }
-    pub fn is_changed(&self, other: ActivityData) -> bool {
+    pub fn is_changed(&self, other: &ActivityData) -> bool {
         self.data != other.data
     }
     pub fn increment(&mut self) {
-        self.update(Default::default());
+        self.update(&Default::default());
     }
 }
 impl Default for ActivityData { // Used to initialize and to increment

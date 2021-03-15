@@ -71,6 +71,11 @@ impl SimulatedInteriorPort {
         }
     }
 }
+impl fmt::Display for SimulatedInteriorPort {
+    fn fmt(&self, _f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(_f, "SimulatedInteriorPort {}: Failover info {}", self.base_port.get_id(), self.failover_info)
+    }
+}
 
 impl CommonPortLike for SimulatedInteriorPort {
     fn get_base_port(&self) -> &BasePort {

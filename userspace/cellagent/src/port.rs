@@ -308,6 +308,36 @@ impl PortSeed {
     }
 }
 
+#[derive(Debug, Copy, Clone, Serialize)]
+pub struct FailoverInfo {
+    port_id: PortID,
+    packet_opt: Option<Packet>
+}
+impl FailoverInfo {
+    pub fn new(port_id: PortID) -> FailoverInfo { 
+        FailoverInfo { port_id, packet_opt: Default::default() }
+    }
+    pub fn if_sent(&self) -> bool { self.packet_opt.is_some() }
+    pub fn if_recd(&self) -> bool { self.packet_opt.is_none() }
+    pub fn get_saved_packet(&self) -> Option<Packet> { self.packet_opt }
+    // Call on every data packet send
+    pub fn save_packet(&mut self, packet: &Packet) {
+        self.packet_opt = Some(packet.clone());
+    }
+    // Call on every data packet receive
+    pub fn clear_saved_packet(&mut self) {
+        self.packet_opt = None;
+    }
+}
+impl fmt::Display for FailoverInfo {
+    fn fmt(&self, _f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let packet_out = match self.packet_opt {
+            Some(p) => p.stringify().expect("Failover Display: Stringify packet must succeed"),
+            None => "None".to_string()
+        };
+        write!(_f, "PortID {} Sent {}, Recd {}, Packet {:?}", self.port_id, self.if_sent(), self.if_recd(), packet_out)
+    }
+}
 // Errors
 use failure::{Error, ResultExt};
 #[derive(Debug, Fail)]

@@ -4,15 +4,16 @@ use crate::config::{CONFIG};
 use crate::dal::{add_to_trace, fork_trace_header, update_trace_header};
 use crate::ec_message::{MsgType};
 use crate::ec_message_formats::{PeFromCm, PeToCm,
-                                PeToPort, PeFromPort, PortToPePacket,
+                                PeToPort, PeFromPort, PortToPePacket, PeToPortPacket,
                                 PeToPortOld, PeFromPortOld, PortToPePacketOld,
-                                CmToPePacket, PeToCmPacket};
+                                PeToCmPacket,
+                                CmToPePacket};
 use crate::name::{Name, CellID, TreeID};
 use crate::packet::{Packet};
 use crate::port::PortStatus;
 use crate::routing_table::RoutingTable;
 use crate::routing_table_entry::{RoutingTableEntry};
-use crate::utility::{Mask, PortNo, S, TraceHeaderParams, TraceType, write_err };
+use crate::utility::{ActivityData, Mask, PortNo, S, TraceHeaderParams, TraceType, write_err };
 use crate::uuid_ec::{AitState, Uuid};
 
 // I need one slot per port, but ports use 1-based indexing.  I could subtract 1 all the time,
@@ -39,6 +40,7 @@ pub struct PacketEngine {
     out_buffers: PacketArray,   // Packets waiting to go on the out port
     in_buffer: Vec<Buffer>,    // Packets on the in port waiting to into out_buf on the out port
     port_got_event: BoolArray,
+    activity_data: ActivityData,
     reroute: Reroute,
     pe_to_cm: PeToCm,
     pe_to_ports: HashMap<PortNo, PeToPort>,
@@ -66,6 +68,7 @@ impl PacketEngine {
             out_buffers: vec![Default::default(); MAX_SLOTS],
             in_buffer: vec![Default::default(); MAX_SLOTS],
             port_got_event: [false; MAX_SLOTS],
+            activity_data: Default::default(),
             reroute: [PortNo(0); MAX_SLOTS],
             pe_to_cm,
             pe_to_ports,
@@ -268,6 +271,10 @@ impl PacketEngine {
                         add_to_trace(TraceType::Trace, trace_params, &trace, _f);
                     }
                 }
+                self.activity_data.update(&data);
+                for (_, pe_to_port) in &self.pe_to_ports {
+                    pe_to_port.send(PeToPortPacket::Activity(self.activity_data))?;
+                }
             },
             PortToPePacket::Increment((port_no, outbuf)) => {
                 {
@@ -277,7 +284,6 @@ impl PacketEngine {
                         add_to_trace(TraceType::Trace, trace_params, &trace, _f);
                     }
                 }
-
             },
             PortToPePacket::Packet((port_no, packet)) => {
                 {
@@ -296,6 +302,11 @@ impl PacketEngine {
                         add_to_trace(TraceType::Trace, trace_params, &trace, _f);
                     }
                 }
+                match status {
+                    PortStatus::Connected => self.set_may_send(port_no),
+                    PortStatus::Disconnected => self.set_may_not_send(port_no)
+                }
+                //self.pe_to_cm.send(PeToCmPacket::Status((port_no, is_border, status, packet_opt))).context(PacketEngineError::Chain { func_name: "listen_port", comment: S("send status to ca ") + &self.cell_id.get_name() })?
             }
         }
         Ok(())
@@ -748,6 +759,7 @@ impl fmt::Display for NumberOfPackets {
         write!(_f, "Number sent {}, Number received {}", self.sent, self.recd)
     }
 }
+
 // Errors
 use failure::{Error, ResultExt};
 
