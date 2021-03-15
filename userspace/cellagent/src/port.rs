@@ -324,21 +324,27 @@ impl PortSeed {
 #[derive(Debug, Copy, Clone, Serialize)]
 pub struct FailoverInfo {
     port_id: PortID,
+    sent: bool,
+    recd: bool,
     packet_opt: Option<Packet>
 }
 impl FailoverInfo {
     pub fn new(port_id: PortID) -> FailoverInfo { 
-        FailoverInfo { port_id, packet_opt: Default::default() }
+        FailoverInfo { port_id, sent: false, recd: false, packet_opt: Default::default() }
     }
-    pub fn if_sent(&self) -> bool { self.packet_opt.is_some() }
-    pub fn if_recd(&self) -> bool { self.packet_opt.is_none() }
+    pub fn if_sent(&self) -> bool { self.sent }
+    pub fn if_recd(&self) -> bool { self.sent | self.recd }
     pub fn get_saved_packet(&self) -> Option<Packet> { self.packet_opt }
     // Call on every data packet send
     pub fn save_packet(&mut self, packet: &Packet) {
+        self.sent = true;
+        self.recd = false;
         self.packet_opt = Some(packet.clone());
     }
     // Call on every data packet receive
     pub fn clear_saved_packet(&mut self) {
+        self.sent = false;
+        self.recd = true;
         self.packet_opt = None;
     }
 }
