@@ -6,14 +6,16 @@ use uuid;
 use crate::utility::{PortNo, PortNumber};
 // First 4 bits for flags, such as Snake and time direction
 const NORMAL:   u8 = 0b0000_0000;  // Used for all Name UUIDs, including TreeIDs and for normal packets
-const ENTL:     u8 = 0b0000_1111;  // Used to break symmetry when a link starts
+const TICK:     u8 = 0b0000_0001;
+const TOCK:     u8 = 0b0000_0010;
+const TECK:     u8 = 0b0000_0011;
+const TACK:     u8 = 0b0000_0100;
+const TUCK:     u8 = 0b0000_0101;
+const TYCK:     u8 = 0b0000_0110;
+const INIT:     u8 = 0b0000_1111;  // Used to break symmetry when a link starts
 const SNAKED:   u8 = 0b0000_1110;  // Snake ack
 const AITD:     u8 = 0b0000_1011;  // AIT packet delivered or not (ACK/NACK depending on time reversal)
 const AIT:      u8 = 0b0000_1001;  // Sent AIT packet
-const TECK:     u8 = 0b0000_0111;
-const TACK:     u8 = 0b0000_0101;
-const TOCK:     u8 = 0b0000_0011;
-const TICK:     u8 = 0b0000_0001;
 const FORWARD:  u8 = 0b0000_0000;  // Denotes forward direction in time for AIT transfer
 const REVERSE:  u8 = 0b1000_0000;  // Denotes time reversal for AIT transfer
 const SNAKE:    u8 = 0b0100_0000;  // Packets that won't get lost on node failure
@@ -63,7 +65,7 @@ impl Uuid {
         self.get_ait_state() == AitState::Ait
     }
     pub fn _is_entl(&self) -> bool {
-        self.get_ait_state() == AitState::Entl
+        self.get_ait_state() == AitState::Init
     }
     pub fn is_snake(&self) -> bool {
         (self.get_code() & SNAKE) != 0
@@ -76,11 +78,13 @@ impl Uuid {
         match self.get_code() & 0b0000_1111 {
             TICK => AitState::Tick,
             TOCK => AitState::Tock,
+            TYCK => AitState::Tyck,
+            TUCK => AitState::Tuck,
             TACK => AitState::Tack,
             TECK => AitState::Teck,
             AITD => AitState::AitD,
-            AIT => AitState::Ait,
-            ENTL => AitState::Entl,
+            AIT =>  AitState::Ait,
+            INIT => AitState::Init,
             SNAKED => AitState::SnakeD,
             _    => AitState::Normal, // Bad uuid codes are treated as normal
         }
@@ -112,8 +116,8 @@ impl Uuid {
         AitState::Normal
     }
     pub fn make_entl(&mut self) -> AitState {
-        self.set_code(ENTL);
-        AitState::Entl
+        self.set_code(INIT);
+        AitState::Init
     }
     pub fn make_ait_send(&mut self) -> AitState {
         self.set_code(AIT);
@@ -176,9 +180,11 @@ impl Uuid {
         Ok(match self.get_code() & !REVERSE {
             TICK => { self.set_code(TOCK); AitState::Tock },
             TOCK => { self.set_code(TICK); AitState::Tick },
-            TACK => { self.set_code(TOCK); AitState::Tock },
+            TYCK => { self.set_code(TICK); AitState::Tick }
+            TUCK => { self.set_code(TYCK); AitState::Tuck }
+            TACK => { self.set_code(TOCK); AitState::Tuck },
             TECK => { self.set_code(TACK); AitState::Tack },
-            AIT => { self.set_code(TECK); AitState::Teck },
+            AIT  => { self.set_code(TECK); AitState::Teck },
             NORMAL => AitState::Normal,
             _ => return Err(UuidError::AitState { func_name: _f, ait_state: self.get_ait_state() }.into())
         })
@@ -186,8 +192,8 @@ impl Uuid {
     fn previous_state(&mut self) -> Result<AitState, Error> {
         let _f = "previous_stat";
         Ok(match self.get_code() & !REVERSE {
-            TICK => { self.set_code(TOCK); self.time_reverse(); AitState::Tock },
-            TOCK => { self.set_code(TACK); AitState::Tack },
+            TYCK => { self.set_code(TUCK); self.time_reverse(); AitState::Tuck },
+            TUCK => { self.set_code(TACK); AitState::Tack },
             TACK => { self.set_code(TECK); AitState::Teck },
             TECK => { self.set_code(AIT); AitState::Ait },
             NORMAL => AitState::Normal,
@@ -214,19 +220,21 @@ impl PartialEq for Uuid {
 }
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum AitState {
-    Normal, Entl, SnakeD, AitD,
-    Ait, Teck, Tack, Tock, Tick
+    Normal, Init, SnakeD, AitD,
+    Ait, Teck, Tack, Tuck, Tyck, Tock, Tick
 }
 impl fmt::Display for AitState {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let s = match *self {
             AitState::Normal => "Normal",
-            AitState::Entl   => "Entl",
+            AitState::Init   => "Entl",
             AitState::SnakeD => "SnakeD",
             AitState::Ait    => "Ait",
             AitState::AitD   => "AitD",
             AitState::Teck   => "TECK",
             AitState::Tack   => "TACK",
+            AitState::Tuck   => "TUCK",
+            AitState::Tyck   => "TYCK",
             AitState::Tock   => "TOCK",
             AitState::Tick   => "TICK",
         };

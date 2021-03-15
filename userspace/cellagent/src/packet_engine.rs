@@ -319,9 +319,11 @@ impl PacketEngine {
         match packet.get_ait_state() {
             AitState::Teck | // Forward packet if end-to-end AIT
             AitState::Tack | // "
+            AitState::Tuck | // "
+            AitState::Tyck | // "
             AitState::Tock | // "
             AitState::Tick | // "
-            AitState::Entl => {
+            AitState::Init => {
                 return Err(PacketEngineError::Ait { func_name: _f, ait_state: packet.get_ait_state() }.into())
             },
             AitState::SnakeD => {
@@ -438,9 +440,11 @@ impl PacketEngine {
         let entry = self.routing_table.get_entry(uuid).context(PacketEngineError::Chain { func_name: _f, comment: S(self.cell_id.get_name()) })?;
         match packet.get_ait_state() {
             AitState::AitD |
-            AitState::Entl |
+            AitState::Init |
             AitState::Tick |
             AitState::Tock |
+            AitState::Tyck |
+            AitState::Tuck |
             AitState::Tack |
             AitState::Teck => return Err(PacketEngineError::Ait { func_name: _f, ait_state: packet.get_ait_state() }.into()), // Not allowed here
             AitState::SnakeD => {}, // Handled in listen_cm()
@@ -526,7 +530,7 @@ impl PacketEngine {
                  }
                 self.set_may_not_send(port_no);
                 match packet.get_ait_state() {
-                    AitState::Entl => self.set_may_send(port_no),
+                    AitState::Init => self.set_may_send(port_no),
                     _              => self.set_may_not_send(port_no)
                 }
                 self.send_packet_to_outbuf(port_no, &packet)?;
@@ -578,12 +582,14 @@ impl PacketEngine {
         match packet.get_ait_state() {
             AitState::Teck |
             AitState::Tack |
+            AitState::Tuck |
+            AitState::Tyck |
             AitState::Tock |
             AitState::Tick => {
                 self.send_next_packet_or_entl(recv_port_no)?; // Don't lock up the port on an error
                 return Err(PacketEngineError::Ait { func_name: _f, ait_state: packet.get_ait_state() }.into())
             },
-            AitState::Entl => {
+            AitState::Init => {
                 self.send_packet_flow_control(recv_port_no)? // send_next_packet_or_entl() does ping pong which spins the CPU in the simulator
             },
             AitState::SnakeD => {
