@@ -102,7 +102,7 @@ impl ECNL_Session {
         }
         #[cfg(feature="cell")]
         for port_id in 0..=*(self.num_ecnl_ports())-1 {
-            nalcell.get_interior_port(&PortNo(port_id as u8))?.clone().listen_link_and_pe(nalcell.get_port_from_pe_or_ca(&PortNo(port_id as u8)).left().expect("ECNL got a border port"));
+            nalcell.listen_link_and_pe(&PortNo(port_id as u8))?;
         }
         #[cfg(feature="cell")]
         println!("Linked ecnl channels");

@@ -267,19 +267,15 @@ impl Rack {
                 .get_pair_mut(&edge_connection.left.cell_no, &edge_connection.rite.cell_no)
                 .unwrap();
             let left_cell_id: CellID = left_cell.get_id(); // For Trace
-            let left_from_pe = left_cell.get_port_from_pe_or_ca(&edge_connection.left.port_no).left().expect("Unexpected border port");
-            let left_port = left_cell.get_interior_port(&edge_connection.left.port_no)?;
+            let left_port_no = &edge_connection.left.port_no;
+            let left_port = left_cell.listen_link_and_pe(&left_port_no)?;
+            let rite_port_no = &edge_connection.rite.port_no;
             let rite_cell_id: CellID = rite_cell.get_id(); // For Trace
-            let rite_from_pe = rite_cell.get_port_from_pe_or_ca(&edge_connection.rite.port_no).left().expect("Unexpected border port");
-            let rite_port = rite_cell.get_interior_port(&edge_connection.rite.port_no)?;
-            let mut left_port_clone = left_port.clone();
-            left_port_clone.listen_link_and_pe(left_from_pe);
-            let mut rite_port_clone = rite_port.clone();
-            rite_port_clone.listen_link_and_pe(rite_from_pe); // listening on pe should really happen from NalCell
-            println!("Edge {} listening on ports left: {} and right: {}", Edge(edge_connection.left.cell_no, edge_connection.rite.cell_no), left_port_clone.get_port_no(), rite_port_clone.get_port_no());
+            let rite_port = rite_cell.listen_link_and_pe(&rite_port_no)?;
+            println!("Edge {} listening on ports left: {} and right: {}", Edge(edge_connection.left.cell_no, edge_connection.rite.cell_no), left_port_no, rite_port_no);
             let link = Link::new(
-                left_port_clone.get_id(),
-                rite_port_clone.get_id(),
+                left_port.get_id(),
+                rite_port.get_id(),
                 LinkToPorts {
                     left: duplex_link_end_channel_map[&edge_connection.left].link_to_port.clone(),
                     rite: duplex_link_end_channel_map[&edge_connection.rite].link_to_port.clone(),
@@ -289,7 +285,7 @@ impl Rack {
             {
                 if CONFIG.trace_options.all || CONFIG.trace_options.dc {
                     let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "connect_link" };
-                    let trace = json!({ "left_cell": left_cell_id, "rite_cell": rite_cell_id, "left_port": left_port_clone.get_port_no(), "rite_port": rite_port_clone.get_port_no(), "link_id": link.get_id() });
+                    let trace = json!({ "left_cell": left_cell_id, "rite_cell": rite_cell_id, "left_port": left_port_no, "rite_port": rite_port_no, "link_id": link.get_id() });
                     add_to_trace(TraceType::Trace, trace_params, &trace, _f);
                 }
             }

@@ -193,10 +193,20 @@ impl<InteriorPortFactoryType: InteriorPortFactoryLike<InteriorPortType>, Interio
     fn _get_name(&self) -> String { self.id.get_name() }                     // Used only in tests
     fn _get_num_ports(&self) -> PortQty { PortQty(self.ports.len() as u8) }  // Used only in tests
     pub fn get_cell_agent(&self) -> &CellAgent { &self.cell_agent }
-    pub fn get_port(&self, port_no: &PortNo) -> Port<InteriorPortType, BorderPortType> {
+    pub fn listen_link_and_pe(&self, port_no: &PortNo) -> Result<InteriorPortType, Error> {
+        let interior_port = self.get_interior_port(port_no)?;
+        interior_port.clone().listen_link_and_pe(self.get_port_from_pe_or_ca(port_no).left().expect("Channel to ca for interior port"));
+        return Ok(interior_port);
+    }
+    pub fn listen_noc_and_ca(&self, port_no: &PortNo) -> Result<BorderPortType, Error> {
+        let border_port = self.get_border_port(port_no)?;
+        border_port.clone().listen_noc_and_ca(self.get_port_from_pe_or_ca(port_no).right().expect("Channel to pe for border port"))?;
+        return Ok(border_port);
+    }
+    fn get_port(&self, port_no: &PortNo) -> Port<InteriorPortType, BorderPortType> {
         self.ports[**port_no as usize].clone()
     }
-    pub fn get_interior_port(&self, port_no: &PortNo) -> Result<InteriorPortType, Error> {
+    fn get_interior_port(&self, port_no: &PortNo) -> Result<InteriorPortType, Error> {
         let _f = "get_interior_port";
         match self.ports[**port_no as usize].clone() {
             Port::Border(border_port) => {
@@ -211,7 +221,7 @@ impl<InteriorPortFactoryType: InteriorPortFactoryLike<InteriorPortType>, Interio
             },
         }
     }
-    pub fn get_border_port(&self, port_no: &PortNo) -> Result<BorderPortType, Error> {
+    fn get_border_port(&self, port_no: &PortNo) -> Result<BorderPortType, Error> {
         let _f = "get_border_port";
         match self.ports[**port_no as usize].clone() {
             Port::Border(border_port) => {
@@ -226,7 +236,7 @@ impl<InteriorPortFactoryType: InteriorPortFactoryLike<InteriorPortType>, Interio
             }
         }
     }
-    pub fn get_port_from_pe_or_ca(&self, port_no: &PortNo) -> Either<PortFromPe, PortFromCa> {
+    fn get_port_from_pe_or_ca(&self, port_no: &PortNo) -> Either<PortFromPe, PortFromCa> {
         return self.ports_from_pe_or_ca[port_no].clone();
     }
     pub fn is_border(&self) -> bool {

@@ -116,11 +116,10 @@ impl Datacenter {
         } else {
             println!("Connecting NOC to border cell {} at port {}", noc_border_cell_no, noc_border_port_no);
         }
-        let noc_border_port = noc_border_cell.get_border_port(&noc_border_port_no)?;
+        let noc_border_port = noc_border_cell.listen_noc_and_ca(&noc_border_port_no)?;
         let mut noc = Noc::new(duplex_noc_port_channel_cell_port_map, noc_to_application).context(DatacenterError::Chain { func_name: _f, comment: S("Noc::new")})?;
         noc.initialize(&blueprint, noc_from_application).context(DatacenterError::Chain { func_name: "initialize", comment: S("")})?;
         println!("NOC created and initialized");
-        noc_border_port.listen_noc_and_ca(noc_border_cell.get_port_from_pe_or_ca(&noc_border_port_no).right().expect("NOC border port should connect to cell agent"))?;
         return Ok(Datacenter { rack, application_to_noc, application_from_noc});
     }
     pub fn get_rack(&self) -> &Rack { &self.rack }
