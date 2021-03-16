@@ -16,7 +16,7 @@ use crate::ec_message_formats::{PortToPe, PeFromPort, PeToPort, PortFromPe,
                                 CmToCa, CaFromCm, CaToCm, CmFromCa, CaToCmBytes, CmToCaBytes,
                                 PeToCm, CmFromPe, CmToPe, PeFromCm};
 use crate::name::{CellID, PortID};
-use crate::port::{InteriorPortLike, BorderPortLike, BasePort, InteriorPortFactoryLike, BorderPortFactoryLike};
+use crate::port::{InteriorPortLike, BorderPortLike, BasePort, InteriorPortFactoryLike, BorderPortFactoryLike, Port};
 use crate::replay::{TraceFormat, process_trace_record};
 use crate::utility::{CellConfig, CellType, PortNo, S,
                      TraceHeaderParams, TraceType};
@@ -29,7 +29,7 @@ pub struct NalCell<InteriorPortFactoryType: InteriorPortFactoryLike<InteriorPort
     id: CellID,
     cell_type: CellType,
     config: CellConfig,
-    ports: Box<[Either<InteriorPortType, BorderPortType>]>,
+    ports: Box<[Port<InteriorPortType, BorderPortType>]>,
     cell_agent: CellAgent,
     ports_from_pe_or_ca: HashMap<PortNo, Either<PortFromPe, PortFromCa>>,
     interior_phantom: PhantomData<InteriorPortType>,
@@ -117,18 +117,18 @@ impl<InteriorPortFactoryType: InteriorPortFactoryLike<InteriorPortType>, Interio
                 Either::Left(port_to_pe) => {
                     let interior_port_factory = port_factory_clone.left().expect("Nalcell: interior port_to_pe_or_ca doesn't match border port_factory");
                     let sub_port = interior_port_factory.new_port(cell_id, port_id, port_number, port_to_pe)?;
-                    ports.push(Either::Left(sub_port));
+                    ports.push(Port::Interior(Box::new(sub_port)));
                 },
                 Either::Right(port_to_ca) => {
                     let border_port_factory = port_factory_clone.right().expect("Nalcell: border port_to_pe_or_ca doesn't match interior port_factory");
                     let sub_port = border_port_factory.new_port(cell_id, port_id, port_number, port_to_ca)?;
-                    ports.push(Either::Right(sub_port));
+                    ports.push(Port::Border(Box::new(sub_port)));
                 },
             }
             println!("Created port {} for cell {}", port_num, name);
         }
         println!("Linked pe channels");
-        let boxed_ports: Box<[Either<InteriorPortType, BorderPortType>]> = ports.into_boxed_slice();
+        let boxed_ports: Box<[Port<InteriorPortType, BorderPortType>]> = ports.into_boxed_slice();
         let (cm_to_ca, ca_from_cm): (CmToCa, CaFromCm) = channel();
         let (ca_to_cm, cm_from_ca): (CaToCm, CmFromCa) = channel();
         let (pe_to_cm, cm_from_pe): (PeToCm, CmFromPe) = channel();
@@ -193,8 +193,38 @@ impl<InteriorPortFactoryType: InteriorPortFactoryLike<InteriorPortType>, Interio
     fn _get_name(&self) -> String { self.id.get_name() }                     // Used only in tests
     fn _get_num_ports(&self) -> PortQty { PortQty(self.ports.len() as u8) }  // Used only in tests
     pub fn get_cell_agent(&self) -> &CellAgent { &self.cell_agent }
-    pub fn get_port(&self, port_no: &PortNo) -> Either<InteriorPortType, BorderPortType> {
+    pub fn get_port(&self, port_no: &PortNo) -> Port<InteriorPortType, BorderPortType> {
         self.ports[**port_no as usize].clone()
+    }
+    pub fn get_interior_port(&self, port_no: &PortNo) -> Result<InteriorPortType, Error> {
+        let _f = "get_interior_port";
+        match self.ports[**port_no as usize].clone() {
+            Port::Border(border_port) => {
+                return Err(NalcellError::UnexpectedBorderPort {
+                    func_name: _f,
+                    cell_id: self.id,
+                    port_no: *port_no,
+                }.into());
+            },
+            Port::Interior(interior_port) => {
+                return Ok(*interior_port);
+            },
+        }
+    }
+    pub fn get_border_port(&self, port_no: &PortNo) -> Result<BorderPortType, Error> {
+        let _f = "get_border_port";
+        match self.ports[**port_no as usize].clone() {
+            Port::Border(border_port) => {
+                return Ok(*border_port);
+            },
+            Port::Interior(interior_port) => {
+                return Err(NalcellError::UnexpectedInteriorPort {
+                    func_name: _f,
+                    cell_id: self.id,
+                    port_no: *port_no,
+                }.into());
+            }
+        }
     }
     pub fn get_port_from_pe_or_ca(&self, port_no: &PortNo) -> Either<PortFromPe, PortFromCa> {
         return self.ports_from_pe_or_ca[port_no].clone();
@@ -229,10 +259,14 @@ pub enum NalcellError {
     Chain { func_name: &'static str, comment: String },
     #[fail(display = "NalcellError::Channel {}: No receiver for port {:?}", func_name, port_no)]
     Channel { func_name: &'static str, port_no: PortNo },
+    #[fail(display = "NalcellError::UnexpectedInteriorPort {}: Unexpected interior port {} on cell {}", func_name, cell_id, port_no)]
+    UnexpectedInteriorPort { func_name: &'static str, cell_id: CellID, port_no: PortNo },
+    #[fail(display = "NalcellError::UnexpectedBorderPort {}: Unexpected border port {} on cell {}", func_name, cell_id, port_no)]
+    UnexpectedBorderPort { func_name: &'static str, cell_id: CellID, port_no: PortNo },
     #[fail(display = "NalcellError::NoFreePorts {}: All ports have been assigned for cell {}", func_name, cell_id)]
     NoFreePorts { func_name: &'static str, cell_id: CellID },
     #[fail(display = "NalcellError::NumberPorts {}: You asked for {:?} ports, but only {:?} are allowed", func_name, num_phys_ports, max_num_phys_ports)]
     NumberPorts { func_name: &'static str, num_phys_ports: PortQty, max_num_phys_ports: PortQty },
-    #[fail(display = "NalCellError::Replay {}: Error opening replay file {}", func_name, cell_name)]
+    #[fail(display = "NalcellError::Replay {}: Error opening replay file {}", func_name, cell_name)]
     Replay { func_name: &'static str, cell_name: String }
 }

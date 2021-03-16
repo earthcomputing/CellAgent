@@ -268,10 +268,10 @@ impl Rack {
                 .unwrap();
             let left_cell_id: CellID = left_cell.get_id(); // For Trace
             let left_from_pe = left_cell.get_port_from_pe_or_ca(&edge_connection.left.port_no).left().expect("Unexpected border port");
-            let left_port = left_cell.get_port(&edge_connection.left.port_no).left().expect("Shold have been an interior port");
+            let left_port = left_cell.get_interior_port(&edge_connection.left.port_no)?;
             let rite_cell_id: CellID = rite_cell.get_id(); // For Trace
             let rite_from_pe = rite_cell.get_port_from_pe_or_ca(&edge_connection.rite.port_no).left().expect("Unexpected border port");
-            let rite_port = rite_cell.get_port(&edge_connection.rite.port_no).left().expect("Shold have been an interior port");
+            let rite_port = rite_cell.get_interior_port(&edge_connection.rite.port_no)?;
             let mut left_port_clone = left_port.clone();
             left_port_clone.listen_link_and_pe(left_from_pe);
             let mut rite_port_clone = rite_port.clone();

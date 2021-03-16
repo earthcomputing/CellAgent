@@ -245,6 +245,14 @@ impl fmt::Display for BasePort {
     }
 }
 
+#[derive(Debug, Clone)]
+pub enum Port<InteriorPortType: 'static + Clone + InteriorPortLike,
+              BorderPortType: 'static + Clone + BorderPortLike,
+         > {
+    Border(Box<BorderPortType>),
+    Interior(Box<InteriorPortType>),
+}
+
 pub trait InteriorPortFactoryLike<InteriorPortType: InteriorPortLike>: Clone {
     fn new_port(&self, cell_id: CellID, id: PortID, port_number: PortNumber, port_to_pe: PortToPe) -> Result<InteriorPortType, Error>;
     fn get_port_seed(&self) -> &PortSeed;
