@@ -253,6 +253,12 @@ pub enum Port<InteriorPortType: 'static + Clone + InteriorPortLike,
     Interior(Box<InteriorPortType>),
 }
 
+#[derive(Debug, Clone)]
+pub enum PortFromPeOrCa {
+    Border(PortFromCa),
+    Interior(PortFromPe),
+}
+
 pub trait InteriorPortFactoryLike<InteriorPortType: InteriorPortLike>: Clone {
     fn new_port(&self, cell_id: CellID, id: PortID, port_number: PortNumber, port_to_pe: PortToPe) -> Result<InteriorPortType, Error>;
     fn get_port_seed(&self) -> &PortSeed;
