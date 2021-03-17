@@ -32,8 +32,6 @@ pub struct NalCell<InteriorPortFactoryType: InteriorPortFactoryLike<InteriorPort
     ports: Box<[Port<InteriorPortType, BorderPortType>]>,
     cell_agent: CellAgent,
     ports_from_pe_or_ca: HashMap<PortNo, Either<PortFromPe, PortFromCa>>,
-    interior_phantom: PhantomData<InteriorPortType>,
-    border_phantom: PhantomData<BorderPortType>,
     interior_factory_phantom: PhantomData<InteriorPortFactoryType>,
     border_factory_phantom: PhantomData<BorderPortFactoryType>,
 }
@@ -181,8 +179,6 @@ impl<InteriorPortFactoryType: InteriorPortFactoryLike<InteriorPortType>, Interio
             ports: boxed_ports,
             cell_agent,
             ports_from_pe_or_ca,
-            interior_phantom: PhantomData,
-            border_phantom: PhantomData,
             interior_factory_phantom: PhantomData,
             border_factory_phantom: PhantomData,
             },
