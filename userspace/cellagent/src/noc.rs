@@ -2,12 +2,13 @@ use std::{thread,
           thread::{JoinHandle},
           //sync::mpsc::channel,
           collections::{HashMap, HashSet}};
+use crossbeam::crossbeam_channel as mpsc;
 use crossbeam::crossbeam_channel::unbounded as channel;
 
 use crate::app_message::{AppMsgType, AppMessage, AppMsgDirection,
                          AppDeleteTreeMsg, AppInterapplicationMsg, AppQueryMsg,
                          AppManifestMsg, AppStackTreeMsg, AppTreeNameMsg};
-use crate::app_message_formats::{NocFromPort, NocFromApplication, NocToApplication};
+use crate::app_message_formats::{NocFromPort, ApplicationNocMsg, NocToApplicationMsg};
 use crate::blueprint::{Blueprint, Cell};
 use crate::config::{CONFIG, SCHEMA_VERSION};
 use crate::dal::{add_to_trace, fork_trace_header, update_trace_header};
@@ -29,6 +30,8 @@ pub struct DuplexNocPortChannel {
     pub noc_from_port: NocFromPort,
 }
 
+pub type NocToApplication = mpsc::Sender<NocToApplicationMsg>;
+pub type NocFromApplication = mpsc::Receiver<ApplicationNocMsg>;
 #[derive(Clone, Debug)]
 pub struct DuplexNocApplicationChannel {
     pub noc_to_application: NocToApplication,

@@ -1,12 +1,13 @@
 //use std::{sync::mpsc::channel};
+use crossbeam::crossbeam_channel as mpsc;
 use crossbeam::crossbeam_channel::unbounded as channel;
 use std::{fmt, collections::HashMap};
 
-use crate::app_message_formats::{ApplicationFromNoc, ApplicationToNoc, NocFromApplication, NocToApplication};
+use crate::app_message_formats::{ApplicationNocMsg, NocToApplicationMsg};
 use crate::blueprint::{Blueprint, Cell};
 use crate::config::CONFIG;
 use crate::dal::{add_to_trace};
-use crate::noc::{DuplexNocPortChannel, DuplexNocApplicationChannel, Noc};
+use crate::noc::{DuplexNocPortChannel, DuplexNocApplicationChannel, Noc, NocToApplication, NocFromApplication};
 use crate::port::BorderPortLike;
 use crate::rack::{Rack};
 use crate::simulated_border_port::{NocToPort, NocFromPort, PortFromNoc, PortToNoc, DuplexPortNocChannel};
@@ -22,6 +23,9 @@ impl fmt::Display for CellBorderConnection {
         write!(f, "CC: (cell: {}, port: {})", *self.cell_no, *self.port_no)
     }
 }
+
+pub type ApplicationToNoc = mpsc::Sender<ApplicationNocMsg>;
+pub type ApplicationFromNoc = mpsc::Receiver<NocToApplicationMsg>;
 
 #[derive(Clone, Debug)]
 pub struct DuplexApplicationNocChannel {

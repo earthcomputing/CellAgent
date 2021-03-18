@@ -5,10 +5,9 @@ use std::{io::{stdin, stdout, Read, Write},
           collections::{HashSet},
 };
 
-use ec_fabrix::app_message_formats::{ApplicationToNoc};
 use ec_fabrix::blueprint::{Blueprint};
 use ec_fabrix::config::{CONFIG};
-use ec_fabrix::datacenter::{Datacenter};
+use ec_fabrix::datacenter::{Datacenter, ApplicationToNoc};
 use ec_fabrix::gvm_equation::{GvmEqn};
 use ec_fabrix::link::Link;
 use ec_fabrix::rack::{EdgeConnection, CellInteriorConnection};
