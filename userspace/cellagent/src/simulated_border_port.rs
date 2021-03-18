@@ -9,7 +9,7 @@ use std::{
 use crate::blueprint::{Blueprint};
 use crate::config::{CONFIG};
 use crate::dal::{add_to_trace};
-use crate::app_message_formats::{PortToCaMsg, PortToCa, APP};
+use crate::app_message_formats::{PortToCaMsg, PortToCa, NocToPortMsg, PortToNocMsg};
 use crate::name::{Name, PortID, CellID};
 use crate::port::{CommonPortLike, BorderPortLike, PortSeed, BasePort, BorderPortFactoryLike, PortStatus, DuplexPortPeOrCaChannel, DuplexPortCaChannel};
 use crate::utility::{CellNo, PortNo, PortNumber, ByteArray, S, TraceHeaderParams, TraceType};
@@ -132,13 +132,9 @@ impl BorderPortLike for SimulatedBorderPort {
 }
 
 // Noc to Port
-pub type NocToPortMsg = APP;
-pub type NocToPort = mpsc::Sender<NocToPortMsg>;
 //pub type NocPortError = mpsc::SendError<NocToPortMsg>;
 
 // Port to Noc
-pub type PortToNocMsg = APP;
-pub type NocFromPort = mpsc::Receiver<PortToNocMsg>;
 //pub type PortNocError = mpsc::SendError<PortToNocPacket>;
 
 // Errors

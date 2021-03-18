@@ -7,8 +7,8 @@ pub type SNAKE = bool;
 pub type ISAIT = bool;
 pub type APP = ByteArray;
 // Port to Noc World
+pub type NocToPortMsg = APP;
 pub type PortToNocMsg = APP;
-pub type NocFromPort = mpsc::Receiver<PortToNocMsg>;
 //pub type PortNocError = mpsc::SendError<PortToNocMsg>;
 // Application to Noc
 pub type ApplicationNocMsg = String;

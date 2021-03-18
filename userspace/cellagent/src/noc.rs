@@ -8,13 +8,13 @@ use crossbeam::crossbeam_channel::unbounded as channel;
 use crate::app_message::{AppMsgType, AppMessage, AppMsgDirection,
                          AppDeleteTreeMsg, AppInterapplicationMsg, AppQueryMsg,
                          AppManifestMsg, AppStackTreeMsg, AppTreeNameMsg};
-use crate::app_message_formats::{NocFromPort, ApplicationNocMsg, NocToApplicationMsg};
+use crate::app_message_formats::{ApplicationNocMsg, NocToApplicationMsg, PortToNocMsg, NocToPortMsg};
 use crate::blueprint::{Blueprint, Cell};
 use crate::config::{CONFIG, SCHEMA_VERSION};
 use crate::dal::{add_to_trace, fork_trace_header, update_trace_header};
 use crate::name::{CellID};  // CellID used for trace records
 use crate::gvm_equation::{GvmEquation, GvmEqn, GvmVariable, GvmVariableType};
-use crate::simulated_border_port::{PortToNoc, PortFromNoc, NocToPort};
+use crate::simulated_border_port::{PortToNoc, PortFromNoc};
 use crate::uptree_spec::{AllowedTree, ContainerSpec, Manifest, UpTreeSpec, VmSpec};
 use crate::utility::{ByteArray, CellNo, CellConfig, PortNo, S, TraceHeader, TraceHeaderParams, TraceType,
                      get_geometry, vec_from_hashset, write_err};
@@ -23,6 +23,9 @@ const NOC_MASTER_DEPLOY_TREE_NAME: &str = "NocMasterDeploy";
 const NOC_AGENT_DEPLOY_TREE_NAME:  &str = "NocAgentDeploy";
 pub const NOC_CONTROL_TREE_NAME:   &str = "NocMasterAgent";
 pub const NOC_LISTEN_TREE_NAME:    &str = "NocAgentMaster";
+
+pub type NocToPort = mpsc::Sender<NocToPortMsg>;
+pub type NocFromPort = mpsc::Receiver<PortToNocMsg>;
 
 #[derive(Clone, Debug)]
 pub struct DuplexNocPortChannel {

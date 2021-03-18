@@ -7,10 +7,10 @@ use crate::app_message_formats::{ApplicationNocMsg, NocToApplicationMsg};
 use crate::blueprint::{Blueprint, Cell};
 use crate::config::CONFIG;
 use crate::dal::{add_to_trace};
-use crate::noc::{DuplexNocPortChannel, DuplexNocApplicationChannel, Noc, NocToApplication, NocFromApplication};
+use crate::noc::{DuplexNocPortChannel, DuplexNocApplicationChannel, Noc, NocToApplication, NocFromApplication, NocToPort, NocFromPort};
 use crate::port::BorderPortLike;
 use crate::rack::{Rack};
-use crate::simulated_border_port::{NocToPort, NocFromPort, PortFromNoc, PortToNoc, DuplexPortNocChannel};
+use crate::simulated_border_port::{PortFromNoc, PortToNoc, DuplexPortNocChannel};
 use crate::utility::{CellNo, PortNo, S, TraceHeaderParams, TraceType};
 
 #[derive(Debug, Copy, Clone, Hash, Eq, PartialEq, Serialize, Deserialize)]

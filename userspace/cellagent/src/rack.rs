@@ -16,9 +16,10 @@ use crate::ec_message_formats::{PortFromPe};
 use crate::link::{Link, DuplexLinkPortChannel, LinkFromPorts, LinkToPorts };
 use crate::nalcell::{NalCell};
 use crate::name::{CellID, LinkID};
+use crate::noc::{NocFromPort, NocToPort};
 use crate::port::{PortSeed, CommonPortLike, InteriorPortLike, BorderPortLike};
 use crate::replay::{process_trace_record, TraceFormat};
-use crate::simulated_border_port::{NocFromPort, NocToPort, PortFromNoc, PortToNoc, SimulatedBorderPortFactory, SimulatedBorderPort, DuplexPortNocChannel};
+use crate::simulated_border_port::{PortFromNoc, PortToNoc, SimulatedBorderPortFactory, SimulatedBorderPort, DuplexPortNocChannel};
 use crate::simulated_internal_port::{LinkFromPort, LinkToPort, PortFromLink, PortToLink, SimulatedInteriorPortFactory, SimulatedInteriorPort, DuplexPortLinkChannel};
 use crate::utility::{CellNo, CellConfig, PortNo, Edge, S, TraceHeaderParams, TraceType};
 
