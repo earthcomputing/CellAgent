@@ -77,7 +77,6 @@ impl Rack {
         let mut dest_cell_port_map = HashMap::<CellNo, HashMap::<PortNo, CellNo>>::new(); // This isn't needed yet, but may be
         let mut duplex_link_end_channel_map = HashMap::<CellInteriorConnection, DuplexLinkEndChannel>::new();
         for edge in edge_list {
-            println! ("Connecting edge {}", edge);
             let mut connect_port  = |cell_no, dest_cell_no, side_name| {
                 for interior_port_no in match blueprint.get_cell(cell_no).context(RackError::Chain { func_name: _f, comment: S("lookup cell")}) {
                     Ok(cell) => match cell {
@@ -87,7 +86,6 @@ impl Rack {
                     Err(e) => Err(RackError::Chain { func_name: _f, comment: S("lookup cell")}),
                 }? {
                     if !(**interior_port_no == 0) && (!duplex_port_link_channel_cell_port_map.contains_key(&cell_no) || !duplex_port_link_channel_cell_port_map[&cell_no].contains_key(&interior_port_no)) {
-                        println! ("Connecting interior port {} for {} of edge {}", interior_port_no, side_name, edge);
                         let (link_to_port, port_from_link): (LinkToPort, PortFromLink) = channel();
                         let (port_to_link, link_from_port): (PortToLink, LinkFromPort) = channel();
                         if duplex_port_link_channel_cell_port_map.contains_key(&cell_no) {
@@ -188,7 +186,6 @@ impl Rack {
         for interior_cell in blueprint.get_interior_cells() {
             cell_no_map.insert(interior_cell.get_name(), interior_cell.get_cell_no());
         }
-        println! ("Constructing border port factory");
         let simulated_border_port_factory: SimulatedBorderPortFactory = SimulatedBorderPortFactory::new(
             PortSeed::new(),
             cell_no_map.clone(),
@@ -196,7 +193,6 @@ impl Rack {
             duplex_port_noc_channel_cell_port_map.clone(),
             PhantomData,
         );
-        println! ("Constructing interior port factory");
         let simulated_interior_port_factory: SimulatedInteriorPortFactory = SimulatedInteriorPortFactory::new(
             PortSeed::new(),
             cell_no_map.clone(),
@@ -221,7 +217,6 @@ impl Rack {
                     return Err(RackError::Chain { func_name: _f, comment: S("Border cell") }.into() );
                 }
             };
-            println!("Created NAL Cell for border cell {}", cell_no);
             {
                 if CONFIG.trace_options.all || CONFIG.trace_options.dc || CONFIG.trace_options.visualize { // Needed for visualization
                     let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "border_cell_start" };
@@ -250,7 +245,6 @@ impl Rack {
                     return Err(RackError::Chain { func_name: _f, comment: S("Interior cell") }.into());
                 }
             };
-            println!("Created NAL Cell for interior cell {}", cell_no);
             {
                 if CONFIG.trace_options.all || CONFIG.trace_options.dc || CONFIG.trace_options.visualize { // Needed for visualization
                     let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "interior_cell_start" };
@@ -263,7 +257,6 @@ impl Rack {
         }
         println!("Created all simulated cells");
         for edge_connection in edge_connection_list {
-            println!("Hello edge connection {}", edge_connection);
             let (left_cell, rite_cell) = self.cells
                 .get_pair_mut(&edge_connection.left.cell_no, &edge_connection.rite.cell_no)
                 .unwrap();
@@ -273,7 +266,6 @@ impl Rack {
             let rite_port_no = &edge_connection.rite.port_no;
             let rite_cell_id: CellID = rite_cell.get_id(); // For Trace
             let rite_port = rite_cell.listen_link_and_pe(&rite_port_no)?;
-            println!("Edge {} listening on ports left: {} and right: {}", Edge(edge_connection.left.cell_no, edge_connection.rite.cell_no), left_port_no, rite_port_no);
             let link = Link::new(
                 left_port.get_id(),
                 rite_port.get_id(),

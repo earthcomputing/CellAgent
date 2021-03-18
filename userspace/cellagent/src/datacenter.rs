@@ -59,7 +59,7 @@ impl Datacenter {
             let border_cell_no = border_cell.get_cell_no();
             for border_port_no in border_cell.get_border_ports() {
                 if !(**border_port_no == 0) && (!duplex_port_noc_channel_cell_port_map.contains_key(&border_cell_no) || !duplex_port_noc_channel_cell_port_map[&border_cell_no].contains_key(&border_port_no)) {
-                    println! ("Connecting border cell {} to noc on port {}", border_cell_no, border_port_no);
+                    println! ("Assigning border cell {} to noc on port {}", border_cell_no, border_port_no);
                     let (noc_to_port, port_from_noc): (NocToPort, PortFromNoc) = channel();
                     let (port_to_noc, noc_from_port): (PortToNoc, NocFromPort) = channel();
                     if duplex_port_noc_channel_cell_port_map.contains_key(&border_cell_no) {

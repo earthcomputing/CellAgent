@@ -55,7 +55,6 @@ impl InteriorPortFactoryLike<SimulatedInteriorPort> for SimulatedInteriorPortFac
     fn new_port(&self, cell_id: CellID, port_id: PortID, port_number: PortNumber, duplex_port_pe_channel: DuplexPortPeChannel) -> Result<SimulatedInteriorPort, Error> {
         let cell_no = self.cell_no_map[&cell_id.get_name()];
         let port_no = port_number.get_port_no();
-        println!("Trying on interior port no {} for cell {}", port_no, cell_no);
         let ref duplex_port_link_channel_port_map = (*self).duplex_port_link_channel_cell_port_map[&cell_no];
         Ok( SimulatedInteriorPort {
             base_port: BasePort::new(

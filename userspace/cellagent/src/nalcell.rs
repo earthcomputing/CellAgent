@@ -77,11 +77,9 @@ impl<InteriorPortFactoryType: InteriorPortFactoryLike<InteriorPortType>, Interio
             }
         }
         let cell_type = if border_port_nos.is_empty() { CellType::Interior } else { CellType::Border };
-        println!("Hello cell {}", cell_id);
         for port_num in 0..*num_phys_ports {
             let port_no = PortNo(port_num);
             let is_border_port = border_port_nos.contains(&port_no);
-            println!("connecting port num {} for cell {}; is_border_port: {}", port_num, name, is_border_port);
             let duplex_port_pe_or_ca_channel = if is_border_port {
                 let (ca_to_port, port_from_ca): (CaToPort, PortFromCa) = channel();
                 ca_to_ports.insert(PortNo(port_num), ca_to_port);
@@ -111,7 +109,6 @@ impl<InteriorPortFactoryType: InteriorPortFactoryLike<InteriorPortType>, Interio
                 is_border_port,
                 duplex_port_pe_or_ca_channel.clone(),
             ).context(NalcellError::Chain { func_name: "new", comment: S("port") })?;
-            println!("Hello port {}", port_num);
             let port_factory_clone = port_factory.clone();
             match duplex_port_pe_or_ca_channel {
                 DuplexPortPeOrCaChannel::Interior(duplex_port_pe_channel) => {
@@ -125,9 +122,7 @@ impl<InteriorPortFactoryType: InteriorPortFactoryLike<InteriorPortType>, Interio
                     ports.push(Port::Border(Box::new(sub_port)));
                 },
             }
-            println!("Created port {} for cell {}", port_num, name);
         }
-        println!("Linked pe channels");
         let boxed_ports: Box<[Port<InteriorPortType, BorderPortType>]> = ports.into_boxed_slice();
         let (cm_to_ca, ca_from_cm): (CmToCa, CaFromCm) = channel();
         let (ca_to_cm, cm_from_ca): (CaToCm, CmFromCa) = channel();
