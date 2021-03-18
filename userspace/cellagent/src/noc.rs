@@ -72,8 +72,7 @@ impl Noc {
         for border_cell in blueprint.get_border_cells() {
             let cell_no = border_cell.get_cell_no();
             for border_port_no in border_cell.get_border_ports() {
-                let duplex_noc_port_channel: DuplexNocPortChannel = self.duplex_noc_port_channel_cell_port_map[&cell_no][border_port_no].clone();
-                self.listen_port(duplex_noc_port_channel);
+                self.listen_port(cell_no, *border_port_no);
             }
         }
         Ok(())
@@ -86,20 +85,21 @@ impl Noc {
     pub fn get_name(&self) -> &str { "NOC" }
 
     // SPAWN THREAD (listen_port_loop)
-    fn listen_port(&mut self, duplex_noc_port_channel: DuplexNocPortChannel) -> JoinHandle<()> {
+    fn listen_port(&mut self, cell_no: CellNo, border_port_no: PortNo) -> JoinHandle<()> {
         let _f = "listen_port";
         let mut noc = self.clone();
         let child_trace_header = fork_trace_header();
         let thread_name = format!("{} listen_port", self.get_name()); // NOC NOC
+        let duplex_noc_port_channel: DuplexNocPortChannel = self.duplex_noc_port_channel_cell_port_map[&cell_no][&border_port_no].clone();
         thread::Builder::new().name(thread_name).spawn( move || {
             update_trace_header(child_trace_header);
-            let _ = noc.listen_port_loop(&duplex_noc_port_channel).map_err(|e| write_err("Noc: port", &e));
-            if CONFIG.continue_on_error { noc.listen_port(duplex_noc_port_channel); }
+            let _ = noc.listen_port_loop(cell_no, border_port_no).map_err(|e| write_err("Noc: port", &e));
+            if CONFIG.continue_on_error { noc.listen_port(cell_no, border_port_no); }
         }).expect("noc listen port failed")
     }
 
     // WORKER (NocToPort)
-    fn listen_port_loop(&mut self, duplex_noc_port_channel: &DuplexNocPortChannel)
+    fn listen_port_loop(&mut self, cell_no: CellNo, border_port_no: PortNo)
             -> Result<(), Error> {
         let _f = "listen_port_loop";
         {
@@ -109,6 +109,7 @@ impl Noc {
                 add_to_trace(TraceType::Trace, trace_params, &trace, _f);
             }
         }
+        let duplex_noc_port_channel = &self.duplex_noc_port_channel_cell_port_map[&cell_no][&border_port_no].clone();
         loop {
             let bytes = duplex_noc_port_channel.noc_from_port.recv().context(NocError::Chain { func_name: _f, comment: S("")})?;
             let serialized = bytes.stringify()?;
