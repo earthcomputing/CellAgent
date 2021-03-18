@@ -6,7 +6,7 @@ use crate::app_message_formats::{ApplicationFromNoc, ApplicationToNoc, NocFromAp
 use crate::blueprint::{Blueprint, Cell};
 use crate::config::CONFIG;
 use crate::dal::{add_to_trace};
-use crate::noc::{DuplexNocPortChannel, Noc};
+use crate::noc::{DuplexNocPortChannel, DuplexNocApplicationChannel, Noc};
 use crate::port::BorderPortLike;
 use crate::rack::{Rack};
 use crate::simulated_border_port::{NocToPort, NocFromPort, PortFromNoc, PortToNoc, DuplexPortNocChannel};
@@ -23,11 +23,16 @@ impl fmt::Display for CellBorderConnection {
     }
 }
 
+#[derive(Clone, Debug)]
+pub struct DuplexApplicationNocChannel {
+    pub application_to_noc: ApplicationToNoc,
+    pub application_from_noc: ApplicationFromNoc,
+}
+
 #[derive(Debug)]
 pub struct Datacenter {
     rack: Rack,
-    application_to_noc: ApplicationToNoc,
-    application_from_noc: ApplicationFromNoc,
+    duplex_application_noc_channel: DuplexApplicationNocChannel,
 }
 impl Datacenter {
     pub fn construct(blueprint: Blueprint) -> Result<Datacenter, Error> {
@@ -117,15 +122,24 @@ impl Datacenter {
             println!("Connecting NOC to border cell {} at port {}", noc_border_cell_no, noc_border_port_no);
         }
         let noc_border_port = noc_border_cell.listen_noc_and_ca(&noc_border_port_no)?;
-        let mut noc = Noc::new(duplex_noc_port_channel_cell_port_map, noc_to_application).context(DatacenterError::Chain { func_name: _f, comment: S("Noc::new")})?;
-        noc.initialize(&blueprint, noc_from_application).context(DatacenterError::Chain { func_name: "initialize", comment: S("")})?;
+        let mut noc = Noc::new(duplex_noc_port_channel_cell_port_map, DuplexNocApplicationChannel {
+            noc_to_application,
+            noc_from_application,
+        }).context(DatacenterError::Chain { func_name: _f, comment: S("Noc::new")})?;
+        noc.initialize(&blueprint).context(DatacenterError::Chain { func_name: "initialize", comment: S("")})?;
         println!("NOC created and initialized");
-        return Ok(Datacenter { rack, application_to_noc, application_from_noc});
+        return Ok(Datacenter {
+            rack,
+            duplex_application_noc_channel: DuplexApplicationNocChannel {
+                application_to_noc,
+                application_from_noc,
+            },
+        });
     }
     pub fn get_rack(&self) -> &Rack { &self.rack }
     pub fn get_rack_mut(&mut self) -> &mut Rack { &mut self.rack }
-    pub fn get_application_to_noc(&self) -> &ApplicationToNoc { &self.application_to_noc }
-    pub fn get_application_from_noc(&self) -> &ApplicationFromNoc { &self.application_from_noc }
+    pub fn get_application_to_noc(&self) -> &ApplicationToNoc { &self.duplex_application_noc_channel.application_to_noc }
+    pub fn get_application_from_noc(&self) -> &ApplicationFromNoc { &self.duplex_application_noc_channel.application_from_noc }
 }
 
 // Errors
