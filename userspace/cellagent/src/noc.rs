@@ -73,7 +73,7 @@ impl Noc {
             let cell_no = border_cell.get_cell_no();
             for border_port_no in border_cell.get_border_ports() {
                 let duplex_noc_port_channel: DuplexNocPortChannel = self.duplex_noc_port_channel_cell_port_map[&cell_no][border_port_no].clone();
-                self.listen_port(duplex_noc_port_channel.noc_to_port.clone(), duplex_noc_port_channel.noc_from_port.clone());
+                self.listen_port(duplex_noc_port_channel);
             }
         }
         Ok(())
@@ -86,20 +86,20 @@ impl Noc {
     pub fn get_name(&self) -> &str { "NOC" }
 
     // SPAWN THREAD (listen_port_loop)
-    fn listen_port(&mut self, noc_to_port: NocToPort, noc_from_port: NocFromPort) -> JoinHandle<()> {
+    fn listen_port(&mut self, duplex_noc_port_channel: DuplexNocPortChannel) -> JoinHandle<()> {
         let _f = "listen_port";
         let mut noc = self.clone();
         let child_trace_header = fork_trace_header();
         let thread_name = format!("{} listen_port", self.get_name()); // NOC NOC
         thread::Builder::new().name(thread_name).spawn( move || {
             update_trace_header(child_trace_header);
-            let _ = noc.listen_port_loop(&noc_to_port, &noc_from_port).map_err(|e| write_err("Noc: port", &e));
-            if CONFIG.continue_on_error { noc.listen_port(noc_to_port, noc_from_port); }
+            let _ = noc.listen_port_loop(&duplex_noc_port_channel).map_err(|e| write_err("Noc: port", &e));
+            if CONFIG.continue_on_error { noc.listen_port(duplex_noc_port_channel); }
         }).expect("noc listen port failed")
     }
 
     // WORKER (NocToPort)
-    fn listen_port_loop(&mut self, noc_to_port: &NocToPort, noc_from_port: &NocFromPort)
+    fn listen_port_loop(&mut self, duplex_noc_port_channel: &DuplexNocPortChannel)
             -> Result<(), Error> {
         let _f = "listen_port_loop";
         {
@@ -110,7 +110,7 @@ impl Noc {
             }
         }
         loop {
-            let bytes = noc_from_port.recv().context(NocError::Chain { func_name: _f, comment: S("")})?;
+            let bytes = duplex_noc_port_channel.noc_from_port.recv().context(NocError::Chain { func_name: _f, comment: S("")})?;
             let serialized = bytes.stringify()?;
             let app_msg: Box<dyn AppMessage> = serde_json::from_str(&serialized).context(NocError::Chain { func_name: _f, comment: S("") })?;
             {
@@ -120,7 +120,7 @@ impl Noc {
                     add_to_trace(TraceType::Trace, trace_params, &trace, _f);
                 }
             }
-            app_msg.process_noc(self, noc_to_port)?;
+            app_msg.process_noc(self, &duplex_noc_port_channel.noc_to_port)?;
         }
     }
     pub fn app_process_delete_tree(&self, _msg: &AppDeleteTreeMsg, _noc_to_port: &NocToPort) -> Result<(), Error> {
