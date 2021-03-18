@@ -1,6 +1,6 @@
 use std::{collections::{HashMap, HashSet, VecDeque}, fmt, fmt::Write, hash::Hash, str, sync::{Arc, Mutex}, thread, thread::JoinHandle};
 
-use crate::config::{CONFIG};
+use crate::{config::{CONFIG, PortQty}};
 use crate::dal::{add_to_trace, fork_trace_header, update_trace_header};
 use crate::ec_message::{MsgType};
 use crate::ec_message_formats::{PeFromCm, PeToCm,
@@ -13,19 +13,21 @@ use crate::packet::{Packet};
 use crate::port::{PortStatus, PortStatusOld};
 use crate::routing_table::RoutingTable;
 use crate::routing_table_entry::{RoutingTableEntry};
-use crate::utility::{ActivityData, Mask, PortNo, S, TraceHeaderParams, TraceType, write_err };
+use crate::utility::{ActivityData, Mask, OutbufType, PortNo, S, TraceHeaderParams, TraceType, write_err };
 use crate::uuid_ec::{AitState, Uuid};
 
 // I need one slot per port, but ports use 1-based indexing.  I could subtract 1 all the time,
 // but it's safer to waste slot 0.
 // TODO: Use Config.max_num_phys_ports_per_cell
-const MAX_SLOTS: usize = 10; //MAX_NUM_PHYS_PORTS_PER_CELL.0 as usize + 1;
+const MAX_PORTS: u8 = 10; //MAX_NUM_PHYS_PORTS_PER_CELL.0 as usize + 1;
 
-type BoolArray = [bool; MAX_SLOTS];
-type UsizeArray = [usize; MAX_SLOTS];
-type Buffer = VecDeque<(bool, PortNo, Packet)>;
-type PacketArray = Vec<Buffer>;
-type Reroute = [PortNo; MAX_SLOTS];
+type BoolArray = [bool; MAX_PORTS as usize];
+type UsizeArray = [usize; MAX_PORTS as usize];
+type InBuffer = (usize, Packet); // usize = # remaining to move to out port
+type OutBuffer = (usize, VecDeque<PortNo>);
+type BufferOld = VecDeque<(bool, PortNo, Packet)>; // bool = pong sent
+type PacketArray = Vec<BufferOld>;
+type Reroute = Vec<PortNo>;
 
 #[derive(Debug, Clone)]
 pub struct PacketEngine {
@@ -36,11 +38,14 @@ pub struct PacketEngine {
     routing_table_mutex: Arc<Mutex<RoutingTable>>,  // So I can show the routing table on the console
     no_seen_packets: UsizeArray, // Number of packets received since last packet sent
     no_sent_packets: UsizeArray, // Number of packets sent since last packet received
-    sent_packets: PacketArray, // Packets that may need to be resent
-    out_buffers: PacketArray,   // Packets waiting to go on the out port
-    in_buffer: Vec<Buffer>,    // Packets on the in port waiting to into out_buf on the out port
+    no_free_slots: UsizeArray,  // Amount of room in port's out buffer
+    sent_packets: PacketArray,  // Packets that may need to be resent
+    out_buffers: Vec<HashMap<OutbufType, OutBuffer>>,
+    out_buffers_old: PacketArray,   // Packets waiting to go on the out port
+    in_buffers: Vec<InBuffer>,
+    in_buffer_old: Vec<BufferOld>,    // Packets on the in port waiting to into out_buf on the out port
     port_got_event: BoolArray,
-    activity_data: ActivityData,
+    activity_data: Vec<ActivityData>,
     reroute: Reroute,
     pe_to_cm: PeToCm,
     pe_to_ports: HashMap<PortNo, PeToPort>,
@@ -55,21 +60,24 @@ impl PacketEngine {
                border_port_nos: &HashSet<PortNo>) -> PacketEngine {
         let routing_table = RoutingTable::new(cell_id);
         let routing_table_mutex = Arc::new(Mutex::new(routing_table.clone()));
-        let count = [0; MAX_SLOTS];
+        let count = [0; MAX_PORTS as usize];
         PacketEngine {
             cell_id,
             connected_tree_uuid: connected_tree_id.get_uuid(),
             routing_table,
             routing_table_mutex,  // Needed so I can print the routing table from main
             border_port_nos: border_port_nos.clone(),
+            no_free_slots: [MAX_PORTS as usize; MAX_PORTS as usize],
             no_seen_packets: count,
             no_sent_packets: count,
-            sent_packets: vec![Default::default(); MAX_SLOTS], // Slots need to be allocated ahead of time
-            out_buffers: vec![Default::default(); MAX_SLOTS],
-            in_buffer: vec![Default::default(); MAX_SLOTS],
-            port_got_event: [false; MAX_SLOTS],
-            activity_data: Default::default(),
-            reroute: [PortNo(0); MAX_SLOTS],
+            sent_packets: vec![Default::default(); MAX_PORTS as usize], // Slots need to be allocated ahead of time
+            out_buffers: vec![Default::default(); MAX_PORTS as usize],
+            out_buffers_old: vec![Default::default(); MAX_PORTS as usize],
+            in_buffers: vec![Default::default(); MAX_PORTS as usize],
+            in_buffer_old: vec![Default::default(); MAX_PORTS as usize],
+            port_got_event: [false; MAX_PORTS as usize],
+            activity_data: vec![Default::default(); MAX_PORTS as usize],
+            reroute: vec![Default::default(); MAX_PORTS as usize],
             pe_to_cm,
             pe_to_ports,
             pe_to_ports_old,
@@ -124,27 +132,63 @@ impl PacketEngine {
     fn set_may_send(&mut self, port_no: PortNo) {
         self.port_got_event[port_no.as_usize()] = true;
     }
-    fn get_outbuf(&self, port_no: PortNo) -> &Buffer {
-        self.out_buffers.get(port_no.as_usize()).expect("PacketEngine: get_outbuf must succeed")
+    fn get_inbuf(&self, port_no: PortNo) -> &InBuffer {
+        &self.in_buffers[port_no.as_usize()]
     }
-    fn get_outbuf_mut(&mut self, port_no: PortNo) -> &mut Buffer {
-        self.out_buffers.get_mut(port_no.as_usize()).expect("PacketEngine: get_outbuf must succeed")
+    fn get_inbuf_mut(&mut self, port_no: PortNo) -> &mut InBuffer {
+        &mut self.in_buffers[port_no.as_usize()]
+    }
+    fn set_inbuf(&mut self, port_no: PortNo, new_count: usize, packet_ref: &Packet) {
+        self.in_buffers[port_no.as_usize()] = (new_count, packet_ref.clone());
+    }
+    fn decrement_inbuf_count(&mut self, port_no: PortNo) -> Result<usize, Error> {
+        let _f = "decrement_inbuf_count";
+        let (count, _packet) = self.get_inbuf_mut(port_no);
+        if *count == 0 { return Err(PacketEngineError::InBuffer { func_name: _f, cell_id: self.cell_id, port_no: port_no }.into()); }
+        *count = *count - 1;
+        Ok(*count)
+    }
+    fn get_outbuf(&self, outbuf_type: OutbufType, port_no: PortNo) -> &OutBuffer {
+        self.out_buffers[port_no.as_usize()].get(&outbuf_type).expect("get_outbuf: OutbufType must be set")
+    }
+    fn get_outbuf_mut(&mut self, outbuf_type: OutbufType, port_no: PortNo) -> &mut OutBuffer {
+        self.out_buffers[port_no.as_usize()].get_mut(&outbuf_type).expect("get_outbuf: OutbufType must be set")
+    }
+    fn get_outbuf_size(&self, port_no: PortNo) -> usize {
+        self.out_buffers[port_no.as_usize()].len()
+    }
+    fn get_outbuf_old(&self, port_no: PortNo) -> &BufferOld {
+        self.out_buffers_old.get(port_no.as_usize()).expect("PacketEngine: get_outbuf_old must succeed")
+    }
+    fn get_outbuf_mut_old(&mut self, port_no: PortNo) -> &mut BufferOld {
+        self.out_buffers_old.get_mut(port_no.as_usize()).expect("PacketEngine: get_outbuf_mut_old must succeed")
     }
     fn get_size(array: &PacketArray, port_no: PortNo) -> usize {
         array[port_no.as_usize()].len()
     }
-    fn get_outbuf_size(&self, port_no: PortNo) -> usize {
-        PacketEngine::get_size(&self.out_buffers, port_no)
+    fn get_outbuf_size_old(&self, port_no: PortNo) -> usize {
+        PacketEngine::get_size(&self.out_buffers_old, port_no)
     }
-    fn get_outbuf_first_type(&self, port_no: PortNo) -> Option<MsgType> {
-        self.get_outbuf(port_no)
+    fn get_outbuf_first_type_old(&self, port_no: PortNo) -> Option<MsgType> {
+        self.get_outbuf_old(port_no)
             .get(0)
             .map(|(_, _, packet)| MsgType::msg_type(packet))
     }
-    fn get_outbuf_first_ait_state(&self, port_no: PortNo) -> Option<AitState> {
-        self.get_outbuf(port_no)
+    fn get_outbuf_first_ait_state_old(&self, port_no: PortNo) -> Option<AitState> {
+        self.get_outbuf_old(port_no)
             .get(0)
             .map(|(_, _, packet)| packet.get_ait_state())
+    }
+    fn get_no_free_slots(&self, port_no: PortNo) -> usize {
+        self.no_free_slots[port_no.as_usize()]
+    }
+    fn decr_no_free_slots(&mut self, port_no: PortNo) -> usize {
+        self.no_free_slots[port_no.as_usize()] = self.no_free_slots[port_no.as_usize()] + 1;
+        self.no_free_slots[port_no.as_usize()]
+    }
+    fn incr_no_free_slots(&mut self, port_no: PortNo) -> usize {
+        self.no_free_slots[port_no.as_usize()] = self.no_free_slots[port_no.as_usize()] - 1;
+        self.no_free_slots[port_no.as_usize()]
     }
     fn add_to_packet_count(packet_count: &mut UsizeArray, port_no: PortNo) {
          if packet_count.len() == 1 { // Replace 1 with PACKET_PIPELINE_SIZE when adding pipelining
@@ -178,7 +222,7 @@ impl PacketEngine {
         self.clear_seen_packet_count(port_no);
     }
     fn pop_first_outbuf(&mut self, port_no: PortNo) -> Option<(bool, PortNo, Packet)> {
-        self.get_outbuf_mut(port_no).pop_front()
+        self.get_outbuf_mut_old(port_no).pop_front()
     }
     fn add_to_out_buffer_back(&mut self, recv_port_no: PortNo, port_no: PortNo, packet: Packet) -> bool {
         let _f = "add_to_out_buff_back";
@@ -186,8 +230,8 @@ impl PacketEngine {
         // pong_sent to denote this case.  If the packet was put into the second half of the buffer, the pong
         // was not sent.  In that case, we remember the recv_port_no and use it to send the pong when the packet
         // reaches the first half of the buffer.  We then set pong_sent to true.
-        let outbuf = self.get_outbuf_mut(port_no);
-        let pong_sent = outbuf.len() < MAX_SLOTS;
+        let outbuf = self.get_outbuf_mut_old(port_no);
+        let pong_sent = outbuf.len() < MAX_PORTS as usize;
         outbuf.push_back((pong_sent, recv_port_no, packet));
         pong_sent
     }
@@ -271,10 +315,12 @@ impl PacketEngine {
                         add_to_trace(TraceType::Trace, trace_params, &trace, _f);
                     }
                 }
-                self.activity_data.update(&data);
-                for (_, pe_to_port) in &self.pe_to_ports {
-                    pe_to_port.send(PeToPortPacket::Activity(self.activity_data))?;
+                let p = port_no.as_usize();
+                // Check activity data
+                if self.activity_data[p] == data {
+                    // Do something interesting
                 }
+                self.activity_data[p].update(&data);
             },
             PortToPePacket::Increment((port_no, outbuf)) => {
                 {
@@ -317,12 +363,12 @@ impl PacketEngine {
     fn process_packet_from_port(&mut self, recv_port_no: PortNo, packet: Packet) -> Result<(), Error> {
         let _f = "process_packet_from_port";
         match packet.get_ait_state() {
-            AitState::Teck | // Forward packet if end-to-end AIT
+            AitState::Teck | // Forward packet if end-to-end AIT, but now we have hop by hop
             AitState::Tack | // "
             AitState::Tuck | // "
             AitState::Tyck | // "
-            AitState::Tock | // "
             AitState::Tick | // "
+            AitState::Tock | // "
             AitState::Init => {
                 return Err(PacketEngineError::Ait { func_name: _f, ait_state: packet.get_ait_state() }.into())
             },
@@ -428,11 +474,11 @@ impl PacketEngine {
         let no_her_seen_packets = no_packets.get_number_seen();
         let no_resend = no_my_sent_packets - no_her_seen_packets;
         let mut remaining_sent = sent_buf.split_off(no_resend);
-        let broken_outbuf = &mut self.get_outbuf_mut(broken_port_no).clone();
-        let new_parent_outbuf = &mut self.get_outbuf_mut(new_parent);
+        let broken_outbuf = &mut self.get_outbuf_mut_old(broken_port_no).clone();
+        let new_parent_outbuf = &mut self.get_outbuf_mut_old(new_parent);
         new_parent_outbuf.append(&mut remaining_sent);
         new_parent_outbuf.append(broken_outbuf); 
-        self.get_outbuf_mut(broken_port_no).clear(); // Because I had to clone the buffer
+        self.get_outbuf_mut_old(broken_port_no).clear(); // Because I had to clone the buffer
     }
     fn process_packet_from_cm(&mut self, user_mask: Mask, packet: Packet) -> Result<(), Error> {
         let _f = "process_packet_from_cm";
@@ -468,7 +514,7 @@ impl PacketEngine {
                     }
                 }
                 let port_no = PortNo(0);
-                self.forward(port_no, entry, user_mask, &packet).context(PacketEngineError::Chain { func_name: _f, comment: S(self.cell_id.get_name()) })?;
+                self.forward_old(port_no, entry, user_mask, &packet).context(PacketEngineError::Chain { func_name: _f, comment: S(self.cell_id.get_name()) })?;
             }
         }
         Ok(())
@@ -486,18 +532,18 @@ impl PacketEngine {
         if reroute_port_no == PortNo(0) {
             reroute_port_no = recv_port_no;
         } else {
-            let broken_outbuf = &mut self.get_outbuf_mut(recv_port_no).clone();
+            let broken_outbuf = &mut self.get_outbuf_mut_old(recv_port_no).clone();
             if broken_outbuf.len() > 0 {
-                let reroute_outbuf = self.get_outbuf_mut(reroute_port_no);
+                let reroute_outbuf = self.get_outbuf_mut_old(reroute_port_no);
                 reroute_outbuf.append(broken_outbuf);
-                self.get_outbuf_mut(recv_port_no).clear();
+                self.get_outbuf_mut_old(recv_port_no).clear();
             }
         }
         if recv_port_no == PortNo(0) {
             self.pe_to_cm.send(PeToCmPacket::Packet((recv_port_no, packet.clone())))?;
         } else {
             self.pe_to_ports_old.get(&reroute_port_no)
-                .ok_or::<Error>(PacketEngineError::Sender { cell_id: self.cell_id, func_name: _f, port_no: *reroute_port_no }.into())?
+                .ok_or::<Error>(PacketEngineError::Sender { cell_id: self.cell_id, func_name: _f, port_no: reroute_port_no }.into())?
                 .send(packet.clone())?;
         }
         Ok(())
@@ -505,13 +551,13 @@ impl PacketEngine {
     fn send_packet_flow_control(&mut self, port_no: PortNo) -> Result<(), Error> {
         let _f = "send_packet_flow_control";
         let cell_id = self.cell_id;
-        let outbuf_size = self.get_outbuf_size(port_no);
+        let outbuf_size = self.get_outbuf_size_old(port_no);
         let may_send = self.may_send(port_no);
         if may_send {
             let first = self.pop_first_outbuf(port_no);
             if let Some((_, _, packet)) = first {
-                let outbuf = self.get_outbuf_mut(port_no);
-                let last_item = outbuf.get(MAX_SLOTS as usize);
+                let outbuf = self.get_outbuf_mut_old(port_no);
+                let last_item = outbuf.get(MAX_PORTS as usize);
                 if let Some((pong_sent, recv_port_no, last_packet)) = last_item {
                     {
                         if CONFIG.debug_options.all || CONFIG.debug_options.flow_control {
@@ -524,7 +570,7 @@ impl PacketEngine {
                     }
                     if !pong_sent {
                         let recv_port_no = *recv_port_no; // Needed to avoid https://github.com/rust-lang/rust/issues/59159>
-                        outbuf[MAX_SLOTS as usize] = (true, recv_port_no, last_packet.clone());
+                        outbuf[MAX_PORTS as usize] = (true, recv_port_no, last_packet.clone());
                         self.send_next_packet_or_entl(recv_port_no)?;
                     }
                  }
@@ -541,9 +587,9 @@ impl PacketEngine {
         } else { // Debug only
             {
                 if CONFIG.debug_options.all || CONFIG.debug_options.flow_control {
-                    match self.get_outbuf_first_ait_state(port_no) {
+                    match self.get_outbuf_first_ait_state_old(port_no) {
                         Some(ait_state) => match ait_state {
-                            AitState::Normal => println!("PacketEngine {}: port {} {} outbuf size {} {:?} {:?}", self.cell_id, *port_no, _f, self.get_outbuf_size(port_no), self.get_outbuf_first_type(port_no), self.get_outbuf_first_ait_state(port_no)),
+                            AitState::Normal => println!("PacketEngine {}: port {} {} outbuf size {} {:?} {:?}", self.cell_id, *port_no, _f, self.get_outbuf_size_old(port_no), self.get_outbuf_first_type_old(port_no), self.get_outbuf_first_ait_state_old(port_no)),
                             _ => ()
                         },
                         None => ()
@@ -556,7 +602,7 @@ impl PacketEngine {
     fn send_next_packet_or_entl(&mut self, port_no: PortNo) -> Result<(), Error> {
         let _f = "send_next_packet_or_entl";
         // TOCTTOU race here, but the only cost is sending an extra ENTL packet
-        if self.get_outbuf_size(port_no) == 0 {
+        if self.get_outbuf_size_old(port_no) == 0 {
             // ENTL packets have no recv_port_no, so use 0 instead
             self.add_to_out_buffer_back(PortNo(0), port_no, Packet::make_entl_packet());
         }
@@ -565,7 +611,7 @@ impl PacketEngine {
 
     fn process_packet_from_port_old(&mut self, recv_port_no: PortNo, packet: Packet)
                                 -> Result<(), Error> {
-        let _f = "process_packet";
+        let _f = "process_packet_from_port_old";
         // Got a packet from the other side, so clear state
         self.set_may_send(recv_port_no);
         self.add_seen_packet_count(recv_port_no);
@@ -574,7 +620,7 @@ impl PacketEngine {
             if CONFIG.debug_options.all || CONFIG.debug_options.flow_control {
                 let msg_type = MsgType::msg_type(&packet);
                 match packet.get_ait_state() {
-                    AitState::Normal => println!("PacketEngine {}: recv port {} {} outbuf size {} msg type {} {}", self.cell_id, *recv_port_no, _f, self.get_outbuf_size(recv_port_no), msg_type, packet.get_ait_state()),
+                    AitState::Normal => println!("PacketEngine {}: recv port {} {} outbuf size {} msg type {} {}", self.cell_id, *recv_port_no, _f, self.get_outbuf_size_old(recv_port_no), msg_type, packet.get_ait_state()),
                     _ => ()
                 }
             }
@@ -653,7 +699,7 @@ impl PacketEngine {
                 if entry.is_in_use() {
                     // Put packets on the right port's queue
                     let mask = entry.get_mask();
-                    self.forward(recv_port_no, entry, mask, &packet).context(PacketEngineError::Chain { func_name: "process_packet", comment: S("forward ") + &self.cell_id.get_name() })?;
+                    self.forward_old(recv_port_no, entry, mask, &packet).context(PacketEngineError::Chain { func_name: "process_packet", comment: S("forward ") + &self.cell_id.get_name() })?;
                     // Send the packet at the head of this port's queue
                     self.send_next_packet_or_entl(recv_port_no)?;
                 }
@@ -664,6 +710,130 @@ impl PacketEngine {
     fn forward(&mut self, recv_port_no: PortNo, entry: RoutingTableEntry, user_mask: Mask, packet_ref: &Packet)
             -> Result<(), Error> {
         let _f = "forward";
+        let packet = packet_ref.clone();
+        {
+            if CONFIG.trace_options.all | CONFIG.trace_options.pe {
+                let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "pe_forward" };
+                let trace = json!({ "cell_id": &self.cell_id, "recv_port_no": recv_port_no, "user_mask": user_mask, 
+                    "entry_mask": entry.get_mask(), "packet": packet.stringify()? });
+                add_to_trace(TraceType::Trace, trace_params, &trace, _f);
+            }
+        }
+        let tree_uuid = packet.get_tree_uuid().for_lookup();
+        let count = if tree_uuid == self.connected_tree_uuid {
+            0  // Control message, send with CA flow control (currently none)
+        } else if recv_port_no != entry.get_parent() { // Rootward
+            1  // Send to parent
+        } else { // Leafward
+            // Don't need following line once flow control for CA is implemented
+            let test_mask = entry.get_mask().and(Mask::all_but_zero(PortQty(MAX_PORTS)));
+            test_mask.get_no_ports() // Send leafward to potentially multiple ports
+        };
+        if packet.get_tree_uuid().for_lookup() == self.connected_tree_uuid {
+            // No snake for hop-by-hop messages
+            // Send with CA flow control (currently none)
+            let mask = user_mask.and(entry.get_mask());
+            let port_nos = mask.get_port_nos();
+            {
+                if CONFIG.trace_options.all | CONFIG.trace_options.pe {
+                    let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "pe_forward_connected_tree" };
+                    let trace = json!({ "cell_id": &self.cell_id, "port": recv_port_no,
+                        "user_mask": user_mask, "entry_mask": entry.get_mask(), "port_nos": port_nos,
+                        "packet": packet.stringify()? });
+                    add_to_trace(TraceType::Trace, trace_params, &trace, _f);
+                }
+            }
+            for &port_no in port_nos.iter() {
+                if port_no == PortNo(0) { 
+                    self.pe_to_cm.send(PeToCmPacket::Packet((recv_port_no, packet.clone())))?;
+                } else {
+                    // Replace with OutbufType::Control
+                    self.move_to_outbuf(OutbufType::Control, recv_port_no, port_no);
+                }
+            }
+        } else {
+            if recv_port_no != entry.get_parent() {
+                // Send to root if recv port is not parent
+                let parent = entry.get_parent();
+                if *parent == 0 {
+                    // deliver to CModel
+                    {
+                        if CONFIG.trace_options.all | CONFIG.trace_options.pe {
+                            let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "pe_to_cm_as_parent" };
+                            let trace = json!({ "cell_id": &self.cell_id, "recv_port": recv_port_no, "entry": entry, "packet": packet.stringify()? });
+                            add_to_trace(TraceType::Trace, trace_params, &trace, _f);
+                        }
+                    }
+                    self.pe_to_cm.send(PeToCmPacket::Packet((recv_port_no, packet.clone())))?;
+                } else {
+                    // Forward rootward
+                    {
+                        if CONFIG.trace_options.all | CONFIG.trace_options.pe {
+                            let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "pe_to_ports_rootward" };
+                            let trace = json!({ "cell_id": &self.cell_id, "port": recv_port_no, "packet": packet.stringify()? });
+                            add_to_trace(TraceType::Trace, trace_params, &trace, _f);
+                        }
+                    }
+                    self.move_to_outbuf(OutbufType::Message, recv_port_no, parent);
+                }
+            } else {
+                // Send leafward if recv port is parent
+                let mask = user_mask.and(entry.get_mask());
+                let port_nos = mask.get_port_nos();
+                // Only side effects so use explicit loop instead of map
+                for port_no in port_nos.iter().cloned() {
+                    if *port_no == 0 {
+                        // deliver to CModel
+                        {
+                            if CONFIG.trace_options.all | CONFIG.trace_options.pe {
+                                let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "pe_to_cm_leafward_uptree" };
+                                let trace = json!({ "cell_id": &self.cell_id, "mask": mask, "recv_port_no": recv_port_no, "port_no": port_no, "packet": packet_ref.stringify()? });
+                                add_to_trace(TraceType::Trace, trace_params, &trace, _f);
+                            }
+                        }
+                        self.pe_to_cm.send(PeToCmPacket::Packet((recv_port_no, packet.clone()))).context(PacketEngineError::Chain { func_name: _f, comment: S("leafcast packet to ca ") + &self.cell_id.get_name() })?;
+                    } else {
+                        // forward to neighbor
+                        {
+                            if CONFIG.trace_options.all | CONFIG.trace_options.pe {
+                                let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "pe_to_port_leafward" };
+                                let trace = json!({ "cell_id": &self.cell_id, "mask": mask, "recv_port_no": recv_port_no, "port_no": port_no, "packet": packet.stringify()? });
+                                add_to_trace(TraceType::Trace, trace_params, &trace, _f);
+                            }
+                        }
+                        self.move_to_outbuf(OutbufType::Message, recv_port_no, port_no);
+                    }
+                }
+            }
+        };
+        if packet.is_snake() {
+            {
+                if CONFIG.trace_options.all | CONFIG.trace_options.pe {
+                    let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "pe_to_cm_snake" };
+                    let trace = json!({ "cell_id": &self.cell_id, "recv_port_no": recv_port_no, "count": count, "is_snake": true, "packet": packet_ref.stringify()? });
+                    add_to_trace(TraceType::Trace, trace_params, &trace, _f);
+                }
+            }
+            self.pe_to_cm.send(PeToCmPacket::Snake((recv_port_no, count, packet)))?; 
+        }
+        Ok(())
+    }
+    fn move_to_outbuf(&mut self, outbuf_type: OutbufType, recv_port_no: PortNo, port_no: PortNo) {
+        let (_no_free_slots, outbuf) = self.get_outbuf_mut(outbuf_type, port_no);
+        outbuf.push_back(recv_port_no);
+        assert!(outbuf.len() <= MAX_PORTS as usize); // Should be guaranteed by flow control
+    }
+    fn send_to_port(&mut self, port_no: PortNo, packet_ref: &Packet) -> Result<(), Error> {
+        if self.get_no_free_slots(port_no ) > 0 {
+            let pe_to_port = self.pe_to_ports.get(&port_no).expect("PacketEngine: pe_to_ports must be set");
+            pe_to_port.send(PeToPortPacket::Packet((OutbufType::Message, packet_ref.clone())))?;
+            self.decr_no_free_slots(port_no);
+        }
+        Ok(())
+    }
+    fn forward_old(&mut self, recv_port_no: PortNo, entry: RoutingTableEntry, user_mask: Mask, packet_ref: &Packet)
+            -> Result<(), Error> {
+        let _f = "forward_old";
         let packet = packet_ref.clone();
         {
             if CONFIG.trace_options.all | CONFIG.trace_options.pe {
@@ -709,22 +879,6 @@ impl PacketEngine {
                             let trace = json!({ "cell_id": &self.cell_id, "recv_port": recv_port_no, "entry": entry, "packet": packet.stringify()? });
                             add_to_trace(TraceType::Trace, trace_params, &trace, _f);
                         }
-                        if CONFIG.debug_options.all || CONFIG.debug_options.pe_pkt_send {
-                            let msg_type = MsgType::msg_type(&packet);
-                            match msg_type {
-                                MsgType::Discover => (),
-                                _ => {
-                                    let uuid = packet.get_uuid();
-                                    {
-                                        let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "pe_to_cm_rootward_dbg" };
-                                        let trace = json!({ "cell_id": self.cell_id, "uuid": &uuid, "msg_type": &msg_type, "parent_port": &parent });
-                                        add_to_trace(TraceType::Debug, trace_params, &trace, _f);
-                                    }
-                                    if msg_type == MsgType::Manifest { println!("PacketEngine {} forwarding manifest rootward", self.cell_id); }
-                                    println!("PacketEngine {}: {} [{}] {} {}", self.cell_id, _f, *parent, msg_type, uuid);
-                                },
-                            }
-                        }
                     }
                     self.pe_to_cm.send(PeToCmPacket::Packet((recv_port_no, packet.clone())))?;
                     0
@@ -769,7 +923,7 @@ impl PacketEngine {
                             if CONFIG.debug_options.all || CONFIG.debug_options.flow_control {
                                 let msg_type = MsgType::msg_type(&packet);
                                 match packet.get_ait_state() {
-                                    AitState::Normal => println!("PacketEngine {}: port {} {} outbuf size {} msg type {} {}", self.cell_id, *port_no, _f, self.get_outbuf_size(port_no), msg_type, packet.get_ait_state()),
+                                    AitState::Normal => println!("PacketEngine {}: port {} {} outbuf size {} msg type {} {}", self.cell_id, *port_no, _f, self.get_outbuf_size_old(port_no), msg_type, packet.get_ait_state()),
                                     _ => ()
                                 }
                             }
@@ -835,8 +989,10 @@ pub enum PacketEngineError {
     //Buffer { func_name: &'static str, buffer_name: &'static str },
     #[fail(display = "PacketEngineError::Chain {} {}", func_name, comment)]
     Chain { func_name: &'static str, comment: String },
+    #[fail(display = "PacketEngineError::InBuffer {} port {} on cell {} count is zero", func_name, port_no, cell_id)]
+    InBuffer { func_name: &'static str, cell_id: CellID, port_no: PortNo},
     #[fail(display = "PacketEngineError::Sender {}: No sender for port {} on cell {}", func_name, port_no, cell_id)]
-    Sender { func_name: &'static str, cell_id: CellID, port_no: u8 },
+    Sender { func_name: &'static str, cell_id: CellID, port_no: PortNo },
     #[fail(display = "PacketEngineError::Uuid {}: CellID {}: type {} entry uuid {}, packet uuid {}", func_name, cell_id, msg_type, table_uuid, packet_uuid)]
     Uuid { func_name: &'static str, cell_id: CellID, msg_type: MsgType, table_uuid: Uuid, packet_uuid: Uuid }
 }

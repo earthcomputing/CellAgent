@@ -13,7 +13,7 @@ use time;
 
 use crate::config::{CONFIG, PAYLOAD_DEFAULT_ELEMENT, REPO,
                     CellQty, MASK_MAX, MaskValue, PortQty};
-use crate::name::{Name, TreeID};
+use crate::name::{TreeID};
 use crate::uuid_ec::Uuid;
 
 pub const BASE_TENANT_MASK: Mask = Mask { mask: MaskValue(MASK_MAX) };     // All ports
@@ -50,6 +50,10 @@ impl Mask {
             .iter()
             .fold(Mask::empty(), |mask, port_number|
                 mask.or(Mask::new(*port_number)) )
+    }
+    pub fn get_no_ports(self) -> usize {
+        assert!(std::mem::size_of::<usize>() >= 4); // If not, then "as" below can wrap
+        self.mask.0.count_ones() as usize 
     }
     pub fn get_port_nos(self) -> Vec<PortNo> {
         (0..=*CONFIG.max_num_phys_ports_per_cell)
@@ -349,11 +353,14 @@ impl fmt::Display for Edge {
         write!(f, "E: ({}, {})", *self.0, *self.1)
     }
 }
-#[derive(Debug, Clone, Copy, Eq, PartialEq, Serialize, Deserialize)]
-pub struct ActivityData {
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
+pub struct ActivityData { // Currently is Copy, but I don't want to depend on that
     data: usize,
 }
 impl ActivityData {
+    pub fn new() -> ActivityData {
+        Default::default()
+    }
     pub fn update(&mut self, new_data: &ActivityData) {
         self.data = self.data + new_data.data;
     }
@@ -371,10 +378,10 @@ impl Default for ActivityData { // Used to initialize and to increment
 }
 impl fmt::Display for ActivityData {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "Activity {}", self.data)
+        write!(f, "Activity: {}", self.data)
     }
 }
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize)]
 pub enum OutbufType {
     Control, Message, HeadOfLine(HolSelector)
 }
@@ -383,22 +390,29 @@ impl fmt::Display for OutbufType {
         let string = match self {
             OutbufType::Control => "Control".to_owned(),
             OutbufType::Message => "Message".to_owned(),
-            OutbufType::HeadOfLine(selector) => selector.stringify()
+            OutbufType::HeadOfLine(selector) => selector.to_string()
         };
         write!(f, "Outbuf type: {}", string)
     }
 }
 // Specifies which head of line buffer to use based on the selector
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, Default, Serialize, Deserialize)]
 pub struct HolSelector {
-    selector: TreeID
+    selector: Vec<TreeID>
 }
 impl HolSelector {
-    pub fn new(tree_id: TreeID) -> HolSelector {
+    pub fn new() -> HolSelector {
         // I haven't decided on what that is yet, but it might be a Bloom filter of tree IDs
-        HolSelector { selector: tree_id }
+        HolSelector { selector: Default::default() }
     }
-    fn stringify(&self) -> String { self.selector.get_name() }
+    pub fn add(&mut self, tree_id: TreeID) {
+        self.selector.push(tree_id);
+    }
+}
+impl fmt::Display for HolSelector {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "Head of Line Selecter: Trees to block {:?}", self.selector)
+    }
 }
 
 // Utility functions
