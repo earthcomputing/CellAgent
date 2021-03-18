@@ -18,6 +18,18 @@ use crate::packet::{Packet, UniqueMsgId};
 use crate::utility::{ByteArray, PortNo, PortNumber, S, TraceHeader, TraceHeaderParams, TraceType,
                      write_err};
 
+#[derive(Clone, Debug)]
+pub struct DuplexPortPeChannel {
+    pub port_from_pe: PortFromPe,
+    pub port_to_pe: PortToPe,
+}
+
+#[derive(Clone, Debug)]
+pub struct DuplexPortCaChannel {
+    pub port_from_ca: PortFromCa,
+    pub port_to_ca: PortToCa,
+}
+
 // TODO: There is no distinction between a broken link and a disconnected one.  We may want to revisit.
 #[derive(Debug, Copy, Clone, Serialize, Deserialize)]
 pub enum PortStatus {
@@ -47,10 +59,12 @@ pub trait CommonPortLike: 'static {
 
 pub trait InteriorPortLike: 'static + Clone + Sync + Send + CommonPortLike {
     fn is_border(&self) -> bool { return false; } // SHOULDN'T BE NEEDED
-    fn get_port_to_pe(&self) -> PortToPe { return self.get_base_port().get_port_to_pe_or_ca().left().expect("Port: Sender to Pe must be set"); }
+    fn get_duplex_port_pe_channel(&self) -> DuplexPortPeChannel {
+        return if let DuplexPortPeOrCaChannel::Interior(duplex_port_pe_channel) = self.get_base_port().get_duplex_port_pe_or_ca_channel() {duplex_port_pe_channel} else {panic!("Expected an interior port")};
+    }
     fn send(self: &mut Self, packet: &mut Packet) -> Result<(), Error>;
     fn listen(self: &mut Self, port_to_pe: PortToPe) -> Result<(), Error>;
-    fn listen_link_and_pe(&mut self, port_from_pe: PortFromPe) {
+    fn listen_link_and_pe(&mut self) {
         let _f = "listen_link_and_pe_loops";
         let mut port = self.clone();
         let child_trace_header = fork_trace_header();
@@ -66,8 +80,8 @@ pub trait InteriorPortLike: 'static + Clone + Sync + Send + CommonPortLike {
         let thread_name = format!("Port {} listen_pe", port_clone.get_id().get_name());
         thread::Builder::new().name(thread_name).spawn( move || {
             update_trace_header(child_trace_header);
-            let _ = port.listen_pe_loop(&port_from_pe.clone()).map_err(|e| write_err("port", &e));
-            if CONFIG.continue_on_error { port.listen_pe_loop(&port_from_pe).map_err(|e| write_err("port", &e)).ok(); }
+            let _ = port.listen_pe_loop().map_err(|e| write_err("port", &e));
+            if CONFIG.continue_on_error { port.listen_pe_loop().map_err(|e| write_err("port", &e)).ok(); }
         }).expect("thread failed");
     }
     // THESE COULD BE PRIVATE
@@ -81,7 +95,7 @@ pub trait InteriorPortLike: 'static + Clone + Sync + Send + CommonPortLike {
                 add_to_trace(TraceType::Trace, trace_params, &trace, _f);
             }
         }
-        let port_to_pe = self.get_port_to_pe().clone();
+        let port_to_pe = self.get_duplex_port_pe_channel().port_to_pe.clone();
         #[cfg(any(feature = "cell", feature = "simulator"))] {
             return self.listen(port_to_pe);
         }
@@ -89,7 +103,7 @@ pub trait InteriorPortLike: 'static + Clone + Sync + Send + CommonPortLike {
         return Ok(()) // For now, needs to be fleshed out!
     }
     // WORKER (PortFromPe)
-    fn listen_pe_loop(&mut self, port_from_pe: &PortFromPe) -> Result<(), Error> {
+    fn listen_pe_loop(&mut self) -> Result<(), Error> {
         let _f = "listen_pe_loop";
         {
             if CONFIG.trace_options.all || CONFIG.trace_options.port {
@@ -100,7 +114,7 @@ pub trait InteriorPortLike: 'static + Clone + Sync + Send + CommonPortLike {
         }
         loop {
             //println!("Port {}: waiting for packet from pe", id);
-            let mut packet = port_from_pe.recv().context(PortError::Chain { func_name: _f, comment: S(self.get_id().get_name()) + " port_from_pe"})?;
+            let mut packet = self.get_duplex_port_pe_channel().port_from_pe.recv().context(PortError::Chain { func_name: _f, comment: S(self.get_id().get_name()) + " port_from_pe"})?;
             {
                 if CONFIG.trace_options.all || CONFIG.trace_options.port {
                     let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "port_from_pe" };
@@ -123,10 +137,12 @@ pub trait InteriorPortLike: 'static + Clone + Sync + Send + CommonPortLike {
 
 pub trait BorderPortLike: 'static + Clone + Sync + Send + CommonPortLike {
     fn is_border(&self) -> bool { return true; } // SHOULDN'T BE NEEDED
-    fn get_port_to_ca(&self) -> PortToCa { return self.get_base_port().get_port_to_pe_or_ca().right().expect("Port: Sender to Ca must be set"); }
+    fn get_duplex_port_ca_channel(&self) -> DuplexPortCaChannel {
+        return if let DuplexPortPeOrCaChannel::Border(duplex_port_ca_channel) = self.get_base_port().get_duplex_port_pe_or_ca_channel() {duplex_port_ca_channel} else {panic!("Expected a border port")};
+    }
     fn send(self: &Self, bytes: &mut ByteArray) -> Result<(), Error>;
     fn listen(self: &mut Self, port_to_ca: PortToCa) -> Result<(), Error>;
-    fn listen_noc_and_ca(&self, port_from_ca: PortFromCa) -> Result<JoinHandle<()>, Error> {
+    fn listen_noc_and_ca(&self) -> Result<JoinHandle<()>, Error> {
         let _f = "listen_noc_and_ca";
         let status = PortToCaMsg::Status(self.get_port_no(), PortStatus::Connected);
         {
@@ -136,10 +152,10 @@ pub trait BorderPortLike: 'static + Clone + Sync + Send + CommonPortLike {
                 add_to_trace(TraceType::Trace, trace_params, &trace, _f);
             }
         }
-        let port_to_ca = self.get_port_to_ca();
+        let port_to_ca = self.get_duplex_port_ca_channel().port_to_ca;
         port_to_ca.send(status).context(PortError::Chain { func_name: "noc_channel", comment: S(self.get_id().get_name()) + " send to pe"})?;
         self.clone().listen_noc(port_to_ca)?;
-        let join_handle = self.listen_ca(port_from_ca)?;
+        let join_handle = self.listen_ca()?;
         Ok(join_handle)
     }
 
@@ -172,21 +188,21 @@ pub trait BorderPortLike: 'static + Clone + Sync + Send + CommonPortLike {
     }
 
     // SPAWN THREAD (listen_ca_loop)
-    fn listen_ca(&self, port_from_ca: PortFromCa) -> Result<JoinHandle<()>, Error> {
+    fn listen_ca(&self) -> Result<JoinHandle<()>, Error> {
         let _f = "listen_ca";
         let port = self.clone();
         let child_trace_header = fork_trace_header();
         let thread_name = format!("Port {} {}", self.get_id().get_name(), _f);
         let join_handle = thread::Builder::new().name(thread_name).spawn( move || {
             update_trace_header(child_trace_header);
-            let _ = port.listen_ca_loop(&port_from_ca.clone()).map_err(|e| write_err("port", &e));
-            if CONFIG.continue_on_error { let _ = port.listen_ca(port_from_ca.clone()); }
+            let _ = port.listen_ca_loop().map_err(|e| write_err("port", &e));
+            if CONFIG.continue_on_error { let _ = port.listen_ca(); }
         })?;
         Ok(join_handle)
     }
 
     // WORKER (PortFromPe)
-    fn listen_ca_loop(&self, port_from_ca: &PortFromCa) -> Result<(), Error> {
+    fn listen_ca_loop(&self) -> Result<(), Error> {
         let _f = "listen_ca_loop";
         {
             if CONFIG.trace_options.all || CONFIG.trace_options.port {
@@ -196,7 +212,7 @@ pub trait BorderPortLike: 'static + Clone + Sync + Send + CommonPortLike {
             }
         }
         loop {
-            let mut bytes = port_from_ca.recv().context(PortError::Chain { func_name: _f, comment: S(self.get_id().get_name()) + " recv from ca"})?;
+            let mut bytes = self.get_duplex_port_ca_channel().port_from_ca.recv().context(PortError::Chain { func_name: _f, comment: S(self.get_id().get_name()) + " recv from ca"})?;
             {
                 if CONFIG.trace_options.all || CONFIG.trace_options.port {
                     let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "port_from_ca" };
@@ -215,14 +231,14 @@ pub struct BasePort {
     id: PortID,
     port_number: PortNumber,
     is_border: bool,
-    port_to_pe_or_ca: Either<PortToPe, PortToCa>,
+    duplex_port_pe_or_ca_channel: DuplexPortPeOrCaChannel,
 }
 impl BasePort {
     pub fn new(cell_id: CellID, port_number: PortNumber, is_border: bool,
-               port_to_pe_or_ca: Either<PortToPe, PortToCa>) -> Result<BasePort, Error> {
+               duplex_port_pe_or_ca_channel: DuplexPortPeOrCaChannel) -> Result<BasePort, Error> {
         let port_id = PortID::new(cell_id, port_number).context(PortError::Chain { func_name: "new", comment: S(cell_id.get_name()) + &S(*port_number.get_port_no())})?;
         Ok(BasePort { cell_id, id: port_id, port_number, is_border,
-                      port_to_pe_or_ca,
+                      duplex_port_pe_or_ca_channel,
         })
     }
     pub fn get_id(&self) -> PortID { self.id }
@@ -230,7 +246,7 @@ impl BasePort {
     pub fn get_port_no(&self) -> PortNo { self.port_number.get_port_no() }
 //  pub fn get_port_number(&self) -> PortNumber { self.port_number }
     pub fn is_border(&self) -> bool { self.is_border }
-    pub fn get_port_to_pe_or_ca(&self) -> Either<PortToPe, PortToCa> { return self.port_to_pe_or_ca.clone(); }
+    pub fn get_duplex_port_pe_or_ca_channel(&self) -> DuplexPortPeOrCaChannel { return self.duplex_port_pe_or_ca_channel.clone(); }
 }
 impl fmt::Display for BasePort {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -254,19 +270,19 @@ pub enum Port<InteriorPortType: 'static + Clone + InteriorPortLike,
 }
 
 #[derive(Debug, Clone)]
-pub enum PortFromPeOrCa {
-    Border(PortFromCa),
-    Interior(PortFromPe),
+pub enum DuplexPortPeOrCaChannel {
+    Interior(DuplexPortPeChannel),
+    Border(DuplexPortCaChannel),
 }
 
 pub trait InteriorPortFactoryLike<InteriorPortType: InteriorPortLike>: Clone {
-    fn new_port(&self, cell_id: CellID, id: PortID, port_number: PortNumber, port_to_pe: PortToPe) -> Result<InteriorPortType, Error>;
+    fn new_port(&self, cell_id: CellID, id: PortID, port_number: PortNumber, duplex_port_pe_channel: DuplexPortPeChannel) -> Result<InteriorPortType, Error>;
     fn get_port_seed(&self) -> &PortSeed;
     fn get_port_seed_mut(&mut self) -> &mut PortSeed;
 }
 
 pub trait BorderPortFactoryLike<BorderPortType: BorderPortLike>: Clone {
-    fn new_port(&self, cell_id: CellID, id: PortID, port_number: PortNumber, port_to_ca: PortToCa) -> Result<BorderPortType, Error>;
+    fn new_port(&self, cell_id: CellID, id: PortID, port_number: PortNumber, duplex_port_ca_channel: DuplexPortCaChannel) -> Result<BorderPortType, Error>;
     fn get_port_seed(&self) -> &PortSeed;
     fn get_port_seed_mut(&mut self) -> &mut PortSeed;
 }

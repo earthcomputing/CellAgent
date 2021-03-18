@@ -16,7 +16,7 @@ use crate::ec_message_formats::{PortToPe, PeFromPort, PeToPort, PortFromPe,
                                 CmToCa, CaFromCm, CaToCm, CmFromCa, CaToCmBytes, CmToCaBytes,
                                 PeToCm, CmFromPe, CmToPe, PeFromCm};
 use crate::name::{CellID, PortID};
-use crate::port::{InteriorPortLike, BorderPortLike, BasePort, InteriorPortFactoryLike, BorderPortFactoryLike, Port, PortFromPeOrCa};
+use crate::port::{InteriorPortLike, BorderPortLike, BasePort, InteriorPortFactoryLike, BorderPortFactoryLike, Port, DuplexPortPeOrCaChannel, DuplexPortPeChannel, DuplexPortCaChannel};
 use crate::replay::{TraceFormat, process_trace_record};
 use crate::utility::{CellConfig, CellType, PortNo, S,
                      TraceHeaderParams, TraceType};
@@ -31,7 +31,6 @@ pub struct NalCell<InteriorPortFactoryType: InteriorPortFactoryLike<InteriorPort
     config: CellConfig,
     ports: Box<[Port<InteriorPortType, BorderPortType>]>,
     cell_agent: CellAgent,
-    ports_from_pe_or_ca: HashMap<PortNo, PortFromPeOrCa>,
     interior_factory_phantom: PhantomData<InteriorPortFactoryType>,
     border_factory_phantom: PhantomData<BorderPortFactoryType>,
 }
@@ -69,7 +68,6 @@ impl<InteriorPortFactoryType: InteriorPortFactoryLike<InteriorPortType>, Interio
         interior_port_list.sort();
         let mut ports = Vec::new();
         let mut pe_to_ports = HashMap::new();
-        let mut ports_from_pe_or_ca = HashMap::new(); // So I can remove the item
         let mut ca_to_ports = HashMap::new();
         {
             if CONFIG.trace_options.all || CONFIG.trace_options.nal {
@@ -84,16 +82,20 @@ impl<InteriorPortFactoryType: InteriorPortFactoryLike<InteriorPortType>, Interio
             let port_no = PortNo(port_num);
             let is_border_port = border_port_nos.contains(&port_no);
             println!("connecting port num {} for cell {}; is_border_port: {}", port_num, name, is_border_port);
-            let port_to_pe_or_ca = if is_border_port {
+            let duplex_port_pe_or_ca_channel = if is_border_port {
                 let (ca_to_port, port_from_ca): (CaToPort, PortFromCa) = channel();
                 ca_to_ports.insert(PortNo(port_num), ca_to_port);
-                ports_from_pe_or_ca.insert(PortNo(port_num), PortFromPeOrCa::Border(port_from_ca));
-                Either::Right(port_to_ca.clone())
+                DuplexPortPeOrCaChannel::Border(DuplexPortCaChannel {
+                    port_from_ca,
+                    port_to_ca: port_to_ca.clone(),
+                })
             } else {
                 let (pe_to_port, port_from_pe): (PeToPort, PortFromPe) = channel();
                 pe_to_ports.insert(PortNo(port_num), pe_to_port);
-                ports_from_pe_or_ca.insert(PortNo(port_num), PortFromPeOrCa::Interior(port_from_pe));
-                Either::Left(port_to_pe.clone())
+                DuplexPortPeOrCaChannel::Interior(DuplexPortPeChannel {
+                    port_from_pe,
+                    port_to_pe: port_to_pe.clone(),
+                })
             };
             let port_number = PortNo(port_num).make_port_number(num_phys_ports).context(NalcellError::Chain { func_name: "new", comment: S("port number") })?;
             let ref port_factory = if is_border_port {
@@ -107,19 +109,19 @@ impl<InteriorPortFactoryType: InteriorPortFactoryLike<InteriorPortType>, Interio
                 cell_id,
                 port_number,
                 is_border_port,
-                port_to_pe_or_ca.clone(),
+                duplex_port_pe_or_ca_channel.clone(),
             ).context(NalcellError::Chain { func_name: "new", comment: S("port") })?;
             println!("Hello port {}", port_num);
             let port_factory_clone = port_factory.clone();
-            match port_to_pe_or_ca {
-                Either::Left(port_to_pe) => {
+            match duplex_port_pe_or_ca_channel {
+                DuplexPortPeOrCaChannel::Interior(duplex_port_pe_channel) => {
                     let interior_port_factory = port_factory_clone.left().expect("Nalcell: interior port_to_pe_or_ca doesn't match border port_factory");
-                    let sub_port = interior_port_factory.new_port(cell_id, port_id, port_number, port_to_pe)?;
+                    let sub_port = interior_port_factory.new_port(cell_id, port_id, port_number, duplex_port_pe_channel)?;
                     ports.push(Port::Interior(Box::new(sub_port)));
                 },
-                Either::Right(port_to_ca) => {
+                DuplexPortPeOrCaChannel::Border(duplex_port_ca_channel) => {
                     let border_port_factory = port_factory_clone.right().expect("Nalcell: border port_to_pe_or_ca doesn't match interior port_factory");
-                    let sub_port = border_port_factory.new_port(cell_id, port_id, port_number, port_to_ca)?;
+                    let sub_port = border_port_factory.new_port(cell_id, port_id, port_number, duplex_port_ca_channel)?;
                     ports.push(Port::Border(Box::new(sub_port)));
                 },
             }
@@ -178,7 +180,6 @@ impl<InteriorPortFactoryType: InteriorPortFactoryLike<InteriorPortType>, Interio
             config,
             ports: boxed_ports,
             cell_agent,
-            ports_from_pe_or_ca,
             interior_factory_phantom: PhantomData,
             border_factory_phantom: PhantomData,
             },
@@ -191,12 +192,12 @@ impl<InteriorPortFactoryType: InteriorPortFactoryLike<InteriorPortType>, Interio
     pub fn get_cell_agent(&self) -> &CellAgent { &self.cell_agent }
     pub fn listen_link_and_pe(&self, port_no: &PortNo) -> Result<InteriorPortType, Error> {
         let interior_port = self.get_interior_port(port_no)?;
-        interior_port.clone().listen_link_and_pe(self.get_port_from_pe(port_no).expect("Channel to ca for interior port"));
+        interior_port.clone().listen_link_and_pe();
         return Ok(interior_port);
     }
     pub fn listen_noc_and_ca(&self, port_no: &PortNo) -> Result<BorderPortType, Error> {
         let border_port = self.get_border_port(port_no)?;
-        border_port.clone().listen_noc_and_ca(self.get_port_from_ca(port_no).expect("Channel to pe for border port"))?;
+        border_port.clone().listen_noc_and_ca()?;
         return Ok(border_port);
     }
     fn get_port(&self, port_no: &PortNo) -> Port<InteriorPortType, BorderPortType> {
@@ -224,39 +225,6 @@ impl<InteriorPortFactoryType: InteriorPortFactoryLike<InteriorPortType>, Interio
                 return Ok(*border_port);
             },
             Port::Interior(interior_port) => {
-                return Err(NalcellError::UnexpectedInteriorPort {
-                    func_name: _f,
-                    cell_id: self.id,
-                    port_no: *port_no,
-                }.into());
-            }
-        }
-    }
-    fn get_port_from_pe_or_ca(&self, port_no: &PortNo) -> PortFromPeOrCa {
-        return self.ports_from_pe_or_ca[port_no].clone();
-    }
-    fn get_port_from_pe(&self, port_no: &PortNo) -> Result<PortFromPe, Error> {
-        let _f = "get_port_from_pe";
-        match self.ports_from_pe_or_ca[port_no].clone() {
-            PortFromPeOrCa::Border(port_from_ca) => {
-                return Err(NalcellError::UnexpectedBorderPort {
-                    func_name: _f,
-                    cell_id: self.id,
-                    port_no: *port_no,
-                }.into());
-            },
-            PortFromPeOrCa::Interior(port_from_pe) => {
-                return Ok(port_from_pe);
-            },
-        }
-    }
-    fn get_port_from_ca(&self, port_no: &PortNo) -> Result<PortFromCa, Error> {
-        let _f = "get_port_from_ca";
-        match self.ports_from_pe_or_ca[port_no].clone() {
-            PortFromPeOrCa::Border(port_from_ca) => {
-                return Ok(port_from_ca);
-            },
-            PortFromPeOrCa::Interior(port_from_pe) => {
                 return Err(NalcellError::UnexpectedInteriorPort {
                     func_name: _f,
                     cell_id: self.id,

@@ -11,7 +11,7 @@ use crate::config::{CONFIG};
 use crate::dal::{add_to_trace};
 use crate::app_message_formats::{PortToCaMsg, PortToCa, APP};
 use crate::name::{Name, PortID, CellID};
-use crate::port::{CommonPortLike, BorderPortLike, PortSeed, BasePort, BorderPortFactoryLike, PortStatus};
+use crate::port::{CommonPortLike, BorderPortLike, PortSeed, BasePort, BorderPortFactoryLike, PortStatus, DuplexPortPeOrCaChannel, DuplexPortCaChannel};
 use crate::utility::{CellNo, PortNo, PortNumber, ByteArray, S, TraceHeaderParams, TraceType};
 use crate::uuid_ec::{AitState};
 
@@ -46,7 +46,7 @@ impl SimulatedBorderPortFactory {
 }
 
 impl BorderPortFactoryLike<SimulatedBorderPort> for SimulatedBorderPortFactory {
-    fn new_port(&self, cell_id: CellID, id: PortID, port_number: PortNumber, port_to_ca: PortToCa) -> Result<SimulatedBorderPort, Error> {
+    fn new_port(&self, cell_id: CellID, id: PortID, port_number: PortNumber, duplex_port_ca_channel: DuplexPortCaChannel) -> Result<SimulatedBorderPort, Error> {
         let cell_no = self.cell_no_map[&cell_id.get_name()];
         let port_no = port_number.get_port_no();
         println!("Trying on border port no {} for cell {}", port_no, cell_no);
@@ -56,7 +56,7 @@ impl BorderPortFactoryLike<SimulatedBorderPort> for SimulatedBorderPortFactory {
                 cell_id,
                 port_number,
                 true,
-                Either::Right(port_to_ca),
+                DuplexPortPeOrCaChannel::Border(duplex_port_ca_channel),
             )?,
             is_connected: true,
             duplex_port_noc_channel: if duplex_port_noc_channel_port_map.contains_key(&port_no) {

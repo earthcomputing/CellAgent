@@ -11,13 +11,12 @@ use std::{
 };
 
 use crossbeam::crossbeam_channel as mpsc;
-use either::Either;
 
 use crate::app_message_formats::{PortToCa};
 use crate::ec_message_formats::{PortToPePacket, PortToPe};
 use crate::name::{PortID, CellID};
 use crate::packet::{Packet};
-use crate::port::{CommonPortLike, InteriorPortLike, BasePort, InteriorPortFactoryLike, PortStatus, PortSeed};
+use crate::port::{CommonPortLike, InteriorPortLike, BasePort, InteriorPortFactoryLike, PortStatus, PortSeed, DuplexPortPeOrCaChannel, DuplexPortPeChannel};
 use crate::utility::{PortNo, PortNumber};
 
 #[repr(C)]
@@ -98,13 +97,13 @@ impl InBufferDesc {
 
 #[cfg(feature="cell")]
 impl InteriorPortFactoryLike<ECNL_Port> for PortSeed {
-    fn new_port(&self, cell_id: CellID, id: PortID, port_number: PortNumber, port_to_pe: PortToPe) -> Result<ECNL_Port, Error> {
+    fn new_port(&self, cell_id: CellID, id: PortID, port_number: PortNumber, duplex_port_pe_channel: DuplexPortPeChannel) -> Result<ECNL_Port, Error> {
 	unsafe {
             let base_port = BasePort::new(
                 cell_id,
                 port_number,
                 false,
-                Either::Left(port_to_pe),
+                DuplexPortPeOrCaChannel::Interior(duplex_port_pe_channel),
             )?;
             let port_num = *(base_port.get_port_no());
             let ecnl_port_sub_ptr: *mut ECNL_Port_Sub = port_create(port_num);

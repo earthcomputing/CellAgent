@@ -16,7 +16,7 @@ use crate::ec_message_formats::{PortToPePacket, PortToPe};
 use crate::link::{Link};
 use crate::name::{Name, CellID, PortID};
 use crate::packet::{Packet}; // Eventually use SimulatedPacket
-use crate::port::{CommonPortLike, InteriorPortLike, PortSeed, BasePort, InteriorPortFactoryLike, PortStatus};
+use crate::port::{CommonPortLike, InteriorPortLike, PortSeed, BasePort, InteriorPortFactoryLike, PortStatus, DuplexPortPeOrCaChannel, DuplexPortPeChannel};
 use crate::utility::{CellNo, PortNo, PortNumber, Edge, S, TraceHeaderParams, TraceType};
 use crate::uuid_ec::{AitState};
 
@@ -52,7 +52,7 @@ impl SimulatedInteriorPortFactory {
 }
 
 impl InteriorPortFactoryLike<SimulatedInteriorPort> for SimulatedInteriorPortFactory {
-    fn new_port(&self, cell_id: CellID, port_id: PortID, port_number: PortNumber, port_to_pe: PortToPe) -> Result<SimulatedInteriorPort, Error> {
+    fn new_port(&self, cell_id: CellID, port_id: PortID, port_number: PortNumber, duplex_port_pe_channel: DuplexPortPeChannel) -> Result<SimulatedInteriorPort, Error> {
         let cell_no = self.cell_no_map[&cell_id.get_name()];
         let port_no = port_number.get_port_no();
         println!("Trying on interior port no {} for cell {}", port_no, cell_no);
@@ -62,7 +62,7 @@ impl InteriorPortFactoryLike<SimulatedInteriorPort> for SimulatedInteriorPortFac
                 cell_id,
                 port_number,
                 false,
-                Either::Left(port_to_pe),
+                DuplexPortPeOrCaChannel::Interior(duplex_port_pe_channel),
             )?,
             is_connected: duplex_port_link_channel_port_map.contains_key(&port_no),
             duplex_port_link_channel: if duplex_port_link_channel_port_map.contains_key(&port_no) {
