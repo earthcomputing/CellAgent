@@ -36,7 +36,6 @@ pub struct ECNL_Session {
     #[allow(dead_code)]
     nl_session: *mut c_void,
     module_info_ptr: *const ModuleInfo,
-    ecnl_port_ptr_vector: Vec<ECNL_Port>,
 }
 
 #[derive(Debug)]
@@ -63,16 +62,13 @@ impl ECNL_Session {
     pub fn new() -> ECNL_Session {
         let nsp: *mut c_void = null_mut(); // initialization required to keep Rust compiler happy
         let mip: *const ModuleInfo = null(); // initialization required to keep Rust compiler happy
-        let eppv: Vec<ECNL_Port>;
         unsafe {
             alloc_nl_session(&nsp);
             ecnl_get_module_info(nsp, &mip as *const *const ModuleInfo);
             let num_ports = ((*mip).num_ports as u8);
-            eppv = Vec::with_capacity(num_ports as usize);
             let ecnl_session: ECNL_Session = ECNL_Session {
                 nl_session: nsp,
                 module_info_ptr: mip,
-                ecnl_port_ptr_vector: eppv,
             };
             println!("Created ECNL session for module #{}, {} with {} ECNL ports", (*mip).module_id, ecnl_session.get_module_name(), num_ports);
             return ecnl_session
