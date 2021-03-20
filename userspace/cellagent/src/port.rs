@@ -7,7 +7,6 @@ use std::{
 };
 
 use crossbeam::crossbeam_channel as mpsc;
-use either::Either;
 
 use crate::app_message_formats::{PortToCa, PortToCaMsg, PortFromCa};
 use crate::config::CONFIG;

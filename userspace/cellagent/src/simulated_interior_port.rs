@@ -1,7 +1,6 @@
 use std::fmt;
 
 use crossbeam::crossbeam_channel as mpsc;
-use either::Either;
 
 use std::{
     collections::{HashMap, },
