@@ -31,6 +31,63 @@ pub struct SimulatedBorderPort {
     duplex_port_noc_channel: Option<DuplexPortNocChannel>,
 }
 
+impl SimulatedBorderPort {
+    fn recv(&self) -> Result<NocToPortMsg, Error> {
+       Ok(self.duplex_port_noc_channel.as_ref().unwrap().port_from_noc.recv()?)
+    }
+    fn direct_send(&self, bytes: &ByteArray) -> Result<(), Error> {
+        let _f = "send_to_noc";
+        {
+            if CONFIG.trace_options.all | CONFIG.trace_options.port {
+                let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "port_to_noc" };
+                let trace = json!({ "cell_id": self.base_port.get_cell_id(), "id": self.base_port.get_id().get_name(), "bytes": bytes.stringify()? });
+                add_to_trace(TraceType::Trace, trace_params, &trace, _f);
+            }
+        }
+       Ok(self.duplex_port_noc_channel.as_ref().unwrap().port_to_noc.send(bytes.clone()).context(SimulatedBorderPortError::Chain {func_name: "new",comment: S("")})?)
+    }
+}
+
+impl CommonPortLike for SimulatedBorderPort {
+    fn get_base_port(&self) -> &BasePort {
+        return &(*self).base_port;
+    }
+    fn get_base_port_mut(&mut self) -> &mut BasePort {
+        return &mut (*self).base_port;
+    }
+    fn get_whether_connected(&self) -> bool { return self.is_connected; }
+    fn set_connected(&mut self) -> () { self.is_connected = true; }
+    fn set_disconnected(&mut self) -> () { self.is_connected = false; }
+}
+
+impl BorderPortLike for SimulatedBorderPort {
+    fn send(&self, bytes: &mut ByteArray) -> Result<(), Error> {
+        let _f = "send";
+	self.direct_send(bytes)
+    }
+    fn listen(&mut self, port_to_ca: PortToCa) -> Result<(), Error> {
+        let _f = "listen";
+        loop {
+            let msg = self.duplex_port_noc_channel.as_ref().unwrap().port_from_noc.recv()?;
+            {
+                if CONFIG.trace_options.all || CONFIG.trace_options.port {
+                    let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "port_from_noc_app" };
+                    let trace = json!({ "cell_id": self.base_port.get_cell_id(),"id": self.base_port.get_id().get_name(), "msg": msg });
+                    add_to_trace(TraceType::Trace, trace_params, &trace, _f);
+                }
+            }
+            {
+                if CONFIG.trace_options.all || CONFIG.trace_options.port {
+                    let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "port_to_pe_app" };
+                    let trace = json!({ "cell_id": self.base_port.get_cell_id(), "id": self.base_port.get_id().get_name(), "msg": msg });
+                    add_to_trace(TraceType::Trace, trace_params, &trace, _f);
+                }
+            }
+            port_to_ca.send(PortToCaMsg::AppMsg(self.base_port.get_port_no(), msg)).context(SimulatedBorderPortError::Chain { func_name: "listen_noc_for_pe", comment: S(self.base_port.get_id().get_name()) + " send app msg to pe"})?;
+        }
+    }
+}
+
 #[derive(Clone, Debug)]
 pub struct SimulatedBorderPortFactory {
     port_seed: PortSeed,
@@ -73,62 +130,6 @@ impl BorderPortFactoryLike<SimulatedBorderPort> for SimulatedBorderPortFactory {
     }
 }
 
-
-impl SimulatedBorderPort {
-    fn recv(&self) -> Result<NocToPortMsg, Error> {
-       Ok(self.duplex_port_noc_channel.as_ref().unwrap().port_from_noc.recv()?)
-    }
-    fn direct_send(&self, bytes: &ByteArray) -> Result<(), Error> {
-        let _f = "send_to_noc";
-        {
-            if CONFIG.trace_options.all | CONFIG.trace_options.port {
-                let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "port_to_noc" };
-                let trace = json!({ "cell_id": self.base_port.get_cell_id(), "id": self.base_port.get_id().get_name(), "bytes": bytes.stringify()? });
-                add_to_trace(TraceType::Trace, trace_params, &trace, _f);
-            }
-        }
-       Ok(self.duplex_port_noc_channel.as_ref().unwrap().port_to_noc.send(bytes.clone()).context(SimulatedBorderPortError::Chain {func_name: "new",comment: S("")})?)
-    }
-}
-
-impl CommonPortLike for SimulatedBorderPort {
-    fn get_base_port(&self) -> &BasePort {
-        return &(*self).base_port;
-    }
-    fn get_base_port_mut(&mut self) -> &mut BasePort {
-        return &mut (*self).base_port;
-    }
-    fn get_whether_connected(&self) -> bool { return self.is_connected; }
-    fn set_connected(&mut self) -> () { self.is_connected = true; }
-    fn set_disconnected(&mut self) -> () { self.is_connected = false; }
-}
-impl BorderPortLike for SimulatedBorderPort {
-    fn send(&self, bytes: &mut ByteArray) -> Result<(), Error> {
-        let _f = "send";
-	self.direct_send(bytes)
-    }
-    fn listen(&mut self, port_to_ca: PortToCa) -> Result<(), Error> {
-        let _f = "listen";
-        loop {
-            let msg = self.duplex_port_noc_channel.as_ref().unwrap().port_from_noc.recv()?;
-            {
-                if CONFIG.trace_options.all || CONFIG.trace_options.port {
-                    let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "port_from_noc_app" };
-                    let trace = json!({ "cell_id": self.base_port.get_cell_id(),"id": self.base_port.get_id().get_name(), "msg": msg });
-                    add_to_trace(TraceType::Trace, trace_params, &trace, _f);
-                }
-            }
-            {
-                if CONFIG.trace_options.all || CONFIG.trace_options.port {
-                    let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "port_to_pe_app" };
-                    let trace = json!({ "cell_id": self.base_port.get_cell_id(), "id": self.base_port.get_id().get_name(), "msg": msg });
-                    add_to_trace(TraceType::Trace, trace_params, &trace, _f);
-                }
-            }
-            port_to_ca.send(PortToCaMsg::AppMsg(self.base_port.get_port_no(), msg)).context(SimulatedBorderPortError::Chain { func_name: "listen_noc_for_pe", comment: S(self.base_port.get_id().get_name()) + " send app msg to pe"})?;
-        }
-    }
-}
 
 // Noc to Port
 //pub type NocPortError = mpsc::SendError<NocToPortMsg>;

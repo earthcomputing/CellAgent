@@ -37,49 +37,6 @@ pub struct SimulatedInteriorPort {
     duplex_port_link_channel: Option<DuplexPortLinkChannel>,
 }
 
-#[derive(Clone, Debug)]
-pub struct SimulatedInteriorPortFactory {
-    port_seed: PortSeed,
-    cell_no_map: HashMap<String, CellNo>,
-    blueprint: Blueprint,
-    duplex_port_link_channel_cell_port_map: HashMap<CellNo, HashMap<PortNo, DuplexPortLinkChannel>>,
-}
-
-impl SimulatedInteriorPortFactory {
-    pub fn new(port_seed: PortSeed, cell_no_map: HashMap<String, CellNo>, blueprint: Blueprint, duplex_port_link_channel_cell_port_map: HashMap<CellNo, HashMap<PortNo, DuplexPortLinkChannel>>, phantom: PhantomData<SimulatedInteriorPort>) -> SimulatedInteriorPortFactory {
-        SimulatedInteriorPortFactory { port_seed, cell_no_map, blueprint, duplex_port_link_channel_cell_port_map }
-    }
-}
-
-impl InteriorPortFactoryLike<SimulatedInteriorPort> for SimulatedInteriorPortFactory {
-    fn new_port(&self, cell_id: CellID, port_id: PortID, port_number: PortNumber, duplex_port_pe_channel: DuplexPortPeChannel) -> Result<SimulatedInteriorPort, Error> {
-        let cell_no = self.cell_no_map[&cell_id.get_name()];
-        let port_no = port_number.get_port_no();
-        let ref duplex_port_link_channel_port_map = (*self).duplex_port_link_channel_cell_port_map[&cell_no];
-        Ok( SimulatedInteriorPort {
-            base_port: BasePort::new(
-                cell_id,
-                port_number,
-                false,
-                DuplexPortPeOrCaChannel::Interior(duplex_port_pe_channel),
-            )?,
-            is_connected: duplex_port_link_channel_port_map.contains_key(&port_no),
-            duplex_port_link_channel: if duplex_port_link_channel_port_map.contains_key(&port_no) {
-                Some(duplex_port_link_channel_port_map[&port_no].clone())
-            } else {
-                None
-            },
-            failover_info: FailoverInfo::new(port_id),
-        })
-    }
-    fn get_port_seed(&self) -> &PortSeed {
-        return &(*self).port_seed;
-    }
-    fn get_port_seed_mut(&mut self) -> &mut PortSeed {
-        return &mut (*self).port_seed;
-    }
-}
-
 impl SimulatedInteriorPort {
     fn recv(&mut self) -> Result<LinkToPortPacket, Error> {
         let _f = "recv";
@@ -127,6 +84,7 @@ impl CommonPortLike for SimulatedInteriorPort {
     fn set_connected(&mut self) -> () { self.is_connected = true; }
     fn set_disconnected(&mut self) -> () { self.is_connected = false; }
 }
+
 impl InteriorPortLike for SimulatedInteriorPort {
     fn send(self: &mut Self, packet: &mut Packet) -> Result<(), Error> {
         let _f = "send";
@@ -237,6 +195,49 @@ impl InteriorPortLike for SimulatedInteriorPort {
                     }
 		        }
             }
+    }
+}
+
+#[derive(Clone, Debug)]
+pub struct SimulatedInteriorPortFactory {
+    port_seed: PortSeed,
+    cell_no_map: HashMap<String, CellNo>,
+    blueprint: Blueprint,
+    duplex_port_link_channel_cell_port_map: HashMap<CellNo, HashMap<PortNo, DuplexPortLinkChannel>>,
+}
+
+impl SimulatedInteriorPortFactory {
+    pub fn new(port_seed: PortSeed, cell_no_map: HashMap<String, CellNo>, blueprint: Blueprint, duplex_port_link_channel_cell_port_map: HashMap<CellNo, HashMap<PortNo, DuplexPortLinkChannel>>, phantom: PhantomData<SimulatedInteriorPort>) -> SimulatedInteriorPortFactory {
+        SimulatedInteriorPortFactory { port_seed, cell_no_map, blueprint, duplex_port_link_channel_cell_port_map }
+    }
+}
+
+impl InteriorPortFactoryLike<SimulatedInteriorPort> for SimulatedInteriorPortFactory {
+    fn new_port(&self, cell_id: CellID, port_id: PortID, port_number: PortNumber, duplex_port_pe_channel: DuplexPortPeChannel) -> Result<SimulatedInteriorPort, Error> {
+        let cell_no = self.cell_no_map[&cell_id.get_name()];
+        let port_no = port_number.get_port_no();
+        let ref duplex_port_link_channel_port_map = (*self).duplex_port_link_channel_cell_port_map[&cell_no];
+        Ok( SimulatedInteriorPort {
+            base_port: BasePort::new(
+                cell_id,
+                port_number,
+                false,
+                DuplexPortPeOrCaChannel::Interior(duplex_port_pe_channel),
+            )?,
+            is_connected: duplex_port_link_channel_port_map.contains_key(&port_no),
+            duplex_port_link_channel: if duplex_port_link_channel_port_map.contains_key(&port_no) {
+                Some(duplex_port_link_channel_port_map[&port_no].clone())
+            } else {
+                None
+            },
+            failover_info: FailoverInfo::new(port_id),
+        })
+    }
+    fn get_port_seed(&self) -> &PortSeed {
+        return &(*self).port_seed;
+    }
+    fn get_port_seed_mut(&mut self) -> &mut PortSeed {
+        return &mut (*self).port_seed;
     }
 }
 
