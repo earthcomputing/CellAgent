@@ -58,7 +58,6 @@ pub trait CommonPortLike: 'static {
 }
 
 pub trait InteriorPortLike: 'static + Clone + Sync + Send + CommonPortLike {
-    fn is_border(&self) -> bool { return false; } // SHOULDN'T BE NEEDED
     fn send(self: &mut Self, packet: &mut Packet) -> Result<(), Error>;
     fn listen_and_forward_to(self: &mut Self, port_to_pe: PortToPe) -> Result<(), Error>;
     fn listen_link_and_pe(&mut self) {
@@ -138,7 +137,6 @@ pub trait InteriorPortLike: 'static + Clone + Sync + Send + CommonPortLike {
 }
 
 pub trait BorderPortLike: 'static + Clone + Sync + Send + CommonPortLike {
-    fn is_border(&self) -> bool { return true; } // SHOULDN'T BE NEEDED
     fn send(self: &Self, bytes: &mut ByteArray) -> Result<(), Error>;
     fn listen_and_forward_to(self: &mut Self, port_to_ca: PortToCa) -> Result<(), Error>;
     fn listen_noc_and_ca(&self) -> Result<JoinHandle<()>, Error> {
