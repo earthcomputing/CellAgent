@@ -59,11 +59,8 @@ pub trait CommonPortLike: 'static {
 
 pub trait InteriorPortLike: 'static + Clone + Sync + Send + CommonPortLike {
     fn is_border(&self) -> bool { return false; } // SHOULDN'T BE NEEDED
-    fn get_duplex_port_pe_channel(&self) -> DuplexPortPeChannel {
-        return if let DuplexPortPeOrCaChannel::Interior(duplex_port_pe_channel) = self.get_base_port().get_duplex_port_pe_or_ca_channel() {duplex_port_pe_channel} else {panic!("Expected an interior port")};
-    }
     fn send(self: &mut Self, packet: &mut Packet) -> Result<(), Error>;
-    fn listen(self: &mut Self, port_to_pe: PortToPe) -> Result<(), Error>;
+    fn listen_and_forward_to(self: &mut Self, port_to_pe: PortToPe) -> Result<(), Error>;
     fn listen_link_and_pe(&mut self) {
         let _f = "listen_link_and_pe_loops";
         let mut port = self.clone();
@@ -84,8 +81,14 @@ pub trait InteriorPortLike: 'static + Clone + Sync + Send + CommonPortLike {
             if CONFIG.continue_on_error { port.listen_pe_loop().map_err(|e| write_err("port", &e)).ok(); }
         }).expect("thread failed");
     }
+
     // THESE COULD BE PRIVATE
-    // WORKER (PortFromLink)
+    fn listen(self: &mut Self) -> Result<(), Error> {
+        self.listen_and_forward_to(self.get_duplex_port_pe_channel().port_to_pe)
+    }
+    fn get_duplex_port_pe_channel(&self) -> DuplexPortPeChannel {
+        return if let DuplexPortPeOrCaChannel::Interior(duplex_port_pe_channel) = self.get_base_port().get_duplex_port_pe_or_ca_channel() {duplex_port_pe_channel} else {panic!("Expected an interior port")};
+    }
     fn listen_link_loop(&mut self) -> Result<(), Error> {
         let _f = "listen_link_loop";
         {
@@ -95,9 +98,8 @@ pub trait InteriorPortLike: 'static + Clone + Sync + Send + CommonPortLike {
                 add_to_trace(TraceType::Trace, trace_params, &trace, _f);
             }
         }
-        let port_to_pe = self.get_duplex_port_pe_channel().port_to_pe.clone();
         #[cfg(any(feature = "cell", feature = "simulator"))] {
-            return self.listen(port_to_pe);
+            return self.listen();
         }
         #[cfg(feature = "noc")]
         return Ok(()) // For now, needs to be fleshed out!
@@ -137,11 +139,8 @@ pub trait InteriorPortLike: 'static + Clone + Sync + Send + CommonPortLike {
 
 pub trait BorderPortLike: 'static + Clone + Sync + Send + CommonPortLike {
     fn is_border(&self) -> bool { return true; } // SHOULDN'T BE NEEDED
-    fn get_duplex_port_ca_channel(&self) -> DuplexPortCaChannel {
-        return if let DuplexPortPeOrCaChannel::Border(duplex_port_ca_channel) = self.get_base_port().get_duplex_port_pe_or_ca_channel() {duplex_port_ca_channel} else {panic!("Expected a border port")};
-    }
     fn send(self: &Self, bytes: &mut ByteArray) -> Result<(), Error>;
-    fn listen(self: &mut Self, port_to_ca: PortToCa) -> Result<(), Error>;
+    fn listen_and_forward_to(self: &mut Self, port_to_ca: PortToCa) -> Result<(), Error>;
     fn listen_noc_and_ca(&self) -> Result<JoinHandle<()>, Error> {
         let _f = "listen_noc_and_ca";
         let status = PortToCaMsg::Status(self.get_port_no(), PortStatus::Connected);
@@ -154,28 +153,34 @@ pub trait BorderPortLike: 'static + Clone + Sync + Send + CommonPortLike {
         }
         let port_to_ca = self.get_duplex_port_ca_channel().port_to_ca;
         port_to_ca.send(status).context(PortError::Chain { func_name: "noc_channel", comment: S(self.get_id().get_name()) + " send to pe"})?;
-        self.clone().listen_noc(port_to_ca)?;
+        self.clone().listen_noc()?;
         let join_handle = self.listen_ca()?;
         Ok(join_handle)
     }
 
+    // THESE COULD BE PRIVATE
+    fn listen(self: &mut Self) -> Result<(), Error> {
+        self.listen_and_forward_to(self.get_duplex_port_ca_channel().port_to_ca)
+    }
+    fn get_duplex_port_ca_channel(&self) -> DuplexPortCaChannel {
+        return if let DuplexPortPeOrCaChannel::Border(duplex_port_ca_channel) = self.get_base_port().get_duplex_port_pe_or_ca_channel() {duplex_port_ca_channel} else {panic!("Expected a border port")};
+    }
     // SPAWN THREAD (listen_noc_for_pe_loop)
-    fn listen_noc(&self, port_to_ca: PortToCa) -> Result<(), Error> {
+    fn listen_noc(&self) -> Result<(), Error> {
         let _f = "listen_noc";
         let mut port = self.clone();
         let child_trace_header = fork_trace_header();
         let thread_name = format!("Port {} {}", self.get_id().get_name(), _f);
-        let port_to_ca_clone = port_to_ca.clone();
         thread::Builder::new().name(thread_name).spawn( move || {
             update_trace_header(child_trace_header);
-            let _ = port.listen_noc_loop(port_to_ca).map_err(|e| write_err("port", &e));
-            if CONFIG.continue_on_error { let _ = port.clone().listen_noc(port_to_ca_clone); }
+            let _ = port.listen_noc_loop().map_err(|e| write_err("port", &e));
+            if CONFIG.continue_on_error { let _ = port.clone().listen_noc(); }
         })?;
         Ok(())
     }
 
     // WORKER (PortFromNoc)
-    fn listen_noc_loop(&mut self, port_to_ca: PortToCa) -> Result<(), Error> {
+    fn listen_noc_loop(&mut self) -> Result<(), Error> {
         let _f = "listen_noc_loop";
         {
             if CONFIG.trace_options.all || CONFIG.trace_options.port {
@@ -184,7 +189,7 @@ pub trait BorderPortLike: 'static + Clone + Sync + Send + CommonPortLike {
                 add_to_trace(TraceType::Trace, trace_params, &trace, _f);
             }
         }
-        return self.listen(port_to_ca);
+        return self.listen();
     }
 
     // SPAWN THREAD (listen_ca_loop)

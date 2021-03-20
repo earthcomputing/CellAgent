@@ -102,8 +102,8 @@ impl InteriorPortLike for SimulatedInteriorPort {
         }
 	self.direct_send(packet)
     }
-    fn listen(self: &mut Self, port_to_pe: PortToPe) -> Result<(), Error> {
-        let _f = "listen";
+    fn listen_and_forward_to(self: &mut Self, port_to_pe: PortToPe) -> Result<(), Error> {
+        let _f = "listen_and_forward_to";
         let mut msg: LinkToPortPacket;
             loop {
                 msg = self.recv().context(SimulatedInteriorPortError::Chain { func_name: _f, comment: S(self.base_port.get_id().get_name()) + " recv from link"})?;

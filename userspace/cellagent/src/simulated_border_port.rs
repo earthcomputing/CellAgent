@@ -65,8 +65,8 @@ impl BorderPortLike for SimulatedBorderPort {
         let _f = "send";
 	self.direct_send(bytes)
     }
-    fn listen(&mut self, port_to_ca: PortToCa) -> Result<(), Error> {
-        let _f = "listen";
+    fn listen_and_forward_to(&mut self, port_to_ca: PortToCa) -> Result<(), Error> {
+        let _f = "listen_and_forward_to";
         loop {
             let msg = self.duplex_port_noc_channel.as_ref().unwrap().port_from_noc.recv()?;
             {
@@ -78,7 +78,7 @@ impl BorderPortLike for SimulatedBorderPort {
             }
             {
                 if CONFIG.trace_options.all || CONFIG.trace_options.port {
-                    let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "port_to_pe_app" };
+                    let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "port_to_ca_app" };
                     let trace = json!({ "cell_id": self.base_port.get_cell_id(), "id": self.base_port.get_id().get_name(), "msg": msg });
                     add_to_trace(TraceType::Trace, trace_params, &trace, _f);
                 }

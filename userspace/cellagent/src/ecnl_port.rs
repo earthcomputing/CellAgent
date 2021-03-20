@@ -193,8 +193,8 @@ impl InteriorPortLike for ECNL_Port {
 	}
 	return Ok(())
     }
-     fn listen(self: &mut Self, port_to_pe: PortToPe) -> Result<(), Error> {
-         let _f = "listen";
+     fn listen_and_forward_to(self: &mut Self, port_to_pe: PortToPe) -> Result<(), Error> {
+         let _f = "listen_and_forward_to";
          unsafe {
              let ecnl_port_sub = (*(self.ecnl_port_sub_ptr));
 	     println!("Listening for events on port {}",  ecnl_port_sub.port_id);
