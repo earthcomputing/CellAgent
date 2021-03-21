@@ -45,8 +45,6 @@ impl fmt::Display for PortStatus {
 }
 
 pub trait CommonPortLike: 'static {
-    fn get_base_port(&self) -> &BasePort;
-    fn get_base_port_mut(&mut self) -> &mut BasePort;
     fn get_id(&self) -> PortID { return self.get_base_port().get_id(); }
     fn get_cell_id(&self) -> CellID { return self.get_base_port().get_cell_id(); }
     fn get_port_no(&self) -> PortNo { return self.get_base_port().get_port_no(); }
@@ -54,11 +52,13 @@ pub trait CommonPortLike: 'static {
     fn get_whether_connected(&self) -> bool;
     fn set_connected(&mut self);
     fn set_disconnected(&mut self);
+
+    // THESE COULD BE PROTECTED
+    fn get_base_port(&self) -> &BasePort;
+    fn get_base_port_mut(&mut self) -> &mut BasePort;
 }
 
 pub trait InteriorPortLike: 'static + Clone + Sync + Send + CommonPortLike {
-    fn send(self: &mut Self, packet: &mut Packet) -> Result<(), Error>;
-    fn listen_and_forward_to(self: &mut Self, port_to_pe: PortToPe) -> Result<(), Error>;
     fn listen_link_and_pe(&mut self) {
         let _f = "listen_link_and_pe_loops";
         let mut port = self.clone();
@@ -79,6 +79,10 @@ pub trait InteriorPortLike: 'static + Clone + Sync + Send + CommonPortLike {
             if CONFIG.continue_on_error { port.listen_pe_loop().map_err(|e| write_err("port", &e)).ok(); }
         }).expect("thread failed");
     }
+
+    // THESE COULD BE PROTECTED
+    fn send(self: &mut Self, packet: &mut Packet) -> Result<(), Error>;
+    fn listen_and_forward_to(self: &mut Self, port_to_pe: PortToPe) -> Result<(), Error>;
 
     // THESE COULD BE PRIVATE
     fn listen(self: &mut Self) -> Result<(), Error> {
@@ -136,8 +140,6 @@ pub trait InteriorPortLike: 'static + Clone + Sync + Send + CommonPortLike {
 }
 
 pub trait BorderPortLike: 'static + Clone + Sync + Send + CommonPortLike {
-    fn send(self: &Self, bytes: &mut ByteArray) -> Result<(), Error>;
-    fn listen_and_forward_to(self: &mut Self, port_to_ca: PortToCa) -> Result<(), Error>;
     fn listen_noc_and_ca(&self) -> Result<JoinHandle<()>, Error> {
         let _f = "listen_noc_and_ca";
         let status = PortToCaMsg::Status(self.get_port_no(), PortStatus::Connected);
@@ -154,6 +156,10 @@ pub trait BorderPortLike: 'static + Clone + Sync + Send + CommonPortLike {
         let join_handle = self.listen_ca()?;
         Ok(join_handle)
     }
+
+    // THESE COULD BE PROTECTED
+    fn send(self: &Self, bytes: &mut ByteArray) -> Result<(), Error>;
+    fn listen_and_forward_to(self: &mut Self, port_to_ca: PortToCa) -> Result<(), Error>;
 
     // THESE COULD BE PRIVATE
     fn listen(self: &mut Self) -> Result<(), Error> {
