@@ -7,24 +7,14 @@ pub type SNAKE = bool;
 pub type ISAIT = bool;
 pub type APP = ByteArray;
 // Port to Noc World
-pub type PortToNocMsg = APP;
-pub type PortToNoc = mpsc::Sender<PortToNocMsg>;
-pub type NocFromPort = mpsc::Receiver<PortToNocMsg>;
-//pub type PortNocError = mpsc::SendError<PortToNocMsg>;
-// Noc to Port
 pub type NocToPortMsg = APP;
-pub type NocToPort = mpsc::Sender<NocToPortMsg>;
-pub type PortFromNoc = mpsc::Receiver<NocToPortMsg>;
-//pub type NocPortError = mpsc::SendError<NocToPortMsg>;
+pub type PortToNocMsg = APP;
+//pub type PortNocError = mpsc::SendError<PortToNocMsg>;
 // Application to Noc
 pub type ApplicationNocMsg = String;
-pub type ApplicationToNoc = mpsc::Sender<ApplicationNocMsg>;
-pub type NocFromApplication = mpsc::Receiver<ApplicationNocMsg>;
 //pub type ApplicationNocError = mpsc::SendError<ApplicationNocMsg>;
 // Noc to Application
 pub type NocToApplicationMsg = String;
-pub type NocToApplication = mpsc::Sender<NocToApplicationMsg>;
-pub type ApplicationFromNoc = mpsc::Receiver<NocToApplicationMsg>;
 //pub type NocApplicationError = mpsc::SendError<NocToApplicationMsg>;
 // Boundary Port to Ca
 #[derive(Debug, Clone, Serialize)]

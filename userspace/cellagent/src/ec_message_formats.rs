@@ -16,7 +16,6 @@ type REROUTE = (PortNo, PortNo, NumberOfPackets);
 type STATUS = (PortNo, bool, NumberOfPackets, PortStatus);
 type TUNNELPORT = (PortNo, ByteArray);
 type TUNNELUP = (OriginatorID, ByteArray);
-pub type PACKET = Packet;
 //pub type PePeError = mpsc::SendError<PeToPePacket>;
 // CellAgent to Cmodel (index, tree_uuid, user_mask, direction, bytes)
 #[derive(Debug, Clone, Serialize)]
@@ -45,22 +44,10 @@ pub type CmToPe = mpsc::Sender<CmToPePacket>;
 pub type PeFromCm = mpsc::Receiver<CmToPePacket>;
 //pub type CmPeError = mpsc::SendError<CmToPePacket>;
 // PacketEngine to Port
-pub type PeToPortPacket = PACKET;
+pub type PeToPortPacket = Packet;
 pub type PeToPort = mpsc::Sender<PeToPortPacket>;
 pub type PortFromPe = mpsc::Receiver<PeToPortPacket>;
 //pub type PePortError = mpsc::SendError<PeToPortPacket>;
-// PacketEngine to Port, Port to Link
-pub type PortToLinkPacket = PACKET;
-pub type LinkFromPort = mpsc::Receiver<PortToLinkPacket>;
-//pub type PortLinkError = mpsc::SendError<PortToLinkPacket>;
-// Link to Port
-#[derive(Debug, Clone, Serialize)]
-pub enum LinkToPortPacket {
-    Status(PortStatus),
-    Packet(PACKET),
-}
-pub type LinkToPort = mpsc::Sender<LinkToPortPacket>;
-//pub type LinkPortError = mpsc::SendError<LinkToPortPacket>;
 // Port to PacketEngine
 #[derive(Debug, Clone, Serialize)]
 pub enum PortToPePacket {

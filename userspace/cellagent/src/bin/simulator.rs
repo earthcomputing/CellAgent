@@ -5,14 +5,14 @@ use std::{io::{stdin, stdout, Read, Write},
           collections::{HashSet},
 };
 
-use ec_fabrix::app_message_formats::{ApplicationToNoc};
 use ec_fabrix::blueprint::{Blueprint};
 use ec_fabrix::config::{CONFIG};
-use ec_fabrix::datacenter::{Datacenter};
+use ec_fabrix::datacenter::{Datacenter, ApplicationToNoc};
 use ec_fabrix::gvm_equation::{GvmEqn};
 use ec_fabrix::link::Link;
+use ec_fabrix::rack::{EdgeConnection, CellInteriorConnection};
 use ec_fabrix::uptree_spec::{AllowedTree, ContainerSpec, Manifest, UpTreeSpec, VmSpec};
-use ec_fabrix::utility::{CellConfig, CellNo, Edge, S, print_hash_map, sleep};
+use ec_fabrix::utility::{CellConfig, CellNo, PortNo, Edge, S, print_hash_map, sleep};
 
 fn main() -> Result<(), Error> {
     let _f = "main";
@@ -99,27 +99,41 @@ fn show_pe(dc: &Datacenter) -> Result<(), Error> {
 }
 fn break_link(dc: &mut Datacenter) -> Result<(), Error> {
     let rack = dc.get_rack_mut();
-    let edge: Edge = match CONFIG.auto_break {
-        Some(edge) => {
+    // Changed this (for the time being, at least) to use an edge_connection (with ports) instead of an edge.  We may want to look up and break all connections for an edge
+    let edge_connection: EdgeConnection = match CONFIG.auto_break {
+        Some(edge_connection) => {
             // TODO: Wait until discover is done before automatically breaking link, should be removed
             println!("---> Sleeping to let discover finish before automatically breaking link");
             sleep(6);
-            println!("---> Automatically break link {}", edge);
-            edge
+            println!("---> Automatically break link {}", edge_connection);
+            edge_connection
         },
         None => {
             let link_ids = rack.get_link_ids();
             print_hash_map(&link_ids);
             let _ = stdout().write(b"Enter first cell number of link to break\n")?;
-            let left: usize = read_int()?;
+            let left_cell: usize = read_int()?;
+            let _ = stdout().write(b"Enter first port number of link to break\n")?;
+            let left_port: usize = read_int()?;
             let _ = stdout().write(b"Enter second cell number of link to break\n")?;
-            let right: usize = read_int()?;
-            Edge(CellNo(left), CellNo(right))
+            let rite_cell: usize = read_int()?;
+            let _ = stdout().write(b"Enter second port number of link to break\n")?;
+            let rite_port: usize = read_int()?;
+            EdgeConnection {
+                left: CellInteriorConnection {
+                    cell_no: CellNo(left_cell),
+                    port_no: PortNo(left_port as u8),
+                },
+                rite: CellInteriorConnection {
+                    cell_no: CellNo(rite_cell),
+                    port_no: PortNo(rite_port as u8),
+                },
+            }
         },
     };
     let links = rack.get_links_mut();
-    links.get_mut(&edge)
-        .map_or_else(|| -> Result<(), Error> { println!("{} is not a valid input", edge); Ok(()) },
+    links.get_mut(&edge_connection)
+        .map_or_else(|| -> Result<(), Error> { println!("{} is not a valid input", edge_connection); Ok(()) },
                      |link: &mut Link| -> Result<(), Error> { link.break_link()?; Ok(()) }
         )?;
     Ok(())

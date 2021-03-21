@@ -8,7 +8,7 @@ use serde_json;
 use crate::cellagent::CellAgent;
 use crate::gvm_equation::{GvmEquation};
 use crate::name::{OriginatorID};
-use crate::noc::Noc;
+use crate::noc::{NocToPort, Noc};
 use crate::uptree_spec::{AllowedTree, Manifest};
 use crate::utility::{ByteArray, S};
 
@@ -481,7 +481,6 @@ impl fmt::Display for AppTreeNameMsgPayload {
 
 // Errors
 use failure::{Error, ResultExt};
-use crate::app_message_formats::NocToPort;
 
 #[derive(Debug, Fail)]
 pub enum AppMessageError {

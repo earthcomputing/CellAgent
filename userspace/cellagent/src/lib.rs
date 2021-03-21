@@ -46,7 +46,9 @@ pub mod replay;
 pub mod routing_table;
 pub mod routing_table_entry;
 pub mod service;
-pub mod simulated_port;
+pub mod simulated_border_port;
+#[cfg(any(feature = "simulator"))]
+pub mod simulated_interior_port;
 pub mod snake;
 pub mod tenant;
 pub mod traph;
