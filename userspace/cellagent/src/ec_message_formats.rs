@@ -2,7 +2,7 @@
 use crossbeam::crossbeam_channel as mpsc;
 
 use crate::app_message::{SenderMsgSeqNo};
-use crate::app_message_formats::{ISAIT, SNAKE};
+use crate::app_message_formats::{ISCONTROL, ISAIT, SNAKE};
 use crate::name::{OriginatorID, TreeID};
 use crate::packet::{Packet};
 use crate::packet_engine::NumberOfPackets;
@@ -11,7 +11,7 @@ use crate::routing_table_entry::{RoutingTableEntry};
 use crate::utility::{ActivityData, ByteArray, Mask, PortNo, OutbufType};
 use crate::uuid_ec::Uuid;
 
-type CATOCM = (TreeID, ISAIT, SNAKE, Mask, SenderMsgSeqNo, ByteArray);
+type CATOCM = (TreeID, ISCONTROL, ISAIT, SNAKE, Mask, SenderMsgSeqNo, ByteArray);
 type PACKET = Packet;
 type REROUTE = (PortNo, PortNo, NumberOfPackets);
 type STATUS = (PortNo, bool, PortStatus); // bool = is_border

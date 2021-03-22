@@ -168,9 +168,10 @@ impl Cmodel {
             }
         
             // packetize
-            CaToCmBytes::Bytes((tree_id, is_ait, is_snake, user_mask, seq_no, bytes)) => {
+            CaToCmBytes::Bytes((tree_id, is_control, is_ait, is_snake, user_mask, seq_no, bytes)) => {
                 // xmit msg
                 let mut uuid = tree_id.get_uuid();
+                if is_control { uuid.make_control(); }
                 if is_ait { uuid.make_ait_send(); }
                 if is_snake { uuid.make_snake(); }
                 let packets = Packetizer::packetize(&uuid, seq_no, &bytes).context(CmodelError::Chain { func_name: _f, comment: S("") })?;

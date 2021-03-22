@@ -1983,10 +1983,11 @@ impl CellAgent {
                 add_to_trace(TraceType::Debug, trace_params, &trace, _f);
             }
         }
-        self.send_bytes(line_no, tree_id, msg.is_ait(), msg.is_snake(), user_mask, seq_no, bytes).map_err(Error::from)
+        self.send_bytes(line_no, tree_id, msg.is_control(), msg.is_ait(), msg.is_snake(), user_mask, seq_no, bytes).map_err(Error::from)
     }
-    fn send_bytes(&self, line_no: u32, tree_id: TreeID, is_ait: bool, is_snake: bool, user_mask: Mask,
-                  seq_no: SenderMsgSeqNo, bytes: ByteArray) -> Result<(), Error> {
+    fn send_bytes(&self, line_no: u32, tree_id: TreeID, 
+                    is_control: bool,is_ait: bool, is_snake: bool, user_mask: Mask,
+                    seq_no: SenderMsgSeqNo, bytes: ByteArray) -> Result<(), Error> {
         let _f = "send_bytes";
         let tree_uuid = tree_id.get_uuid();
         // Make sure tree_id is legit
@@ -2009,7 +2010,7 @@ impl CellAgent {
                 add_to_trace(TraceType::Trace, trace_params, &trace, _f);
             }
         }
-        let msg = CaToCmBytes::Bytes((tree_id, is_ait, is_snake, user_mask, seq_no, bytes));
+        let msg = CaToCmBytes::Bytes((tree_id, is_control, is_ait, is_snake, user_mask, seq_no, bytes));
         self.ca_to_cm[0].send(msg)?;
         Ok(())
    }

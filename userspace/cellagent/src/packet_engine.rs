@@ -719,8 +719,7 @@ impl PacketEngine {
                 add_to_trace(TraceType::Trace, trace_params, &trace, _f);
             }
         }
-        let tree_uuid = packet.get_tree_uuid().for_lookup();
-        let count = if tree_uuid == self.connected_tree_uuid {
+        let count = if packet.get_tree_uuid().is_control() {
             0  // Control message, send with CA flow control (currently none)
         } else if recv_port_no != entry.get_parent() { // Rootward
             1  // Send to parent
@@ -730,7 +729,7 @@ impl PacketEngine {
             test_mask.get_no_ports() // Send leafward to potentially multiple ports
         };
         self.set_inbuf(recv_port_no, count, packet_ref);
-        if packet.get_tree_uuid().for_lookup() == self.connected_tree_uuid {
+        if packet.get_tree_uuid().is_control() {
             // No snake for hop-by-hop messages
             // Send with CA flow control (currently none)
             let mask = user_mask.and(entry.get_mask());
@@ -851,7 +850,7 @@ impl PacketEngine {
                 add_to_trace(TraceType::Trace, trace_params, &trace, _f);
             }
         }
-        let count = if packet.get_tree_uuid().for_lookup() == self.connected_tree_uuid {
+        let count = if packet.get_tree_uuid().is_control() {
             // No snake for hop-by-hop messages
             // Send with CA flow control (currently none)
             let mask = user_mask.and(entry.get_mask());

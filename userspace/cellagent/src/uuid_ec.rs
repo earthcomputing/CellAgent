@@ -19,6 +19,7 @@ const AIT:      u8 = 0b0000_1001;  // Sent AIT packet
 const FORWARD:  u8 = 0b0000_0000;  // Denotes forward direction in time for AIT transfer
 const REVERSE:  u8 = 0b1000_0000;  // Denotes time reversal for AIT transfer
 const SNAKE:    u8 = 0b0100_0000;  // Packets that won't get lost on node failure
+const CTRL:     u8 = 0b0010_0000;  // Control packets
 
 const AIT_BYTE: usize = 0;
 const PORT_NO_BYTE: usize = 1;
@@ -48,11 +49,19 @@ impl Uuid {
         bytes
     }
     fn get_code(&self) -> u8 {
-        *self.uuid.as_bytes().get(AIT_BYTE).unwrap()
+        self.uuid.as_bytes()[AIT_BYTE] & 0b0000_1111
     }
     fn set_code(&mut self, code: u8) {
         let mut bytes = self.get_bytes();
-        bytes[AIT_BYTE] = code | (bytes[AIT_BYTE] & REVERSE); // Make sure to keep direction when changing code
+        bytes[AIT_BYTE] = (bytes[AIT_BYTE] & 0b1111_0000) ^ code; // Keep flags when setting code
+        self.set_bytes(bytes);
+    }
+    fn get_flags(&self) -> u8 {
+        self.uuid.as_bytes()[AIT_BYTE] & 0b1111_0000
+    }
+    fn clear_flags(&mut self) {
+        let mut bytes = self.get_bytes();
+        bytes[AIT_BYTE] = bytes[AIT_BYTE] & 0b0000_1111;
         self.set_bytes(bytes);
     }
     pub fn is_ait(&self) -> bool {
@@ -64,14 +73,17 @@ impl Uuid {
     pub fn is_ait_recv(&self) -> bool {
         self.get_ait_state() == AitState::Ait
     }
-    pub fn _is_entl(&self) -> bool {
+    pub fn is_init(&self) -> bool {
         self.get_ait_state() == AitState::Init
     }
     pub fn is_snake(&self) -> bool {
-        (self.get_code() & SNAKE) != 0
+        (self.get_flags() & SNAKE) != 0
     }
     pub fn is_snaked(&self) -> bool {
         self.get_ait_state() == AitState::SnakeD
+    }
+    pub fn is_control(&self) -> bool {
+        (self.get_flags() & CTRL) != 0
     }
     pub fn get_ait_state(&self) -> AitState {
         let _f = "get_ait_state"; 
@@ -104,8 +116,7 @@ impl Uuid {
     }
     fn _is_reverse(&self) -> bool { !self._is_forward() }
     pub fn for_lookup(&self) -> Uuid {
-        let mut bytes = self.mask_ait_byte();
-        bytes[AIT_BYTE] = NORMAL;
+        let bytes = self.mask_ait_byte();
         Uuid { uuid: uuid::Uuid::from_bytes(bytes) }
     }
     pub fn make_normal(&mut self) -> AitState {
@@ -115,7 +126,7 @@ impl Uuid {
         self.set_bytes(bytes);
         AitState::Normal
     }
-    pub fn make_entl(&mut self) -> AitState {
+    pub fn make_init(&mut self) -> AitState {
         self.set_code(INIT);
         AitState::Init
     }
@@ -124,22 +135,33 @@ impl Uuid {
         AitState::Ait
     }
     pub fn make_snake(&mut self) -> AitState {
-        let ait_state = self.get_ait_state();
         let code = self.get_code();
         let new_code = code ^ SNAKE;
         self.set_code(new_code);
-        ait_state
+        self.get_ait_state()
     }
     pub fn make_snaked(&mut self) -> AitState {
         self.set_code(SNAKED);
         AitState::SnakeD
+    }
+    pub fn make_control(&mut self) -> AitState {
+        let code = self.get_code();
+        let new_code = code ^ CTRL;
+        self.set_code(new_code);
+        self.get_ait_state()
     }
     // Tell sender if transfer succeeded or not
     pub fn make_ait_reply(&mut self) -> AitState {
         self.set_code(AITD);
         AitState::AitD
     }
+    pub fn make_tick(&mut self) -> AitState {
+        self.clear_flags();
+        self.set_code(TICK);
+        AitState::Tick
+    }
     pub fn make_tock(&mut self) -> AitState {
+        self.clear_flags();
         self.set_code(TOCK);
         AitState::Tock
     }
@@ -186,7 +208,9 @@ impl Uuid {
             TECK => { self.set_code(TACK); AitState::Tack },
             AIT  => { self.set_code(TECK); AitState::Teck },
             NORMAL => AitState::Normal,
-            _ => return Err(UuidError::AitState { func_name: _f, ait_state: self.get_ait_state() }.into())
+            _ => return {
+                Err(UuidError::AitState { func_name: _f, ait_state: self.get_ait_state() }.into())
+            }
         })
     }
     fn previous_state(&mut self) -> Result<AitState, Error> {

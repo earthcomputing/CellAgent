@@ -5,6 +5,7 @@ use crate::port::PortStatusOld;
 use crate::utility::{ByteArray, PortNo};
 pub type SNAKE = bool;
 pub type ISAIT = bool;
+pub type ISCONTROL = bool;
 pub type APP = ByteArray;
 // Port to Noc World
 pub type NocToPortMsg = APP;
