@@ -42,7 +42,7 @@ pub struct CellInteriorConnection {
 }
 impl fmt::Display for CellInteriorConnection {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "CC: (cell: {}, port: {})", *self.cell_no, *self.port_no)
+        write!(f, "(cell: {}, port: {})", *self.cell_no, *self.port_no)
     }
 }
 
@@ -53,7 +53,7 @@ pub struct EdgeConnection {
 }
 impl fmt::Display for EdgeConnection {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "EC: (left: {}, rite: {})", self.left, self.rite)
+        write!(f, "{}<->{}", self.left, self.rite)
     }
 }
 
@@ -255,7 +255,7 @@ impl Rack {
             }
             self.cells.insert(cell_no, nal_cell);
         }
-        println!("Created all simulated cells");
+        println!("Created all simulated cells\n\nConnections");
         for edge_connection in edge_connection_list {
             let (left_cell, rite_cell) = self.cells
                 .get_pair_mut(&edge_connection.left.cell_no, &edge_connection.rite.cell_no)
@@ -274,7 +274,7 @@ impl Rack {
                     rite: duplex_link_end_channel_map[&edge_connection.rite].link_to_port.clone(),
                 }
             )?;
-            println!("Created link for edge connection {}", edge_connection);
+            println!("{}", edge_connection);
             {
                 if CONFIG.trace_options.all || CONFIG.trace_options.dc {
                     let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "connect_link" };
@@ -298,7 +298,7 @@ impl Rack {
             link_handles.append(&mut vec![join_handle]);
             self.links.insert(edge_connection, link);
         }
-        println!("Rack {}: Assigned ports; created and listening on simulated links", _f);
+        println!("\nRack {}: Assigned ports; created and listening on simulated links", _f);
         Ok(link_handles)
     }
     pub fn construct(blueprint: &Blueprint, duplex_port_noc_channel_cell_port_map: HashMap::<CellNo, HashMap::<PortNo, DuplexPortNocChannel>>) -> Result<(Rack, Vec<JoinHandle<()>>), Error> {
