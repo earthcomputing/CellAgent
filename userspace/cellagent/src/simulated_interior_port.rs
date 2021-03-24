@@ -7,16 +7,14 @@ use std::{
     marker::{PhantomData},
 };
 
-use crate::app_message_formats::{PortToCa};
 use crate::blueprint::{Blueprint, };
 use crate::config::{CONFIG};
 use crate::dal::{add_to_trace};
 use crate::ec_message_formats::{PortToPePacketOld, PortToPeOld};
-use crate::link::{Link};
 use crate::name::{Name, CellID, PortID};
 use crate::packet::{Packet}; // Eventually use SimulatedPacket
 use crate::port::{CommonPortLike, InteriorPortLike, PortSeed, BasePort, InteriorPortFactoryLike, PortStatusOld, DuplexPortPeOrCaChannel, DuplexPortPeChannel};
-use crate::utility::{CellNo, PortNo, PortNumber, Edge, S, TraceHeaderParams, TraceType};
+use crate::utility::{CellNo, PortNo, PortNumber, S, TraceHeaderParams, TraceType};
 use crate::uuid_ec::{AitState};
 
 pub type PortToLink = mpsc::Sender<PortToLinkPacket>;

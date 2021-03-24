@@ -17,14 +17,11 @@ use crate::ec_message_formats::{PortToPe, PeFromPort, PeToPort, PortFromPe,
                                 CmToCa, CaFromCm, CaToCm, CmFromCa, CaToCmBytes, CmToCaBytes,
                                 PeToCm, CmFromPe, CmToPe, PeFromCm};
 use crate::name::{CellID, PortID};
-use crate::port::{InteriorPortLike, BorderPortLike, BasePort, InteriorPortFactoryLike, BorderPortFactoryLike, Port, DuplexPortPeOrCaChannel, DuplexPortPeChannel, DuplexPortCaChannel};
+use crate::port::{InteriorPortLike, BorderPortLike, InteriorPortFactoryLike, BorderPortFactoryLike, Port, DuplexPortPeOrCaChannel, DuplexPortPeChannel, DuplexPortCaChannel};
 use crate::replay::{TraceFormat, process_trace_record};
 use crate::utility::{CellConfig, CellType, PortNo, S,
                      TraceHeaderParams, TraceType};
 
-#[cfg(not(feature = "cell"))]
-#[allow(non_camel_case_types)]
-type ECNL_Session = usize;
 #[derive(Debug, Clone)]
 pub struct NalCell<InteriorPortFactoryType: InteriorPortFactoryLike<InteriorPortType>, InteriorPortType: 'static + Clone + InteriorPortLike, BorderPortFactoryType: BorderPortFactoryLike<BorderPortType>, BorderPortType: 'static + Clone + BorderPortLike> {
     id: CellID,
@@ -114,12 +111,6 @@ impl<InteriorPortFactoryType: InteriorPortFactoryLike<InteriorPortType>, Interio
             };
             // THIS IS ALSO GENERATED IN BasePort::new !!
             let port_id = PortID::new(cell_id, port_number).context(NalcellError::Chain { func_name: "new", comment: S(cell_id.get_name()) + &S(*port_number.get_port_no())})?;
-            let base_port = BasePort::new(
-                cell_id,
-                port_number,
-                is_border_port,
-                duplex_port_pe_or_ca_channel.clone(),
-            ).context(NalcellError::Chain { func_name: "new", comment: S("port") })?;
             let port_factory_clone = port_factory.clone();
             match duplex_port_pe_or_ca_channel {
                 DuplexPortPeOrCaChannel::Interior(duplex_port_pe_channel) => {
@@ -207,13 +198,13 @@ impl<InteriorPortFactoryType: InteriorPortFactoryLike<InteriorPortType>, Interio
         border_port.clone().listen_noc_and_ca()?;
         return Ok(border_port);
     }
-    fn get_port(&self, port_no: &PortNo) -> Port<InteriorPortType, BorderPortType> {
+    fn _get_port(&self, port_no: &PortNo) -> Port<InteriorPortType, BorderPortType> {
         self.ports[**port_no as usize].clone()
     }
     fn get_interior_port(&self, port_no: &PortNo) -> Result<InteriorPortType, Error> {
         let _f = "get_interior_port";
         match self.ports[**port_no as usize].clone() {
-            Port::Border(border_port) => {
+            Port::Border(_border_port) => {
                 return Err(NalcellError::UnexpectedBorderPort {
                     func_name: _f,
                     cell_id: self.id,
@@ -231,7 +222,7 @@ impl<InteriorPortFactoryType: InteriorPortFactoryLike<InteriorPortType>, Interio
             Port::Border(border_port) => {
                 return Ok(*border_port);
             },
-            Port::Interior(interior_port) => {
+            Port::Interior(_interior_port) => {
                 return Err(NalcellError::UnexpectedInteriorPort {
                     func_name: _f,
                     cell_id: self.id,

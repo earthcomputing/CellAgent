@@ -8,7 +8,6 @@ use crate::blueprint::{Blueprint, Cell};
 use crate::config::CONFIG;
 use crate::dal::{add_to_trace};
 use crate::noc::{DuplexNocPortChannel, DuplexNocApplicationChannel, Noc, NocToApplication, NocFromApplication, NocToPort, NocFromPort};
-use crate::port::BorderPortLike;
 use crate::rack::{Rack};
 use crate::simulated_border_port::{PortFromNoc, PortToNoc, DuplexPortNocChannel};
 use crate::utility::{CellNo, PortNo, S, TraceHeaderParams, TraceType};
@@ -125,7 +124,7 @@ impl Datacenter {
         } else {
             println!("Connecting NOC to border cell {} at port {}", noc_border_cell_no, noc_border_port_no);
         }
-        let noc_border_port = noc_border_cell.listen_noc_and_ca(&noc_border_port_no)?;
+        noc_border_cell.listen_noc_and_ca(&noc_border_port_no)?; // Returns border cell, but it's not needed
         let mut noc = Noc::new(duplex_noc_port_channel_cell_port_map, DuplexNocApplicationChannel {
             noc_to_application,
             noc_from_application,

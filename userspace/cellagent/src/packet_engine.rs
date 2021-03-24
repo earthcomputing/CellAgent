@@ -1,4 +1,4 @@
-use std::{collections::{HashMap, HashSet, VecDeque}, fmt, fmt::Write, hash::Hash, str, sync::{Arc, Mutex}, thread, thread::JoinHandle};
+use std::{collections::{HashMap, HashSet, VecDeque}, fmt, fmt::Write, str, sync::{Arc, Mutex}, thread, thread::JoinHandle};
 
 use crate::{config::{CONFIG, PortQty}};
 use crate::dal::{add_to_trace, fork_trace_header, update_trace_header};
@@ -114,6 +114,10 @@ impl PacketEngine {
                     let msg = recvd.context(PacketEngineError::Chain { func_name: _f, comment: S("pe from cm") })?;
                     self.listen_cm(msg).context(PacketEngineError::Chain { func_name: _f, comment: S("listen cm") })?;
                 },
+                recv(pe_from_ports) -> recvd => {
+                    let msg = recvd.context(PacketEngineError::Chain { func_name: _f, comment: S("pe from port") })?;
+                    self.listen_port(msg).context(PacketEngineError::Chain { func_name: _f, comment: S("listen port") })?;
+                }
                 recv(pe_from_ports_old) -> recvd => {
                     let msg = recvd.context(PacketEngineError::Chain { func_name: _f, comment: S("pe from port") })?;
                     self.listen_port_old(msg).context(PacketEngineError::Chain { func_name: _f, comment: S("listen port") })?;
@@ -132,36 +136,36 @@ impl PacketEngine {
     fn set_may_send(&mut self, port_no: PortNo) {
         self.port_got_event[port_no.as_usize()] = true;
     }
-    fn get_inbuf(&self, port_no: PortNo) -> &InBuffer {
+    fn _get_inbuf(&self, port_no: PortNo) -> &InBuffer {
         &self.in_buffers[port_no.as_usize()]
     }
-    fn get_inbuf_mut(&mut self, port_no: PortNo) -> &mut InBuffer {
+    fn _get_inbuf_mut(&mut self, port_no: PortNo) -> &mut InBuffer {
         &mut self.in_buffers[port_no.as_usize()]
     }
-    fn set_inbuf(&mut self, port_no: PortNo, new_count: usize, packet_ref: &Packet) {
+    fn _set_inbuf(&mut self, port_no: PortNo, new_count: usize, packet_ref: &Packet) {
         self.in_buffers[port_no.as_usize()] = (new_count, packet_ref.clone());
     }
-    fn decrement_inbuf_count(&mut self, port_no: PortNo) -> Result<usize, Error> {
+    fn _decrement_inbuf_count(&mut self, port_no: PortNo) -> Result<usize, Error> {
         let _f = "decrement_inbuf_count";
-        let (count, _packet) = self.get_inbuf_mut(port_no);
+        let (count, _packet) = self._get_inbuf_mut(port_no);
         if *count == 0 { return Err(PacketEngineError::InBuffer { func_name: _f, cell_id: self.cell_id, port_no: port_no }.into()); }
         *count = *count - 1;
         Ok(*count)
     }
-    fn get_outbuf(&self, outbuf_type: &OutbufType, port_no: PortNo) -> &OutBuffer {
+    fn _get_outbuf(&self, outbuf_type: &OutbufType, port_no: PortNo) -> &OutBuffer {
         self.out_buffers[port_no.as_usize()]
             .get(&outbuf_type)
             .expect("PacketEngine: get_outbuf: OutbufType must be set")
     }
-    fn get_outbuf_mut(&mut self, outbuf_type: &OutbufType, port_no: PortNo) -> &mut OutBuffer {
+    fn _get_outbuf_mut(&mut self, outbuf_type: &OutbufType, port_no: PortNo) -> &mut OutBuffer {
         self.out_buffers[port_no.as_usize()]
             .get_mut(&outbuf_type)
             .expect("PacketEngine: get_outbuf: OutbufType must be set")
     }
-    fn get_outbuf_size(&self, outbuf_type: &OutbufType, port_no: PortNo) -> usize {
-        self.get_outbuf(outbuf_type, port_no).1.len()
+    fn _get_outbuf_size(&self, outbuf_type: &OutbufType, port_no: PortNo) -> usize {
+        self._get_outbuf(outbuf_type, port_no).1.len()
     }
-    fn get_outbuf_old(&self, port_no: PortNo) -> &BufferOld {
+    fn _get_outbuf_old(&self, port_no: PortNo) -> &BufferOld {
         self.out_buffers_old.get(port_no.as_usize()).expect("PacketEngine: get_outbuf_old must succeed")
     }
     fn get_outbuf_mut_old(&mut self, port_no: PortNo) -> &mut BufferOld {
@@ -173,29 +177,29 @@ impl PacketEngine {
     fn get_outbuf_size_old(&self, port_no: PortNo) -> usize {
         PacketEngine::get_size(&self.out_buffers_old, port_no)
     }
-    fn get_outbuf_first_type_old(&self, port_no: PortNo) -> Option<MsgType> {
-        self.get_outbuf_old(port_no)
+    fn _get_outbuf_first_type_old(&self, port_no: PortNo) -> Option<MsgType> {
+        self._get_outbuf_old(port_no)
             .get(0)
             .map(|(_, _, packet)| MsgType::msg_type(packet))
     }
-    fn get_outbuf_first_ait_state_old(&self, port_no: PortNo) -> Option<AitState> {
-        self.get_outbuf_old(port_no)
+    fn _get_outbuf_first_ait_state_old(&self, port_no: PortNo) -> Option<AitState> {
+        self._get_outbuf_old(port_no)
             .get(0)
             .map(|(_, _, packet)| packet.get_ait_state())
     }
-    fn get_no_free_slots(&self, outbuf_type: &OutbufType, port_no: PortNo) -> usize {
+    fn _get_no_free_slots(&self, outbuf_type: &OutbufType, port_no: PortNo) -> usize {
         *self.no_free_slots[port_no.as_usize()]
             .get(&outbuf_type)
             .expect("PacketEngine: Outbuf type must succeed")
     }
-    fn decr_no_free_slots(&mut self, outbuf_type: &OutbufType, port_no: PortNo) -> usize {
+    fn _decr_no_free_slots(&mut self, outbuf_type: &OutbufType, port_no: PortNo) -> usize {
         let no_free_slots = self.no_free_slots[port_no.as_usize()]
             .get(&outbuf_type)
             .expect("PacketEngine: Outbuf type must succeed")
             - 1;
         no_free_slots
     }
-    fn incr_no_free_slots(&mut self, outbuf_type: OutbufType, port_no: PortNo) -> usize {
+    fn _incr_no_free_slots(&mut self, outbuf_type: OutbufType, port_no: PortNo) -> usize {
         let no_free_slots = self.no_free_slots[port_no.as_usize()]
             .get(&outbuf_type)
             .expect("PacketEngine: Outbuf type must succeed")
@@ -351,7 +355,7 @@ impl PacketEngine {
                         add_to_trace(TraceType::Trace, trace_params, &trace, _f);
                     }
                 }
-                self.process_packet_from_port(port_no, packet)?;
+                self._process_packet_from_port(port_no, packet)?;
             },
             PortToPePacket::Status((port_no, is_border, status)) => {
                 {
@@ -372,7 +376,7 @@ impl PacketEngine {
         }
         Ok(())
     }
-    fn process_packet_from_port(&mut self, recv_port_no: PortNo, packet: Packet) -> Result<(), Error> {
+    fn _process_packet_from_port(&mut self, recv_port_no: PortNo, packet: Packet) -> Result<(), Error> {
         let _f = "process_packet_from_port";
         match packet.get_ait_state() {
             AitState::Teck | // Forward packet if end-to-end AIT, but now we have hop by hop
@@ -427,7 +431,7 @@ impl PacketEngine {
                 if entry.is_in_use() {
                     // Put packets on the right port's queue
                     let mask = entry.get_mask();
-                    self.forward(recv_port_no, entry, mask, &packet).context(PacketEngineError::Chain { func_name: "process_packet", comment: S("forward ") + &self.cell_id.get_name() })?;
+                    self._forward(recv_port_no, entry, mask, &packet).context(PacketEngineError::Chain { func_name: "process_packet", comment: S("forward ") + &self.cell_id.get_name() })?;
                 }
             }
         }
@@ -707,7 +711,7 @@ impl PacketEngine {
         }
         Ok(())
     }
-    fn forward(&mut self, recv_port_no: PortNo, entry: RoutingTableEntry, user_mask: Mask, packet_ref: &Packet)
+    fn _forward(&mut self, recv_port_no: PortNo, entry: RoutingTableEntry, user_mask: Mask, packet_ref: &Packet)
             -> Result<(), Error> {
         let _f = "forward";
         let packet = packet_ref.clone();
@@ -728,7 +732,7 @@ impl PacketEngine {
             let test_mask = entry.get_mask().and(Mask::all_but_zero(PortQty(MAX_PORTS)));
             test_mask.get_no_ports() // Send leafward to potentially multiple ports
         };
-        self.set_inbuf(recv_port_no, count, packet_ref);
+        self._set_inbuf(recv_port_no, count, packet_ref);
         if packet.get_tree_uuid().is_control() {
             // No snake for hop-by-hop messages
             // Send with CA flow control (currently none)
@@ -748,7 +752,7 @@ impl PacketEngine {
                     self.pe_to_cm.send(PeToCmPacket::Packet((recv_port_no, packet.clone())))?;
                 } else {
                     // Replace with OutbufType::Control
-                    self.move_to_outbuf(OutbufType::Control, recv_port_no, port_no)?;
+                    self._move_to_outbuf(OutbufType::Control, recv_port_no, port_no)?;
                 }
             }
         } else {
@@ -774,7 +778,7 @@ impl PacketEngine {
                             add_to_trace(TraceType::Trace, trace_params, &trace, _f);
                         }
                     }
-                    self.move_to_outbuf(OutbufType::Message, recv_port_no, parent)?;
+                    self._move_to_outbuf(OutbufType::Message, recv_port_no, parent)?;
                 }
             } else {
                 // Send leafward if recv port is parent
@@ -801,7 +805,7 @@ impl PacketEngine {
                                 add_to_trace(TraceType::Trace, trace_params, &trace, _f);
                             }
                         }
-                        self.move_to_outbuf(OutbufType::Message, recv_port_no, port_no)?;
+                        self._move_to_outbuf(OutbufType::Message, recv_port_no, port_no)?;
                     }
                 }
             }
@@ -818,20 +822,20 @@ impl PacketEngine {
         }
         Ok(())
     }
-    fn move_to_outbuf(&mut self, outbuf_type: OutbufType, recv_port_no: PortNo, port_no: PortNo) -> Result<(), Error> {
-        let (_no_free_slots, outbuf) = self.get_outbuf_mut(&outbuf_type, port_no);
+    fn _move_to_outbuf(&mut self, outbuf_type: OutbufType, recv_port_no: PortNo, port_no: PortNo) -> Result<(), Error> {
+        let (_no_free_slots, outbuf) = self._get_outbuf_mut(&outbuf_type, port_no);
         outbuf.push_back(recv_port_no);
         assert!(outbuf.len() <= MAX_PORTS as usize); // Should be guaranteed by flow control
-        self.send_to_port(&outbuf_type, recv_port_no, port_no)?;
-        Ok(())
+        self._send_to_port(&outbuf_type, recv_port_no, port_no)?;
+        Ok(()) 
     }
-    fn send_to_port(&mut self, outbuf_type: &OutbufType, recv_port_no: PortNo, port_no: PortNo) -> Result<(), Error> {
-        while self.get_no_free_slots(outbuf_type, port_no) > 0 {
-            self.decr_no_free_slots(outbuf_type, port_no);
-            let (_, packet_ref) = self.get_inbuf(port_no);
+    fn _send_to_port(&mut self, outbuf_type: &OutbufType, recv_port_no: PortNo, port_no: PortNo) -> Result<(), Error> {
+        while self._get_no_free_slots(outbuf_type, port_no) > 0 {
+            self._decr_no_free_slots(outbuf_type, port_no);
+            let (_, packet_ref) = self._get_inbuf(port_no);
             let pe_to_port = self.pe_to_ports.get(&port_no).expect("PacketEngine: pe_to_ports must be set");
             pe_to_port.send(PeToPortPacket::Packet((OutbufType::Message, packet_ref.clone())))?;
-            if self.decrement_inbuf_count(port_no)? == 0 {
+            if self._decrement_inbuf_count(port_no)? == 0 {
                 let pe_to_recv_port = self.pe_to_ports.get(&recv_port_no).expect("PacketEngine: pe_to_ports must be set");
                 pe_to_recv_port.send(PeToPortPacket::Ready)?;
             }

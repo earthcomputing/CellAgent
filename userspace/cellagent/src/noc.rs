@@ -3,7 +3,6 @@ use std::{thread,
           //sync::mpsc::channel,
           collections::{HashMap, HashSet}};
 use crossbeam::crossbeam_channel as mpsc;
-use crossbeam::crossbeam_channel::unbounded as channel;
 
 use crate::app_message::{AppMsgType, AppMessage, AppMsgDirection,
                          AppDeleteTreeMsg, AppInterapplicationMsg, AppQueryMsg,
@@ -14,7 +13,7 @@ use crate::config::{CONFIG, SCHEMA_VERSION};
 use crate::dal::{add_to_trace, fork_trace_header, update_trace_header};
 use crate::name::{CellID};  // CellID used for trace records
 use crate::gvm_equation::{GvmEquation, GvmEqn, GvmVariable, GvmVariableType};
-use crate::simulated_border_port::{PortToNoc, PortFromNoc};
+
 use crate::uptree_spec::{AllowedTree, ContainerSpec, Manifest, UpTreeSpec, VmSpec};
 use crate::utility::{ByteArray, CellNo, CellConfig, PortNo, S, TraceHeader, TraceHeaderParams, TraceType,
                      get_geometry, vec_from_hashset, write_err};
@@ -90,7 +89,6 @@ impl Noc {
         let mut noc = self.clone();
         let child_trace_header = fork_trace_header();
         let thread_name = format!("{} listen_port", self.get_name()); // NOC NOC
-        let duplex_noc_port_channel: DuplexNocPortChannel = self.duplex_noc_port_channel_cell_port_map[&cell_no][&border_port_no].clone();
         thread::Builder::new().name(thread_name).spawn( move || {
             update_trace_header(child_trace_header);
             let _ = noc.listen_port_loop(cell_no, border_port_no).map_err(|e| write_err("Noc: port", &e));
