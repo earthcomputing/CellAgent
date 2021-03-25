@@ -1,19 +1,17 @@
 use std::{
     clone::{Clone},
     fmt,
-    marker::{PhantomData},
     thread,
     thread::JoinHandle,
 };
 
-use crossbeam::crossbeam_channel as mpsc;
 
 use crate::app_message_formats::{PortToCa, PortToCaMsg, PortFromCa};
 use crate::config::CONFIG;
 use crate::dal::{add_to_trace, fork_trace_header, update_trace_header};
 use crate::ec_message_formats::{PortToPe, PortFromPe};
 use crate::name::{Name, CellID, PortID};
-use crate::packet::{Packet, UniqueMsgId};
+use crate::packet::{Packet};
 use crate::utility::{ByteArray, PortNo, PortNumber, S, TraceHeader, TraceHeaderParams, TraceType,
                      write_err};
 

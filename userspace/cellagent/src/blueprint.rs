@@ -132,7 +132,7 @@ impl Blueprint {
     pub fn get_neighbor_edges(&self, cell_no: CellNo) -> Vec<Edge> {
         let mut neighbors = Vec::<Edge>::new();
         for edge in self.get_edge_list() {
-            if (edge.0 == cell_no || edge.1 == cell_no) {
+            if (edge.0 == cell_no) || (edge.1 == cell_no) {
                 neighbors.push(*edge);
             }
         }

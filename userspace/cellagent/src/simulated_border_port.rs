@@ -10,7 +10,7 @@ use crate::config::{CONFIG};
 use crate::dal::{add_to_trace};
 use crate::app_message_formats::{PortToCaMsg, PortToCa, NocToPortMsg, PortToNocMsg};
 use crate::name::{Name, PortID, CellID};
-use crate::port::{CommonPortLike, BorderPortLike, PortSeed, BasePort, BorderPortFactoryLike, PortStatus, DuplexPortPeOrCaChannel, DuplexPortCaChannel};
+use crate::port::{CommonPortLike, BorderPortLike, PortSeed, BasePort, BorderPortFactoryLike, DuplexPortPeOrCaChannel, DuplexPortCaChannel};
 use crate::utility::{CellNo, PortNo, PortNumber, ByteArray, S, TraceHeaderParams, TraceType};
 use crate::uuid_ec::{AitState};
 
