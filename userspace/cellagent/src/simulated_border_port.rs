@@ -2,7 +2,6 @@ use crossbeam::crossbeam_channel as mpsc;
 
 use std::{
     collections::{HashMap, },
-    marker::{PhantomData},
 };
 
 use crate::blueprint::{Blueprint};
@@ -32,7 +31,8 @@ pub struct SimulatedBorderPort {
 
 impl SimulatedBorderPort {
     fn recv(&self) -> Result<NocToPortMsg, Error> {
-       Ok(self.duplex_port_noc_channel.as_ref().unwrap().port_from_noc.recv()?)
+        let _f = "recv";
+        Ok(self.duplex_port_noc_channel.as_ref().unwrap().port_from_noc.recv()?)
     }
     fn direct_send(&self, bytes: &ByteArray) -> Result<(), Error> {
         let _f = "send_to_noc";
@@ -67,7 +67,7 @@ impl BorderPortLike for SimulatedBorderPort {
     fn listen_and_forward_to(&mut self, port_to_ca: PortToCa) -> Result<(), Error> {
         let _f = "listen_and_forward_to";
         loop {
-            let msg = self.duplex_port_noc_channel.as_ref().unwrap().port_from_noc.recv()?;
+            let msg = self.recv()?;
             {
                 if CONFIG.trace_options.all || CONFIG.trace_options.port {
                     let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "port_from_noc_app" };
@@ -96,13 +96,13 @@ pub struct SimulatedBorderPortFactory {
 }
 
 impl SimulatedBorderPortFactory {
-    pub fn new(port_seed: PortSeed, cell_no_map: HashMap<String, CellNo>, blueprint: Blueprint, duplex_port_noc_channel_cell_port_map: HashMap<CellNo, HashMap::<PortNo, DuplexPortNocChannel>>, phantom: PhantomData<SimulatedBorderPort>) -> SimulatedBorderPortFactory {
+    pub fn new(port_seed: PortSeed, cell_no_map: HashMap<String, CellNo>, blueprint: Blueprint, duplex_port_noc_channel_cell_port_map: HashMap<CellNo, HashMap::<PortNo, DuplexPortNocChannel>>) -> SimulatedBorderPortFactory {
         SimulatedBorderPortFactory { port_seed, cell_no_map, blueprint, duplex_port_noc_channel_cell_port_map }
     }
 }
 
 impl BorderPortFactoryLike<SimulatedBorderPort> for SimulatedBorderPortFactory {
-    fn new_port(&self, cell_id: CellID, id: PortID, port_number: PortNumber, duplex_port_ca_channel: DuplexPortCaChannel) -> Result<SimulatedBorderPort, Error> {
+    fn new_port(&self, cell_id: CellID, _port_id: PortID, port_number: PortNumber, duplex_port_ca_channel: DuplexPortCaChannel) -> Result<SimulatedBorderPort, Error> {
         let cell_no = self.cell_no_map[&cell_id.get_name()];
         let port_no = port_number.get_port_no();
         let ref duplex_port_noc_channel_port_map = (*self).duplex_port_noc_channel_cell_port_map[&cell_no];

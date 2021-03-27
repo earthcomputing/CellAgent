@@ -4,7 +4,6 @@ use crossbeam::crossbeam_channel as mpsc;
 
 use std::{
     collections::{HashMap, },
-    marker::{PhantomData},
 };
 
 use crate::blueprint::{Blueprint, };
@@ -204,7 +203,7 @@ pub struct SimulatedInteriorPortFactory {
 }
 
 impl SimulatedInteriorPortFactory {
-    pub fn new(port_seed: PortSeed, cell_no_map: HashMap<String, CellNo>, blueprint: Blueprint, duplex_port_link_channel_cell_port_map: HashMap<CellNo, HashMap<PortNo, DuplexPortLinkChannel>>, phantom: PhantomData<SimulatedInteriorPort>) -> SimulatedInteriorPortFactory {
+    pub fn new(port_seed: PortSeed, cell_no_map: HashMap<String, CellNo>, blueprint: Blueprint, duplex_port_link_channel_cell_port_map: HashMap<CellNo, HashMap<PortNo, DuplexPortLinkChannel>>) -> SimulatedInteriorPortFactory {
         SimulatedInteriorPortFactory { port_seed, cell_no_map, blueprint, duplex_port_link_channel_cell_port_map }
     }
 }
