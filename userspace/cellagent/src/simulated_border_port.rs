@@ -34,17 +34,6 @@ impl SimulatedBorderPort {
         let _f = "recv";
         Ok(self.duplex_port_noc_channel.as_ref().unwrap().port_from_noc.recv()?)
     }
-    fn direct_send(&self, bytes: &ByteArray) -> Result<(), Error> {
-        let _f = "send_to_noc";
-        {
-            if CONFIG.trace_options.all | CONFIG.trace_options.port {
-                let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "port_to_noc" };
-                let trace = json!({ "cell_id": self.base_port.get_cell_id(), "id": self.base_port.get_id().get_name(), "bytes": bytes.stringify()? });
-                add_to_trace(TraceType::Trace, trace_params, &trace, _f);
-            }
-        }
-       Ok(self.duplex_port_noc_channel.as_ref().unwrap().port_to_noc.send(bytes.clone()).context(SimulatedBorderPortError::Chain {func_name: "new",comment: S("")})?)
-    }
 }
 
 impl CommonPortLike for SimulatedBorderPort {
@@ -61,8 +50,15 @@ impl CommonPortLike for SimulatedBorderPort {
 
 impl BorderPortLike for SimulatedBorderPort {
     fn send(&self, bytes: &mut ByteArray) -> Result<(), Error> {
-        let _f = "send";
-	self.direct_send(bytes)
+        let _f = "send_to_noc";
+        {
+            if CONFIG.trace_options.all | CONFIG.trace_options.port {
+                let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "port_to_noc" };
+                let trace = json!({ "cell_id": self.base_port.get_cell_id(), "id": self.base_port.get_id().get_name(), "bytes": bytes.stringify()? });
+                add_to_trace(TraceType::Trace, trace_params, &trace, _f);
+            }
+        }
+       Ok(self.duplex_port_noc_channel.as_ref().unwrap().port_to_noc.send(bytes.clone()).context(SimulatedBorderPortError::Chain {func_name: "new",comment: S("")})?)
     }
     fn listen_and_forward_to(&mut self, port_to_ca: PortToCa) -> Result<(), Error> {
         let _f = "listen_and_forward_to";
