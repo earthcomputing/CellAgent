@@ -1,6 +1,6 @@
 use crossbeam::crossbeam_channel as mpsc;
 use crossbeam::crossbeam_channel::unbounded as channel;
-use std::{collections::{HashMap, hash_map::Entry}, fmt};
+use std::{collections::{HashMap}, fmt};
 
 use crate::app_message_formats::{ApplicationNocMsg, NocToApplicationMsg};
 use crate::blueprint::{Blueprint, Cell};
@@ -67,16 +67,9 @@ impl Datacenter {
         let mut noc_border_port_map = HashMap::<CellNo, PortNo>::new();
         for border_cell in blueprint.get_border_cells() {
             let border_cell_no = border_cell.get_cell_no();
-            let noc_port_channels = match duplex_noc_port_channel_cell_port_map
-                .entry(border_cell_no) {
-                    Entry::Occupied(entry) => entry.into_mut(),
-                    Entry::Vacant(entry) => entry.insert(HashMap::new()),
-                };
-            let port_noc_channels = match duplex_port_noc_channel_cell_port_map
-                .entry(border_cell_no) {
-                    Entry::Occupied(entry) => entry.into_mut(),
-                    Entry::Vacant(entry) => entry.insert(HashMap::new())
-                };
+            // Next two lines don't work unless duplex_*_*_cell_port_map are empty
+            let mut noc_port_channels = HashMap::new();
+            let mut port_noc_channels = HashMap::new();
             for &border_port_no in border_cell.get_border_ports() {
                 if *border_port_no == 0 {
                     return Err(DatacenterError::BorderPort { func_name: _f, cell_no: border_cell_no }.into())
@@ -92,6 +85,8 @@ impl Datacenter {
                     port_no: border_port_no,
                 });
             }
+            duplex_noc_port_channel_cell_port_map.insert(border_cell_no, noc_port_channels);
+            duplex_port_noc_channel_cell_port_map.insert(border_cell_no, port_noc_channels);
         }
         let (mut rack, _join_handles) = Rack::construct(&blueprint, duplex_port_noc_channel_cell_port_map).context(DatacenterError::Chain { func_name: _f, comment: S("Rack")})?;
         let (noc_border_cell_no, noc_border_cell) = rack.select_noc_border_cell()?;
