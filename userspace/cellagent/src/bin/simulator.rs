@@ -35,8 +35,7 @@ fn main() -> Result<(), Error> {
                                                    &CONFIG.edge_list,
                                                    CONFIG.num_ports_per_cell,
                                                    &CONFIG.cell_port_exceptions,
-                                                   &CONFIG.border_cell_ports,
-        )?) {
+                                                   &CONFIG.border_cell_ports,)?) {
             Ok(dc) => dc,
             Err(err) => panic!("Datacenter construction failure: {}", err)
         };
