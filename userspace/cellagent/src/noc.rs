@@ -13,7 +13,6 @@ use crate::config::{CONFIG, SCHEMA_VERSION};
 use crate::dal::{add_to_trace, fork_trace_header, update_trace_header};
 use crate::name::{CellID};  // CellID used for trace records
 use crate::gvm_equation::{GvmEquation, GvmEqn, GvmVariable, GvmVariableType};
-
 use crate::uptree_spec::{AllowedTree, ContainerSpec, Manifest, UpTreeSpec, VmSpec};
 use crate::utility::{ByteArray, CellNo, CellConfig, PortNo, S, TraceHeader, TraceHeaderParams, TraceType,
                      get_geometry, vec_from_hashset, write_err};

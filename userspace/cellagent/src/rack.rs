@@ -3,7 +3,6 @@ use multi_mut::HashMapMultiMut;
 use std::{fmt, fmt::Write,
           collections::{HashMap, HashSet},
           iter::FromIterator,
-          marker::{PhantomData},
           //sync::mpsc::channel,
           thread, thread::{JoinHandle}};
 use crossbeam::crossbeam_channel::unbounded as channel;
@@ -188,14 +187,12 @@ impl Rack {
             cell_no_map.clone(),
             blueprint.clone(),
             duplex_port_noc_channel_cell_port_map.clone(),
-            PhantomData,
         );
         let simulated_interior_port_factory: SimulatedInteriorPortFactory = SimulatedInteriorPortFactory::new(
             PortSeed::new(),
             cell_no_map.clone(),
             blueprint.clone(),
             duplex_port_link_channel_cell_port_map.clone(),
-            PhantomData,
         );
         for border_cell in blueprint.get_border_cells() {
             let cell_no = border_cell.get_cell_no();
