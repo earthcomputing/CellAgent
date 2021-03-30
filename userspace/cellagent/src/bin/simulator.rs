@@ -48,7 +48,6 @@ fn main() -> Result<(), Error> {
             c to print cells
             l to print links
             p to print forwarding table
-            m to deploy an application
             x to exit program\n\n").context(MainError::Chain { func_name: "run", comment: S("") })?;
         let mut print_opt = String::new();
         stdin().read_line(&mut print_opt).context(MainError::Chain { func_name: _f, comment: S("") })?;
@@ -61,7 +60,6 @@ fn main() -> Result<(), Error> {
                 "c" => show_ca(&dc),
                 "l" => break_link(&mut dc),
                 "p" => show_pe(&dc),
-                "m" => deploy(&dc.get_application_to_noc().clone()),
                 "x" => std::process::exit(0),
                 _   => {
                     println!("Invalid input {}", print_opt);
@@ -144,7 +142,7 @@ fn read_int() -> Result<usize, Error> {
         }
     }
 }
-fn deploy(application_to_noc: &ApplicationToNoc) -> Result<(), Error> {
+fn _deploy(application_to_noc: &ApplicationToNoc) -> Result<(), Error> {
     let _f = "deploy";
     stdout().write(b"Enter the name of a file containing a manifest\n").context(MainError::Chain { func_name: "run", comment: S("") })?;
     let mut filename = String::new();

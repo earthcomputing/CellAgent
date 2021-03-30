@@ -89,7 +89,8 @@ impl Rack {
                     if **interior_port_no == 0 {
                         return Err(RackError::InteriorPort { func_name: _f, cell_no: cell_no }.into())
                     }
-                    if (!duplex_port_link_channel_cell_port_map.contains_key(&cell_no)) || (!duplex_port_link_channel_cell_port_map[&cell_no].contains_key(&interior_port_no)) {
+                    if (!duplex_port_link_channel_cell_port_map.contains_key(&cell_no)) || 
+                       (!duplex_port_link_channel_cell_port_map[&cell_no].contains_key(&interior_port_no)) {
                         let (link_to_port, port_from_link): (LinkToPort, PortFromLink) = channel();
                         let (port_to_link, link_from_port): (PortToLink, LinkFromPort) = channel();
                         duplex_port_link_channel_cell_port_map
@@ -148,22 +149,22 @@ impl Rack {
         for interior_cell in blueprint.get_interior_cells() {
             cell_no_map.insert(interior_cell.get_name(), interior_cell.get_cell_no());
         }
-        let simulated_border_port_factory: SimulatedBorderPortFactory = SimulatedBorderPortFactory::new(
+        let simulated_border_port_factory = SimulatedBorderPortFactory::new(
             PortSeed::new(),
             cell_no_map.clone(),
             blueprint.clone(),
-            duplex_port_noc_channel_cell_port_map.clone(),
+            duplex_port_noc_channel_cell_port_map,
         );
-        let simulated_interior_port_factory: SimulatedInteriorPortFactory = SimulatedInteriorPortFactory::new(
+        let simulated_interior_port_factory = SimulatedInteriorPortFactory::new(
             PortSeed::new(),
             cell_no_map.clone(),
             blueprint.clone(),
-            duplex_port_link_channel_cell_port_map.clone(),
+            duplex_port_link_channel_cell_port_map,
         );
         for border_cell in blueprint.get_border_cells() {
             let cell_no = border_cell.get_cell_no();
             let border_ports = border_cell.get_border_ports();
-            let (nal_cell, _join_handle) = match NalCell::<SimulatedInteriorPortFactory, SimulatedInteriorPort, SimulatedBorderPortFactory, SimulatedBorderPort>::new(
+            let (nal_cell, _join_handle) = match NalCell::new(
                 &border_cell.get_name(),
                 border_cell.get_num_phys_ports(),
                 &HashSet::from_iter(border_ports.clone()),
@@ -190,7 +191,7 @@ impl Rack {
         }
         for interior_cell in blueprint.get_interior_cells() {
             let cell_no = interior_cell.get_cell_no();
-            let (nal_cell, _join_handle) = match NalCell::<SimulatedInteriorPortFactory, SimulatedInteriorPort, SimulatedBorderPortFactory, SimulatedBorderPort>::new(
+            let (nal_cell, _join_handle) = match NalCell::new(
                 &interior_cell.get_name(),
                 interior_cell.get_num_phys_ports(),
                 &HashSet::new(),
@@ -219,7 +220,7 @@ impl Rack {
         for edge_connection in edge_connection_list {
             let (left_cell, rite_cell) = self.cells
                 .get_pair_mut(&edge_connection.left.cell_no, &edge_connection.rite.cell_no)
-                .unwrap();
+                .expect("Rack: problem with edge connection");
             let left_cell_id: CellID = left_cell.get_id(); // For Trace
             let left_port_no = &edge_connection.left.port_no;
             let left_port = left_cell.listen_link_and_pe(&left_port_no)?;

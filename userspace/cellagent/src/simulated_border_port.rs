@@ -2,6 +2,7 @@ use crossbeam::crossbeam_channel as mpsc;
 
 use std::{
     collections::{HashMap, },
+    fmt,
 };
 
 use crate::blueprint::{Blueprint};
@@ -18,8 +19,18 @@ pub type PortFromNoc = mpsc::Receiver<NocToPortMsg>;
 
 #[derive(Clone, Debug)]
 pub struct DuplexPortNocChannel {
-    pub port_from_noc: PortFromNoc,
-    pub port_to_noc: PortToNoc,
+    port_from_noc: PortFromNoc,
+    port_to_noc: PortToNoc,
+}
+impl DuplexPortNocChannel {
+    pub fn new(port_from_noc: PortFromNoc, port_to_noc: PortToNoc) -> DuplexPortNocChannel {
+        DuplexPortNocChannel { port_from_noc, port_to_noc }
+    }
+}
+impl fmt::Display for DuplexPortNocChannel {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "Channels between Port and NOC")
+    }
 }
 
 #[derive(Clone, Debug)]
@@ -101,7 +112,7 @@ impl BorderPortFactoryLike<SimulatedBorderPort> for SimulatedBorderPortFactory {
     fn new_port(&self, cell_id: CellID, _port_id: PortID, port_number: PortNumber, duplex_port_ca_channel: DuplexPortCaChannel) -> Result<SimulatedBorderPort, Error> {
         let cell_no = self.cell_no_map[&cell_id.get_name()];
         let port_no = port_number.get_port_no();
-        let ref duplex_port_noc_channel_port_map = (*self).duplex_port_noc_channel_cell_port_map[&cell_no];
+        let duplex_port_noc_channel_port_map = &(*self).duplex_port_noc_channel_cell_port_map[&cell_no];
         Ok(SimulatedBorderPort{
             base_port: BasePort::new(
                 cell_id,
