@@ -2,7 +2,6 @@ use std::{fmt, fmt::Write,
           collections::{HashMap, HashSet},
           iter::FromIterator,
 };
-use either::Either;
 
 use crate::config::{CONFIG, CellQty, PortQty};
 use crate::utility::{CellNo, CellType, Edge, PortNo};
@@ -114,17 +113,17 @@ impl Blueprint {
     pub fn get_edge_list(&self) -> &Vec<Edge> { &self.edges }
     pub fn get_border_cells(&self) -> &Vec<BorderCell> { &self.border_cells }
     pub fn get_interior_cells(&self) -> &Vec<InteriorCell> { &self.interior_cells }
-    pub fn get_cell(&self, cell_no: CellNo) -> Result<Either<&InteriorCell, &BorderCell>, BlueprintError> {
+    pub fn get_cell(&self, cell_no: CellNo) -> Result<&dyn Cell, BlueprintError> {
         let _f = "get_cell";
         // Ridiculously inefficient code to do something that should be extremely simple
         for border_cell in self.get_border_cells() {
             if cell_no == border_cell.get_cell_no() {
-                return Ok(Either::Right(border_cell));
+                return Ok(border_cell);
             }
         }
         for interior_cell in self.get_interior_cells() {
             if cell_no == interior_cell.get_cell_no() {
-                return Ok(Either::Left(interior_cell));
+                return Ok(interior_cell);
             }
         }
         return Err(BlueprintError::CellNotFound { func_name: _f, cell_no})

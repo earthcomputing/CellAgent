@@ -1,4 +1,3 @@
-use either::Either;
 use multi_mut::HashMapMultiMut;
 use std::{fmt, fmt::Write,
           collections::{HashMap, HashSet},
@@ -21,20 +20,25 @@ use crate::utility::{CellNo, CellConfig, PortNo, Edge, S, TraceHeaderParams, Tra
 
 #[derive(Clone, Debug)]
 pub struct DuplexLinkEndChannel {
-    pub link_to_port: LinkToPort,
-    pub link_from_port: LinkFromPort,
+    link_to_port: LinkToPort,
+    link_from_port: LinkFromPort,
 }
 
 #[derive(Clone, Debug)]
 pub struct DuplexLinkEndChannels {
-    pub left: DuplexLinkEndChannel,
-    pub rite: DuplexLinkEndChannel,
+    left: DuplexLinkEndChannel,
+    rite: DuplexLinkEndChannel,
 }
 
 #[derive(Debug, Copy, Clone, Hash, Eq, PartialEq, Serialize, Deserialize)]
 pub struct CellInteriorConnection {
-    pub cell_no: CellNo,
-    pub port_no: PortNo,
+    cell_no: CellNo,
+    port_no: PortNo,
+}
+impl CellInteriorConnection {
+    pub fn new(cell_no: CellNo, port_no: PortNo) -> CellInteriorConnection {
+        CellInteriorConnection { cell_no, port_no }
+    }
 }
 impl fmt::Display for CellInteriorConnection {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -44,18 +48,23 @@ impl fmt::Display for CellInteriorConnection {
 
 #[derive(Debug, Copy, Clone, Hash, Eq, PartialEq, Serialize, Deserialize)]
 pub struct EdgeConnection {
-    pub left: CellInteriorConnection,
-    pub rite: CellInteriorConnection,
+    left: CellInteriorConnection,
+    rite: CellInteriorConnection,
+}
+impl EdgeConnection {
+    pub fn new(left: CellInteriorConnection, rite: CellInteriorConnection) -> EdgeConnection {
+        EdgeConnection { left, rite }
+    }
 }
 impl fmt::Display for EdgeConnection {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{}<->{}", self.left, self.rite)
     }
 }
-
+type NalCellType = NalCell::<SimulatedInteriorPortFactory, SimulatedInteriorPort, SimulatedBorderPortFactory, SimulatedBorderPort>;
 #[derive(Clone, Debug, Default)]
 pub struct Rack {
-    cells: HashMap<CellNo, NalCell::<SimulatedInteriorPortFactory, SimulatedInteriorPort, SimulatedBorderPortFactory, SimulatedBorderPort>>,
+    cells: HashMap<CellNo, NalCellType>,
     links: HashMap<EdgeConnection, Link>,
 }
 impl Rack {
@@ -74,13 +83,9 @@ impl Rack {
         let mut duplex_link_end_channel_map = HashMap::<CellInteriorConnection, DuplexLinkEndChannel>::new();
         for edge in edge_list {
             let mut connect_port  = |cell_no, dest_cell_no, side_name| {
-                for interior_port_no in match blueprint.get_cell(cell_no).context(RackError::Chain { func_name: _f, comment: S("lookup cell")}) {
-                    Ok(cell) => match cell {
-                        Either::Left(interior_cell) => Ok(interior_cell.get_interior_ports()),
-                        Either::Right(border_cell) => Ok(border_cell.get_interior_ports()),
-                    },
-                    Err(_) => Err(RackError::Chain { func_name: _f, comment: S("lookup cell")}),
-                }? {
+                let cell = blueprint.get_cell(cell_no).expect(&format!("Rack: blueprint.get_cell(cell_no for cell {} must work", cell_no));
+                let interior_ports = cell.get_interior_ports();
+                for interior_port_no in interior_ports {
                     if !(**interior_port_no == 0) && (!duplex_port_link_channel_cell_port_map.contains_key(&cell_no) || !duplex_port_link_channel_cell_port_map[&cell_no].contains_key(&interior_port_no)) {
                         let (link_to_port, port_from_link): (LinkToPort, PortFromLink) = channel();
                         let (port_to_link, link_from_port): (PortToLink, LinkFromPort) = channel();
@@ -354,6 +359,8 @@ use failure::{Error, ResultExt};
 pub enum RackError {
     #[fail(display = "RackError::Chain {} {}", func_name, comment)]
     Chain { func_name: &'static str, comment: String },
+    #[fail(display = "RackError::BorderPort {} {}", func_name, cell_no)]
+    InteriorPort { func_name: &'static str, cell_no: CellNo },
     #[fail(display = "RackError::Boundary {}: No boundary cells found", func_name)]
     Boundary { func_name: &'static str },
     #[fail(display = "RackError::Cells {}: The number of cells {:?} must be at least 1", func_name, num_cells)]

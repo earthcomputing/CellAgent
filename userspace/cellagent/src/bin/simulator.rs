@@ -1,6 +1,7 @@
 #[macro_use] extern crate failure;
 
-use std::{io::{stdin, stdout, Read, Write},
+use std::{convert::TryFrom,
+          io::{stdin, stdout, Read, Write},
           fs::{File,},
           collections::{HashSet},
 };
@@ -111,23 +112,17 @@ fn break_link(dc: &mut Datacenter) -> Result<(), Error> {
             let link_ids = rack.get_link_ids();
             print_hash_map(&link_ids);
             let _ = stdout().write(b"Enter first cell number of link to break\n")?;
-            let left_cell: usize = read_int()?;
+            let left_cell = usize::try_from(read_int()?)?;
             let _ = stdout().write(b"Enter first port number of link to break\n")?;
-            let left_port: usize = read_int()?;
+            let left_port = u8::try_from(read_int()?)?;
             let _ = stdout().write(b"Enter second cell number of link to break\n")?;
-            let rite_cell: usize = read_int()?;
+            let rite_cell = usize::try_from(read_int()?)?;
             let _ = stdout().write(b"Enter second port number of link to break\n")?;
-            let rite_port: usize = read_int()?;
-            EdgeConnection {
-                left: CellInteriorConnection {
-                    cell_no: CellNo(left_cell),
-                    port_no: PortNo(left_port as u8),
-                },
-                rite: CellInteriorConnection {
-                    cell_no: CellNo(rite_cell),
-                    port_no: PortNo(rite_port as u8),
-                },
-            }
+            let rite_port = u8::try_from(read_int()?)?;
+            EdgeConnection::new(
+                CellInteriorConnection::new(CellNo(left_cell), PortNo(left_port)),
+                CellInteriorConnection::new(CellNo(rite_cell), PortNo(rite_port))
+            )
         },
     };
     let links = rack.get_links_mut();
