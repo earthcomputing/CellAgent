@@ -93,7 +93,7 @@ impl Blueprint {
         let mut border_cells = 	Vec::new();
         for no in 0..*num_cells {
             let cell_no = CellNo(no);
-            let phys_port_list : Vec<PortNo> = (0..*cell_num_phys_ports[&cell_no] as usize).map(|i| PortNo(i as u8)).collect();
+            let phys_port_list : Vec<PortNo> = (1..*cell_num_phys_ports[&cell_no] as usize).map(|i| PortNo(i as u8)).collect();
             match border_cell_ports.get(&cell_no) {
                 Some(border_ports) => {
                     let border: HashSet<PortNo> = HashSet::from_iter(border_ports.clone());
@@ -170,7 +170,7 @@ impl Cell for BorderCell {
     fn get_interior_ports(&self) -> &Vec<PortNo> { &self.interior_ports }
 }
 impl BorderCell {
-    pub fn _new(cell_no: CellNo, cell_type: CellType, interior_ports: Vec<PortNo>, border_ports: Vec<PortNo>) -> BorderCell {
+    pub fn new(cell_no: CellNo, cell_type: CellType, interior_ports: Vec<PortNo>, border_ports: Vec<PortNo>) -> BorderCell {
 	    BorderCell { cell_no, cell_type, interior_ports, border_ports }
     }
     pub fn get_border_ports(&self) -> &Vec<PortNo> { &self.border_ports }
@@ -198,7 +198,7 @@ impl Cell for InteriorCell {
     fn get_interior_ports(&self) -> &Vec<PortNo> { &self.interior_ports }
 }
 impl InteriorCell {
-    pub fn _new(cell_no: CellNo, cell_type: CellType, interior_ports: Vec<PortNo>) -> InteriorCell {
+    pub fn new(cell_no: CellNo, cell_type: CellType, interior_ports: Vec<PortNo>) -> InteriorCell {
         InteriorCell { cell_no, cell_type, interior_ports }
     }
 }

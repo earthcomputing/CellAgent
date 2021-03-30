@@ -86,63 +86,24 @@ impl Rack {
                 let cell = blueprint.get_cell(cell_no).expect(&format!("Rack: blueprint.get_cell(cell_no for cell {} must work", cell_no));
                 let interior_ports = cell.get_interior_ports();
                 for interior_port_no in interior_ports {
-                    if !(**interior_port_no == 0) && (!duplex_port_link_channel_cell_port_map.contains_key(&cell_no) || !duplex_port_link_channel_cell_port_map[&cell_no].contains_key(&interior_port_no)) {
+                    if **interior_port_no == 0 {
+                        return Err(RackError::InteriorPort { func_name: _f, cell_no: cell_no }.into())
+                    }
+                    if (!duplex_port_link_channel_cell_port_map.contains_key(&cell_no)) || (!duplex_port_link_channel_cell_port_map[&cell_no].contains_key(&interior_port_no)) {
                         let (link_to_port, port_from_link): (LinkToPort, PortFromLink) = channel();
                         let (port_to_link, link_from_port): (PortToLink, LinkFromPort) = channel();
-                        if duplex_port_link_channel_cell_port_map.contains_key(&cell_no) {
-                            duplex_port_link_channel_cell_port_map.get_mut(&cell_no).unwrap().insert(
-                                *interior_port_no,
-                                DuplexPortLinkChannel {
-                                    port_from_link: port_from_link.clone(),
-                                    port_to_link: port_to_link.clone(),
-                                },
-                            );
-                            duplex_link_port_channel_cell_port_map.get_mut(&cell_no).unwrap().insert(
-                                *interior_port_no,
-                                DuplexLinkPortChannel {
-                                    link_from_port: link_from_port.clone(),
-                                    link_to_port: link_to_port.clone(),
-                                },
-                            );
-                            dest_cell_port_map.get_mut(&cell_no).unwrap().insert(
-                                *interior_port_no,
-                                dest_cell_no,
-                            );
-                        } else {
-                            let mut duplex_port_link_channel_port_map = HashMap::<PortNo, DuplexPortLinkChannel>::new();
-                            duplex_port_link_channel_port_map.insert(
-                                *interior_port_no,
-                                DuplexPortLinkChannel {
-                                    port_from_link: port_from_link.clone(),
-                                    port_to_link: port_to_link.clone(),
-                                },
-                            );
-                            duplex_port_link_channel_cell_port_map.insert(
-                                cell_no,
-                                duplex_port_link_channel_port_map,
-                            );
-                            let mut duplex_link_port_channel_port_map = HashMap::<PortNo, DuplexLinkPortChannel>::new();
-                            duplex_link_port_channel_port_map.insert(
-                                *interior_port_no,
-                                DuplexLinkPortChannel {
-                                    link_from_port: link_from_port.clone(),
-                                    link_to_port: link_to_port.clone(),
-                                },
-                            );
-                            duplex_link_port_channel_cell_port_map.insert(
-                                cell_no,
-                                duplex_link_port_channel_port_map,
-                            );
-                            let mut dest_port_map = HashMap::<PortNo, CellNo>::new();
-                            dest_port_map.insert(
-                                *interior_port_no,
-                                dest_cell_no,
-                            );
-                            dest_cell_port_map.insert(
-                                cell_no,
-                                dest_port_map,
-                            );
-                        }
+                        duplex_port_link_channel_cell_port_map
+                            .entry(cell_no)
+                            .or_insert(HashMap::new())
+                            .insert(*interior_port_no, DuplexPortLinkChannel { port_from_link, port_to_link });
+                        duplex_link_port_channel_cell_port_map
+                            .entry(cell_no)
+                            .or_insert(HashMap::new())
+                            .insert(*interior_port_no, DuplexLinkPortChannel { link_from_port, link_to_port });
+                        dest_cell_port_map
+                            .entry(cell_no)
+                            .or_insert(HashMap::new())
+                            .insert(*interior_port_no, dest_cell_no);
                         return Ok(interior_port_no);
                     }
                 }
@@ -359,14 +320,14 @@ use failure::{Error, ResultExt};
 pub enum RackError {
     #[fail(display = "RackError::Chain {} {}", func_name, comment)]
     Chain { func_name: &'static str, comment: String },
-    #[fail(display = "RackError::BorderPort {} {}", func_name, cell_no)]
-    InteriorPort { func_name: &'static str, cell_no: CellNo },
     #[fail(display = "RackError::Boundary {}: No boundary cells found", func_name)]
     Boundary { func_name: &'static str },
     #[fail(display = "RackError::Cells {}: The number of cells {:?} must be at least 1", func_name, num_cells)]
     Cells { num_cells: CellQty, func_name: &'static str },
     #[fail(display = "RackError::Edges {}: {:?} is not enough links to connect all cells", func_name, nlinks)]
     Edges { nlinks: LinkQty, func_name: &'static str },
+    #[fail(display = "RackError::InteriorPort {} {}", func_name, cell_no)]
+    InteriorPort { func_name: &'static str, cell_no: CellNo },
     #[fail(display = "RackError::Wire {}: {:?} is not a valid edge at {}", func_name, edge, comment)]
     Wire { edge: Edge, func_name: &'static str, comment: &'static str },
     #[fail(display = "RackError::NoPortAvailable {}: {:?} No port available for {} side of edge at {}", func_name, side_name, edge, comment)]
