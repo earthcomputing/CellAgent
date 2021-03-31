@@ -10,14 +10,20 @@ use crate::dal::{add_to_trace};
 use crate::ec_message_formats::{PortToPePacketOld, PortToPeOld};
 use crate::name::{Name, CellID, PortID};
 use crate::packet::{Packet}; // Eventually use SimulatedPacket
-use crate::port::{CommonPortLike, InteriorPortLike, PortSeed, BasePort, InteriorPortFactoryLike, PortStatusOld, DuplexPortPeOrCaChannel, DuplexPortPeChannel};
+use crate::port::{CommonPortLike, InteriorPortLike, PortSeed, BasePort, InteriorPortFactoryLike, 
+    PortStatus, PortStatusOld, DuplexPortPeOrCaChannel, DuplexPortPeChannel};
 use crate::utility::{CellNo, PortNo, PortNumber, S, TraceHeaderParams, TraceType};
 use crate::uuid_ec::{AitState};
 
 #[derive(Clone, Debug)]
 pub struct DuplexPortLinkChannel {
-    pub port_from_link_old: PortFromLinkOld,
-    pub port_to_link_old: PortToLinkOld,
+    port_from_link_old: PortFromLinkOld,
+    port_to_link_old: PortToLinkOld,
+}
+impl DuplexPortLinkChannel {
+    pub fn new(port_from_link_old: PortFromLinkOld, port_to_link_old: PortToLinkOld) -> DuplexPortLinkChannel {
+        DuplexPortLinkChannel { port_from_link_old, port_to_link_old }
+    }
 }
 
 #[derive(Clone, Debug)]
@@ -243,15 +249,29 @@ impl InteriorPortFactoryLike<SimulatedInteriorPort> for SimulatedInteriorPortFac
         return &mut self.port_seed;
     }
 }
-
-// Link to Port
+// Link to Port Old
 type PACKET = Packet;
+pub type PortToLink = mpsc::Sender<PortToLinkPacket>;
+pub type PortFromLink = mpsc::Receiver<LinkToPortPacket>;
+#[derive(Debug, Clone, Serialize)]
+pub enum LinkToPortPacket {
+    Status(PortStatus),
+    Packet(PACKET),
+}
+pub type LinkToPort = mpsc::Sender<LinkToPortPacket>;
+
+// Port to Link
+pub type PortToLinkPacket = PACKET; // SimulatedPacket
+pub type LinkFromPort = mpsc::Receiver<PortToLinkPacket>;
+
+// Link to Port Old
+type PACKETOLD = Packet;
 pub type PortToLinkOld = mpsc::Sender<PortToLinkPacketOld>;
 pub type PortFromLinkOld = mpsc::Receiver<LinkToPortPacketOld>;
 #[derive(Debug, Clone, Serialize)]
 pub enum LinkToPortPacketOld {
     Status(PortStatusOld),
-    Packet(PACKET),
+    Packet(PACKETOLD),
 }
 pub type LinkToPortOld = mpsc::Sender<LinkToPortPacketOld>;
 

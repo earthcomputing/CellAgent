@@ -21,14 +21,23 @@ use crate::utility::{CellNo, CellConfig, PortNo, Edge, S, TraceHeaderParams, Tra
 
 #[derive(Clone, Debug)]
 pub struct DuplexLinkEndChannel {
-    link_to_port: LinkToPortOld,
-    link_from_port: LinkFromPortOld,
+    link_to_port_old: LinkToPortOld,
+    link_from_port_old: LinkFromPortOld,
+}
+impl DuplexLinkEndChannel {
+    pub fn get_link_to_port_old(&self) -> &LinkToPortOld { &self.link_to_port_old }
+    pub fn get_link_from_port_old(&self) -> &LinkFromPortOld { &self.link_from_port_old }
 }
 
 #[derive(Clone, Debug)]
 pub struct DuplexLinkEndChannels {
     left: DuplexLinkEndChannel,
     rite: DuplexLinkEndChannel,
+}
+impl DuplexLinkEndChannels {
+    pub fn new(left: DuplexLinkEndChannel, rite: DuplexLinkEndChannel) -> DuplexLinkEndChannels {
+        DuplexLinkEndChannels { left, rite }
+    }
 }
 
 #[derive(Debug, Copy, Clone, Hash, Eq, PartialEq, Serialize, Deserialize)]
@@ -97,11 +106,11 @@ impl Rack {
                         duplex_port_link_channel_cell_port_map
                             .entry(cell_no)
                             .or_insert(HashMap::new())
-                            .insert(*interior_port_no, DuplexPortLinkChannel { port_from_link_old, port_to_link_old });
+                            .insert(*interior_port_no, DuplexPortLinkChannel::new(port_from_link_old, port_to_link_old));
                         duplex_link_port_channel_cell_port_map
                             .entry(cell_no)
                             .or_insert(HashMap::new())
-                            .insert(*interior_port_no, DuplexLinkPortChannel { link_from_port_old, link_to_port_old });
+                            .insert(*interior_port_no, DuplexLinkPortChannel::new(link_from_port_old, link_to_port_old));
                         dest_cell_port_map
                             .entry(cell_no)
                             .or_insert(HashMap::new())
@@ -129,8 +138,8 @@ impl Rack {
             duplex_link_end_channel_map.insert(
                 edge_connection.left,
                 DuplexLinkEndChannel {
-                    link_to_port: left_duplex_link_port_channel.link_to_port_old.clone(),
-                    link_from_port: left_duplex_link_port_channel.link_from_port_old.clone(),
+                    link_to_port_old: left_duplex_link_port_channel.get_link_to_port_old().clone(),
+                    link_from_port_old: left_duplex_link_port_channel.get_link_from_port_old().clone(),
                 },
             );
             let rite_duplex_link_port_channel_port_map = &duplex_link_port_channel_cell_port_map[&edge.1];
@@ -138,8 +147,8 @@ impl Rack {
             duplex_link_end_channel_map.insert(
                 edge_connection.rite,
                 DuplexLinkEndChannel {
-                    link_to_port: rite_duplex_link_port_channel.link_to_port_old.clone(),
-                    link_from_port: rite_duplex_link_port_channel.link_from_port_old.clone(),
+                    link_to_port_old: rite_duplex_link_port_channel.get_link_to_port_old().clone(),
+                    link_from_port_old: rite_duplex_link_port_channel.get_link_from_port_old().clone(),
                 },
             );
         }
@@ -231,10 +240,10 @@ impl Rack {
             let link = Link::new(
                 left_port.get_id(),
                 rite_port.get_id(),
-                LinkToPortsOld {
-                    left_old: duplex_link_end_channel_map[&edge_connection.left].link_to_port.clone(),
-                    rite_old: duplex_link_end_channel_map[&edge_connection.rite].link_to_port.clone(),
-                }
+                LinkToPortsOld::new(
+                    duplex_link_end_channel_map[&edge_connection.left].get_link_to_port_old().clone(),
+                    duplex_link_end_channel_map[&edge_connection.rite].get_link_to_port_old().clone(),
+                )
             )?;
             println!("{}", edge_connection);
             {
@@ -247,14 +256,14 @@ impl Rack {
             let mut link_clone = link.clone();
             let child_trace_header = fork_trace_header();
             let thread_name = format!("Link {} thread", link.get_id());
-            let link_from_left = duplex_link_end_channel_map[&edge_connection.left].link_from_port.clone();
-            let link_from_rite = duplex_link_end_channel_map[&edge_connection.rite].link_from_port.clone();
+            let link_from_left = duplex_link_end_channel_map[&edge_connection.left].link_from_port_old.clone();
+            let link_from_rite = duplex_link_end_channel_map[&edge_connection.rite].link_from_port_old.clone();
             let join_handle = thread::Builder::new().name(thread_name).spawn( move || {
                 update_trace_header(child_trace_header);
-                let _ = link_clone.listen(LinkFromPortsOld {
-                    left_old: link_from_left,
-                    rite_old: link_from_rite,
-                });
+                let _ = link_clone.listen(LinkFromPortsOld::new(
+                    link_from_left,
+                    link_from_rite,
+            ));
             })?;
             //let mut handle_pair = link.start_threads(link_to_left, link_from_left, link_to_rite, link_from_rite)?;
             link_handles.append(&mut vec![join_handle]);

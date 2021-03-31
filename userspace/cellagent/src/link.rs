@@ -10,20 +10,37 @@ use crate::utility::{S, TraceHeaderParams, TraceType};
 // TODO: There is no distinction between a broken link and a disconnected one.  We may want to revisit.
 #[derive(Clone, Debug)]
 pub struct DuplexLinkPortChannel {
-    pub link_from_port_old: LinkFromPortOld,
-    pub link_to_port_old: LinkToPortOld,
+    link_from_port_old: LinkFromPortOld,
+    link_to_port_old: LinkToPortOld,
+}
+impl DuplexLinkPortChannel {
+    pub fn new(link_from_port_old: LinkFromPortOld, link_to_port_old: LinkToPortOld) -> DuplexLinkPortChannel {
+        DuplexLinkPortChannel { link_from_port_old, link_to_port_old }
+    }
+    pub fn get_link_from_port_old(&self) -> &LinkFromPortOld { &self.link_from_port_old }
+    pub fn get_link_to_port_old(&self) -> &LinkToPortOld { &self.link_to_port_old }
 }
 
 #[derive(Clone, Debug)]
 pub struct LinkToPortsOld {
-    pub left_old: LinkToPortOld,
-    pub rite_old: LinkToPortOld,
+    left_old: LinkToPortOld,
+    rite_old: LinkToPortOld,
+}
+impl LinkToPortsOld {
+    pub fn new(left_old: LinkToPortOld, rite_old: LinkToPortOld) -> LinkToPortsOld {
+        LinkToPortsOld { left_old, rite_old }
+    }
 }
 
 #[derive(Clone, Debug)]
 pub struct LinkFromPortsOld {
-    pub left_old: LinkFromPortOld,
-    pub rite_old: LinkFromPortOld,
+    left_old: LinkFromPortOld,
+    rite_old: LinkFromPortOld,
+}
+impl LinkFromPortsOld {
+    pub fn new( left_old: LinkFromPortOld, rite_old: LinkFromPortOld) -> LinkFromPortsOld {
+        LinkFromPortsOld { left_old, rite_old }
+    }
 }
 
 #[derive(Debug, Clone)]
