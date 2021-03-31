@@ -734,11 +734,7 @@ pub fn get_geometry(num_cells: CellQty) -> (usize, usize) {
         .map(|xy| xy.1 + 1)
         .unwrap_or(0);
     if CONFIG.geometry.len() != *num_cells {
-        panic!(format!(
-            "Topology has {} entries for {} cells",
-            CONFIG.geometry.len(),
-            *num_cells
-        ))
+        panic!("The topology in CONFIG.geometry does not have the right number of cells.")
     };
     (max_x, max_y)
 }
