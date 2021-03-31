@@ -12,7 +12,6 @@ use crate::utility::{ActivityData, ByteArray, Mask, PortNo, OutbufType};
 use crate::uuid_ec::Uuid;
 
 type CATOCM = (TreeID, ISCONTROL, ISAIT, SNAKE, Mask, SenderMsgSeqNo, ByteArray);
-type PACKET = Packet;
 type REROUTE = (PortNo, PortNo, NumberOfPackets);
 type STATUS = (PortNo, bool, PortStatus); // bool = is_border
 type STATUSOLD = (PortNo, bool, NumberOfPackets, PortStatusOld); // bool = is_border
@@ -57,19 +56,7 @@ pub enum PeToPortPacket {
 }
 pub type PeToPort = mpsc::Sender<PeToPortPacket>;
 pub type PortFromPe = mpsc::Receiver<PeToPortPacket>;
-//pub type PePortError = mpsc::SendError<PeToPortPacket>;
-// PacketEngine to Port, Port to Link
-pub type PortToLinkPacket = PACKET;
-pub type LinkFromPort = mpsc::Receiver<PortToLinkPacket>;
-//pub type PortLinkError = mpsc::SendError<PortToLinkPacket>;
-// Link to Port
-#[derive(Debug, Clone, Serialize)]
-pub enum LinkToPortPacket {
-    Status(PortStatusOld),
-    Packet(PACKET),
-}
-pub type LinkToPort = mpsc::Sender<LinkToPortPacket>;
-//pub type LinkPortError = mpsc::SendError<LinkToPortPacket>;
+
 // Port to PacketEngine
 #[derive(Debug, Clone, Serialize)]
 pub enum PortToPePacket {
