@@ -23,7 +23,10 @@ use crate::utility::{CellConfig, CellType, PortNo, S,
                      TraceHeaderParams, TraceType};
 
 #[derive(Debug, Clone)]
-pub struct NalCell<InteriorPortFactoryType: InteriorPortFactoryLike<InteriorPortType>, InteriorPortType: 'static + Clone + InteriorPortLike, BorderPortFactoryType: BorderPortFactoryLike<BorderPortType>, BorderPortType: 'static + Clone + BorderPortLike> {
+pub struct NalCell<InteriorPortFactoryType: InteriorPortFactoryLike<InteriorPortType>, 
+                   InteriorPortType: 'static + Clone + InteriorPortLike, 
+                   BorderPortFactoryType: BorderPortFactoryLike<BorderPortType>, 
+                   BorderPortType: 'static + Clone + BorderPortLike> {
     id: CellID,
     cell_type: CellType,
     config: CellConfig,
@@ -33,9 +36,17 @@ pub struct NalCell<InteriorPortFactoryType: InteriorPortFactoryLike<InteriorPort
     border_factory_phantom: PhantomData<BorderPortFactoryType>,
 }
 
-impl<InteriorPortFactoryType: InteriorPortFactoryLike<InteriorPortType>, InteriorPortType: 'static + Clone + InteriorPortLike, BorderPortFactoryType: BorderPortFactoryLike<BorderPortType>, BorderPortType: 'static + Clone + BorderPortLike> NalCell::<InteriorPortFactoryType, InteriorPortType, BorderPortFactoryType, BorderPortType> {
-    pub fn new(name: &str, num_phys_ports: PortQty, border_port_nos: &HashSet<PortNo>, config: CellConfig, interior_port_factory: InteriorPortFactoryType, border_port_factory: Option<BorderPortFactoryType>)
-            -> Result<(NalCell<InteriorPortFactoryType, InteriorPortType, BorderPortFactoryType, BorderPortType>, JoinHandle<()>), Error> {
+impl<InteriorPortFactoryType: InteriorPortFactoryLike<InteriorPortType>, 
+                 InteriorPortType: 'static + Clone + InteriorPortLike, 
+                 BorderPortFactoryType: BorderPortFactoryLike<BorderPortType>, 
+                 BorderPortType: 'static + Clone + BorderPortLike> 
+        NalCell::<InteriorPortFactoryType, InteriorPortType, 
+                  BorderPortFactoryType, BorderPortType> {
+    pub fn new(name: &str, num_phys_ports: PortQty, border_port_nos: &HashSet<PortNo>, config: CellConfig, 
+            interior_port_factory: InteriorPortFactoryType, 
+            border_port_factory: Option<BorderPortFactoryType>)
+                -> Result<(NalCell<InteriorPortFactoryType, InteriorPortType, BorderPortFactoryType, BorderPortType>, 
+                           JoinHandle<()>), Error> {
         let _f = "new";
         if *num_phys_ports > *CONFIG.max_num_phys_ports_per_cell {
             return Err(NalcellError::NumberPorts { num_phys_ports, func_name: "new", max_num_phys_ports: CONFIG.max_num_phys_ports_per_cell }.into())
@@ -85,10 +96,10 @@ impl<InteriorPortFactoryType: InteriorPortFactoryLike<InteriorPortType>, Interio
             let duplex_port_pe_or_ca_channel = if is_border_port {
                 let (ca_to_port, port_from_ca): (CaToPort, PortFromCa) = channel();
                 ca_to_ports.insert(PortNo(port_num), ca_to_port);
-                DuplexPortPeOrCaChannel::Border(DuplexPortCaChannel {
+                DuplexPortPeOrCaChannel::Border(DuplexPortCaChannel::new(
                     port_from_ca,
-                    port_to_ca: port_to_ca.clone(),
-                })
+                    port_to_ca.clone(),
+                ))
             } else {
                 let (pe_to_port, port_from_pe): (PeToPort, PortFromPe) = channel();
                 let (pe_to_port_old, port_from_pe_old): (PeToPortOld, PortFromPeOld) = channel();
@@ -96,15 +107,15 @@ impl<InteriorPortFactoryType: InteriorPortFactoryLike<InteriorPortType>, Interio
                 pe_to_ports_old.insert(PortNo(port_num), pe_to_port_old);
                 ports_from_pe.insert(PortNo(port_num), port_from_pe.clone()); // These two lines may not be needed.
                 ports_from_pe_old.insert(PortNo(port_num), port_from_pe_old.clone()); // I'm putting them here during a rebase.
-                DuplexPortPeOrCaChannel::Interior(DuplexPortPeChannel {
+                DuplexPortPeOrCaChannel::Interior(DuplexPortPeChannel::new(
                     port_from_pe,
                     port_from_pe_old,
-                    port_to_pe: port_to_pe.clone(),
-                    port_to_pe_old: port_to_pe_old.clone(),
-                })
+                    port_to_pe.clone(),
+                    port_to_pe_old.clone(),
+                ))
             };
             let port_number = PortNo(port_num).make_port_number(num_phys_ports).context(NalcellError::Chain { func_name: "new", comment: S("port number") })?;
-            let ref port_factory = if is_border_port {
+            let port_factory = if is_border_port {
                 Either::Right(border_port_factory.clone().unwrap())
             } else {
                 Either::Left(interior_port_factory.clone())
@@ -239,7 +250,11 @@ impl<InteriorPortFactoryType: InteriorPortFactoryLike<InteriorPortType>, Interio
     }
 }
 
-impl<InteriorPortFactoryType: InteriorPortFactoryLike<InteriorPortType>, InteriorPortType: Clone + InteriorPortLike, BorderPortFactoryType: BorderPortFactoryLike<BorderPortType>, BorderPortType: Clone + BorderPortLike> fmt::Display for NalCell::<InteriorPortFactoryType, InteriorPortType, BorderPortFactoryType, BorderPortType> {
+impl<InteriorPortFactoryType: InteriorPortFactoryLike<InteriorPortType>, 
+     InteriorPortType: Clone + InteriorPortLike, 
+     BorderPortFactoryType: BorderPortFactoryLike<BorderPortType>, 
+     BorderPortType: Clone + BorderPortLike> 
+     fmt::Display for NalCell::<InteriorPortFactoryType, InteriorPortType, BorderPortFactoryType, BorderPortType> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let mut s = String::new();
         match self.cell_type {

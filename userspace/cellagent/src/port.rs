@@ -16,16 +16,33 @@ use crate::utility::{ByteArray, PortNo, PortNumber, S, TraceHeader, TraceHeaderP
 
 #[derive(Clone, Debug)]
 pub struct DuplexPortPeChannel {
-    pub port_from_pe: PortFromPe,
-    pub port_from_pe_old: PortFromPeOld,
-    pub port_to_pe: PortToPe,
-    pub port_to_pe_old: PortToPeOld,
+    port_from_pe: PortFromPe,
+    port_from_pe_old: PortFromPeOld,
+    port_to_pe: PortToPe,
+    port_to_pe_old: PortToPeOld,
+}
+impl DuplexPortPeChannel {
+    pub fn new(port_from_pe: PortFromPe, port_from_pe_old: PortFromPeOld,
+               port_to_pe: PortToPe, port_to_pe_old: PortToPeOld) -> DuplexPortPeChannel {
+        DuplexPortPeChannel { port_from_pe, port_from_pe_old, port_to_pe, port_to_pe_old }
+    }
+    pub fn get_port_from_pe(&self) -> &PortFromPe { &self.port_from_pe }
+    pub fn get_port_from_pe_old(&self) -> &PortFromPeOld { &self.port_from_pe_old }
+    pub fn get_port_to_pe(&self) -> &PortToPe { &self.port_to_pe }
+    pub fn get_port_to_pe_old(&self) -> &PortToPeOld { &self.port_to_pe_old }
 }
 
 #[derive(Clone, Debug)]
 pub struct DuplexPortCaChannel {
-    pub port_from_ca: PortFromCa,
-    pub port_to_ca: PortToCa,
+    port_from_ca: PortFromCa,
+    port_to_ca: PortToCa,
+}
+impl DuplexPortCaChannel {
+    pub fn new(port_from_ca: PortFromCa, port_to_ca: PortToCa) -> DuplexPortCaChannel {
+        DuplexPortCaChannel { port_from_ca, port_to_ca }
+    }
+    pub fn get_port_from_ca(&self) -> &PortFromCa { &self.port_from_ca }
+    pub fn get_port_to_ca(&self) -> &PortToCa { &self.port_to_ca }
 }
 
 // TODO: There is no distinction between a broken link and a disconnected one.  We may want to revisit.
@@ -264,7 +281,6 @@ impl BasePort {
     pub fn get_id(&self) -> PortID { self.id }
     pub fn get_cell_id(&self) -> CellID { self.cell_id }
     pub fn get_port_no(&self) -> PortNo { self.port_number.get_port_no() }
-//  pub fn get_port_number(&self) -> PortNumber { self.port_number }
     pub fn is_border(&self) -> bool { self.is_border }
     pub fn get_duplex_port_pe_or_ca_channel(&self) -> DuplexPortPeOrCaChannel { return self.duplex_port_pe_or_ca_channel.clone(); }
 }
