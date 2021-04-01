@@ -13,7 +13,7 @@ use crate::ec_message::MsgType;
 use crate::ec_message_formats::{CaToCmBytes, CmToCa, CmFromCa, CmToPe, CmFromPe, PeToCm, PeFromCm, 
                                 PeToPort, PeFromPort,
                                 PeToPortOld, PeFromPortOld, 
-                                PeToCmPacket, CmToPePacket, CmToCaBytes};
+                                PeToCmPacketOld, CmToPePacket, CmToCaBytesOld};
 use crate::name::{Name, CellID, TreeID};
 use crate::packet_engine::{PacketEngine};
 use crate::packet::{Packet, PacketAssembler, PacketAssemblers, Packetizer, PacketUniquifier};
@@ -144,7 +144,7 @@ impl Cmodel {
                         add_to_trace(TraceType::Trace, trace_params, &trace, _f);
                     }
                 }
-                self.cm_to_ca.send(CmToCaBytes::Status((port_no, is_border, no_packets, status)))?;
+                self.cm_to_ca.send(CmToCaBytesOld::Status((port_no, is_border, no_packets, status)))?;
             }
             CaToCmBytes::TunnelPort(tunnel_msg) => {
                 {
@@ -154,7 +154,7 @@ impl Cmodel {
                         add_to_trace(TraceType::Trace, trace_params, &trace, _f);
                     }
                 }
-                self.cm_to_ca.send(CmToCaBytes::TunnelPort(tunnel_msg))?;
+                self.cm_to_ca.send(CmToCaBytesOld::TunnelPort(tunnel_msg))?;
             }
             CaToCmBytes::TunnelUp(tunnel_msg) => {
                 {
@@ -164,7 +164,7 @@ impl Cmodel {
                         add_to_trace(TraceType::Trace, trace_params, &trace, _f);
                     }
                 }
-                self.cm_to_ca.send(CmToCaBytes::TunnelUp(tunnel_msg))?;
+                self.cm_to_ca.send(CmToCaBytesOld::TunnelUp(tunnel_msg))?;
             }
         
             // packetize
@@ -201,11 +201,11 @@ impl Cmodel {
     }
 
     // WORKER (CmFromPe)
-    fn listen_pe(&mut self, packet: PeToCmPacket) -> Result<(), Error> {
+    fn listen_pe(&mut self, packet: PeToCmPacketOld) -> Result<(), Error> {
         let _f = "listen_pe";
         match packet {
             // just forward to CA
-            PeToCmPacket::Status((port_no, is_border, number_of_packets, status)) => {
+            PeToCmPacketOld::Status((port_no, is_border, number_of_packets, status)) => {
                 {
                     if CONFIG.trace_options.all || CONFIG.trace_options.cm {
                         let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "cm_to_ca_status" };
@@ -214,12 +214,12 @@ impl Cmodel {
                     }
                 }
                 if !CONFIG.replay {
-                    self.cm_to_ca.send(CmToCaBytes::Status((port_no, is_border, number_of_packets, status)))?;
+                    self.cm_to_ca.send(CmToCaBytesOld::Status((port_no, is_border, number_of_packets, status)))?;
                 }
             },
         
             // de-packetize
-            PeToCmPacket::Packet((port_no, packet)) => {
+            PeToCmPacketOld::Packet((port_no, packet)) => {
                 {
                     if CONFIG.trace_options.all || CONFIG.trace_options.cm {
                         let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "cm_from_pe_packet" };
@@ -258,7 +258,7 @@ impl Cmodel {
                     self.process_packet(port_no, packet)?;
                 }
             },
-            PeToCmPacket::Snake((ack_port_no, count, packet)) => {
+            PeToCmPacketOld::Snake((ack_port_no, count, packet)) => {
                 let uniquifier = packet.get_uniquifier();
                 if count > 0 {
                     let snake = Snake::new(ack_port_no, count, packet);
@@ -334,7 +334,7 @@ packets: Vec<Packet>,
                     }
                 }
             }
-            let msg = CmToCaBytes::Bytes((port_no, is_ait, uuid, bytes));
+            let msg = CmToCaBytesOld::Bytes((port_no, is_ait, uuid, bytes));
             if !CONFIG.replay {
                 self.cm_to_ca.send(msg)?;
             }

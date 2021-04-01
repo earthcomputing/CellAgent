@@ -256,19 +256,19 @@ impl InteriorPortFactoryLike<SimulatedInteriorPort> for SimulatedInteriorPortFac
 }
 
 // Link to Port
-type PACKETOLD = Packet;
+type PACKET = Packet;
 pub type PortToLink = mpsc::Sender<PortToLinkPacket>;
 pub type PortFromLink = mpsc::Receiver<LinkToPortPacket>;
 #[derive(Debug, Clone, Serialize)]
 pub enum LinkToPortPacket {
     Status(LinkStatus),
-    Packet(PACKETOLD),
+    Packet(PACKET),
 }
-pub type LinkToPortOld = mpsc::Sender<LinkToPortPacket>;
+pub type LinkToPort = mpsc::Sender<LinkToPortPacket>;
 
 // Port to Link
 pub type PortToLinkPacket = Packet; // SimulatedPacket
-pub type LinkFromPortOld = mpsc::Receiver<PortToLinkPacket>;
+pub type LinkFromPort = mpsc::Receiver<PortToLinkPacket>;
 
 #[derive(Debug, Copy, Clone, Serialize)]
 pub struct FailoverInfo {

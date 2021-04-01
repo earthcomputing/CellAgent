@@ -2,7 +2,7 @@ use std::{fmt};
 
 use crate::config::{CONFIG};
 use crate::dal::{add_to_trace};
-use crate::simulated_interior_port::{LinkFromPortOld, LinkToPortOld, LinkToPortPacket};
+use crate::simulated_interior_port::{LinkFromPort, LinkToPort, LinkToPortPacket};
 use crate::name::{Name, LinkID, PortID};
 use crate::utility::{S, TraceHeaderParams, TraceType};
 
@@ -22,36 +22,36 @@ impl fmt::Display for LinkStatus {
 // TODO: There is no distinction between a broken link and a disconnected one.  We may want to revisit.
 #[derive(Clone, Debug)]
 pub struct DuplexLinkPortChannel {
-    link_from_port: LinkFromPortOld,
-    link_to_port: LinkToPortOld,
+    link_from_port: LinkFromPort,
+    link_to_port: LinkToPort,
 }
 impl DuplexLinkPortChannel {
-    pub fn new(link_from_port: LinkFromPortOld, link_to_port: LinkToPortOld) -> DuplexLinkPortChannel {
+    pub fn new(link_from_port: LinkFromPort, link_to_port: LinkToPort) -> DuplexLinkPortChannel {
         DuplexLinkPortChannel { link_from_port, link_to_port }
     }
-    pub fn get_link_from_port(&self) -> &LinkFromPortOld { &self.link_from_port }
-    pub fn get_link_to_port(&self) -> &LinkToPortOld { &self.link_to_port }
+    pub fn get_link_from_port(&self) -> &LinkFromPort { &self.link_from_port }
+    pub fn get_link_to_port(&self) -> &LinkToPort { &self.link_to_port }
 }
 
 #[derive(Clone, Debug)]
-pub struct LinkToPortsOld {
-    left: LinkToPortOld,
-    rite: LinkToPortOld,
+pub struct LinkToPorts {
+    left: LinkToPort,
+    rite: LinkToPort,
 }
-impl LinkToPortsOld {
-    pub fn new(left: LinkToPortOld, rite: LinkToPortOld) -> LinkToPortsOld {
-        LinkToPortsOld { left, rite }
+impl LinkToPorts {
+    pub fn new(left: LinkToPort, rite: LinkToPort) -> LinkToPorts {
+        LinkToPorts { left, rite }
     }
 }
 
 #[derive(Clone, Debug)]
-pub struct LinkFromPortsOld {
-    left: LinkFromPortOld,
-    rite: LinkFromPortOld,
+pub struct LinkFromPorts {
+    left: LinkFromPort,
+    rite: LinkFromPort,
 }
-impl LinkFromPortsOld {
-    pub fn new( left: LinkFromPortOld, rite: LinkFromPortOld) -> LinkFromPortsOld {
-        LinkFromPortsOld { left, rite }
+impl LinkFromPorts {
+    pub fn new( left: LinkFromPort, rite: LinkFromPort) -> LinkFromPorts {
+        LinkFromPorts { left, rite }
     }
 }
 
@@ -59,11 +59,11 @@ impl LinkFromPortsOld {
 pub struct Link {
     id: LinkID,
     is_connected: bool,              //     Left Port        Link        Rite Port
-    link_to_ports: LinkToPortsOld,
+    link_to_ports: LinkToPorts,
 }
 impl Link {
     pub fn new(left_id: PortID, rite_id: PortID,
-               link_to_ports: LinkToPortsOld) -> Result<Link, Error> {
+               link_to_ports: LinkToPorts) -> Result<Link, Error> {
         let _f = "new";
         let id = LinkID::new(left_id, rite_id)?;
         {
@@ -78,14 +78,14 @@ impl Link {
         Ok(Link {
             id,
             is_connected: true,
-            link_to_ports: LinkToPortsOld {
+            link_to_ports: LinkToPorts {
                 left: link_to_ports.left,
                 rite: link_to_ports.rite,
             },
         })
     }
     pub fn get_id(&self) -> LinkID { self.id }
-    pub fn listen(&mut self, link_from_ports: LinkFromPortsOld)
+    pub fn listen(&mut self, link_from_ports: LinkFromPorts)
                   -> Result<(), Error> {
         let _f = "listen";
         loop {

@@ -14,7 +14,7 @@ use crate::config::{CONFIG, PortQty};
 use crate::dal::{add_to_trace, get_cell_replay_lines};
 use crate::ec_message_formats::{PortToPe, PeFromPort, PeToPort, PortFromPe,
                                 PortToPeOld, PeFromPortOld, PeToPortOld, PortFromPeOld,
-                                CmToCa, CaFromCm, CaToCm, CmFromCa, CaToCmBytes, CmToCaBytes,
+                                CmToCa, CaFromCm, CaToCm, CmFromCa, CaToCmBytes, CmToCaBytesOld,
                                 PeToCm, CmFromPe, CmToPe, PeFromCm};
 use crate::name::{CellID, PortID};
 use crate::port::{InteriorPortLike, BorderPortLike, InteriorPortFactoryLike, BorderPortFactoryLike, Port, DuplexPortPeOrCaChannel, DuplexPortPeChannel, DuplexPortCaChannel};
@@ -164,10 +164,10 @@ impl<InteriorPortFactoryType: InteriorPortFactoryLike<InteriorPortType>,
                                     ca_to_cm.send(CaToCmBytes::Entry(entry))?;
                                 }
                                 TraceFormat::CaFromCmBytesMsg(port_no, is_ait, uuid, msg) => {
-                                    cm_to_ca.send(CmToCaBytes::Bytes((port_no, is_ait, uuid, msg)))?;
+                                    cm_to_ca.send(CmToCaBytesOld::Bytes((port_no, is_ait, uuid, msg)))?;
                                 }
                                 TraceFormat::CaFromCmBytesStatus(port_no, is_border, number_of_packets, status) => {
-                                    cm_to_ca.send(CmToCaBytes::Status((port_no, is_border, number_of_packets, status)))?;
+                                    cm_to_ca.send(CmToCaBytesOld::Status((port_no, is_border, number_of_packets, status)))?;
                                 }
                                 TraceFormat::CaToNoc(noc_port, bytes) => {
                                     let ca_to_port = ca_to_ports.get(&noc_port).expect("cellagent.rs: border port sender must be set");

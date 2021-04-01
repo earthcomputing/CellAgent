@@ -6,7 +6,7 @@ use crate::ec_message::{MsgType};
 use crate::ec_message_formats::{PeFromCm, PeToCm,
                                 PeToPort, PeFromPort, PortToPePacket, PeToPortPacket,
                                 PeToPortOld, PeFromPortOld, PortToPePacketOld,
-                                PeToCmPacket,
+                                PeToCmPacketOld,
                                 CmToPePacket};
 use crate::name::{Name, CellID, TreeID};
 use crate::packet::{Packet};
@@ -396,7 +396,7 @@ impl PacketEngine {
                         add_to_trace(TraceType::Trace, trace_params, &trace, _f);
                     }
                 }
-                self.pe_to_cm.send(PeToCmPacket::Packet((recv_port_no, packet)))?;
+                self.pe_to_cm.send(PeToCmPacketOld::Packet((recv_port_no, packet)))?;
             },
             AitState::AitD => (), // TODO: Send to cm once cell agent knows how to handle it
             AitState::Ait | // Implements hop-by-hop AIT
@@ -413,7 +413,7 @@ impl PacketEngine {
                                 add_to_trace(TraceType::Trace, trace_params, &trace, _f);
                             }
                         }
-                        self.pe_to_cm.send(PeToCmPacket::Packet((recv_port_no, packet))).context(PacketEngineError::Chain { func_name: "forward", comment: S("rootcast packet to ca ") + &self.cell_id.get_name() })?;
+                        self.pe_to_cm.send(PeToCmPacketOld::Packet((recv_port_no, packet))).context(PacketEngineError::Chain { func_name: "forward", comment: S("rootcast packet to ca ") + &self.cell_id.get_name() })?;
                         return Ok(())
                     }
                 };
@@ -465,7 +465,7 @@ impl PacketEngine {
                         add_to_trace(TraceType::Trace, trace_params, &trace, _f);
                     }
                 }
-                self.pe_to_cm.send(PeToCmPacket::Status((port_no, is_border, number_of_packets, port_status))).context(PacketEngineError::Chain { func_name: "listen_port", comment: S("send status to ca ") + &self.cell_id.get_name() })?
+                self.pe_to_cm.send(PeToCmPacketOld::Status((port_no, is_border, number_of_packets, port_status))).context(PacketEngineError::Chain { func_name: "listen_port", comment: S("send status to ca ") + &self.cell_id.get_name() })?
             },
             
             // recv from neighbor
@@ -556,7 +556,7 @@ impl PacketEngine {
             }
         }
         if recv_port_no == PortNo(0) {
-            self.pe_to_cm.send(PeToCmPacket::Packet((recv_port_no, packet.clone())))?;
+            self.pe_to_cm.send(PeToCmPacketOld::Packet((recv_port_no, packet.clone())))?;
         } else {
             self.pe_to_ports_old.get(&reroute_port_no)
                 .ok_or::<Error>(PacketEngineError::Sender { cell_id: self.cell_id, func_name: _f, port_no: reroute_port_no }.into())?
@@ -650,7 +650,7 @@ impl PacketEngine {
                         add_to_trace(TraceType::Trace, trace_params, &trace, _f);
                     }
                 }
-                self.pe_to_cm.send(PeToCmPacket::Packet((recv_port_no, packet)))?;
+                self.pe_to_cm.send(PeToCmPacketOld::Packet((recv_port_no, packet)))?;
             },
             AitState::Ait  => { // Goes to cm until we have multi-hop AIT
                 {
@@ -660,7 +660,7 @@ impl PacketEngine {
                         add_to_trace(TraceType::Trace, trace_params, &trace, _f);
                     }
                 }
-                self.pe_to_cm.send(PeToCmPacket::Packet((recv_port_no, packet)))?
+                self.pe_to_cm.send(PeToCmPacketOld::Packet((recv_port_no, packet)))?
             },
             AitState::AitD => (), // TODO: Send to cm once cell agent knows how to handle it
             AitState::Normal => { // Forward packet
@@ -676,7 +676,7 @@ impl PacketEngine {
                                 add_to_trace(TraceType::Trace, trace_params, &trace, _f);
                             }
                         }
-                        self.pe_to_cm.send(PeToCmPacket::Packet((recv_port_no, packet))).context(PacketEngineError::Chain { func_name: "forward", comment: S("rootcast packet to ca ") + &self.cell_id.get_name() })?;
+                        self.pe_to_cm.send(PeToCmPacketOld::Packet((recv_port_no, packet))).context(PacketEngineError::Chain { func_name: "forward", comment: S("rootcast packet to ca ") + &self.cell_id.get_name() })?;
                         return Ok(())
                     }
                 };
@@ -749,7 +749,7 @@ impl PacketEngine {
             }
             for &port_no in port_nos.iter() {
                 if port_no == PortNo(0) { 
-                    self.pe_to_cm.send(PeToCmPacket::Packet((recv_port_no, packet.clone())))?;
+                    self.pe_to_cm.send(PeToCmPacketOld::Packet((recv_port_no, packet.clone())))?;
                 } else {
                     // Replace with OutbufType::Control
                     self._move_to_outbuf(OutbufType::Control, recv_port_no, port_no)?;
@@ -768,7 +768,7 @@ impl PacketEngine {
                             add_to_trace(TraceType::Trace, trace_params, &trace, _f);
                         }
                     }
-                    self.pe_to_cm.send(PeToCmPacket::Packet((recv_port_no, packet.clone())))?;
+                    self.pe_to_cm.send(PeToCmPacketOld::Packet((recv_port_no, packet.clone())))?;
                 } else {
                     // Forward rootward
                     {
@@ -795,7 +795,7 @@ impl PacketEngine {
                                 add_to_trace(TraceType::Trace, trace_params, &trace, _f);
                             }
                         }
-                        self.pe_to_cm.send(PeToCmPacket::Packet((recv_port_no, packet.clone()))).context(PacketEngineError::Chain { func_name: _f, comment: S("leafcast packet to ca ") + &self.cell_id.get_name() })?;
+                        self.pe_to_cm.send(PeToCmPacketOld::Packet((recv_port_no, packet.clone()))).context(PacketEngineError::Chain { func_name: _f, comment: S("leafcast packet to ca ") + &self.cell_id.get_name() })?;
                     } else {
                         // forward to neighbor
                         {
@@ -818,7 +818,7 @@ impl PacketEngine {
                     add_to_trace(TraceType::Trace, trace_params, &trace, _f);
                 }
             }
-            self.pe_to_cm.send(PeToCmPacket::Snake((recv_port_no, count, packet)))?; 
+            self.pe_to_cm.send(PeToCmPacketOld::Snake((recv_port_no, count, packet)))?; 
         }
         Ok(())
     }
@@ -871,7 +871,7 @@ impl PacketEngine {
             for &port_no in port_nos.iter() {
                 // Should add_to_buffer_front, but that may confuse my "when to send pong" algorithm
                 if port_no == PortNo(0) { 
-                    self.pe_to_cm.send(PeToCmPacket::Packet((recv_port_no, packet.clone())))?;
+                    self.pe_to_cm.send(PeToCmPacketOld::Packet((recv_port_no, packet.clone())))?;
                 } else {
                     let pe_to_port = self.pe_to_ports_old.get(&port_no).expect("PacketEngine forward pe_to_port must be defined");
                     pe_to_port.send(packet.clone())?;  // Control message so just send
@@ -891,7 +891,7 @@ impl PacketEngine {
                             add_to_trace(TraceType::Trace, trace_params, &trace, _f);
                         }
                     }
-                    self.pe_to_cm.send(PeToCmPacket::Packet((recv_port_no, packet.clone())))?;
+                    self.pe_to_cm.send(PeToCmPacketOld::Packet((recv_port_no, packet.clone())))?;
                     0
                 } else {
                     // Forward rootward
@@ -921,7 +921,7 @@ impl PacketEngine {
                                 add_to_trace(TraceType::Trace, trace_params, &trace, _f);
                             }
                         }
-                        self.pe_to_cm.send(PeToCmPacket::Packet((recv_port_no, packet.clone()))).context(PacketEngineError::Chain { func_name: _f, comment: S("leafcast packet to ca ") + &self.cell_id.get_name() })?;
+                        self.pe_to_cm.send(PeToCmPacketOld::Packet((recv_port_no, packet.clone()))).context(PacketEngineError::Chain { func_name: _f, comment: S("leafcast packet to ca ") + &self.cell_id.get_name() })?;
                     } else {
                         count = count + 1;  // Only count ports other than 0
                         // forward to neighbor
@@ -953,7 +953,7 @@ impl PacketEngine {
                     add_to_trace(TraceType::Trace, trace_params, &trace, _f);
                 }
             }
-            self.pe_to_cm.send(PeToCmPacket::Snake((recv_port_no, count, packet)))?; 
+            self.pe_to_cm.send(PeToCmPacketOld::Snake((recv_port_no, count, packet)))?; 
         }
         Ok(())
     }
