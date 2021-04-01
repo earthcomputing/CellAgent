@@ -65,23 +65,23 @@ impl SimulatedInteriorPort {
 	    }
         self.failover_info.save_packet(&packet);
         match &self.duplex_port_link_channel {
-            Some(connected_duplex_port_link_channel) => Ok(connected_duplex_port_link_channel.port_to_link.send(*packet).context(SimulatedInteriorPortError::Chain {func_name: "new",comment: S("")})?),
+            Some(connected_duplex_port_link_channel) => {
+                Ok(connected_duplex_port_link_channel.port_to_link.send(*packet).context(SimulatedInteriorPortError::Chain {func_name: "new",comment: S("")})?)
+            },
             None => Err(SimulatedInteriorPortError::SendDisconnected { func_name: _f, port_no: self.base_port.get_port_no(), cell_id: self.base_port.get_cell_id()}.into()),
         }
     }
 }
 impl fmt::Display for SimulatedInteriorPort {
     fn fmt(&self, _f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(_f, "SimulatedInteriorPort {}: Failover info {}", self.base_port.get_id(), self.failover_info)
+        let is_connected = if self.is_connected { "" } else { " not" };
+        write!(_f, "SimulatedInteriorPort {}: is{} Failover info {}", self.base_port.get_id(), is_connected, self.failover_info)
     }
 }
 
 impl CommonPortLike for SimulatedInteriorPort {
     fn get_base_port(&self) -> &BasePort {
-        return &(*self).base_port;
-    }
-    fn get_base_port_mut(&mut self) -> &mut BasePort {
-        return &mut (*self).base_port;
+        return &self.base_port;
     }
     fn get_whether_connected(&self) -> bool { return self.is_connected; }
     fn set_connected(&mut self) -> () { self.is_connected = true; }
@@ -230,11 +230,7 @@ impl InteriorPortFactoryLike<SimulatedInteriorPort> for SimulatedInteriorPortFac
         let cell_no = self.cell_no_map[&cell_id.get_name()];
         let port_no = port_number.get_port_no();
         let duplex_port_link_channel_port_map = &self.duplex_port_link_channel_cell_port_map[&cell_no];
-        let duplex_port_link_channel = if duplex_port_link_channel_port_map.contains_key(&port_no) {
-            Some(duplex_port_link_channel_port_map[&port_no].clone())
-        } else {
-            None
-        };
+        let duplex_port_link_channel = duplex_port_link_channel_port_map.get(&port_no).cloned();
         Ok( SimulatedInteriorPort {
             base_port: BasePort::new(
                 cell_id,

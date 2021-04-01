@@ -58,10 +58,7 @@ impl fmt::Display for SimulatedBorderPort {
 }
 impl CommonPortLike for SimulatedBorderPort {
     fn get_base_port(&self) -> &BasePort {
-        return &(*self).base_port;
-    }
-    fn get_base_port_mut(&mut self) -> &mut BasePort {
-        return &mut (*self).base_port;
+        return &self.base_port;
     }
     fn get_whether_connected(&self) -> bool { return self.is_connected; }
     fn set_connected(&mut self) -> () { self.is_connected = true; }

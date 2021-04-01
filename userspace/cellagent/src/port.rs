@@ -84,7 +84,6 @@ pub trait CommonPortLike: 'static {
 
     // THESE COULD BE PROTECTED
     fn get_base_port(&self) -> &BasePort;
-    fn get_base_port_mut(&mut self) -> &mut BasePort;
 }
 
 pub trait InteriorPortLike: 'static + Clone + Sync + Send + CommonPortLike {

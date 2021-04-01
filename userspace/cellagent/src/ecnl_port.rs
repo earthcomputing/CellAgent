@@ -155,10 +155,7 @@ impl ECNL_Port {
 
 impl CommonPortLike for ECNL_Port {
     fn get_base_port(&self) -> &BasePort {
-        return &(*self).base_port;
-    }
-    fn get_base_port_mut(&mut self) -> &mut BasePort {
-        return &mut (*self).base_port;
+        return &self.base_port;
     }
     fn get_whether_connected(&self) -> bool {
          unsafe {

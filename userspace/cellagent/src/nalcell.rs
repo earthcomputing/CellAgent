@@ -17,7 +17,9 @@ use crate::ec_message_formats::{PortToPe, PeFromPort, PeToPort, PortFromPe,
                                 CmToCa, CaFromCm, CaToCm, CmFromCa, CaToCmBytes, CmToCaBytesOld,
                                 PeToCm, CmFromPe, CmToPe, PeFromCm};
 use crate::name::{CellID, PortID};
-use crate::port::{InteriorPortLike, BorderPortLike, InteriorPortFactoryLike, BorderPortFactoryLike, Port, DuplexPortPeOrCaChannel, DuplexPortPeChannel, DuplexPortCaChannel};
+use crate::port::{InteriorPortLike, BorderPortLike, 
+                  InteriorPortFactoryLike, BorderPortFactoryLike, Port, 
+                  DuplexPortPeOrCaChannel, DuplexPortPeChannel, DuplexPortCaChannel};
 use crate::replay::{TraceFormat, process_trace_record};
 use crate::utility::{CellConfig, CellType, PortNo, S,
                      TraceHeaderParams, TraceType};
