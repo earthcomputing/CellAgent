@@ -2,44 +2,56 @@ use std::{fmt};
 
 use crate::config::{CONFIG};
 use crate::dal::{add_to_trace};
-use crate::simulated_interior_port::{LinkFromPortOld, LinkToPortOld, LinkToPortPacketOld};
+use crate::simulated_interior_port::{LinkFromPortOld, LinkToPortOld, LinkToPortPacket};
 use crate::name::{Name, LinkID, PortID};
-use crate::port::{PortStatusOld};
 use crate::utility::{S, TraceHeaderParams, TraceType};
 
+#[derive(Debug, Copy, Clone, Serialize)]
+pub enum LinkStatus {
+    Connected,
+    Disconnected
+}
+impl fmt::Display for LinkStatus {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            LinkStatus::Connected    => write!(f, "Connected"),
+            LinkStatus::Disconnected => write!(f, "Disconnected")
+        }
+    }
+}
 // TODO: There is no distinction between a broken link and a disconnected one.  We may want to revisit.
 #[derive(Clone, Debug)]
 pub struct DuplexLinkPortChannel {
-    link_from_port_old: LinkFromPortOld,
-    link_to_port_old: LinkToPortOld,
+    link_from_port: LinkFromPortOld,
+    link_to_port: LinkToPortOld,
 }
 impl DuplexLinkPortChannel {
-    pub fn new(link_from_port_old: LinkFromPortOld, link_to_port_old: LinkToPortOld) -> DuplexLinkPortChannel {
-        DuplexLinkPortChannel { link_from_port_old, link_to_port_old }
+    pub fn new(link_from_port: LinkFromPortOld, link_to_port: LinkToPortOld) -> DuplexLinkPortChannel {
+        DuplexLinkPortChannel { link_from_port, link_to_port }
     }
-    pub fn get_link_from_port_old(&self) -> &LinkFromPortOld { &self.link_from_port_old }
-    pub fn get_link_to_port_old(&self) -> &LinkToPortOld { &self.link_to_port_old }
+    pub fn get_link_from_port(&self) -> &LinkFromPortOld { &self.link_from_port }
+    pub fn get_link_to_port(&self) -> &LinkToPortOld { &self.link_to_port }
 }
 
 #[derive(Clone, Debug)]
 pub struct LinkToPortsOld {
-    left_old: LinkToPortOld,
-    rite_old: LinkToPortOld,
+    left: LinkToPortOld,
+    rite: LinkToPortOld,
 }
 impl LinkToPortsOld {
-    pub fn new(left_old: LinkToPortOld, rite_old: LinkToPortOld) -> LinkToPortsOld {
-        LinkToPortsOld { left_old, rite_old }
+    pub fn new(left: LinkToPortOld, rite: LinkToPortOld) -> LinkToPortsOld {
+        LinkToPortsOld { left, rite }
     }
 }
 
 #[derive(Clone, Debug)]
 pub struct LinkFromPortsOld {
-    left_old: LinkFromPortOld,
-    rite_old: LinkFromPortOld,
+    left: LinkFromPortOld,
+    rite: LinkFromPortOld,
 }
 impl LinkFromPortsOld {
-    pub fn new( left_old: LinkFromPortOld, rite_old: LinkFromPortOld) -> LinkFromPortsOld {
-        LinkFromPortsOld { left_old, rite_old }
+    pub fn new( left: LinkFromPortOld, rite: LinkFromPortOld) -> LinkFromPortsOld {
+        LinkFromPortsOld { left, rite }
     }
 }
 
@@ -61,14 +73,14 @@ impl Link {
                 add_to_trace(TraceType::Trace, trace_params, &trace, _f);
             }
         }
-        link_to_ports.left_old.send(LinkToPortPacketOld::Status(PortStatusOld::Connected)).context(LinkError::Chain { func_name: _f, comment: S(id) + " send status to port"})?;
-        link_to_ports.rite_old.send(LinkToPortPacketOld::Status(PortStatusOld::Connected)).context(LinkError::Chain { func_name: _f, comment: S(id) + " send status to port"})?;
+        link_to_ports.left.send(LinkToPortPacket::Status(LinkStatus::Connected)).context(LinkError::Chain { func_name: _f, comment: S(id) + " send status to port"})?;
+        link_to_ports.rite.send(LinkToPortPacket::Status(LinkStatus::Connected)).context(LinkError::Chain { func_name: _f, comment: S(id) + " send status to port"})?;
         Ok(Link {
             id,
             is_connected: true,
             link_to_ports: LinkToPortsOld {
-                left_old: link_to_ports.left_old,
-                rite_old: link_to_ports.rite_old,
+                left: link_to_ports.left,
+                rite: link_to_ports.rite,
             },
         })
     }
@@ -78,7 +90,7 @@ impl Link {
         let _f = "listen";
         loop {
             select! {
-                recv(link_from_ports.left_old) -> recvd => {
+                recv(link_from_ports.left) -> recvd => {
                     let packet = recvd.context(LinkError::Chain { func_name: _f, comment: S(self.id.clone()) + " receive from left"})?;
                     {
                         if CONFIG.trace_options.all || CONFIG.trace_options.link {
@@ -90,9 +102,9 @@ impl Link {
                             add_to_trace(TraceType::Trace, trace_params, &trace, _f);
                         }
                     }
-                    self.link_to_ports.rite_old.send(LinkToPortPacketOld::Packet(packet)).context(LinkError::Chain { func_name: _f, comment: S(self.id.clone()) + " send to rite"})?;
+                    self.link_to_ports.rite.send(LinkToPortPacket::Packet(packet)).context(LinkError::Chain { func_name: _f, comment: S(self.id.clone()) + " send to rite"})?;
                 },
-                recv(link_from_ports.rite_old) -> recvd => {
+                recv(link_from_ports.rite) -> recvd => {
                     let packet = recvd.context(LinkError::Chain { func_name: _f, comment: S(self.id.clone()) + " receive from rite"})?;
                     {
                         if CONFIG.trace_options.all || CONFIG.trace_options.link {
@@ -104,7 +116,7 @@ impl Link {
                             add_to_trace(TraceType::Trace, trace_params, &trace, _f);
                         }
                     }
-                    self.link_to_ports.left_old.send(LinkToPortPacketOld::Packet(packet)).context(LinkError::Chain { func_name: _f, comment: S(self.id.clone()) + " send to left"})?;
+                    self.link_to_ports.left.send(LinkToPortPacket::Packet(packet)).context(LinkError::Chain { func_name: _f, comment: S(self.id.clone()) + " send to left"})?;
                 }
             }
         }
@@ -115,12 +127,12 @@ impl Link {
         {
             if CONFIG.trace_options.all || CONFIG.trace_options.link {
                 let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "link_to_port_disconnected" };
-                let trace = json!({ "id": &self.get_id(), "status": LinkToPortPacketOld::Status(PortStatusOld::Disconnected) });
+                let trace = json!({ "id": &self.get_id(), "status": LinkToPortPacket::Status(LinkStatus::Disconnected) });
                 add_to_trace(TraceType::Trace, trace_params, &trace, _f);
             }
         }
-        self.link_to_ports.left_old.send(LinkToPortPacketOld::Status(PortStatusOld::Disconnected)).context(LinkError::Chain { func_name: _f, comment: S(self.id.clone()) + " left"})?;
-        self.link_to_ports.rite_old.send(LinkToPortPacketOld::Status(PortStatusOld::Disconnected)).context(LinkError::Chain { func_name: _f, comment: S(self.id.clone()) + " left"})?;
+        self.link_to_ports.left.send(LinkToPortPacket::Status(LinkStatus::Disconnected)).context(LinkError::Chain { func_name: _f, comment: S(self.id.clone()) + " left"})?;
+        self.link_to_ports.rite.send(LinkToPortPacket::Status(LinkStatus::Disconnected)).context(LinkError::Chain { func_name: _f, comment: S(self.id.clone()) + " left"})?;
         Ok(())
     }
 }

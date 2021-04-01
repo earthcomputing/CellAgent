@@ -8,21 +8,22 @@ use crate::blueprint::{Blueprint, };
 use crate::config::{CONFIG};
 use crate::dal::{add_to_trace};
 use crate::ec_message_formats::{PortToPePacketOld, PortToPeOld};
+use crate::link::{LinkStatus};
 use crate::name::{Name, CellID, PortID};
 use crate::packet::{Packet}; // Eventually use SimulatedPacket
 use crate::port::{CommonPortLike, InteriorPortLike, PortSeed, BasePort, InteriorPortFactoryLike, 
-    PortStatus, PortStatusOld, DuplexPortPeOrCaChannel, DuplexPortPeChannel};
+                  PortStatusOld, DuplexPortPeOrCaChannel, DuplexPortPeChannel};
 use crate::utility::{CellNo, PortNo, PortNumber, S, TraceHeaderParams, TraceType};
 use crate::uuid_ec::{AitState};
 
 #[derive(Clone, Debug)]
 pub struct DuplexPortLinkChannel {
-    port_from_link_old: PortFromLinkOld,
-    port_to_link_old: PortToLinkOld,
+    port_from_link: PortFromLink,
+    port_to_link: PortToLink,
 }
 impl DuplexPortLinkChannel {
-    pub fn new(port_from_link_old: PortFromLinkOld, port_to_link_old: PortToLinkOld) -> DuplexPortLinkChannel {
-        DuplexPortLinkChannel { port_from_link_old, port_to_link_old }
+    pub fn new(port_from_link: PortFromLink, port_to_link: PortToLink) -> DuplexPortLinkChannel {
+        DuplexPortLinkChannel { port_from_link, port_to_link }
     }
 }
 
@@ -35,20 +36,20 @@ pub struct SimulatedInteriorPort {
 }
 
 impl SimulatedInteriorPort {
-    fn recv(&mut self) -> Result<LinkToPortPacketOld, Error> {
+    fn recv(&mut self) -> Result<LinkToPortPacket, Error> {
         let _f = "recv";
         match &self.duplex_port_link_channel {
             Some(connected_duplex_port_link_channel) => {
-                let link_to_port_packet_old = connected_duplex_port_link_channel.port_from_link_old.recv()?;
+                let link_to_port_packet = connected_duplex_port_link_channel.port_from_link.recv()?;
                 {
                     if CONFIG.trace_options.all || CONFIG.trace_options.port {
                         let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "simulated_port_receive" };
-                        let trace = json!({ "cell_id": self.base_port.get_cell_id(), "id": self.base_port.get_id().get_name(), "link_to_port_packet": link_to_port_packet_old });
+                        let trace = json!({ "cell_id": self.base_port.get_cell_id(), "id": self.base_port.get_id().get_name(), "link_to_port_packet": link_to_port_packet });
                         add_to_trace(TraceType::Trace, trace_params, &trace, _f);
                     }
 	            }
                 self.failover_info.clear_saved_packet();
-                Ok(link_to_port_packet_old)
+                Ok(link_to_port_packet)
             },
             None => Err(SimulatedInteriorPortError::RecvDisconnected { func_name: _f, port_no: self.base_port.get_port_no(), cell_id: self.base_port.get_cell_id()}.into()),
         }
@@ -64,7 +65,7 @@ impl SimulatedInteriorPort {
 	    }
         self.failover_info.save_packet(&packet);
         match &self.duplex_port_link_channel {
-            Some(connected_duplex_port_link_channel) => Ok(connected_duplex_port_link_channel.port_to_link_old.send(*packet).context(SimulatedInteriorPortError::Chain {func_name: "new",comment: S("")})?),
+            Some(connected_duplex_port_link_channel) => Ok(connected_duplex_port_link_channel.port_to_link.send(*packet).context(SimulatedInteriorPortError::Chain {func_name: "new",comment: S("")})?),
             None => Err(SimulatedInteriorPortError::SendDisconnected { func_name: _f, port_no: self.base_port.get_port_no(), cell_id: self.base_port.get_cell_id()}.into()),
         }
     }
@@ -106,20 +107,20 @@ impl InteriorPortLike for SimulatedInteriorPort {
         }
 	    self.direct_send(packet)
     }
-    fn listen_and_forward_to(self: &mut Self, port_to_pe_old: PortToPeOld) -> Result<(), Error> {
+    fn listen_and_forward_to(self: &mut Self, port_to_pe: PortToPeOld) -> Result<(), Error> {
         let _f = "listen_and_forward_to";
-        let mut msg: LinkToPortPacketOld;
+        let mut msg: LinkToPortPacket;
         loop {
             msg = self.recv().context(SimulatedInteriorPortError::Chain { func_name: _f, comment: S(self.base_port.get_id().get_name()) + " recv from link"})?;
             {
                 if CONFIG.trace_options.all || CONFIG.trace_options.port {
                     match &msg {
-                        LinkToPortPacketOld::Packet(packet) => {
+                        LinkToPortPacket::Packet(packet) => {
                             let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "port_from_link_packet" };
                             let trace = json!({ "cell_id": self.base_port.get_cell_id(), "id": self.base_port.get_id().get_name(), "packet":packet.stringify()? });
                             add_to_trace(TraceType::Trace, trace_params, &trace, _f);
                         },
-                        LinkToPortPacketOld::Status(status) => {
+                        LinkToPortPacket::Status(status) => {
                             let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "port_from_link_status" };
                             let trace = json!({ "cell_id": self.base_port.get_cell_id(), "id": self.base_port.get_id().get_name(), "status": status, "msg": msg});
                             add_to_trace(TraceType::Trace, trace_params, &trace, _f);
@@ -128,10 +129,10 @@ impl InteriorPortLike for SimulatedInteriorPort {
                 }
             }
             match msg {
-                LinkToPortPacketOld::Status(status) => {
+                LinkToPortPacket::Status(status) => {
                     match status {
-                        PortStatusOld::Connected => self.set_connected(),
-                        PortStatusOld::Disconnected => self.set_disconnected()
+                        LinkStatus::Connected => self.set_connected(),
+                        LinkStatus::Disconnected => self.set_disconnected()
                     };
                     {
                         if CONFIG.trace_options.all || CONFIG.trace_options.port {
@@ -140,9 +141,13 @@ impl InteriorPortLike for SimulatedInteriorPort {
                             add_to_trace(TraceType::Trace, trace_params, &trace, _f);
                         }
                     }
-                    port_to_pe_old.send(PortToPePacketOld::Status((self.base_port.get_port_no(), self.base_port.is_border(), status))).context(SimulatedInteriorPortError::Chain { func_name: _f, comment: S(self.base_port.get_id().get_name()) + " send status to pe"})?;
+                    let status_old = match status {
+                        LinkStatus::Connected => PortStatusOld::Connected,
+                        LinkStatus::Disconnected => PortStatusOld::Disconnected
+                    };
+                    port_to_pe.send(PortToPePacketOld::Status((self.base_port.get_port_no(), self.base_port.is_border(), status_old))).context(SimulatedInteriorPortError::Chain { func_name: _f, comment: S(self.base_port.get_id().get_name()) + " send status to pe"})?;
                 }
-                LinkToPortPacketOld::Packet(mut packet) => {
+                LinkToPortPacket::Packet(mut packet) => {
                     let ait_state = packet.get_ait_state();
                     match ait_state {
                         AitState::AitD |
@@ -159,7 +164,7 @@ impl InteriorPortLike for SimulatedInteriorPort {
                                     add_to_trace(TraceType::Trace, trace_params, &trace, _f);
                                 }
                             }
-                            port_to_pe_old.send(PortToPePacketOld::Packet((self.base_port.get_port_no(), packet)))?;
+                            port_to_pe.send(PortToPePacketOld::Packet((self.base_port.get_port_no(), packet)))?;
                         },
                         AitState::Teck |
                         AitState::Tack |
@@ -195,7 +200,7 @@ impl InteriorPortLike for SimulatedInteriorPort {
                                     add_to_trace(TraceType::Trace, trace_params, &trace, _f);
                                 }
                             }
-                            port_to_pe_old.send(PortToPePacketOld::Packet((self.base_port.get_port_no(), packet)))?;
+                            port_to_pe.send(PortToPePacketOld::Packet((self.base_port.get_port_no(), packet)))?;
                         },
                     }
                 }
@@ -249,35 +254,21 @@ impl InteriorPortFactoryLike<SimulatedInteriorPort> for SimulatedInteriorPortFac
         return &mut self.port_seed;
     }
 }
-// Link to Port Old
-type PACKET = Packet;
+
+// Link to Port
+type PACKETOLD = Packet;
 pub type PortToLink = mpsc::Sender<PortToLinkPacket>;
 pub type PortFromLink = mpsc::Receiver<LinkToPortPacket>;
 #[derive(Debug, Clone, Serialize)]
 pub enum LinkToPortPacket {
-    Status(PortStatus),
-    Packet(PACKET),
-}
-pub type LinkToPort = mpsc::Sender<LinkToPortPacket>;
-
-// Port to Link
-pub type PortToLinkPacket = PACKET; // SimulatedPacket
-pub type LinkFromPort = mpsc::Receiver<PortToLinkPacket>;
-
-// Link to Port Old
-type PACKETOLD = Packet;
-pub type PortToLinkOld = mpsc::Sender<PortToLinkPacketOld>;
-pub type PortFromLinkOld = mpsc::Receiver<LinkToPortPacketOld>;
-#[derive(Debug, Clone, Serialize)]
-pub enum LinkToPortPacketOld {
-    Status(PortStatusOld),
+    Status(LinkStatus),
     Packet(PACKETOLD),
 }
-pub type LinkToPortOld = mpsc::Sender<LinkToPortPacketOld>;
+pub type LinkToPortOld = mpsc::Sender<LinkToPortPacket>;
 
 // Port to Link
-pub type PortToLinkPacketOld = Packet; // SimulatedPacket
-pub type LinkFromPortOld = mpsc::Receiver<PortToLinkPacketOld>;
+pub type PortToLinkPacket = Packet; // SimulatedPacket
+pub type LinkFromPortOld = mpsc::Receiver<PortToLinkPacket>;
 
 #[derive(Debug, Copy, Clone, Serialize)]
 pub struct FailoverInfo {
