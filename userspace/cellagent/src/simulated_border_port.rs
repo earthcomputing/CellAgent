@@ -46,7 +46,16 @@ impl SimulatedBorderPort {
         Ok(self.duplex_port_noc_channel.as_ref().unwrap().port_from_noc.recv()?)
     }
 }
-
+impl fmt::Display for SimulatedBorderPort {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let not_connected = if self.is_connected { "" } else {" not"};
+        let channel_not_set = match self.duplex_port_noc_channel {
+            Some(_) => "",
+            None => " not"
+        };
+        write!(f, "{} is{} connected and the channel is{} defined", self.base_port, not_connected, channel_not_set)
+    }
+}
 impl CommonPortLike for SimulatedBorderPort {
     fn get_base_port(&self) -> &BasePort {
         return &(*self).base_port;
@@ -103,13 +112,16 @@ pub struct SimulatedBorderPortFactory {
 }
 
 impl SimulatedBorderPortFactory {
-    pub fn new(port_seed: PortSeed, cell_no_map: HashMap<String, CellNo>, blueprint: Blueprint, duplex_port_noc_channel_cell_port_map: HashMap<CellNo, HashMap::<PortNo, DuplexPortNocChannel>>) -> SimulatedBorderPortFactory {
+    pub fn new(port_seed: PortSeed, cell_no_map: HashMap<String, CellNo>, blueprint: Blueprint, 
+            duplex_port_noc_channel_cell_port_map: HashMap<CellNo, HashMap::<PortNo, DuplexPortNocChannel>>) 
+                -> SimulatedBorderPortFactory {
         SimulatedBorderPortFactory { port_seed, cell_no_map, blueprint, duplex_port_noc_channel_cell_port_map }
     }
 }
 
 impl BorderPortFactoryLike<SimulatedBorderPort> for SimulatedBorderPortFactory {
-    fn new_port(&self, cell_id: CellID, _port_id: PortID, port_number: PortNumber, duplex_port_ca_channel: DuplexPortCaChannel) -> Result<SimulatedBorderPort, Error> {
+    fn new_port(&self, cell_id: CellID, _port_id: PortID, port_number: PortNumber, 
+            duplex_port_ca_channel: DuplexPortCaChannel) -> Result<SimulatedBorderPort, Error> {
         let cell_no = self.cell_no_map[&cell_id.get_name()];
         let port_no = port_number.get_port_no();
         let duplex_port_noc_channel_port_map = &(*self).duplex_port_noc_channel_cell_port_map[&cell_no];
@@ -121,11 +133,7 @@ impl BorderPortFactoryLike<SimulatedBorderPort> for SimulatedBorderPortFactory {
                 DuplexPortPeOrCaChannel::Border(duplex_port_ca_channel),
             )?,
             is_connected: true,
-            duplex_port_noc_channel: if duplex_port_noc_channel_port_map.contains_key(&port_no) {
-                Some(duplex_port_noc_channel_port_map[&port_no].clone())
-            } else {
-                None
-            },
+            duplex_port_noc_channel: duplex_port_noc_channel_port_map.get(&port_no).cloned(),
         })
     }
     fn get_port_seed(&self) -> &PortSeed {
@@ -135,13 +143,6 @@ impl BorderPortFactoryLike<SimulatedBorderPort> for SimulatedBorderPortFactory {
         return &mut (*self).port_seed;
     }
 }
-
-
-// Noc to Port
-//pub type NocPortError = mpsc::SendError<NocToPortMsg>;
-
-// Port to Noc
-//pub type PortNocError = mpsc::SendError<PortToNocPacket>;
 
 // Errors
 use failure::{Error, ResultExt};
