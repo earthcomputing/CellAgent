@@ -107,7 +107,7 @@ impl InteriorPortLike for SimulatedInteriorPort {
         }
 	    self.direct_send(packet)
     }
-    fn listen_and_forward_to(self: &mut Self, port_to_pe: PortToPeOld) -> Result<(), Error> {
+    fn listen_and_forward_to(self: &mut Self, port_to_pe: &PortToPeOld) -> Result<(), Error> {
         let _f = "listen_and_forward_to";
         let mut msg: LinkToPortPacket;
         loop {

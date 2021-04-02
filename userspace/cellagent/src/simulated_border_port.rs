@@ -77,7 +77,7 @@ impl BorderPortLike for SimulatedBorderPort {
         }
        Ok(self.duplex_port_noc_channel.as_ref().unwrap().port_to_noc.send(bytes.clone()).context(SimulatedBorderPortError::Chain {func_name: "new",comment: S("")})?)
     }
-    fn listen_and_forward_to(&mut self, port_to_ca: PortToCa) -> Result<(), Error> {
+    fn listen_and_forward_to(&mut self, port_to_ca: &PortToCa) -> Result<(), Error> {
         let _f = "listen_and_forward_to";
         loop {
             let msg = self.recv()?;

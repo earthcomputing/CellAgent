@@ -110,14 +110,16 @@ pub trait InteriorPortLike: 'static + Clone + Sync + Send + CommonPortLike {
 
     // THESE COULD BE PROTECTED
     fn send(self: &mut Self, packet: &mut Packet) -> Result<(), Error>;
-    fn listen_and_forward_to(self: &mut Self, port_to_pe_old: PortToPeOld) -> Result<(), Error>;
+    fn listen_and_forward_to(&mut self, port_to_pe_old: &PortToPeOld) -> Result<(), Error>;
 
     // THESE COULD BE PRIVATE
-    fn listen(self: &mut Self) -> Result<(), Error> {
-        self.listen_and_forward_to(self.get_duplex_port_pe_channel().port_to_pe_old)
+    fn listen(&mut self) -> Result<(), Error> {
+        let port_pe_old = self.get_duplex_port_pe_channel().clone();
+        let port_to_pe_old = port_pe_old.get_port_to_pe_old();
+        self.listen_and_forward_to(&port_to_pe_old)
     }
-    fn get_duplex_port_pe_channel(&self) -> DuplexPortPeChannel {
-        return if let DuplexPortPeOrCaChannel::Interior(duplex_port_pe_channel) = self.get_base_port().get_duplex_port_pe_or_ca_channel() {duplex_port_pe_channel} else {panic!("Expected an interior port")};
+    fn get_duplex_port_pe_channel(&self) -> &DuplexPortPeChannel {
+        self.get_base_port().get_duplex_port_pe_channel()
     }
     fn listen_link_loop(&mut self) -> Result<(), Error> {
         let _f = "listen_link_loop";
@@ -178,7 +180,7 @@ pub trait BorderPortLike: 'static + Clone + Sync + Send + CommonPortLike {
                 add_to_trace(TraceType::Trace, trace_params, &trace, _f);
             }
         }
-        let port_to_ca = self.get_duplex_port_ca_channel().port_to_ca;
+        let port_to_ca = self.get_base_port().get_duplex_port_ca_channel().port_to_ca;
         port_to_ca.send(status).context(PortError::Chain { func_name: "noc_channel", comment: S(self.get_id().get_name()) + " send to pe"})?;
         self.clone().listen_noc()?;
         let join_handle = self.listen_ca()?;
@@ -187,14 +189,11 @@ pub trait BorderPortLike: 'static + Clone + Sync + Send + CommonPortLike {
 
     // THESE COULD BE PROTECTED
     fn send(self: &Self, bytes: &mut ByteArray) -> Result<(), Error>;
-    fn listen_and_forward_to(self: &mut Self, port_to_ca: PortToCa) -> Result<(), Error>;
+    fn listen_and_forward_to(&mut self, port_to_ca: &PortToCa) -> Result<(), Error>;
 
     // THESE COULD BE PRIVATE
-    fn listen(self: &mut Self) -> Result<(), Error> {
-        self.listen_and_forward_to(self.get_duplex_port_ca_channel().port_to_ca)
-    }
-    fn get_duplex_port_ca_channel(&self) -> DuplexPortCaChannel {
-        return if let DuplexPortPeOrCaChannel::Border(duplex_port_ca_channel) = self.get_base_port().get_duplex_port_pe_or_ca_channel() {duplex_port_ca_channel} else {panic!("Expected a border port")};
+    fn listen(&mut self) -> Result<(), Error> {
+        self.listen_and_forward_to(self.get_base_port().get_duplex_port_ca_channel().get_port_to_ca())
     }
     // SPAWN THREAD (listen_noc_for_pe_loop)
     fn listen_noc(&self) -> Result<(), Error> {
@@ -248,7 +247,7 @@ pub trait BorderPortLike: 'static + Clone + Sync + Send + CommonPortLike {
             }
         }
         loop {
-            let mut bytes = self.get_duplex_port_ca_channel().port_from_ca.recv().context(PortError::Chain { func_name: _f, comment: S(self.get_id().get_name()) + " recv from ca"})?;
+            let mut bytes = self.get_base_port().get_duplex_port_ca_channel().port_from_ca.recv().context(PortError::Chain { func_name: _f, comment: S(self.get_id().get_name()) + " recv from ca"})?;
             {
                 if CONFIG.trace_options.all || CONFIG.trace_options.port {
                     let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "port_from_ca" };
@@ -281,7 +280,19 @@ impl BasePort {
     pub fn get_cell_id(&self) -> CellID { self.cell_id }
     pub fn get_port_no(&self) -> PortNo { self.port_number.get_port_no() }
     pub fn is_border(&self) -> bool { self.is_border }
-    pub fn get_duplex_port_pe_or_ca_channel(&self) -> DuplexPortPeOrCaChannel { return self.duplex_port_pe_or_ca_channel.clone(); }
+    fn get_duplex_port_pe_or_ca_channel(&self) -> &DuplexPortPeOrCaChannel { &self.duplex_port_pe_or_ca_channel }
+    fn get_duplex_port_pe_channel(&self) -> &DuplexPortPeChannel {
+        match self.get_duplex_port_pe_or_ca_channel() {
+            DuplexPortPeOrCaChannel::Interior(c) => c,
+            DuplexPortPeOrCaChannel::Border(_) => panic!("Looking for Interior, found Border")
+        }
+    }
+    fn get_duplex_port_ca_channel(&self) -> DuplexPortCaChannel {
+        match self.duplex_port_pe_or_ca_channel.clone() {
+            DuplexPortPeOrCaChannel::Border(c) => c,
+            DuplexPortPeOrCaChannel::Interior(_) => panic!("Looking for Border, found Interor")
+        }
+    }
 }
 impl fmt::Display for BasePort {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
