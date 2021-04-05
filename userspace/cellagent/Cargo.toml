@@ -1,4 +1,5 @@
 [package]
+resolver = "2"
 name = "ec_fabrix"
 version = "0.1.0"
 authors = ["Alan Karp <alan@earthcomputing.io>"]
@@ -33,8 +34,8 @@ path = "src/test.rs"
 opt-level = 3
 
 [profile.dev]
-# Turn off optimization in Development mode
-opt-level = 0
+opt-level = 0 # Turn off optimization in Development mode
+split-debuginfo = "unpacked" # Speed up compilation on Mac
 
 [profile.release]
 lto = true

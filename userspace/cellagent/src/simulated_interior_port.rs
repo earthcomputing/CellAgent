@@ -238,7 +238,7 @@ impl InteriorPortFactoryLike<SimulatedInteriorPort> for SimulatedInteriorPortFac
                 false,
                 DuplexPortPeOrCaChannel::Interior(duplex_port_pe_channel),
             )?,
-            is_connected: duplex_port_link_channel_port_map.contains_key(&port_no),
+            is_connected: false,
             duplex_port_link_channel,
             failover_info: FailoverInfo::new(port_id),
         })
