@@ -190,7 +190,7 @@ impl InteriorPortLike for ECNL_Port {
 	}
 	return Ok(())
     }
-     fn listen_and_forward_to(self: &mut Self, port_to_pe: PortToPeOld) -> Result<(), Error> {
+     fn listen_and_forward_to(self: &mut Self, port_to_pe: &PortToPeOld) -> Result<(), Error> {
          let _f = "listen_and_forward_to";
          unsafe {
              let ecnl_port_sub = (*(self.ecnl_port_sub_ptr));

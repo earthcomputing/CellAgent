@@ -65,6 +65,11 @@ impl Uuid {
         bytes[AIT_BYTE] = bytes[AIT_BYTE] & 0b0000_1111;
         self.set_bytes(bytes);
     }
+    pub fn is_entl(&self) -> bool {
+        let ait_state = self.get_ait_state();
+        (ait_state == AitState::Tick) ||
+        (ait_state == AitState::Tock)
+    }
     pub fn is_ait(&self) -> bool {
         self.is_ait_send() || self.is_ait_recv()
     }

@@ -120,7 +120,7 @@ impl Packet {
     pub fn is_ait_recv(&self) -> bool { self.header.get_uuid().is_ait_recv() }
     pub fn is_snake(&self) -> bool { self.header.get_uuid().is_snake() }
     pub fn is_snaked(&self) -> bool { self.header.get_uuid().is_snaked() }
-    pub fn _is_entl(&self) -> bool { self.header.get_uuid().is_init() }
+    pub fn is_entl(&self) -> bool { self.header.get_uuid().is_entl() }
     pub fn get_ait_state(&self) -> AitState { self.get_tree_uuid().get_ait_state() }
     pub fn time_reverse(&mut self) { self.header.get_uuid().time_reverse(); }
     pub fn next_ait_state(&mut self) -> Result<AitState, Error> {

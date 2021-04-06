@@ -129,6 +129,7 @@ impl Config {
 pub struct TraceOptions {
     pub all:       bool,
     pub dc:        bool,
+    pub entl:      bool,
     pub nal:       bool,
     pub noc:       bool,
     pub svc:       bool,

@@ -17,6 +17,7 @@
         "ca":false,
         "cm":false,
         "dc":false,
+        "entl":false,
         "link":false,
         "nal":false,
         "noc":false,

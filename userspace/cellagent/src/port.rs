@@ -150,15 +150,14 @@ pub trait InteriorPortLike: 'static + Clone + Sync + Send + CommonPortLike {
             //println!("Port {}: waiting for packet from pe", id);
             let mut packet = self.get_duplex_port_pe_channel().port_from_pe_old.recv().context(PortError::Chain { func_name: _f, comment: S(self.get_id().get_name()) + " port_from_pe"})?;
             {
+                let ait_state = packet.get_ait_state();
                 if CONFIG.trace_options.all || CONFIG.trace_options.port {
                     let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "port_from_pe" };
-                    let trace = json!({ "cell_id": self.get_cell_id(), "id": self.get_id().get_name(), "ait_state": packet.get_ait_state(), "packet":packet.stringify()? });
+                    let trace = json!({ "cell_id": self.get_cell_id(), "id": self.get_id().get_name(), "ait_state": ait_state, "packet":packet.stringify()? });
                     add_to_trace(TraceType::Trace, trace_params, &trace, _f);
                 }
-            }
-            {
-                if CONFIG.trace_options.all | CONFIG.trace_options.port {
-                    let ait_state = packet.get_ait_state();
+                if (CONFIG.trace_options.all || CONFIG.trace_options.port) && 
+                   (!packet.is_entl() || CONFIG.trace_options.entl) {
                     let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "port_to_port_like" };
                     let trace = json!({ "cell_id": self.get_cell_id(), "id": self.get_id().get_name(), "ait_state": ait_state, "packet": packet.stringify()? });
                     add_to_trace(TraceType::Trace, trace_params, &trace, _f);
