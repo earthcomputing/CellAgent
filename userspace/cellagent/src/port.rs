@@ -95,16 +95,16 @@ pub trait InteriorPortLike: 'static + Clone + Sync + Send + CommonPortLike {
         let thread_name = format!("Port {} listen_link", port_clone.get_id().get_name());
         thread::Builder::new().name(thread_name).spawn( move || {
             update_trace_header(child_trace_header);
-            let _ = port.listen_link_loop().map_err(|e| write_err("port", &e));
-            if CONFIG.continue_on_error { port.listen_link_loop().map_err(|e| write_err("port", &e)).ok();  }
+            let _ = port.listen_link_loop().map_err(|e| write_err("port listen link", &e));
+            if CONFIG.continue_on_error { port.listen_link_loop().map_err(|e| write_err("port continue listen link", &e)).ok();  }
         }).expect("thread failed");
         let mut port = self.clone();
         let child_trace_header = fork_trace_header();
         let thread_name = format!("Port {} listen_pe", port_clone.get_id().get_name());
         thread::Builder::new().name(thread_name).spawn( move || {
             update_trace_header(child_trace_header);
-            let _ = port.listen_pe_loop().map_err(|e| write_err("port", &e));
-            if CONFIG.continue_on_error { port.listen_pe_loop().map_err(|e| write_err("port", &e)).ok(); }
+            let _ = port.listen_pe_loop().map_err(|e| write_err("port listen pe", &e));
+            if CONFIG.continue_on_error { port.listen_pe_loop().map_err(|e| write_err("port continue listen pe", &e)).ok(); }
         }).expect("thread failed");
     }
 
@@ -152,14 +152,14 @@ pub trait InteriorPortLike: 'static + Clone + Sync + Send + CommonPortLike {
             {
                 if CONFIG.trace_options.all || CONFIG.trace_options.port {
                     let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "port_from_pe" };
-                    let trace = json!({ "cell_id": self.get_cell_id(), "id": self.get_id().get_name(), "packet":packet.stringify()? });
+                    let trace = json!({ "cell_id": self.get_cell_id(), "id": self.get_id().get_name(), "ait_state": packet.get_ait_state(), "packet":packet.stringify()? });
                     add_to_trace(TraceType::Trace, trace_params, &trace, _f);
                 }
             }
             {
                 if CONFIG.trace_options.all | CONFIG.trace_options.port {
                     let ait_state = packet.get_ait_state();
-                    let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "port_to_link" };
+                    let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "port_to_port_like" };
                     let trace = json!({ "cell_id": self.get_cell_id(), "id": self.get_id().get_name(), "ait_state": ait_state, "packet": packet.stringify()? });
                     add_to_trace(TraceType::Trace, trace_params, &trace, _f);
                 }

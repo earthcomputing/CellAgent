@@ -36,20 +36,12 @@ pub struct SimulatedInteriorPort {
 }
 
 impl SimulatedInteriorPort {
-    fn recv(&mut self) -> Result<LinkToPortPacket, Error> {
+    fn recv_from_link(&mut self) -> Result<LinkToPortPacket, Error> {
         let _f = "recv";
         match &self.duplex_port_link_channel {
             Some(connected_duplex_port_link_channel) => {
-                let link_to_port_packet = connected_duplex_port_link_channel.port_from_link.recv()?;
-                {
-                    if CONFIG.trace_options.all || CONFIG.trace_options.port {
-                        let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "simulated_port_receive" };
-                        let trace = json!({ "cell_id": self.base_port.get_cell_id(), "id": self.base_port.get_id().get_name(), "link_to_port_packet": link_to_port_packet });
-                        add_to_trace(TraceType::Trace, trace_params, &trace, _f);
-                    }
-	            }
-                self.failover_info.clear_saved_packet();
-                Ok(link_to_port_packet)
+                let msg = connected_duplex_port_link_channel.port_from_link.recv()?;
+                Ok(msg)
             },
             None => Err(SimulatedInteriorPortError::RecvDisconnected { func_name: _f, port_no: self.base_port.get_port_no(), cell_id: self.base_port.get_cell_id()}.into()),
         }
@@ -58,8 +50,8 @@ impl SimulatedInteriorPort {
         let _f = "direct_send";
         {
             if CONFIG.trace_options.all || CONFIG.trace_options.port {
-                let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "simulated_port_direct_send" };
-                let trace = json!({ "cell_id": self.base_port.get_cell_id(), "id": self.base_port.get_id().get_name(), "packet": packet });
+                let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "direct_send" };
+                let trace = json!({ "cell_id": self.base_port.get_cell_id(), "id": self.base_port.get_id().get_name(), "ait state": packet.get_ait_state(), "packet": packet.stringify()? });
                 add_to_trace(TraceType::Trace, trace_params, &trace, _f);
             }
 	    }
@@ -91,6 +83,13 @@ impl CommonPortLike for SimulatedInteriorPort {
 impl InteriorPortLike for SimulatedInteriorPort {
     fn send(self: &mut Self, packet: &mut Packet) -> Result<(), Error> {
         let _f = "send";
+        {
+            if CONFIG.trace_options.all || CONFIG.trace_options.port {
+                let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "simulated_port_from_port" };
+                let trace = json!({ "cell_id": self.base_port.get_cell_id(), "id": self.base_port.get_id().get_name(), "ait state": packet.get_ait_state(), "packet": packet.stringify()? });
+                add_to_trace(TraceType::Trace, trace_params, &trace, _f);
+            }
+	    }
         let ait_state = packet.get_ait_state();
         match ait_state {
             AitState::AitD |
@@ -101,7 +100,7 @@ impl InteriorPortLike for SimulatedInteriorPort {
             AitState::Tuck |
             AitState::Tyck => return Err(SimulatedInteriorPortError::Ait { func_name: _f, port_id: self.base_port.get_id(), ait_state }.into()), // Not allowed here
             AitState::Ait => { packet.next_ait_state()?; },
-            AitState::Init | // Only needed for simulator, should be handled by simulated_internal_port
+            AitState::Init | 
             AitState::SnakeD |
             AitState::Normal => ()
         }
@@ -109,15 +108,14 @@ impl InteriorPortLike for SimulatedInteriorPort {
     }
     fn listen_and_forward_to(self: &mut Self, port_to_pe: &PortToPeOld) -> Result<(), Error> {
         let _f = "listen_and_forward_to";
-        let mut msg: LinkToPortPacket;
         loop {
-            msg = self.recv().context(SimulatedInteriorPortError::Chain { func_name: _f, comment: S(self.base_port.get_id().get_name()) + " recv from link"})?;
+            let msg = self.recv_from_link().context(SimulatedInteriorPortError::Chain { func_name: _f, comment: S(self.base_port.get_id().get_name()) + " recv from link"})?;
             {
                 if CONFIG.trace_options.all || CONFIG.trace_options.port {
                     match &msg {
                         LinkToPortPacket::Packet(packet) => {
                             let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "port_from_link_packet" };
-                            let trace = json!({ "cell_id": self.base_port.get_cell_id(), "id": self.base_port.get_id().get_name(), "packet":packet.stringify()? });
+                            let trace = json!({ "cell_id": self.base_port.get_cell_id(), "id": self.base_port.get_id().get_name(), "ait_state": packet.get_ait_state(), "packet": packet.stringify()? });
                             add_to_trace(TraceType::Trace, trace_params, &trace, _f);
                         },
                         LinkToPortPacket::Status(status) => {
@@ -148,59 +146,96 @@ impl InteriorPortLike for SimulatedInteriorPort {
                     port_to_pe.send(PortToPePacketOld::Status((self.base_port.get_port_no(), self.base_port.is_border(), status_old))).context(SimulatedInteriorPortError::Chain { func_name: _f, comment: S(self.base_port.get_id().get_name()) + " send status to pe"})?;
                 }
                 LinkToPortPacket::Packet(mut packet) => {
+                    self.failover_info.clear_saved_packet();
                     let ait_state = packet.get_ait_state();
                     match ait_state {
-                        AitState::AitD |
-                        AitState::Ait => return Err(SimulatedInteriorPortError::Ait { func_name: _f, port_id: self.base_port.get_id(), ait_state }.into()),
+                        AitState::Ait  |
+                        AitState::AitD => return Err(SimulatedInteriorPortError::Ait { func_name: _f, port_id: self.base_port.get_id(), ait_state }.into()),
 
-                        AitState::Tick => (), // TODO: Send AitD to packet engine
-                        AitState::Init |
+                        AitState::Init   |
                         AitState::SnakeD |
                         AitState::Normal => {
                             {
                                 if CONFIG.trace_options.all || CONFIG.trace_options.port {
                                     let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "port_to_pe_packet" };
-                                    let trace = json!({ "cell_id": self.base_port.get_cell_id(), "id": self.base_port.get_id().get_name(), "packet":packet.stringify()? });
+                                    let trace = json!({ "cell_id": self.base_port.get_cell_id(), "id": self.base_port.get_id().get_name(), "ait_state": packet.get_ait_state(), "packet": packet.stringify()? });
                                     add_to_trace(TraceType::Trace, trace_params, &trace, _f);
                                 }
                             }
                             port_to_pe.send(PortToPePacketOld::Packet((self.base_port.get_port_no(), packet)))?;
                         },
-                        AitState::Teck |
-                        AitState::Tack |
-                        AitState::Tuck |
-                        AitState::Tyck => {
+                        AitState::Teck => {
                             packet.next_ait_state()?;
                             {
                                 if CONFIG.trace_options.all | CONFIG.trace_options.port {
                                     let ait_state = packet.get_ait_state();
-                                    let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "port_to_link" };
-                                    let trace = json!({ "cell_id": self.base_port.get_cell_id(), "id": self.base_port.get_id().get_name(), "ait_state": ait_state, "packet":packet.stringify()? });
+                                    let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "port_to_link_tack" };
+                                    let trace = json!({ "cell_id": self.base_port.get_cell_id(), "id": self.base_port.get_id().get_name(), "ait_state": ait_state, "packet": packet.stringify()? });
                                     add_to_trace(TraceType::Trace, trace_params, &trace, _f);
                                 }
                             }
                             self.direct_send(&packet)?;
                         }
+                        AitState::Tack => {
+                            packet.next_ait_state()?;
+                            {
+                                if CONFIG.trace_options.all | CONFIG.trace_options.port {
+                                    let ait_state = packet.get_ait_state();
+                                    let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "port_to_link_tuck" };
+                                    let trace = json!({ "cell_id": self.base_port.get_cell_id(), "id": self.base_port.get_id().get_name(), "ait_state": ait_state, "packet": packet.stringify()? });
+                                    add_to_trace(TraceType::Trace, trace_params, &trace, _f);
+                                }
+                            }
+                            self.direct_send(&packet)?;
+                        }
+                        AitState::Tuck => {
+                            packet.next_ait_state()?;
+                            {
+                                if CONFIG.trace_options.all | CONFIG.trace_options.port {
+                                    let ait_state = packet.get_ait_state();
+                                    let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "port_to_link_tyck" };
+                                    let trace = json!({ "cell_id": self.base_port.get_cell_id(), "id": self.base_port.get_id().get_name(), "ait_state": ait_state, "packet": packet.stringify()? });
+                                    add_to_trace(TraceType::Trace, trace_params, &trace, _f);
+                                }
+                            }
+                            self.direct_send(&packet)?;
+                            packet.make_ait();
+                           {
+                                if CONFIG.trace_options.all | CONFIG.trace_options.port {
+                                    let ait_state = packet.get_ait_state();
+                                    let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "port_to_pe_ait_packet" };
+                                    let trace = json!({ "cell_id": self.base_port.get_cell_id(), "id": self.base_port.get_id().get_name(), "ait_state": ait_state, "packet": packet.stringify()? });
+                                    add_to_trace(TraceType::Trace, trace_params, &trace, _f);
+                                }
+                            }
+                           port_to_pe.send(PortToPePacketOld::Packet((self.base_port.get_port_no(), packet)))?;                           
+                        }
+                        AitState::Tyck => {
+                            {
+                                if CONFIG.trace_options.all || CONFIG.trace_options.port {
+                                    let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "port_to_pe_aitd_packet" };
+                                    let trace = json!({ "cell_id": self.base_port.get_cell_id(), "id": self.base_port.get_id().get_name(), "ait_state": packet.get_ait_state(), "packet": packet.stringify()? });
+                                    add_to_trace(TraceType::Trace, trace_params, &trace, _f);
+                                }
+                            }
+                            packet.next_ait_state()?;
+                            // TODO: Send AITD as acknowledgement that transfer completed correctly
+                            let mut tick_packet: Packet = Default::default();
+                            tick_packet.make_tick();
+                            //self.direct_send(&tick_packet)?;
+                        }
+                        AitState::Tick | 
                         AitState::Tock => {
                             packet.next_ait_state()?;
                             {
                                 if CONFIG.trace_options.all | CONFIG.trace_options.port {
                                     let ait_state = packet.get_ait_state();
                                     let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "port_to_link" };
-                                    let trace = json!({ "cell_id": self.base_port.get_cell_id(), "id": self.base_port.get_id().get_name(), "ait_state": ait_state, "packet":packet.stringify()? });
+                                    let trace = json!({ "cell_id": self.base_port.get_cell_id(), "id": self.base_port.get_id().get_name(), "ait_state": ait_state, "packet": packet.stringify()? });
                                     add_to_trace(TraceType::Trace, trace_params, &trace, _f);
                                 }
                             }
                             self.direct_send(&packet)?;
-                            packet.make_ait_send();
-                            {
-                                if CONFIG.trace_options.all || CONFIG.trace_options.port {
-                                    let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "port_to_pe_packet" };
-                                    let trace = json!({ "cell_id": self.base_port.get_cell_id(), "id": self.base_port.get_id().get_name(), "packet":packet.stringify()? });
-                                    add_to_trace(TraceType::Trace, trace_params, &trace, _f);
-                                }
-                            }
-                            port_to_pe.send(PortToPePacketOld::Packet((self.base_port.get_port_no(), packet)))?;
                         },
                     }
                 }
@@ -307,6 +342,6 @@ pub enum SimulatedInteriorPortError {
     SendDisconnected { func_name: &'static str, cell_id: CellID, port_no: PortNo },
     #[fail(display = "SimulatedInteriorPortError::Chain {} {}", func_name, comment)]
     Chain { func_name: &'static str, comment: String },
-    #[fail(display = "SimulatedInteriorPortError::Ait {} {} is not allowed here on port {}", func_name, port_id, ait_state)]
+    #[fail(display = "SimulatedInteriorPortError::Ait {} state {} is not allowed here on port {}", func_name, ait_state, port_id)]
     Ait { func_name: &'static str, port_id: PortID, ait_state: AitState },
 }

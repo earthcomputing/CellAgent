@@ -172,7 +172,7 @@ impl Cmodel {
                 // xmit msg
                 let mut uuid = tree_id.get_uuid();
                 if is_control { uuid.make_control(); }
-                if is_ait { uuid.make_ait_send(); }
+                if is_ait { uuid.make_ait(); }
                 if is_snake { uuid.make_snake(); }
                 let packets = Packetizer::packetize(&uuid, seq_no, &bytes).context(CmodelError::Chain { func_name: _f, comment: S("") })?;
                 let first = packets.get(0).expect("No packets from packetizer");

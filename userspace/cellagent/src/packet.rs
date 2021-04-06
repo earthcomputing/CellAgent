@@ -111,8 +111,9 @@ impl Packet {
     // pub fn get_payload_size(&self) -> usize { self.payload.get_no_bytes() }
 
     // UUID Magic
-    pub fn make_ait_send(&mut self) { self.header.make_ait_send() }
-    pub fn make_ait_reply(&mut self) { self.header.make_ait_reply() }
+    pub fn make_ait(&mut self) { self.header.make_ait() }
+    pub fn make_aitd(&mut self) { self.header.make_aitd() }
+    pub fn make_tick(&mut self) { self.header.make_tick() }
     pub fn make_tock(&mut self) { self.header.make_tock() }
     pub fn is_ait(&self) -> bool { self.is_ait_recv() || self.is_ait_recv() }
     pub fn is_ait_send(&self) -> bool { self.header.get_uuid().is_ait_send() }
@@ -171,8 +172,9 @@ impl PacketHeader {
         PacketHeader { uuid: *uuid }
     }
     fn get_uuid(&self) -> Uuid { self.uuid }
-    fn make_ait_send(&mut self) { self.uuid.make_ait_send(); }
-    fn make_ait_reply(&mut self) { self.uuid.make_ait_reply(); }
+    fn make_ait(&mut self) { self.uuid.make_ait(); }
+    fn make_aitd(&mut self) { self.uuid.make_aitd(); }
+    fn make_tick(&mut self) { self.uuid.make_tick(); }
     fn make_tock(&mut self) { self.uuid.make_tock(); }
 }
 impl fmt::Display for PacketHeader { 

@@ -355,7 +355,7 @@ impl PacketEngine {
                         add_to_trace(TraceType::Trace, trace_params, &trace, _f);
                     }
                 }
-                self._process_packet_from_port(port_no, packet)?;
+                self.process_packet_from_port(port_no, packet)?;
             },
             PortToPePacket::Status((port_no, is_border, status)) => {
                 {
@@ -376,7 +376,7 @@ impl PacketEngine {
         }
         Ok(())
     }
-    fn _process_packet_from_port(&mut self, recv_port_no: PortNo, packet: Packet) -> Result<(), Error> {
+    fn process_packet_from_port(&mut self, recv_port_no: PortNo, packet: Packet) -> Result<(), Error> {
         let _f = "process_packet_from_port";
         match packet.get_ait_state() {
             AitState::Teck | // Forward packet if end-to-end AIT, but now we have hop by hop
@@ -431,7 +431,7 @@ impl PacketEngine {
                 if entry.is_in_use() {
                     // Put packets on the right port's queue
                     let mask = entry.get_mask();
-                    self._forward(recv_port_no, entry, mask, &packet).context(PacketEngineError::Chain { func_name: "process_packet", comment: S("forward ") + &self.cell_id.get_name() })?;
+                    self.forward(recv_port_no, entry, mask, &packet).context(PacketEngineError::Chain { func_name: "process_packet", comment: S("forward ") + &self.cell_id.get_name() })?;
                 }
             }
         }
@@ -711,7 +711,7 @@ impl PacketEngine {
         }
         Ok(())
     }
-    fn _forward(&mut self, recv_port_no: PortNo, entry: RoutingTableEntry, user_mask: Mask, packet_ref: &Packet)
+    fn forward(&mut self, recv_port_no: PortNo, entry: RoutingTableEntry, user_mask: Mask, packet_ref: &Packet)
             -> Result<(), Error> {
         let _f = "forward";
         let packet = packet_ref.clone();
