@@ -89,6 +89,7 @@ impl Link {
                   -> Result<(), Error> {
         let _f = "listen";
         loop {
+            std::thread::sleep(std::time::Duration::from_millis(1));
             select! {
                 recv(link_from_ports.left) -> recvd => {
                     let packet = recvd.context(LinkError::Chain { func_name: _f, comment: S(self.id.clone()) + " receive from left"})?;

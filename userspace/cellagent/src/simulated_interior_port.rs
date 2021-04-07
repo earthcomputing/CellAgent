@@ -43,7 +43,7 @@ impl SimulatedInteriorPort {
                 let msg = connected_duplex_port_link_channel.port_from_link.recv()?;
                 Ok(msg)
             },
-            None => Err(SimulatedInteriorPortError::RecvDisconnected { func_name: _f, port_no: self.base_port.get_port_no(), cell_id: self.base_port.get_cell_id()}.into()),
+            None => Err(SimulatedInteriorPortError::ChannelClosed { func_name: _f, port_no: self.base_port.get_port_no(), cell_id: self.base_port.get_cell_id()}.into()),
         }
     }
     fn direct_send(&mut self, packet: &Packet) -> Result<(), Error> {
@@ -82,8 +82,8 @@ impl CommonPortLike for SimulatedInteriorPort {
 }
 
 impl InteriorPortLike for SimulatedInteriorPort {
-    fn send(self: &mut Self, packet: &mut Packet) -> Result<(), Error> {
-        let _f = "send";
+    fn send_to_link(self: &mut Self, packet: &mut Packet) -> Result<(), Error> {
+        let _f = "send_to_link";
         {
             if (CONFIG.trace_options.all || CONFIG.trace_options.port) && 
                (!packet.is_entl() || CONFIG.trace_options.entl) {
@@ -108,8 +108,8 @@ impl InteriorPortLike for SimulatedInteriorPort {
         }
 	    self.direct_send(packet)
     }
-    fn listen_and_forward_to(self: &mut Self, port_to_pe: &PortToPeOld) -> Result<(), Error> {
-        let _f = "listen_and_forward_to";
+    fn listen_link(self: &mut Self, port_to_pe: &PortToPeOld) -> Result<(), Error> {
+        let _f = "listen_link";
         loop {
             let msg = self.recv_from_link().context(SimulatedInteriorPortError::Chain { func_name: _f, comment: S(self.base_port.get_id().get_name()) + " recv from link"})?;
             {
@@ -238,10 +238,8 @@ impl InteriorPortLike for SimulatedInteriorPort {
                         AitState::Tock => {
                             packet.next_ait_state()?;
                             {
-                                let foo = packet.is_entl();
-                                let bar = CONFIG.trace_options.entl;
                                 if (CONFIG.trace_options.all || CONFIG.trace_options.port) && 
-                                   (!foo || bar) {
+                                   (!packet.is_entl() || CONFIG.trace_options.entl) {
                                     let ait_state = packet.get_ait_state();
                                     let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "port_to_link" };
                                     let trace = json!({ "cell_id": self.base_port.get_cell_id(), "id": self.base_port.get_id().get_name(), "ait_state": ait_state, "packet": packet.stringify()? });
@@ -350,7 +348,7 @@ use failure::{Error, ResultExt};
 #[derive(Debug, Fail)]
 pub enum SimulatedInteriorPortError {
     #[fail(display = "SimulatedInteriorPortError::RecvDisconnected {} Attempt to receive on disconnected port {} of cell {}", func_name, port_no,  cell_id)]
-    RecvDisconnected { func_name: &'static str, cell_id: CellID, port_no: PortNo },
+    ChannelClosed { func_name: &'static str, cell_id: CellID, port_no: PortNo },
     #[fail(display = "SimulatedInteriorPortError::SendDisconnected {} Attempt to send on disconnected port {} of cell {}", func_name, port_no,  cell_id)]
     SendDisconnected { func_name: &'static str, cell_id: CellID, port_no: PortNo },
     #[fail(display = "SimulatedInteriorPortError::Chain {} {}", func_name, comment)]

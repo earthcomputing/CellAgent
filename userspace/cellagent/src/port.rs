@@ -95,8 +95,8 @@ pub trait InteriorPortLike: 'static + Clone + Sync + Send + CommonPortLike {
         let thread_name = format!("Port {} listen_link", port_clone.get_id().get_name());
         thread::Builder::new().name(thread_name).spawn( move || {
             update_trace_header(child_trace_header);
-            let _ = port.listen_link_loop().map_err(|e| write_err("port listen link", &e));
-            if CONFIG.continue_on_error { port.listen_link_loop().map_err(|e| write_err("port continue listen link", &e)).ok();  }
+            let _ = port.listen().map_err(|e| write_err("port listen link", &e));
+            if CONFIG.continue_on_error { port.listen().map_err(|e| write_err("port continue listen link", &e)).ok();  }
         }).expect("thread failed");
         let mut port = self.clone();
         let child_trace_header = fork_trace_header();
@@ -109,20 +109,12 @@ pub trait InteriorPortLike: 'static + Clone + Sync + Send + CommonPortLike {
     }
 
     // THESE COULD BE PROTECTED
-    fn send(self: &mut Self, packet: &mut Packet) -> Result<(), Error>;
-    fn listen_and_forward_to(&mut self, port_to_pe_old: &PortToPeOld) -> Result<(), Error>;
+    fn send_to_link(self: &mut Self, packet: &mut Packet) -> Result<(), Error>;
+    fn listen_link(&mut self, port_to_pe_old: &PortToPeOld) -> Result<(), Error>;
 
     // THESE COULD BE PRIVATE
     fn listen(&mut self) -> Result<(), Error> {
-        let port_pe_old = self.get_duplex_port_pe_channel().clone();
-        let port_to_pe_old = port_pe_old.get_port_to_pe_old();
-        self.listen_and_forward_to(&port_to_pe_old)
-    }
-    fn get_duplex_port_pe_channel(&self) -> &DuplexPortPeChannel {
-        self.get_base_port().get_duplex_port_pe_channel()
-    }
-    fn listen_link_loop(&mut self) -> Result<(), Error> {
-        let _f = "listen_link_loop";
+        let _f = "listen";
         {
             if CONFIG.trace_options.all || CONFIG.trace_options.port {
                 let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "worker" };
@@ -130,11 +122,12 @@ pub trait InteriorPortLike: 'static + Clone + Sync + Send + CommonPortLike {
                 add_to_trace(TraceType::Trace, trace_params, &trace, _f);
             }
         }
-        #[cfg(any(feature = "cell", feature = "simulator"))] {
-            return self.listen();
-        }
-        #[cfg(feature = "noc")]
-        return Ok(()) // For now, needs to be fleshed out!
+         let port_pe_old = self.get_duplex_port_pe_channel().clone();
+        let port_to_pe_old = port_pe_old.get_port_to_pe_old();
+        self.listen_link(&port_to_pe_old)
+    }
+    fn get_duplex_port_pe_channel(&self) -> &DuplexPortPeChannel {
+        self.get_base_port().get_duplex_port_pe_channel()
     }
     // WORKER (PortFromPe)
     fn listen_pe_loop(&mut self) -> Result<(), Error> {
@@ -163,7 +156,7 @@ pub trait InteriorPortLike: 'static + Clone + Sync + Send + CommonPortLike {
                     add_to_trace(TraceType::Trace, trace_params, &trace, _f);
                 }
             }
-            self.send(&mut packet)?;
+            self.send_to_link(&mut packet)?;
         }
     }
 }
