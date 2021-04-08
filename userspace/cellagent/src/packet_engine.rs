@@ -566,53 +566,36 @@ impl PacketEngine {
     }
     fn send_packet_flow_control(&mut self, port_no: PortNo) -> Result<(), Error> {
         let _f = "send_packet_flow_control";
-        let cell_id = self.cell_id;
-        let outbuf_size = self.get_outbuf_size_old(port_no);
         let may_send = self.may_send(port_no);
+        let first = self.pop_first_outbuf(port_no);
+        {
+            if CONFIG.trace_options.all || CONFIG.trace_options.pe_port {
+                let first_str = match first {
+                    Some((pong_sent, recv_port_no, packet)) => format!("pong_sent: {}, recv_port_no: {}, packet: {}", pong_sent, recv_port_no, packet.stringify()?),
+                    None => "None".to_owned()
+                };
+                let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "pe_first_in_buffer" };
+                let trace = json!({ "cell_id": self.cell_id, "port_no": port_no, "may_send": may_send, "first": first_str });
+                add_to_trace(TraceType::Trace, trace_params, &trace, _f);
+            }
+        }
         if may_send {
-            let first = self.pop_first_outbuf(port_no);
             if let Some((_, _, packet)) = first {
                 let outbuf = self.get_outbuf_mut_old(port_no);
                 let last_item = outbuf.get(MAX_PORTS as usize);
                 if let Some((pong_sent, recv_port_no, last_packet)) = last_item {
-                    {
-                        if CONFIG.debug_options.all || CONFIG.debug_options.flow_control {
-                            let msg_type = MsgType::msg_type(&packet);
-                            match packet.get_ait_state() {
-                                AitState::Normal => println!("PacketEngine {}: port {} {} outbuf size {} {} {}", cell_id, *port_no, _f, outbuf_size, msg_type, packet.get_ait_state()),
-                                _ => ()
-                            }
-                        }
-                    }
                     if !pong_sent {
                         let recv_port_no = *recv_port_no; // Needed to avoid https://github.com/rust-lang/rust/issues/59159>
                         outbuf[MAX_PORTS as usize] = (true, recv_port_no, last_packet.clone());
-                        self.send_next_packet_or_entl(recv_port_no)?;
+                        self.send_packet_flow_control(recv_port_no)?;
                     }
-                 }
-                self.set_may_not_send(port_no);
-                match packet.get_ait_state() {
-                    AitState::Init => self.set_may_send(port_no),
-                    _              => self.set_may_not_send(port_no)
                 }
                 self.send_packet_to_outbuf(port_no, &packet)?;
                 self.add_sent_packet(port_no, packet);
-            } else {
-                // Buffer is empty because simulator doesn't send ENTL in response to ENTL
             }
         }
         Ok(())
     }
-    fn send_next_packet_or_entl(&mut self, port_no: PortNo) -> Result<(), Error> {
-        let _f = "send_next_packet_or_entl";
-        // TOCTTOU race here, but the only cost is sending an extra ENTL packet
-        if self.get_outbuf_size_old(port_no) == 0 {
-            // ENTL packets have no recv_port_no, so use 0 instead
-            self.add_to_out_buffer_back(PortNo(0), port_no, Packet::make_entl_packet());
-        }
-        self.send_packet_flow_control(port_no)
-    }
-
     fn process_packet_from_port_old(&mut self, recv_port_no: PortNo, packet: Packet)
                                 -> Result<(), Error> {
         let _f = "process_packet_from_port_old";
@@ -630,17 +613,14 @@ impl PacketEngine {
             }
         }
         match packet.get_ait_state() {
+            AitState::Init |
             AitState::Teck |
             AitState::Tack |
             AitState::Tuck |
             AitState::Tyck |
             AitState::Tock |
             AitState::Tick => {
-                self.send_next_packet_or_entl(recv_port_no)?; // Don't lock up the port on an error
                 return Err(PacketEngineError::Ait { func_name: _f, ait_state: packet.get_ait_state() }.into())
-            },
-            AitState::Init => {
-                self.send_packet_flow_control(recv_port_no)? // send_next_packet_or_entl() does ping pong which spins the CPU in the simulator
             },
             AitState::SnakeD => {
                 {
@@ -705,7 +685,7 @@ impl PacketEngine {
                     let mask = entry.get_mask();
                     self.forward_old(recv_port_no, entry, mask, &packet).context(PacketEngineError::Chain { func_name: "process_packet", comment: S("forward ") + &self.cell_id.get_name() })?;
                     // Send the packet at the head of this port's queue
-                    self.send_next_packet_or_entl(recv_port_no)?;
+                    self.send_packet_flow_control(recv_port_no)?;
                 }
             }
         }
@@ -960,9 +940,17 @@ impl PacketEngine {
     // Send reply if there is room for my packet in the buffer of the out port
     fn send_pong_if_room(&mut self, recv_port_no: PortNo, port_no: PortNo, packet: &Packet) ->
             Result<(), Error> {
+        let _f = "send_pong_if_room";
         let has_room = self.add_to_out_buffer_back(recv_port_no, port_no, packet.clone());
+        {
+            if CONFIG.trace_options.all | CONFIG.trace_options.pe {
+                let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "pe_send_pong" };
+                let trace = json!({ "cell_id": &self.cell_id, "recv_port_no": recv_port_no, "port_no": port_no, "has_room": has_room, "packet": packet.stringify()? });
+                add_to_trace(TraceType::Trace, trace_params, &trace, _f);
+            }
+        }
         if has_room {  // Send pong if packet went into first half of outbuf
-            self.send_next_packet_or_entl(port_no)?;
+            self.send_packet_flow_control(port_no)?;
         }
         Ok(())
     }
