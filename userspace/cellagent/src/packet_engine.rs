@@ -10,7 +10,6 @@ use crate::ec_message_formats::{PeFromCm, PeToCm,
                                 CmToPePacket};
 use crate::name::{Name, CellID, TreeID};
 use crate::packet::{Packet};
-use crate::port::{PortStatus, PortStatusOld};
 use crate::routing_table::RoutingTable;
 use crate::routing_table_entry::{RoutingTableEntry};
 use crate::utility::{ActivityData, Mask, OutbufType, PortNo, S, TraceHeaderParams, TraceType, write_err };
@@ -21,7 +20,6 @@ use crate::uuid_ec::{AitState, Uuid};
 // TODO: Use Config.max_num_phys_ports_per_cell
 const MAX_PORTS: u8 = 10; //MAX_NUM_PHYS_PORTS_PER_CELL.0 as usize + 1;
 
-type BoolArray = [bool; MAX_PORTS as usize];
 type UsizeArray = [usize; MAX_PORTS as usize];
 type InBuffer = (usize, Packet); // usize = # remaining to move to out port
 type OutBuffer = (usize, VecDeque<PortNo>);
@@ -44,7 +42,6 @@ pub struct PacketEngine {
     out_buffers_old: PacketArray,   // Packets waiting to go on the out port
     in_buffers: Vec<InBuffer>,
     in_buffer_old: Vec<BufferOld>,    // Packets on the in port waiting to into out_buf on the out port
-    port_got_event: BoolArray,
     activity_data: Vec<ActivityData>,
     reroute: Reroute,
     pe_to_cm: PeToCm,
@@ -75,7 +72,6 @@ impl PacketEngine {
             out_buffers_old: vec![Default::default(); MAX_PORTS as usize],
             in_buffers: vec![Default::default(); MAX_PORTS as usize],
             in_buffer_old: vec![Default::default(); MAX_PORTS as usize],
-            port_got_event: [false; MAX_PORTS as usize],
             activity_data: vec![Default::default(); MAX_PORTS as usize],
             reroute: vec![Default::default(); MAX_PORTS as usize],
             pe_to_cm,
@@ -126,16 +122,7 @@ impl PacketEngine {
         }
     }
     pub fn get_cell_id(&self) -> CellID { self.cell_id }
-    
-    fn may_send(&self, port_no: PortNo) -> bool {
-        self.port_got_event[port_no.as_usize()]
-    }
-    fn set_may_not_send(&mut self, port_no: PortNo) {
-        self.port_got_event[port_no.as_usize()] = false;
-    }
-    fn set_may_send(&mut self, port_no: PortNo) {
-        self.port_got_event[port_no.as_usize()] = true;
-    }
+
     fn _get_inbuf(&self, port_no: PortNo) -> &InBuffer {
         &self.in_buffers[port_no.as_usize()]
     }
@@ -365,12 +352,6 @@ impl PacketEngine {
                         add_to_trace(TraceType::Trace, trace_params, &trace, _f);
                     }
                 }
-                match status {
-                    PortStatus::Connected => self.set_may_send(port_no),
-                    PortStatus::Disconnected(_failover_info) => {
-                        self.set_may_not_send(port_no);
-                    }
-                }
                 //self.pe_to_cm.send(PeToCmPacket::Status((port_no, is_border, status, packet_opt))).context(PacketEngineError::Chain { func_name: "listen_port", comment: S("send status to ca ") + &self.cell_id.get_name() })?
             }
         }
@@ -454,10 +435,6 @@ impl PacketEngine {
                     sent: self.get_no_sent_packets(port_no),
                     recd: self.get_no_seen_packets(port_no)
                 };
-                match port_status {
-                    PortStatusOld::Connected => self.set_may_send(port_no),
-                    PortStatusOld::Disconnected => self.set_may_not_send(port_no)
-                }
                 {
                     if CONFIG.trace_options.all | CONFIG.trace_options.pe {
                         let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "pe_to_cm_status_old" };
@@ -566,7 +543,6 @@ impl PacketEngine {
     }
     fn send_packet_flow_control(&mut self, port_no: PortNo) -> Result<(), Error> {
         let _f = "send_packet_flow_control";
-        let may_send = self.may_send(port_no);
         let first = self.pop_first_outbuf(port_no);
         {
             if CONFIG.trace_options.all || CONFIG.trace_options.pe_port {
@@ -575,24 +551,22 @@ impl PacketEngine {
                     None => "None".to_owned()
                 };
                 let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "pe_first_in_buffer" };
-                let trace = json!({ "cell_id": self.cell_id, "port_no": port_no, "may_send": may_send, "first": first_str });
+                let trace = json!({ "cell_id": self.cell_id, "port_no": port_no, "first": first_str });
                 add_to_trace(TraceType::Trace, trace_params, &trace, _f);
             }
         }
-        if may_send {
-            if let Some((_, _, packet)) = first {
-                let outbuf = self.get_outbuf_mut_old(port_no);
-                let last_item = outbuf.get(MAX_PORTS as usize);
-                if let Some((pong_sent, recv_port_no, last_packet)) = last_item {
-                    if !pong_sent {
-                        let recv_port_no = *recv_port_no; // Needed to avoid https://github.com/rust-lang/rust/issues/59159>
-                        outbuf[MAX_PORTS as usize] = (true, recv_port_no, last_packet.clone());
-                        self.send_packet_flow_control(recv_port_no)?;
-                    }
+        if let Some((_, _, packet)) = first {
+            let outbuf = self.get_outbuf_mut_old(port_no);
+            let last_item = outbuf.get(MAX_PORTS as usize);
+            if let Some((pong_sent, recv_port_no, last_packet)) = last_item {
+                if !pong_sent {
+                    let recv_port_no = *recv_port_no; // Needed to avoid https://github.com/rust-lang/rust/issues/59159>
+                    outbuf[MAX_PORTS as usize] = (true, recv_port_no, last_packet.clone());
+                    self.send_packet_flow_control(recv_port_no)?;
                 }
-                self.send_packet_to_outbuf(port_no, &packet)?;
-                self.add_sent_packet(port_no, packet);
             }
+            self.send_packet_to_outbuf(port_no, &packet)?;
+            self.add_sent_packet(port_no, packet);
         }
         Ok(())
     }
@@ -600,7 +574,6 @@ impl PacketEngine {
                                 -> Result<(), Error> {
         let _f = "process_packet_from_port_old";
         // Got a packet from the other side, so clear state
-        self.set_may_send(recv_port_no);
         self.add_seen_packet_count(recv_port_no);
         self.clear_sent_packets(recv_port_no);
         {
