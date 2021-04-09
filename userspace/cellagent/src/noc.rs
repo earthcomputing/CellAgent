@@ -7,7 +7,7 @@ use crossbeam::crossbeam_channel as mpsc;
 use crate::app_message::{AppMsgType, AppMessage, AppMsgDirection,
                          AppDeleteTreeMsg, AppInterapplicationMsg, AppQueryMsg,
                          AppManifestMsg, AppStackTreeMsg, AppTreeNameMsg};
-use crate::app_message_formats::{ApplicationNocMsg, NocToApplicationMsg, PortToNocMsg, NocToPortMsg};
+use crate::app_message_formats::{PortToNocMsg, NocToPortMsg};
 use crate::blueprint::{Blueprint, Cell};
 use crate::config::{CONFIG, SCHEMA_VERSION};
 use crate::dal::{add_to_trace, fork_trace_header, update_trace_header};
@@ -27,16 +27,13 @@ pub type NocFromPort = mpsc::Receiver<PortToNocMsg>;
 
 #[derive(Clone, Debug)]
 pub struct DuplexNocPortChannel {
-    pub noc_to_port: NocToPort,
-    pub noc_from_port: NocFromPort,
+    noc_to_port: NocToPort,
+    noc_from_port: NocFromPort,
 }
-
-pub type NocToApplication = mpsc::Sender<NocToApplicationMsg>;
-pub type NocFromApplication = mpsc::Receiver<ApplicationNocMsg>;
-#[derive(Clone, Debug)]
-pub struct DuplexNocApplicationChannel {
-    pub noc_to_application: NocToApplication,
-    pub noc_from_application: NocFromApplication,
+impl DuplexNocPortChannel {
+    pub fn new(noc_from_port: NocFromPort, noc_to_port: NocToPort) -> DuplexNocPortChannel {
+        DuplexNocPortChannel { noc_from_port, noc_to_port }
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -45,14 +42,14 @@ pub struct Noc {
     base_tree: Option<AllowedTree>,
     allowed_trees: HashSet<AllowedTree>,
     deploy_done: bool,
-    duplex_noc_application_channel: DuplexNocApplicationChannel,
     duplex_noc_port_channel_cell_port_map: HashMap::<CellNo, HashMap<PortNo, DuplexNocPortChannel>>,
 }
 impl Noc {
-    pub fn new(duplex_noc_port_channel_cell_port_map: HashMap::<CellNo, HashMap<PortNo, DuplexNocPortChannel>>,
-               duplex_noc_application_channel: DuplexNocApplicationChannel) -> Result<Noc, Error> {
+    pub fn new(duplex_noc_port_channel_cell_port_map: HashMap::<CellNo, HashMap<PortNo, DuplexNocPortChannel>>) 
+            -> Result<Noc, Error> {
         let cell_id = CellID::new("Noc")?;
-        Ok(Noc { cell_id, base_tree: None, allowed_trees: HashSet::new(), deploy_done: false, duplex_noc_application_channel, duplex_noc_port_channel_cell_port_map })
+        Ok(Noc { cell_id, base_tree: None, allowed_trees: HashSet::new(), deploy_done: false, 
+                 duplex_noc_port_channel_cell_port_map })
     }
     pub fn initialize(&mut self, blueprint: &Blueprint)
             -> Result<(), Error> {
@@ -66,7 +63,6 @@ impl Noc {
                 add_to_trace(TraceType::Trace, trace_params, &trace, _f);
             }
         }
-        self.listen_application();
         for border_cell in blueprint.get_border_cells() {
             let cell_no = border_cell.get_cell_no();
             for border_port_no in border_cell.get_border_ports() {
@@ -181,46 +177,8 @@ impl Noc {
     fn has_allowed_trees(&self, allowed_trees: &[&AllowedTree]) -> bool {
         allowed_trees.iter().all(|&tree| self.allowed_trees.contains(tree))
     }
-    // SPAWN THREAD (listen_application_loop)
-    fn listen_application(&mut self) -> JoinHandle<()> { // This should eventually take noc_to_port: NocToPort
-        let _f = "listen_application";
-        let mut noc = self.clone();
-        let child_trace_header = fork_trace_header();
-        let thread_name = format!("{} listen_application_loop", self.get_name()); // NOC NOC
-        thread::Builder::new().name(thread_name).spawn( move || {
-            update_trace_header(child_trace_header);
-            let _ = noc.listen_application_loop().map_err(|e| write_err("Noc: application", &e));
-            if CONFIG.continue_on_error { noc.listen_application(); }
-        }).expect("noc application thread failed")
-    }
 
-    // WORKER (NocFromApplication)
-    fn listen_application_loop(&mut self)
-            -> Result<(), Error> { // This should eventually take noc_to_port: &NocToPort
-        let _f = "listen_application_loop";
-        {
-            if CONFIG.trace_options.all || CONFIG.trace_options.noc {
-                let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "worker" };
-                let trace = json!({ "cell_id": self.cell_id, "thread_name": thread::current().name(), "thread_id": TraceHeader::parse(thread::current().id()) });
-                add_to_trace(TraceType::Trace, trace_params, &trace, _f);
-            }
-        }
-        let noc_from_application = self.duplex_noc_application_channel.noc_from_application.clone();
-        loop {
-            let input = &noc_from_application.recv()?;
-            {
-                if CONFIG.trace_options.all || CONFIG.trace_options.noc {
-                    let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "noc_from_application" };
-                    let trace = json!({ "cell_id": self.cell_id, "thread_name": thread::current().name(), "thread_id": TraceHeader::parse(thread::current().id()), "input": input });
-                    add_to_trace(TraceType::Trace, trace_params, &trace, _f);
-                }
-            }
-            println!("Noc: {}", input);
-            let manifest = serde_json::from_str::<Manifest>(input).context(NocError::Chain { func_name: "listen_application", comment: S("")})?;
-            println!("Noc: {}", manifest);
-        }
-    }
-    fn deploy_master(&self, master_deploy: &AllowedTree, noc_to_port: &NocToPort) -> Result<(), Error> {
+   fn deploy_master(&self, master_deploy: &AllowedTree, noc_to_port: &NocToPort) -> Result<(), Error> {
         let _f = "deploy_master";
         
         let mut allowed_trees = self.allowed_trees.clone();

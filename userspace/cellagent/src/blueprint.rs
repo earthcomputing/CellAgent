@@ -2,7 +2,6 @@ use std::{fmt, fmt::Write,
           collections::{HashMap, HashSet},
           iter::FromIterator,
 };
-use either::Either;
 
 use crate::config::{CONFIG, CellQty, PortQty};
 use crate::utility::{CellNo, CellType, Edge, PortNo};
@@ -94,7 +93,7 @@ impl Blueprint {
         let mut border_cells = 	Vec::new();
         for no in 0..*num_cells {
             let cell_no = CellNo(no);
-            let phys_port_list : Vec<PortNo> = (0..*cell_num_phys_ports[&cell_no] as usize).map(|i| PortNo(i as u8)).collect();
+            let phys_port_list : Vec<PortNo> = (1..*cell_num_phys_ports[&cell_no] as usize).map(|i| PortNo(i as u8)).collect();
             match border_cell_ports.get(&cell_no) {
                 Some(border_ports) => {
                     let border: HashSet<PortNo> = HashSet::from_iter(border_ports.clone());
@@ -114,17 +113,17 @@ impl Blueprint {
     pub fn get_edge_list(&self) -> &Vec<Edge> { &self.edges }
     pub fn get_border_cells(&self) -> &Vec<BorderCell> { &self.border_cells }
     pub fn get_interior_cells(&self) -> &Vec<InteriorCell> { &self.interior_cells }
-    pub fn get_cell(&self, cell_no: CellNo) -> Result<Either<&InteriorCell, &BorderCell>, BlueprintError> {
+    pub fn get_cell(&self, cell_no: CellNo) -> Result<&dyn Cell, BlueprintError> {
         let _f = "get_cell";
         // Ridiculously inefficient code to do something that should be extremely simple
         for border_cell in self.get_border_cells() {
             if cell_no == border_cell.get_cell_no() {
-                return Ok(Either::Right(border_cell));
+                return Ok(border_cell);
             }
         }
         for interior_cell in self.get_interior_cells() {
             if cell_no == interior_cell.get_cell_no() {
-                return Ok(Either::Left(interior_cell));
+                return Ok(interior_cell);
             }
         }
         return Err(BlueprintError::CellNotFound { func_name: _f, cell_no})
@@ -171,7 +170,7 @@ impl Cell for BorderCell {
     fn get_interior_ports(&self) -> &Vec<PortNo> { &self.interior_ports }
 }
 impl BorderCell {
-    pub fn _new(cell_no: CellNo, cell_type: CellType, interior_ports: Vec<PortNo>, border_ports: Vec<PortNo>) -> BorderCell {
+    pub fn new(cell_no: CellNo, cell_type: CellType, interior_ports: Vec<PortNo>, border_ports: Vec<PortNo>) -> BorderCell {
 	    BorderCell { cell_no, cell_type, interior_ports, border_ports }
     }
     pub fn get_border_ports(&self) -> &Vec<PortNo> { &self.border_ports }
@@ -199,7 +198,7 @@ impl Cell for InteriorCell {
     fn get_interior_ports(&self) -> &Vec<PortNo> { &self.interior_ports }
 }
 impl InteriorCell {
-    pub fn _new(cell_no: CellNo, cell_type: CellType, interior_ports: Vec<PortNo>) -> InteriorCell {
+    pub fn new(cell_no: CellNo, cell_type: CellType, interior_ports: Vec<PortNo>) -> InteriorCell {
         InteriorCell { cell_no, cell_type, interior_ports }
     }
 }

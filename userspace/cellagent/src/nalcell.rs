@@ -13,17 +13,22 @@ use crate::cellagent::{CellAgent};
 use crate::config::{CONFIG, PortQty};
 use crate::dal::{add_to_trace, get_cell_replay_lines};
 use crate::ec_message_formats::{PortToPe, PeFromPort, PeToPort, PortFromPe,
-                                CmToCa, CaFromCm, CaToCm, CmFromCa, CaToCmBytes, CmToCaBytes,
+                                PortToPeOld, PeFromPortOld, PeToPortOld, PortFromPeOld,
+                                CmToCa, CaFromCm, CaToCm, CmFromCa, CaToCmBytes, CmToCaBytesOld,
                                 PeToCm, CmFromPe, CmToPe, PeFromCm};
 use crate::name::{CellID, PortID};
-use crate::port::{InteriorPortLike, BorderPortLike, InteriorPortFactoryLike, BorderPortFactoryLike, Port, DuplexPortPeOrCaChannel, DuplexPortPeChannel, DuplexPortCaChannel};
+use crate::port::{InteriorPortLike, BorderPortLike, 
+                  InteriorPortFactoryLike, BorderPortFactoryLike, Port, 
+                  DuplexPortPeOrCaChannel, DuplexPortPeChannel, DuplexPortCaChannel};
 use crate::replay::{TraceFormat, process_trace_record};
 use crate::utility::{CellConfig, CellType, PortNo, S,
                      TraceHeaderParams, TraceType};
 
-
 #[derive(Debug, Clone)]
-pub struct NalCell<InteriorPortFactoryType: InteriorPortFactoryLike<InteriorPortType>, InteriorPortType: 'static + Clone + InteriorPortLike, BorderPortFactoryType: BorderPortFactoryLike<BorderPortType>, BorderPortType: 'static + Clone + BorderPortLike> {
+pub struct NalCell<InteriorPortFactoryType: InteriorPortFactoryLike<InteriorPortType>, 
+                   InteriorPortType: 'static + Clone + InteriorPortLike, 
+                   BorderPortFactoryType: BorderPortFactoryLike<BorderPortType>, 
+                   BorderPortType: 'static + Clone + BorderPortLike> {
     id: CellID,
     cell_type: CellType,
     config: CellConfig,
@@ -33,9 +38,17 @@ pub struct NalCell<InteriorPortFactoryType: InteriorPortFactoryLike<InteriorPort
     border_factory_phantom: PhantomData<BorderPortFactoryType>,
 }
 
-impl<InteriorPortFactoryType: InteriorPortFactoryLike<InteriorPortType>, InteriorPortType: 'static + Clone + InteriorPortLike, BorderPortFactoryType: BorderPortFactoryLike<BorderPortType>, BorderPortType: 'static + Clone + BorderPortLike> NalCell::<InteriorPortFactoryType, InteriorPortType, BorderPortFactoryType, BorderPortType> {
-    pub fn new(name: &str, num_phys_ports: PortQty, border_port_nos: &HashSet<PortNo>, config: CellConfig, interior_port_factory: InteriorPortFactoryType, border_port_factory: Option<BorderPortFactoryType>)
-            -> Result<(NalCell<InteriorPortFactoryType, InteriorPortType, BorderPortFactoryType, BorderPortType>, JoinHandle<()>), Error> {
+impl<InteriorPortFactoryType: InteriorPortFactoryLike<InteriorPortType>, 
+                 InteriorPortType: 'static + Clone + InteriorPortLike, 
+                 BorderPortFactoryType: BorderPortFactoryLike<BorderPortType>, 
+                 BorderPortType: 'static + Clone + BorderPortLike> 
+        NalCell::<InteriorPortFactoryType, InteriorPortType, 
+                  BorderPortFactoryType, BorderPortType> {
+    pub fn new(name: &str, num_phys_ports: PortQty, border_port_nos: &HashSet<PortNo>, config: CellConfig, 
+            interior_port_factory: InteriorPortFactoryType, 
+            border_port_factory: Option<BorderPortFactoryType>)
+                -> Result<(NalCell<InteriorPortFactoryType, InteriorPortType, BorderPortFactoryType, BorderPortType>, 
+                           JoinHandle<()>), Error> {
         let _f = "new";
         if *num_phys_ports > *CONFIG.max_num_phys_ports_per_cell {
             return Err(NalcellError::NumberPorts { num_phys_ports, func_name: "new", max_num_phys_ports: CONFIG.max_num_phys_ports_per_cell }.into())
@@ -56,6 +69,7 @@ impl<InteriorPortFactoryType: InteriorPortFactoryLike<InteriorPortType>, Interio
              None)
         };
         let (port_to_pe, pe_from_ports): (PortToPe, PeFromPort) = channel();
+        let (port_to_pe_old, pe_from_ports_old): (PortToPeOld, PeFromPortOld) = channel();
         let (port_to_ca, ca_from_ports): (PortToCa, CaFromPort) = channel();
         let port_list: Vec<PortNo> = (0..*num_phys_ports).map(|i| PortNo(i as u8)).collect();
         let all: HashSet<PortNo> = HashSet::from_iter(port_list);
@@ -66,6 +80,9 @@ impl<InteriorPortFactoryType: InteriorPortFactoryLike<InteriorPortType>, Interio
         interior_port_list.sort();
         let mut ports = Vec::new();
         let mut pe_to_ports = HashMap::new();
+        let mut pe_to_ports_old = HashMap::new();
+        let mut ports_from_pe = HashMap::new();
+        let mut ports_from_pe_old = HashMap::new(); // So I can remove the item
         let mut ca_to_ports = HashMap::new();
         {
             if CONFIG.trace_options.all || CONFIG.trace_options.nal {
@@ -81,20 +98,26 @@ impl<InteriorPortFactoryType: InteriorPortFactoryLike<InteriorPortType>, Interio
             let duplex_port_pe_or_ca_channel = if is_border_port {
                 let (ca_to_port, port_from_ca): (CaToPort, PortFromCa) = channel();
                 ca_to_ports.insert(PortNo(port_num), ca_to_port);
-                DuplexPortPeOrCaChannel::Border(DuplexPortCaChannel {
+                DuplexPortPeOrCaChannel::Border(DuplexPortCaChannel::new(
                     port_from_ca,
-                    port_to_ca: port_to_ca.clone(),
-                })
+                    port_to_ca.clone(),
+                ))
             } else {
                 let (pe_to_port, port_from_pe): (PeToPort, PortFromPe) = channel();
+                let (pe_to_port_old, port_from_pe_old): (PeToPortOld, PortFromPeOld) = channel();
                 pe_to_ports.insert(PortNo(port_num), pe_to_port);
-                DuplexPortPeOrCaChannel::Interior(DuplexPortPeChannel {
+                pe_to_ports_old.insert(PortNo(port_num), pe_to_port_old);
+                ports_from_pe.insert(PortNo(port_num), port_from_pe.clone()); // These two lines may not be needed.
+                ports_from_pe_old.insert(PortNo(port_num), port_from_pe_old.clone()); // I'm putting them here during a rebase.
+                DuplexPortPeOrCaChannel::Interior(DuplexPortPeChannel::new(
                     port_from_pe,
-                    port_to_pe: port_to_pe.clone(),
-                })
+                    port_from_pe_old,
+                    port_to_pe.clone(),
+                    port_to_pe_old.clone(),
+                ))
             };
             let port_number = PortNo(port_num).make_port_number(num_phys_ports).context(NalcellError::Chain { func_name: "new", comment: S("port number") })?;
-            let ref port_factory = if is_border_port {
+            let port_factory = if is_border_port {
                 Either::Right(border_port_factory.clone().unwrap())
             } else {
                 Either::Left(interior_port_factory.clone())
@@ -123,9 +146,10 @@ impl<InteriorPortFactoryType: InteriorPortFactoryLike<InteriorPortType>, Interio
         let (cell_agent, _cm_join_handle) = CellAgent::new(cell_id, tree_ids, cell_type, config,
                  num_phys_ports, ca_to_ports.clone(), cm_to_ca.clone(),
                   pe_from_ports, pe_to_ports,
+                  pe_from_ports_old, pe_to_ports_old,
                   border_port_nos,
                   ca_to_cm.clone(), cm_from_ca, pe_to_cm.clone(),
-                            cm_from_pe, cm_to_pe.clone(), pe_from_cm).context(NalcellError::Chain { func_name: "new", comment: S("cell agent create") })?;
+                  cm_from_pe, cm_to_pe.clone(), pe_from_cm).context(NalcellError::Chain { func_name: "new", comment: S("cell agent create") })?;
         let ca_join_handle = cell_agent.start(ca_from_cm, ca_from_ports);
         if CONFIG.replay {
             thread::spawn(move || -> Result<(), Error> {
@@ -142,10 +166,10 @@ impl<InteriorPortFactoryType: InteriorPortFactoryLike<InteriorPortType>, Interio
                                     ca_to_cm.send(CaToCmBytes::Entry(entry))?;
                                 }
                                 TraceFormat::CaFromCmBytesMsg(port_no, is_ait, uuid, msg) => {
-                                    cm_to_ca.send(CmToCaBytes::Bytes((port_no, is_ait, uuid, msg)))?;
+                                    cm_to_ca.send(CmToCaBytesOld::Bytes((port_no, is_ait, uuid, msg)))?;
                                 }
                                 TraceFormat::CaFromCmBytesStatus(port_no, is_border, number_of_packets, status) => {
-                                    cm_to_ca.send(CmToCaBytes::Status((port_no, is_border, number_of_packets, status)))?;
+                                    cm_to_ca.send(CmToCaBytesOld::Status((port_no, is_border, number_of_packets, status)))?;
                                 }
                                 TraceFormat::CaToNoc(noc_port, bytes) => {
                                     let ca_to_port = ca_to_ports.get(&noc_port).expect("cellagent.rs: border port sender must be set");
@@ -228,7 +252,11 @@ impl<InteriorPortFactoryType: InteriorPortFactoryLike<InteriorPortType>, Interio
     }
 }
 
-impl<InteriorPortFactoryType: InteriorPortFactoryLike<InteriorPortType>, InteriorPortType: Clone + InteriorPortLike, BorderPortFactoryType: BorderPortFactoryLike<BorderPortType>, BorderPortType: Clone + BorderPortLike> fmt::Display for NalCell::<InteriorPortFactoryType, InteriorPortType, BorderPortFactoryType, BorderPortType> {
+impl<InteriorPortFactoryType: InteriorPortFactoryLike<InteriorPortType>, 
+     InteriorPortType: Clone + InteriorPortLike, 
+     BorderPortFactoryType: BorderPortFactoryLike<BorderPortType>, 
+     BorderPortType: Clone + BorderPortLike> 
+     fmt::Display for NalCell::<InteriorPortFactoryType, InteriorPortType, BorderPortFactoryType, BorderPortType> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let mut s = String::new();
         match self.cell_type {

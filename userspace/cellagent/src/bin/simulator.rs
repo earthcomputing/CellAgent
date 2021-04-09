@@ -1,6 +1,7 @@
 #[macro_use] extern crate failure;
 
-use std::{io::{stdin, stdout, Read, Write},
+use std::{convert::TryFrom,
+          io::{stdin, stdout, Read, Write},
           fs::{File,},
           collections::{HashSet},
 };
@@ -35,8 +36,7 @@ fn main() -> Result<(), Error> {
                                                    &CONFIG.edge_list,
                                                    CONFIG.num_ports_per_cell,
                                                    &CONFIG.cell_port_exceptions,
-                                                   &CONFIG.border_cell_ports,
-        )?) {
+                                                   &CONFIG.border_cell_ports,)?) {
             Ok(dc) => dc,
             Err(err) => panic!("Datacenter construction failure: {}", err)
         };
@@ -48,7 +48,6 @@ fn main() -> Result<(), Error> {
             c to print cells
             l to print links
             p to print forwarding table
-            m to deploy an application
             x to exit program\n\n").context(MainError::Chain { func_name: "run", comment: S("") })?;
         let mut print_opt = String::new();
         stdin().read_line(&mut print_opt).context(MainError::Chain { func_name: _f, comment: S("") })?;
@@ -61,7 +60,6 @@ fn main() -> Result<(), Error> {
                 "c" => show_ca(&dc),
                 "l" => break_link(&mut dc),
                 "p" => show_pe(&dc),
-                "m" => deploy(&dc.get_application_to_noc().clone()),
                 "x" => std::process::exit(0),
                 _   => {
                     println!("Invalid input {}", print_opt);
@@ -112,23 +110,17 @@ fn break_link(dc: &mut Datacenter) -> Result<(), Error> {
             let link_ids = rack.get_link_ids();
             print_hash_map(&link_ids);
             let _ = stdout().write(b"Enter first cell number of link to break\n")?;
-            let left_cell: usize = read_int()?;
+            let left_cell = usize::try_from(read_int()?)?;
             let _ = stdout().write(b"Enter first port number of link to break\n")?;
-            let left_port: usize = read_int()?;
+            let left_port = u8::try_from(read_int()?)?;
             let _ = stdout().write(b"Enter second cell number of link to break\n")?;
-            let rite_cell: usize = read_int()?;
+            let rite_cell = usize::try_from(read_int()?)?;
             let _ = stdout().write(b"Enter second port number of link to break\n")?;
-            let rite_port: usize = read_int()?;
-            EdgeConnection {
-                left: CellInteriorConnection {
-                    cell_no: CellNo(left_cell),
-                    port_no: PortNo(left_port as u8),
-                },
-                rite: CellInteriorConnection {
-                    cell_no: CellNo(rite_cell),
-                    port_no: PortNo(rite_port as u8),
-                },
-            }
+            let rite_port = u8::try_from(read_int()?)?;
+            EdgeConnection::new(
+                CellInteriorConnection::new(CellNo(left_cell), PortNo(left_port)),
+                CellInteriorConnection::new(CellNo(rite_cell), PortNo(rite_port))
+            )
         },
     };
     let links = rack.get_links_mut();
@@ -150,7 +142,7 @@ fn read_int() -> Result<usize, Error> {
         }
     }
 }
-fn deploy(application_to_noc: &ApplicationToNoc) -> Result<(), Error> {
+fn _deploy(application_to_noc: &ApplicationToNoc) -> Result<(), Error> {
     let _f = "deploy";
     stdout().write(b"Enter the name of a file containing a manifest\n").context(MainError::Chain { func_name: "run", comment: S("") })?;
     let mut filename = String::new();

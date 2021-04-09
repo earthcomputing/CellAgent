@@ -13,10 +13,10 @@ use std::{
 use crossbeam::crossbeam_channel as mpsc;
 
 use crate::app_message_formats::{PortToCa};
-use crate::ec_message_formats::{PortToPePacket, PortToPe};
+use crate::ec_message_formats::{PortToPePacketOld, PortToPeOld};
 use crate::name::{PortID, CellID};
 use crate::packet::{Packet};
-use crate::port::{CommonPortLike, InteriorPortLike, BasePort, InteriorPortFactoryLike, PortStatus, PortSeed, DuplexPortPeOrCaChannel, DuplexPortPeChannel};
+use crate::port::{CommonPortLike, InteriorPortLike, BasePort, InteriorPortFactoryLike, PortStatusOld, PortSeed, DuplexPortPeOrCaChannel, DuplexPortPeChannel};
 use crate::utility::{PortNo, PortNumber};
 
 #[repr(C)]
@@ -155,10 +155,7 @@ impl ECNL_Port {
 
 impl CommonPortLike for ECNL_Port {
     fn get_base_port(&self) -> &BasePort {
-        return &(*self).base_port;
-    }
-    fn get_base_port_mut(&mut self) -> &mut BasePort {
-        return &mut (*self).base_port;
+        return &self.base_port;
     }
     fn get_whether_connected(&self) -> bool {
          unsafe {
@@ -182,7 +179,7 @@ impl CommonPortLike for ECNL_Port {
 
 #[cfg(feature = "cell")]
 impl InteriorPortLike for ECNL_Port {
-     fn send(self: &mut Self, packet: &mut Packet) -> Result<(), Error> {
+     fn send_to_link(self: &mut Self, packet: &mut Packet) -> Result<(), Error> {
         let bufferDesc: OutBufferDesc = OutBufferDesc {
 	    len: size_of::<Packet>() as c_uint, // Always send fixed-length frames
 	    frame: packet,
@@ -193,7 +190,7 @@ impl InteriorPortLike for ECNL_Port {
 	}
 	return Ok(())
     }
-     fn listen_and_forward_to(self: &mut Self, port_to_pe: PortToPe) -> Result<(), Error> {
+     fn listen_link(self: &mut Self, port_to_pe: &PortToPeOld) -> Result<(), Error> {
          let _f = "listen_and_forward_to";
          unsafe {
              let ecnl_port_sub = (*(self.ecnl_port_sub_ptr));
@@ -214,7 +211,7 @@ impl InteriorPortLike for ECNL_Port {
                              self.set_disconnected();
                          }
 			 println!("Port {} is {}", ecnl_port_sub.port_id, port_status_name);
-			port_to_pe.send(PortToPePacket::Status((PortNo(ecnl_port_sub.port_id), self.base_port.is_border(), if (event.event_up_down != 0) {PortStatus::Connected} else {PortStatus::Disconnected}))).unwrap();
+			port_to_pe.send(PortToPePacketOld::Status((PortNo(ecnl_port_sub.port_id), self.base_port.is_border(), if (event.event_up_down != 0) {PortStatusOld::Connected} else {PortStatusOld::Disconnected}))).unwrap();
 		    }
 		    cmd_id if (cmd_id == NL_ECND_Commands::NL_ECNL_CMD_SIGNAL_AIT_MESSAGE as c_int) => {
                         println!("AIT Message Signal Received...");
@@ -223,7 +220,7 @@ impl InteriorPortLike for ECNL_Port {
 			    let possible_packet_or_err: Option<Result<Packet, Error>> = self.retrieve(&mut bd);
 			    match possible_packet_or_err {
 		                Some(packet_or_err) => {
-				    port_to_pe.send(PortToPePacket::Packet((PortNo(ecnl_port_sub.port_id), packet_or_err?))).unwrap();
+				    port_to_pe.send(PortToPePacketOld::Packet((PortNo(ecnl_port_sub.port_id), packet_or_err?))).unwrap();
 				    first = false;
 				},
 				None => {

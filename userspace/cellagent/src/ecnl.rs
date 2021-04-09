@@ -15,7 +15,7 @@ use std::{
 
 use crate::config::{CONFIG, PortQty};
 use crate::dal::{add_to_trace};
-use crate::ec_message_formats::{PortFromPe};
+use crate::ec_message_formats::{PortFromPeOld};
 use crate::ecnl_port::{ECNL_Port};
 use crate::nalcell::{NalCell};
 use crate::port::{PortSeed, InteriorPortLike};

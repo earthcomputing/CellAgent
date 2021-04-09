@@ -1,4 +1,3 @@
-use either::Either;
 use multi_mut::HashMapMultiMut;
 use std::{fmt, fmt::Write,
           collections::{HashMap, HashSet},
@@ -16,25 +15,40 @@ use crate::name::{CellID, LinkID};
 use crate::port::{PortSeed, CommonPortLike};
 use crate::replay::{process_trace_record, TraceFormat};
 use crate::simulated_border_port::{SimulatedBorderPortFactory, SimulatedBorderPort, DuplexPortNocChannel};
-use crate::simulated_interior_port::{LinkFromPort, LinkToPort, PortFromLink, PortToLink, SimulatedInteriorPortFactory, SimulatedInteriorPort, DuplexPortLinkChannel};
+use crate::simulated_interior_port::{SimulatedInteriorPortFactory, SimulatedInteriorPort, DuplexPortLinkChannel,
+                                     LinkFromPort, LinkToPort, PortFromLink, PortToLink};
 use crate::utility::{CellNo, CellConfig, PortNo, Edge, S, TraceHeaderParams, TraceType};
 
 #[derive(Clone, Debug)]
 pub struct DuplexLinkEndChannel {
-    pub link_to_port: LinkToPort,
-    pub link_from_port: LinkFromPort,
+    link_to_port: LinkToPort,
+    link_from_port: LinkFromPort,
+}
+impl DuplexLinkEndChannel {
+    pub fn get_link_to_port(&self) -> &LinkToPort { &self.link_to_port }
+    pub fn get_link_from_port(&self) -> &LinkFromPort { &self.link_from_port }
 }
 
 #[derive(Clone, Debug)]
 pub struct DuplexLinkEndChannels {
-    pub left: DuplexLinkEndChannel,
-    pub rite: DuplexLinkEndChannel,
+    left: DuplexLinkEndChannel,
+    rite: DuplexLinkEndChannel,
+}
+impl DuplexLinkEndChannels {
+    pub fn new(left: DuplexLinkEndChannel, rite: DuplexLinkEndChannel) -> DuplexLinkEndChannels {
+        DuplexLinkEndChannels { left, rite }
+    }
 }
 
 #[derive(Debug, Copy, Clone, Hash, Eq, PartialEq, Serialize, Deserialize)]
 pub struct CellInteriorConnection {
-    pub cell_no: CellNo,
-    pub port_no: PortNo,
+    cell_no: CellNo,
+    port_no: PortNo,
+}
+impl CellInteriorConnection {
+    pub fn new(cell_no: CellNo, port_no: PortNo) -> CellInteriorConnection {
+        CellInteriorConnection { cell_no, port_no }
+    }
 }
 impl fmt::Display for CellInteriorConnection {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -44,18 +58,23 @@ impl fmt::Display for CellInteriorConnection {
 
 #[derive(Debug, Copy, Clone, Hash, Eq, PartialEq, Serialize, Deserialize)]
 pub struct EdgeConnection {
-    pub left: CellInteriorConnection,
-    pub rite: CellInteriorConnection,
+    left: CellInteriorConnection,
+    rite: CellInteriorConnection,
+}
+impl EdgeConnection {
+    pub fn new(left: CellInteriorConnection, rite: CellInteriorConnection) -> EdgeConnection {
+        EdgeConnection { left, rite }
+    }
 }
 impl fmt::Display for EdgeConnection {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{}<->{}", self.left, self.rite)
     }
 }
-
+type NalCellType = NalCell::<SimulatedInteriorPortFactory, SimulatedInteriorPort, SimulatedBorderPortFactory, SimulatedBorderPort>;
 #[derive(Clone, Debug, Default)]
 pub struct Rack {
-    cells: HashMap<CellNo, NalCell::<SimulatedInteriorPortFactory, SimulatedInteriorPort, SimulatedBorderPortFactory, SimulatedBorderPort>>,
+    cells: HashMap<CellNo, NalCellType>,
     links: HashMap<EdgeConnection, Link>,
 }
 impl Rack {
@@ -74,70 +93,28 @@ impl Rack {
         let mut duplex_link_end_channel_map = HashMap::<CellInteriorConnection, DuplexLinkEndChannel>::new();
         for edge in edge_list {
             let mut connect_port  = |cell_no, dest_cell_no, side_name| {
-                for interior_port_no in match blueprint.get_cell(cell_no).context(RackError::Chain { func_name: _f, comment: S("lookup cell")}) {
-                    Ok(cell) => match cell {
-                        Either::Left(interior_cell) => Ok(interior_cell.get_interior_ports()),
-                        Either::Right(border_cell) => Ok(border_cell.get_interior_ports()),
-                    },
-                    Err(_e) => Err(RackError::Chain { func_name: _f, comment: S("lookup cell")}),
-                }? {
-                    if !(**interior_port_no == 0) && (!duplex_port_link_channel_cell_port_map.contains_key(&cell_no) || !duplex_port_link_channel_cell_port_map[&cell_no].contains_key(&interior_port_no)) {
+                let cell = blueprint.get_cell(cell_no).expect(&format!("Rack: blueprint.get_cell(cell_no for cell {} must work", cell_no));
+                let interior_ports = cell.get_interior_ports();
+                for interior_port_no in interior_ports {
+                    if **interior_port_no == 0 {
+                        return Err(RackError::InteriorPort { func_name: _f, cell_no: cell_no }.into())
+                    }
+                    if (!duplex_port_link_channel_cell_port_map.contains_key(&cell_no)) || 
+                       (!duplex_port_link_channel_cell_port_map[&cell_no].contains_key(&interior_port_no)) {
                         let (link_to_port, port_from_link): (LinkToPort, PortFromLink) = channel();
                         let (port_to_link, link_from_port): (PortToLink, LinkFromPort) = channel();
-                        if duplex_port_link_channel_cell_port_map.contains_key(&cell_no) {
-                            duplex_port_link_channel_cell_port_map.get_mut(&cell_no).unwrap().insert(
-                                *interior_port_no,
-                                DuplexPortLinkChannel {
-                                    port_from_link: port_from_link.clone(),
-                                    port_to_link: port_to_link.clone(),
-                                },
-                            );
-                            duplex_link_port_channel_cell_port_map.get_mut(&cell_no).unwrap().insert(
-                                *interior_port_no,
-                                DuplexLinkPortChannel {
-                                    link_from_port: link_from_port.clone(),
-                                    link_to_port: link_to_port.clone(),
-                                },
-                            );
-                            dest_cell_port_map.get_mut(&cell_no).unwrap().insert(
-                                *interior_port_no,
-                                dest_cell_no,
-                            );
-                        } else {
-                            let mut duplex_port_link_channel_port_map = HashMap::<PortNo, DuplexPortLinkChannel>::new();
-                            duplex_port_link_channel_port_map.insert(
-                                *interior_port_no,
-                                DuplexPortLinkChannel {
-                                    port_from_link: port_from_link.clone(),
-                                    port_to_link: port_to_link.clone(),
-                                },
-                            );
-                            duplex_port_link_channel_cell_port_map.insert(
-                                cell_no,
-                                duplex_port_link_channel_port_map,
-                            );
-                            let mut duplex_link_port_channel_port_map = HashMap::<PortNo, DuplexLinkPortChannel>::new();
-                            duplex_link_port_channel_port_map.insert(
-                                *interior_port_no,
-                                DuplexLinkPortChannel {
-                                    link_from_port: link_from_port.clone(),
-                                    link_to_port: link_to_port.clone(),
-                                },
-                            );
-                            duplex_link_port_channel_cell_port_map.insert(
-                                cell_no,
-                                duplex_link_port_channel_port_map,
-                            );
-                            let mut dest_port_map = HashMap::<PortNo, CellNo>::new();
-                            dest_port_map.insert(
-                                *interior_port_no,
-                                dest_cell_no,
-                            );
-                            dest_cell_port_map.insert(
-                                cell_no,
-                                dest_port_map,
-                            );
-                        }
+                        duplex_port_link_channel_cell_port_map
+                            .entry(cell_no)
+                            .or_insert(HashMap::new())
+                            .insert(*interior_port_no, DuplexPortLinkChannel::new(port_from_link, port_to_link));
+                        duplex_link_port_channel_cell_port_map
+                            .entry(cell_no)
+                            .or_insert(HashMap::new())
+                            .insert(*interior_port_no, DuplexLinkPortChannel::new(link_from_port, link_to_port));
+                        dest_cell_port_map
+                            .entry(cell_no)
+                            .or_insert(HashMap::new())
+                            .insert(*interior_port_no, dest_cell_no);
                         return Ok(interior_port_no);
                     }
                 }
@@ -161,8 +138,8 @@ impl Rack {
             duplex_link_end_channel_map.insert(
                 edge_connection.left,
                 DuplexLinkEndChannel {
-                    link_to_port: left_duplex_link_port_channel.link_to_port.clone(),
-                    link_from_port: left_duplex_link_port_channel.link_from_port.clone(),
+                    link_to_port: left_duplex_link_port_channel.get_link_to_port().clone(),
+                    link_from_port: left_duplex_link_port_channel.get_link_from_port().clone(),
                 },
             );
             let rite_duplex_link_port_channel_port_map = &duplex_link_port_channel_cell_port_map[&edge.1];
@@ -170,8 +147,8 @@ impl Rack {
             duplex_link_end_channel_map.insert(
                 edge_connection.rite,
                 DuplexLinkEndChannel {
-                    link_to_port: rite_duplex_link_port_channel.link_to_port.clone(),
-                    link_from_port: rite_duplex_link_port_channel.link_from_port.clone(),
+                    link_to_port: rite_duplex_link_port_channel.get_link_to_port().clone(),
+                    link_from_port: rite_duplex_link_port_channel.get_link_from_port().clone(),
                 },
             );
         }
@@ -182,22 +159,22 @@ impl Rack {
         for interior_cell in blueprint.get_interior_cells() {
             cell_no_map.insert(interior_cell.get_name(), interior_cell.get_cell_no());
         }
-        let simulated_border_port_factory: SimulatedBorderPortFactory = SimulatedBorderPortFactory::new(
+        let simulated_border_port_factory = SimulatedBorderPortFactory::new(
             PortSeed::new(),
             cell_no_map.clone(),
             blueprint.clone(),
-            duplex_port_noc_channel_cell_port_map.clone(),
+            duplex_port_noc_channel_cell_port_map,
         );
-        let simulated_interior_port_factory: SimulatedInteriorPortFactory = SimulatedInteriorPortFactory::new(
+        let simulated_interior_port_factory = SimulatedInteriorPortFactory::new(
             PortSeed::new(),
             cell_no_map.clone(),
             blueprint.clone(),
-            duplex_port_link_channel_cell_port_map.clone(),
+            duplex_port_link_channel_cell_port_map,
         );
         for border_cell in blueprint.get_border_cells() {
             let cell_no = border_cell.get_cell_no();
             let border_ports = border_cell.get_border_ports();
-            let (nal_cell, _join_handle) = match NalCell::<SimulatedInteriorPortFactory, SimulatedInteriorPort, SimulatedBorderPortFactory, SimulatedBorderPort>::new(
+            let (nal_cell, _join_handle) = match NalCell::new(
                 &border_cell.get_name(),
                 border_cell.get_num_phys_ports(),
                 &HashSet::from_iter(border_ports.clone()),
@@ -224,7 +201,7 @@ impl Rack {
         }
         for interior_cell in blueprint.get_interior_cells() {
             let cell_no = interior_cell.get_cell_no();
-            let (nal_cell, _join_handle) = match NalCell::<SimulatedInteriorPortFactory, SimulatedInteriorPort, SimulatedBorderPortFactory, SimulatedBorderPort>::new(
+            let (nal_cell, _join_handle) = match NalCell::new(
                 &interior_cell.get_name(),
                 interior_cell.get_num_phys_ports(),
                 &HashSet::new(),
@@ -253,7 +230,7 @@ impl Rack {
         for edge_connection in edge_connection_list {
             let (left_cell, rite_cell) = self.cells
                 .get_pair_mut(&edge_connection.left.cell_no, &edge_connection.rite.cell_no)
-                .unwrap();
+                .expect("Rack: problem with edge connection");
             let left_cell_id: CellID = left_cell.get_id(); // For Trace
             let left_port_no = &edge_connection.left.port_no;
             let left_port = left_cell.listen_link_and_pe(&left_port_no)?;
@@ -263,10 +240,10 @@ impl Rack {
             let link = Link::new(
                 left_port.get_id(),
                 rite_port.get_id(),
-                LinkToPorts {
-                    left: duplex_link_end_channel_map[&edge_connection.left].link_to_port.clone(),
-                    rite: duplex_link_end_channel_map[&edge_connection.rite].link_to_port.clone(),
-                }
+                LinkToPorts::new(
+                    duplex_link_end_channel_map[&edge_connection.left].get_link_to_port().clone(),
+                    duplex_link_end_channel_map[&edge_connection.rite].get_link_to_port().clone(),
+                )
             )?;
             println!("{}", edge_connection);
             {
@@ -283,10 +260,10 @@ impl Rack {
             let link_from_rite = duplex_link_end_channel_map[&edge_connection.rite].link_from_port.clone();
             let join_handle = thread::Builder::new().name(thread_name).spawn( move || {
                 update_trace_header(child_trace_header);
-                let _ = link_clone.listen(LinkFromPorts {
-                    left: link_from_left,
-                    rite: link_from_rite,
-                });
+                let _ = link_clone.listen(LinkFromPorts::new(
+                    link_from_left,
+                    link_from_rite,
+            ));
             })?;
             //let mut handle_pair = link.start_threads(link_to_left, link_from_left, link_to_rite, link_from_rite)?;
             link_handles.append(&mut vec![join_handle]);
@@ -360,6 +337,8 @@ pub enum RackError {
     Cells { num_cells: CellQty, func_name: &'static str },
     #[fail(display = "RackError::Edges {}: {:?} is not enough links to connect all cells", func_name, nlinks)]
     Edges { nlinks: LinkQty, func_name: &'static str },
+    #[fail(display = "RackError::InteriorPort {} {}", func_name, cell_no)]
+    InteriorPort { func_name: &'static str, cell_no: CellNo },
     #[fail(display = "RackError::Wire {}: {:?} is not a valid edge at {}", func_name, edge, comment)]
     Wire { edge: Edge, func_name: &'static str, comment: &'static str },
     #[fail(display = "RackError::NoPortAvailable {}: {:?} No port available for {} side of edge at {}", func_name, side_name, edge, comment)]

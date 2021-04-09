@@ -5,7 +5,7 @@ use std::{fmt, fmt::Write};
 // Structs to parse trace records
 use crate::name::{CellID, TreeID};
 use crate::packet_engine::NumberOfPackets;
-use crate::port::PortStatus;
+use crate::port::PortStatusOld;
 use crate::routing_table_entry::RoutingTableEntry;
 use crate::utility::{CellNo, ByteArray, PortNo, TraceType};
 use crate::uuid_ec::Uuid;
@@ -16,7 +16,7 @@ pub enum TraceFormat {
     CaNewFormat(CellID, TreeID, TreeID, TreeID),
     CaToCmEntryFormat(RoutingTableEntry),
     CaFromCmBytesMsg(PortNo, bool, Uuid, ByteArray),
-    CaFromCmBytesStatus(PortNo, bool, NumberOfPackets, PortStatus),
+    CaFromCmBytesStatus(PortNo, bool, NumberOfPackets, PortStatusOld),
     CaToNoc(PortNo, ByteArray),
     BorderCell(CellNo)
 }
@@ -168,7 +168,7 @@ struct CaFromCmBytesStatus {
     port: PortNo,
     is_border: bool,
     no_packets: NumberOfPackets,
-    status: PortStatus
+    status: PortStatusOld
 }
 #[derive(Debug, Clone, Serialize, Deserialize)]
 struct TraceRecordCaToNoc {

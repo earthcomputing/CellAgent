@@ -55,7 +55,7 @@ impl Packet {
     }
     pub fn make_entl_packet() -> Packet {
         let mut uuid = Uuid::new();
-        uuid.make_entl();
+        uuid.make_init();
         Packet::new(UniqueMsgId::new(), &uuid, PacketNo(1),
                     false, SenderMsgSeqNo(0), vec![])
     }
@@ -111,15 +111,16 @@ impl Packet {
     // pub fn get_payload_size(&self) -> usize { self.payload.get_no_bytes() }
 
     // UUID Magic
-    pub fn make_ait_send(&mut self) { self.header.make_ait_send() }
-    pub fn make_ait_reply(&mut self) { self.header.make_ait_reply() }
+    pub fn make_ait(&mut self) { self.header.make_ait() }
+    pub fn make_aitd(&mut self) { self.header.make_aitd() }
+    pub fn make_tick(&mut self) { self.header.make_tick() }
     pub fn make_tock(&mut self) { self.header.make_tock() }
     pub fn is_ait(&self) -> bool { self.is_ait_recv() || self.is_ait_recv() }
     pub fn is_ait_send(&self) -> bool { self.header.get_uuid().is_ait_send() }
     pub fn is_ait_recv(&self) -> bool { self.header.get_uuid().is_ait_recv() }
     pub fn is_snake(&self) -> bool { self.header.get_uuid().is_snake() }
     pub fn is_snaked(&self) -> bool { self.header.get_uuid().is_snaked() }
-    pub fn _is_entl(&self) -> bool { self.header.get_uuid()._is_entl() }
+    pub fn is_entl(&self) -> bool { self.header.get_uuid().is_entl() }
     pub fn get_ait_state(&self) -> AitState { self.get_tree_uuid().get_ait_state() }
     pub fn time_reverse(&mut self) { self.header.get_uuid().time_reverse(); }
     pub fn next_ait_state(&mut self) -> Result<AitState, Error> {
@@ -171,8 +172,9 @@ impl PacketHeader {
         PacketHeader { uuid: *uuid }
     }
     fn get_uuid(&self) -> Uuid { self.uuid }
-    fn make_ait_send(&mut self) { self.uuid.make_ait_send(); }
-    fn make_ait_reply(&mut self) { self.uuid.make_ait_reply(); }
+    fn make_ait(&mut self) { self.uuid.make_ait(); }
+    fn make_aitd(&mut self) { self.uuid.make_aitd(); }
+    fn make_tick(&mut self) { self.uuid.make_tick(); }
     fn make_tock(&mut self) { self.uuid.make_tock(); }
 }
 impl fmt::Display for PacketHeader { 
