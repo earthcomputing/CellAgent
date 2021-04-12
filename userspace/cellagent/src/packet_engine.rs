@@ -508,7 +508,7 @@ impl PacketEngine {
         }
         Ok(())
     }
-    fn send_packet(&mut self, recv_port_no: PortNo, packet: &Packet) -> Result<(), Error> {
+    fn send_packet_to_port_or_cm(&mut self, recv_port_no: PortNo, packet: &Packet) -> Result<(), Error> {
         let _f = "send_packet";
         let mut reroute_port_no = self.reroute[recv_port_no.as_usize()];
         {
@@ -562,7 +562,7 @@ impl PacketEngine {
                     self.send_packet_flow_control(recv_port_no)?;
                 }
             }
-            self.send_packet(port_no, &packet)?;
+            self.send_packet_to_port_or_cm(port_no, &packet)?;
         }
         Ok(())
     }
