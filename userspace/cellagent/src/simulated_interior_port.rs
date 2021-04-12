@@ -213,7 +213,7 @@ impl InteriorPortLike for SimulatedInteriorPort {
                                 }
                             }
                             packet.next_ait_state()?;
-                            // TODO: Send AITD as acknowledgement that transfer completed correctly
+                            port_to_pe.send(PortToPePacketOld::Packet((self.base_port.get_port_no(), packet)))?;
                             let mut tick_packet: Packet = Default::default();
                             tick_packet.make_tick();
                             self.direct_send(&tick_packet)?;

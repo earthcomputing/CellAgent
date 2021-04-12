@@ -146,17 +146,11 @@ pub trait InteriorPortLike: 'static + Clone + Sync + Send + CommonPortLike {
             {
                 let ait_state = packet.get_ait_state();
                 if CONFIG.trace_options.all || CONFIG.trace_options.port {
-                    let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "port_from_pe" };
+                    let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "port_from_pe_like" };
                     let trace = json!({ "cell_id": self.get_cell_id(), "id": self.get_id().get_name(), "ait_state": ait_state, "packet":packet.stringify()? });
                     add_to_trace(TraceType::Trace, trace_params, &trace, _f);
                 }
-                if (CONFIG.trace_options.all || CONFIG.trace_options.port) && 
-                   (!packet.is_entl() || CONFIG.trace_options.entl) {
-                    let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "port_to_port_like" };
-                    let trace = json!({ "cell_id": self.get_cell_id(), "id": self.get_id().get_name(), "ait_state": ait_state, "packet": packet.stringify()? });
-                    add_to_trace(TraceType::Trace, trace_params, &trace, _f);
-                }
-            }
+           }
             self.send_to_link(&mut packet)?;
         }
     }
