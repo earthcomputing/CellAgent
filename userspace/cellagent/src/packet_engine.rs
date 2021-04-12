@@ -512,7 +512,7 @@ impl PacketEngine {
         }
         Ok(())
     }
-    fn send_packet_to_outbuf(&mut self, recv_port_no: PortNo, packet: &Packet) -> Result<(), Error> {
+    fn send_packet_to_port_or_cm(&mut self, recv_port_no: PortNo, packet: &Packet) -> Result<(), Error> {
         let _f = "send_packet_to_outbuf";
         let mut reroute_port_no = self.reroute[recv_port_no.as_usize()];
         {
@@ -535,6 +535,7 @@ impl PacketEngine {
         if recv_port_no == PortNo(0) {
             self.pe_to_cm.send(PeToCmPacketOld::Packet((recv_port_no, packet.clone())))?;
         } else {
+            self.add_seen_packet_count(recv_port_no);
             self.pe_to_ports_old.get(&reroute_port_no)
                 .ok_or::<Error>(PacketEngineError::Sender { cell_id: self.cell_id, func_name: _f, port_no: reroute_port_no }.into())?
                 .send(packet.clone())?;
@@ -565,7 +566,7 @@ impl PacketEngine {
                     self.send_packet_flow_control(recv_port_no)?;
                 }
             }
-            self.send_packet_to_outbuf(port_no, &packet)?;
+            self.send_packet_to_port_or_cm(port_no, &packet)?;
             self.add_sent_packet(port_no, packet);
         }
         Ok(())
@@ -574,7 +575,6 @@ impl PacketEngine {
                                 -> Result<(), Error> {
         let _f = "process_packet_from_port_old";
         // Got a packet from the other side, so clear state
-        self.add_seen_packet_count(recv_port_no);
         self.clear_sent_packets(recv_port_no);
         {
             if CONFIG.debug_options.all || CONFIG.debug_options.flow_control {
