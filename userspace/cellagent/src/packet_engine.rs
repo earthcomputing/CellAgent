@@ -323,7 +323,6 @@ impl PacketEngine {
                 if self.activity_data[p] == data {
                     // Do something interesting
                 }
-                self.activity_data[p].update(&data);
             },
             PortToPePacket::Increment((port_no, outbuf)) => {
                 {

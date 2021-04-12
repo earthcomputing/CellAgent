@@ -11,7 +11,8 @@ use crate::dal::{add_to_trace, fork_trace_header, update_trace_header};
 use crate::ec_message_formats::{PortToPe, PortFromPe, PortToPeOld, PortFromPeOld};
 use crate::name::{Name, CellID, PortID};
 use crate::packet::{Packet};
-use crate::utility::{ByteArray, PortNo, PortNumber, S, TraceHeader, TraceHeaderParams, TraceType,
+use crate::utility::{ActivityData, ByteArray, PortNo, PortNumber, S,
+                     TraceHeader, TraceHeaderParams, TraceType,
                      write_err};
 
 #[derive(Clone, Debug)]
@@ -258,6 +259,7 @@ pub struct BasePort {
     id: PortID,
     port_number: PortNumber,
     is_border: bool,
+    activity_data: ActivityData,
     duplex_port_pe_or_ca_channel: DuplexPortPeOrCaChannel,
 }
 impl BasePort {
@@ -265,6 +267,7 @@ impl BasePort {
                duplex_port_pe_or_ca_channel: DuplexPortPeOrCaChannel) -> Result<BasePort, Error> {
         let port_id = PortID::new(cell_id, port_number).context(PortError::Chain { func_name: "new", comment: S(cell_id.get_name()) + &S(*port_number.get_port_no())})?;
         Ok(BasePort { cell_id, id: port_id, port_number, is_border,
+                      activity_data: Default::default(),
                       duplex_port_pe_or_ca_channel,
         })
     }
@@ -272,6 +275,8 @@ impl BasePort {
     pub fn get_cell_id(&self) -> CellID { self.cell_id }
     pub fn get_port_no(&self) -> PortNo { self.port_number.get_port_no() }
     pub fn is_border(&self) -> bool { self.is_border }
+    pub fn get_activity_data(&self) -> &ActivityData { &self.activity_data }
+    pub fn update_activity_data(&mut self) { self.activity_data.increment(); }
     fn get_duplex_port_pe_or_ca_channel(&self) -> &DuplexPortPeOrCaChannel { &self.duplex_port_pe_or_ca_channel }
     fn get_duplex_port_pe_channel(&self) -> &DuplexPortPeChannel {
         match self.get_duplex_port_pe_or_ca_channel() {

@@ -52,7 +52,8 @@ impl SimulatedInteriorPort {
             if (CONFIG.trace_options.all || CONFIG.trace_options.port) && 
                (!packet.is_entl() || CONFIG.trace_options.entl)  {
                 let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "direct_send" };
-                let trace = json!({ "cell_id": self.base_port.get_cell_id(), "id": self.base_port.get_id().get_name(), "ait state": packet.get_ait_state(), "packet": packet.stringify()? });
+                let trace = json!({ "cell_id": self.base_port.get_cell_id(), "id": self.base_port.get_id().get_name(), 
+                            "ait state": packet.get_ait_state(), "packet": packet.stringify()? });
                 add_to_trace(TraceType::Trace, trace_params, &trace, _f);
             }
 	    }
@@ -112,24 +113,7 @@ impl InteriorPortLike for SimulatedInteriorPort {
         let _f = "listen_link";
         loop {
             let msg = self.recv_from_link().context(SimulatedInteriorPortError::Chain { func_name: _f, comment: S(self.base_port.get_id().get_name()) + " recv from link"})?;
-            {
-                if CONFIG.trace_options.all || CONFIG.trace_options.port {
-                    match &msg {
-                        LinkToPortPacket::Packet(packet) => {
-                            if !packet.is_entl() || CONFIG.trace_options.entl {
-                                let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "port_from_link_packet" };
-                                let trace = json!({ "cell_id": self.base_port.get_cell_id(), "id": self.base_port.get_id().get_name(), "ait_state": packet.get_ait_state(), "packet": packet.stringify()? });
-                                add_to_trace(TraceType::Trace, trace_params, &trace, _f);
-                            }
-                        },
-                        LinkToPortPacket::Status(status) => {
-                            let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "port_from_link_status" };
-                            let trace = json!({ "cell_id": self.base_port.get_cell_id(), "id": self.base_port.get_id().get_name(), "status": status, "msg": msg});
-                            add_to_trace(TraceType::Trace, trace_params, &trace, _f);
-                        },
-                    }
-                }
-            }
+            self.base_port.update_activity_data();
             match msg {
                 LinkToPortPacket::Status(status) => {
                     match status {
@@ -139,7 +123,7 @@ impl InteriorPortLike for SimulatedInteriorPort {
                     {
                         if CONFIG.trace_options.all || CONFIG.trace_options.port {
                             let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "port_to_pe_status" };
-                            let trace = json!({ "cell_id": self.base_port.get_cell_id(), "id": self.base_port.get_id().get_name(), "status": status });
+                            let trace = json!({ "cell_id": self.base_port.get_cell_id(), "id": self.base_port.get_id().get_name(), "activity_data": self.base_port.get_activity_data(), "status": status });
                             add_to_trace(TraceType::Trace, trace_params, &trace, _f);
                         }
                     }
@@ -163,7 +147,7 @@ impl InteriorPortLike for SimulatedInteriorPort {
                                 if (CONFIG.trace_options.all || CONFIG.trace_options.port) && 
                                    (!packet.is_entl() || CONFIG.trace_options.entl) {
                                     let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "port_to_pe_packet" };
-                                    let trace = json!({ "cell_id": self.base_port.get_cell_id(), "id": self.base_port.get_id().get_name(), "ait_state": packet.get_ait_state(), "packet": packet.stringify()? });
+                                    let trace = json!({ "cell_id": self.base_port.get_cell_id(), "id": self.base_port.get_id().get_name(), "activity_data": self.base_port.get_activity_data(), "ait_state": packet.get_ait_state(), "packet": packet.stringify()? });
                                     add_to_trace(TraceType::Trace, trace_params, &trace, _f);
                                 }
                             }
@@ -176,7 +160,7 @@ impl InteriorPortLike for SimulatedInteriorPort {
                                    (!packet.is_entl() || CONFIG.trace_options.entl) {
                                     let ait_state = packet.get_ait_state();
                                     let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "port_to_link_tack" };
-                                    let trace = json!({ "cell_id": self.base_port.get_cell_id(), "id": self.base_port.get_id().get_name(), "ait_state": ait_state, "packet": packet.stringify()? });
+                                    let trace = json!({ "cell_id": self.base_port.get_cell_id(), "id": self.base_port.get_id().get_name(), "activity_data": self.base_port.get_activity_data(), "ait_state": ait_state, "packet": packet.stringify()? });
                                     add_to_trace(TraceType::Trace, trace_params, &trace, _f);
                                 }
                             }
@@ -189,7 +173,7 @@ impl InteriorPortLike for SimulatedInteriorPort {
                                    (!packet.is_entl() || CONFIG.trace_options.entl) {
                                     let ait_state = packet.get_ait_state();
                                     let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "port_to_link_tuck" };
-                                    let trace = json!({ "cell_id": self.base_port.get_cell_id(), "id": self.base_port.get_id().get_name(), "ait_state": ait_state, "packet": packet.stringify()? });
+                                    let trace = json!({ "cell_id": self.base_port.get_cell_id(), "id": self.base_port.get_id().get_name(), "activity_data": self.base_port.get_activity_data(), "ait_state": ait_state, "packet": packet.stringify()? });
                                     add_to_trace(TraceType::Trace, trace_params, &trace, _f);
                                 }
                             }
@@ -202,7 +186,7 @@ impl InteriorPortLike for SimulatedInteriorPort {
                                    (!packet.is_entl() || CONFIG.trace_options.entl) {
                                     let ait_state = packet.get_ait_state();
                                     let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "port_to_link_tyck" };
-                                    let trace = json!({ "cell_id": self.base_port.get_cell_id(), "id": self.base_port.get_id().get_name(), "ait_state": ait_state, "packet": packet.stringify()? });
+                                    let trace = json!({ "cell_id": self.base_port.get_cell_id(), "id": self.base_port.get_id().get_name(), "activity_data": self.base_port.get_activity_data(), "ait_state": ait_state, "packet": packet.stringify()? });
                                     add_to_trace(TraceType::Trace, trace_params, &trace, _f);
                                 }
                             }
@@ -213,7 +197,7 @@ impl InteriorPortLike for SimulatedInteriorPort {
                             (!packet.is_entl() || CONFIG.trace_options.entl) {
                              let ait_state = packet.get_ait_state();
                                     let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "port_to_pe_ait_packet" };
-                                    let trace = json!({ "cell_id": self.base_port.get_cell_id(), "id": self.base_port.get_id().get_name(), "ait_state": ait_state, "packet": packet.stringify()? });
+                                    let trace = json!({ "cell_id": self.base_port.get_cell_id(), "id": self.base_port.get_id().get_name(), "activity_data": self.base_port.get_activity_data(), "ait_state": ait_state, "packet": packet.stringify()? });
                                     add_to_trace(TraceType::Trace, trace_params, &trace, _f);
                                 }
                             }
@@ -224,7 +208,7 @@ impl InteriorPortLike for SimulatedInteriorPort {
                                 if (CONFIG.trace_options.all || CONFIG.trace_options.port) && 
                                    (!packet.is_entl() || CONFIG.trace_options.entl) {
                                     let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "port_to_pe_aitd_packet" };
-                                    let trace = json!({ "cell_id": self.base_port.get_cell_id(), "id": self.base_port.get_id().get_name(), "ait_state": packet.get_ait_state(), "packet": packet.stringify()? });
+                                    let trace = json!({ "cell_id": self.base_port.get_cell_id(), "id": self.base_port.get_id().get_name(), "activity_data": self.base_port.get_activity_data(), "ait_state": packet.get_ait_state(), "packet": packet.stringify()? });
                                     add_to_trace(TraceType::Trace, trace_params, &trace, _f);
                                 }
                             }
@@ -242,7 +226,7 @@ impl InteriorPortLike for SimulatedInteriorPort {
                                    (!packet.is_entl() || CONFIG.trace_options.entl) {
                                     let ait_state = packet.get_ait_state();
                                     let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "port_to_link" };
-                                    let trace = json!({ "cell_id": self.base_port.get_cell_id(), "id": self.base_port.get_id().get_name(), "ait_state": ait_state, "packet": packet.stringify()? });
+                                    let trace = json!({ "cell_id": self.base_port.get_cell_id(), "id": self.base_port.get_id().get_name(), "activity_data": self.base_port.get_activity_data(), "ait_state": ait_state, "packet": packet.stringify()? });
                                     add_to_trace(TraceType::Trace, trace_params, &trace, _f);
                                 }
                             }
