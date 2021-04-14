@@ -62,8 +62,8 @@ impl Blueprint {
             let cell_no = CellNo(no);
             cell_num_phys_ports.insert(cell_no,
                                        *cell_port_exceptions
-                                       .get(&cell_no)
-                                       .unwrap_or(&default_num_phys_ports_per_cell));
+                                            .get(&cell_no)
+                                            .unwrap_or(&default_num_phys_ports_per_cell));
         }
         for (cell_no, port_nos) in border_cell_ports {
             if **cell_no >= *num_cells {
@@ -74,7 +74,7 @@ impl Blueprint {
                 }.into());
             }
             for port_no in port_nos {
-                let num_phys_ports: PortQty = cell_num_phys_ports[cell_no];
+                let num_phys_ports = cell_num_phys_ports[cell_no];
                 if **port_no >= *num_phys_ports {
                     return Err(BlueprintError::BorderCellPortsPort {
                         func_name: _f,
@@ -93,20 +93,20 @@ impl Blueprint {
         let mut border_cells = 	Vec::new();
         for no in 0..*num_cells {
             let cell_no = CellNo(no);
-            let phys_port_list : Vec<PortNo> = (1..*cell_num_phys_ports[&cell_no] as usize).map(|i| PortNo(i as u8)).collect();
+            let phys_port_list : Vec<_> = (1..*cell_num_phys_ports[&cell_no] as usize).map(|i| PortNo(i as u8)).collect();
             match border_cell_ports.get(&cell_no) {
                 Some(border_ports) => {
                     let border: HashSet<PortNo> = HashSet::from_iter(border_ports.clone());
                     let all: HashSet<PortNo> = HashSet::from_iter(phys_port_list);
                     let mut interior_ports = all.difference(&border).cloned().collect::<Vec<_>>();
                     interior_ports.sort();
-                    border_cells.push(BorderCell { cell_no, cell_type: CellType::Border, interior_ports, border_ports: border_ports.clone() });
+                    border_cells.push(BorderCell::new(cell_no, CellType::Border, interior_ports, border_ports.clone()));
                 },
-                None => interior_cells.push(InteriorCell { cell_no, cell_type: CellType::Interior, interior_ports : phys_port_list })
+                None => interior_cells.push(InteriorCell::new(cell_no, CellType::Interior, phys_port_list)),
             }
         }
         Ok(Blueprint { interior_cells, border_cells, edges:edges.clone() })
-               }
+    }
     pub fn get_ncells(&self) -> CellQty { CellQty(self.get_n_interior_cells() + self.get_n_border_cells()) }
     pub fn get_n_border_cells(&self) -> usize { self.border_cells.len() }
     pub fn get_n_interior_cells(&self) -> usize { self.interior_cells.len() }

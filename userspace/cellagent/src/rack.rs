@@ -97,7 +97,7 @@ impl Rack {
                 let interior_ports = cell.get_interior_ports();
                 for interior_port_no in interior_ports {
                     if **interior_port_no == 0 {
-                        return Err(RackError::InteriorPort { func_name: _f, cell_no: cell_no }.into())
+                        return Err(RackError::InteriorPort { func_name: _f, cell_no }.into())
                     }
                     if (!duplex_port_link_channel_cell_port_map.contains_key(&cell_no)) || 
                        (!duplex_port_link_channel_cell_port_map[&cell_no].contains_key(&interior_port_no)) {
@@ -118,7 +118,7 @@ impl Rack {
                         return Ok(interior_port_no);
                     }
                 }
-                return Err(RackError::NoPortAvailable { edge: *edge, side_name: side_name, func_name: _f, comment: "no port available for edge", });
+                return Err(RackError::NoPortAvailable { edge: *edge, side_name, func_name: _f, comment: "no port available for edge", });
             };
             let left_port_no = connect_port(edge.0, edge.1, "left")?;
             let rite_port_no = connect_port(edge.1, edge.0, "rite")?;
@@ -152,7 +152,7 @@ impl Rack {
                 },
             );
         }
-        let mut cell_no_map = HashMap::<String, CellNo>::new();
+        let mut cell_no_map = HashMap::new();
         for border_cell in blueprint.get_border_cells() {
             cell_no_map.insert(border_cell.get_name(), border_cell.get_cell_no());
         }
@@ -289,7 +289,7 @@ impl Rack {
     }
     pub fn select_noc_border_cell(&mut self) -> Result<(CellNo, NalCell::<SimulatedInteriorPortFactory, SimulatedInteriorPort, SimulatedBorderPortFactory, SimulatedBorderPort>), Error> {
         let _f = "select_noc_border_cell";
-        return if CONFIG.replay {
+        if CONFIG.replay {
             let mut trace_lines = get_cell_replay_lines("Rack").context(RackError::Chain { func_name: _f, comment: S("Rack") })?;
             let record = trace_lines.next().transpose()?.expect(&format!("First record for rack must be there"));
             let trace_format = process_trace_record(record)?;

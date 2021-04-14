@@ -111,7 +111,7 @@ pub trait InteriorPortLike: 'static + Clone + Sync + Send + CommonPortLike {
 
     // THESE COULD BE PROTECTED
     fn send_to_link(self: &mut Self, packet: &mut Packet) -> Result<(), Error>;
-    fn listen_link(&mut self, port_to_pe_old: &PortToPeOld) -> Result<(), Error>;
+    fn listen_link(&mut self, port_pe: &DuplexPortPeChannel) -> Result<(), Error>;
 
     // THESE COULD BE PRIVATE
     fn listen(&mut self) -> Result<(), Error> {
@@ -123,9 +123,8 @@ pub trait InteriorPortLike: 'static + Clone + Sync + Send + CommonPortLike {
                 add_to_trace(TraceType::Trace, trace_params, &trace, _f);
             }
         }
-         let port_pe_old = self.get_duplex_port_pe_channel().clone();
-        let port_to_pe_old = port_pe_old.get_port_to_pe_old();
-        self.listen_link(&port_to_pe_old)
+        let port_pe = self.get_duplex_port_pe_channel().clone();
+        self.listen_link(&port_pe)
     }
     fn get_duplex_port_pe_channel(&self) -> &DuplexPortPeChannel {
         self.get_base_port().get_duplex_port_pe_channel()
