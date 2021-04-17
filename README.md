@@ -107,16 +107,17 @@ Ensure nothing is broken by the previous feature enhancements.
 ```
 $ git merge --no-ff <subsystem>-<feature>
 ```
-Ensure that this feature enhancement is consistent with the rest of the subsystem.
-If so:
+If there are no conflicts, the merge will complete automatically.  If there are conflicts, you need to resolve them.  Once you do that:
 ```
 $ git commit
 $ git push origin <subsystem>-master
 ```
-If not:
+If you want to back out of the merge instead of resolving the conflicts:
 ```
 $ git merge --abort
 ```
+To undo a merge after it's completed, use interactive rebase and delete the new commits.
+
 
 ## Build and Execution Instructions for cells running drivers
 1. Build e1000e kernel module as described [here](driver/e1000e/README.md)
