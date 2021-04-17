@@ -1,5 +1,5 @@
 [package]
-resolver = "2" # resolver that doesn't combine features
+# resolver = "2" # resolver that doesn't combine features
 name = "ec_fabrix"
 version = "0.1.0"
 authors = ["Alan Karp <alan@earthcomputing.io>"]
