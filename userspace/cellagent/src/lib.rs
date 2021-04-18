@@ -1,5 +1,6 @@
 #![warn(bare_trait_objects)]
 #![deny(unused_must_use)]
+#![deny(bindings_with_variant_name)]
 //#![allow(dead_code)]
 //#![allow(unused_variables)]
 //#![allow(unused_imports)]
@@ -21,6 +22,7 @@ pub mod dal;
 #[cfg(any(feature = "simulator"))]
 pub mod datacenter;
 pub mod dumpstack;
+#[cfg(feature = "cell")]
 pub mod ecnl;
 pub mod errors;
 pub mod gvm_equation;
@@ -28,6 +30,7 @@ pub mod gvm_equation;
 pub mod link;
 pub mod ec_message;
 pub mod ec_message_formats;
+#[cfg(feature = "cell")]
 pub mod ecnl_port;
 #[cfg(any(feature = "simulator", feature = "cell"))]
 pub mod nalcell;
@@ -43,7 +46,10 @@ pub mod replay;
 pub mod routing_table;
 pub mod routing_table_entry;
 pub mod service;
-pub mod simulated_port;
+pub mod simulated_border_port;
+#[cfg(any(feature = "simulator"))]
+pub mod simulated_interior_port;
+pub mod snake;
 pub mod tenant;
 pub mod traph;
 pub mod traph_element;

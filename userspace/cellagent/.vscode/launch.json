@@ -2,7 +2,7 @@
     "version": "2.0.0",
     "configurations": [
       {
-        "name": "Launch",
+        "name": "Launch simulator",
         "type": "lldb",
         "request": "launch",
         "args": [
@@ -18,7 +18,7 @@
           "rust"
         ],
         "env":{"SERVER_URL":"127.0.0.1:8088", "HTML": "html/index.html"},
-        "preLaunchTask": "cargo build"
-      },
+        //"preLaunchTask": "cargo build"
+      }
     ]
 }

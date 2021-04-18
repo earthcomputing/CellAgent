@@ -12,10 +12,12 @@ use std::{
 
 use crossbeam::crossbeam_channel as mpsc;
 
-use crate::ec_message_formats::{LinkToPortPacket, PortToPePacket};
+use crate::app_message_formats::{PortToCa};
+use crate::ec_message_formats::{PortToPePacketOld, PortToPeOld};
+use crate::name::{PortID, CellID};
 use crate::packet::{Packet};
-use crate::port::{Port, PortStatus};
-use crate::utility::{PortNo};
+use crate::port::{CommonPortLike, InteriorPortLike, BasePort, InteriorPortFactoryLike, PortStatusOld, PortSeed, DuplexPortPeOrCaChannel, DuplexPortPeChannel};
+use crate::utility::{PortNo, PortNumber};
 
 #[repr(C)]
 enum NL_ECND_Commands {
@@ -57,13 +59,19 @@ pub struct OutBufferDesc {
 
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
-pub struct ECNL_Port {
+pub struct ECNL_Port_Sub {
     pub port_module_id: u32,
     pub port_sock: *mut c_void, // Can this be const?
     pub port_esock: *const c_void,
     pub port_name: *const c_char,
     pub port_id: u8,
     pub port_up_down: c_int,
+}
+
+#[derive(Debug, Clone)]
+pub struct ECNL_Port {
+    base_port: BasePort,
+    pub ecnl_port_sub_ptr: *mut ECNL_Port_Sub,
 }
 
 #[cfg(feature = "cell")]
@@ -87,37 +95,123 @@ impl InBufferDesc {
      }
 }
 
-#[cfg(feature = "cell")]
+#[cfg(feature="cell")]
+impl InteriorPortFactoryLike<ECNL_Port> for PortSeed {
+    fn new_port(&self, cell_id: CellID, id: PortID, port_number: PortNumber, duplex_port_pe_channel: DuplexPortPeChannel) -> Result<ECNL_Port, Error> {
+	unsafe {
+            let base_port = BasePort::new(
+                cell_id,
+                port_number,
+                false,
+                DuplexPortPeOrCaChannel::Interior(duplex_port_pe_channel),
+            )?;
+            let port_num = *(base_port.get_port_no());
+            let ecnl_port_sub_ptr: *mut ECNL_Port_Sub = port_create(port_num);
+            let ecnl_port = ECNL_Port {
+                base_port,
+                ecnl_port_sub_ptr: ecnl_port_sub_ptr,
+            };
+            println!("Created ECNL port #{}, {} as {}", port_num, ecnl_port.get_port_name(), (*ecnl_port_sub_ptr).port_id);
+            return Ok(ecnl_port);
+	}
+    }
+    fn get_port_seed(&self) -> &PortSeed {
+        return &(*self);
+    }
+    fn get_port_seed_mut(&mut self) -> &mut PortSeed {
+        return &mut (*self);
+    }
+}
+
+#[cfg(feature="cell")]
 #[link(name = ":ecnl_proto.o")]
 impl ECNL_Port {
-     pub fn new(port_id: u8) -> ECNL_Port {
-     	  unsafe {
-              let ecnl_port: ECNL_Port = port_create(port_id);
-              println!("Created ECNL port #{}, {} as {}", port_id, ecnl_port.get_port_name(), ecnl_port.port_id);
-              return ecnl_port;
-	  }
-     }
-     pub fn is_connected(&self) -> bool {
-	 return self.port_up_down > 0;
-     }
      pub fn refresh_connected_status(&self) {
          unsafe {
 	     return port_update(self);
 	 }
      }
-     pub fn listen(&self, port: &Port, port_to_pe: mpsc::Sender<PortToPePacket>) -> Result<(), Error> {
-         let _f = "listen";
-	 println!("Listening for events on port {}",  self.port_id);
-	 let mut bd = InBufferDesc::new();
-     	 loop {
-            let mut event : ECNL_Event;
-            unsafe { 
-                event = std::mem::uninitialized();
-                port_get_event(self, &mut event);
-		match event.event_cmd_id {
-		    cmd_id if (cmd_id == NL_ECND_Commands::NL_ECNL_CMD_GET_PORT_STATE as c_int) => {
-			println!("Port {} is {}", self.port_id, if (event.event_up_down != 0) {"up"} else {"down"});
-			port_to_pe.send(PortToPePacket::Status((PortNo(self.port_id), port.is_border(), if (event.event_up_down != 0) {PortStatus::Connected} else {PortStatus::Disconnected}))).unwrap();
+     pub fn retrieve(&self, bdp: &mut InBufferDesc) -> Option<Result<Packet, Error>> {
+         let _f = "retrieve";
+         println!("Retrieving Packet...");
+	 unsafe {
+             port_do_read_async(self, bdp);
+	     if ((*bdp).frame != null_mut() && (*bdp).len != 0) {
+	         sleep(Duration::from_millis(100));
+	         let packet: &Packet = &*((*bdp).frame);
+                 println!("Received Packet: {}", packet.to_string()); // Probably usually sufficient to print ec_msg_type.
+	         return Some(Ok(*packet));
+	     } else {
+	         return None;
+	     }
+	 }
+     }
+    pub fn get_port_name(&self) -> String {
+        unsafe {
+            return CStr::from_ptr((*(self.ecnl_port_sub_ptr)).port_name).to_string_lossy().into_owned();
+        }
+    }
+}
+
+impl CommonPortLike for ECNL_Port {
+    fn get_base_port(&self) -> &BasePort {
+        return &self.base_port;
+    }
+    fn get_whether_connected(&self) -> bool {
+         unsafe {
+             let ecnl_port_sub = (*(self.ecnl_port_sub_ptr));
+	     return ecnl_port_sub.port_up_down > 0;
+         }
+     }
+    fn set_connected(&mut self) -> () {
+         unsafe {
+             let mut ecnl_port_sub = (*(self.ecnl_port_sub_ptr));
+	     ecnl_port_sub.port_up_down = 1;
+         }
+     }
+    fn set_disconnected(&mut self) -> () {
+         unsafe {
+             let mut ecnl_port_sub = (*(self.ecnl_port_sub_ptr));
+	     ecnl_port_sub.port_up_down = 0;
+         }
+     }
+}
+
+#[cfg(feature = "cell")]
+impl InteriorPortLike for ECNL_Port {
+     fn send_to_link(self: &mut Self, packet: &mut Packet) -> Result<(), Error> {
+        let bufferDesc: OutBufferDesc = OutBufferDesc {
+	    len: size_of::<Packet>() as c_uint, // Always send fixed-length frames
+	    frame: packet,
+	};
+	println!("Sending Packet: {}", packet.to_string()); // Probably usually sufficient to print ec_msg_type.
+        unsafe {
+	    port_do_xmit(self, &bufferDesc)
+	}
+	return Ok(())
+    }
+     fn listen_link(self: &mut Self, port_to_pe: &PortToPeOld) -> Result<(), Error> {
+         let _f = "listen_and_forward_to";
+         unsafe {
+             let ecnl_port_sub = (*(self.ecnl_port_sub_ptr));
+	     println!("Listening for events on port {}",  ecnl_port_sub.port_id);
+	     let mut bd = InBufferDesc::new();
+             loop {
+                 let mut event : ECNL_Event;
+                 event = std::mem::uninitialized();
+                 port_get_event(self, &mut event);
+		 match event.event_cmd_id {
+		     cmd_id if (cmd_id == NL_ECND_Commands::NL_ECNL_CMD_GET_PORT_STATE as c_int) => {
+                         let mut port_status_name: &str;
+                         if (event.event_up_down != 0) {
+                             port_status_name = "up";
+                             self.set_connected();
+                         } else {
+                             port_status_name = "down";
+                             self.set_disconnected();
+                         }
+			 println!("Port {} is {}", ecnl_port_sub.port_id, port_status_name);
+			port_to_pe.send(PortToPePacketOld::Status((PortNo(ecnl_port_sub.port_id), self.base_port.is_border(), if (event.event_up_down != 0) {PortStatusOld::Connected} else {PortStatusOld::Disconnected}))).unwrap();
 		    }
 		    cmd_id if (cmd_id == NL_ECND_Commands::NL_ECNL_CMD_SIGNAL_AIT_MESSAGE as c_int) => {
                         println!("AIT Message Signal Received...");
@@ -126,12 +220,12 @@ impl ECNL_Port {
 			    let possible_packet_or_err: Option<Result<Packet, Error>> = self.retrieve(&mut bd);
 			    match possible_packet_or_err {
 		                Some(packet_or_err) => {
-				    port_to_pe.send(PortToPePacket::Packet((PortNo(self.port_id), packet_or_err?))).unwrap();
+				    port_to_pe.send(PortToPePacketOld::Packet((PortNo(ecnl_port_sub.port_id), packet_or_err?))).unwrap();
 				    first = false;
 				},
 				None => {
 				    if first {
-				        return Err(ECNL_PortError::NoPacketRetrieved { func_name: _f, port_id: self.port_id }.into())
+				        return Err(ECNL_PortError::NoPacketRetrieved { func_name: _f, port_id: ecnl_port_sub.port_id }.into())
 				    }
 				    break;
 				},
@@ -146,37 +240,6 @@ impl ECNL_Port {
          }
 
      }
-     pub fn retrieve(&self, bdp: &mut InBufferDesc) -> Option<Result<Packet, Error>> {
-         let _f = "retrieve";
-         println!("Retrieving Packet...");
-    	 unsafe {
-             port_do_read_async(self, bdp);
-	     if ((*bdp).frame != null_mut() && (*bdp).len != 0) {
-	         sleep(Duration::from_millis(100));
-	         let packet: &Packet = &*((*bdp).frame);
-                 println!("Received Packet: {}", packet.to_string().unwrap()); // Probably usually sufficient to print ec_msg_type.
-	         return Some(Ok((*packet).clone())); // Can't keep this clone!
-	     } else {
-	         return None;
-	     }
-	 }
-     }
-    pub fn send(&self, packet: &Packet) -> Result<(), Error> {
-        let bufferDesc: OutBufferDesc = OutBufferDesc {
-	    len: size_of::<Packet>() as c_uint, // Always send fixed-length frames
-	    frame: packet,
-	};
-	println!("Sending Packet: {}", packet.to_string()?); // Probably usually sufficient to print ec_msg_type.
-        unsafe {
-	    port_do_xmit(self, &bufferDesc)
-	}
-	return Ok(())
-    }
-    pub fn get_port_name(&self) -> String {
-        unsafe {
-            return CStr::from_ptr(self.port_name).to_string_lossy().into_owned();
-        }
-    }
 }
 
 unsafe impl Send for ECNL_Port {}
@@ -196,8 +259,8 @@ pub struct ECNL_Event {
 #[link(name = ":port.o")]
 extern "C" {
     pub fn ecnl_init(debug: bool) -> ::std::os::raw::c_int;
-    pub fn port_create(port_id: u8) -> ECNL_Port;
-    pub fn port_destroy(port: *const ECNL_Port);
+    pub fn port_create(port_id: u8) -> *mut ECNL_Port_Sub;
+    pub fn port_destroy(port: *const ECNL_Port_Sub);
 
     // which of these should we be using
     pub fn port_do_read_async(port: *const ECNL_Port, bdp: *mut InBufferDesc);

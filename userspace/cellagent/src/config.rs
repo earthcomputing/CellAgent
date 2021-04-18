@@ -9,6 +9,8 @@ use std::{fmt,
 use itertools::Itertools;
 use lazy_static::lazy_static;
 
+#[cfg(any(feature = "simulator"))]
+use crate::rack::{EdgeConnection};
 use crate::utility::{CellConfig, CellNo, Edge, PortNo, Quench, S};
 
 pub type MaskType = u16;
@@ -22,7 +24,7 @@ pub const CONTROL_TREE_NAME: & str = "Control";
 pub const CONNECTED_PORTS_TREE_NAME: & str = "Connected";
 pub const BASE_TREE_NAME: & str = "Base";
 pub const PAYLOAD_DEFAULT_ELEMENT: u8 = 0;
-pub const PACKET_MIN: usize = 72;   // Must be at least NON_PAYLOAD_SIZE.  Can't be in Config because I use it as a const in packet.rs
+pub const PACKET_MIN: usize = 72;  // Must be at least NON_PAYLOAD_SIZE.  Can't be in Config because I use it as a const in packet.rs
 pub const PACKET_MAX: usize = 256; // Can't be in Config because I use it as a const in packet.rs
 pub const PACKET_PADDING: usize = 40; // Can't be in Config because I use it as a const in packet.rs
 
@@ -35,7 +37,8 @@ pub struct Config {
     pub min_num_border_cells: CellQty,
     pub quench: Quench,
     pub continue_on_error: bool,
-    pub auto_break: Option<Edge>,
+    #[cfg(any(feature = "simulator"))]
+    pub auto_break: Option<EdgeConnection>,
     pub output_dir_name: String,
     pub output_file_name: String,
     pub kafka_server: String,
@@ -126,6 +129,7 @@ impl Config {
 pub struct TraceOptions {
     pub all:       bool,
     pub dc:        bool,
+    pub entl:      bool,
     pub nal:       bool,
     pub noc:       bool,
     pub svc:       bool,
@@ -138,6 +142,7 @@ pub struct TraceOptions {
     pub port:      bool,
     pub link:      bool,
     pub replay:    bool,
+    pub snake:     bool,
     pub visualize: bool,
 }
 
@@ -185,7 +190,7 @@ impl Deref for LinkQty { type Target = usize; fn deref(&self) -> &Self::Target {
 #[derive(Debug, Copy, Clone, Default, Eq, PartialEq, Hash, Serialize, Deserialize)]
 pub struct MaskValue(pub MaskType);
 impl Deref for MaskValue { type Target = MaskType; fn deref(&self) -> &Self::Target { &self.0 } }
-#[derive(Debug, Copy, Clone, Default, Serialize)]
+#[derive(Debug, Copy, Clone, Default, Hash, PartialEq, Eq, Serialize, Deserialize)]
 pub struct PacketNo(pub u16);
 impl Deref for PacketNo { type Target = u16; fn deref(&self) -> &Self::Target { &self.0 } }
 #[derive(Debug, Copy, Clone, Default, Hash, Eq, PartialEq, Ord, PartialOrd, Serialize, Deserialize)]

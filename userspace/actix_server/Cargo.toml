@@ -1,14 +1,33 @@
 [package]
+resolver = "2"
 name = "ec_trace_analyzer"
 version = "0.1.0"
 authors = ["alanhkarp <alanhkarp@gmail.com>"]
 edition = "2018"
 
+# I have no idea why I need these features,
+# but the rust-analyzer complains if I don't.
+[features]
+simulator = []
+webserver = []
+
+[profile.dev.package."*"]
+# Set the default for dependencies in Development mode
+opt-level = 3
+
+[profile.dev]
+opt-level = 0 # Turn off optimization in Development mode
+split-debuginfo = "unpacked" # Speed up compilation on Mac
+
+[profile.release]
+lto = true
+
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
 actix-files = "0.1.4"
-actix-web = "1.0.5"
+actix-web = "2.0"
+actix-rt = "1.0"
 failure = "0.1.5"
 serde = { version = "1.0.27", features = ["rc"] }
 serde_derive = "1.0.27"

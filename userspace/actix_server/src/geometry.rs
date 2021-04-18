@@ -60,17 +60,17 @@ impl Geometry {
         self.rowcol.insert(cell_id.name, rowcol);
     }
 }
-fn border_cell_start(state: web::Data<AppGeometry>, record: web::Json<Value>)
+async fn border_cell_start(state: web::Data<AppGeometry>, record: web::Json<Value>)
                      ->impl Responder {
     let path = "border_cell_start";
     cell_geometry(path, true, state, record)
 }
-fn interior_cell_start(state: web::Data<AppGeometry>, record: web::Json<Value>)
+async fn interior_cell_start(state: web::Data<AppGeometry>, record: web::Json<Value>)
                        -> impl Responder {
     let path = "interior_cell_start";
     cell_geometry(path, false, state, record)
 }
-fn show_geometry(state: web::Data<AppGeometry>) -> Result<HttpResponse, actix_web::Error> {
+async fn show_geometry(state: web::Data<AppGeometry>) -> Result<HttpResponse, actix_web::Error> {
     let geo = state.get_ref();
     let string = serde_json::to_string(geo)?;
     Ok(HttpResponse::Ok().body(string))
@@ -78,7 +78,6 @@ fn show_geometry(state: web::Data<AppGeometry>) -> Result<HttpResponse, actix_we
 
 pub fn get() -> Scope {
     web::scope("/geometry")
-        .data(web::Data::new(AppGeometry::default()))
         .route("", web::get().to(show_geometry))
 }
 pub fn post_border() -> Scope {

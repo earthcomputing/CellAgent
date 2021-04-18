@@ -8,12 +8,12 @@ use serde_json;
 use crate::cellagent::CellAgent;
 use crate::gvm_equation::{GvmEquation};
 use crate::name::{OriginatorID};
-use crate::noc::Noc;
+use crate::noc::{NocToPort, Noc};
 use crate::uptree_spec::{AllowedTree, Manifest};
 use crate::utility::{ByteArray, S};
 
 // This is currently at the cell level, but could be placed at the up-tree level.
-#[derive(Debug, Copy, Clone, Hash, Eq, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Copy, Clone, Default, Hash, Eq, PartialEq, Serialize, Deserialize)]
 pub struct SenderMsgSeqNo(pub u64);
 impl Deref for SenderMsgSeqNo { type Target = u64; fn deref(&self) -> &Self::Target { &self.0 } }
 static MESSAGE_COUNT: AtomicU64 = AtomicU64::new(0);
@@ -31,7 +31,7 @@ pub enum AppMsgType { // Make sure these match the struct names
 impl AppMsgType {
     pub fn app_msg_from_bytes(bytes: &ByteArray) -> Result<Box<dyn AppMessage>, Error> {
         let _f = "app_msg_from_bytes";
-        let serialized = bytes.to_string()?;
+        let serialized = bytes.stringify()?;
         let msg = serde_json::from_str(&serialized)?;
         Ok(msg)
     }
@@ -76,6 +76,7 @@ pub trait AppMessage: fmt::Display {
     }
     fn is_leafward(&self) -> bool { !self.is_rootward() }
     fn is_ait(&self) -> bool { self.get_header().is_ait() }
+    fn is_snake(&self) -> bool { self.get_header().is_snake() }
     fn get_target_tree_name(&self) -> &AllowedTree { self.get_header().get_target_tree_name() }
     fn value(&self) -> serde_json::Value;
     fn get_sender_msg_seq_no(&self) -> SenderMsgSeqNo { self.get_header().get_sender_msg_seq_no() } // Should prepend self.get_header().get_sender_id()
@@ -94,22 +95,24 @@ pub struct AppMsgHeader {
     sender_name: String,
     msg_type: AppMsgType,
     is_ait: bool,
+    is_snake: bool,
     direction: AppMsgDirection,
     allowed_trees: Vec<AllowedTree>, // Trees named in message body
 }
 impl AppMsgHeader {
-    pub fn new(sender_name: &str, target_tree: &AllowedTree, is_ait: bool,
+    pub fn new(sender_name: &str, target_tree: &AllowedTree, is_ait: bool, is_snake: bool,
                msg_type: AppMsgType, direction: AppMsgDirection, allowed_trees: &Vec<AllowedTree>)
             -> AppMsgHeader {
         let msg_count = get_next_count();
         AppMsgHeader { sender_msg_seq_no: msg_count, target_tree: target_tree.clone(),
-            sender_name: S(sender_name), msg_type, is_ait, direction, allowed_trees: allowed_trees.clone() }
+            sender_name: S(sender_name), msg_type, is_ait, is_snake, direction, allowed_trees: allowed_trees.clone() }
     }
     fn get_sender_msg_seq_no(&self) -> SenderMsgSeqNo { self.sender_msg_seq_no }
     fn get_target_tree_name(&self) -> &AllowedTree { &self.target_tree }
     fn get_sender_name(&self) -> &str { &self.sender_name }
     fn _get_msg_type(&self) -> AppMsgType { self.msg_type }
     fn is_ait(&self) -> bool { self.is_ait }
+    fn is_snake(&self) -> bool { self.is_snake }
     fn get_direction(&self) -> AppMsgDirection { self.direction }
     fn get_allowed_trees(&self) -> &Vec<AllowedTree> { &self.allowed_trees }
 }
@@ -127,10 +130,10 @@ pub struct AppInterapplicationMsg {
     payload: AppInterapplicationMsgPayload
 }
 impl AppInterapplicationMsg {
-    pub fn new(sender_name: &str, is_ait: bool, target_tree: &AllowedTree, direction: AppMsgDirection,
+    pub fn new(sender_name: &str, is_ait: bool, is_snake: bool, target_tree: &AllowedTree, direction: AppMsgDirection,
                allowed_trees: &Vec<AllowedTree>, body: &str) -> AppInterapplicationMsg {
         let msg_type = AppMsgType::AppInterapplicationMsg;
-        let header = AppMsgHeader::new(sender_name, target_tree, is_ait,
+        let header = AppMsgHeader::new(sender_name, target_tree, is_ait, is_snake,
                                        msg_type, direction, allowed_trees);
         let payload = AppInterapplicationMsgPayload::new(body);
         AppInterapplicationMsg { header, payload }
@@ -174,7 +177,7 @@ impl AppInterapplicationMsgPayload {
 impl AppMsgPayload for AppInterapplicationMsgPayload {}
 impl fmt::Display for AppInterapplicationMsgPayload {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let body = self.body.to_string().expect("Error converting bytes to string in AppInterapplicationMsg fmt::Display");
+        let body = self.body.stringify().expect("Error converting bytes to string in AppInterapplicationMsg fmt::Display");
         write!(f, "{}", body)
     }
 }
@@ -184,11 +187,11 @@ pub struct AppDeleteTreeMsg {
     payload: AppDeleteTreeMsgPayload
 }
 impl AppDeleteTreeMsg {
-    pub fn new(sender_name: &str, is_ait: bool, target_tree: &AllowedTree, direction: AppMsgDirection)
+    pub fn new(sender_name: &str, is_ait: bool, is_snake: bool, target_tree: &AllowedTree, direction: AppMsgDirection)
             -> AppDeleteTreeMsg {
         let allowed_trees = &vec![target_tree.clone()];
         let msg_type = AppMsgType::AppDeleteTreeMsg;
-        let header = AppMsgHeader::new(sender_name, target_tree, is_ait,
+        let header = AppMsgHeader::new(sender_name, target_tree, is_ait, is_snake,
                                        msg_type, direction, allowed_trees);
         let payload = AppDeleteTreeMsgPayload::new();
         AppDeleteTreeMsg { header, payload }
@@ -238,12 +241,12 @@ pub struct AppManifestMsg {
     payload: AppManifestMsgPayload
 }
 impl AppManifestMsg {
-    pub fn new(sender_name: &str, is_ait: bool, deploy_tree_name: &AllowedTree, manifest: &Manifest,
+    pub fn new(sender_name: &str, is_ait: bool, is_snake: bool, deploy_tree_name: &AllowedTree, manifest: &Manifest,
                allowed_trees: &Vec<AllowedTree>) -> AppManifestMsg {
         // Note that direction is leafward so cell agent will get the message
         let msg_type = AppMsgType::AppManifestMsg;
         let header = AppMsgHeader::new(sender_name, deploy_tree_name,
-                                           is_ait, msg_type,
+                                           is_ait, is_snake, msg_type,
                                            AppMsgDirection::Leafward, allowed_trees);
         let payload = AppManifestMsgPayload::new(manifest);
         AppManifestMsg { header, payload }
@@ -298,11 +301,11 @@ pub struct AppQueryMsg {
     payload: AppQueryMsgPayload
 }
 impl AppQueryMsg {
-    pub fn new(sender_name: &str, is_ait: bool, query_tree_name: &AllowedTree, query: &str,
+    pub fn new(sender_name: &str, is_ait: bool, is_snake: bool, query_tree_name: &AllowedTree, query: &str,
                direction: AppMsgDirection, query_trees: &Vec<AllowedTree>) -> AppQueryMsg {
         let msg_type = AppMsgType::AppQueryMsg;
         let header = AppMsgHeader::new(sender_name, query_tree_name,
-                                       is_ait, msg_type, direction,
+                                       is_ait, is_snake, msg_type, direction,
                                        query_trees);
         let payload = AppQueryMsgPayload::new(query_trees, query);
         AppQueryMsg { header, payload }
@@ -356,11 +359,12 @@ pub struct AppStackTreeMsg {
     payload: AppStackTreeMsgPayload
 }
 impl AppStackTreeMsg {
-    pub fn new(sender_name: &str, new_tree_name: &AllowedTree, parent_tree_name: &AllowedTree,
+    pub fn new(sender_name: &str, is_ait: bool, is_snake: bool,
+                new_tree_name: &AllowedTree, parent_tree_name: &AllowedTree,
                direction: AppMsgDirection, gvm_eqn: &GvmEquation) -> AppStackTreeMsg {
         let msg_type = AppMsgType::AppStackTreeMsg;
         let header = AppMsgHeader::new(sender_name, parent_tree_name,
-                                       true, msg_type,
+                                       is_ait, is_snake, msg_type,
                                        direction, &Vec::new());
         let payload = AppStackTreeMsgPayload::new(new_tree_name, gvm_eqn);
         AppStackTreeMsg { header, payload}
@@ -418,13 +422,14 @@ pub struct AppTreeNameMsg {
     payload: AppTreeNameMsgPayload
 }
 impl AppTreeNameMsg {
-    pub fn new(sender_name: &str, target_tree_name: &AllowedTree, tree_name: &AllowedTree)
-            -> AppTreeNameMsg {
+    pub fn new(sender_name: &str, is_ait: bool, is_snake: bool,
+            target_tree_name: &AllowedTree, tree_name: &AllowedTree)
+                -> AppTreeNameMsg {
         // Note that direction is rootward so cell agent will get the message
         let allowed_trees = &vec![];
         let msg_type = AppMsgType::AppTreeNameMsg;
         let header = AppMsgHeader::new(sender_name, target_tree_name,
-                                       false, msg_type,
+                                       is_ait, is_snake, msg_type,
                                        AppMsgDirection::Rootward, allowed_trees);
         let payload = AppTreeNameMsgPayload::new(tree_name);
         AppTreeNameMsg { header, payload }
@@ -476,7 +481,6 @@ impl fmt::Display for AppTreeNameMsgPayload {
 
 // Errors
 use failure::{Error, ResultExt};
-use crate::app_message_formats::NocToPort;
 
 #[derive(Debug, Fail)]
 pub enum AppMessageError {

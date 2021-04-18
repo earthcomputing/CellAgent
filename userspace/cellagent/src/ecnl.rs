@@ -1,4 +1,3 @@
-use either::Either;
 use failure::{Error, ResultExt, Fail};
 #[cfg(feature = "cell")]
 use libc::{free};
@@ -11,12 +10,17 @@ use std::{
     collections::{HashMap},
     os::raw::{c_char, c_int, c_uchar, c_uint, c_ulong, c_void},
     ptr::{null, null_mut},
+    thread,
 };
 
 use crate::config::{CONFIG, PortQty};
 use crate::dal::{add_to_trace};
-use crate::ec_message_formats::{LinkToPortPacket};
+use crate::ec_message_formats::{PortFromPeOld};
 use crate::ecnl_port::{ECNL_Port};
+use crate::nalcell::{NalCell};
+use crate::port::{PortSeed, InteriorPortLike};
+use crate::simulated_border_port::{SimulatedBorderPort, SimulatedBorderPortFactory};
+use crate::utility::{PortNo, TraceHeader, TraceHeaderParams, TraceType};
 
 #[derive(Debug)]
 #[repr(C)]
@@ -32,7 +36,6 @@ pub struct ECNL_Session {
     #[allow(dead_code)]
     nl_session: *mut c_void,
     module_info_ptr: *const ModuleInfo,
-    ecnl_port_ptr_vector: Vec<ECNL_Port>,
 }
 
 #[derive(Debug)]
@@ -59,31 +62,13 @@ impl ECNL_Session {
     pub fn new() -> ECNL_Session {
         let nsp: *mut c_void = null_mut(); // initialization required to keep Rust compiler happy
         let mip: *const ModuleInfo = null(); // initialization required to keep Rust compiler happy
-        let mut eppv: Vec<ECNL_Port>;
-        #[cfg(feature = "cell")]
         unsafe {
             alloc_nl_session(&nsp);
             ecnl_get_module_info(nsp, &mip as *const *const ModuleInfo);
-        }
-        let ecnl_session: ECNL_Session;
-        #[cfg(any(feature = "noc", feature = "simulator"))] {
-            return ECNL_Session {
-                nl_session: null_mut(),
-                module_info_ptr: null(),
-                ecnl_port_ptr_vector: Vec::new(),
-            };
-        }
-        #[cfg(feature = "cell")]
-        unsafe {
             let num_ports = ((*mip).num_ports as u8);
-            eppv = Vec::with_capacity(num_ports as usize);
-            for port_id in 0..=num_ports-1 {
-                eppv.push(ECNL_Port::new(port_id as u8));
-            }
             let ecnl_session: ECNL_Session = ECNL_Session {
                 nl_session: nsp,
                 module_info_ptr: mip,
-                ecnl_port_ptr_vector: eppv,
             };
             println!("Created ECNL session for module #{}, {} with {} ECNL ports", (*mip).module_id, ecnl_session.get_module_name(), num_ports);
             return ecnl_session
@@ -94,9 +79,6 @@ impl ECNL_Session {
             return PortQty((*(self.module_info_ptr)).num_ports as u8)
         }
     }
-    pub fn get_port(&self, port_id: u8) -> ECNL_Port {
-	return self.ecnl_port_ptr_vector[port_id as usize];
-    }
     pub fn get_module_name(&self) -> String {
         #[cfg(feature = "cell")]
         unsafe {
@@ -104,6 +86,23 @@ impl ECNL_Session {
         }
         #[cfg(any(feature = "noc", feature = "simulator"))]
         return "Simulated Module".to_string();
+    }
+    pub fn listen_link_and_pe_loops(&mut self, nalcell: &mut NalCell<PortSeed, ECNL_Port, SimulatedBorderPortFactory, SimulatedBorderPort>) -> Result<(), Error> {
+        let _f = "link_ecnl_channels";
+        {
+            if CONFIG.trace_options.all || CONFIG.trace_options.ca {
+                let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "worker" };
+                let trace = json!({ "thread_name": thread::current().name(), "thread_id": TraceHeader::parse(thread::current().id()) });
+                let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
+            }
+        }
+        #[cfg(feature="cell")]
+        for port_id in 0..=*(self.num_ecnl_ports())-1 {
+            nalcell.listen_link_and_pe(&PortNo(port_id as u8))?;
+        }
+        #[cfg(feature="cell")]
+        println!("Linked ecnl channels");
+        Ok(())
     }
 }
 

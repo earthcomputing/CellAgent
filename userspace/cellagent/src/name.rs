@@ -23,7 +23,7 @@ pub trait Name: Sized {
     fn get_uuid(&self) -> Uuid;
     fn create_from_string(&self, n: &str) -> Self;
     // Default implementations
-    fn stringify(&self) -> String { S(self.get_name()) }
+    fn stringify(&self) -> String { self.get_name() }
     fn name_from_str(&self, s: &str) -> Result<Self, Error> {
         // Names may not contain blanks
         match s.find(' ') {

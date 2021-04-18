@@ -6,18 +6,18 @@ use rand::{
 };
 
 use std::{collections::{HashSet},
-          fmt,
-          fs::{File, OpenOptions},
+          fs::{OpenOptions},
 	  iter::{FromIterator, repeat},
           process::{Command, Stdio},
-          sync::{Arc}
 };
 
 use ec_fabrix::config::{CONFIG, PortQty};
 use ec_fabrix::ecnl::{ECNL_Session};
+use ec_fabrix::ecnl_port::{ECNL_Port};
 use ec_fabrix::nalcell::{NalCell};
+use ec_fabrix::port::{PortSeed};
+use ec_fabrix::simulated_border_port::{SimulatedBorderPortFactory, SimulatedBorderPort};
 use ec_fabrix::utility::{CellConfig, PortNo};
-
 
 fn main() -> Result<(), Error> {
     let _f = "main";
@@ -40,9 +40,8 @@ fn main() -> Result<(), Error> {
             .spawn()
             .expect("lspci failed in identifying ethernet ports");
         use std::process::*;
-        use std::io::*;
         use std::os::unix::io::{AsRawFd, FromRawFd};
-        unsafe {
+        unsafe {  // AHK: I don't think this block needs unsave
             let grep_cmd = Command::new("grep")
                 .arg("Ethernet")
                 .stdin(Stdio::from_raw_fd(lspci_cmd.stdout.unwrap().as_raw_fd()))
@@ -61,19 +60,20 @@ fn main() -> Result<(), Error> {
     };
     println!("num_phys_ports: {}", num_phys_ports_str);
     let num_phys_ports : PortQty = PortQty(num_phys_ports_str.trim().parse().unwrap());
-    let ecnl = Arc::new(ECNL_Session::new());
-    let num_ecnl_ports = ecnl.clone().num_ecnl_ports();
+    let mut ecnl_session = ECNL_Session::new();
+    let num_ecnl_ports = ecnl_session.clone().num_ecnl_ports();
     println!("Num ecnl ports: {:?} ", num_ecnl_ports);
     let border_port_list : Vec<PortNo> = (*num_ecnl_ports+1..*num_phys_ports+1)
-        .map(|i| PortNo(i))
+        .map(|port_num| PortNo(port_num))
 	.collect();
     let (mut nal_cell, ca_join_handle) = NalCell::new(&cell_name,
                                                       num_phys_ports,
                                                       &HashSet::from_iter(border_port_list),
                                                       CellConfig::Large,
-                                                      Some(ecnl.clone()),
+                                                      PortSeed::new(),
+                                                      None,
     )?;
-    nal_cell.link_ecnl_channels(ecnl)?;
+    ecnl_session.listen_link_and_pe_loops(&mut nal_cell)?;
     match ca_join_handle.join() {
         Ok(()) => Ok(()),
         Err(e) => Err(MainError::Chain { func_name: _f, comment: format!("{:?}", e) }.into())

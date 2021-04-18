@@ -9,21 +9,22 @@ use crate::app_message_formats::{VmToCa, VmFromCa,
 use crate::config::{CONFIG};
 use crate::container::{Container};
 use crate::dal::{add_to_trace, fork_trace_header, update_trace_header};
-use crate::name::{Name, ContainerID, UptreeID, VmID};
+use crate::name::{Name, CellID, ContainerID, UptreeID, VmID}; // CellID for tracing purposes
 use crate::uptree_spec::{AllowedTree, ContainerSpec};
 use crate::utility::{S, write_err, TraceHeader, TraceHeaderParams, TraceType};
 
 #[derive(Debug, Clone)]
 pub struct VirtualMachine {
+    cell_id: CellID,
     id: VmID,
     vm_to_ca: VmToCa,
     allowed_trees: Vec<AllowedTree>,
     vm_to_containers: Vec<VmToContainer>,
 }
 impl VirtualMachine {
-    pub fn new(id: &VmID, vm_to_ca: VmToCa, allowed_trees_ref: &[AllowedTree]) -> VirtualMachine {
+    pub fn new(cell_id: CellID, id: VmID, vm_to_ca: VmToCa, allowed_trees_ref: &[AllowedTree]) -> VirtualMachine {
         //println!("Create VM {}", id);
-        VirtualMachine { id: id.clone(), vm_to_ca, allowed_trees: allowed_trees_ref.to_owned(),
+        VirtualMachine { cell_id, id, vm_to_ca, allowed_trees: allowed_trees_ref.to_owned(),
             vm_to_containers: Vec::new() }
     }
     pub fn initialize(&mut self, up_tree_name: &str, vm_from_ca: VmFromCa, allowed_trees: &HashSet<AllowedTree>,
@@ -36,21 +37,21 @@ impl VirtualMachine {
             let name = format!("Container:{}+{}", self.id, container_specs.len() + 1);
             let container_id = ContainerID::new(&name).context(VmError::Chain { func_name: "initialize", comment: S(self.id.get_name())})?;
             let service_name = container_spec.get_image();
-            let container = Container::new(container_id, service_name.as_str(), allowed_trees,
+            let container = Container::new(self.cell_id, container_id, service_name.as_str(), allowed_trees,
                  container_to_vm).context(VmError::Chain { func_name: "initialize", comment: S("")})?;
             container.initialize(up_tree_id, container_from_vm).context(VmError::Chain { func_name: "initialize", comment: S(self.id.get_name())})?;
             self.vm_to_containers.push(vm_to_container);
             // Next line must be inside loop or vm_to_container goes out of scope in listen_container
-            self.listen_container(container_id, vm_from_container, self.vm_to_ca.clone()).context(VmError::Chain { func_name: "initialize", comment: S(self.id.get_name()) + " listen_container"})?;
+            self.listen_container(container_id, vm_from_container, self.vm_to_ca.clone());
         }
         //println!("VM {}: {} containers", self.id, self.vm_to_containers.len());
-        self.listen_ca(vm_from_ca).context(VmError::Chain { func_name: "initialize", comment: S(self.id.get_name()) + " listen_ca"})?;
+        self.listen_ca(vm_from_ca);
         Ok(())
     }
     pub fn _get_id(&self) -> &VmID { &self.id }
 
     // SPAWN THREAD (listen_ca_loop)
-    fn listen_ca(&self, vm_from_ca: VmFromCa) -> Result<(), Error> {
+    fn listen_ca(&self, vm_from_ca: VmFromCa) {
         let _f = "listen_ca";
         //println!("VM {}: listening to Ca", self.id);
         let vm = self.clone();
@@ -59,14 +60,13 @@ impl VirtualMachine {
         thread::Builder::new().name(thread_name).spawn( move || {
             update_trace_header(child_trace_header);
             let _ = vm.listen_ca_loop(&vm_from_ca).map_err(|e| write_err("vm", &e));
-            if CONFIG.continue_on_error { let _ = vm.listen_ca(vm_from_ca); }
-        })?;
-        Ok(())
+            if CONFIG.continue_on_error { vm.listen_ca(vm_from_ca); }
+        }).expect("VM listen_ca thread failed");
     }
 
     // SPAWN THREAD (listen_container_loop)
     fn listen_container(&self, container_id: ContainerID, vm_from_container: VmFromContainer,
-            vm_to_ca: VmToCa) -> Result<(), Error> {
+            vm_to_ca: VmToCa) {
         let _f = "listen_container";
         //println!("VM {}: listening to container {}", self.id, container_id);
         let vm = self.clone();
@@ -75,9 +75,8 @@ impl VirtualMachine {
         thread::Builder::new().name(thread_name).spawn( move || {
             update_trace_header(child_trace_header);
             let _ = vm.listen_container_loop(container_id, &vm_from_container, &vm_to_ca).map_err(|e| write_err("vm", &e));
-            if CONFIG.continue_on_error { let _ = vm.listen_container(container_id, vm_from_container, vm_to_ca); }
-        })?;
-        Ok(())
+            if CONFIG.continue_on_error { vm.listen_container(container_id, vm_from_container, vm_to_ca); }
+        }).expect("VM listen_container thread failed");
     }
 
     // WORKER (VmFromCa)
@@ -86,21 +85,21 @@ impl VirtualMachine {
         {
             if CONFIG.trace_options.all || CONFIG.trace_options.vm {
                 let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "worker" };
-                let trace = json!({ "id": self.id, "thread_name": thread::current().name(), "thread_id": TraceHeader::parse(thread::current().id()) });
-                let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
+                let trace = json!({ "cell_id": self.cell_id, "id": self.id, "thread_name": thread::current().name(), "thread_id": TraceHeader::parse(thread::current().id()) });
+                add_to_trace(TraceType::Trace, trace_params, &trace, _f);
             }
         }
         loop {
             let bytes = vm_from_ca.recv().context("listen_ca_loop").context(VmError::Chain { func_name: "listen_ca_loop", comment: S(self.id.get_name()) })?;
             {
                 if CONFIG.trace_options.all || CONFIG.trace_options.vm {
-                    let msg: Box<dyn AppMessage> = serde_json::from_str(&bytes.to_string()?)?;
+                    let msg: Box<dyn AppMessage> = serde_json::from_str(&bytes.stringify()?)?;
                     let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "vm_from_ca" };
-                    let trace = json!({ "id": self.id, "msg": msg.to_string() });
-                    let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
+                    let trace = json!({ "cell_id": self.cell_id, "id": self.id, "msg": msg.to_string() });
+                    add_to_trace(TraceType::Trace, trace_params, &trace, _f);
                     let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "vm_to_container" };
-                    let trace = json!({ "id": self.id, "msg": msg.to_string() });
-                    let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
+                    let trace = json!({ "cell_id": self.cell_id, "id": self.id, "msg": msg.to_string() });
+                    add_to_trace(TraceType::Trace, trace_params, &trace, _f);
                 }
             }
             //println!("VM {} send to {} containers msg from ca: {}", self.id,  self.vm_to_containers.len(), msg);
@@ -117,21 +116,21 @@ impl VirtualMachine {
         {
             if CONFIG.trace_options.all || CONFIG.trace_options.vm {
                 let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "worker" };
-                let trace = json!({ "id": self.id, "thread_name": thread::current().name(), "thread_id": TraceHeader::parse(thread::current().id()) });
-                let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
+                let trace = json!({ "cell_id": self.cell_id, "id": self.id, "thread_name": thread::current().name(), "thread_id": TraceHeader::parse(thread::current().id()) });
+                add_to_trace(TraceType::Trace, trace_params, &trace, _f);
             }
         }
         loop {
             let bytes = vm_from_container.recv().context("listen_container_loop").context(VmError::Chain { func_name: "listen_container_loop", comment: S(self.id.get_name()) + " recv from container"})?;
             {
                 if CONFIG.trace_options.all || CONFIG.trace_options.vm {
-                    let msg: Box<dyn AppMessage> = serde_json::from_str(&bytes.to_string()?)?;
+                    let msg: Box<dyn AppMessage> = serde_json::from_str(&bytes.stringify()?)?;
                     let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "vm_from_container" };
-                    let trace = json!({ "id": self.id, "msg": msg.to_string() });
-                    let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
+                    let trace = json!({ "cell_id": self.cell_id, "id": self.id, "msg": msg });
+                    add_to_trace(TraceType::Trace, trace_params, &trace, _f);
                     let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "vm_to_ca" };
-                    let trace = json!({ "id": self.id, "msg": msg.to_string() });
-                    let _ = add_to_trace(TraceType::Trace, trace_params, &trace, _f);
+                    let trace = json!({ "cell_id": self.cell_id, "id": self.id, "msg": msg });
+                    add_to_trace(TraceType::Trace, trace_params, &trace, _f);
                 }
             }
             //println!("VM {} got from container {} msg {} {} {} {}", self.id, container_id, msg.0, msg.1, msg.2, msg.3);

@@ -4,7 +4,7 @@ use std::{
 
 use actix_web::{web, HttpResponse, Responder};
 
-pub fn index(html_file_data: web::Data<String>) -> impl Responder {
+pub async fn index(html_file_data: web::Data<String>) -> impl Responder {
     HttpResponse::Ok().body(html(html_file_data))}
 
 fn html(html_file_data: web::Data<String>) -> String {
