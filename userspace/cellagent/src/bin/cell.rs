@@ -1,23 +1,26 @@
 #[macro_use] extern crate failure;
+use crossbeam::crossbeam_channel::unbounded as channel;
 
 use rand::{
     {Rng, thread_rng},
     distributions::{Alphanumeric},
 };
 
-use std::{collections::{HashSet},
+use std::{collections::{HashMap, HashSet},
           fs::{OpenOptions},
 	  iter::{FromIterator, repeat},
           process::{Command, Stdio},
 };
 
-use ec_fabrix::config::{CONFIG, PortQty};
+use ec_fabrix::blueprint::{Blueprint};
+use ec_fabrix::config::{CONFIG, PortQty, CellQty};
 use ec_fabrix::ecnl::{ECNL_Session};
 use ec_fabrix::ecnl_port::{ECNL_Port};
 use ec_fabrix::nalcell::{NalCell};
+use ec_fabrix::noc::{DuplexNocPortChannel, Noc, NocToPort, NocFromPort};
 use ec_fabrix::port::{PortSeed};
-use ec_fabrix::simulated_border_port::{SimulatedBorderPortFactory, SimulatedBorderPort};
-use ec_fabrix::utility::{CellConfig, PortNo};
+use ec_fabrix::simulated_border_port::{SimulatedBorderPortFactory, SimulatedBorderPort, PortFromNoc, PortToNoc, DuplexPortNocChannel};
+use ec_fabrix::utility::{CellConfig, CellNo, PortNo, S};
 
 fn main() -> Result<(), Error> {
     let _f = "main";
@@ -66,13 +69,46 @@ fn main() -> Result<(), Error> {
     let border_port_list : Vec<PortNo> = (*num_ecnl_ports+1..*num_phys_ports+1)
         .map(|port_num| PortNo(port_num))
 	.collect();
-    let (mut nal_cell, ca_join_handle) = NalCell::new(&cell_name,
-                                                      num_phys_ports,
-                                                      &HashSet::from_iter(border_port_list),
-                                                      CellConfig::Large,
-                                                      PortSeed::new(),
-                                                      None,
+    let mut cell_no_map = HashMap::<String, CellNo>::new();
+    cell_no_map.insert(cell_name.clone(), CellNo(0));
+    let mut duplex_port_noc_channel_cell_port_map = HashMap::new();
+    let mut duplex_noc_port_channel_cell_port_map = HashMap::new();
+    let mut duplex_port_noc_channel_port_map = HashMap::new();
+    let mut duplex_noc_port_channel_port_map = HashMap::new();
+    for border_port_no in border_port_list.clone() {
+        let (noc_to_port, port_from_noc): (NocToPort, PortFromNoc) = channel();
+        let (port_to_noc, noc_from_port): (PortToNoc, NocFromPort) = channel();
+        duplex_port_noc_channel_port_map.insert(border_port_no, DuplexPortNocChannel::new(port_from_noc, port_to_noc));
+        duplex_noc_port_channel_port_map.insert(border_port_no, DuplexNocPortChannel::new(noc_from_port, noc_to_port));
+    }
+    duplex_port_noc_channel_cell_port_map.insert(CellNo(0), duplex_port_noc_channel_port_map);
+    duplex_noc_port_channel_cell_port_map.insert(CellNo(0), duplex_noc_port_channel_port_map);
+    let mut border_cell_ports = HashMap::new();
+    border_cell_ports.insert(CellNo(0), border_port_list.clone());
+    let blueprint = Blueprint::new(
+        CellQty(1),
+        &Vec::new(),
+        num_phys_ports,
+        &HashMap::new(),
+        &border_cell_ports,
     )?;
+    let (mut nal_cell, ca_join_handle) = NalCell::new(
+        &cell_name,
+        num_phys_ports,
+        &HashSet::from_iter(border_port_list),
+        CellConfig::Large,
+        PortSeed::new(),
+        Some(
+            SimulatedBorderPortFactory::new(
+                PortSeed::new(),
+                cell_no_map,
+                blueprint.clone(),
+                duplex_port_noc_channel_cell_port_map,
+            )
+        ),
+    )?;
+    let mut noc = Noc::new(duplex_noc_port_channel_cell_port_map).context(MainError::Chain { func_name: _f, comment: S("Noc::new")})?;
+    noc.initialize(&blueprint).context(MainError::Chain { func_name: "initialize", comment: S("")})?;
     ecnl_session.listen_link_and_pe_loops(&mut nal_cell)?;
     match ca_join_handle.join() {
         Ok(()) => Ok(()),
@@ -111,7 +147,7 @@ fn main() -> Result<(), Error> {
 //     Ok(())
 // }
 // Errors
-use failure::{Error};
+use failure::{Error, Fail, ResultExt};
 #[derive(Debug, Fail)]
 pub enum MainError {
     #[fail(display = "MainError::Chain {} {}", func_name, comment)]
