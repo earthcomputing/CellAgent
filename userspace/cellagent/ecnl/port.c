@@ -195,7 +195,7 @@ extern int ecnl_init(bool debug) {
 }
 
 // per-port sock
-extern ecnl_port_t port_create(uint8_t port_id) {
+extern ecnl_port_t *port_create(uint8_t port_id) {
     struct nl_sock *sock = init_sock();
     struct nl_sock *esock = init_sock_events();
     ecnl_port_t *ecnl_port_ptr = malloc(sizeof(ecnl_port_t));
