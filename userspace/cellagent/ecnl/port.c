@@ -7,7 +7,6 @@
 #include <pthread.h>
 #include <time.h>
 #include "ecnl_proto.h"
-#include "entl_ioctl.h"
 #include "port.h"
 #include <syslog.h>
 #include <sys/ioctl.h>
@@ -215,7 +214,7 @@ extern ecnl_port_t *port_create(uint8_t port_id) {
     ecnl_port_ptr->port_id = port_id;
 
     link_state_t link_state; 
-    get_link_state(&ecnl_port, &link_state);
+    get_link_state(ecnl_port_ptr, &link_state);
     ecnl_port_ptr->port_up_down = link_state.port_link_state;
     ecnl_port_ptr->port_name = link_state.port_name; // fill in name
     return ecnl_port_ptr;

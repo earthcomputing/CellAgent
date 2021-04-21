@@ -25,8 +25,6 @@ struct nl_sock *init_sock();
 #include <sys/ioctl.h>
 #include <sys/types.h>
 
-#include "entl_ioctl.h"
-
 // Interface routines
 int alloc_nl_session(void **nl_session_ptr) {
     int err;
