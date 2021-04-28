@@ -80,6 +80,7 @@ reqwest = "0.9.11"
 #schema = { path = "/Users/alan/Documents/Eclipse/schema" }  # JSON schema
 #schema_derive = { path = "/Users/alan/Documents/Eclipse/schema-derive" }
 serde = { version = "1.0.27", features = ["rc"] }
+serde-big-array = { version = "0.3.2", features = ["const-generics"] }
 serde_derive = "1.0.27"
 serde_json = { version = "1.0.9", features = ["preserve_order"] }
 strum = "0.15.0" # Enum operations

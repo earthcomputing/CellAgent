@@ -2,13 +2,14 @@ use std::{fmt,
           collections::HashMap,
           convert::TryFrom,
           cmp::min,
-	  mem::{size_of},
+	      mem::{size_of},
           ops::Deref,
           sync::atomic::{AtomicUsize, Ordering},
           str};
 
 use rand;
 use serde;
+use serde_big_array::BigArray;
 use serde_json;
 use serde::ser::{Serialize, SerializeStruct};
 
@@ -38,7 +39,7 @@ impl fmt::Display for UniqueMsgId {
 }
 static PACKET_COUNT: AtomicUsize = AtomicUsize::new(0);
 #[repr(C)]
-#[derive(Copy, Clone, Debug, Default, Eq, PartialEq, Serialize)]
+#[derive(Copy, Clone, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
 pub struct Packet {
     // Changes here must be reflected in the calculations of PAYLOAD_MIN and PAYLOAD_MAX in packet.rs
     header: PacketHeader,
@@ -163,7 +164,7 @@ impl fmt::Display for Packet {
 }
 
 #[repr(C)]
-#[derive(Debug, Copy, Clone, Default, Eq, PartialEq, Serialize)]
+#[derive(Debug, Copy, Clone, Default, Eq, PartialEq, Serialize, Deserialize)]
 pub struct PacketHeader {
     uuid: Uuid,     // Tree identifier 16 bytes
 }
@@ -187,12 +188,13 @@ impl fmt::Display for PacketHeader {
 }
 
 #[repr(C)]
-#[derive(Copy, Clone, Eq, PartialEq)]
+#[derive(Copy, Clone, Eq, PartialEq, Deserialize)]
 pub struct Payload {
     unique_msg_id: UniqueMsgId,  // Unique identifier of this message
     size: PacketNo, // Number of packets remaining in message if not last packet
                     // Number of bytes in last packet if last packet, 0 => Error
     is_last: bool,
+    #[serde(with = "BigArray")]
     bytes: [u8; PAYLOAD_MAX],
     //wrapped_header: Stack<PacketHeader>,
 }
