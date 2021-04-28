@@ -1,12 +1,13 @@
 use std::{
     fmt,
-    collections::{HashMap, },
+    thread,
+    collections::HashMap,
 };
 
 use crossbeam::crossbeam_channel as mpsc;
 use crate::blueprint::{Blueprint, };
 use crate::config::{CONFIG};
-use crate::dal::{add_to_trace};
+use crate::dal::{add_to_trace, fork_trace_header, update_trace_header};
 #[cfg(feature = "api-old")]
 use crate::ec_message_formats::{PortToPePacketOld};
 #[cfg(feature = "api-new")]
@@ -20,7 +21,7 @@ use crate::port::{CommonPortLike, InteriorPortLike, PortSeed, BasePort, Interior
 use crate::port::PortStatusOld;
 #[cfg(feture = "api-new")]
 use crate::port::PortStatus;
-use crate::utility::{CellNo, PortNo, PortNumber, S, TraceHeaderParams, TraceType};
+use crate::utility::{CellNo, PortNo, PortNumber, S, TraceHeaderParams, TraceType, write_err};
 use crate::uuid_ec::{AitState};
 
 #[derive(Clone, Debug)]
@@ -94,6 +95,26 @@ impl CommonPortLike for SimulatedInteriorPort {
 }
 
 impl InteriorPortLike for SimulatedInteriorPort {
+    fn listen_link_and_pe(&mut self) {
+        let _f = "listen_link_and_pe_loops";
+        let mut port = self.clone();
+        let child_trace_header = fork_trace_header();
+        let port_clone = self.clone();
+        let thread_name = format!("Port {} listen_link", port_clone.get_id().get_name());
+        thread::Builder::new().name(thread_name).spawn( move || {
+            update_trace_header(child_trace_header);
+            let _ = port.listen().map_err(|e| write_err("port listen link", &e));
+            if CONFIG.continue_on_error { port.listen().map_err(|e| write_err("port continue listen link", &e)).ok();  }
+        }).expect("thread failed");
+        let mut port = self.clone();
+        let child_trace_header = fork_trace_header();
+        let thread_name = format!("Port {} listen_pe", port_clone.get_id().get_name());
+        thread::Builder::new().name(thread_name).spawn( move || {
+            update_trace_header(child_trace_header);
+            let _ = port.listen_pe_loop().map_err(|e| write_err("port listen pe", &e));
+            if CONFIG.continue_on_error { port.listen_pe_loop().map_err(|e| write_err("port continue listen pe", &e)).ok(); }
+        }).expect("thread failed");
+    }
     fn send_to_link(self: &mut Self, packet: &mut Packet) -> Result<(), Error> {
         let _f = "send_to_link";
         {
