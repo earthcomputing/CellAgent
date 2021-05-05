@@ -3,7 +3,30 @@
     "command": "~/.cargo/bin/cargo",
     "tasks": [
         {
-            "label": "simulator run",
+            "label": "simulator run api-new",
+            "type": "shell",
+            "command": "cargo",
+            "args": [
+                "run",
+                "--bin",
+                "simulator",
+                "--features",
+                "api-new, simulator, webserver",
+                "--",
+                "${workspaceFolder}/configs/10cell_config.json"
+            ],
+            "group": "build",
+            "options": {
+                "env": {
+                    "SERVER_URL": "127.0.0.1:8088",
+                    "HTML": "html/index.html",
+                    "RA_LOG": "info"
+                }
+            },
+            "problemMatcher": []
+        },
+        {
+            "label": "simulator run api-old",
             "type": "shell",
             "command": "cargo",
             "args": [
@@ -26,7 +49,24 @@
             "problemMatcher": []
         },
         {
-            "label": "simulator build",
+            "label": "simulator build api-new",
+            "type": "shell",
+            "command": "cargo",
+            "args": [
+                "build",
+                "--bin",
+                "simulator",
+                "--features",
+                "api-new, simulator, webserver"
+            ],
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            },
+            "problemMatcher": []
+        },
+        {
+            "label": "simulator build api-old",
             "type": "shell",
             "command": "cargo",
             "args": [
@@ -43,7 +83,22 @@
             "problemMatcher": []
         },
         {
-            "label": "simulator check",
+            "label": "simulator check api-new",
+            "type": "shell",
+            "command": "cargo",
+            "args": [
+                "check",
+                "--bin",
+                "simulator",
+                "--features",
+                "api-new, simulator, webserver"
+            ],
+            "group": "build",
+            "problemMatcher": "$rustc-watch",
+            "isBackground": true
+        },
+        {
+            "label": "simulator check api-old",
             "type": "shell",
             "command": "cargo",
             "args": [
@@ -58,7 +113,7 @@
             "isBackground": true
         },
         {
-            "label": "simulator clippy",
+            "label": "simulator clippy api-new",
             "type": "shell",
             "command": "cargo",
             "args": [
@@ -66,7 +121,7 @@
                 "--bin",
                 "simulator",
                 "--features",
-                "api-old, simulator, webserver"
+                "api-new, simulator, webserver"
             ],
             "group": "build",
             "problemMatcher": "$rustc-watch",

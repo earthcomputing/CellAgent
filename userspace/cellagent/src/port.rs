@@ -336,14 +336,14 @@ impl PortSeed {
 
 #[derive(Debug, Copy, Clone, Serialize)]
 pub struct FailoverInfo {
-    port_id: PortID,
+    port_no: PortNo,
     sent: bool,
     recd: bool,
     packet_opt: Option<Packet>
 }
 impl FailoverInfo {
-    pub fn new(port_id: PortID) -> FailoverInfo { 
-        FailoverInfo { port_id, sent: false, recd: false, packet_opt: Default::default() }
+    pub fn new(port_no: PortNo) -> FailoverInfo { 
+        FailoverInfo { port_no, sent: false, recd: false, packet_opt: Default::default() }
     }
     pub fn if_sent(&self) -> bool { self.sent }
     pub fn if_recd(&self) -> bool { self.sent | self.recd }
@@ -367,7 +367,7 @@ impl fmt::Display for FailoverInfo {
             Some(p) => p.stringify().expect("Failover Display: Stringify packet must succeed"),
             None => "None".to_string()
         };
-        write!(_f, "PortID {} Sent {}, Recd {}, Packet {:?}", self.port_id, self.if_sent(), self.if_recd(), packet_out)
+        write!(_f, "PortID {} Sent {}, Recd {}, Packet {:?}", self.port_no, self.if_sent(), self.if_recd(), packet_out)
     }
 }
 // Errors

@@ -27,13 +27,13 @@ const PAYLOAD_MAX: usize = PACKET_MAX - NON_PAYLOAD_SIZE;
 
 pub type PacketAssemblers = HashMap<UniqueMsgId, PacketAssembler>;
 
-#[derive(Debug, Copy, Clone, Default, Hash, Eq, PartialEq, Serialize, Deserialize)]
-pub struct UniqueMsgId(pub u64);
+#[derive(Debug, Copy, Clone, Default, Hash, Eq, PartialEq, PartialOrd, Serialize, Deserialize)]
+pub struct UniqueMsgId(u64);
 impl UniqueMsgId { fn new() -> UniqueMsgId { UniqueMsgId(rand::random()) } }
 impl Deref for UniqueMsgId { type Target = u64; fn deref(&self) -> &Self::Target { &self.0 } }
 impl fmt::Display for UniqueMsgId {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let s = format!("UniqueMsgId {}", self.0);
+        let s = format!("UniqueMsgId {:016x}", self.0);
         write!(f, "{}", s)
     }
 }
@@ -54,7 +54,7 @@ impl Packet {
         let payload = Payload::new(unique_msg_id, size, is_last_packet, data_bytes);
         Packet { header, payload, packet_count: Packet::get_next_count(), sender_msg_seq_no: seq_no }
     }
-    pub fn make_entl_packet() -> Packet {
+    pub fn make_init_packet() -> Packet {
         let mut uuid = Uuid::new();
         uuid.make_init();
         Packet::new(UniqueMsgId::new(), &uuid, PacketNo(1),

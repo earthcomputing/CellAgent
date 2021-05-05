@@ -77,22 +77,39 @@ pub type PeFromPortOld = mpsc::Receiver<PortToPePacketOld>;
 //pub type PortPeError = mpsc::SendError<PortToPePacket>;
 // PacketEngine to Cmodel
 #[derive(Debug, Clone, Serialize)]
-pub enum PeToCmPacketOld {
+pub enum PeToCmPacketNew {
+    Status(STATUS),
+    Packet((PortNo, Packet)),
+    Snake((PortNo, usize, Packet))
+}
+pub type PeToCmNew = mpsc::Sender<PeToCmPacketNew>;
+pub type CmFromPeNew = mpsc::Receiver<PeToCmPacketNew>;
+#[derive(Debug, Clone, Serialize)]
+pub enum PeToCmPacket {
     Status(STATUSOLD),
     Packet((PortNo, Packet)),
     Snake((PortNo, usize, Packet))
 }
-pub type PeToCm = mpsc::Sender<PeToCmPacketOld>;
-pub type CmFromPe = mpsc::Receiver<PeToCmPacketOld>;
+pub type PeToCm = mpsc::Sender<PeToCmPacket>;
+pub type CmFromPe = mpsc::Receiver<PeToCmPacket>;
 //pub type PeCmError = mpsc::SendError<PeToCmPacket>;
 // Cmodel to CellAgent
 #[derive(Debug, Clone, Serialize)]
-pub enum CmToCaBytesOld {
+pub enum CmToCaBytesNew {
+    Status(STATUS),
+    Bytes((PortNo, bool, Uuid, ByteArray)),
+    TunnelPort(TUNNELPORT),
+    TunnelUp(TUNNELUP),
+}
+pub type CmToCaNew = mpsc::Sender<CmToCaBytesNew>;
+pub type CaFromCmNew = mpsc::Receiver<CmToCaBytesNew>;
+#[derive(Debug, Clone, Serialize)]
+pub enum CmToCaBytes {
     Status(STATUSOLD),
     Bytes((PortNo, bool, Uuid, ByteArray)),
     TunnelPort(TUNNELPORT),
     TunnelUp(TUNNELUP),
 }
-pub type CmToCa = mpsc::Sender<CmToCaBytesOld>;
-pub type CaFromCm = mpsc::Receiver<CmToCaBytesOld>;
+pub type CmToCa = mpsc::Sender<CmToCaBytes>;
+pub type CaFromCm = mpsc::Receiver<CmToCaBytes>;
 //pub type CmCaError = mpsc::SendError<CmToCaBytes>;
