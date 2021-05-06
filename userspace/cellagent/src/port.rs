@@ -8,7 +8,7 @@ use std::{
 use crate::app_message_formats::{PortToCa, PortToCaMsg, PortFromCa};
 use crate::config::CONFIG;
 use crate::dal::{add_to_trace, fork_trace_header, update_trace_header};
-use crate::ec_message_formats::{PortToPe, PortFromPe, PortToPeOld, PortFromPeOld};
+use crate::ec_message_formats::{PeToPortPacket, PortToPe, PortFromPe};
 use crate::name::{Name, CellID, PortID};
 use crate::packet::{Packet};
 use crate::utility::{ActivityData, ByteArray, PortNo, PortNumber, S,
@@ -18,19 +18,14 @@ use crate::utility::{ActivityData, ByteArray, PortNo, PortNumber, S,
 #[derive(Clone, Debug)]
 pub struct DuplexPortPeChannel {
     port_from_pe: PortFromPe,
-    port_from_pe_old: PortFromPeOld,
     port_to_pe: PortToPe,
-    port_to_pe_old: PortToPeOld,
 }
 impl DuplexPortPeChannel {
-    pub fn new(port_from_pe: PortFromPe, port_from_pe_old: PortFromPeOld,
-               port_to_pe: PortToPe, port_to_pe_old: PortToPeOld) -> DuplexPortPeChannel {
-        DuplexPortPeChannel { port_from_pe, port_from_pe_old, port_to_pe, port_to_pe_old }
+    pub fn new(port_from_pe: PortFromPe, port_to_pe: PortToPe) -> DuplexPortPeChannel {
+        DuplexPortPeChannel { port_from_pe, port_to_pe }
     }
     pub fn get_port_from_pe(&self) -> &PortFromPe { &self.port_from_pe }
-    pub fn get_port_from_pe_old(&self) -> &PortFromPeOld { &self.port_from_pe_old }
     pub fn get_port_to_pe(&self) -> &PortToPe { &self.port_to_pe }
-    pub fn get_port_to_pe_old(&self) -> &PortToPeOld { &self.port_to_pe_old }
 }
 
 #[derive(Clone, Debug)]
@@ -48,10 +43,12 @@ impl DuplexPortCaChannel {
 
 // TODO: There is no distinction between a broken link and a disconnected one.  We may want to revisit.
 #[derive(Debug, Copy, Clone, Serialize)]
+#[cfg(feature = "api-new")]
 pub enum PortStatus {
     Connected,
     Disconnected(FailoverInfo),
 }
+#[cfg(feature = "api-new")]
 impl fmt::Display for PortStatus {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
@@ -61,15 +58,17 @@ impl fmt::Display for PortStatus {
     }
 }
 #[derive(Debug, Copy, Clone, Serialize, Deserialize)]
-pub enum PortStatusOld {
+#[cfg(feature = "api-old")]
+pub enum PortStatus {
     Connected,
     Disconnected,
 }
-impl fmt::Display for PortStatusOld {
+#[cfg(feature = "api-old")]
+impl fmt::Display for PortStatus {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            PortStatusOld::Connected    => write!(f, "Connected"),
-            PortStatusOld::Disconnected => write!(f, "Disconnected")
+            PortStatus::Connected    => write!(f, "Connected"),
+            PortStatus::Disconnected => write!(f, "Disconnected")
         }
     }
 }
@@ -141,24 +140,34 @@ pub trait InteriorPortLike: 'static + Clone + Sync + Send + CommonPortLike {
         }
         loop {
             //println!("Port {}: waiting for packet from pe", id);
-            let mut packet = self.get_duplex_port_pe_channel().port_from_pe_old.recv().context(PortError::Chain { func_name: _f, comment: S(self.get_id().get_name()) + " port_from_pe"})?;
-            {
-                let ait_state = packet.get_ait_state();
-                if CONFIG.trace_options.all || CONFIG.trace_options.port {
-                    let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "port_from_pe_like" };
-                    let trace = json!({ "cell_id": self.get_cell_id(), "id": self.get_id().get_name(), "ait_state": ait_state, "packet":packet.stringify()? });
-                    add_to_trace(TraceType::Trace, trace_params, &trace, _f);
+            let msg = self.get_duplex_port_pe_channel().port_from_pe.recv().context(PortError::Chain { func_name: _f, comment: S(self.get_id().get_name()) + " port_from_pe"})?;
+            match msg {
+                PeToPortPacket::Packet(mut packet) => {
+                    {
+                        let ait_state = packet.get_ait_state();
+                        if CONFIG.trace_options.all || CONFIG.trace_options.port {
+                            let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "port_from_pe_like" };
+                            let trace = json!({ "cell_id": self.get_cell_id(), "id": self.get_id().get_name(), "ait_state": ait_state, "packet":packet.stringify()? });
+                            add_to_trace(TraceType::Trace, trace_params, &trace, _f);
+                        }
                 }
-           }
-            self.send_to_link(&mut packet)?;
-        }
-    }
+                    self.send_to_link(&mut packet)?;
+                }
+                #[cfg(feature = "api-new")]
+                PortToPePacket::Packet(packet) => { todo!() },
+                #[cfg(feature = "api-new")]
+                PortToPePacket::Ready => { todo!() },
+                #[cfg(feature = "api-new")]
+                PortToPePacket::Activity => { todo!() }
+            }
+        }  
+    } 
 }
 
 pub trait BorderPortLike: 'static + Clone + Sync + Send + CommonPortLike {
     fn listen_noc_and_ca(&self) -> Result<JoinHandle<()>, Error> {
         let _f = "listen_noc_and_ca";
-        let status = PortToCaMsg::Status(self.get_port_no(), PortStatusOld::Connected);
+        let status = PortToCaMsg::Status(self.get_port_no(), PortStatus::Connected);
         {
             if CONFIG.trace_options.all || CONFIG.trace_options.port {
                 let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "port_to_pe_status" };

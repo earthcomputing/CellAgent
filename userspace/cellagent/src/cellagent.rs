@@ -29,15 +29,15 @@ use crate::ec_message::{Message, MsgHeader, MsgTreeMap, MsgType,
                         DiscoverAckDMsg, DiscoverAckMsg,
                         StackTreeMsg, StackTreeDMsg,
                         TreeNameMsg};
-use crate::ec_message_formats::{CaToCm, CaFromCm, CmToCa, CmFromCa, PeToCm, CmFromPe,
+use crate::ec_message_formats::{CaToCm, CaFromCm, CmToCa, CmFromCa, 
+                                PeToCm, CmFromPe,
                                 CmToPe, PeFromCm,
                                 CaToCmBytes, CmToCaBytes,
-                                PeToPort, PeFromPort,
-                                PeToPortOld, PeFromPortOld};
+                                PeToPort, PeFromPort};
 use crate::gvm_equation::{GvmEquation, GvmEqn};
 use crate::name::{Name, CellID, OriginatorID, PortTreeID, TreeID, UptreeID, VmID};
 use crate::packet_engine::NumberOfPackets;
-use crate::port::{PortStatusOld};
+use crate::port::{PortStatus};
 use crate::port_tree::PortTree;
 use crate::routing_table_entry::{RoutingTableEntry};
 use crate::traph::{PortState, Traph};
@@ -115,10 +115,9 @@ impl CellAgent {
                config: CellConfig, no_ports: PortQty,
                ca_to_ports: HashMap<PortNo, CaToPort>, cm_to_ca: CmToCa, 
                pe_from_ports: PeFromPort, pe_to_ports: HashMap<PortNo, PeToPort>,
-               pe_from_ports_old: PeFromPortOld, pe_to_ports_old: HashMap<PortNo, PeToPortOld>,
                border_port_nos: &HashSet<PortNo>,
-               ca_to_cm: CaToCm, cm_from_ca: CmFromCa, pe_to_cm: PeToCm, cm_from_pe: CmFromPe,
-               cm_to_pe: CmToPe, pe_from_cm: PeFromCm)
+               ca_to_cm: CaToCm, cm_from_ca: CmFromCa, pe_to_cm: PeToCm, 
+               cm_from_pe: CmFromPe, cm_to_pe: CmToPe, pe_from_cm: PeFromCm)
                -> Result<(CellAgent, JoinHandle<()>), Error> {
         let _f = "new";
         let tenant_masks = vec![BASE_TENANT_MASK];
@@ -147,10 +146,10 @@ impl CellAgent {
         (1..=(*CONFIG.max_num_phys_ports_per_cell).into())
             .for_each(|_| no_packets.push(NumberOfPackets::new()));
         let my_entry = RoutingTableEntry::default().add_child(PortNumber::default());
-        let (cmodel, _pe_join_handle) = Cmodel::new(cell_id, connected_tree_id, pe_to_cm, cm_to_ca,
-                                                    pe_from_ports, pe_to_ports, 
-                                                    pe_from_ports_old, pe_to_ports_old, 
-                                                    border_port_nos, cm_to_pe, pe_from_cm);
+        let (cmodel, _pe_join_handle) = Cmodel::new(cell_id, connected_tree_id, 
+                            pe_to_cm, 
+                            cm_to_ca, pe_from_ports, pe_to_ports, 
+                            border_port_nos, cm_to_pe, pe_from_cm);
         let cm_join_handle = cmodel.start(cm_from_ca, cm_from_pe);
         Ok((CellAgent {
             cell_id, my_tree_id, cell_type, config, no_ports,
@@ -880,7 +879,11 @@ impl CellAgent {
                 }
                 PortToCaMsg::Status(port_no, port_status) => {
                     let is_border = true;
-                    self.ca_to_cm[0].send(CaToCmBytes::Status((port_no, is_border, NumberOfPackets::new(), port_status)))?;
+                    #[cfg(feature = "api-old")]
+                    let status_msg = (port_no, is_border, port_status, NumberOfPackets::new());
+                    #[cfg(feature = "api-new")]
+                    let status_msg = (port_no, is_border, port_status);
+                    self.ca_to_cm[0].send(CaToCmBytes::Status(status_msg))?;
                 }
             }
         }
@@ -946,9 +949,9 @@ impl CellAgent {
                 }
             }
             match msg {
-                CmToCaBytes::Status((port_no, is_border, number_of_packets, status)) => match status {
-                    PortStatusOld::Connected => self.port_connected(port_no, is_border).context(CellagentError::Chain { func_name: _f, comment: S(self.cell_id) + " port_connected" })?,
-                    PortStatusOld::Disconnected => self.port_disconnected(port_no, number_of_packets).context(CellagentError::Chain { func_name: _f, comment: S(self.cell_id) + " port_disconnected" })?
+                CmToCaBytes::Status((port_no, is_border, status, number_of_packets)) => match status {
+                    PortStatus::Connected => self.port_connected(port_no, is_border).context(CellagentError::Chain { func_name: _f, comment: S(self.cell_id) + " port_connected" })?,
+                    PortStatus::Disconnected => self.port_disconnected(port_no, number_of_packets).context(CellagentError::Chain { func_name: _f, comment: S(self.cell_id) + " port_disconnected" })?
                 },
                 CmToCaBytes::Bytes((port_no, is_ait, uuid, bytes)) => {
                     // The index may be pointing to the control tree because the other cell didn't get the StackTree or StackTreeD message in time

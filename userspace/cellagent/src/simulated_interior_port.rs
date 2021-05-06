@@ -9,16 +9,18 @@ use crate::blueprint::{Blueprint};
 use crate::config::{CONFIG};
 use crate::dal::{add_to_trace, fork_trace_header, update_trace_header};
 #[cfg(feature = "api-old")]
-use crate::ec_message_formats::{PortToPePacketOld};
+use crate::ec_message_formats::{PortToPePacket};
 #[cfg(feature = "api-new")]
 use crate::ec_message_formats::{PortToPePacket};
 use crate::link::{LinkStatus};
 use crate::name::{Name, CellID, PortID};
 use crate::packet::{Packet}; // Eventually use SimulatedPacket
+#[cfg(feature = "api-old")]
+use crate::packet_engine::NumberOfPackets;
 use crate::port::{CommonPortLike, FailoverInfo, InteriorPortLike, PortSeed, BasePort, InteriorPortFactoryLike, 
                   DuplexPortPeOrCaChannel, DuplexPortPeChannel};
 #[cfg(feature = "api-old")]
-use crate::port::PortStatusOld;
+use crate::port::PortStatus;
 #[cfg(feature = "api-new")]
 use crate::port::PortStatus;
 use crate::utility::{CellNo, PortNo, PortNumber, S, TraceHeaderParams, TraceType, write_err};
@@ -146,16 +148,13 @@ impl InteriorPortLike for SimulatedInteriorPort {
     }
     fn listen_link(self: &mut Self, port_pe: &DuplexPortPeChannel) -> Result<(), Error> {
         let _f = "listen_link";
-        #[cfg(feature = "api-old")]
-        let port_to_pe_old = port_pe.get_port_to_pe_old();
-        #[cfg(feature = "api-new")]
         let port_to_pe = port_pe.get_port_to_pe();
         let port_no = self.get_port_no();
         loop {
             let msg = self.recv_from_link().context(SimulatedInteriorPortError::Chain { func_name: _f, comment: S(self.base_port.get_id().get_name()) + " recv from link"})?;
             self.base_port.update_activity_data();
             match msg {
-                LinkToPortPacket::Status(status) => {
+                LinkToPortPacket::Status(link_status) => {
                     #[cfg(feature = "api-new")]
                     {                   
                         match status {
@@ -174,23 +173,27 @@ impl InteriorPortLike for SimulatedInteriorPort {
                     }
                     #[cfg(feature = "api-old")]
                     {
-                        let status = match status {
+                        let status = match link_status {
                             LinkStatus::Connected => {
                                 self.set_connected();
-                                PortStatusOld::Connected
+                                PortStatus::Connected
                             },
                             LinkStatus::Disconnected => {
                                 self.set_disconnected();
-                            PortStatusOld::Disconnected
+                            PortStatus::Disconnected
                             }
                         };
-                        port_to_pe_old.send(PortToPePacketOld::Status((port_no, self.base_port.is_border(), status))).context(SimulatedInteriorPortError::Chain { func_name: _f, comment: S(self.base_port.get_id().get_name()) + " send status to pe"})?;
+                        #[cfg(feature = "api-old")]
+                        let status_msg = (port_no, false, status, NumberOfPackets::new());
+                        #[cfg(feature = "api-new")]
+                        let status_msg = (port_no, self.base_port.is_border(), status);
+                        port_to_pe.send(PortToPePacket::Status(status_msg)).context(SimulatedInteriorPortError::Chain { func_name: _f, comment: S(self.base_port.get_id().get_name()) + " send status to pe"})?;
                     }   
                     {
                         if CONFIG.trace_options.all || CONFIG.trace_options.port {
                             let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "port_to_pe_status" };
                             let trace = json!({ "cell_id": self.base_port.get_cell_id(), "port_no": port_no, 
-                                "activity_data": self.base_port.get_activity_data(), "init_packet": self.init_packet, "status": status });
+                                "activity_data": self.base_port.get_activity_data(), "init_packet": self.init_packet, "link status": link_status });
                             add_to_trace(TraceType::Trace, trace_params, &trace, _f);
                         }
                     }
@@ -233,7 +236,7 @@ impl InteriorPortLike for SimulatedInteriorPort {
                                 }
                             }
                             #[cfg(feature = "api-old")]
-                            port_to_pe_old.send(PortToPePacketOld::Packet((self.base_port.get_port_no(), packet)))?;
+                            port_to_pe.send(PortToPePacket::Packet((self.base_port.get_port_no(), packet)))?;
                             #[cfg(feature = "api-new")]
                             port_to_pe.send(PortToPePacket::Packet((port_no, packet)))?;
                         },
@@ -259,7 +262,7 @@ impl InteriorPortLike for SimulatedInteriorPort {
                                 }
                             }
                             #[cfg(feature = "api-old")]
-                            port_to_pe_old.send(PortToPePacketOld::Packet((self.base_port.get_port_no(), packet)))?;
+                            port_to_pe.send(PortToPePacket::Packet((self.base_port.get_port_no(), packet)))?;
                             #[cfg(feature = "api-new")]
                             port_to_pe.send(PortToPePacket::Packet((self.base_port.get_port_no(), packet)))?;
                         }
@@ -273,9 +276,6 @@ impl InteriorPortLike for SimulatedInteriorPort {
                                     add_to_trace(TraceType::Trace, trace_params, &trace, _f);
                                 }
                             }
-                            #[cfg(feature = "api-old")]
-                            port_to_pe_old.send(PortToPePacketOld::Packet((self.base_port.get_port_no(), packet)))?;
-                            #[cfg(feature = "api-new")]
                             port_to_pe.send(PortToPePacket::Packet((self.base_port.get_port_no(), packet)))?;
                             let mut tick_packet: Packet = Default::default();
                             tick_packet.make_tick();

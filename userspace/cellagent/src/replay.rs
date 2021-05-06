@@ -3,9 +3,10 @@ use serde_json::Value;
 use std::{fmt, fmt::Write};
 
 // Structs to parse trace records
+use crate::ec_message_formats::STATUS;
 use crate::name::{CellID, TreeID};
 use crate::packet_engine::NumberOfPackets;
-use crate::port::PortStatusOld;
+use crate::port::PortStatus;
 use crate::routing_table_entry::RoutingTableEntry;
 use crate::utility::{CellNo, ByteArray, PortNo, TraceType};
 use crate::uuid_ec::Uuid;
@@ -16,7 +17,7 @@ pub enum TraceFormat {
     CaNewFormat(CellID, TreeID, TreeID, TreeID),
     CaToCmEntryFormat(RoutingTableEntry),
     CaFromCmBytesMsg(PortNo, bool, Uuid, ByteArray),
-    CaFromCmBytesStatus(PortNo, bool, NumberOfPackets, PortStatusOld),
+    CaFromCmBytesStatus(STATUS),
     CaToNoc(PortNo, ByteArray),
     BorderCell(CellNo)
 }
@@ -27,7 +28,7 @@ impl fmt::Display for TraceFormat {
             TraceFormat::CaNewFormat(_, _, _, _) => "CaNew",
             TraceFormat::CaToCmEntryFormat(_) => "CaToCmEntry",
             TraceFormat::CaFromCmBytesMsg(_, _, _, _) => "CaFromCmBytesMsg",
-            TraceFormat::CaFromCmBytesStatus(_, _, _, _) => "CaFromCmBytesStatus",
+            TraceFormat::CaFromCmBytesStatus((_, _, _, _)) => "CaFromCmBytesStatus",
             TraceFormat::CaToNoc(_, _) => "CaToNoc",
             TraceFormat::BorderCell(_) => "BorderCell"
         };
@@ -67,7 +68,7 @@ pub fn process_trace_record(mut record: String) -> Result<TraceFormat, Error> {
                     return Err(e.into());
                 }
             };
-            TraceFormat::CaFromCmBytesStatus(m2a.port, m2a.is_border, m2a.no_packets, m2a.status)
+            TraceFormat::CaFromCmBytesStatus((m2a.port, m2a.is_border, m2a.status, m2a.no_packets))
         }
         "ca_to_noc_tree_name" => {
             let a2n: CaToNoc = match serde_json::from_value(trace.body) {
@@ -168,7 +169,7 @@ struct CaFromCmBytesStatus {
     port: PortNo,
     is_border: bool,
     no_packets: NumberOfPackets,
-    status: PortStatusOld
+    status: PortStatus
 }
 #[derive(Debug, Clone, Serialize, Deserialize)]
 struct TraceRecordCaToNoc {

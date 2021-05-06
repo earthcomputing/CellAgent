@@ -12,9 +12,8 @@ use crate::app_message_formats::{CaToPort, PortFromCa, PortToCa, CaFromPort};
 use crate::cellagent::{CellAgent};
 use crate::config::{CONFIG, PortQty};
 use crate::dal::{add_to_trace, get_cell_replay_lines};
-use crate::ec_message_formats::{PortToPe, PeFromPort, PeToPort, PortFromPe,
-                                PortToPeOld, PeFromPortOld, PeToPortOld, PortFromPeOld,
-                                CmToCa, CaFromCm, CaToCm, CmFromCa, CaToCmBytes, CmToCaBytes,
+use crate::ec_message_formats::{PortToPe, PeFromPort, PeToPort, PortFromPe, CmToCaBytes,
+                                CmToCa, CaFromCm, CaToCm, CmFromCa, CaToCmBytes,
                                 PeToCm, CmFromPe, CmToPe, PeFromCm};
 use crate::name::{CellID, PortID};
 use crate::port::{InteriorPortLike, BorderPortLike, 
@@ -69,7 +68,6 @@ impl<InteriorPortFactoryType: InteriorPortFactoryLike<InteriorPortType>,
              None)
         };
         let (port_to_pe, pe_from_ports): (PortToPe, PeFromPort) = channel();
-        let (port_to_pe_old, pe_from_ports_old): (PortToPeOld, PeFromPortOld) = channel();
         let (port_to_ca, ca_from_ports): (PortToCa, CaFromPort) = channel();
         let port_list: Vec<PortNo> = (0..*num_phys_ports).map(|i| PortNo(i as u8)).collect();
         let all: HashSet<PortNo> = HashSet::from_iter(port_list);
@@ -80,9 +78,7 @@ impl<InteriorPortFactoryType: InteriorPortFactoryLike<InteriorPortType>,
         interior_port_list.sort();
         let mut ports = Vec::new();
         let mut pe_to_ports = HashMap::new();
-        let mut pe_to_ports_old = HashMap::new();
         let mut ports_from_pe = HashMap::new();
-        let mut ports_from_pe_old = HashMap::new(); // So I can remove the item
         let mut ca_to_ports = HashMap::new();
         {
             if CONFIG.trace_options.all || CONFIG.trace_options.nal {
@@ -104,16 +100,11 @@ impl<InteriorPortFactoryType: InteriorPortFactoryLike<InteriorPortType>,
                 ))
             } else {
                 let (pe_to_port, port_from_pe): (PeToPort, PortFromPe) = channel();
-                let (pe_to_port_old, port_from_pe_old): (PeToPortOld, PortFromPeOld) = channel();
                 pe_to_ports.insert(PortNo(port_num), pe_to_port);
-                pe_to_ports_old.insert(PortNo(port_num), pe_to_port_old);
                 ports_from_pe.insert(PortNo(port_num), port_from_pe.clone()); // These two lines may not be needed.
-                ports_from_pe_old.insert(PortNo(port_num), port_from_pe_old.clone()); // I'm putting them here during a rebase.
                 DuplexPortPeOrCaChannel::Interior(DuplexPortPeChannel::new(
                     port_from_pe,
-                    port_from_pe_old,
                     port_to_pe.clone(),
-                    port_to_pe_old.clone(),
                 ))
             };
             let port_number = PortNo(port_num).make_port_number(num_phys_ports).context(NalcellError::Chain { func_name: "new", comment: S("port number") })?;
@@ -144,9 +135,8 @@ impl<InteriorPortFactoryType: InteriorPortFactoryLike<InteriorPortType>,
         let (pe_to_cm, cm_from_pe): (PeToCm, CmFromPe) = channel();
         let (cm_to_pe, pe_from_cm): (CmToPe, PeFromCm) = channel();
         let (cell_agent, _cm_join_handle) = CellAgent::new(cell_id, tree_ids, cell_type, config,
-                 num_phys_ports, ca_to_ports.clone(), cm_to_ca.clone(),
+                 num_phys_ports, ca_to_ports.clone(), cm_to_ca.clone(), 
                   pe_from_ports, pe_to_ports,
-                  pe_from_ports_old, pe_to_ports_old,
                   border_port_nos,
                   ca_to_cm.clone(), cm_from_ca, pe_to_cm.clone(),
                   cm_from_pe, cm_to_pe.clone(), pe_from_cm).context(NalcellError::Chain { func_name: "new", comment: S("cell agent create") })?;
@@ -168,8 +158,8 @@ impl<InteriorPortFactoryType: InteriorPortFactoryLike<InteriorPortType>,
                                 TraceFormat::CaFromCmBytesMsg(port_no, is_ait, uuid, msg) => {
                                     cm_to_ca.send(CmToCaBytes::Bytes((port_no, is_ait, uuid, msg)))?;
                                 }
-                                TraceFormat::CaFromCmBytesStatus(port_no, is_border, number_of_packets, status) => {
-                                    cm_to_ca.send(CmToCaBytes::Status((port_no, is_border, number_of_packets, status)))?;
+                                TraceFormat::CaFromCmBytesStatus(status_msg) => {
+                                    cm_to_ca.send(CmToCaBytes::Status(status_msg))?;
                                 }
                                 TraceFormat::CaToNoc(noc_port, bytes) => {
                                     let ca_to_port = ca_to_ports.get(&noc_port).expect("cellagent.rs: border port sender must be set");
