@@ -1,3 +1,7 @@
+#---------------------------------------------------------------------------------------------
+ #  Copyright © 2016-present Earth Computing Corporation. All rights reserved.
+ #  Licensed under the MIT License. See LICENSE.txt in the project root for license information.
+#---------------------------------------------------------------------------------------------
 CONFIG_MODULE_SIG=n
 KDIR := /lib/modules/$(shell uname -r)/build
 PWD       := $(shell pwd)

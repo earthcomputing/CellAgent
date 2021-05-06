@@ -8,6 +8,8 @@
 
     https://www.kernel.org/doc/Documentation/kbuild/modules.txt
 
+    This currently works on kernel 4.18.0-25-generic, switch to that kernel
+
     $ cd driver/ecnl/src
     driver/ecnl/src$ make
     driver/ecnl/src$ cd ../lib
