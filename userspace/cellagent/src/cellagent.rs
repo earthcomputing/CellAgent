@@ -9,10 +9,10 @@ use crossbeam::crossbeam_channel::unbounded as channel;
 use serde;
 use serde_json;
 
-use crate::app_message::{AppMessage, AppMsgType,
+use crate::{app_message::{AppMessage, AppMsgType,
                          AppDeleteTreeMsg, AppInterapplicationMsg, AppManifestMsg,
                          AppQueryMsg, AppStackTreeMsg, AppTreeNameMsg,
-                         SenderMsgSeqNo};
+                         SenderMsgSeqNo},};
 use crate::app_message_formats::{CaToPort, PortToCaMsg,
                                  CaToVm, VmFromCa, VmToCa, CaFromVm};
 use crate::cmodel::{Cmodel};
@@ -90,6 +90,7 @@ pub struct CellAgent {
     tree_vm_map: TreeVmMap,
     ca_to_vms: HashMap<VmID, CaToVm>,
     ca_to_cm: Vec<CaToCm>,
+    cm_to_ca: Vec<CmToCa>,
     ca_to_ports: HashMap<PortNo, CaToPort>,
     vm_id_no: usize,
     up_tree_senders: HashMap<UptreeID, HashMap<String,TreeID>>,
@@ -148,13 +149,14 @@ impl CellAgent {
         let my_entry = RoutingTableEntry::default().add_child(PortNumber::default());
         let (cmodel, _pe_join_handle) = Cmodel::new(cell_id, connected_tree_id, 
                             pe_to_cm, 
-                            cm_to_ca, pe_from_ports, pe_to_ports, 
+                            cm_to_ca.clone(), pe_from_ports, pe_to_ports, 
                             border_port_nos, cm_to_pe, pe_from_cm);
         let cm_join_handle = cmodel.start(cm_from_ca, cm_from_pe);
         Ok((CellAgent {
             cell_id, my_tree_id, cell_type, config, no_ports,
             control_tree_id, connected_tree_id,
-            cmodel: vec![cmodel], ca_to_cm: vec![ca_to_cm], ca_to_ports, my_entry, base_tree_map, no_packets, tenant_masks,
+            cmodel: vec![cmodel], ca_to_cm: vec![ca_to_cm], cm_to_ca: vec![cm_to_ca], ca_to_ports, 
+            my_entry, base_tree_map, no_packets, tenant_masks,
             ..Default::default()
         }, cm_join_handle))
     }
@@ -738,7 +740,7 @@ impl CellAgent {
                     add_to_trace(TraceType::Trace, trace_params, &trace, _f);
                 }
             }
-            self.ca_to_cm[0].send(CaToCmBytes::TunnelUp((originator_id, bytes)))?;
+            self.cm_to_ca[0].send(CmToCaBytes::TunnelUp((originator_id, bytes)))?;
         }
     }
     /*
@@ -875,7 +877,7 @@ impl CellAgent {
             }
             match msg {
                 PortToCaMsg::AppMsg(port_no, bytes) => {
-                    self.ca_to_cm[0].send(CaToCmBytes::TunnelPort((port_no, bytes)))?;
+                    self.cm_to_ca[0].send(CmToCaBytes::TunnelPort((port_no, bytes)))?;
                 }
                 PortToCaMsg::Status(port_no, port_status) => {
                     let is_border = true;

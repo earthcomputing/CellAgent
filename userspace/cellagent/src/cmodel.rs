@@ -154,6 +154,7 @@ impl Cmodel {
                         add_to_trace(TraceType::Trace, trace_params, &trace, _f);
                     }
                 }
+                println!("Cmodel: {} should not get TunnelPort", _f);
                 self.cm_to_ca.send(CmToCaBytes::TunnelPort(tunnel_msg))?;
             }
             CaToCmBytes::TunnelUp(tunnel_msg) => {
@@ -164,6 +165,7 @@ impl Cmodel {
                         add_to_trace(TraceType::Trace, trace_params, &trace, _f);
                     }
                 }
+                println!("Cmodel: {} should not get TunnelUp", _f);
                 self.cm_to_ca.send(CmToCaBytes::TunnelUp(tunnel_msg))?;
             }
         
