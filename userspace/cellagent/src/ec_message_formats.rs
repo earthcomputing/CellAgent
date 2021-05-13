@@ -33,8 +33,6 @@ pub enum CaToCmBytes {
     Entry(RoutingTableEntry),
     Reroute(REROUTE),
     Status(STATUS),
-    TunnelPort(TUNNELPORT),
-    TunnelUp(TUNNELUP),
 }
 pub type CaToCm = mpsc::Sender<CaToCmBytes>;
 pub type CmFromCa = mpsc::Receiver<CaToCmBytes>;

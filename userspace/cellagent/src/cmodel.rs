@@ -146,29 +146,6 @@ impl Cmodel {
                 }
                 self.cm_to_ca.send(CmToCaBytes::Status(status_msg))?;
             }
-            CaToCmBytes::TunnelPort(tunnel_msg) => {
-                {
-                    if CONFIG.trace_options.all || CONFIG.trace_options.cm {
-                        let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "cm_from_ca_tunnel_port" };
-                        let trace = json!({ "cell_id": &self.cell_id, "tunnel_msg": tunnel_msg.1.stringify()? });
-                        add_to_trace(TraceType::Trace, trace_params, &trace, _f);
-                    }
-                }
-                println!("Cmodel: {} should not get TunnelPort", _f);
-                self.cm_to_ca.send(CmToCaBytes::TunnelPort(tunnel_msg))?;
-            }
-            CaToCmBytes::TunnelUp(tunnel_msg) => {
-                {
-                    if CONFIG.trace_options.all || CONFIG.trace_options.cm {
-                        let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "cm_from_ca_tunnel_up" };
-                        let trace = json!({ "cell_id": &self.cell_id, "tunnel_msg": tunnel_msg.1.stringify()? });
-                        add_to_trace(TraceType::Trace, trace_params, &trace, _f);
-                    }
-                }
-                println!("Cmodel: {} should not get TunnelUp", _f);
-                self.cm_to_ca.send(CmToCaBytes::TunnelUp(tunnel_msg))?;
-            }
-        
             // packetize
             CaToCmBytes::Bytes((tree_id, is_control, is_ait, is_snake, user_mask, seq_no, bytes)) => {
                 // xmit msg
