@@ -1,3 +1,7 @@
+/*---------------------------------------------------------------------------------------------
+ *  Copyright © 2016-present Earth Computing Corporation. All rights reserved.
+ *  Licensed under the MIT License. See LICENSE.txt in the project root for license information.
+ *--------------------------------------------------------------------------------------------*/
 // retrieve_ait_message
 // send_ait_message
 // get_module_info
@@ -7,7 +11,6 @@
 #include <pthread.h>
 #include <time.h>
 #include "ecnl_proto.h"
-#include "entl_ioctl.h"
 #include "port.h"
 #include <syslog.h>
 #include <sys/ioctl.h>
@@ -205,20 +208,20 @@ extern int ecnl_init(bool debug) {
 }
 
 // per-port sock
-extern ecnl_port_t port_create(uint8_t port_id) {
+extern ecnl_port_t *port_create(uint8_t port_id) {
     struct nl_sock *sock = init_sock();
     struct nl_sock *esock = init_sock_events();
-    ecnl_port_t port;
-    port.port_sock = sock;
-    port.port_esock = esock;
-    port.port_module_id = 0; // hardwired
-    port.port_id = port_id;
+    ecnl_port_t *ecnl_port_ptr = malloc(sizeof(ecnl_port_t));
+    ecnl_port_ptr->port_sock = sock;
+    ecnl_port_ptr->port_esock = esock;
+    ecnl_port_ptr->port_module_id = 0; // hardwired
+    ecnl_port_ptr->port_id = port_id;
 
     link_state_t link_state; 
-    get_link_state(&port, &link_state);
-    port.port_up_down = link_state.port_link_state;
-    port.port_name = link_state.port_name; // fill in name
-    return port;
+    get_link_state(ecnl_port_ptr, &link_state);
+    ecnl_port_ptr->port_up_down = link_state.port_link_state;
+    ecnl_port_ptr->port_name = link_state.port_name; // fill in name
+    return ecnl_port_ptr;
 }
 
 extern void port_destroy(ecnl_port_t *port) {

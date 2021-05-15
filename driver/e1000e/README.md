@@ -6,8 +6,18 @@
     The build then combines the patch intel files with a set of Earth Computing additional files.
 
 ## build steps
-$ cd driver/e1000e
-driver/e1000e$ make
+The current working kernel is 4.18.0-25-generic, switch to that kernel
+
+If present on the system, use this command and select the correct kernel:
+$ sudo kswitch
+
+If 4.18.0-25-generic is not present on the system:
+$ sudo apt install linux-headers-4.18.0-25-generic linux-image-4.18.0-25-generic
+
+Then switch the kernel, either via the "Advanced Options" in the GRUB menu at boot, or by modifying the 'GRUB_DEFAULT=` inside /etc/default/grub then run `update-grub' (which is what kswitch does)
+
+Then:
+$ cd driver/e1000e && make
 
 ## Copyright
 

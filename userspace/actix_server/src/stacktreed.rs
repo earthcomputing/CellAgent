@@ -13,12 +13,12 @@ use crate::hello::{AppCell, AppCells, LinkType, Neighbor};
 
 type Size = usize;
 
-fn show_stacked_tree(appcells: web::Data<AppCells>) -> Result<HttpResponse, actix_web::Error> {
+async fn show_stacked_tree(appcells: web::Data<AppCells>) -> Result<HttpResponse, actix_web::Error> {
     let appcells = appcells.get_ref();
     let string = serde_json::to_string(appcells)?;
     Ok(HttpResponse::Ok().body(string))
 }
-fn process_stack_treed(appcells: web::Data<AppCells>, record: web::Json<Value>)
+async fn process_stack_treed(appcells: web::Data<AppCells>, record: web::Json<Value>)
                      -> Result<impl Responder, Error> {
     let trace_body = record.get("body").expect("StackTreeDMsg: bad trace record");
     let body: Body = serde_json::from_value(trace_body.clone())?;
@@ -85,11 +85,9 @@ struct TreeID {
 
 pub fn get() -> Scope {
     web::scope("/stack_treed")
-        .data(web::Data::new(AppCells::default()))
         .route("", web::get().to(show_stacked_tree))
 }
 pub fn post() -> Scope {
     web::scope("/ca_process_stack_treed_msg")
-        .data(web::Data::new(AppCells::default()))
         .route("", web::post().to(process_stack_treed))
 }

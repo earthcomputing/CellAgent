@@ -1,3 +1,7 @@
+/*---------------------------------------------------------------------------------------------
+ *  Copyright © 2016-present Earth Computing Corporation. All rights reserved.
+ *  Licensed under the MIT License. See LICENSE.txt in the project root for license information.
+ *--------------------------------------------------------------------------------------------*/
 #ifndef ECNL_PORT_H
 #define ECNL_PORT_H
 
@@ -22,7 +26,7 @@ typedef struct {
 
 extern int ecnl_init(bool debug);
 // Returning struct because Rust doesn't want to store the pointers :-(.
-extern ecnl_port_t port_create(uint8_t port_id);
+extern ecnl_port_t *port_create(uint8_t port_id);
 extern void port_destroy(ecnl_port_t *port);
 
 extern void port_do_read_async(ecnl_port_t *port, port_buf_desc_t *bdp);

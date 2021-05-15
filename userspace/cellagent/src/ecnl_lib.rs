@@ -1,3 +1,7 @@
+/*---------------------------------------------------------------------------------------------
+ *  Copyright © 2016-present Earth Computing Corporation. All rights reserved.
+ *  Licensed under the MIT License. See LICENSE.txt in the project root for license information.
+ *--------------------------------------------------------------------------------------------*/
 extern crate crossbeam;
 extern crate futures;
 extern crate libc; // use libc::size_t;
@@ -11,7 +15,7 @@ mod ecnl_endpoint;
 #[allow(non_snake_case)]
 #[allow(non_upper_case_globals)]
 #[allow(unused_parens)]
-#[cfg(test)]
+#[cfg(feature = "test")]
 mod tests {
     use std::ffi::{CString, CStr};
     use crate::ecnl_endpoint::ept;

@@ -1,3 +1,7 @@
+/*---------------------------------------------------------------------------------------------
+ *  Copyright © 2016-present Earth Computing Corporation. All rights reserved.
+ *  Licensed under the MIT License. See LICENSE.txt in the project root for license information.
+ *--------------------------------------------------------------------------------------------*/
 use std;
 use std::{fmt,
           collections::{HashMap, HashSet}};
@@ -9,7 +13,7 @@ use crate::app_message::{SenderMsgSeqNo, AppMsgDirection, AppInterapplicationMsg
 use crate::cellagent::{CellAgent};
 use crate::config::{CellQty, PathLength};
 use crate::gvm_equation::{GvmEquation};
-use crate::name::{Name, CellID, PortTreeID, OriginatorID, TreeID};
+use crate::name::{CellID, PortTreeID, OriginatorID, TreeID};
 use crate::packet::{Packet, Packetizer, Serializer};
 use crate::packet_engine::NumberOfPackets;
 use crate::uptree_spec::{AllowedTree, Manifest};
@@ -21,6 +25,8 @@ pub type MsgTreeMap = HashMap<String, TreeID>; // Must be String for serializati
 pub enum MsgType {
     Entl,        // Needed for the msg_type hack, otherwise panic
     DeleteTree,
+    DiscoverAck,
+    DiscoverAckD,
     Discover,
     DiscoverD,
     Failover,
@@ -28,8 +34,6 @@ pub enum MsgType {
     Hello,
     Interapplication,
     Manifest,
-    Prepare,
-    PrepareD,
     StackTree,
     StackTreeD,
     TreeName
@@ -40,13 +44,13 @@ impl MsgType {
         let _f = "get_msg";
         let bytes = Packetizer::unpacketize(packets).context(MessageError::Chain { func_name: _f, comment: S("unpacketize")})?;
         //println!("Message get_msg: serialized {}, packets {:?}", serialized, packets);
-        let serialized = bytes.to_string()?;
+        let serialized = bytes.stringify()?;
         let msg = serde_json::from_str(&serialized)?;
         Ok(msg)
     }
     pub fn msg_from_bytes(bytes: &ByteArray) -> Result<Box<dyn Message>, Error> {
         let _f = "msg_from_bytes";
-        let serialized = bytes.to_string()?;
+        let serialized = bytes.stringify()?;
         let msg = serde_json::from_str(&serialized)?;
         Ok(msg)
     }
@@ -58,14 +62,14 @@ impl MsgType {
     pub fn msg_type(packet: &Packet) -> MsgType {
         if      MsgType::is_type(packet, MsgType::Interapplication) { MsgType::Interapplication }
         else if MsgType::is_type(packet, MsgType::DeleteTree)  { MsgType::DeleteTree }
+        else if MsgType::is_type(packet, MsgType::DiscoverAck) { MsgType::DiscoverAck }
+        else if MsgType::is_type(packet, MsgType::DiscoverAckD){ MsgType::DiscoverAckD }
         else if MsgType::is_type(packet, MsgType::Discover)    { MsgType::Discover }
         else if MsgType::is_type(packet, MsgType::DiscoverD)   { MsgType::DiscoverD }
         else if MsgType::is_type(packet, MsgType::Failover)    { MsgType::Failover }
         else if MsgType::is_type(packet, MsgType::FailoverD)   { MsgType::FailoverD }
         else if MsgType::is_type(packet, MsgType::Hello)       { MsgType::Hello }
         else if MsgType::is_type(packet, MsgType::Manifest)    { MsgType::Manifest }
-        else if MsgType::is_type(packet, MsgType::Prepare)     { MsgType::Prepare }
-        else if MsgType::is_type(packet, MsgType::PrepareD)    { MsgType::PrepareD }
         else if MsgType::is_type(packet, MsgType::StackTree)   { MsgType::StackTree }
         else if MsgType::is_type(packet, MsgType::StackTreeD)  { MsgType::StackTreeD }
         else if MsgType::is_type(packet, MsgType::TreeName)    { MsgType::TreeName }
@@ -77,6 +81,8 @@ impl fmt::Display for MsgType {
         let s = match *self {
             MsgType::Entl              => "Entl",
             MsgType::DeleteTree        => "DeleteTree",
+            MsgType::DiscoverAck       => "DiscoverAck",
+            MsgType::DiscoverAckD      => "DiscoverAckD",
             MsgType::Discover          => "Discover",
             MsgType::DiscoverD         => "DiscoverD",
             MsgType::Failover          => "Failover",
@@ -84,8 +90,6 @@ impl fmt::Display for MsgType {
             MsgType::Hello             => "Hello",
             MsgType::Interapplication  => "Interapplication",
             MsgType::Manifest          => "Manifest",
-            MsgType::Prepare           => "Prepare",
-            MsgType::PrepareD          => "PrepareD",
             MsgType::StackTree         => "StackTree",
             MsgType::StackTreeD        => "StackTreeD",
             MsgType::TreeName          => "TreeName",
@@ -128,22 +132,16 @@ pub trait Message {
         }
     }
     fn is_leafward(&self) -> bool { !self.is_rootward() }
+    fn is_control(&self) -> bool { self.get_header().get_control() }
     fn is_ait(&self) -> bool { self.get_header().get_ait() }
+    fn is_snake(&self) -> bool { self.get_header().get_snake() }
     fn value(&self) -> serde_json::Value;
     fn get_sender_msg_seq_no(&self) -> SenderMsgSeqNo { self.get_header().get_sender_msg_seq_no() }
     fn get_originator_id(&self) -> OriginatorID { self.get_header().get_originator_id() }
     fn to_bytes(&self) -> Result<ByteArray, Error> where Self: serde::Serialize + Sized {
         let _f = "to_bytes";
-        let bytes = Serializer::serialize(self).context(MessageError::Chain { func_name: _f, comment: S("")})?;
-        Ok(ByteArray::new(&bytes))
-    }
-    fn to_packets(&self, tree_id: TreeID) -> Result<Vec<Packet>, Error>
-            where Self:std::marker::Sized + serde::Serialize {
-        let _f = "to_packets";
-        let bytes = Serializer::serialize(self).context(MessageError::Chain { func_name: _f, comment: S("")})?;
-        let packets = Packetizer::packetize(&tree_id.get_uuid(),
-                                            self.get_sender_msg_seq_no(), &ByteArray::new(&bytes))?;
-        Ok(packets)
+        let serialized = Serializer::serialize(self).context(MessageError::Chain { func_name: _f, comment: S("")})?;
+        Ok(ByteArray::new(&serialized))
     }
     fn process_ca(&mut self, _cell_agent: &mut CellAgent, _port_no: PortNo,
                   _msg_tree_id: PortTreeID, _is_ait: bool) -> Result<(), Error>;
@@ -161,16 +159,20 @@ pub struct MsgHeader {
     sending_cell_id: CellID, // Immediate forwarder of message, used in trace for debugging
     sender_msg_seq_no: SenderMsgSeqNo, // Debugging only on simulator
     originator_id: OriginatorID, // Originator of message, used to find set of AllowedTrees
+    is_control: bool,
     is_ait: bool,
+    is_snake: bool,
     msg_type: MsgType,
     direction: MsgDirection,
     tree_map: MsgTreeMap,
 }
 impl MsgHeader {
-    pub fn new(sending_cell_id: CellID, originator_id: OriginatorID, is_ait: bool, tree_map: MsgTreeMap,
-               msg_type: MsgType, direction: MsgDirection) -> MsgHeader {
+    pub fn new(sending_cell_id: CellID, originator_id: OriginatorID, 
+            is_control: bool, is_ait: bool, is_snake: bool,
+            tree_map: MsgTreeMap, msg_type: MsgType, direction: MsgDirection) -> MsgHeader {
         let msg_count = get_next_count();
-        MsgHeader { sending_cell_id, originator_id, is_ait, msg_type, direction,
+        MsgHeader { sending_cell_id, originator_id, 
+            is_control, is_ait, is_snake, msg_type, direction,
             sender_msg_seq_no: msg_count, tree_map: tree_map.clone() }
     }
     pub fn get_msg_type(&self) -> MsgType { self.msg_type }
@@ -179,6 +181,8 @@ impl MsgHeader {
     pub fn get_sender_msg_seq_no(&self) -> SenderMsgSeqNo { self.sender_msg_seq_no }
     pub fn get_originator_id(&self) -> OriginatorID { self.originator_id }
     pub fn get_ait(&self) -> bool { self.is_ait }
+    pub fn get_control(&self) -> bool { self.is_control }
+    pub fn get_snake(&self) -> bool { self.is_snake }
     pub fn _get_direction(&self) -> MsgDirection { self.direction }
     pub fn get_tree_map(&self) -> &MsgTreeMap { &self.tree_map }
 }
@@ -194,9 +198,10 @@ pub struct DeleteTreeMsg {
     payload: DeleteTreeMsgPayload
 }
 impl DeleteTreeMsg {
-    pub fn new(sending_cell_id: CellID, originator_id: OriginatorID, delete_tree_id: TreeID) -> DeleteTreeMsg {
+    pub fn new(sending_cell_id: CellID, originator_id: OriginatorID, is_ait: bool, is_snake: bool,
+            delete_tree_id: TreeID) -> DeleteTreeMsg {
         let header = MsgHeader::new(sending_cell_id,
-            originator_id, false, HashMap::new(),
+            originator_id, true, is_ait, is_snake, HashMap::new(),
             MsgType::DeleteTree,
             MsgDirection::Leafward);
         let payload = DeleteTreeMsgPayload::new(delete_tree_id);
@@ -244,7 +249,7 @@ impl DiscoverMsg {
     pub fn new(sending_cell_id: CellID, originator_id: OriginatorID, port_tree_id: PortTreeID,
                hops: PathLength, path: Path) -> DiscoverMsg {
         let header = MsgHeader::new(sending_cell_id, originator_id,
-                                    true, HashMap::new(),
+                                    true, true, false, HashMap::new(),
                                     MsgType::Discover, MsgDirection::Leafward);
         let payload = DiscoverPayload::new(port_tree_id, hops, path);
         DiscoverMsg { header, payload }
@@ -317,7 +322,7 @@ impl DiscoverDMsg {
         // Note that direction is leafward so we can use the connected ports tree
         // If we send rootward, then the first recipient forwards the DiscoverD
         let header = MsgHeader::new(sending_cell_id, originator_id,
-                                    true, HashMap::new(),
+                                    true, true, false, HashMap::new(),
                                     MsgType::DiscoverD, MsgDirection::Leafward);
         let payload = DiscoverDPayload::new(in_reply_to,
                                             port_tree_id, path, discover_type);
@@ -394,7 +399,7 @@ impl FailoverMsg {
         // Note that direction is leafward so we can use the connected ports tree
         // If we send rootward, then the first recipient forwards the FailoverMsg
         let header = MsgHeader::new(sending_cell_id, originator_id,
-                                    true, HashMap::new(),
+                                    true, true, false, HashMap::new(),
                                     MsgType::Failover, MsgDirection::Leafward);
         let payload = FailoverMsgPayload::new(rw_port_tree_id, lw_port_tree_id,
                                               broken_tree_ids, path);
@@ -454,7 +459,7 @@ impl FailoverDMsg {
         // Note that direction is leafward so we can use the connected ports tree
         // If we send rootward, then the first recipient forwards the FailoverMsg
         let header = MsgHeader::new(sending_cell_id, originator_id,
-                                    true, HashMap::new(),
+                                    true, true, false, HashMap::new(),
                                     MsgType::FailoverD, MsgDirection::Leafward);
         let payload = FailoverDMsgPayload::new(in_reply_to, response,
                                                no_packets, failover_payload);
@@ -524,7 +529,7 @@ impl HelloMsg {
         // Note that direction is leafward so we can use the connected ports tree
         // If we send rootward, then the first recipient forwards the FailoverMsg
         let header = MsgHeader::new(sending_cell_id, originator_id,
-                                    true, HashMap::new(),
+                                    true, true, false, HashMap::new(),
                                     MsgType::Hello, MsgDirection::Leafward);
         let payload = HelloMsgPayload::new(cell_id, port_no);
         HelloMsg { header, payload }
@@ -574,10 +579,10 @@ pub struct DiscoverAckDMsg {
 impl DiscoverAckDMsg {
     pub fn new(in_reply_to: SenderMsgSeqNo, sending_cell_id: CellID, originator_id: OriginatorID, port_tree_id: PortTreeID) -> DiscoverAckDMsg {
         // Note that direction is leafward so we can use the connected ports tree
-        // If we send rootward, then the first recipient forwards the Prepare
+        // If we send rootward, then the first recipient forwards the DiscoverAckD
         let header = MsgHeader::new(sending_cell_id, originator_id,
-                                    true, HashMap::new(),
-                                    MsgType::Prepare, MsgDirection::Leafward);
+                                    true, true, false, HashMap::new(),
+                                    MsgType::DiscoverAckD, MsgDirection::Leafward);
         let payload = DiscoverAckDPayload::new(in_reply_to, port_tree_id);
         DiscoverAckDMsg { header, payload }
     }
@@ -624,10 +629,10 @@ pub struct DiscoverAckMsg {
 impl DiscoverAckMsg {
     pub fn new(in_reply_to: SenderMsgSeqNo, sending_cell_id: CellID, originator_id: OriginatorID, port_tree_id: PortTreeID) -> DiscoverAckMsg {
         // Note that direction is leafward so we can use the connected ports tree
-        // If we send rootward, then the first recipient forwards the PrepareD
+        // If we send rootward, then the first recipient forwards the DiscoverAck
         let header = MsgHeader::new(sending_cell_id, originator_id,
-                                    true, HashMap::new(),
-                                    MsgType::PrepareD, MsgDirection::Leafward);
+                                    true, true, false, HashMap::new(),
+                                    MsgType::DiscoverAck, MsgDirection::Leafward);
         let payload = DiscoverAckPayload::new(in_reply_to, port_tree_id);
         DiscoverAckMsg { header, payload }
     }
@@ -675,7 +680,7 @@ impl StackTreeMsg {
     pub fn new(sending_cell_id: CellID, originator_id: OriginatorID, new_tree_name: &AllowedTree, new_tree_id: TreeID, parent_tree_id: TreeID,
                direction: MsgDirection, gvm_eqn: &GvmEquation) -> StackTreeMsg {
         let header = MsgHeader::new(sending_cell_id,  originator_id,
-                                    true, HashMap::new(),
+                                    true, true, false, HashMap::new(),
                                      MsgType::StackTree, direction);
         let payload = StackTreeMsgPayload::new(new_tree_name,
                                                new_tree_id, parent_tree_id, gvm_eqn);
@@ -736,7 +741,7 @@ impl StackTreeDMsg {
     pub fn new(in_reply_to: SenderMsgSeqNo, sending_cell_id: CellID, originator_id: OriginatorID, port_tree_id: PortTreeID,
                parent_port_tree_id: PortTreeID, join: bool) -> StackTreeDMsg {
         let header = MsgHeader::new(sending_cell_id, originator_id,
-                                    true, HashMap::new(),
+                                    true, true, false, HashMap::new(),
                                     MsgType::StackTreeD, MsgDirection::Leafward);
         let payload = StackTreeMsgDPayload::new(in_reply_to, port_tree_id, parent_port_tree_id, join);
         StackTreeDMsg { header, payload}
@@ -790,10 +795,11 @@ pub struct ManifestMsg {
     payload: ManifestMsgPayload
 }
 impl ManifestMsg {
-    pub fn new(sending_cell_id: CellID, originator_id: OriginatorID, is_ait: bool, deploy_tree_id: TreeID, tree_map: &MsgTreeMap, manifest: &Manifest) -> ManifestMsg {
+    pub fn new(sending_cell_id: CellID, originator_id: OriginatorID, is_ait: bool, is_snake: bool,
+                deploy_tree_id: TreeID, tree_map: &MsgTreeMap, manifest: &Manifest) -> ManifestMsg {
         // Note that direction is leafward so cell agent will get the message
         let header = MsgHeader::new(sending_cell_id, originator_id,
-                                    is_ait, tree_map.clone(),
+                                    false, is_ait, is_snake, tree_map.clone(),
                                         MsgType::Manifest, MsgDirection::Leafward);
 
         let payload = ManifestMsgPayload::new(deploy_tree_id.to_port_tree_id_0(), &manifest);
@@ -845,10 +851,11 @@ pub struct InterapplicationMsg {
     payload: InterapplicationMsgPayload
 }
 impl InterapplicationMsg {
-    pub fn new(sending_cell_id: CellID, originator_id: OriginatorID, is_ait: bool, tree_id: TreeID, direction: MsgDirection,
+    pub fn new(sending_cell_id: CellID, originator_id: OriginatorID, is_ait: bool, is_snake: bool,
+                tree_id: TreeID, direction: MsgDirection,
                tree_map: &MsgTreeMap, app_msg: &AppInterapplicationMsg) -> InterapplicationMsg {
         let header = MsgHeader::new(sending_cell_id, originator_id,
-                                    is_ait, tree_map.clone(),
+                                    false, is_ait, is_snake, tree_map.clone(),
                                     MsgType::Interapplication, direction);
         let payload = InterapplicationMsgPayload::new(tree_id.to_port_tree_id_0(), app_msg);
         InterapplicationMsg { header, payload }
@@ -901,10 +908,11 @@ pub struct TreeNameMsg {
     payload: TreeNameMsgPayload
 }
 impl TreeNameMsg {
-    pub fn _new(sending_cell_id: CellID, originator_id: OriginatorID, tree_name: &str) -> TreeNameMsg {
+    pub fn _new(sending_cell_id: CellID, originator_id: OriginatorID, is_ait: bool, is_snake: bool,
+                tree_name: &str) -> TreeNameMsg {
         // Note that direction is rootward so cell agent will get the message
         let header = MsgHeader::new(sending_cell_id, originator_id,
-                                    false, HashMap::new(),
+                                    false, is_ait, is_snake, HashMap::new(),
                                     MsgType::TreeName, MsgDirection::Rootward);
         let payload = TreeNameMsgPayload::_new(tree_name);
         TreeNameMsg { header, payload }

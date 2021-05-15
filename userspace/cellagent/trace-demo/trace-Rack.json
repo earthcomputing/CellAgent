@@ -1,0 +1,1 @@
+{"header":{"starting_epoch":1607127534872772,"epoch":1607127535004939,"spawning_thread_id":1,"thread_id":1,"event_id":[599],"trace_type":"Trace","module":"src/rack.rs","line_no":166,"function":"connect_to_noc","format":"border_cell","repo":"CellAgent"},"body":{"cell_id":{"name":"Rack"},"cell_no":3}},

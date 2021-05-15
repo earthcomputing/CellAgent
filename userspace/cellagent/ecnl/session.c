@@ -1,3 +1,7 @@
+/*---------------------------------------------------------------------------------------------
+ *  Copyright © 2016-present Earth Computing Corporation. All rights reserved.
+ *  Licensed under the MIT License. See LICENSE.txt in the project root for license information.
+ *--------------------------------------------------------------------------------------------*/
 #include <netlink/attr.h>
 #include <netlink/cli/utils.h>
 #include <linux/genetlink.h>
@@ -24,8 +28,6 @@ struct nl_sock *init_sock();
 #include <unistd.h>
 #include <sys/ioctl.h>
 #include <sys/types.h>
-
-#include "entl_ioctl.h"
 
 // Interface routines
 int alloc_nl_session(void **nl_session_ptr) {

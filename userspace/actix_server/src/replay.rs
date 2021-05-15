@@ -15,10 +15,10 @@ use crate::trace_record::TraceRecord;
 #[derive(Debug, Clone, Serialize, Deserialize)]
 struct FileNameParams { filename: String }
 
-fn replay_from_file(appcells: web::Data<AppCells>, appgeometry: web::Data<AppGeometry>,
+async fn replay_from_file(appcells: web::Data<AppCells>, appgeometry: web::Data<AppGeometry>,
                     form_data: web::Form<FileNameParams>)
                     -> Result<impl Responder, Error> {
-    reset(appcells.clone(), appgeometry.clone());
+    reset(appcells.clone(), appgeometry.clone()).await;
     let filename = if form_data.filename == "" {
         "../cellagent/trace/trace.json"
     } else {
@@ -65,7 +65,7 @@ fn replay_from_file(appcells: web::Data<AppCells>, appgeometry: web::Data<AppGeo
         .content_type("text/plain")
         .body(format!("Replay from file {}", filename)))
 }
-pub fn reset(appcells: web::Data<AppCells>, geometry: web::Data<AppGeometry>) {
+pub async fn reset(appcells: web::Data<AppCells>, geometry: web::Data<AppGeometry>) -> impl Responder {
     let mut cells = appcells
         .get_ref()
         .appcells.lock().unwrap();
@@ -76,9 +76,9 @@ pub fn reset(appcells: web::Data<AppCells>, geometry: web::Data<AppGeometry>) {
     geometry.maxcol = 0;
     geometry.maxrow = 0;
     geometry.rowcol = RowCol::default();
+    HttpResponse::Ok().body("reset")
 }
 pub fn post() -> Scope {
     web::scope("/replay")
-        .data(web::Data::new(AppCells::default()))
         .route("", web::post().to(replay_from_file))
 }

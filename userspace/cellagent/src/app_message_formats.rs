@@ -1,34 +1,29 @@
+/*---------------------------------------------------------------------------------------------
+ *  Copyright © 2016-present Earth Computing Corporation. All rights reserved.
+ *  Licensed under the MIT License. See LICENSE.txt in the project root for license information.
+ *--------------------------------------------------------------------------------------------*/
 //use std::sync::mpsc;
 use crossbeam::crossbeam_channel as mpsc;
 
-use crate::port::PortStatus;
+use crate::port::PortStatusOld;
 use crate::utility::{ByteArray, PortNo};
-
+pub type SNAKE = bool;
 pub type ISAIT = bool;
+pub type ISCONTROL = bool;
 pub type APP = ByteArray;
 // Port to Noc World
-pub type PortToNocMsg = APP;
-pub type PortToNoc = mpsc::Sender<PortToNocMsg>;
-pub type NocFromPort = mpsc::Receiver<PortToNocMsg>;
-//pub type PortNocError = mpsc::SendError<PortToNocMsg>;
-// Noc to Port
 pub type NocToPortMsg = APP;
-pub type NocToPort = mpsc::Sender<NocToPortMsg>;
-pub type PortFromNoc = mpsc::Receiver<NocToPortMsg>;
-//pub type NocPortError = mpsc::SendError<NocToPortMsg>;
+pub type PortToNocMsg = APP;
+//pub type PortNocError = mpsc::SendError<PortToNocMsg>;
 // Application to Noc
 pub type ApplicationNocMsg = String;
-pub type ApplicationToNoc = mpsc::Sender<ApplicationNocMsg>;
-pub type NocFromApplication = mpsc::Receiver<ApplicationNocMsg>;
 //pub type ApplicationNocError = mpsc::SendError<ApplicationNocMsg>;
 // Noc to Application
 pub type NocToApplicationMsg = String;
-pub type NocToApplication = mpsc::Sender<NocToApplicationMsg>;
-pub type ApplicationFromNoc = mpsc::Receiver<NocToApplicationMsg>;
 //pub type NocApplicationError = mpsc::SendError<NocToApplicationMsg>;
 // Boundary Port to Ca
 #[derive(Debug, Clone, Serialize)]
-pub enum PortToCaMsg { Status(PortNo, PortStatus), AppMsg(PortNo, APP) }
+pub enum PortToCaMsg { Status(PortNo, PortStatusOld), AppMsg(PortNo, APP) }
 pub type PortToCa = mpsc::Sender<PortToCaMsg>;
 pub type CaFromPort = mpsc::Receiver<PortToCaMsg>;
 //pub type PortCaError = mpsc::SendError<PortToCaMsg>;

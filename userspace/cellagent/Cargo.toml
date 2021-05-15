@@ -1,4 +1,9 @@
+#---------------------------------------------------------------------------------------------
+ #  Copyright © 2016-present Earth Computing Corporation. All rights reserved.
+ #  Licensed under the MIT License. See LICENSE.txt in the project root for license information.
+#---------------------------------------------------------------------------------------------
 [package]
+# resolver = "2" # resolver that doesn't combine features
 name = "ec_fabrix"
 version = "0.1.0"
 authors = ["Alan Karp <alan@earthcomputing.io>"]
@@ -33,14 +38,14 @@ path = "src/test.rs"
 opt-level = 3
 
 [profile.dev]
-# Turn off optimization in Development mode
-opt-level = 0
+opt-level = 0 # Turn off optimization in Development mode
+split-debuginfo = "unpacked" # Speed up compilation on Mac
 
 [profile.release]
 lto = true
 
 [dependencies]
-actix-web = "1.0.5"
+actix-web = "2.0.0"
 actix-rt = "0.2.4"
 arrayvec = {version = "0.4.11", features = ["serde-1"]}
 backtrace = "0.3" # used in dumpstack.rs
@@ -48,16 +53,17 @@ bimap = {version = "0.3.1", features = ["serde"]} # bi-directional hashmap h: H(
 #bincode = "1.1.2" # for binary serialization
 #chrono = { version = "0.4.3", features = ["serde"] }
 crossbeam = "0.7.1"
-crossbeam-channel = "0.3.9"
+crossbeam-channel = "0.4.4"
 #[cfg(feature = "cell")]
-c_string = "0.7.0"
+#c_string = "0.7.0"
 #displaydoc = "0.1.4" // Derive Display from doc comments
 #ditto = "0.2.0" # CRDT library
 either = "1.5"
-eval = "^0.4.1"
+eval = "^0.4.1" # Abandoned
+#evalexpr = "5" # A more comprehensive eval
 failure = "0.1.5"
 failure_derive = "0.1.0"
-futures = "0.1.23" # used in dal.rs
+futures = "0.3.1" # used in dal.rs
 #im = "13.0.0" # Fast cloneable collections
 #indexmap = "1.0.1" # HashMap and HashSet that preserve order
 #internment = "0.3.6"
@@ -67,6 +73,8 @@ lazy_static = "1.1.0"
 libc = "0.2.57"
 #log = {version = "0.4.6", features = ["std", "serde"]} # Should use instead of my trace approach
 multi_mut = "0.1"
+#puffin = "0.3" # Simple to use profiler
+#puffin-imgui = "??" # Visualizer for puffin
 rand = "0.5.4"
 #rdkafka = "0.17.0"
 reqwest = "0.9.11"

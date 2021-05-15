@@ -1,3 +1,7 @@
+/*---------------------------------------------------------------------------------------------
+ *  Copyright © 2016-present Earth Computing Corporation. All rights reserved.
+ *  Licensed under the MIT License. See LICENSE.txt in the project root for license information.
+ *--------------------------------------------------------------------------------------------*/
 use std::{fmt, marker::Sized};
 use std::string::String;
 
@@ -23,7 +27,7 @@ pub trait Name: Sized {
     fn get_uuid(&self) -> Uuid;
     fn create_from_string(&self, n: &str) -> Self;
     // Default implementations
-    fn stringify(&self) -> String { S(self.get_name()) }
+    fn stringify(&self) -> String { self.get_name() }
     fn name_from_str(&self, s: &str) -> Result<Self, Error> {
         // Names may not contain blanks
         match s.find(' ') {

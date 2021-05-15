@@ -1,18 +1,23 @@
+/*---------------------------------------------------------------------------------------------
+ *  Copyright © 2016-present Earth Computing Corporation. All rights reserved.
+ *  Licensed under the MIT License. See LICENSE.txt in the project root for license information.
+ *--------------------------------------------------------------------------------------------*/
 #[macro_use] extern crate failure;
 
-use std::{io::{stdin, stdout, Read, Write},
+use std::{convert::TryFrom,
+          io::{stdin, stdout, Read, Write},
           fs::{File,},
           collections::{HashSet},
 };
 
-use ec_fabrix::app_message_formats::{ApplicationToNoc};
 use ec_fabrix::blueprint::{Blueprint};
 use ec_fabrix::config::{CONFIG};
-use ec_fabrix::datacenter::{Datacenter};
+use ec_fabrix::datacenter::{Datacenter, ApplicationToNoc};
 use ec_fabrix::gvm_equation::{GvmEqn};
 use ec_fabrix::link::Link;
+use ec_fabrix::rack::{EdgeConnection, CellInteriorConnection};
 use ec_fabrix::uptree_spec::{AllowedTree, ContainerSpec, Manifest, UpTreeSpec, VmSpec};
-use ec_fabrix::utility::{CellConfig, CellNo, Edge, S, print_hash_map, sleep};
+use ec_fabrix::utility::{CellConfig, CellNo, PortNo, S, print_hash_map, sleep};
 
 fn main() -> Result<(), Error> {
     let _f = "main";
@@ -35,8 +40,7 @@ fn main() -> Result<(), Error> {
                                                    &CONFIG.edge_list,
                                                    CONFIG.num_ports_per_cell,
                                                    &CONFIG.cell_port_exceptions,
-                                                   &CONFIG.border_cell_ports,
-        )?) {
+                                                   &CONFIG.border_cell_ports,)?) {
             Ok(dc) => dc,
             Err(err) => panic!("Datacenter construction failure: {}", err)
         };
@@ -48,7 +52,6 @@ fn main() -> Result<(), Error> {
             c to print cells
             l to print links
             p to print forwarding table
-            m to deploy an application
             x to exit program\n\n").context(MainError::Chain { func_name: "run", comment: S("") })?;
         let mut print_opt = String::new();
         stdin().read_line(&mut print_opt).context(MainError::Chain { func_name: _f, comment: S("") })?;
@@ -61,7 +64,6 @@ fn main() -> Result<(), Error> {
                 "c" => show_ca(&dc),
                 "l" => break_link(&mut dc),
                 "p" => show_pe(&dc),
-                "m" => deploy(&dc.get_application_to_noc().clone()),
                 "x" => std::process::exit(0),
                 _   => {
                     println!("Invalid input {}", print_opt);
@@ -99,27 +101,35 @@ fn show_pe(dc: &Datacenter) -> Result<(), Error> {
 }
 fn break_link(dc: &mut Datacenter) -> Result<(), Error> {
     let rack = dc.get_rack_mut();
-    let edge: Edge = match CONFIG.auto_break {
-        Some(edge) => {
+    // Changed this (for the time being, at least) to use an edge_connection (with ports) instead of an edge.  We may want to look up and break all connections for an edge
+    let edge_connection: EdgeConnection = match CONFIG.auto_break {
+        Some(edge_connection) => {
             // TODO: Wait until discover is done before automatically breaking link, should be removed
             println!("---> Sleeping to let discover finish before automatically breaking link");
             sleep(6);
-            println!("---> Automatically break link {}", edge);
-            edge
+            println!("---> Automatically break link {}", edge_connection);
+            edge_connection
         },
         None => {
             let link_ids = rack.get_link_ids();
             print_hash_map(&link_ids);
             let _ = stdout().write(b"Enter first cell number of link to break\n")?;
-            let left: usize = read_int()?;
+            let left_cell = usize::try_from(read_int()?)?;
+            let _ = stdout().write(b"Enter first port number of link to break\n")?;
+            let left_port = u8::try_from(read_int()?)?;
             let _ = stdout().write(b"Enter second cell number of link to break\n")?;
-            let right: usize = read_int()?;
-            Edge(CellNo(left), CellNo(right))
+            let rite_cell = usize::try_from(read_int()?)?;
+            let _ = stdout().write(b"Enter second port number of link to break\n")?;
+            let rite_port = u8::try_from(read_int()?)?;
+            EdgeConnection::new(
+                CellInteriorConnection::new(CellNo(left_cell), PortNo(left_port)),
+                CellInteriorConnection::new(CellNo(rite_cell), PortNo(rite_port))
+            )
         },
     };
     let links = rack.get_links_mut();
-    links.get_mut(&edge)
-        .map_or_else(|| -> Result<(), Error> { println!("{} is not a valid input", edge); Ok(()) },
+    links.get_mut(&edge_connection)
+        .map_or_else(|| -> Result<(), Error> { println!("{} is not a valid input", edge_connection); Ok(()) },
                      |link: &mut Link| -> Result<(), Error> { link.break_link()?; Ok(()) }
         )?;
     Ok(())
@@ -136,7 +146,7 @@ fn read_int() -> Result<usize, Error> {
         }
     }
 }
-fn deploy(application_to_noc: &ApplicationToNoc) -> Result<(), Error> {
+fn _deploy(application_to_noc: &ApplicationToNoc) -> Result<(), Error> {
     let _f = "deploy";
     stdout().write(b"Enter the name of a file containing a manifest\n").context(MainError::Chain { func_name: "run", comment: S("") })?;
     let mut filename = String::new();

@@ -1,3 +1,7 @@
+/*---------------------------------------------------------------------------------------------
+ *  Copyright © 2016-present Earth Computing Corporation. All rights reserved.
+ *  Licensed under the MIT License. See LICENSE.txt in the project root for license information.
+ *--------------------------------------------------------------------------------------------*/
 // This file contains hacks that represent functions of the DAL.
 // which will be replaced by actual distributed storage algorithms.
 use std::{cell::RefCell,
@@ -10,7 +14,7 @@ use std::{cell::RefCell,
 use {
     actix_rt::{System, SystemRunner},
     actix_web::client::{ClientBuilder},
-    futures::{future::lazy},
+    futures::executor::block_on,
     std::sync::atomic::Ordering
 };
 
@@ -21,7 +25,7 @@ use serde_json;
 use serde_json::{Value};
 
 use crate::config::{CONFIG};
-use crate::utility::{S, TraceHeader, TraceHeaderParams, TraceType};
+use crate::utility::{S, TraceHeader, TraceHeaderParams, TraceType, write_err};
 
 const FOR_EVAL: bool = true;
 
@@ -52,7 +56,7 @@ pub fn fork_trace_header() -> TraceHeader { TRACE_HEADER.with(|t| t.borrow_mut()
 pub fn update_trace_header(child_trace_header: TraceHeader) { TRACE_HEADER.with(|t| *t.borrow_mut() = child_trace_header); }
 
 pub fn add_to_trace(trace_type: TraceType, trace_params: &TraceHeaderParams,
-                    trace_body: &Value, caller: &str) -> Result<(), Error> {
+                    trace_body: &Value, caller: &str) {
     let _f = "add_to_trace";
     let other = json!({"name": "Other"});
     let cell_id = trace_body
@@ -64,11 +68,11 @@ pub fn add_to_trace(trace_type: TraceType, trace_params: &TraceHeaderParams,
         .unwrap();
     // Mac Finder replaces ":" with "/" which is obviously bad for filenames in the shell
     let cell_file_name = format!("{}{}-{}.json", CONFIG.output_dir_name, CONFIG.output_file_name, str::replace(cell_id, ":", "-"));
-    let mut cell_file_handle = OpenOptions::new().append(true).open(cell_file_name.clone())
-        .or_else(|_| { File::create(cell_file_name) })?;
+    let cell_file_handle = OpenOptions::new().append(true).open(cell_file_name.clone())
+        .or_else(|_| { File::create(cell_file_name) }).map_err(|e| write_err(&format!("Dal: {}", caller), &e.into()));
     let output_file_name = format!("{}/{}.json", CONFIG.output_dir_name, CONFIG.output_file_name);
-    let mut file_handle = OpenOptions::new().append(true).open(output_file_name.clone())
-        .or_else(|_| { File::create(output_file_name) })?;
+    let file_handle = OpenOptions::new().append(true).open(output_file_name.clone())
+        .or_else(|_| { File::create(output_file_name) }).map_err(|e| write_err(&format!("Dal: {}", caller), &e.into()));
     TRACE_HEADER.with(|t| {
         t.borrow_mut().next(trace_type);
         t.borrow_mut().update(trace_params);
@@ -76,14 +80,20 @@ pub fn add_to_trace(trace_type: TraceType, trace_params: &TraceHeaderParams,
     let trace_header = TRACE_HEADER.with(|t| t.borrow().clone());
     let trace_record = TraceRecord { header: &trace_header, body: trace_body };
     #[cfg(feature="webserver")]
-    trace_it(&trace_record)?;
+    let _ = trace_it(&trace_record).map_err(|e| write_err(&format!("Dal: {}", caller), &e));
     let line = if FOR_EVAL {
-        serde_json::to_string(&trace_record).context(DalError::Chain { func_name: "add_to_trace", comment: S(caller) })?
+        serde_json::to_string(&trace_record).map_err(|e| write_err(&format!("Dal: {}", caller), &e.into()))
     } else {
-        format!("{:?}", &trace_record)
+        Ok(format!("{:?}", &trace_record))
     };
-    cell_file_handle.write_all(&(line.clone() + ",\n").into_bytes()).context(DalError::Chain { func_name: _f, comment: S("Write cell record") })?;
-    file_handle.write_all(&(line.clone() + ",\n").into_bytes()).context(DalError::Chain { func_name: _f, comment: S("Write record") })?;
+    if let Ok(line) = line {
+        if let Ok(mut c) = cell_file_handle {
+            let _ = c.write_all(&(line.clone() + ",\n").into_bytes()).map_err(|e| write_err(&format!("Dal: {}", caller), &e.into()));
+        };
+        if let Ok(mut f) = file_handle {
+            let _ = f.write_all(&(line.clone() + ",\n").into_bytes()).map_err(|e| write_err(&format!("Dal: {}", caller), &e.into()));
+        }
+    };
 /*
     let _ = PRODUCER_RD.send(FutureRecord::to(&CONFIG.kafka_topic)
                                  .payload(&line)
@@ -97,7 +107,6 @@ pub fn add_to_trace(trace_type: TraceType, trace_params: &TraceHeaderParams,
             }
         });
 */
-    Ok(())
 }
 pub fn get_cell_replay_lines(cell_name: &str) -> Result<Lines<BufReader<File>>, Error> {
     let _f = "get_cell_replay_lines";
@@ -108,11 +117,11 @@ pub fn get_cell_replay_lines(cell_name: &str) -> Result<Lines<BufReader<File>>, 
         S("/dev/null")
     };
     let cell_file_name = str::replace(&file_name, ":", "-");
-    let mut cell_file_handle = OpenOptions::new().read(true).open(cell_file_name.clone()).context(DalError::Replay { func_name: _f, file_name: cell_file_name, cell_name: S(cell_name) })?;
+    let cell_file_handle = OpenOptions::new().read(true).open(cell_file_name.clone()).context(DalError::Replay { func_name: _f, file_name: cell_file_name, cell_name: S(cell_name) })?;
     let reader = BufReader::new(cell_file_handle);
     Ok(reader.lines())
 }
-#[cfg(feature="webserver")]
+#[cfg(feature = "webserver")]
 fn trace_it(trace_record: &TraceRecord<'_>) -> Result<(), Error> {
     let _f = "trace_it";
     if SERVER_ERROR.load(Ordering::SeqCst) { return Ok(()); }
@@ -122,32 +131,28 @@ fn trace_it(trace_record: &TraceRecord<'_>) -> Result<(), Error> {
     let server_url_clone = server_url.clone(); // So I can print as part of en error response
     let value = serde_json::to_value(trace_record)?;
     SKIP.with(|skip| {
-        let mut s = skip.borrow_mut();
-        if !s.contains(format) {
-            let client_builder = ClientBuilder::new();
-            let client = client_builder.disable_timeout().finish();
-            let _ = SYSTEM.with(|sys| {
-                let mut system = sys.borrow_mut();
-                system.block_on(lazy(|| {
-                    client.post(server_url)
-                        .header("User-Agent", "Actix-web")
-                        .send_json(&value)
-                        .map_err(|e| {
-                            println!("\nError from server: url {} {:?}\n", server_url_clone, e);
-                            SERVER_ERROR.swap(true, Ordering::SeqCst);
-                        })
-                        .and_then(|response| {
-                            if !response.status().is_success() {
-                                if response.status() != 404 {
-                                    println!("Error {}: {:?}", server_url_clone, response);
-                                }
+        block_on(
+            async {
+                let mut s = skip.borrow_mut();
+                if !s.contains(format) {
+                    let client_builder = ClientBuilder::new();
+                    let client = client_builder.disable_timeout().finish();
+                    if let Ok(response) = 
+                        client
+                            .post(server_url)
+                            .send_json(&value)
+                            .await
+                    {
+                        if !response.status().is_success() {
+                            if response.status() != 404 {
+                                println!("Error {}: {:?}", server_url_clone, response);
+                            }
                                 s.insert(format.to_owned());
                             }
-                            Ok(())
-                        })
-                }))
-            });
-        }
+                    };
+                }
+            }
+        );
     });
     Ok(())
 }
