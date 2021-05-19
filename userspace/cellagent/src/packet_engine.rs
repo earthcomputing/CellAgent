@@ -1,3 +1,7 @@
+/*---------------------------------------------------------------------------------------------
+ *  Copyright © 2016-present Earth Computing Corporation. All rights reserved.
+ *  Licensed under the MIT License. See LICENSE.txt in the project root for license information.
+ *--------------------------------------------------------------------------------------------*/
 use std::{collections::{HashMap, HashSet, VecDeque}, fmt, fmt::Write, str, sync::{Arc, Mutex}, thread, thread::JoinHandle};
 
 use crate::{config::{CONFIG}};

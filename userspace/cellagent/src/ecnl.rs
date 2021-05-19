@@ -1,3 +1,7 @@
+/*---------------------------------------------------------------------------------------------
+ *  Copyright © 2016-present Earth Computing Corporation. All rights reserved.
+ *  Licensed under the MIT License. See LICENSE.txt in the project root for license information.
+ *--------------------------------------------------------------------------------------------*/
 use failure::{Error, ResultExt, Fail};
 #[cfg(feature = "cell")]
 use libc::{free};
@@ -15,7 +19,7 @@ use std::{
 
 use crate::config::{CONFIG, PortQty};
 use crate::dal::{add_to_trace};
-use crate::ec_message_formats::{PortFromPeOld};
+use crate::ec_message_formats::{PortFromPe};
 use crate::ecnl_port::{ECNL_Port};
 use crate::nalcell::{NalCell};
 use crate::port::{PortSeed, InteriorPortLike};
@@ -48,7 +52,7 @@ pub struct BuffDesc {
 
 #[cfg(feature = "cell")]
 #[allow(improper_ctypes)]
-#[link(name = ":ecnl_sdk.o")]
+#[link(name = ":session.o")]
 #[link(name = ":ecnl_proto.o")]
 #[link(name = ":libnl-3.so")]
 #[link(name = ":libnl-genl-3.so")]

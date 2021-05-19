@@ -37,8 +37,8 @@
       <change beforePath="$PROJECT_DIR$/../ec-hello.js" beforeDir="false" afterPath="$PROJECT_DIR$/ec-hello.js" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/../eclipse-mac-README" beforeDir="false" afterPath="$PROJECT_DIR$/eclipse-mac-README" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/../ecnl/Makefile" beforeDir="false" afterPath="$PROJECT_DIR$/ecnl/Makefile" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/../ecnl/ecnl_sdk.c" beforeDir="false" afterPath="$PROJECT_DIR$/ecnl/ecnl_sdk.c" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/../ecnl/ecnl_sdk.h" beforeDir="false" afterPath="$PROJECT_DIR$/ecnl/ecnl_sdk.h" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../ecnl/session.c" beforeDir="false" afterPath="$PROJECT_DIR$/ecnl/session.c" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../ecnl/session.h" beforeDir="false" afterPath="$PROJECT_DIR$/ecnl/session.h" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/../multicell.iml" beforeDir="false" afterPath="$PROJECT_DIR$/multicell.iml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/../sample_output.txt" beforeDir="false" afterPath="$PROJECT_DIR$/sample_output.txt" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/../src/app_message.rs" beforeDir="false" afterPath="$PROJECT_DIR$/src/app_message.rs" afterDir="false" />

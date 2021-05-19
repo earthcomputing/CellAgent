@@ -1,5 +1,9 @@
+#---------------------------------------------------------------------------------------------
+ #  Copyright © 2016-present Earth Computing Corporation. All rights reserved.
+ #  Licensed under the MIT License. See LICENSE.txt in the project root for license information.
+#---------------------------------------------------------------------------------------------
 [package]
-resolver = "2" # resolver that doesn't combine features
+# resolver = "2" # resolver that doesn't combine features
 name = "ec_fabrix"
 version = "0.1.0"
 authors = ["Alan Karp <alan@earthcomputing.io>"]
