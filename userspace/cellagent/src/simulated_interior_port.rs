@@ -2,7 +2,8 @@
  *  Copyright © 2016-present Earth Computing Corporation. All rights reserved.
  *  Licensed under the MIT License. See LICENSE.txt in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
-use std::{
+ #![allow(unused_import_braces)]
+ use std::{
     fmt,
     thread,
     collections::HashMap,
@@ -12,9 +13,6 @@ use crossbeam::crossbeam_channel as mpsc;
 use crate::blueprint::{Blueprint};
 use crate::config::{CONFIG};
 use crate::dal::{add_to_trace, fork_trace_header, update_trace_header};
-#[cfg(feature = "api-old")]
-use crate::ec_message_formats::{PortToPePacket};
-#[cfg(feature = "api-new")]
 use crate::ec_message_formats::{PortToPePacket};
 use crate::link::{LinkStatus};
 use crate::name::{Name, CellID, PortID};
@@ -23,9 +21,6 @@ use crate::packet::{Packet}; // Eventually use SimulatedPacket
 use crate::packet_engine::NumberOfPackets;
 use crate::port::{CommonPortLike, FailoverInfo, InteriorPortLike, PortSeed, BasePort, InteriorPortFactoryLike, 
                   DuplexPortPeOrCaChannel, DuplexPortPeChannel};
-#[cfg(feature = "api-old")]
-use crate::port::PortStatus;
-#[cfg(feature = "api-new")]
 use crate::port::PortStatus;
 use crate::utility::{CellNo, PortNo, PortNumber, S, TraceHeaderParams, TraceType, write_err};
 use crate::uuid_ec::{AitState};
