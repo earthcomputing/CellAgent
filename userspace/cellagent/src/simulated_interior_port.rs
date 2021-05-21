@@ -41,6 +41,7 @@ pub struct SimulatedInteriorPort {
     base_port: BasePort,
     failover_info: FailoverInfo,
     is_connected: bool,
+    my_turn: bool,
     init_packet: Packet,
     duplex_port_link_channel: Option<DuplexPortLinkChannel>,
 }
@@ -48,7 +49,7 @@ pub struct SimulatedInteriorPort {
 impl SimulatedInteriorPort {
     pub fn new(base_port: BasePort, failover_info: FailoverInfo, is_connected: bool, 
         duplex_port_link_channel: Option<DuplexPortLinkChannel>) -> SimulatedInteriorPort {
-            SimulatedInteriorPort { base_port, failover_info, is_connected, 
+            SimulatedInteriorPort { base_port, failover_info, is_connected, my_turn: true,
                 duplex_port_link_channel, init_packet: Packet::make_init_packet() }
     }
     fn get_port_no(&self) -> PortNo { self.base_port.get_port_no() }
@@ -154,40 +155,30 @@ impl InteriorPortLike for SimulatedInteriorPort {
             self.base_port.update_activity_data();
             match msg {
                 LinkToPortPacket::Status(link_status) => {
-                    #[cfg(feature = "api-new")]
-                    {                   
-                        match status {
-                            LinkStatus::Connected => {
-                                self.set_connected();
-                                port_to_pe.send(PortToPePacket::Status((port_no, self.base_port.is_border(), PortStatus::Connected)))?;
-                                self.direct_send(&self.init_packet.clone())?;
-                            },
-                            LinkStatus::Disconnected => {
-                                self.set_disconnected();
+                    match link_status {
+                        LinkStatus::Connected => {
+                            self.set_connected();
+                            self.direct_send(&self.init_packet.clone())?;
+                            #[cfg(feature = "api-new")]
+                            let status_msg = (port_no, false, PortStatus::Connected);
+                            #[cfg(feature = "api-old")]
+                            let status_msg = (port_no, false, PortStatus::Connected, NumberOfPackets::new());
+                            port_to_pe.send(PortToPePacket::Status(status_msg)).context(SimulatedInteriorPortError::Chain { func_name: _f, comment: S(self.base_port.get_id().get_name()) + " send status to pe"})?;
+                            
+                        },
+                        LinkStatus::Disconnected => {
+                            self.set_disconnected();
+                            self.init_packet = Packet::make_init_packet(); // To get a different random value
+                            #[cfg(feature = "api-new")]
+                            let status_msg = {
                                 let failover_info = FailoverInfo::new(port_no); // TODO: provide actual failover info
-                                self.init_packet = Packet::make_init_packet(); // To get a different random value
-                                port_to_pe.send(PortToPePacket::Status((port_no, self.base_port.is_border(), PortStatus::Disconnected(failover_info))))?;
-                            }
-                        };
+                                (port_no, false, PortStatus::Disconnected(failover_info)) 
+                            };
+                            #[cfg(feature = "api-old")]
+                            let status_msg = (port_no, false, PortStatus::Disconnected, NumberOfPackets::new());
+                            port_to_pe.send(PortToPePacket::Status(status_msg)).context(SimulatedInteriorPortError::Chain { func_name: _f, comment: S(self.base_port.get_id().get_name()) + " send status to pe"})?;
+                        }
                     }
-                    #[cfg(feature = "api-old")]
-                    {
-                        let status = match link_status {
-                            LinkStatus::Connected => {
-                                self.set_connected();
-                                PortStatus::Connected
-                            },
-                            LinkStatus::Disconnected => {
-                                self.set_disconnected();
-                            PortStatus::Disconnected
-                            }
-                        };
-                        #[cfg(feature = "api-old")]
-                        let status_msg = (port_no, false, status, NumberOfPackets::new());
-                        #[cfg(feature = "api-new")]
-                        let status_msg = (port_no, self.base_port.is_border(), status);
-                        port_to_pe.send(PortToPePacket::Status(status_msg)).context(SimulatedInteriorPortError::Chain { func_name: _f, comment: S(self.base_port.get_id().get_name()) + " send status to pe"})?;
-                    }   
                     {
                         if CONFIG.trace_options.all || CONFIG.trace_options.port {
                             let trace_params = &TraceHeaderParams { module: file!(), line_no: line!(), function: _f, format: "port_to_pe_status" };
