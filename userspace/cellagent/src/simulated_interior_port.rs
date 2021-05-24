@@ -10,6 +10,7 @@
 };
 
 use crossbeam::crossbeam_channel as mpsc;
+use crossbeam::crossbeam_channel::unbounded as channel;
 use crate::blueprint::{Blueprint};
 use crate::config::{CONFIG};
 use crate::dal::{add_to_trace, fork_trace_header, update_trace_header};
@@ -43,14 +44,16 @@ pub struct SimulatedInteriorPort {
     is_connected: bool,
     my_turn: bool,
     init_packet: Packet,
+    port_channel: (mpsc::Sender<()>, mpsc::Receiver<()>),
     duplex_port_link_channel: Option<DuplexPortLinkChannel>,
 }
 
 impl SimulatedInteriorPort {
     pub fn new(base_port: BasePort, failover_info: FailoverInfo, is_connected: bool, 
         duplex_port_link_channel: Option<DuplexPortLinkChannel>) -> SimulatedInteriorPort {
+            let port_channel: (mpsc::Sender<()>, mpsc::Receiver<()>) = channel();
             SimulatedInteriorPort { base_port, failover_info, is_connected, my_turn: true,
-                duplex_port_link_channel, init_packet: Packet::make_init_packet() }
+                port_channel, duplex_port_link_channel, init_packet: Packet::make_init_packet() }
     }
     fn get_port_no(&self) -> PortNo { self.base_port.get_port_no() }
     fn recv_from_link(&mut self) -> Result<LinkToPortPacket, Error> {
@@ -141,10 +144,13 @@ impl InteriorPortLike for SimulatedInteriorPort {
             AitState::Tyck => return Err(SimulatedInteriorPortError::Ait { func_name: _f, port_id: self.base_port.get_id(), ait_state }.into()), // Not allowed here
             AitState::Ait => { packet.next_ait_state()?; },
             AitState::Init | 
-            AitState::SnakeD |
-            AitState::Normal => ()
+            AitState::SnakeD => (),
+            AitState::Normal => self.port_channel.0.send(())? // Ready for next packet from PE
+
         }
-	    self.direct_send(packet)
+	    self.direct_send(packet)?;
+        self.port_channel.1.recv()?; // Block until transfer of this packet is done
+        Ok(())
     }
     fn listen_link(self: &mut Self, port_pe: &DuplexPortPeChannel) -> Result<(), Error> {
         let _f = "listen_link";
@@ -255,6 +261,7 @@ impl InteriorPortLike for SimulatedInteriorPort {
                             port_to_pe.send(PortToPePacket::Packet((self.base_port.get_port_no(), packet)))?;
                             #[cfg(feature = "api-new")]
                             port_to_pe.send(PortToPePacket::Packet((self.base_port.get_port_no(), packet)))?;
+                            self.port_channel.0.send(())?; // Ready for next packet from PE
                         }
                         AitState::Tyck => {
                             packet.next_ait_state()?;
@@ -270,6 +277,7 @@ impl InteriorPortLike for SimulatedInteriorPort {
                             let mut tick_packet: Packet = Default::default();
                             tick_packet.make_tick();
                             self.direct_send(&tick_packet)?;
+                            self.port_channel.0.send(())?; // Ready for next packet from PE
                         }
                         AitState::Tick | 
                         AitState::Tock => {
