@@ -53,6 +53,7 @@ arrayvec = {version = "0.4.11", features = ["serde-1"]}
 backtrace = "0.3" # used in dumpstack.rs
 bimap = {version = "0.3.1", features = ["serde"]} # bi-directional hashmap h: H(A,B), h.get_by_left(a: A), h.get_by_right(b: B)
 #bincode = "1.1.2" # for binary serialization
+cc = "1.0"
 #chrono = { version = "0.4.3", features = ["serde"] }
 crossbeam = "0.7.1"
 crossbeam-channel = "0.4.4"
@@ -75,6 +76,7 @@ lazy_static = "1.1.0"
 libc = "0.2.57"
 #log = {version = "0.4.6", features = ["std", "serde"]} # Should use instead of my trace approach
 multi_mut = "0.1"
+openssl-sys = {version = "0.9.63", features = ["vendored"]}
 #puffin = "0.3" # Simple to use profiler
 #puffin-imgui = "??" # Visualizer for puffin
 rand = "0.5.4"
